@@ -2095,7 +2095,7 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         try:
             all_filter_plan = Plan.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).all()
+                state__in=['运行中', '等待']).all().order_by(*['-state', 'order_by'])
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_filter_plan:
@@ -2146,13 +2146,19 @@ class WeightingTankStatus(APIView):
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True) \
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
         # 获取计划号
-        planids = ''
-        processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1).order_by('id').last()
+        date_now = datetime.datetime.now().date()
+        date_before = date_now - timedelta(days=1)
+        date_now_planid = ''.join(str(date_now).split('-'))[2:]
+        date_before_planid = ''.join(str(date_before).split('-'))[2:]
+        all_filter_plan = Plan.objects.using(equip_no).filter(
+            Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+            state__in=['运行中', '等待']).all().order_by(*['-state', 'order_by'])
+        processing_plan = all_filter_plan.filter(state='运行中', actno__gte=1).order_by('id').last()
         if processing_plan:
             planids = processing_plan.planid.strip()
             diff_no = processing_plan.setno - processing_plan.actno
             if diff_no / processing_plan.setno <= 0.2:  # 不足20%查询下一条计划
-                next_plan = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'], order_by__gte=processing_plan.order_by, id__gt=processing_plan.id).order_by('order_by').first()
+                next_plan = all_filter_plan.filter(order_by__gte=processing_plan.order_by, id__gt=processing_plan.id).first()
                 if next_plan:
                     planids += f',{next_plan.planid.strip()}'
             data = xl_c_calculate(equip_no, planids, self.queryset)

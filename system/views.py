@@ -15,6 +15,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
+from basics.models import GlobalCode
+from equipment.utils import get_children_section
 from mes.conf import WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -221,7 +223,7 @@ class SectionViewSet(ModelViewSet):
                                                'section_id': section.section_id,
                                                'in_charge_user_id': section.in_charge_user_id,
                                                'in_charge_username': in_charge_username,
-                                               "label": section.name,
+                                               "label": section.name, 'repair_areas': section.repair_areas,
                                                'children': []})
 
             if not section.parent_section_id:  # 根节点
@@ -240,7 +242,7 @@ class SectionViewSet(ModelViewSet):
                      'in_charge_user_id': section.in_charge_user_id,
                      'in_charge_username': in_charge_username,
                      "label": section.parent_section.name,
-                     "children": []})
+                     "children": [], 'repair_areas': section.repair_areas})
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
         return Response({'results': data})
 
