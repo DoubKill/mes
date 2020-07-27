@@ -69,7 +69,6 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     filter_fields = ('global_type_id', 'global_type__type_no', )
 
 
-
 @method_decorator([api_recorder], name="dispatch")
 class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     """
@@ -164,6 +163,7 @@ class ClassesDetailViewSet(CommonDeleteMixin, ModelViewSet):
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
                           PermissionClass(permission_required=return_permission_params(model_name)))
+
 
 @method_decorator([api_recorder], name="dispatch")
 class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
