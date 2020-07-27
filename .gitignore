@@ -1,0 +1,7 @@
+migrations
+*venv*
+db.sqlite3
+logs
+.idea
+.svn
+__pycache__

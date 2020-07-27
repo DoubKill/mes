@@ -1,0 +1,112 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <script src="{% static 'node_modules/vue/dist/vue.js' %}"></script>
+    <script src="{% static 'node_modules/element-ui/lib/index.js' %}"></script>
+    <script src="{% static 'node_modules/axios/dist/axios.min.js' %}"></script>
+    <script src="{% static 'gui/js/base.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'node_modules/element-ui/lib/theme-chalk/index.css' %}">
+    <link rel="stylesheet" href="{% static 'gui/css/base.css' %}">
+    {% block links %}
+    {% endblock %}
+    <title>{{ namePath|last }}</title>
+</head>
+<body>
+<div id="app">
+    <el-container>
+        <el-aside>
+            <el-menu
+                    :default-active="defaultActive"
+                    :default-openeds="openeds"
+                    @select="select">
+                <el-submenu index="1">
+                    <template slot="title">
+                        <i class="el-icon-location"></i>
+                        <span>系统管理</span>
+                    </template>
+                </el-submenu>
+                <el-submenu index="2">
+                    <template slot="title">
+                        <i class="el-icon-menu"></i>
+                        <span slot="title">基础信息管理</span>
+                    </template>
+                    <el-menu-item index="2-1">公用代码管理</el-menu-item>
+                    <el-menu-item index="2-2">角色管理</el-menu-item>
+                    <el-menu-item index="2-3">用户管理</el-menu-item>
+                    <el-menu-item index="2-4">角色别用户管理</el-menu-item>
+                    <el-menu-item index="2-5">设备基础信息管理</el-menu-item>
+                </el-submenu>
+                <el-submenu index="3">
+                    <template slot="title">
+                        <i class="el-icon-document"></i>
+                        <span slot="title">配方管理</span>
+                    </template>
+                </el-submenu>
+                <el-submenu index="4">
+                    <template slot="title">
+                        <i class="el-icon-setting"></i>
+                        <span slot="title">生产计划管理</span>
+                    </template>
+                </el-submenu>
+                <el-submenu index="5">
+                    <template slot="title">
+                        <i class="el-icon-setting"></i>
+                        <span slot="title">生产管理</span>
+                    </template>
+                </el-submenu>
+                <el-menu-item index="6">
+                    <template slot="title">
+                        <i class="el-icon-setting"></i>
+                        <span slot="title">上辅机群控软件</span>
+                    </template>
+                </el-menu-item>
+            </el-menu>
+        </el-aside>
+        <el-main>
+            {% block breadcrumb %}
+                <el-row type="flex" justify="space-between">
+                    <el-breadcrumb separator="/">
+                        {% for name in namePath %}
+                            <el-breadcrumb-item>{{ name }}</el-breadcrumb-item>
+                        {% endfor %}
+                    </el-breadcrumb>
+                    <el-dropdown>
+                          <span class="el-dropdown-link">
+                            用户<i class="el-icon-arrow-down el-icon--right"></i>
+                          </span>
+                        <el-dropdown-menu slot="dropdown">
+                            <el-dropdown-item>测试1</el-dropdown-item>
+                            <el-dropdown-item>测试1</el-dropdown-item>
+                            <el-dropdown-item>测试1</el-dropdown-item>
+                            <el-dropdown-item disabled>测试1</el-dropdown-item>
+                            <el-dropdown-item divided>测试1</el-dropdown-item>
+                        </el-dropdown-menu>
+                    </el-dropdown>
+                </el-row>
+
+            {% endblock %}
+            <el-card class="box-card">
+                <div slot="header">
+                    <span>{{ namePath|last }}</span>
+                </div>
+                {% block main %}{% endblock %}
+            </el-card>
+        </el-main>
+    </el-container>
+    {% block dialogs %}
+    {% endblock %}
+</div>
+<script>
+    const Routes = {
+        "2-1": "{% url 'gui:global-codes-manage' %}",
+        "2-3": "{% url 'gui:user-manage' %}"
+    }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

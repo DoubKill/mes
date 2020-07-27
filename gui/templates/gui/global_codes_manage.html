@@ -1,0 +1,207 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+
+{% block main %}
+    <el-row :gutter="20">
+        <el-col :span="12">
+            <el-form :inline="true">
+                <el-form-item label="类型名称">
+                    <el-input v-model="type_name" v-on:input="typeNameChanged"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button @click="showCreateGlobalCodeTypeDialog">新建</el-button>
+                </el-form-item>
+            </el-form>
+            <template>
+                <el-table
+                        :data="tableData"
+                        border
+                        highlight-current-row
+                        @current-change="handleGlobalCodeTypesCurrentRowChange"
+                        style="width: 100%">
+                    <el-table-column
+                            prop="id"
+                            label="Id"
+                            width="50">
+                    </el-table-column>
+                    <el-table-column
+                            prop="type_no"
+                            label="类型代码">
+                    </el-table-column>
+                    <el-table-column
+                            prop="type_name"
+                            label="类型名称">
+                    </el-table-column>
+                    <el-table-column
+                            prop="used_flag"
+                            label="使用"
+                            width="50"
+                            :formatter="globalCodeTypeFormatter">
+                    </el-table-column>
+                    <el-table-column label="操作">
+                        <template slot-scope="scope">
+                            <el-button-group>
+                                <el-button
+                                        size="mini"
+                                        @click="showEditGlobalCodeTypeDialog(scope.row)">编辑
+                                </el-button>
+                                <el-button
+                                        size="mini"
+                                        type="danger"
+                                        @click="handleGlobalCodeTypeDelete(scope.row)">删除
+                                </el-button>
+                            </el-button-group>
+                        </template>
+                    </el-table-column>
+                </el-table>
+                <el-pagination
+                        @current-change="currentChange"
+                        :current-page.sync="currentPage"
+                        :page-size="pageSize"
+                        :total="tableDataTotal"
+                        layout="total, prev, pager, next">
+                </el-pagination>
+            </template>
+        </el-col>
+        <el-col :span="12">
+            <el-form :inline="true">
+                <el-form-item>
+                    <el-button :disabled="!globalCodeTypesCurrentRow" @click="showCreateGlobalCodeDialog">新建</el-button>
+                </el-form-item>
+            </el-form>
+            <template>
+                <el-table
+                        :data="globalCodes"
+                        border
+                        style="width: 100%">
+                    <el-table-column
+                            label=Id
+                            prop="id"
+                            width="50">
+                    </el-table-column>
+                    <el-table-column
+                            prop="global_no"
+                            label="公用代码">
+                    </el-table-column>
+                    <el-table-column
+                            prop="global_name"
+                            label="公用代码名称">
+                    </el-table-column>
+                    <el-table-column
+                            prop="description"
+                            label="备注">
+                    </el-table-column>
+                    <el-table-column
+                            prop="used_flag"
+                            width="50"
+                            label="使用"
+                            :formatter="globalCodeUsedFlagFormatter">
+                    </el-table-column>
+                    <el-table-column label="操作">
+                        <template slot-scope="scope">
+                            <el-button-group>
+                                <el-button
+                                        size="mini"
+                                        @click="showEditGlobalCodeDialog(scope.row)">编辑
+                                </el-button>
+                                <el-button
+                                        size="mini"
+                                        type="danger"
+                                        @click="handleGlobalCodesDelete(scope.row)">删除
+                                </el-button>
+                            </el-button-group>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </template>
+        </el-col>
+    </el-row>
+{% endblock %}
+
+{% block dialogs %}
+    <el-dialog title="添加公用代码类型" :visible.sync="dialogCreateGlobalCodeTypeVisible">
+        <el-form :model="globalCodeTypeForm">
+            <el-form-item :error="globalCodeTypeFormError.type_no" label="类型编号" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeTypeForm.type_no"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeTypeFormError.type_name" label="类型名称" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeTypeForm.type_name"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeTypeFormError.description" label="说明" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeTypeForm.description"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeTypeFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
+                <el-switch v-model="globalCodeTypeForm.used_flag"></el-switch>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogCreateGlobalCodeTypeVisible = false">取 消</el-button>
+            <el-button type="primary" @click="handleCreateGlobalCodeType()">确 定</el-button>
+        </div>
+    </el-dialog>
+    <el-dialog title="编辑公用代码类型" :visible.sync="dialogEditGlobalCodeTypeVisible">
+        <el-form :model="globalCodeTypeForm">
+            <el-form-item :error="globalCodeTypeFormError.type_no" label="类型编号" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeTypeForm.type_no"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeTypeFormError.type_name" label="类型名称" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeTypeForm.type_name"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeTypeFormError.description" label="说明" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeTypeForm.description"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeTypeFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
+                <el-switch v-model="globalCodeTypeForm.used_flag"></el-switch>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogEditGlobalCodeTypeVisible = false">取 消</el-button>
+            <el-button type="primary" @click="handleEditGlobalCodeType">确 定</el-button>
+        </div>
+    </el-dialog>
+    <el-dialog title="添加公用代码" :visible.sync="dialogCreateGlobalCodeVisible">
+        <el-form :model="globalCodeForm">
+            <el-form-item :error="globalCodeFormError.global_no" label="公用代码编号" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeForm.global_no"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeFormError.global_name" label="公用代码名称" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeForm.global_name"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeFormError.description" label="说明" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeForm.description"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
+                <el-switch v-model="globalCodeForm.used_flag_b"></el-switch>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogCreateGlobalCodeVisible = false">取 消</el-button>
+            <el-button type="primary" @click="handleCreateGlobalCode">确 定</el-button>
+        </div>
+    </el-dialog>
+    <el-dialog title="编辑公用代码" :visible.sync="dialogEditGlobalCodeVisible">
+        <el-form :model="globalCodeForm">
+            <el-form-item :error="globalCodeFormError.global_no" label="公用代码编号" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeForm.global_no"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeFormError.global_name" label="公用代码名称" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeForm.global_name"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeFormError.description" label="说明" :label-width="formLabelWidth">
+                <el-input v-model="globalCodeForm.description"></el-input>
+            </el-form-item>
+            <el-form-item :error="globalCodeFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
+                <el-switch v-model="globalCodeForm.used_flag_b"></el-switch>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogEditGlobalCodeVisible = false">取 消</el-button>
+            <el-button type="primary" @click="handleEditGlobalCode">确 定</el-button>
+        </div>
+    </el-dialog>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/global_codes_manage.js' %}"></script>
+{% endblock %}
