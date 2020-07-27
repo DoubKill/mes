@@ -61,9 +61,11 @@ class BaseModelSerializer(serializers.ModelSerializer):
         :param validated_data:
         :return:
         """
+        if self.Meta.model.__name__ in ["Permission", "Group", "GroupExtension"]:
+            return super().create(validated_data)
         validated_data.update(created_user=self.context["request"].user)
-        isinstance = super().create(validated_data)
-        return isinstance
+        instance = super().create(validated_data)
+        return instance
 
     def update(self, instance, validated_data):
         """
@@ -72,6 +74,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
         :param validated_data:
         :return:
         """
+        if self.Meta.model.__name__ in ["User", "Permission", "Group", "GroupExtension"]:
+            return super().update(instance ,validated_data)
         validated_data.update(last_updated_user=self.context["request"].user)
-        isinstance = super().update(instance ,validated_data)
-        return isinstance
+        return super().update(instance ,validated_data)
