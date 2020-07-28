@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from basics.views import GlobalCodeTypeViewSet, GlobalCodeViewSet, WorkScheduleViewSet, \
     EquipViewSet, SysbaseEquipLevelViewSet, WorkSchedulePlanViewSet, ClassesDetailViewSet, PlanScheduleViewSet
 
-app_name = 'basics'
+# app_name = 'basics'
 router = DefaultRouter()
 
 # 公共代码类型

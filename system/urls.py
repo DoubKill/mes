@@ -4,7 +4,7 @@ from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from system.views import UserViewSet, UserGroupsViewSet,GroupExtensionViewSet, SectionViewSet, PermissionViewSet
 
-app_name = 'system'
+# app_name = 'system'
 router = DefaultRouter()
 # router.register(r'group', GroupViewSet)
 router.register(r'personnels', UserViewSet)
