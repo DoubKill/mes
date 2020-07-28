@@ -10,6 +10,7 @@
     <script src="{% static 'node_modules/element-ui/lib/index.js' %}"></script>
     <script src="{% static 'node_modules/axios/dist/axios.min.js' %}"></script>
     <script src="{% static 'gui/js/base.js' %}"></script>
+    <script src="{% static 'gui/js/permissions.js' %}"></script>
     <link rel="stylesheet" href="{% static 'node_modules/element-ui/lib/theme-chalk/index.css' %}">
     <link rel="stylesheet" href="{% static 'gui/css/base.css' %}">
     {% block links %}
@@ -104,6 +105,7 @@
 <script>
     const Routes = {
         "2-1": "{% url 'gui:global-codes-manage' %}",
+        "2-2": "{% url 'gui:group-manage' %}",
         "2-3": "{% url 'gui:user-manage' %}"
     }
 </script>

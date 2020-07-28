@@ -5,7 +5,6 @@ from basics.views import GlobalCodeTypeViewSet, GlobalCodeViewSet, WorkScheduleV
     EquipViewSet, SysbaseEquipLevelViewSet, WorkSchedulePlanViewSet, ClassesDetailViewSet, PlanScheduleViewSet
 
 # app_name = 'basics'
-
 router = DefaultRouter()
 
 # 公共代码类型
@@ -20,12 +19,17 @@ router.register(r'work_schedules', WorkScheduleViewSet)
 # 设备
 router.register(r'equips', EquipViewSet)
 
+# 设备层次
 router.register(r'base_equip_levels', SysbaseEquipLevelViewSet)
 
+# 班次条目
 router.register(r'schedule-classes', ClassesDetailViewSet)
-router.register(r'schedule-plans', WorkSchedulePlanViewSet)
-router.register(r'plan-schedule', PlanScheduleViewSet)
 
+# 工作日程计划
+router.register(r'schedule-plans', WorkSchedulePlanViewSet)
+
+# 计划时间
+router.register(r'plan-schedule', PlanScheduleViewSet)
 
 
 urlpatterns = [

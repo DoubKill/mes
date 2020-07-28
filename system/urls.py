@@ -2,13 +2,13 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
-from system.views import GroupViewSet, UserViewSet, GroupExtensionViewSet, SectionViewSet, \
-    FunctionBlockViewSet, FunctionPermissionViewSet, FunctionViewSet, MenuViewSet, PermissionViewSet
+from system.views import UserViewSet, UserGroupsViewSet,GroupExtensionViewSet, SectionViewSet, PermissionViewSet
 
 # app_name = 'system'
 router = DefaultRouter()
-router.register(r'group', GroupViewSet)
+# router.register(r'group', GroupViewSet)
 router.register(r'personnels', UserViewSet)
+router.register(r"personnels_groups", UserGroupsViewSet)
 
 router.register(r'group_extension', GroupExtensionViewSet)
 router.register(r'section', SectionViewSet)
@@ -18,6 +18,7 @@ router.register(r'section', SectionViewSet)
 # router.register(r'function', FunctionViewSet)
 # router.register(r'menu', MenuViewSet)
 router.register(r"permission", PermissionViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),

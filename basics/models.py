@@ -149,6 +149,7 @@ class SysbaseEquipLevel(AbstractEntity):
 
 
 class PlanSchedule(models.Model):
+    """计划时间表"""
     TYPE_CHOICE_WEEK = (
         ('monday', '星期一'),
         ('tuesday', '星期二'),
