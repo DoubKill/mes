@@ -232,7 +232,7 @@ class MesLogin(ObtainJSONWebToken):
             "section",
         },
         "auth": {
-            "group",
+            # "group",
             "permission",
         }
 
