@@ -4,41 +4,41 @@ from django.utils.decorators import method_decorator
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_fun import menu
+from mes.common_code import menu
 from mes.derorators import api_recorder
-from mes.permissions import PermissonsDispatch
-from system.models import GroupExtension, User, Group,Section, FunctionBlock, FunctionPermission,\
+from mes.paginations import SinglePageNumberPagination
+from system.models import GroupExtension, User, Group, Section, FunctionBlock, FunctionPermission, \
     Function, Menu
-from system.serializers import GroupExtensionSerializer, GroupSerializer, UserSerializer, UserUpdateSerializer,\
-    SectionSerializer, FunctionBlockSerializer, FunctionPermissionSerializer, FunctionSerializer, MenuSerializer, \
-    PermissionSerializer
+from system.serializers import GroupExtensionSerializer, GroupSerializer, UserSerializer, UserUpdateSerializer, \
+    SectionSerializer, PermissionSerializer
 from basics.views import CommonDeleteMixin
 from django_filters.rest_framework import DjangoFilterBackend
-from system.filters import  UserFilter, GroupExtensionFilter
+from system.filters import UserFilter, GroupExtensionFilter
+
+
+# @method_decorator([api_recorder], name="dispatch")
+# class GroupViewSet(ModelViewSet):
+#     """
+#     list:
+#         角色列表
+#     create:
+#         创建角色
+#     update:
+#         修改角色
+#     destroy:
+#         删除角色
+#     """
+#     queryset = Group.objects.filter()
+#     serializer_class = GroupSerializer
+#     permission_classes = (IsAuthenticatedOrReadOnly,)
+#     filter_backends = (DjangoFilterBackend,)
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GroupViewSet(ModelViewSet):
-    """
-    list:
-        角色列表
-    create:
-        创建角色
-    update:
-        修改角色
-    destroy:
-        删除角色
-    """
-    queryset = Group.objects.filter()
-    serializer_class = GroupSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
-
-@method_decorator([api_recorder], name="dispatch")
-class PermissionViewSet(ModelViewSet):
+class PermissionViewSet(ReadOnlyModelViewSet):
     """
     list:
         权限列表
@@ -52,8 +52,8 @@ class PermissionViewSet(ModelViewSet):
     queryset = Permission.objects.filter()
     serializer_class = PermissionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
+    pagination_class = SinglePageNumberPagination
     # filter_backends = (DjangoFilterBackend,)
-    # filter_class = GroupFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -88,6 +88,23 @@ class UserViewSet(ModelViewSet):
             return UserSerializer
 
 
+class UserGroupsViewSet(ModelViewSet):
+    queryset = User.objects.all()
+
+    serializer_class = UserSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = (DjangoFilterBackend,)
+    pagination_class = SinglePageNumberPagination
+    filter_class = UserFilter
+
+    def create(self, request, *args, **kwargs):
+        pass
+
+    def update(self, request, *args, **kwargs):
+        pass
+
+    def destroy(self, request, *args, **kwargs):
+        pass
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -127,80 +144,79 @@ class SectionViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class FunctionBlockViewSet(ModelViewSet):
-    """
-    list:
-        角色列表
-    create:
-        创建角色
-    update:
-        修改角色
-    destroy:
-        删除角色
-    """
-    queryset = FunctionBlock.objects.filter()
-    serializer_class = FunctionBlockSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+# @method_decorator([api_recorder], name="dispatch")
+# class FunctionBlockViewSet(ModelViewSet):
+#     """
+#     list:
+#         角色列表
+#     create:
+#         创建角色
+#     update:
+#         修改角色
+#     destroy:
+#         删除角色
+#     """
+#     queryset = FunctionBlock.objects.filter()
+#     serializer_class = FunctionBlockSerializer
+#     permission_classes = (IsAuthenticatedOrReadOnly,)
+#     filter_backends = (DjangoFilterBackend,)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class FunctionPermissionViewSet(ModelViewSet):
-    """
-    list:
-        角色列表
-    create:
-        创建角色
-    update:
-        修改角色
-    destroy:
-        删除角色
-    """
-    queryset = FunctionPermission.objects.filter()
-    serializer_class = FunctionPermissionSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+# @method_decorator([api_recorder], name="dispatch")
+# class FunctionPermissionViewSet(ModelViewSet):
+#     """
+#     list:
+#         角色列表
+#     create:
+#         创建角色
+#     update:
+#         修改角色
+#     destroy:
+#         删除角色
+#     """
+#     queryset = FunctionPermission.objects.filter()
+#     serializer_class = FunctionPermissionSerializer
+#     permission_classes = (IsAuthenticatedOrReadOnly,)
+#     filter_backends = (DjangoFilterBackend,)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class FunctionViewSet(ModelViewSet):
-    """
-    list:
-        角色列表
-    create:
-        创建角色
-    update:
-        修改角色
-    destroy:
-        删除角色
-    """
-    queryset = Function.objects.filter()
-    serializer_class = FunctionSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+# @method_decorator([api_recorder], name="dispatch")
+# class FunctionViewSet(ModelViewSet):
+#     """
+#     list:
+#         角色列表
+#     create:
+#         创建角色
+#     update:
+#         修改角色
+#     destroy:
+#         删除角色
+#     """
+#     queryset = Function.objects.filter()
+#     serializer_class = FunctionSerializer
+#     permission_classes = (IsAuthenticatedOrReadOnly,)
+#     filter_backends = (DjangoFilterBackend,)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class MenuViewSet(ModelViewSet):
-    """
-    list:
-        角色列表
-    create:
-        创建角色
-    update:
-        修改角色
-    destroy:
-        删除角色
-    """
-    queryset = Menu.objects.filter()
-    serializer_class = MenuSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+# @method_decorator([api_recorder], name="dispatch")
+# class MenuViewSet(ModelViewSet):
+#     """
+#     list:
+#         角色列表
+#     create:
+#         创建角色
+#     update:
+#         修改角色
+#     destroy:
+#         删除角色
+#     """
+#     queryset = Menu.objects.filter()
+#     serializer_class = MenuSerializer
+#     permission_classes = (IsAuthenticatedOrReadOnly,)
+#     filter_backends = (DjangoFilterBackend,)
 
 
 class MesLogin(ObtainJSONWebToken):
-
     menu = {
         "basics": [
             "globalcodetype",
@@ -216,9 +232,9 @@ class MesLogin(ObtainJSONWebToken):
             "section",
         },
         "auth": {
-            "group",
+            # "group",
             "permission",
-                    }
+        }
 
     }
 
@@ -243,8 +259,7 @@ class ImportExcel(APIView):
         all_list_1 = self.get_sheets_mg(data)
         for x in all_list_1:
             print(x)
-        return Response({"msg":"ok"})
-
+        return Response({"msg": "ok"})
 
     def get_sheets_mg(self, data, num=0):  # data:Excel数据对象，num要读取的表
         table = data.sheets()[num]  # 打开第一张表
@@ -288,6 +303,3 @@ class ImportExcel(APIView):
         :return:
         """
         return sheet.merged_cells
-
-
-

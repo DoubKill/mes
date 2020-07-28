@@ -1,8 +1,6 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticatedOrReadOnly,DjangoModelPermissions
 from rest_framework.viewsets import ModelViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter
@@ -11,19 +9,10 @@ from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, Sysba
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, \
     WorkScheduleSerializer, EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, \
     WorkScheduleUpdateSerializer, ClassesDetailSerializer, PlanScheduleSerializer
-from mes.common_fun import return_permission_params
+from mes.common_code import return_permission_params, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
 from mes.paginations import SinglePageNumberPagination
-
-
-class CommonDeleteMixin(object):
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.delete_flag = True
-        instance.delete_user = request.user
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -157,7 +146,16 @@ class WorkSchedulePlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ClassesDetailViewSet(CommonDeleteMixin, ModelViewSet):
-
+    """
+    list:
+        班次条目列表
+    create:
+        创建班次条目
+    update:
+        修改班次条目
+    destroy:
+        删除班次条目
+    """
     queryset = ClassesDetail.objects.filter(delete_flag=False)
     serializer_class = ClassesDetailSerializer
     model_name = queryset.model.__name__.lower()
@@ -167,7 +165,16 @@ class ClassesDetailViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
-
+    """
+    list:
+        计划时间列表
+    create:
+        创建计划时间
+    update:
+        修改计划时间
+    destroy:
+        删除计划时间
+    """
     queryset = PlanSchedule.objects.filter()
     serializer_class = PlanScheduleSerializer
     model_name = queryset.model.__name__.lower()

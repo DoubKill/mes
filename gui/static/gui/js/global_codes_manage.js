@@ -2,8 +2,8 @@
 
     var Main = {
 
-        mixins: [mixin],
-        data() {
+        mixins: [BaseMixin],
+        data: function() {
 
             return {
 
@@ -38,20 +38,20 @@
         },
         methods: {
 
-            beforeGetData() {
+            beforeGetData: function() {
 
                 this.getParams['type_name'] = this.type_name;
             },
-            afterGetData() {
+            afterGetData: function() {
 
                 this.globalCodeTypesCurrentRow = null;
             },
-            typeNameChanged() {  // 类型名搜索
+            typeNameChanged: function() {  // 类型名搜索
 
                 this.currentPage = 1;
                 this.currentChange(1);
             },
-            clearGlobalCodeTypeForm() {
+            clearGlobalCodeTypeForm: function() {
 
                 this.globalCodeTypeForm = {
                     type_no: '',
@@ -60,7 +60,7 @@
                     used_flag: true
                 };
             },
-            clearGlobalCodeTypeFormError() {
+            clearGlobalCodeTypeFormError: function() {
 
                 this.globalCodeTypeFormError = {
                     type_no: '',
@@ -69,13 +69,13 @@
                     used_flag: ''
                 };
             },
-            showCreateGlobalCodeTypeDialog() {
+            showCreateGlobalCodeTypeDialog: function() {
 
                 this.clearGlobalCodeTypeForm();
                 this.clearGlobalCodeTypeFormError();
                 this.dialogCreateGlobalCodeTypeVisible = true;
             },
-            handleCreateGlobalCodeType() { // 创建全局代码类型
+            handleCreateGlobalCodeType: function() { // 创建全局代码类型
 
                 this.clearGlobalCodeTypeFormError();
                 const app = this;
@@ -87,20 +87,20 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
-                    for (const key in app.globalCodeTypeFormError) {
+                    for (var key in app.globalCodeTypeFormError) {
                         if (error.response.data[key])
                             app.globalCodeTypeFormError[key] = error.response.data[key].join(",")
                     }
                 });
             },
-            showEditGlobalCodeTypeDialog(row) {
+            showEditGlobalCodeTypeDialog: function(row) {
 
                 this.clearGlobalCodeTypeForm();
                 this.clearGlobalCodeTypeFormError();
                 this.globalCodeTypeForm = Object.assign({}, row);
                 this.dialogEditGlobalCodeTypeVisible = true;
             },
-            handleEditGlobalCodeType() {
+            handleEditGlobalCodeType: function() {
 
                 const app = this;
                 axios.put(GlobalTypesUrl + this.globalCodeTypeForm.id + '/', this.globalCodeTypeForm)
@@ -110,21 +110,21 @@
                         app.$message(app.globalCodeTypeForm.type_name + "修改成功");
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
-                    for (const key in app.globalCodeTypeFormError) {
+                    for (var key in app.globalCodeTypeFormError) {
 
                         if (error.response.data[key])
                             app.globalCodeTypeFormError[key] = error.response.data[key].join(",")
                     }
                 });
             },
-            handleGlobalCodeTypeDelete(row) {
+            handleGlobalCodeTypeDelete: function(row) {
 
                 var app = this;
                 this.$confirm('此操作将永久删除' + row.type_name + ', 是否继续?', '提示', {
                     confirmButtonText: '确定',
                     cancelButtonText: '取消',
                     type: 'warning'
-                }).then(() => {
+                }).then(function () {
 
                     axios.delete(GlobalTypesUrl + row.id + '/')
                         .then(function (response) {
@@ -142,12 +142,12 @@
                     });
 
 
-                }).catch(() => {
+                }).catch(function () {
 
                 });
             },
 
-            handleGlobalCodeTypesCurrentRowChange(row) {
+            handleGlobalCodeTypesCurrentRowChange: function(row) {
 
                 if (!row)
                     return;
@@ -167,7 +167,7 @@
                     this.$message.error(error);
                 })
             },
-            clearGlobalCodeForm() {
+            clearGlobalCodeForm: function() {
 
                 this.globalCodeForm = {
 
@@ -179,7 +179,7 @@
                     global_type: this.globalCodeForm.global_type
                 };
             },
-            clearGlobalCodeFormError() {
+            clearGlobalCodeFormError: function() {
 
                 this.globalCodeFormError = {
 
@@ -189,7 +189,7 @@
                     used_flag: '',
                 }
             },
-            showCreateGlobalCodeDialog() {
+            showCreateGlobalCodeDialog: function() {
 
                 if (!this.globalCodeForm.global_type)
                     return;
@@ -197,7 +197,7 @@
                 this.clearGlobalCodeFormError();
                 this.dialogCreateGlobalCodeVisible = true
             },
-            handleCreateGlobalCode() {
+            handleCreateGlobalCode: function() {
 
                 this.clearGlobalCodeFormError();
                 this.globalCodeForm.used_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
@@ -210,13 +210,13 @@
                         app.handleGlobalCodeTypesCurrentRowChange(app.globalCodeTypesCurrentRow);
                     }).catch(function (error) {
 
-                    for (const key in app.globalCodeFormError) {
+                    for (var key in app.globalCodeFormError) {
                         if (error.response.data[key])
                             app.globalCodeFormError[key] = error.response.data[key].join(",")
                     }
                 });
             },
-            showEditGlobalCodeDialog(row) {
+            showEditGlobalCodeDialog: function(row) {
 
                 this.clearGlobalCodeForm();
                 this.clearGlobalCodeFormError();
@@ -227,7 +227,7 @@
                 this.globalCodeForm.used_flag_b = row.used_flag === 0;
                 this.dialogEditGlobalCodeVisible = true;
             },
-            handleEditGlobalCode() {
+            handleEditGlobalCode: function() {
 
                 this.globalCodeForm.used_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
                 const app = this;
@@ -238,23 +238,23 @@
                         app.$message(app.globalCodeForm.global_name + "修改成功");
                         app.handleGlobalCodeTypesCurrentRowChange(app.globalCodeTypesCurrentRow);
                     }).catch(function (error) {
-                    for (const key in app.globalCodeFormError) {
+                    for (var key in app.globalCodeFormError) {
 
-                        for (const key in app.globalCodeFormError) {
+                        for (var key in app.globalCodeFormError) {
                             if (error.response.data[key])
                                 app.globalCodeFormError[key] = error.response.data[key].join(",")
                         }
                     }
                 });
             },
-            handleGlobalCodesDelete(row) {
+            handleGlobalCodesDelete: function(row) {
 
                 var app = this;
                 this.$confirm('此操作将永久删除' + row.global_name + ', 是否继续?', '提示', {
                     confirmButtonText: '确定',
                     cancelButtonText: '取消',
                     type: 'warning'
-                }).then(() => {
+                }).then(function () {
 
                     axios.delete(GlobalCodesUrl + row.id + '/')
                         .then(function (response) {
@@ -269,15 +269,15 @@
                     });
 
 
-                }).catch(() => {
+                }).catch(function () {
 
                 });
             },
-            globalCodeTypeFormatter(row, column) {
+            globalCodeTypeFormatter: function(row, column) {
 
                 return this.boolFormatter(row.used_flag);
             },
-            globalCodeUsedFlagFormatter(row, column) {
+            globalCodeUsedFlagFormatter: function(row, column) {
 
                 return this.boolFormatter(row.used_flag === 0);
             },
