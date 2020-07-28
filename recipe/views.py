@@ -31,3 +31,5 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialFilter
 
+
+
