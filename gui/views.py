@@ -17,3 +17,8 @@ class GlobalCodesManageView(TitleMixin, TemplateView):
 class UserManageView(TitleMixin, TemplateView):
     template_name = 'gui/user_manage.html'
     name_path = ['基础信息管理', '用户管理']
+
+
+class GroupManageView(TitleMixin, TemplateView):
+    template_name = 'gui/group_manage.html'
+    name_path = ['基础信息管理', '角色管理']

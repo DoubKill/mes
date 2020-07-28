@@ -3,11 +3,12 @@ const GlobalTypesUrl = BasicsUrl + "global-types/";
 const GlobalCodesUrl = BasicsUrl + "global-codes/";
 const SystemUrl = "/api/v1/system/";
 const PersonnelsUrl = SystemUrl + "personnels/";
+const PermissionUrl = "/api/v1/system/permission/";
+const GroupUrl = "/api/v1/system/group_extension/";
 
+var BaseMixin = {
 
-var mixin = {
-
-    data() {
+    data: function () {
         return {
 
             pageSize: 10,
@@ -32,11 +33,16 @@ var mixin = {
     },
     methods: {
 
-        beforeGetData() {
+        beforeGetData: function () {
         },
-        afterGetData() {
+        afterGetData: function () {
         },
-        currentChange(page) {
+        getFirstPage: function () {
+
+            this.currentPage = 1;
+            this.currentChange(1);
+        },
+        currentChange: function (page) {
 
             this.beforeGetData();
             this.getParams['page'] = page;
@@ -56,11 +62,11 @@ var mixin = {
                 this.$message.error(error);
             })
         },
-        select(index, indexPath) {
+        select: function (index, indexPath) {
 
             window.location = Routes[index];
         },
-        boolFormatter(flag) {
+        boolFormatter: function (flag) {
 
             return flag ? "Y" : "N"
         }

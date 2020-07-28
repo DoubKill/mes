@@ -23,7 +23,7 @@ from rest_framework.documentation import include_docs_urls
 
 
 # 修改后
-
+# 配置swgger
 schema_view = get_schema_view(
     openapi.Info(
         title="MES-API",
@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/v1/basics/', include('basics.urls')),
     path('api/v1/system/', include('system.urls')),
     path('api/v1/recipe/', include('recipe.urls')),
+    path('gui/', include('gui.urls'))
 ]
 
 if settings.DEBUG:

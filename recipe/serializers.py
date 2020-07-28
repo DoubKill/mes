@@ -1,10 +1,9 @@
 from rest_framework import serializers
 
+from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material
 
-COMMON_READ_ONLY_FIELDS = ('created_date', 'last_updated_date', 'delete_date',
-                           'delete_flag', 'created_user', 'last_updated_user',
-                           'delete_user')
+
 
 
 class MaterialSerializer(serializers.ModelSerializer):
