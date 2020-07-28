@@ -3,10 +3,14 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
+from basics.models import GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from recipe.filters import MaterialFilter, ProductInfoFilter
@@ -73,3 +77,23 @@ class ProductInfoCopyView(CreateAPIView):
     """复制配方"""
     serializer_class = ProductInfoCopySerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductStageInfo(APIView):
+    """根据产地获取所以胶料及其段次信息, 参数：xxx/?factory_id=111"""
+
+    def get(self, request):
+        factory_id = self.request.query_params.get('factory_id')
+        if not factory_id:
+            raise ValidationError('缺少必填参数')
+        try:
+            factory = GlobalCode.objects.get(id=factory_id)
+        except Exception:
+            raise ValidationError('产地不存在')
+        ret = []
+        products = ProductInfo.objects.filter(factory=factory).prefetch_related('productrecipe_set')
+        for product in products:
+            stage_names = product.productrecipe_set.values_list('stage__global_name', flat=True)
+            ret.append({'product_info': product.product_no, 'stage_names': stage_names})
+        return Response(data=ret)
