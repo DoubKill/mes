@@ -1,8 +1,6 @@
 import django_filters
-from django.contrib.auth.models import User, Group
 
 from basics.models import Equip, GlobalCodeType, WorkSchedule
-from system.models import GroupExtension
 
 
 class EquipFilter(django_filters.rest_framework.FilterSet):

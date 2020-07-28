@@ -30,6 +30,10 @@ class PermissonsDispatch(object):
 
     @property
     def get_user_module_permissions(self):
+        """
+        返回带模块名的用户所有权限集合
+        :return:
+        """
         return self.user.get_all_permissions()
 
     @property
@@ -120,7 +124,7 @@ def PermissionClass(permission_required=None):
                 return True
             if request.user.is_superuser:
                 return True
-            permission = PermissonsDispatch(request.user)(dispatch="group")
+            permission = PermissonsDispatch(request.user)(dispatch="all")
             # 判断是否有权限
             if not set(permission_dict.get(request.method, "")) & set(permission):
                 return False

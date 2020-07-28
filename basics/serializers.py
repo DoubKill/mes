@@ -4,10 +4,7 @@ from django.db.transaction import atomic
 from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute
 from mes.base_serializer import BaseModelSerializer
-
-COMMON_READ_ONLY_FIELDS = ('created_date', 'last_updated_date', 'delete_date',
-                           'delete_flag', 'created_user', 'last_updated_user',
-                           'delete_user')
+from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
 class GlobalCodeTypeSerializer(BaseModelSerializer):
@@ -21,6 +18,7 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
 
 class GlobalCodeSerializer(BaseModelSerializer):
     """公共代码序列化器"""
+
     # global_code_type = serializers.HyperlinkedIdentityField(view_name='globalcodetype-detail')
     class Meta:
         model = GlobalCode
@@ -33,7 +31,7 @@ class ClassesDetailSerializer(BaseModelSerializer):
 
     class Meta:
         model = ClassesDetail
-        exclude = ('work_schedule', )
+        exclude = ('work_schedule',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -42,13 +40,14 @@ class ClassesDetailUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = ClassesDetail
-        exclude = ('work_schedule', )
+        exclude = ('work_schedule',)
         extra_kwargs = {'id': {'read_only': False}}
 
 
 class WorkScheduleSerializer(BaseModelSerializer):
     """日程创建、列表、详情序列化器"""
-    classesdetail_set = ClassesDetailSerializer(many=True, help_text="""[{"classes":班次id,"classes_name":班次名称,"start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""",)
+    classesdetail_set = ClassesDetailSerializer(many=True,
+                                                help_text="""[{"classes":班次id,"classes_name":班次名称,"start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""", )
 
     @atomic()
     def create(self, validated_data):
@@ -69,7 +68,8 @@ class WorkScheduleSerializer(BaseModelSerializer):
 
 class WorkScheduleUpdateSerializer(BaseModelSerializer):
     """日程修改序列化器"""
-    classesdetail_set = ClassesDetailUpdateSerializer(many=True, help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,"start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""")
+    classesdetail_set = ClassesDetailUpdateSerializer(many=True,
+                                                      help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,"start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""")
 
     @atomic()
     def update(self, instance, validated_data):
@@ -87,7 +87,6 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
 
 
 class EquipCategoryAttributeSerializer(BaseModelSerializer):
-
     class Meta:
         model = EquipCategoryAttribute
         fields = '__all__'
@@ -117,15 +116,14 @@ class WorkSchedulePlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = WorkSchedulePlan
-        exclude = ('plan_schedule', )
+        exclude = ('plan_schedule',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class PlanScheduleSerializer(BaseModelSerializer):
-    """
-    计划时间排班序列化器
-    """
-    work_schedule_plan = WorkSchedulePlanSerializer(many=True, help_text="""{"work_schedule_plan":[{"classes_detail":1,"group":1,"group_name":"a班","rest_flag":0},{"classes_detail":2,"group":2,"group_name":"b班","rest_flag":0},{"classes_detail":3,"group":3,"group_name":"c班","rest_flag":0}],"day_time":"2020-07-25 15:55:50","week_time":"monday","work_schedule":1}""")
+    """计划时间排班序列化器"""
+    work_schedule_plan = WorkSchedulePlanSerializer(many=True,
+                                                    help_text="""{"work_schedule_plan":[{"classes_detail":1,"group":1,"group_name":"a班","rest_flag":0},{"classes_detail":2,"group":2,"group_name":"b班","rest_flag":0},{"classes_detail":3,"group":3,"group_name":"c班","rest_flag":0}],"day_time":"2020-07-25 15:55:50","week_time":"monday","work_schedule":1}""")
 
     class Meta:
         model = PlanSchedule
