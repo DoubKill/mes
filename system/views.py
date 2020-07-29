@@ -256,9 +256,9 @@ class MesLogin(ObtainJSONWebToken):
             "globalcode",
             "workschedule",
             "equip",
-            "sysbaseequiplevel",
+            # "sysbaseequiplevel",
             "classesdetail",
-            "workscheduleplan"
+            # "workscheduleplan"
         ],
         "system": {
             "user",
