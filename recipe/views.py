@@ -16,7 +16,7 @@ from basics.models import GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductRecipeFilter, ProductBatchingFilter
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductMaster
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCreateSerializer, \
     ProductInfoUpdateSerializer, ProductInfoPartialUpdateSerializer, ProductInfoCopySerializer, \
     ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer
@@ -170,3 +170,22 @@ class ProductBatchingViewSet(CommonDeleteMixin, ModelViewSet):
             return ProductBatchingCreateSerializer
         else:
             return ProductBatchingListSerializer
+
+
+class ProductMasterViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list:
+        胶料主信息列表
+    retrieve:
+        胶料主信息详情
+    create:
+        新建胶料主信息
+    update:
+        修改胶料主信息
+    partial_update:
+        修改胶料主信息
+    """
+    queryset = ProductMaster.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = (DjangoFilterBackend,)
+    # filter_class = ProductBatchingFilter

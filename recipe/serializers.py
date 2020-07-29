@@ -5,7 +5,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from basics.models import GlobalCode
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail
+from mes.base_serializer import BaseModelSerializer
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, ProductMaster
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material
 
@@ -295,3 +296,10 @@ class ProductBatchingCreateSerializer(serializers.ModelSerializer):
         fields = ('product_info', 'stage_product_batch_no', 'stage', 'dev_type',
                   'batching_time_interval', 'rm_time_interval', 'production_time_interval', 'batching_details'
                   )
+
+
+class ProductMasterSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ProductMaster
+        fields = "__all__"
