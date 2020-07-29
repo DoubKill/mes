@@ -300,15 +300,11 @@ class ProductBatchingCreateSerializer(serializers.ModelSerializer):
 
 class ProductMasterSerializer(BaseModelSerializer):
 
-    factory = serializers.SerializerMethodField(read_only=True)
-    versions = serializers.SerializerMethodField(read_only=True)
+    factory = serializers.CharField(source="product_info.factory.global_name")
+    versions = serializers.CharField(source="product_info.versions")
+    stage = serializers.CharField(source="stage.global_name")
+    dev_type = serializers.CharField(source="dev_type.global_name")
 
     class Meta:
         model = ProductBatching
         fields = "__all__"
-
-    def get_factory(self, object):
-        return object.product_info.factory.global_name
-
-    def get_versions(self, object):
-        return object.product_info.versions
