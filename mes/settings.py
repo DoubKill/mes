@@ -190,7 +190,6 @@ LOGGING_DIR = os.environ.get('LOGGING_DIR', os.path.join(BASE_DIR, 'logs'))
 # }
 
 
-# Database
 if DEBUG:
     DATABASES = {
         'default': {
@@ -204,8 +203,8 @@ else:
             'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
             'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
             'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mysql'),  # 密码
-            'HOST': os.getenv('DATABASE_HOSTNAME', '127.0.0.1'),  # HOST
+            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mes@2020'),  # 密码
+            'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
         }
     }

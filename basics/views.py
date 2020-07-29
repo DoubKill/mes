@@ -4,10 +4,10 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, DjangoModelPer
 from rest_framework.viewsets import ModelViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter
-from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
+from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, EquipCategoryAttribute, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
-from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, \
-    WorkScheduleSerializer, EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, \
+from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer,WorkScheduleSerializer, \
+    EquipCategoryAttributeSerializer, EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, \
     WorkScheduleUpdateSerializer, ClassesDetailSerializer, PlanScheduleSerializer, EquipCreateAndUpdateSerializer, \
     EquipCategoryAttributeSerializer
 from mes.common_code import return_permission_params, CommonDeleteMixin
@@ -84,6 +84,24 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
             return WorkScheduleUpdateSerializer
         else:
             return WorkScheduleSerializer
+
+
+class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list:
+        设备种类列表
+    create:
+        创建设备种类
+    update:
+        修改设备种类
+    destroy:
+        删除设备种类
+    """
+    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False)
+    serializer_class = EquipCategoryAttributeSerializer
+    model_name = queryset.model.__name__.lower()
+    permission_classes = (IsAuthenticatedOrReadOnly,
+                          PermissionClass(permission_required=return_permission_params(model_name)))
 
 
 @method_decorator([api_recorder], name="dispatch")
