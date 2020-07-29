@@ -3,7 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, DjangoModelPermissions
 from rest_framework.viewsets import ModelViewSet
 
-from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter
+from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, EquipCategoryAttribute, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer,WorkScheduleSerializer, \
@@ -56,7 +56,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
                           PermissionClass(permission_required=return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     pagination_class = SinglePageNumberPagination
-    filter_fields = ('global_type_id', 'global_type__type_no',)
+    filter_class = GlobalCodeFilter
 
 
 @method_decorator([api_recorder], name="dispatch")

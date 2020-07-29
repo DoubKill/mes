@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from recipe.views import MaterialViewSet, ProductInfoViewSet, ProductInfoCopyView, ProductStageInfo, \
-    ProductRecipeListAPI, ProductBatchingViewSet
+    ProductRecipeListAPI, ProductBatchingViewSet, ProductMasterView
 
 router = DefaultRouter()
 
@@ -20,4 +20,5 @@ urlpatterns = [
     path('copy-product-infos/', ProductInfoCopyView.as_view()),  # 胶料复制
     path(r'product-stages/', ProductStageInfo.as_view()),  # 根据产地获取胶料及其段次信息
     path(r'product-recipe/', ProductRecipeListAPI.as_view()),  # 根据胶料工艺和段次获取胶料段次配方原材料信息
+    path(r'product-master', ProductMasterView.as_view()) # 胶料主信息列表展示
 ]
