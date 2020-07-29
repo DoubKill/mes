@@ -163,7 +163,7 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
         recipes = validated_data.pop('productrecipe_set', None)
         recipe_weight = sum(i.get('ratio', 0) for i in recipes)
         if recipes:
-            ProductRecipe.objects.filter(product_info=instance, delete_flag=False).update(delete_flag=True)
+            ProductRecipe.objects.filter(product_info=instance).delete()
             recipes_list = []
             product_recipe_no = instance.product_no  # TODO 搞清楚product_info表存的是编号还是编码
             for recipe in recipes:
@@ -246,7 +246,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('stage_product_batch_no', 'product_name', 'dev_type_name', 'used_type_name',
+        fields = ('id', 'stage_product_batch_no', 'product_name', 'dev_type_name', 'used_type_name',
                   'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
                   'created_user_name', 'created_date', 'update_user_name', 'last_updated_date')
 
@@ -310,3 +310,57 @@ class ProductBatchingCreateSerializer(serializers.ModelSerializer):
         fields = ('product_info', 'stage_product_batch_no', 'stage', 'dev_type',
                   'batching_time_interval', 'rm_time_interval', 'production_time_interval', 'batching_details'
                   )
+
+
+class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
+    batching_details = ProductBatchingDetailSerializer(many=True)
+
+    class Meta:
+        model = ProductBatching
+        fields = '__all__'
+
+
+class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
+
+    def validate(self, attrs):
+        batching_details = attrs.get('batching_details', None)
+        batching_weight = manual_material_weight = volume = 0
+        for detail in batching_details:
+            batching_weight += detail.get('actual_weight', 0)
+            volume += detail.get('actual_volume', 0)
+            if detail.get('material'):
+                if detail.get('material').material_type.global_type.type_name == '手动小料':
+                    manual_material_weight += detail.get('actual_weight', 0)
+        attrs['manual_material_weight'] = manual_material_weight
+        attrs['batching_weight'] = batching_weight
+        attrs['volume'] = volume
+        attrs['batching_proportion'] = float(batching_weight / volume) if volume else 0
+        attrs['created_user'] = self.context['request'].user
+        return attrs
+
+    @atomic()
+    def update(self, instance, validated_data):
+        batching_details = validated_data.pop('batching_details', None)
+        instance = super().update(instance, validated_data)
+        instance.batching_details.all().delete()
+        batching_detail_list = []
+        for detail in batching_details:
+            detail['product_batching'] = instance
+            detail['ratio'] = ProductRecipe
+            if detail.get('material'):
+                recipe = ProductRecipe.objects.filter(product_info=instance.product_info,
+                                                      stage=instance.stage,
+                                                      material=detail['material']
+                                                      ).first()
+                if recipe:
+                    detail['ratio'] = recipe.ratio
+                detail['density'] = detail.get('material').density
+            else:
+                detail['density'] = 0
+            batching_detail_list.append(ProductBatchingDetail(**detail))
+        ProductBatchingDetail.objects.bulk_create(batching_detail_list)
+        return instance
+
+    class Meta:
+        model = ProductBatching
+        fields = ('id', 'batching_details')

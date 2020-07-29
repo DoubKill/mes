@@ -2,7 +2,7 @@
 from django.db.models import Sum
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins
+from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -20,7 +20,7 @@ from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching,
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCreateSerializer, \
     ProductInfoUpdateSerializer, ProductInfoPartialUpdateSerializer, ProductInfoCopySerializer, \
     ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer, \
-    MaterialAttributeSerializer
+    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -103,7 +103,7 @@ class ProductInfoCopyView(CreateAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class ProductStageInfo(APIView):
+class ProductStageInfoView(APIView):
     """根据产地获取所以胶料及其段次信息, 参数：xxx/?factory_id=111"""
 
     def get(self, request):
@@ -122,7 +122,7 @@ class ProductStageInfo(APIView):
         return Response(data=ret)
 
 
-class ProductRecipeListAPI(ListAPIView):
+class ProductRecipeListView(ListAPIView):
     """根据胶料工艺和段次获取胶料段次配方原材料信息"""
     queryset = ProductRecipe.objects.filter(delete_flag=False).order_by('num')
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -131,41 +131,8 @@ class ProductRecipeListAPI(ListAPIView):
     serializer_class = ProductRecipeListSerializer
     pagination_class = None
 
-    def list(self, request, *args, **kwargs):
-        product_info_id = self.request.query_params.get('product_info_id')
-        stage_id = self.request.query_params.get('stage_id')
-        if not all([product_info_id, stage_id]):
-            raise ValidationError('参数错误')
-        recipe = ProductRecipe.objects.filter(product_info_id=product_info_id, stage_id=stage_id).first()
-        if not recipe:
-            raise ValidationError('当前段次配方不存在')
 
-        pre_recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                                  num__lt=recipe.num).order_by('-num').first()
-        pre_recipe_data = None
-        if pre_recipe:
-            pre_batch = ProductBatching.objects.filter(product_info_id=product_info_id,
-                                                       stage_id=pre_recipe.stage_id).first()
-            if not pre_batch:
-                raise ValidationError('请先配置上段位的配料')
-            else:
-                ratio = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                                     num__lte=recipe.num
-                                                     ).aggregate(ratio=Sum('ratio'))['ratio']
-                pre_recipe_data = OrderedDict()
-                pre_recipe_data['material_type'] = pre_batch.stage.global_name
-                pre_recipe_data['material'] = None
-                pre_recipe_data['ratio'] = ratio
-                pre_recipe_data['density'] = pre_batch.batching_proportion
-                pre_recipe_data['material_name'] = pre_batch.stage_product_batch_no
-        resp = super().list(request, *args, **kwargs)
-        data = resp.data
-        if pre_recipe_data:
-            data.insert(0, pre_recipe_data)
-        return Response(data)
-
-
-class ProductBatchingViewSet(CommonDeleteMixin, ModelViewSet):
+class ProductBatchingViewSet(ModelViewSet):
     """
     list:
         胶料配料标准列表
@@ -188,5 +155,51 @@ class ProductBatchingViewSet(CommonDeleteMixin, ModelViewSet):
             return ProductBatchingListSerializer
         elif self.action == 'create':
             return ProductBatchingCreateSerializer
+        elif self.action == 'retrieve':
+            return ProductBatchingRetrieveSerializer
         else:
-            return ProductBatchingListSerializer
+            return ProductBatchingUpdateSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = request.user
+        instance.save()
+        instance.batching_details.filter().update(delete_flag=True, delete_user=request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PreProductBatchView(APIView):
+    """根据胶料工艺id和段次获取上段位配料信息(新建配料时调用)，参数:xxx/?product_info_id=1&stage_id=1"""
+
+    def get(self, request):
+        product_info_id = self.request.query_params.get('product_info_id')
+        stage_id = self.request.query_params.get('stage_id')
+        try:
+            product_info_id = int(product_info_id)
+            stage_id = int(stage_id)
+        except Exception:
+            raise ValidationError('参数错误')
+        recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
+                                              stage_id=stage_id).order_by('-num').first()
+        if not recipe:
+            raise ValidationError('当前段次配方不存在')
+
+        pre_recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
+                                                  num__lt=recipe.num).order_by('-num').first()
+        pre_recipe_data = {}
+        if pre_recipe:
+            pre_batch = ProductBatching.objects.filter(product_info_id=product_info_id,
+                                                       stage_id=pre_recipe.stage_id).first()
+            if not pre_batch:
+                raise ValidationError('请先配置上段位的配料')
+            else:
+                ratio = ProductRecipe.objects.filter(product_info_id=product_info_id,
+                                                     num__lte=recipe.num
+                                                     ).aggregate(ratio=Sum('ratio'))['ratio']
+                pre_recipe_data = OrderedDict()
+                pre_recipe_data['material_type'] = pre_batch.stage.global_name
+                pre_recipe_data['ratio'] = ratio
+                pre_recipe_data['density'] = pre_batch.batching_proportion
+                pre_recipe_data['material_name'] = pre_batch.stage_product_batch_no
+        return Response(pre_recipe_data)
