@@ -26,7 +26,7 @@ router.register(r'base_equip_levels', SysbaseEquipLevelViewSet)
 router.register(r'schedule-classes', ClassesDetailViewSet)
 
 # 工作日程计划
-router.register(r'schedule-plans', WorkSchedulePlanViewSet)
+# router.register(r'schedule-plans', WorkSchedulePlanViewSet)
 
 # 计划时间
 router.register(r'plan-schedule', PlanScheduleViewSet)

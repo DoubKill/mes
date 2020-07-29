@@ -3,17 +3,19 @@
 
 
 {% block main %}
-    <el-row :gutter="20">
-        <el-col :span="12">
-            <el-form :inline="true">
-                <el-form-item label="类型名称">
-                    <el-input v-model="type_name" v-on:input="typeNameChanged"></el-input>
-                </el-form-item>
-                <el-form-item>
-                    <el-button @click="showCreateGlobalCodeTypeDialog">新建</el-button>
-                </el-form-item>
-            </el-form>
-            <template>
+    {% if perms.basics.view_globalcodetype %}
+        <el-row :gutter="20">
+            <el-col :span="12">
+                <el-form :inline="true">
+                    <el-form-item label="类型名称">
+                        <el-input v-model="type_name" v-on:input="typeNameChanged"></el-input>
+                    </el-form-item>
+                    {% if perms.basics.add_globalcodetype %}
+                        <el-form-item>
+                            <el-button @click="showCreateGlobalCodeTypeDialog">新建</el-button>
+                        </el-form-item>
+                    {% endif %}
+                </el-form>
                 <el-table
                         :data="tableData"
                         border
@@ -22,7 +24,7 @@
                         style="width: 100%">
                     <el-table-column
                             prop="id"
-                            label="Id"
+                            label="序"
                             width="50">
                     </el-table-column>
                     <el-table-column
@@ -42,81 +44,88 @@
                     <el-table-column label="操作">
                         <template slot-scope="scope">
                             <el-button-group>
-                                <el-button
-                                        size="mini"
-                                        @click="showEditGlobalCodeTypeDialog(scope.row)">编辑
-                                </el-button>
-                                <el-button
-                                        size="mini"
-                                        type="danger"
-                                        @click="handleGlobalCodeTypeDelete(scope.row)">删除
-                                </el-button>
+                                {% if perms.basics.change_globalcodetype %}
+                                    <el-button
+                                            size="mini"
+                                            @click="showEditGlobalCodeTypeDialog(scope.row)">编辑
+                                    </el-button>
+                                {% endif %}
+                                {% if perms.basics.delete_globalcodetype %}
+                                    <el-button
+                                            size="mini"
+                                            type="danger"
+                                            @click="handleGlobalCodeTypeDelete(scope.row)">删除
+                                    </el-button>
+                                {% endif %}
                             </el-button-group>
                         </template>
                     </el-table-column>
                 </el-table>
-                <el-pagination
-                        @current-change="currentChange"
-                        :current-page.sync="currentPage"
-                        :page-size="pageSize"
-                        :total="tableDataTotal"
-                        layout="total, prev, pager, next">
-                </el-pagination>
-            </template>
-        </el-col>
-        <el-col :span="12">
-            <el-form :inline="true">
-                <el-form-item>
-                    <el-button :disabled="!globalCodeTypesCurrentRow" @click="showCreateGlobalCodeDialog">新建</el-button>
-                </el-form-item>
-            </el-form>
-            <template>
-                <el-table
-                        :data="globalCodes"
-                        border
-                        style="width: 100%">
-                    <el-table-column
-                            label=Id
-                            prop="id"
-                            width="50">
-                    </el-table-column>
-                    <el-table-column
-                            prop="global_no"
-                            label="公用代码">
-                    </el-table-column>
-                    <el-table-column
-                            prop="global_name"
-                            label="公用代码名称">
-                    </el-table-column>
-                    <el-table-column
-                            prop="description"
-                            label="备注">
-                    </el-table-column>
-                    <el-table-column
-                            prop="used_flag"
-                            width="50"
-                            label="使用"
-                            :formatter="globalCodeUsedFlagFormatter">
-                    </el-table-column>
-                    <el-table-column label="操作">
-                        <template slot-scope="scope">
-                            <el-button-group>
-                                <el-button
-                                        size="mini"
-                                        @click="showEditGlobalCodeDialog(scope.row)">编辑
+                {% include 'gui/paginations.html' %}
+            </el-col>
+            {% if perms.basics.view_globalcode %}
+                <el-col :span="12">
+                    <el-form :inline="true">
+                        {% if perms.basics.add_globalcode %}
+                            <el-form-item>
+                                <el-button :disabled="!globalCodeTypesCurrentRow" @click="showCreateGlobalCodeDialog">新建
                                 </el-button>
-                                <el-button
-                                        size="mini"
-                                        type="danger"
-                                        @click="handleGlobalCodesDelete(scope.row)">删除
-                                </el-button>
-                            </el-button-group>
-                        </template>
-                    </el-table-column>
-                </el-table>
-            </template>
-        </el-col>
-    </el-row>
+                            </el-form-item>
+                        {% endif %}
+                    </el-form>
+                    <el-table
+                            :data="globalCodes"
+                            border
+                            style="width: 100%">
+                        <el-table-column
+                                label=Id
+                                prop="id"
+                                width="50">
+                        </el-table-column>
+                        <el-table-column
+                                prop="global_no"
+                                label="公用代码">
+                        </el-table-column>
+                        <el-table-column
+                                prop="global_name"
+                                label="公用代码名称">
+                        </el-table-column>
+                        <el-table-column
+                                prop="description"
+                                label="备注">
+                        </el-table-column>
+                        <el-table-column
+                                prop="used_flag"
+                                width="50"
+                                label="使用"
+                                :formatter="globalCodeUsedFlagFormatter">
+                        </el-table-column>
+                        <el-table-column label="操作">
+                            <template slot-scope="scope">
+                                <el-button-group>
+                                    {% if perms.basics.change_globalcode %}
+                                        <el-button
+                                                size="mini"
+                                                @click="showEditGlobalCodeDialog(scope.row)">编辑
+                                        </el-button>
+                                    {% endif %}
+                                    {% if perms.basics.delete_globalcode %}
+                                        <el-button
+                                                size="mini"
+                                                type="danger"
+                                                @click="handleGlobalCodesDelete(scope.row)">删除
+                                        </el-button>
+                                    {% endif %}
+
+                                </el-button-group>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-col>
+            {% endif %}
+
+        </el-row>
+    {% endif %}
 {% endblock %}
 
 {% block dialogs %}

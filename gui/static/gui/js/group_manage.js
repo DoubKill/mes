@@ -2,7 +2,7 @@
 
     var Main = {
 
-        mixins: [BaseMixin, PermissionsMixin],
+        mixins: [BaseMixin, PermissionsMixin, GroupsFilterMixin],
         data: function () {
 
             return {
@@ -21,24 +21,10 @@
                     use_flag: "",
                 },
                 dialogEditGroupVisible: false,
-                group_code: "",
-                name: "",
             }
         },
         methods: {
-            groupCodeChanged: function () {
 
-                this.getFirstPage();
-            },
-            nameChanged: function () {
-
-                this.getFirstPage();
-            },
-            beforeGetData() {
-
-                this.getParams['group_code'] = this.group_code;
-                this.getParams['name'] = this.name;
-            },
             clearGroupForm: function () {
 
                 this.groupForm = {
