@@ -1,0 +1,46 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-row>
+        <el-col :span="12">
+            <el-form :inline="true">
+                <el-form-item label="角色">
+                    <el-input v-model="group_code" v-on:input="groupCodeChanged"></el-input>
+                </el-form-item>
+                <el-form-item label="角色名">
+                    <el-input v-model="name" v-on:input="nameChanged"></el-input>
+                </el-form-item>
+            </el-form>
+            <el-table
+                    :data="tableData"
+                    border
+                    highlight-current-row
+                    @current-change="handleGroupsCurrentRowChange"
+                    style="width: 100%">
+                <el-table-column
+                        prop="id"
+                        label="序"
+                        width="50">
+                </el-table-column>
+                <el-table-column
+                        prop="group_code"
+                        label="角色代码">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="角色名称">
+                </el-table-column>
+            </el-table>
+            {% include 'gui/paginations.html' %}
+        </el-col>
+        <el-col :span="12">
+
+        </el-col>
+    </el-row>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/groups_filter.js' %}"></script>
+    <script src="{% static 'gui/js/users_by_group_manage.js' %}"></script>
+{% endblock %}

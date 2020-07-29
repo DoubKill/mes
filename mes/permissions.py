@@ -11,9 +11,9 @@ class IsSuperUser(BasePermission):
     """
     Allows access only to superuser users.
     """
+
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_superuser)
-
 
 
 class PermissonsDispatch(object):
@@ -67,9 +67,6 @@ class PermissonsDispatch(object):
             return self.get_user_module_permissions
         else:
             return self.get_all_permissions
-
-
-
 
 
 def PermissionClass(permission_required=None):

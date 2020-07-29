@@ -29,10 +29,16 @@ class GlobalCodeSerializer(BaseModelSerializer):
 class ClassesDetailSerializer(BaseModelSerializer):
     """工作日程班次条目创建、列表、详情序列化器"""
 
+    classes_name = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = ClassesDetail
         exclude = ('work_schedule',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def get_classes_name(self, object):
+        return object.classes.global_name
+
 
 
 class ClassesDetailUpdateSerializer(BaseModelSerializer):
@@ -87,6 +93,8 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
 
 
 class EquipCategoryAttributeSerializer(BaseModelSerializer):
+    """设备分类属性表序列化器"""
+
     class Meta:
         model = EquipCategoryAttribute
         fields = '__all__'
@@ -95,6 +103,21 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
 
 class EquipSerializer(BaseModelSerializer):
     """设备序列化器"""
+    category = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Equip
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def get_category(self, object):
+        temp = object.category.__dict__
+        temp.pop('_state')
+        return temp
+
+
+class EquipCreateAndUpdateSerializer(BaseModelSerializer):
+    """设备序列化器增改用"""
 
     class Meta:
         model = Equip

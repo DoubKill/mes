@@ -3,12 +3,7 @@
 
 {% block main %}
     <el-form :inline="true">
-        <el-form-item label="角色">
-            <el-input v-model="group_code" v-on:input="groupCodeChanged"></el-input>
-        </el-form-item>
-        <el-form-item label="角色名">
-            <el-input v-model="name" v-on:input="nameChanged"></el-input>
-        </el-form-item>
+        {% include 'gui/groups_filter.html' %}
         <el-form-item>
             <el-button @click="showCreateGroupDialog">新建</el-button>
         </el-form-item>
@@ -61,13 +56,7 @@
                 </template>
             </el-table-column>
         </el-table>
-        <el-pagination
-                @current-change="currentChange"
-                :current-page.sync="currentPage"
-                :page-size="pageSize"
-                :total="tableDataTotal"
-                layout="total, prev, pager, next">
-        </el-pagination>
+        {% include 'gui/paginations.html' %}
     </template>
 {% endblock %}
 
@@ -122,5 +111,6 @@
 {% endblock %}
 
 {% block scripts %}
+    <script src="{% static 'gui/js/groups_filter.js' %}"></script>
     <script src="{% static 'gui/js/group_manage.js' %}"></script>
 {% endblock %}

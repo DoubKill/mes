@@ -16,6 +16,7 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import RedirectView
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
@@ -42,7 +43,8 @@ urlpatterns = [
     path('api/v1/basics/', include('basics.urls')),
     path('api/v1/system/', include('system.urls')),
     path('api/v1/recipe/', include('recipe.urls')),
-    path('gui/', include('gui.urls'))
+    path('gui/', include('gui.urls')),
+    path('favicon.ico', RedirectView.as_view(url='static/m.ico'))
 ]
 
 if settings.DEBUG:

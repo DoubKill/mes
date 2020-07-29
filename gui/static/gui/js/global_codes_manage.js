@@ -48,8 +48,7 @@
             },
             typeNameChanged: function() {  // 类型名搜索
 
-                this.currentPage = 1;
-                this.currentChange(1);
+                this.getFirstPage();
             },
             clearGlobalCodeTypeForm: function() {
 

@@ -78,14 +78,10 @@
                     </el-breadcrumb>
                     <el-dropdown>
                           <span class="el-dropdown-link">
-                            用户<i class="el-icon-arrow-down el-icon--right"></i>
+                            用户：{{ user }}<i class="el-icon-arrow-down el-icon--right"></i>
                           </span>
                         <el-dropdown-menu slot="dropdown">
-                            <el-dropdown-item>测试1</el-dropdown-item>
-                            <el-dropdown-item>测试1</el-dropdown-item>
-                            <el-dropdown-item>测试1</el-dropdown-item>
-                            <el-dropdown-item disabled>测试1</el-dropdown-item>
-                            <el-dropdown-item divided>测试1</el-dropdown-item>
+                            <el-dropdown-item><el-link href="{% url 'gui:logout' %}" :underline="false">注销</el-link></el-dropdown-item>
                         </el-dropdown-menu>
                     </el-dropdown>
                 </el-row>
@@ -106,7 +102,8 @@
     const Routes = {
         "2-1": "{% url 'gui:global-codes-manage' %}",
         "2-2": "{% url 'gui:group-manage' %}",
-        "2-3": "{% url 'gui:user-manage' %}"
+        "2-3": "{% url 'gui:user-manage' %}",
+        "2-4": "{% url 'gui:users-by-group-manage' %}"
     }
 </script>
 {% block scripts %}{% endblock %}

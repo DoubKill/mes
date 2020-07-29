@@ -1,14 +1,15 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.permissions import IsAuthenticatedOrReadOnly,DjangoModelPermissions
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, DjangoModelPermissions
 from rest_framework.viewsets import ModelViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
-    WorkSchedulePlan, ClassesDetail, PlanSchedule
+    WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, \
     WorkScheduleSerializer, EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, \
-    WorkScheduleUpdateSerializer, ClassesDetailSerializer, PlanScheduleSerializer
+    WorkScheduleUpdateSerializer, ClassesDetailSerializer, PlanScheduleSerializer, EquipCreateAndUpdateSerializer, \
+    EquipCategoryAttributeSerializer
 from mes.common_code import return_permission_params, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -32,7 +33,7 @@ class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
                           PermissionClass(permission_required=return_permission_params(model_name)))
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     filter_class = GlobalCodeTypeFilter
 
 
@@ -53,9 +54,9 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
                           PermissionClass(permission_required=return_permission_params(model_name)))
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     pagination_class = SinglePageNumberPagination
-    filter_fields = ('global_type_id', 'global_type__type_no', )
+    filter_fields = ('global_type_id', 'global_type__type_no',)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -102,8 +103,31 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
                           PermissionClass(permission_required=return_permission_params(model_name)))
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create' or "update":
+            return EquipCreateAndUpdateSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipCategoryAttributeViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list:
+        设备分类属性列表
+    create:
+        创建设备分类属性
+    update:
+        修改设备分类属性
+    destroy:
+        删除设备分类属性
+    """
+    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False)
+    serializer_class = EquipCategoryAttributeSerializer
+    model_name = queryset.model.__name__.lower()
+    permission_classes = (IsAuthenticatedOrReadOnly,
+                          PermissionClass(permission_required=return_permission_params(model_name)))
 
 
 @method_decorator([api_recorder], name="dispatch")

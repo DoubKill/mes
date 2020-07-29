@@ -33,6 +33,7 @@ class User(AbstractUser):
     class Meta:
         db_table = "user"
         verbose_name_plural = verbose_name = '用户'
+        permissions = ()
 
 
 class AbstractEntity(models.Model):
