@@ -28,7 +28,7 @@ class GlobalCodeSerializer(BaseModelSerializer):
 
 class ClassesDetailSerializer(BaseModelSerializer):
     """工作日程班次条目创建、列表、详情序列化器"""
-
+    sum = serializers.CharField(read_only=True)
     classes_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:

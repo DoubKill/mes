@@ -1,6 +1,8 @@
+import time
+
 from django.conf import settings
 from django.db import models
-
+from datetime import timedelta
 MANAGED = True if settings.DEBUG else False
 from system.models import AbstractEntity
 from django.utils.translation import ugettext_lazy as _
@@ -76,8 +78,16 @@ class ClassesDetail(AbstractEntity):
     # classes_type_name = models.CharField(max_length=64, choices=TYPE_CHOICE,
     #                                      help_text='类型', verbose_name='类型')
 
+
+
     def __str__(self):
-        return self.classes_name
+        return self.classes.global_name
+
+    def _sum(self):
+        temp = self.end_time - self.start_time
+        return temp.total_seconds()
+
+    sum = property(_sum)
 
     class Meta:
         managed = MANAGED

@@ -5,12 +5,10 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from basics.models import GlobalCode
-from recipe.models import Material, ProductInfo, ProductRecipe
+from mes.base_serializer import BaseModelSerializer
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, ProductMaster
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material
-
-
-
 
 
 class MaterialSerializer(serializers.ModelSerializer):
@@ -203,3 +201,110 @@ class ProductInfoCopySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductInfo
         fields = ('product_info_id', 'factory', 'versions')
+
+
+class ProductRecipeListSerializer(serializers.ModelSerializer):
+    material_type = serializers.CharField(source='material.material_type.global_name')
+    material_name = serializers.CharField(source='material.material_name')
+    density = serializers.CharField(source='material.density')
+
+    class Meta:
+        model = ProductRecipe
+        fields = ('material_type', 'material', 'ratio', 'density', 'material_name')
+
+
+class ProductBatchingDetailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductBatchingDetail
+        exclude = ('product_batching', 'density', 'ratio')
+
+
+class ProductBatchingListSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product_info.product_name')
+    dev_type_name = serializers.CharField(source='dev_type.global_name')
+    used_type_name = serializers.CharField(source='product_info.used_type.global_name')
+    created_user_name = serializers.CharField(source='created_user.username', read_only=True)
+    update_user_name = serializers.SerializerMethodField(read_only=True)
+
+    def get_update_user_name(self, obj):
+        return obj.last_updated_user.username if obj.last_updated_user else None
+
+    class Meta:
+        model = ProductBatching
+        fields = ('stage_product_batch_no', 'product_name', 'dev_type_name', 'used_type_name',
+                  'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
+                  'created_user_name', 'created_date', 'update_user_name', 'last_updated_date')
+
+
+class ProductBatchingCreateSerializer(serializers.ModelSerializer):
+    batching_details = ProductBatchingDetailSerializer(many=True, help_text=
+                                                       """
+                                                       配料详情：{
+                                                                'num': '序号',
+                                                                'material': '原材料',
+                                                                'ratio_weight': '配比体积',
+                                                                'standard_volume': '序号',
+                                                                'actual_volume': '计算体积',
+                                                                'standard_weight': '实际体积',
+                                                                'actual_weight': '标准重量',
+                                                                'time_interval': '实际重量',
+                                                                'temperature': '温度',
+                                                                'rpm': '转速',
+                                                            }""")
+
+    def validate(self, attrs):
+        batching_details = attrs.get('batching_details', None)
+        batching_weight = manual_material_weight = volume = 0
+        for detail in batching_details:
+            batching_weight += detail.get('actual_weight', 0)
+            volume += detail.get('actual_volume', 0)
+            if detail.get('material'):
+                if detail.get('material').material_type.global_type.type_name == '手动小料':
+                    manual_material_weight += detail.get('actual_weight', 0)
+        attrs['manual_material_weight'] = manual_material_weight
+        attrs['batching_weight'] = batching_weight
+        attrs['volume'] = volume
+        attrs['batching_proportion'] = float(batching_weight / volume) if volume else 0
+        attrs['created_user'] = self.context['request'].user
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        batching_details = validated_data.pop('batching_details', None)
+        instance = super().create(validated_data)
+        batching_detail_list = []
+        for detail in batching_details:
+            detail['product_batching'] = instance
+            detail['ratio'] = ProductRecipe
+            if detail.get('material'):
+                recipe = ProductRecipe.objects.filter(product_info=validated_data['product_info'],
+                                                      stage=validated_data['stage'],
+                                                      material=detail['material']
+                                                      ).first()
+                if recipe:
+                    detail['ratio'] = recipe.ratio
+                detail['density'] = detail.get('material').density
+            else:
+                detail['density'] = 0
+            batching_detail_list.append(ProductBatchingDetail(**detail))
+        ProductBatchingDetail.objects.bulk_create(batching_detail_list)
+        return instance
+
+    class Meta:
+        model = ProductBatching
+        fields = ('product_info', 'stage_product_batch_no', 'stage', 'dev_type',
+                  'batching_time_interval', 'rm_time_interval', 'production_time_interval', 'batching_details'
+                  )
+
+
+class ProductMasterSerializer(BaseModelSerializer):
+
+    factory = serializers.CharField(source="product_info.factory.global_name")
+    versions = serializers.CharField(source="product_info.versions")
+    stage = serializers.CharField(source="stage.global_name")
+    dev_type = serializers.CharField(source="dev_type.global_name")
+
+    class Meta:
+        model = ProductBatching
+        fields = "__all__"
