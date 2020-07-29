@@ -2,12 +2,14 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from recipe.views import MaterialViewSet, ProductInfoViewSet, ProductInfoCopyView, ProductStageInfo, \
-    ProductRecipeListAPI, ProductBatchingViewSet
+    ProductRecipeListAPI, ProductBatchingViewSet, MaterialAttributeViewSet
 
 router = DefaultRouter()
 
 # 原材料
 router.register(r'materials', MaterialViewSet)
+# 原材料属性
+router.register(r'materials-attribute', MaterialAttributeViewSet)
 
 # 胶料工艺信息
 router.register(r'product-infos', ProductInfoViewSet)

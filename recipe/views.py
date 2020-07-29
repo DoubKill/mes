@@ -1,4 +1,3 @@
-
 # Create your views here.
 from django.db.models import Sum
 from django.utils.decorators import method_decorator
@@ -15,11 +14,13 @@ from collections import OrderedDict
 from basics.models import GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
-from recipe.filters import MaterialFilter, ProductInfoFilter, ProductRecipeFilter, ProductBatchingFilter
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching
+from recipe.filters import MaterialFilter, ProductInfoFilter, ProductRecipeFilter, ProductBatchingFilter, \
+    MaterialAttributeFilter
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCreateSerializer, \
     ProductInfoUpdateSerializer, ProductInfoPartialUpdateSerializer, ProductInfoCopySerializer, \
-    ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer
+    ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer, \
+    MaterialAttributeSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -36,9 +37,28 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = Material.objects.filter(delete_flag=False)
     serializer_class = MaterialSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly, )
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list:
+        原材料属性列表
+    create:
+        新建原材料属性
+    update:
+        修改原材料属性
+    destroy:
+        删除原材料属性
+    """
+    queryset = MaterialAttribute.objects.filter(delete_flag=False)
+    serializer_class = MaterialAttributeSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialAttributeFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -60,7 +80,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
         胶料应用和废弃操作
     """
     queryset = ProductInfo.objects.filter(delete_flag=False)
-    permission_classes = (IsAuthenticatedOrReadOnly, )
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductInfoFilter
 

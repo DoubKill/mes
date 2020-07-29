@@ -5,7 +5,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from basics.models import GlobalCode
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, \
+    MaterialAttribute
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material
 
@@ -29,6 +30,20 @@ class MaterialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Material
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialAttributeSerializer(serializers.ModelSerializer):
+    material_no = serializers.CharField(source='Material.material_no', read_only=True)
+    material_name = serializers.CharField(source='Material.material_name', read_only=True)
+    # for_short = serializers.CharField(source='Material.for_short', read_only=True)
+    # material_type_name = serializers.CharField(source='Material.material_type.global_name', read_only=True)
+    # material_type_id = serializers.CharField(source='Material.material_type.id', read_only=True)
+    # material_id = serializers.CharField(source='material.id')
+
+    class Meta:
+        model = MaterialAttribute
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -135,7 +150,7 @@ class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductInfo
-        fields = ('id', )
+        fields = ('id',)
 
 
 class ProductInfoUpdateSerializer(serializers.ModelSerializer):
@@ -167,7 +182,8 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
 
 class ProductInfoCopySerializer(serializers.ModelSerializer):
     product_info_id = serializers.PrimaryKeyRelatedField(queryset=ProductInfo.objects.exclude(
-        used_type__global_type__type_name='胶料状态', used_type__global_name='编辑', used_type__used_flag=0), write_only=True, help_text='复制配方工艺id')
+        used_type__global_type__type_name='胶料状态', used_type__global_name='编辑', used_type__used_flag=0), write_only=True,
+        help_text='复制配方工艺id')
 
     def validate(self, attrs):
         used_type = GlobalCode.objects.filter(global_type__type_name='胶料状态',
@@ -213,7 +229,6 @@ class ProductRecipeListSerializer(serializers.ModelSerializer):
 
 
 class ProductBatchingDetailSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = ProductBatchingDetail
         exclude = ('product_batching', 'density', 'ratio')
@@ -238,19 +253,19 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
 class ProductBatchingCreateSerializer(serializers.ModelSerializer):
     batching_details = ProductBatchingDetailSerializer(many=True, help_text=
-                                                       """
-                                                       配料详情：{
-                                                                'num': '序号',
-                                                                'material': '原材料',
-                                                                'ratio_weight': '配比体积',
-                                                                'standard_volume': '序号',
-                                                                'actual_volume': '计算体积',
-                                                                'standard_weight': '实际体积',
-                                                                'actual_weight': '标准重量',
-                                                                'time_interval': '实际重量',
-                                                                'temperature': '温度',
-                                                                'rpm': '转速',
-                                                            }""")
+    """
+    配料详情：{
+             'num': '序号',
+             'material': '原材料',
+             'ratio_weight': '配比体积',
+             'standard_volume': '序号',
+             'actual_volume': '计算体积',
+             'standard_weight': '实际体积',
+             'actual_weight': '标准重量',
+             'time_interval': '实际重量',
+             'temperature': '温度',
+             'rpm': '转速',
+         }""")
 
     def validate(self, attrs):
         batching_details = attrs.get('batching_details', None)
