@@ -41,6 +41,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialFilter
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if ProductRecipe.objects.filter(material=instance).exists():
+            raise ValidationError('该原材料已关联配方，无法删除')
+        else:
+            return super().destroy(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
@@ -117,8 +124,8 @@ class ProductStageInfoView(APIView):
         ret = []
         products = ProductInfo.objects.filter(factory=factory).prefetch_related('productrecipe_set')
         for product in products:
-            stage_names = product.productrecipe_set.values_list('stage__global_name', flat=True)
-            ret.append({'product_info': product.product_no, 'stage_names': stage_names})
+            stages = product.productrecipe_set.values('stage', 'stage__global_name')
+            ret.append({'product_info': product.id, 'product_no': product.product_no, 'stages': stages})
         return Response(data=ret)
 
 

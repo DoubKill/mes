@@ -8,7 +8,6 @@ from basics.models import GlobalCode
 from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from recipe.models import Material
 
 
 class MaterialSerializer(serializers.ModelSerializer):
@@ -63,6 +62,13 @@ class ProductInfoCreateSerializer(serializers.ModelSerializer):
     "stage": 段次id, "ratio": 配比}...]""")
 
     def validate(self, attrs):
+        versions = attrs['versions']
+        factory = attrs['factory']
+        product_no = attrs['product_no']
+        product_info = ProductInfo.objects.filter(factory=factory, product_no=product_no).order_by('-versions').first()
+        if product_info:
+            if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+                raise serializers.ValidationError('版本不得小于目前已有的版本')
         recipes = attrs.get('productrecipe_set')
         recipe_weight = sum(i.get('ratio', 0) for i in recipes)
         used_type = GlobalCode.objects.filter(global_type__type_name='胶料状态',
@@ -80,7 +86,8 @@ class ProductInfoCreateSerializer(serializers.ModelSerializer):
         validated_data['created_user'] = self.context['request'].user
         instance = super().create(validated_data)
         recipes_list = []
-        product_recipe_no = instance.product_no  # TODO 搞清楚product_info表存的是编号还是编码
+        product_recipe_no = '{}-{}-{}'.format(instance.factory.global_no, instance.product_no, instance.versions)
+        # TODO 搞清楚product_info表存的是编号还是编码
         for recipe in recipes:
             recipe['product_info'] = instance
             recipe['product_recipe_no'] = product_recipe_no
@@ -95,10 +102,15 @@ class ProductInfoCreateSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoSerializer(serializers.ModelSerializer):
+    product_standard_no = serializers.SerializerMethodField()
     factory = serializers.CharField(source='factory.global_name')
     update_user = serializers.SerializerMethodField(read_only=True)
     used_user = serializers.SerializerMethodField(read_only=True)
     used_type_name = serializers.CharField(source='used_type.global_name')
+
+    def get_product_standard_no(self, obj):
+        """胶料标准编码"""
+        return '{}-{}-{}'.format(obj.factory.global_no, obj.product_no, obj.versions)
 
     def get_update_user(self, obj):
         return obj.last_updated_user.username if obj.last_updated_user else None
@@ -108,41 +120,42 @@ class ProductInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductInfo
-        fields = ('id', 'product_no', 'product_name', 'factory', 'used_type', "used_user",
+        fields = ('id', 'product_standard_no', 'product_name', 'factory', 'used_type', "used_user",
                   'recipe_weight', 'used_time', 'obsolete_time', 'update_user', 'used_type_name')
 
 
 class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
-        if self.instance.used_type.global_name == '编辑':  # 应用
-            used_type = GlobalCode.objects.filter(global_type=self.instance.used_type.global_type,
-                                                  global_name='应用',
-                                                  used_flag=0).first()
-            if not used_type:
-                raise serializers.ValidationError('请先配置公共代码中的胶料状态【应用】数据')
-        elif self.instance.used_type.global_name == '应用':  # 废弃
-            used_type = GlobalCode.objects.filter(global_type=self.instance.used_type.global_type,
-                                                  global_name='废弃',
-                                                  used_flag=0).first()
-            if not used_type:
-                raise serializers.ValidationError('请先配置公共代码中的胶料状态【废弃】数据')
-        else:
-            raise serializers.ValidationError('无法操作')
-        attrs['used_type'] = used_type
+        used_type0 = GlobalCode.objects.filter(global_type=self.instance.used_type.global_type,
+                                               global_name='编辑',
+                                               used_flag=0).first()
+        used_type1 = GlobalCode.objects.filter(global_type=self.instance.used_type.global_type,
+                                               global_name='应用',
+                                               used_flag=0).first()
+        used_type2 = GlobalCode.objects.filter(global_type=self.instance.used_type.global_type,
+                                               global_name='废弃',
+                                               used_flag=0).first()
+        if not all([used_type1, used_type2]):
+            raise serializers.ValidationError('请先配置公共代码中的胶料状态【应用】数据')
+        attrs['used_type0'] = used_type0
+        attrs['used_type1'] = used_type1
+        attrs['used_type2'] = used_type2
         return attrs
 
     def update(self, instance, validated_data):
-        used_type = validated_data['used_type']
-        if instance.used_type.global_name == '编辑':  # 应用
-            instance.used_type = used_type
+        if instance.used_type == validated_data['used_type0']:  # 应用
+            instance.used_type = validated_data['used_type1']
             instance.used_user = self.context['request'].user
             instance.used_time = datetime.now()
             # 废弃旧版本
-            ProductInfo.objects.exclude(id=instance.id
-                                        ).filter(used_type=2).update(used_type=3, obsolete_time=datetime.now())
-        else:  # 废弃
-            instance.used_type = used_type
+            ProductInfo.objects.filter(used_type=validated_data['used_type1'],
+                                       product_no=instance.product_no,
+                                       factory=instance.factory
+                                       ).update(used_type=validated_data['used_type2'],
+                                                obsolete_time=datetime.now())
+        elif instance.used_type == validated_data['used_type1']:  # 应用  # 废弃
+            instance.used_type = validated_data['used_type2']
             instance.obsolete_time = datetime.now()
         instance.last_updated_user = self.context['request'].user
         instance.save()
@@ -154,18 +167,25 @@ class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoUpdateSerializer(serializers.ModelSerializer):
+    product_standard_no = serializers.SerializerMethodField(read_only=True)
     productrecipe_set = ProductRecipeSerializer(many=True)
+    used_type = serializers.CharField(source='used_type.global_name', read_only=True)
+
+    def get_product_standard_no(self, obj):
+        """胶料标准编码"""
+        return '{}-{}-{}'.format(obj.factory.global_no, obj.product_no, obj.versions)
 
     @atomic()
     def update(self, instance, validated_data):
         if not instance.used_type.global_name == '编辑':
-            raise PermissionDenied('当前胶料状态不是编辑，无法操作')
+            raise PermissionDenied('当前胶料不是编辑状态，无法操作')
         recipes = validated_data.pop('productrecipe_set', None)
         recipe_weight = sum(i.get('ratio', 0) for i in recipes)
         if recipes:
             ProductRecipe.objects.filter(product_info=instance).delete()
             recipes_list = []
-            product_recipe_no = instance.product_no  # TODO 搞清楚product_info表存的是编号还是编码
+            product_recipe_no = '{}-{}-{}'.format(instance.factory.global_no, instance.product_no, instance.versions)
+            # TODO 搞清楚product_info表存的是编号还是编码
             for recipe in recipes:
                 recipe['product_recipe_no'] = product_recipe_no
                 recipe['product_info'] = instance
@@ -177,7 +197,8 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductInfo
-        fields = ('id', 'product_no', 'product_name', 'used_type', 'recipe_weight', 'productrecipe_set')
+        fields = ('id', 'product_standard_no', 'product_name', 'used_type', 'recipe_weight', 'productrecipe_set')
+        read_only_fields = ('product_name', 'recipe_weight')
 
 
 class ProductInfoCopySerializer(serializers.ModelSerializer):
@@ -186,6 +207,13 @@ class ProductInfoCopySerializer(serializers.ModelSerializer):
         help_text='复制配方工艺id')
 
     def validate(self, attrs):
+        versions = attrs['versions']
+        factory = attrs['factory']
+        product_no = attrs['product_info_id'].product_no
+        product_info = ProductInfo.objects.filter(factory=factory, product_no=product_no).order_by('-versions').first()
+        if product_info:
+            if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+                raise serializers.ValidationError('版本不得小于目前已有的版本')
         used_type = GlobalCode.objects.filter(global_type__type_name='胶料状态',
                                               global_name='编辑',
                                               used_flag=0).first()
@@ -202,7 +230,6 @@ class ProductInfoCopySerializer(serializers.ModelSerializer):
         validated_data['product_no'] = base_product_info.product_no
         validated_data['product_name'] = base_product_info.product_name
         validated_data['precept'] = base_product_info.precept
-        validated_data['created_user'] = base_product_info.precept
         instance = super().create(validated_data)
         recipes = base_product_info.productrecipe_set.filter(delete_flag=False).values(
             'product_recipe_no', 'num', 'material_id', 'stage_id', 'ratio')
