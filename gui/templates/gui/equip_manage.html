@@ -52,7 +52,7 @@
                 label="设备类型">
         </el-table-column>
         <el-table-column
-                prop="equip_level"
+                prop="equip_level_name"
                 label="设备层级">
         </el-table-column>
 
@@ -115,7 +115,7 @@
                 <el-select @change="shiftsEquipLevelChange" style="width: 100%"
                            v-model="EquipForm.equip_level" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipLevelOptions">
@@ -126,7 +126,7 @@
                 <el-select @change="shiftsEquipCategoryChange" style="width: 100%"
                            v-model="EquipForm.category" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipCategoryOptions">
@@ -166,7 +166,7 @@
                 <el-select @change="shiftsEquipLevelChange" style="width: 100%"
                            v-model="EquipForm.equip_level" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipLevelOptions">
@@ -177,7 +177,7 @@
                 <el-select @change="shiftsEquipCategoryChange" style="width: 100%"
                            v-model="EquipForm.category" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipCategoryOptions">

@@ -1,15 +1,12 @@
 import xlrd
 from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
-from rest_framework import status
 from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
-from django.http import HttpResponse
-import json
 
 from mes.common_code import menu
 from mes.derorators import api_recorder
@@ -20,24 +17,6 @@ from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSer
 from basics.views import CommonDeleteMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from system.filters import UserFilter, GroupExtensionFilter
-
-
-# @method_decorator([api_recorder], name="dispatch")
-# class GroupViewSet(ModelViewSet):
-#     """
-#     list:
-#         角色列表
-#     create:
-#         创建角色
-#     update:
-#         修改角色
-#     destroy:
-#         删除角色
-#     """
-#     queryset = Group.objects.filter()
-#     serializer_class = GroupSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend,)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -140,11 +119,12 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.action == 'partial_update':
             return GroupExtensionSerializer
 
+
+@method_decorator([api_recorder], name="dispatch")
 class GroupAddUserViewSet(UpdateAPIView):
     """控制角色中用户具体为哪些的视图"""
     queryset = GroupExtension.objects.all()
     serializer_class = GroupUserUpdateSerializer
-
 
 
 @method_decorator([api_recorder], name="dispatch")

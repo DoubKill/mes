@@ -129,9 +129,11 @@ class EquipCategoryListViewSet(APIView):
                 "category_no": ele.category_no,
                 "category_name": ele.category_name,
                 "volume": ele.volume,
-                "equip_type": ele.equip_type.global_name,
+                "equip_type_name": ele.equip_type.global_name,
                 "global_no": ele.process.global_no,
                 "global_name": ele.process.global_name,
+                "equip_type": ele.equip_type.id,
+                "process": ele.process.id,
             })
         resp = {"results": result_list}
         return HttpResponse(json.dumps(resp), status=200)
@@ -161,14 +163,14 @@ class EquipListViewSet(APIView):
                 "equip_no":ele.equip_no,
                 "equip_name":ele.equip_name,
                 "equip_type":ele.category.equip_type.global_name,
-                "equip_level":ele.equip_level.global_name,
+                "equip_level_name":ele.equip_level.global_name,
                 "count_flag":ele.count_flag,
                 "used_flag":ele.used_flag,
-                "description":ele.description
+                "description":ele.description,
+                "category":ele.category.id,
+                "equip_level": ele.equip_level.id
             })
         resp = {"results": result_list}
-        print("="*100)
-        print(resp)
         return HttpResponse(json.dumps(resp), status=200)
 
 
@@ -192,25 +194,6 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFilter
 
-
-
-@method_decorator([api_recorder], name="dispatch")
-class EquipCategoryAttributeViewSet(CommonDeleteMixin, ModelViewSet):
-    """
-    list:
-        设备分类属性列表
-    create:
-        创建设备分类属性
-    update:
-        修改设备分类属性
-    destroy:
-        删除设备分类属性
-    """
-    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False)
-    serializer_class = EquipCategoryAttributeSerializer
-    model_name = queryset.model.__name__.lower()
-    permission_classes = (IsAuthenticatedOrReadOnly,
-                          PermissionClass(permission_required=return_permission_params(model_name)))
 
 
 @method_decorator([api_recorder], name="dispatch")

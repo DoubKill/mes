@@ -110,8 +110,7 @@ class EquipSerializer(BaseModelSerializer):
     category_name = serializers.CharField(source="category.global_name", read_only=True)
     equip_process_name = serializers.CharField(source="category.process.global_name", read_only=True)
     equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
-    equip_level = serializers.CharField(source="equip_level.global_name", read_only=True)
-
+    equip_level_name = serializers.CharField(source="equip_level.global_name", read_only=True)
 
     class Meta:
         model = Equip

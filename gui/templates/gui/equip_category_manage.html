@@ -37,7 +37,7 @@
                     label="容积">
             </el-table-column>
             <el-table-column
-                    prop="equip_type"
+                    prop="equip_type_name"
                     label="设备类型">
             </el-table-column>
             <el-table-column
@@ -90,7 +90,7 @@
                 <el-select @change="shiftsEquipCateChange" style="width: 100%"
                            v-model="EquipCateForm.equip_type" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipCateOptions">
@@ -102,7 +102,7 @@
                 <el-select @change="shiftsEquipCateProcessChange" style="width: 100%"
                            v-model="EquipCateForm.process" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipCateProcessOptions">
@@ -135,7 +135,7 @@
                 <el-select @change="shiftsEquipCateChange" style="width: 100%"
                            v-model="EquipCateForm.equip_type" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipCateOptions">
@@ -147,7 +147,7 @@
                 <el-select @change="shiftsEquipCateProcessChange" style="width: 100%"
                            v-model="EquipCateForm.process" placeholder="请选择">
                     <el-option
-                            :key="item.value"
+                            :key="item.id"
                             :value="item.value"
                             :label="item.label"
                             v-for="item in EquipCateProcessOptions">

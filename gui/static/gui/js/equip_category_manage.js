@@ -89,20 +89,20 @@
                 })
             },
             showEditEquipCateDialog: function (row) {
-                var row_custom = {};
-                for (var key in row) {
-                    row_custom[key] = row[key];
-                    if(key == "global_no"){
-                        row_custom['process'] = row[key]
-                    }
-                    if(key == "global_name"){
-                        row_custom['process'] = row_custom["process"] + "——" + row[key]
-                    }
-                }
+                // var row_custom = {};
+                // for (var key in row) {
+                //     row_custom[key] = row[key];
+                //     if(key == "global_no"){
+                //         row_custom['process'] = row[key]
+                //     }
+                //     if(key == "global_name"){
+                //         row_custom['process'] = row_custom["process"] + "——" + row[key]
+                //     }
+                // }
 
                 this.clearEquipCateForm();
                 this.clearEquipCateFormError();
-                this.EquipCateForm = Object.assign({}, row_custom);
+                this.EquipCateForm = Object.assign({}, row);
                 console.log("=============================");
                 console.log(this.EquipCateForm);
                 console.log("=============================");

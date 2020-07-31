@@ -2,8 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from basics.views import GlobalCodeTypeViewSet, GlobalCodeViewSet, WorkScheduleViewSet, EquipCategoryViewSet, \
-    EquipViewSet, ClassesDetailViewSet, PlanScheduleViewSet, EquipCategoryListViewSet, EquipListViewSet, \
-    EquipCategoryAttributeViewSet
+    EquipViewSet, ClassesDetailViewSet, PlanScheduleViewSet, EquipCategoryListViewSet, EquipListViewSet
 
 # app_name = 'basics'
 router = DefaultRouter()

@@ -97,34 +97,29 @@
                 })
             },
             showEditEquipDialog: function (row) {
-                var row_equip_custom = {};
-                for (var key in row) {
-                    row_equip_custom[key] = row[key];
-                    if(key == "process_name"){
-                        row_equip_custom['category'] = " 工序: "+ row[key]
-                    }
-                    if(key == "equip_type"){
-                        row_equip_custom['category'] = "  设备类型: " + row[key] + row_equip_custom['category']
-                    }
-                    if(key == "category_name"){
-                        row_equip_custom['category'] = "  机型名称: " + row[key] + row_equip_custom['category']
-                    }
-                    if(key == "category_no"){
-                        row_equip_custom['category'] = "  机型编号: " + row[key] + row_equip_custom['category']
-                    }
-
-
-                    console.log("==========================================================");
-                    console.log(row_equip_custom);
-                    console.log("==========================================================");
-                }
-
+                // var row_equip_custom = {};
+                // for (var key in row) {
+                //     row_equip_custom[key] = row[key];
+                //     if(key == "process_name"){
+                //         row_equip_custom['category'] = " 工序: "+ row[key]
+                //     }
+                //     if(key == "equip_type"){
+                //         row_equip_custom['category'] = "  设备类型: " + row[key] + row_equip_custom['category']
+                //     }
+                //     if(key == "category_name"){
+                //         row_equip_custom['category'] = "  机型名称: " + row[key] + row_equip_custom['category']
+                //     }
+                //     if(key == "category_no"){
+                //         row_equip_custom['category'] = "  机型编号: " + row[key] + row_equip_custom['category']
+                //     }
+                //
+                // }
                 this.clearEquipForm();
                 this.clearEquipFormError();
-                this.EquipForm = Object.assign({}, row_equip_custom);
-                console.log("==========================================================");
-                console.log(row);
-                console.log("==========================================================");
+                this.EquipForm = Object.assign({}, row);
+                // console.log("==========================================================");
+                // console.log(row);
+                // console.log("==========================================================");
                 this.dialogEditEquipVisible = true;
             },
 
