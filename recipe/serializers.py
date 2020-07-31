@@ -155,6 +155,7 @@ class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
                                        ).update(used_type=validated_data['used_type2'],
                                                 obsolete_time=datetime.now())
         elif instance.used_type == validated_data['used_type1']:  # 应用  # 废弃
+            instance.obsolete_user = self.context['request'].user
             instance.used_type = validated_data['used_type2']
             instance.obsolete_time = datetime.now()
         instance.last_updated_user = self.context['request'].user
@@ -267,15 +268,33 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
     used_type_name = serializers.CharField(source='product_info.used_type.global_name')
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.SerializerMethodField(read_only=True)
+    stage_name = serializers.CharField(source="stage.global_name")
+    versions_name = serializers.CharField(source="product_info.versions")
+    used_type_flag = serializers.SerializerMethodField()
+    used_time = serializers.CharField(source="product_info.used_time")
+    obsolete_time = serializers.CharField(source="product_info.obsolete_time")
+    used_user_name = serializers.SerializerMethodField()
+    obsolete_user_name = serializers.SerializerMethodField()
+
+    def get_used_type_flag(self, obj):
+        return 'Y' if obj.product_info.used_type.global_name == '应用' else 'N'
+
+    def get_used_user_name(self, obj):
+        return obj.product_infoused_user.username if obj.product_info.used_user else None
+
+    def get_obsolete_user_name(self, obj):
+        return obj.product_infoobsolete_user.username if obj.product_info.obsolete_user else None
 
     def get_update_user_name(self, obj):
-        return obj.last_updated_user.username if obj.last_updated_user else None
+        return obj.product_infolast_updated_user.username if obj.product_info.last_updated_user else None
 
     class Meta:
         model = ProductBatching
         fields = ('id', 'stage_product_batch_no', 'product_name', 'dev_type_name', 'used_type_name',
                   'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
-                  'created_user_name', 'created_date', 'update_user_name', 'last_updated_date')
+                  'created_user_name', 'created_date', 'update_user_name', 'last_updated_date',
+                  'stage_name', 'versions_name', 'used_type_flag', 'used_time', 'obsolete_time',
+                  'used_user_name', 'obsolete_user_name')
 
 
 class ProductBatchingCreateSerializer(serializers.ModelSerializer):

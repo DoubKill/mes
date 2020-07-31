@@ -58,8 +58,10 @@ class ProductInfo(AbstractEntity):
                                   on_delete=models.DO_NOTHING, related_name='ut_prods')
     recipe_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=2, max_digits=8)
     used_user = models.ForeignKey(User, help_text='应用人', verbose_name='应用人', on_delete=models.DO_NOTHING,
-                                  related_name='user_prods', blank=True, null=True)
+                                  related_name='used_prods', blank=True, null=True)
     used_time = models.DateTimeField(help_text='应用时间', verbose_name='应用时间', blank=True, null=True)
+    obsolete_user = models.ForeignKey(User, help_text='应用人', verbose_name='应用人', on_delete=models.DO_NOTHING,
+                                      related_name='obsolete_prods', blank=True, null=True)
     obsolete_time = models.DateTimeField(help_text='废弃时间', verbose_name='废弃时间', blank=True, null=True)
 
     def __str__(self):

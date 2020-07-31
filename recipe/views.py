@@ -211,12 +211,3 @@ class PreProductBatchView(APIView):
                 pre_recipe_data['density'] = pre_batch.batching_proportion
                 pre_recipe_data['material_name'] = pre_batch.stage_product_batch_no
         return Response(pre_recipe_data)
-
-
-class ProductMasterView(ListAPIView):
-    """
-    list:
-        胶料主信息列表
-    """
-    queryset = ProductBatching.objects.filter(delete_flag=False)
-    serializer_class = ProductMasterSerializer
