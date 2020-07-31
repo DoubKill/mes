@@ -31,7 +31,7 @@ class ProductClassesPlan(AbstractEntity):
     time = models.DateTimeField(verbose_name='时间', help_text='时间')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)
-    unint = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
+    unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_classes_plan')
@@ -74,7 +74,7 @@ class ProductBatchingClassesPlan(AbstractEntity):
     time = models.DateTimeField(verbose_name='时间', help_text='时间')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)
-    unint = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
+    unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_batching_classes_plan')
@@ -112,7 +112,7 @@ class MaterialRequisition(AbstractEntity):
     plan_schedule = models.ForeignKey(PlanSchedule, on_delete=models.DO_NOTHING, help_text='排班计划id',
                                       verbose_name='排班计划id',
                                       related_name='ps_material_requisition')
-    unint = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
+    unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
 
     class Meta:
         db_table = 'material_requisition'
@@ -131,7 +131,7 @@ class MaterialRequisitionClasses(AbstractEntity):
                                        related_name='pm_material_requisition_classes')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)
-    unint = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
+    unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_material_requisition_classes')
@@ -147,11 +147,11 @@ class MaterialStorage(AbstractEntity):
                                  verbose_name='物料id',
                                  related_name='m_material_storage')
     qty = models.PositiveIntegerField(help_text='库存数量', verbose_name='库存数量')
-    qty_unint = models.CharField(max_length=8, help_text='数量单位', verbose_name='数量单位')
+    qty_unit = models.CharField(max_length=8, help_text='数量单位', verbose_name='数量单位')
     weight = models.DecimalField(verbose_name='库存重量', help_text='库存重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)
 
-    weight_unint = models.CharField(max_length=8, help_text='重量单位', verbose_name='重量单位')
+    weight_unit = models.CharField(max_length=8, help_text='重量单位', verbose_name='重量单位')
 
     class Meta:
         db_table = 'material_storage'

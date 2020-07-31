@@ -1,14 +1,9 @@
-from datetime import datetime
-
 from django.db.transaction import atomic
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
-
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisition, MaterialRequisitionClasses
 from basics.models import PlanSchedule
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from recipe.models import Material
 
 
 class ProductClassesPlanSerializer(serializers.ModelSerializer):
@@ -24,7 +19,7 @@ class ProductDayPlanSerializer(serializers.ModelSerializer):
     # inventory=serializers.IntegerField(source='') TODO:库存暂时不写
 
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
-                                                            help_text='{"sn":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unint":1,"classes_detail":1}')
+                                                            help_text='{"sn":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":1,"classes_detail":1}')
 
     class Meta:
         model = ProductDayPlan
@@ -43,6 +38,20 @@ class ProductDayPlanSerializer(serializers.ModelSerializer):
             detail_dic['product_day_plan'] = instance
             ProductClassesPlan.objects.create(**detail_dic)
         return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        print(instance)
+        print(validated_data)
+        update_pcp_list = validated_data.pop('pdp_product_classes_plan', None)
+        pdp_obj = super().update(instance, validated_data)
+        if update_pcp_list is None:
+            return pdp_obj
+        for update_pcp in update_pcp_list:
+            update_pcp = dict(update_pcp)
+            pcp_queryset = ProductClassesPlan.objects.filter(product_day_plan=instance)
+            pcp_queryset.update(**update_pcp)
+        return pdp_obj
 
 
 class MaterialDemandedSerializer(serializers.ModelSerializer):
@@ -64,7 +73,7 @@ class ProductBatchingClassesPlanSerializer(serializers.ModelSerializer):
 
 class ProductBatchingDayPlanSerializer(serializers.ModelSerializer):
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
-                                                                             help_text='{"product_master":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unint":"1","classes_detail":1}')
+                                                                             help_text='{"product_master":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":"1","classes_detail":1}')
 
     class Meta:
         model = ProductBatchingDayPlan
@@ -88,6 +97,20 @@ class ProductBatchingDayPlanSerializer(serializers.ModelSerializer):
             ProductBatchingClassesPlan.objects.create(**detail_dic)
         return instance
 
+    @atomic()
+    def update(self, instance, validated_data):
+        print(instance)
+        print(validated_data)
+        update_pcp_list = validated_data.pop('pdp_product_batching_classes_plan', None)
+        pdp_obj = super().update(instance, validated_data)
+        if update_pcp_list is None:
+            return pdp_obj
+        for update_pcp in update_pcp_list:
+            update_pcp = dict(update_pcp)
+            pcp_queryset = ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance)
+            pcp_queryset.update(**update_pcp)
+        return pdp_obj
+
 
 class MaterialRequisitionClassesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -98,12 +121,12 @@ class MaterialRequisitionClassesSerializer(serializers.ModelSerializer):
 
 class MaterialRequisitionSerializer(serializers.ModelSerializer):
     mr_material_requisition_classes = MaterialRequisitionClassesSerializer(many=True,
-                                                                           help_text='{"product_master":1,"weight":1,"unint":"1","classes_detail":1}')
+                                                                           help_text='{"product_master":1,"weight":1,"unit":"1","classes_detail":1}')
 
     class Meta:
         model = MaterialRequisition
         fields = (
-            'material_demanded', 'count', 'plan_schedule', 'unint', 'mr_material_requisition_classes')
+            'material_demanded', 'count', 'plan_schedule', 'unit', 'mr_material_requisition_classes')
 
     @atomic()
     def create(self, validated_data):
@@ -112,15 +135,28 @@ class MaterialRequisitionSerializer(serializers.ModelSerializer):
         pdp_dic['material_demanded'] = validated_data.pop('material_demanded')
         pdp_dic['count'] = validated_data.pop('count')
         pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
-        pdp_dic['unint'] = validated_data.pop('unint')
+        pdp_dic['unit'] = validated_data.pop('unit')
         instance = MaterialRequisition.objects.create(**pdp_dic)
-        print(instance)
         details = validated_data['mr_material_requisition_classes']
         for detail in details:
             detail_dic = dict(detail)
-            detail_dic['material_requisition'] = instance  # TODO 暂且写1 是否是领料计划
+            detail_dic['material_requisition'] = instance
             MaterialRequisitionClasses.objects.create(**detail_dic)
         return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        print(instance)
+        print(validated_data)
+        update_pcp_list = validated_data.pop('mr_material_requisition_classes', None)
+        pdp_obj = super().update(instance, validated_data)
+        if update_pcp_list is None:
+            return pdp_obj
+        for update_pcp in update_pcp_list:
+            update_pcp = dict(update_pcp)
+            pcp_queryset = MaterialRequisitionClasses.objects.filter(material_requisition=instance)
+            pcp_queryset.update(**update_pcp)
+        return pdp_obj
 
 
 class ProductDayPlanCopySerializer(serializers.ModelSerializer):
@@ -165,7 +201,7 @@ class ProductDayPlanCopySerializer(serializers.ModelSerializer):
                                                      plan_schedule=ps_obj)
             pc_obj = ProductClassesPlan.objects.filter(product_day_plan=pdp_obj).first()
             ProductClassesPlan.objects.create(product_day_plan=instance, sn=pc_obj.sn, num=pc_obj.num, time=pc_obj.time,
-                                              weight=pc_obj.weight, unint=pc_obj.unint,
+                                              weight=pc_obj.weight, unit=pc_obj.unit,
                                               classes_detail=pc_obj.classes_detail)
         return instance
 
@@ -216,7 +252,7 @@ class ProductBatchingDayPlanCopySerializer(serializers.ModelSerializer):
             ProductBatchingClassesPlan.objects.create(product_batching_day_plan=instance,
                                                       product_master=pc_obj.product_master, num=pc_obj.num,
                                                       time=pc_obj.time,
-                                                      weight=pc_obj.weight, unint=pc_obj.unint,
+                                                      weight=pc_obj.weight, unit=pc_obj.unit,
                                                       classes_detail=pc_obj.classes_detail)
         return instance
 
@@ -261,12 +297,12 @@ class MaterialRequisitionCopySerializer(serializers.ModelSerializer):
         for mr_obj in mr_queryset:
             instance = MaterialRequisition.objects.create(material_demanded=mr_obj.material_demanded,
                                                           count=mr_obj.count,
-                                                          plan_schedule=ps_obj, unint=mr_obj.unint
+                                                          plan_schedule=ps_obj, unit=mr_obj.unit
                                                           )
             pc_obj = MaterialRequisitionClasses.objects.filter(material_requisition=mr_obj).first()
             MaterialRequisitionClasses.objects.create(material_requisition=instance,
                                                       product_master=pc_obj.product_master,
                                                       weight=pc_obj.weight,
-                                                      unint=pc_obj.unint,
+                                                      unit=pc_obj.unit,
                                                       classes_detail=pc_obj.classes_detail)
         return instance

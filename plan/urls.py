@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from plan.views import ProductDayPlanViewSet, MaterialDemandedViewSet, ProductBatchingDayPlanViewSet, \
-    MaterialRequisitionViewSet, ProductDayPlanCopyView,ProductBatchingDayPlanCopyView,MaterialRequisitionCopyView
+    MaterialRequisitionViewSet, ProductDayPlanCopyView, ProductBatchingDayPlanCopyView, MaterialRequisitionCopyView
 
 router = DefaultRouter()
 

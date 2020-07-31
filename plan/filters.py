@@ -1,7 +1,5 @@
 import django_filters
-
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
-from plan.models import ProductDayPlan, MaterialDemanded, ProductBatchingDayPlan
+from plan.models import ProductDayPlan, MaterialDemanded, ProductBatchingDayPlan, MaterialRequisition
 
 
 class ProductDayPlanFilter(django_filters.rest_framework.FilterSet):
@@ -32,3 +30,12 @@ class ProductBatchingDayPlanFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = ProductBatchingDayPlan
         fields = ('plan_data', 'sort')
+
+
+class MaterialRequisitionFilter(django_filters.rest_framework.FilterSet):
+    """领料日计划过滤器"""
+    material_id = django_filters.DateTimeFilter(field_name='id', help_text='日期')
+
+    class Meta:
+        model = MaterialRequisition
+        fields = ('material_id',)

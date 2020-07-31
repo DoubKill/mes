@@ -1,24 +1,19 @@
-from django.shortcuts import render
-from django.db.models import Sum
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
-from rest_framework.exceptions import ValidationError
-from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
-from collections import OrderedDict
-
-from basics.models import GlobalCode
+from rest_framework.viewsets import ModelViewSet
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
-from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductBatchingDayPlanFilter
+from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductBatchingDayPlanFilter, \
+    MaterialRequisitionFilter
 from plan.serializers import ProductDayPlanSerializer, MaterialDemandedSerializer, ProductBatchingDayPlanSerializer, \
-    MaterialRequisitionSerializer, ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer,MaterialRequisitionCopySerializer
+    MaterialRequisitionSerializer, ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer, \
+    MaterialRequisitionCopySerializer
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
-    MaterialRequisition
+    MaterialRequisition, ProductBatchingClassesPlan, MaterialRequisitionClasses
 
 
 # Create your views here.
@@ -40,6 +35,14 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductDayPlanFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        ProductClassesPlan.objects.filter(product_day_plan=instance).update(delete_flag=True)
+        instance.delete_flag = True
+        instance.delete_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -79,8 +82,15 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingDayPlanFilter
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance).update(delete_flag=True)
+        instance.delete_flag = True
+        instance.delete_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-# TODO:暂时是错的 等待明天讨论
+
 @method_decorator([api_recorder], name="dispatch")
 class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
     """
@@ -96,8 +106,16 @@ class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = MaterialRequisition.objects.filter(delete_flag=False)
     serializer_class = MaterialRequisitionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    # filter_backends = (DjangoFilterBackend,)
-    # filter_class = MaterialDemandedFilter
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialRequisitionFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        MaterialRequisitionClasses.objects.filter(material_requisition=instance).update(delete_flag=True)
+        instance.delete_flag = True
+        instance.delete_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -109,12 +127,13 @@ class ProductDayPlanCopyView(CreateAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductBatchingDayPlanCopyView(CreateAPIView):
-    """复制胶料日计划"""
+    """复制配料小料日计划"""
     serializer_class = ProductBatchingDayPlanCopySerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class MaterialRequisitionCopyView(CreateAPIView):
-    """复制胶料日计划"""
+    """复制领料日计划"""
     serializer_class = MaterialRequisitionCopySerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
