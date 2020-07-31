@@ -16,11 +16,12 @@ from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductRecipeFilter, ProductBatchingFilter, \
     MaterialAttributeFilter
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCreateSerializer, \
     ProductInfoUpdateSerializer, ProductInfoPartialUpdateSerializer, ProductInfoCopySerializer, \
     ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer, \
-    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer
+    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
+    ProductMasterSerializer
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -210,3 +211,12 @@ class PreProductBatchView(APIView):
                 pre_recipe_data['density'] = pre_batch.batching_proportion
                 pre_recipe_data['material_name'] = pre_batch.stage_product_batch_no
         return Response(pre_recipe_data)
+
+
+class ProductMasterView(ListAPIView):
+    """
+    list:
+        胶料主信息列表
+    """
+    queryset = ProductBatching.objects.filter(delete_flag=False)
+    serializer_class = ProductMasterSerializer

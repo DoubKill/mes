@@ -171,7 +171,7 @@ class ProductMaster(AbstractEntity):
 
     class Meta:
         db_table = 'product_master'
-        verbose_name_plural = verbose_name = '胶料配料标准'
+        verbose_name_plural = verbose_name = '胶料主信息'
 
 
 class ProductProcess(AbstractEntity):

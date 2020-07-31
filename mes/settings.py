@@ -17,7 +17,6 @@ from django.utils.translation import ugettext_lazy
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
@@ -90,7 +89,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
-        ) if DEBUG else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
+    ) if DEBUG else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
 }
@@ -191,7 +190,6 @@ LOGGING_DIR = os.environ.get('LOGGING_DIR', os.path.join(BASE_DIR, 'logs'))
 # }
 
 
-# Database
 if DEBUG:
     DATABASES = {
         'default': {
@@ -205,12 +203,11 @@ else:
             'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
             'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
             'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mysql'),  # 密码
-            'HOST': os.getenv('DATABASE_HOSTNAME', '127.0.0.1'),  # HOST
+            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mes@2020'),  # 密码
+            'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
         }
     }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -230,7 +227,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 
@@ -244,7 +240,6 @@ USE_L10N = True
 
 USE_TZ = False
 
-
 AUTH_USER_MODEL = 'system.User'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
@@ -257,5 +252,9 @@ LANGUAGES = (
 )
 
 LOCALE_PATHS = (
-     os.path.join(BASE_DIR, 'locale'),
+    os.path.join(BASE_DIR, 'locale'),
 )
+
+LOGIN_URL = 'gui:login'
+LOGIN_REDIRECT_URL = 'gui:global-codes-manage'
+LOGOUT_REDIRECT_URL = 'gui:login'

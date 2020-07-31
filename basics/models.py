@@ -1,6 +1,8 @@
+import time
+
 from django.conf import settings
 from django.db import models
-
+from datetime import timedelta
 MANAGED = True if settings.DEBUG else False
 from system.models import AbstractEntity
 from django.utils.translation import ugettext_lazy as _
@@ -65,10 +67,10 @@ class ClassesDetail(AbstractEntity):
         ('rest', '休假'),
     )
     work_schedule = models.ForeignKey('WorkSchedule', models.DO_NOTHING,
-                                      help_text='工作日程id', verbose_name='工作日程id', related_name="classes_detail")
+                                      help_text='工作日程id', verbose_name='工作日程id', related_name="classesdetail_set")
     classes = models.ForeignKey('GlobalCode', models.DO_NOTHING,
                                 help_text='班次', verbose_name='班次', related_name="classes_detail")
-    classes_name = models.CharField(max_length=64, help_text='班次名称', verbose_name='班次名称')
+    # classes_name = models.CharField(max_length=64, help_text='班次名称', verbose_name='班次名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
     start_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
@@ -76,8 +78,16 @@ class ClassesDetail(AbstractEntity):
     # classes_type_name = models.CharField(max_length=64, choices=TYPE_CHOICE,
     #                                      help_text='类型', verbose_name='类型')
 
+
+
     def __str__(self):
-        return self.classes_name
+        return self.classes.global_name
+
+    def _sum(self):
+        temp = self.end_time - self.start_time
+        return temp.total_seconds()
+
+    sum = property(_sum)
 
     class Meta:
         managed = MANAGED
