@@ -94,6 +94,9 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
 
 class EquipCategoryAttributeSerializer(BaseModelSerializer):
     """设备分类属性表序列化器"""
+    equip_process_name = serializers.CharField(source="process.global_name", read_only=True)
+    equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
+    equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
 
     class Meta:
         model = EquipCategoryAttribute
@@ -103,17 +106,18 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
 
 class EquipSerializer(BaseModelSerializer):
     """设备序列化器"""
-    category = serializers.SerializerMethodField()
+    category_no = serializers.CharField(source="category.global_no", read_only=True)
+    category_name = serializers.CharField(source="category.global_name", read_only=True)
+    equip_process_name = serializers.CharField(source="category.process.global_name", read_only=True)
+    equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
+    equip_level = serializers.CharField(source="equip_level.global_name", read_only=True)
+
 
     class Meta:
         model = Equip
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
-    def get_category(self, object):
-        temp = object.category.__dict__
-        temp.pop('_state')
-        return temp
 
 
 class EquipCreateAndUpdateSerializer(BaseModelSerializer):

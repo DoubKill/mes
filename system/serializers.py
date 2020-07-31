@@ -14,13 +14,6 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from system.models import GroupExtension, Group, User, Section
 
 
-class GroupSerializer(BaseModelSerializer):
-    class Meta:
-        model = Group
-        fields = '__all__'
-        # read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
 class PermissionSerializer(BaseModelSerializer):
     class Meta:
         model = Permission
@@ -88,6 +81,7 @@ class GroupUserSerializer(BaseModelSerializer):
 
 class GroupExtensionSerializer(BaseModelSerializer):
     """角色组扩展序列化器"""
+    user_set = UserUpdateSerializer(read_only=True, many=True)
 
     class Meta:
         model = GroupExtension
@@ -100,20 +94,28 @@ class GroupExtensionSerializer(BaseModelSerializer):
 
 class GroupExtensionUpdateSerializer(BaseModelSerializer):
     """更新角色组用户序列化器"""
-    user_ids = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), write_only=True)
-
-    def update(self, instance, validated_data):
-        user_ids = validated_data['user_ids']
-
-        instance.user_set.add(*user_ids)
-        instance.save()
-        return instance
 
     class Meta:
         model = GroupExtension
-        fields = ('id', 'user_ids')
-        # fields = '__all__'
-        # read_only_fields = COMMON_READ_ONLY_FIELDS
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class GroupUserUpdateSerializer(BaseModelSerializer):
+    """更新角色组用户序列化器"""
+    user_set = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), write_only=True,
+                                                  help_text="""{"user_set":[<user_id>, ……]}""")
+
+    def update(self, instance, validated_data):
+        user_ids = validated_data['user_set']
+        instance.user_set.remove(*instance.user_set.all())
+        instance.user_set.add(*user_ids)
+        instance.save()
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = GroupExtension
+        fields = ('id', 'user_set')
 
 
 class SectionSerializer(BaseModelSerializer):

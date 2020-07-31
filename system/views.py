@@ -1,6 +1,8 @@
 import xlrd
 from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
+from rest_framework import status
+from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,10 +14,9 @@ import json
 from mes.common_code import menu
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from system.models import GroupExtension, User, Group, Section, FunctionBlock, FunctionPermission, \
-    Function, Menu
-from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, GroupSerializer, \
-    UserSerializer, UserUpdateSerializer, SectionSerializer, PermissionSerializer
+from system.models import GroupExtension, User, Section
+from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
+    UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
 from basics.views import CommonDeleteMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from system.filters import UserFilter, GroupExtensionFilter
@@ -139,23 +140,10 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.action == 'partial_update':
             return GroupExtensionSerializer
 
-class GroupAddUserViewSet(APIView):
-    def put(self,request, pk:int):
-        user_set = request.GET.get('user_set',[])
-        group_ext_obj = GroupExtension.objects.filter(id=pk).first()
-
-        if len(eval(user_set)) == 0:
-            user_obj = User.objects.filter(groups__in=[pk])
-
-            for ele in user_obj:
-                ele.groups.remove(Group.objects.filter(name=group_ext_obj.name).first().id)
-
-        for user_ele in eval(user_set):
-            user_obj = User.objects.filter(id=user_ele)[0]
-            group_obj = Group.objects.filter(name=group_ext_obj.name)
-            user_obj.groups.add(*group_obj)
-
-        return HttpResponse(json.dumps("success"), status=200)
+class GroupAddUserViewSet(UpdateAPIView):
+    """控制角色中用户具体为哪些的视图"""
+    queryset = GroupExtension.objects.all()
+    serializer_class = GroupUserUpdateSerializer
 
 
 

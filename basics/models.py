@@ -118,10 +118,10 @@ class EquipCategoryAttribute(AbstractEntity):
 
 class Equip(AbstractEntity):
     """设备表"""
-    category = models.ForeignKey('EquipCategoryAttribute', models.DO_NOTHING, related_name='equip',
+    category = models.ForeignKey('EquipCategoryAttribute', models.DO_NOTHING, related_name='equip_c',
                                    help_text='设备种类属性', verbose_name='设备种类属性')
     parent = models.ForeignKey('self', blank=True, null=True,
-                               help_text='上层设备', verbose_name='上层设备', on_delete=models.DO_NOTHING, related_name="equip")
+                               help_text='上层设备', verbose_name='上层设备', on_delete=models.DO_NOTHING, related_name="equip_p")
     equip_no = models.CharField(max_length=64, help_text='设备编号', verbose_name='设备编号')
     equip_name = models.CharField(max_length=64, help_text='设备名称', verbose_name='设备名称')
     used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
@@ -129,7 +129,7 @@ class Equip(AbstractEntity):
                                    help_text='设备说明', verbose_name='设备说明')
     count_flag = models.BooleanField(help_text='是否产量计数', verbose_name='是否产量计数')
 
-    equip_level = models.ForeignKey('GlobalCode', models.DO_NOTHING, related_name='equip',
+    equip_level = models.ForeignKey('GlobalCode', models.DO_NOTHING, related_name='equip_l',
                                     help_text='层级', verbose_name='层级')
 
     def __str__(self):
