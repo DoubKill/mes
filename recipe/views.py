@@ -14,13 +14,13 @@ from collections import OrderedDict
 from basics.models import GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
+from mes.permissions import ProductInfoPermissions
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductRecipeFilter, ProductBatchingFilter, \
     MaterialAttributeFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCreateSerializer, \
     ProductInfoUpdateSerializer, ProductInfoPartialUpdateSerializer, ProductInfoCopySerializer, \
     ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer, \
-    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
-    ProductMasterSerializer
+    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer
 from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
 
 
@@ -88,9 +88,15 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
         胶料应用和废弃操作
     """
     queryset = ProductInfo.objects.filter(delete_flag=False)
-    permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductInfoFilter
+
+    def get_permissions(self):
+        if self.action == 'partial_update':
+            return (ProductInfoPermissions(),
+                    IsAuthenticatedOrReadOnly())
+        else:
+            return (IsAuthenticatedOrReadOnly(),)
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -210,4 +216,5 @@ class PreProductBatchView(APIView):
                 pre_recipe_data['ratio'] = ratio
                 pre_recipe_data['density'] = pre_batch.batching_proportion
                 pre_recipe_data['material_name'] = pre_batch.stage_product_batch_no
+                pre_recipe_data['previous_product_batching'] = pre_batch.id
         return Response(pre_recipe_data)
