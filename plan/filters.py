@@ -14,7 +14,7 @@ class ProductDayPlanFilter(django_filters.rest_framework.FilterSet):
 
 class MaterialDemandedFilter(django_filters.rest_framework.FilterSet):
     """原材料需求量过滤器"""
-    schedule_no = django_filters.BaseInFilter(field_name='material__material_no')
+    schedule_no = django_filters.NumberFilter(field_name='material__material_no')
     sort = django_filters.CharFilter(field_name='material__material_name')
 
     class Meta:
@@ -34,7 +34,7 @@ class ProductBatchingDayPlanFilter(django_filters.rest_framework.FilterSet):
 
 class MaterialRequisitionFilter(django_filters.rest_framework.FilterSet):
     """领料日计划过滤器"""
-    material_id = django_filters.DateTimeFilter(field_name='id', help_text='日期')
+    material_id = django_filters.NumberFilter(field_name='id')
 
     class Meta:
         model = MaterialRequisition

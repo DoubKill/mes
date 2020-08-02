@@ -1,10 +1,6 @@
-from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
-from django.utils import six
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import BasePermission
-
-from system.models import User
 
 
 class IsSuperUser(BasePermission):
@@ -14,6 +10,19 @@ class IsSuperUser(BasePermission):
 
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_superuser)
+
+
+class ProductInfoPermissions(BasePermission):
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+        if obj.used_type == 1:  # 当前状态是编辑
+            return '配方审核' in request.user.groups.values_list('name', flat=True)
+        elif obj.used_type == 2:  # 当前状态是校验通过
+            return '配方应用' in request.user.groups.values_list('name', flat=True)
+        elif obj.used_type == 3:  # 当前状态是应用
+            return '配方废弃' in request.user.groups.values_list('name', flat=True)
 
 
 class PermissonsDispatch(object):
