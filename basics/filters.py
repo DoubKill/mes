@@ -16,7 +16,7 @@ class EquipFilter(django_filters.rest_framework.FilterSet):
 class GlobalCodeTypeFilter(django_filters.rest_framework.FilterSet):
     type_no = django_filters.CharFilter(field_name='type_no', lookup_expr='icontains', help_text='代码编号')
     type_name = django_filters.CharFilter(field_name='type_name', lookup_expr='icontains', help_text='代码名称')
-    used_flag = django_filters.BooleanFilter(field_name='used_flag', lookup_expr='icontains', help_text='是否启用')
+    used_flag = django_filters.BooleanFilter(field_name='used_flag', help_text='是否启用')
     class_name = django_filters.CharFilter(field_name='type_name',  help_text='筛选班次')
 
     class Meta:
@@ -37,10 +37,11 @@ class GlobalCodeFilter(django_filters.rest_framework.FilterSet):
     class_name = django_filters.CharFilter(field_name='global_type__type_name', help_text='筛选班次')
     id = django_filters.CharFilter(field_name='global_type__id', help_text="全局代码类型id")
     type_no = django_filters.CharFilter(field_name='global_type__type_no', help_text="全局代码类型编码")
+    used_flag = django_filters.BooleanFilter(field_name='used_flag', help_text='是否启用')
 
     class Meta:
         model = GlobalCode
-        fields = ('class_name', 'id', 'type_no')
+        fields = ('class_name', 'id', 'type_no', 'used_flag')
 
 
 class EquipCategoryFilter(django_filters.rest_framework.FilterSet):

@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
@@ -24,7 +25,8 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
     queryset = TrainsFeedbacks.objects.filter(delete_flag=False)
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = TrainsFeedbacksSerializer
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (OrderingFilter,)
+    orderind_fields = ["id", "plan_classes_uid"]
 
 
 class PalletFeedbacksViewSet(mixins.CreateModelMixin,
