@@ -170,7 +170,7 @@ class PlanSchedule(models.Model):
         ('saturday', '星期六'),
         ('sunday', '星期日'),
     )
-    day_time = models.DateTimeField(help_text='日期', verbose_name='日期')
+    day_time = models.DateField(help_text='日期', verbose_name='日期')
     week_time = models.CharField(max_length=64, choices=TYPE_CHOICE_WEEK, help_text='星期', verbose_name='星期')
     work_schedule = models.ForeignKey(WorkSchedule, models.DO_NOTHING,
                                       help_text='工作日程id', verbose_name='工作日程id', related_name="plan_schedule")

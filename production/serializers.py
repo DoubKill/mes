@@ -1,6 +1,7 @@
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl
+from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
+    OperationLog
 
 
 class TrainsFeedbacksSerializer(BaseModelSerializer):
@@ -52,7 +53,7 @@ class OperationLogSerializer(BaseModelSerializer):
     """操作日志"""
 
     class Meta:
-        model = ExpendMaterial
+        model = OperationLog
         fields = "__all__"
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
