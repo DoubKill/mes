@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
@@ -9,59 +10,120 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
 
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = TrainsFeedbacks
+                             mixins.RetrieveModelMixin,
+                             mixins.ListModelMixin,
+                             GenericViewSet):
+    """
+    list:
+        车次/批次产出反馈列表
+    retrieve:
+        车次/批次产出反馈详情
+    create:
+        创建车次/批次产出反馈
+    """
+    queryset = TrainsFeedbacks.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = TrainsFeedbacksSerializer
     filter_backends = (DjangoFilterBackend,)
 
 
-
-
 class PalletFeedbacksViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = PalletFeedbacks
+                             mixins.RetrieveModelMixin,
+                             mixins.ListModelMixin,
+                             GenericViewSet):
+    """
+        list:
+            托盘产出反馈列表
+        retrieve:
+            托盘产出反馈详情
+        create:
+            托盘产出反馈反馈
+    """
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = PalletFeedbacksSerializer
 
 
 class EquipStatusViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = EquipStatus
+                         mixins.RetrieveModelMixin,
+                         mixins.ListModelMixin,
+                         GenericViewSet):
+    """
+        list:
+            机台状况反馈列表
+        retrieve:
+            机台状况反馈详情
+        create:
+            创建机台状况反馈
+    """
+    queryset = EquipStatus.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = EquipStatusSerializer
 
 
 class PlanStatusViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = PlanStatus
+                        mixins.RetrieveModelMixin,
+                        mixins.ListModelMixin,
+                        GenericViewSet):
+    """
+        list:
+            计划状态变更列表
+        retrieve:
+            计划状态变更详情
+        create:
+            创建计划状态变更
+    """
+    queryset = PlanStatus.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = PlanStatusSerializer
 
 
 class ExpendMaterialViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = ExpendMaterial
+                            mixins.RetrieveModelMixin,
+                            mixins.ListModelMixin,
+                            GenericViewSet):
+    """
+        list:
+            原材料消耗列表
+        retrieve:
+            原材料消耗详情
+        create:
+            创建原材料消耗
+    """
+    queryset = ExpendMaterial.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ExpendMaterialSerializer
 
 
 class OperationLogViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = OperationLog
+                          mixins.RetrieveModelMixin,
+                          mixins.ListModelMixin,
+                          GenericViewSet):
+    """
+        list:
+            操作日志列表
+        retrieve:
+            操作日志详情
+        create:
+            创建操作日志
+    """
+    queryset = OperationLog.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = OperationLogSerializer
 
 
 class QualityControlViewSet(mixins.CreateModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.ListModelMixin,
-                   GenericViewSet):
-    queryset = QualityControl
+                            mixins.RetrieveModelMixin,
+                            mixins.ListModelMixin,
+                            GenericViewSet):
+    """
+        list:
+            质检结果列表
+        retrieve:
+            质检结果详情
+        create:
+            创建质检结果
+    """
+    queryset = QualityControl.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = QualityControlSerializer
