@@ -105,7 +105,7 @@ class ProductBatching(AbstractEntity):
     product_info = models.ForeignKey(ProductInfo, help_text='胶料工艺信息', on_delete=models.DO_NOTHING)
     stage_product_batch_no = models.CharField(max_length=63, help_text='段次胶料标准编码')
     stage = models.ForeignKey(GlobalCode, help_text='段次', verbose_name='段次',
-                              on_delete=models.DO_NOTHING, related_name='stage_masters')
+                              on_delete=models.DO_NOTHING, related_name='stage_batches')
     dev_type = models.ForeignKey(GlobalCode, help_text='机型', on_delete=models.DO_NOTHING)
     batching_weight = models.DecimalField(verbose_name='配料重量', help_text='配料重量', decimal_places=2, max_digits=8)
     manual_material_weight = models.DecimalField(verbose_name='手动小料重量', help_text='手动小料重量',

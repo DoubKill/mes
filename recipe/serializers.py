@@ -4,6 +4,7 @@ from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.validators import UniqueTogetherValidator
 
 from mes.base_serializer import BaseModelSerializer
 from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, \
@@ -33,6 +34,13 @@ class MaterialSerializer(serializers.ModelSerializer):
         model = Material
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('material_no', 'material_name', 'used_flag'),
+                message="该原材料已存在"
+            )
+        ]
 
 
 class MaterialAttributeSerializer(serializers.ModelSerializer):
