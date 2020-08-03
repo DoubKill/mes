@@ -125,7 +125,7 @@ class ProductStageInfoView(APIView):
         if not factory_id:
             raise ValidationError('缺少必填参数')
         try:
-            factory = GlobalCode.objects.get(id=factory_id)
+            factory = GlobalCode.objects.get(id=factory_id, used_flag=True, delete_flag=False)
         except Exception:
             raise ValidationError('产地不存在')
         ret = []
