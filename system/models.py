@@ -22,9 +22,20 @@ class User(AbstractUser):
     is_leave = models.BooleanField(help_text='是否离职', verbose_name='是否离职', default=False)
     section = models.ForeignKey(Section, blank=True, null=True, help_text='部门', verbose_name='部门',
                                 on_delete=models.DO_NOTHING)
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
+    delete_date = models.DateTimeField(blank=True, null=True,
+                                       help_text='删除日期', verbose_name='删除日期')
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
-    created_user = models.ForeignKey("self", blank=True, null=True, related_name='user',
-                                     on_delete=models.DO_NOTHING, help_text='创建人', verbose_name='创建人')
+    created_user = models.ForeignKey('self', blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
+                                     help_text='创建人', verbose_name='创建人', on_delete=models.DO_NOTHING,
+                                     related_query_name='c_%(app_label)s_%(class)ss')
+    last_updated_user = models.ForeignKey('self', blank=True, null=True, related_name='u_%(app_label)s_%(class)s_related',
+                                          help_text='更新人', verbose_name='更新人', on_delete=models.DO_NOTHING,
+                                          related_query_name='u_%(app_label)s_%(class)ss')
+    delete_user = models.ForeignKey('self', blank=True, null=True, related_name='d_%(app_label)s_%(class)s_related',
+                                    help_text='删除人', verbose_name='删除人', on_delete=models.DO_NOTHING,
+                                    related_query_name='d_%(app_label)s_%(class)ss')
 
 
     def __str__(self):
@@ -121,6 +132,20 @@ class GroupExtension(Group):
     """组织拓展信息表"""
     group_code = models.CharField(max_length=50, help_text='角色代码', verbose_name='角色代码')
     use_flag = models.BooleanField(help_text='是否使用', verbose_name='是否使用')
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
+    delete_date = models.DateTimeField(blank=True, null=True,
+                                       help_text='删除日期', verbose_name='删除日期')
+    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+    created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
+                                     help_text='创建人', verbose_name='创建人', on_delete=models.DO_NOTHING,
+                                     related_query_name='c_%(app_label)s_%(class)ss')
+    last_updated_user = models.ForeignKey(User, blank=True, null=True, related_name='u_%(app_label)s_%(class)s_related',
+                                          help_text='更新人', verbose_name='更新人', on_delete=models.DO_NOTHING,
+                                          related_query_name='u_%(app_label)s_%(class)ss')
+    delete_user = models.ForeignKey(User, blank=True, null=True, related_name='d_%(app_label)s_%(class)s_related',
+                                    help_text='删除人', verbose_name='删除人', on_delete=models.DO_NOTHING,
+                                    related_query_name='d_%(app_label)s_%(class)ss')
     # menu = models.ManyToManyField(Menu, blank=True, null=True, help_text='菜单', verbose_name='菜单')
     # function = models.ManyToManyField(Function, blank=True, null=True, help_text='功能', verbose_name='功能')
 

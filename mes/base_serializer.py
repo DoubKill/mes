@@ -6,6 +6,8 @@ from rest_framework.relations import PKOnlyObject
 
 from django.utils.translation import ugettext as _
 
+from system.models import User
+
 
 def _common_to_representation(self, instance):
     """
@@ -51,6 +53,14 @@ class BaseHyperlinkSerializer(serializers.HyperlinkedModelSerializer):
 
 class BaseModelSerializer(serializers.ModelSerializer):
     """封装字段值国际化功能后的模型类序列化器，需要用ModelSerializer请直接继承该类"""
+    created_username = serializers.SerializerMethodField(read_only=True)
+
+    def get_created_username(self, object):
+        user_id = object.created_user.id if object.created_user else 0
+        created_user = User.objects.filter(id=user_id).first()
+        return created_user.username if created_user else ""
+
+
     def to_representation(self, instance):
         """复用公共私有方法,扩展并继承原本to_representation方法"""
         return _common_to_representation(self, instance)
@@ -61,7 +71,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
         :param validated_data:
         :return:
         """
-        if self.Meta.model.__name__ in ["Permission", "Group", "GroupExtension"]:
+        if self.Meta.model.__name__ in ["Permission", "Group"]:
             return super().create(validated_data)
         validated_data.update(created_user=self.context["request"].user)
         instance = super().create(validated_data)
@@ -74,7 +84,7 @@ class BaseModelSerializer(serializers.ModelSerializer):
         :param validated_data:
         :return:
         """
-        if self.Meta.model.__name__ in ["User", "Permission", "Group", "GroupExtension"]:
+        if self.Meta.model.__name__ in ["Permission", "Group"]:
             return super().update(instance ,validated_data)
         validated_data.update(last_updated_user=self.context["request"].user)
         return super().update(instance ,validated_data)

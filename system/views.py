@@ -51,7 +51,7 @@ class UserViewSet(ModelViewSet):
     destroy:
         删除用户
     """
-    queryset = User.objects.all()
+    queryset = User.objects.filter(delete_flag=False)
 
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -73,7 +73,7 @@ class UserViewSet(ModelViewSet):
 
 class UserGroupsViewSet(mixins.ListModelMixin,
                            GenericViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.filter(delete_flag=False)
 
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -95,7 +95,7 @@ class GroupExtensionViewSet(ModelViewSet):
     destroy:
         删除角色
     """
-    queryset = GroupExtension.objects.filter()
+    queryset = GroupExtension.objects.filter(delete_flag=False)
     serializer_class = GroupExtensionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -117,7 +117,7 @@ class GroupExtensionViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class GroupAddUserViewSet(UpdateAPIView):
     """控制角色中用户具体为哪些的视图"""
-    queryset = GroupExtension.objects.all()
+    queryset = GroupExtension.objects.filter(delete_flag=False)
     serializer_class = GroupUserUpdateSerializer
 
 
@@ -133,7 +133,7 @@ class SectionViewSet(ModelViewSet):
     destroy:
         删除角色
     """
-    queryset = Section.objects.filter()
+    queryset = Section.objects.filter(delete_flag=False)
     serializer_class = SectionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
