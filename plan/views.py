@@ -1,5 +1,6 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework import mixins, status
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -34,8 +35,9 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = ProductDayPlan.objects.filter(delete_flag=False)
     serializer_class = ProductDayPlanSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductDayPlanFilter
+    ordering_fields = ['id', 'equip__category__equip_type__global_name']
     pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
@@ -62,8 +64,9 @@ class MaterialDemandedViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = MaterialDemanded.objects.filter(delete_flag=False)
     serializer_class = MaterialDemandedSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = MaterialDemandedFilter
+    ordering_fields = ['id', 'product_day_plan__plan_schedule__work_schedule__schedule_name']
     pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
@@ -88,8 +91,9 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = ProductBatchingDayPlan.objects.filter(delete_flag=False)
     serializer_class = ProductBatchingDayPlanSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductBatchingDayPlanFilter
+    ordering_fields = ['id', 'equip__category__equip_type__global_name']
     pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
@@ -117,8 +121,9 @@ class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = MaterialRequisition.objects.filter(delete_flag=False)
     serializer_class = MaterialRequisitionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = MaterialRequisitionFilter
+    ordering_fields = ['id']
     pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):

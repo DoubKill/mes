@@ -29,7 +29,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     class Meta:
         model = ProductDayPlan
         # fields = '__all__'
-        fields = ('equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
+        fields = ('id','equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
         # fields = ('equip', 'product_master', 'plan_schedule', 'equip_no', 'product_no', 'batching_weight','production_time_interval',
         #           'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
