@@ -35,6 +35,7 @@ class ProductClassesPlan(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_classes_plan')
+    plan_classes_uid = models.IntegerField(verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
     class Meta:
         db_table = 'product_classes_plan'
@@ -78,6 +79,7 @@ class ProductBatchingClassesPlan(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_batching_classes_plan')
+    plan_classes_uid = models.IntegerField(verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
     class Meta:
         db_table = 'product_batching_classes_plan'
@@ -135,6 +137,7 @@ class MaterialRequisitionClasses(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_material_requisition_classes')
+    plan_classes_uid = models.IntegerField(verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
     class Meta:
         db_table = 'material_requisition_classes'
