@@ -54,6 +54,8 @@ class MaterialAttributeSerializer(serializers.ModelSerializer):
 
 
 class ProductRecipeSerializer(serializers.ModelSerializer):
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1),
+                                                  allow_empty=True, allow_null=True, required=False)
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     stage_name = serializers.CharField(source='stage.global_name', read_only=True)
     material_material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
@@ -243,6 +245,8 @@ class ProductRecipeListSerializer(serializers.ModelSerializer):
 
 
 class ProductBatchingDetailSerializer(serializers.ModelSerializer):
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=True),
+                                                  allow_empty=True, allow_null=True, required=False)
     material_type = serializers.SerializerMethodField()
     material_name = serializers.SerializerMethodField()
 
