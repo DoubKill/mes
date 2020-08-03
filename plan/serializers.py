@@ -21,10 +21,17 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
                                                             help_text='{"sn":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":1,"classes_detail":1}')
 
+    # equip_no = serializers.IntegerField(source='equip.equip_no', read_only=True)
+    # product_no = serializers.IntegerField(source='product_master.stage_product_batch_no', read_only=True)
+    # batching_weight = serializers.IntegerField(source='product_master.batching_weight',read_only=True)
+    # production_time_interval=serializers.TimeField(source='product_master.batching_time_interval',read_only=True)
+
     class Meta:
         model = ProductDayPlan
         # fields = '__all__'
-        fields = ('equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan')
+        fields = ('equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
+        # fields = ('equip', 'product_master', 'plan_schedule', 'equip_no', 'product_no', 'batching_weight','production_time_interval',
+        #           'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     @atomic()
