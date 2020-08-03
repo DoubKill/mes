@@ -48,14 +48,21 @@ class MaterialSupplier(AbstractEntity):
 
 class ProductInfo(AbstractEntity):
     """胶料工艺信息"""
+    USE_TYPE_CHOICE = (
+        (1, '编辑'),
+        (2, '通过'),
+        (3, '应用'),
+        (4, '驳回'),
+        (5, '废弃'),
+    )
     product_no = models.CharField(max_length=64, help_text='胶料编码', verbose_name='胶料编码')
     product_name = models.CharField(max_length=64, help_text='胶料名称', verbose_name='胶料名称')
     versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
     precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案')
     factory = models.ForeignKey(GlobalCode, help_text='产地', verbose_name='产地',
                                 on_delete=models.DO_NOTHING, related_name='f_prods')
-    used_type = models.ForeignKey(GlobalCode, help_text='使用状态', verbose_name='使用状态',
-                                  on_delete=models.DO_NOTHING, related_name='ut_prods')
+    used_type = models.PositiveIntegerField(help_text='使用状态', verbose_name='使用状态',
+                                            choices=USE_TYPE_CHOICE)
     recipe_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=2, max_digits=8)
     used_user = models.ForeignKey(User, help_text='应用人', verbose_name='应用人', on_delete=models.DO_NOTHING,
                                   related_name='used_prods', blank=True, null=True)

@@ -38,7 +38,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        ProductClassesPlan.objects.filter(product_day_plan=instance).update(delete_flag=True)
+        ProductClassesPlan.objects.filter(product_day_plan=instance).update(delete_flag=True, delete_user=request.user)
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
@@ -63,6 +63,12 @@ class MaterialDemandedViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDemandedFilter
 
+    def perform_create(self, serializer):
+        serializer.save(created_user=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(last_updated_user=self.request.user)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
@@ -84,7 +90,8 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance).update(delete_flag=True)
+        ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance).update(delete_flag=True,
+                                                                                             delete_user=request.user)
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
@@ -111,7 +118,8 @@ class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        MaterialRequisitionClasses.objects.filter(material_requisition=instance).update(delete_flag=True)
+        MaterialRequisitionClasses.objects.filter(material_requisition=instance).update(delete_flag=True,
+                                                                                        delete_user=request.user)
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
