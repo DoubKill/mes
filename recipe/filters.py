@@ -5,10 +5,11 @@ from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching,
 
 class MaterialFilter(django_filters.rest_framework.FilterSet):
     material_type_id = django_filters.NumberFilter(field_name='material_type', help_text='原材料类别')
+    used_flag = django_filters.BooleanFilter(field_name='used_flag', help_text='是否使用')
 
     class Meta:
         model = Material
-        fields = ('material_type_id',)
+        fields = ('material_type_id', 'used_flag')
 
 
 class ProductInfoFilter(django_filters.rest_framework.FilterSet):
