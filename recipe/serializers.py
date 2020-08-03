@@ -13,7 +13,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 
 class MaterialSerializer(serializers.ModelSerializer):
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
-    packet_unit_name = serializers.CharField(source='packet_unit.global_name', read_only=True)
+    package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.SerializerMethodField(read_only=True)
 
@@ -154,7 +154,7 @@ class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
 
 class ProductInfoUpdateSerializer(serializers.ModelSerializer):
     product_standard_no = serializers.SerializerMethodField(read_only=True)
-    productrecipe_set = ProductRecipeSerializer(many=True)
+    productrecipe_set = ProductRecipeSerializer(many=True, required=False)
 
     @staticmethod
     def get_product_standard_no(obj):
@@ -165,9 +165,9 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if instance.used_type != 1:
             raise PermissionDenied('当前胶料不是编辑状态，无法操作')
-        recipes = validated_data.pop('productrecipe_set', None)
-        recipe_weight = sum(i.get('ratio', 0) for i in recipes)
-        if recipes:
+        if 'productrecipe_set' in validated_data:
+            recipes = validated_data.get('productrecipe_set')
+            recipe_weight = sum(i.get('ratio') if i.get('ratio') else 0 for i in recipes)
             ProductRecipe.objects.filter(product_info=instance).delete()
             recipes_list = []
             product_recipe_no = '{}-{}-{}'.format(instance.factory.global_no, instance.product_no, instance.versions)
@@ -176,8 +176,8 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
                 recipe['product_info'] = instance
                 recipes_list.append(ProductRecipe(**recipe))
             ProductRecipe.objects.bulk_create(recipes_list)
-        instance.recipe_weight = recipe_weight
-        instance.save()
+            instance.recipe_weight = recipe_weight
+            instance.save()
         return instance
 
     class Meta:
@@ -289,7 +289,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_update_user_name(obj):
-        return obj.product_infolast_updated_user.username if obj.product_info.last_updated_user else None
+        return obj.product_info.last_updated_user.username if obj.product_info.last_updated_user else None
 
     class Meta:
         model = ProductBatching
@@ -384,9 +384,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     def validate(self, attrs):
         recipe = ProductRecipe.objects.filter(product_info=self.instance.product_info,
                                               stage=self.instance.stage, delete_flag=False)
-        batching_details = attrs.get('batching_details')
         batching_weight = manual_material_weight = volume = 0
-        if batching_details:
+        if 'batching_details' in attrs:
+            batching_details = attrs.get('batching_details')
             for detail in batching_details:
                 actual_weight = detail.get('actual_weight')
                 batching_weight += actual_weight if actual_weight else 0
@@ -421,7 +421,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     def update(self, instance, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         instance = super().update(instance, validated_data)
-        if batching_details:
+        if 'batching_details' is not None:
             instance.batching_details.all().delete()
             batching_detail_list = []
             for detail in batching_details:
