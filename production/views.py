@@ -15,7 +15,6 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
     queryset = TrainsFeedbacks
     serializer_class = TrainsFeedbacksSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_class
 
 
 
