@@ -38,7 +38,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductDayPlanFilter
     ordering_fields = ['id', 'equip__category__equip_type__global_name']
-    pagination_class = LimitOffsetPagination
+    # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -67,7 +67,7 @@ class MaterialDemandedViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = MaterialDemandedFilter
     ordering_fields = ['id', 'product_day_plan__plan_schedule__work_schedule__schedule_name']
-    pagination_class = LimitOffsetPagination
+    # pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
         serializer.save(created_user=self.request.user)
@@ -94,7 +94,7 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductBatchingDayPlanFilter
     ordering_fields = ['id', 'equip__category__equip_type__global_name']
-    pagination_class = LimitOffsetPagination
+    # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -124,7 +124,7 @@ class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = MaterialRequisitionFilter
     ordering_fields = ['id']
-    pagination_class = LimitOffsetPagination
+    # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

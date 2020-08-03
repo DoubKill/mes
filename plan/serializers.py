@@ -20,6 +20,8 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     """胶料日计划序列化"""
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
                                                             help_text='{"sn":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":1,"classes_detail":1}')
+    # plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00",write_only=True)
+
 
     # equip_no = serializers.IntegerField(source='equip.equip_no', read_only=True)
     # product_no = serializers.IntegerField(source='product_master.stage_product_batch_no', read_only=True)
@@ -29,17 +31,20 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     class Meta:
         model = ProductDayPlan
         # fields = '__all__'
-        fields = ('id','equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
+        fields = ('plan_date', 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
+        fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
         # fields = ('equip', 'product_master', 'plan_schedule', 'equip_no', 'product_no', 'batching_weight','production_time_interval',
         #           'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     @atomic()
     def create(self, validated_data):
+        print(validated_data)
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_master'] = validated_data.pop('product_master')
         pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
+        # pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
         pdp_dic['created_user'] = self.context['request'].user
         # instance = ProductDayPlan.objects.create(**pdp_dic)
         instance = super().create(pdp_dic)
