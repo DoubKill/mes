@@ -14,6 +14,7 @@ from plan.serializers import ProductDayPlanSerializer, MaterialDemandedSerialize
     MaterialRequisitionCopySerializer
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     MaterialRequisition, ProductBatchingClassesPlan, MaterialRequisitionClasses
+from plan.paginations import LimitOffsetPagination
 
 
 # Create your views here.
@@ -35,6 +36,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductDayPlanFilter
+    pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -62,6 +64,7 @@ class MaterialDemandedViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDemandedFilter
+    pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
         serializer.save(created_user=self.request.user)
@@ -87,6 +90,7 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingDayPlanFilter
+    pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -115,6 +119,7 @@ class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialRequisitionFilter
+    pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
