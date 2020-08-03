@@ -44,6 +44,7 @@ urlpatterns = [
     path('api/v1/system/', include('system.urls')),
     path('api/v1/recipe/', include('recipe.urls')),
     path('api/v1/plan/', include('plan.urls')),
+    path('api/v1/production/', include('production.urls')),
     path('gui/', include('gui.urls')),
     path('favicon.ico', RedirectView.as_view(url='static/m.ico'))
 ]
