@@ -4,9 +4,10 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Pr
     ProductBatchingClassesPlan, MaterialRequisition, MaterialRequisitionClasses
 from basics.models import PlanSchedule
 from mes.conf import COMMON_READ_ONLY_FIELDS
+from mes.base_serializer import BaseModelSerializer
 
 
-class ProductClassesPlanSerializer(serializers.ModelSerializer):
+class ProductClassesPlanSerializer(BaseModelSerializer):
     classes = serializers.CharField(source='classes_detail.classes.global_name', read_only=True)
 
     class Meta:
@@ -15,23 +16,35 @@ class ProductClassesPlanSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ProductDayPlanSerializer(serializers.ModelSerializer):
-    # inventory=serializers.IntegerField(source='') TODO:库存暂时不写
-
+class ProductDayPlanSerializer(BaseModelSerializer):
+    """胶料日计划序列化"""
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
                                                             help_text='{"sn":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":1,"classes_detail":1}')
+    # plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00",write_only=True)
+
+
+    # equip_no = serializers.IntegerField(source='equip.equip_no', read_only=True)
+    # product_no = serializers.IntegerField(source='product_master.stage_product_batch_no', read_only=True)
+    # batching_weight = serializers.IntegerField(source='product_master.batching_weight',read_only=True)
+    # production_time_interval=serializers.TimeField(source='product_master.batching_time_interval',read_only=True)
 
     class Meta:
         model = ProductDayPlan
-        fields = ('equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan')
+        # fields = '__all__'
+        fields = ('plan_date', 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
+        fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
+        # fields = ('equip', 'product_master', 'plan_schedule', 'equip_no', 'product_no', 'batching_weight','production_time_interval',
+        #           'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     @atomic()
     def create(self, validated_data):
+        print(validated_data)
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_master'] = validated_data.pop('product_master')
         pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
+        # pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
         pdp_dic['created_user'] = self.context['request'].user
         # instance = ProductDayPlan.objects.create(**pdp_dic)
         instance = super().create(pdp_dic)
@@ -57,7 +70,8 @@ class ProductDayPlanSerializer(serializers.ModelSerializer):
             return pdp_obj
 
 
-class MaterialDemandedSerializer(serializers.ModelSerializer):
+class MaterialDemandedSerializer(BaseModelSerializer):
+    """原材料需求量序列化"""
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     classes_name = serializers.CharField(source='classes.classes_name', read_only=True)
 
@@ -65,16 +79,18 @@ class MaterialDemandedSerializer(serializers.ModelSerializer):
         model = MaterialDemanded
         fields = (
             'product_day_plan', 'classes', 'material', 'material_name', 'classes_name', 'material_demanded',)
+        # read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ProductBatchingClassesPlanSerializer(serializers.ModelSerializer):
+class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
     class Meta:
         model = ProductBatchingClassesPlan
         exclude = ('product_batching_day_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ProductBatchingDayPlanSerializer(serializers.ModelSerializer):
+class ProductBatchingDayPlanSerializer(BaseModelSerializer):
+    """配料小料日计划序列化"""
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
                                                                              help_text='{"product_master":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":"1","classes_detail":1}')
 
@@ -120,14 +136,15 @@ class ProductBatchingDayPlanSerializer(serializers.ModelSerializer):
         return pdp_obj
 
 
-class MaterialRequisitionClassesSerializer(serializers.ModelSerializer):
+class MaterialRequisitionClassesSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialRequisitionClasses
         exclude = ('material_requisition',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MaterialRequisitionSerializer(serializers.ModelSerializer):
+class MaterialRequisitionSerializer(BaseModelSerializer):
+    """领料日计划序列化"""
     mr_material_requisition_classes = MaterialRequisitionClassesSerializer(many=True,
                                                                            help_text='{"product_master":1,"weight":1,"unit":"1","classes_detail":1}')
 
@@ -171,7 +188,7 @@ class MaterialRequisitionSerializer(serializers.ModelSerializer):
         return pdp_obj
 
 
-class ProductDayPlanCopySerializer(serializers.ModelSerializer):
+class ProductDayPlanCopySerializer(BaseModelSerializer):
     src_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
     dst_date = serializers.DateTimeField(help_text="2020-07-31 10:50:00", write_only=True)
 
@@ -220,7 +237,7 @@ class ProductDayPlanCopySerializer(serializers.ModelSerializer):
         return instance
 
 
-class ProductBatchingDayPlanCopySerializer(serializers.ModelSerializer):
+class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
     src_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
     dst_date = serializers.DateTimeField(help_text="2020-07-31 10:50:00", write_only=True)
 
@@ -273,7 +290,7 @@ class ProductBatchingDayPlanCopySerializer(serializers.ModelSerializer):
         return instance
 
 
-class MaterialRequisitionCopySerializer(serializers.ModelSerializer):
+class MaterialRequisitionCopySerializer(BaseModelSerializer):
     src_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
     dst_date = serializers.DateTimeField(help_text="2020-07-31 10:50:00", write_only=True)
 

@@ -4,7 +4,9 @@ from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.validators import UniqueTogetherValidator
 
+from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute
@@ -12,8 +14,14 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
 class MaterialSerializer(serializers.ModelSerializer):
+    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True,
+                                                                                          delete_flag=False),
+                                                       help_text='原材料类型id')
+    package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True,
+                                                                                         delete_flag=False),
+                                                      help_text='包装单位id')
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
-    packet_unit_name = serializers.CharField(source='packet_unit.global_name', read_only=True)
+    package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.SerializerMethodField(read_only=True)
 
@@ -33,6 +41,13 @@ class MaterialSerializer(serializers.ModelSerializer):
         model = Material
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('material_no', 'material_name', 'used_flag'),
+                message="该原材料已存在"
+            )
+        ]
 
 
 class MaterialAttributeSerializer(serializers.ModelSerializer):
@@ -46,6 +61,9 @@ class MaterialAttributeSerializer(serializers.ModelSerializer):
 
 
 class ProductRecipeSerializer(serializers.ModelSerializer):
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1),
+                                                  allow_empty=True, allow_null=True, required=False)
+    stage = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1))
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     stage_name = serializers.CharField(source='stage.global_name', read_only=True)
     material_material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
@@ -56,6 +74,8 @@ class ProductRecipeSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoCreateSerializer(serializers.ModelSerializer):
+    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+                                                 help_text='产地id')
     productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"num": 编号, "material": 原材料id, 
     "stage": 段次id, "ratio": 配比}...]""")
 
@@ -154,7 +174,7 @@ class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
 
 class ProductInfoUpdateSerializer(serializers.ModelSerializer):
     product_standard_no = serializers.SerializerMethodField(read_only=True)
-    productrecipe_set = ProductRecipeSerializer(many=True)
+    productrecipe_set = ProductRecipeSerializer(many=True, required=False)
 
     @staticmethod
     def get_product_standard_no(obj):
@@ -165,9 +185,9 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if instance.used_type != 1:
             raise PermissionDenied('当前胶料不是编辑状态，无法操作')
-        recipes = validated_data.pop('productrecipe_set', None)
-        recipe_weight = sum(i.get('ratio', 0) for i in recipes)
-        if recipes:
+        if 'productrecipe_set' in validated_data:
+            recipes = validated_data.get('productrecipe_set')
+            recipe_weight = sum(i.get('ratio') if i.get('ratio') else 0 for i in recipes)
             ProductRecipe.objects.filter(product_info=instance).delete()
             recipes_list = []
             product_recipe_no = '{}-{}-{}'.format(instance.factory.global_no, instance.product_no, instance.versions)
@@ -176,8 +196,8 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
                 recipe['product_info'] = instance
                 recipes_list.append(ProductRecipe(**recipe))
             ProductRecipe.objects.bulk_create(recipes_list)
-        instance.recipe_weight = recipe_weight
-        instance.save()
+            instance.recipe_weight = recipe_weight
+            instance.save()
         return instance
 
     class Meta:
@@ -187,6 +207,8 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoCopySerializer(serializers.ModelSerializer):
+    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+                                                 help_text='产地id')
     product_info_id = serializers.PrimaryKeyRelatedField(queryset=ProductInfo.objects.exclude(used_type=1),
                                                          write_only=True, help_text='复制配方工艺id')
 
@@ -235,6 +257,8 @@ class ProductRecipeListSerializer(serializers.ModelSerializer):
 
 
 class ProductBatchingDetailSerializer(serializers.ModelSerializer):
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=True),
+                                                  allow_empty=True, allow_null=True, required=False)
     material_type = serializers.SerializerMethodField()
     material_name = serializers.SerializerMethodField()
 
@@ -289,7 +313,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_update_user_name(obj):
-        return obj.product_infolast_updated_user.username if obj.product_info.last_updated_user else None
+        return obj.product_info.last_updated_user.username if obj.product_info.last_updated_user else None
 
     class Meta:
         model = ProductBatching
@@ -301,6 +325,10 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
 
 class ProductBatchingCreateSerializer(serializers.ModelSerializer):
+    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+                                               help_text='段次id')
+    dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+                                                  help_text='机型id')
     batching_details = ProductBatchingDetailSerializer(many=True, help_text="""配料详情：{
                                                                                      'num': '序号',
                                                                                      'material': '原材料id',
@@ -384,9 +412,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     def validate(self, attrs):
         recipe = ProductRecipe.objects.filter(product_info=self.instance.product_info,
                                               stage=self.instance.stage, delete_flag=False)
-        batching_details = attrs.get('batching_details')
         batching_weight = manual_material_weight = volume = 0
-        if batching_details:
+        if 'batching_details' in attrs:
+            batching_details = attrs.get('batching_details')
             for detail in batching_details:
                 actual_weight = detail.get('actual_weight')
                 batching_weight += actual_weight if actual_weight else 0
@@ -421,7 +449,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     def update(self, instance, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         instance = super().update(instance, validated_data)
-        if batching_details:
+        if 'batching_details' is not None:
             instance.batching_details.all().delete()
             batching_detail_list = []
             for detail in batching_details:
