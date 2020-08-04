@@ -1,6 +1,8 @@
+from django.db.models import F
 from rest_framework import serializers
 from django.db.transaction import atomic
 
+from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute
 from mes.base_serializer import BaseModelSerializer
@@ -9,21 +11,72 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 
 class GlobalCodeTypeSerializer(BaseModelSerializer):
     """公共代码类型序列化器"""
+    type_name = serializers.CharField(max_length=64,
+                                      validators=[
+                                          UniqueValidator(queryset=GlobalCodeType.objects.filter(delete_flag=False),
+                                                          message='该代码类型名称已存在'),
+                                      ])
+
+    def update(self, instance, validated_data):
+        if 'used_flag' in validated_data:
+            if instance.used_flag != validated_data['used_flag']:
+                if validated_data['used_flag'] == 0:  # 弃用
+                    instance.global_codes.filter().update(used_flag=F('id'))
+                else:  # 启用
+                    instance.global_codes.filter().update(used_flag=0)
+        instance = super().update(instance, validated_data)
+        return instance
 
     class Meta:
         model = GlobalCodeType
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('type_name', 'used_flag'),
+                message="该代码类型名称已存在"
+            )
+        ]
 
 
 class GlobalCodeSerializer(BaseModelSerializer):
     """公共代码序列化器"""
 
-    # global_code_type = serializers.HyperlinkedIdentityField(view_name='globalcodetype-detail')
+    @staticmethod
+    def validate_global_type(global_type):
+        if global_type.used_flag == 0:
+            raise serializers.ValidationError('弃用状态的代码类型不可新建公共代码')
+        return global_type
+
+    def create(self, validated_data):
+        validated_data.update(created_user=self.context["request"].user)
+        instance = super().create(validated_data)
+        if 'used_flag' in validated_data:
+            if validated_data['used_flag'] != 0:  # 不是启用状态，修改其used_flag为id
+                instance.used_flag = instance.id
+                instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        if 'used_flag' in validated_data:
+            if instance.used_flag != validated_data['used_flag']:
+                if validated_data['used_flag'] != 0:  # 弃用
+                    validated_data['used_flag'] = instance.id
+        validated_data.update(last_updated_user=self.context["request"].user)
+        return super(GlobalCodeSerializer, self).update(instance, validated_data)
+
     class Meta:
         model = GlobalCode
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('global_no', 'global_name', 'global_type', 'used_flag'),
+                message="该公共代码已存在"
+            )
+        ]
 
 
 class ClassesDetailSerializer(BaseModelSerializer):
@@ -94,6 +147,9 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
 
 class EquipCategoryAttributeSerializer(BaseModelSerializer):
     """设备分类属性表序列化器"""
+    equip_process_name = serializers.CharField(source="process.global_name", read_only=True)
+    equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
+    equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
 
     class Meta:
         model = EquipCategoryAttribute
@@ -103,17 +159,17 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
 
 class EquipSerializer(BaseModelSerializer):
     """设备序列化器"""
-    category = serializers.SerializerMethodField()
+    category_no = serializers.CharField(source="category.global_no", read_only=True)
+    category_name = serializers.CharField(source="category.global_name", read_only=True)
+    equip_process_name = serializers.CharField(source="category.process.global_name", read_only=True)
+    equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
+    equip_level_name = serializers.CharField(source="equip_level.global_name", read_only=True)
 
     class Meta:
         model = Equip
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
-    def get_category(self, object):
-        temp = object.category.__dict__
-        temp.pop('_state')
-        return temp
 
 
 class EquipCreateAndUpdateSerializer(BaseModelSerializer):

@@ -1,10 +1,24 @@
 const BasicsUrl = "/api/v1/basics/";
 const GlobalTypesUrl = BasicsUrl + "global-types/";
 const GlobalCodesUrl = BasicsUrl + "global-codes/";
+
+const EquipCategoryPostUpdUrl = BasicsUrl + "equips-category/";
+const EquipCategoryUrl = BasicsUrl + "equips-category-list/";
+const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=设备类型";
+const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
+const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
+
+const EquipPostUrl = BasicsUrl + "equips/";
+const EquipUrl = BasicsUrl + "equips-list/";
+
+
 const SystemUrl = "/api/v1/system/";
 const PersonnelsUrl = SystemUrl + "personnels/";
-const PermissionUrl = "/api/v1/system/permission/";
-const GroupUrl = "/api/v1/system/group_extension/";
+const PermissionUrl = SystemUrl + "permission/";
+const GroupUrl = SystemUrl + "group_extension/";
+const UsersByGroupUrl = SystemUrl + "personnels_groups/";
+const WorkSchedulesUrl = BasicsUrl + "work_schedules/";
+const GroupAddUserUrl = SystemUrl + "group_add_user/";
 
 var BaseMixin = {
 
@@ -49,6 +63,7 @@ var BaseMixin = {
             this.tableData = [];
             const app = this;
             axios.get(this.tableDataUrl, {
+
                 params: this.getParams
             }).then(function (response) {
 
@@ -57,8 +72,8 @@ var BaseMixin = {
                 }
                 app.tableData = response.data.results;
                 app.afterGetData();
-            }).catch(function (error) {
 
+            }).catch(function (error) {
                 this.$message.error(error);
             })
         },

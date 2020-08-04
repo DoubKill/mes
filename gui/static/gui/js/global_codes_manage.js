@@ -154,11 +154,11 @@
                 this.globalCodeTypesCurrentRow = row;
                 axios.get(GlobalCodesUrl, {
                     params: {
-                        global_type_id: row.id
+                        id: row.id
                     }
                 }).then(function (response) {
 
-                    app.globalCodes = response.data;
+                    app.globalCodes = response.data.results;
                     app.globalCodes.used_flag_b = app.globalCodes.used_flag ? 0 : 1;
                     app.globalCodeForm.global_type = row.id;
                 }).catch(function (error) {

@@ -1,0 +1,151 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-row>
+        <el-col :span="14">
+            <el-card shadow="never">
+                <el-calendar>
+                </el-calendar>
+            </el-card>
+        </el-col>
+        <el-col :span="10">
+            <el-card shadow="never">
+                <el-form :label-width="formLabelWidth">
+                    <el-form-item>
+                        <el-button @click="generateScheduling" style="float: right">生成</el-button>
+                    </el-form-item>
+                    <el-form-item label="开始时间" :label-width="formLabelWidth">
+                        <el-date-picker style="width: 100%"
+                                        v-model="startTime"
+                                        type="date"
+                                        placeholder="选择日期">
+                        </el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="倒班时间" :label-width="formLabelWidth">
+                        <el-select @change="shiftsTimeChange" style="width: 100%"
+                                   v-model="workScheduleIndex" placeholder="请选择">
+                            <el-option
+                                    :key="item.value"
+                                    :value="item.value"
+                                    :label="item.label"
+                                    v-for="item in workScheduleOptions">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="倒班周期" :label-width="formLabelWidth">
+                        <el-select v-model="changeShiftsPeriod" style="width: 100%" placeholder="请选择">
+                            <el-option
+                                    :key="period.id"
+                                    :value="period.global_name"
+                                    :label="period.global_name"
+                                    v-for="period in changeShiftsPeriods">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                </el-form>
+                <el-table
+                        :data="classData"
+                        border
+                        style="width: 100%">
+                    <el-table-column
+                            prop="classes_name"
+                            label="班次"
+                            width="180">
+                    </el-table-column>
+                    <el-table-column
+                            prop="start_time"
+                            label="开始"
+                            width="180">
+                    </el-table-column>
+                    <el-table-column
+                            prop="end_time"
+                            label="结束"
+                            width="180">
+                    </el-table-column>
+                    <el-table-column label="班组">
+                        <template slot-scope="scope">
+                            <el-select size="mini" v-model="scope.row.group" placeholder="请选择">
+                                <el-option
+                                        v-for="group in groups"
+                                        :key="group.id"
+                                        :label="group.global_name"
+                                        :value="group.id">
+                                </el-option>
+                            </el-select>
+                        </template>
+                    </el-table-column>
+                    </el-table-column>
+                </el-table>
+            </el-card>
+        </el-col>
+    </el-row>
+    <el-row>
+        <el-form>
+            <el-form-item>
+                <el-button @click="" style="float: right">保存</el-button>
+            </el-form-item>
+        </el-form>
+
+        {% verbatim vue %}
+            <table class="table table-bordered"
+                   style="width: 100%; color: #909399; font-size: 14px;">
+                <thead>
+                <tr>
+                    <th></th>
+                    <th></th>
+                    <th colspan="4" v-for="class_ in classes">
+                        {{ class_.global_name }}
+                    </th>
+                </tr>
+                <tr>
+                    <th>生产日期</th>
+                    <th>星期</th>
+                    <template v-for="class_ in classes">
+                        <th>班组</th>
+                        <th>休息</th>
+                        <th>开始</th>
+                        <th>结束</th>
+                    </template>
+                </tr>
+                </thead>
+                <tbody style="color: #606266;">
+                <tr v-for="schedule in scheduleData">
+                    <td>{{ schedule.production_time }}</td>
+                    <td>{{ schedule.day_of_the_week }}</td>
+                    <template v-for="info in schedule.group_infos">
+                        <td>
+                            {{ info.group_name }}
+                        </td>
+                        <td>
+                            <el-select v-model="info.is_rest">
+                                <el-option
+                                        v-for="item in [{label: '否', value: false}, {label: '是', value: true}]"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value">
+                                </el-option>
+                            </el-select>
+                        </td>
+                        <td>
+                            {{ info.start_time }}
+                        </td>
+                        <td>
+                            {{ info.end_time }}
+                        </td>
+                    </template>
+                </tr>
+                </tbody>
+            </table>
+        {% endverbatim vue %}
+    </el-row>
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'node_modules/bootstrap/dist/css/bootstrap.min.css' %}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
+    <script src="{% static 'gui/js/factory_schedule_manage.js' %}"></script>
+{% endblock %}
