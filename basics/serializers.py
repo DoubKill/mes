@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.db.transaction import atomic
+from rest_framework.validators import UniqueTogetherValidator
 
 from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute
@@ -14,16 +15,29 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
         model = GlobalCodeType
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('type_name', 'used_flag'),
+                message="该代码类型名称已存在"
+            )
+        ]
 
 
 class GlobalCodeSerializer(BaseModelSerializer):
     """公共代码序列化器"""
 
-    # global_code_type = serializers.HyperlinkedIdentityField(view_name='globalcodetype-detail')
     class Meta:
         model = GlobalCode
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('global_no', 'global_name', 'used_flag'),
+                message="该公共代码已存在"
+            )
+        ]
 
 
 class ClassesDetailSerializer(BaseModelSerializer):

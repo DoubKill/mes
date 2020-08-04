@@ -22,6 +22,7 @@ class GlobalCodeType(AbstractEntity):
         managed = MANAGED
         db_table = 'global_code_type'
         verbose_name_plural = verbose_name = '公共代码类型'
+        unique_together = ("id")
 
 
 class GlobalCode(AbstractEntity):
