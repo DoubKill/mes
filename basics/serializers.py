@@ -151,6 +151,7 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
     equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
 
+
     class Meta:
         model = EquipCategoryAttribute
         fields = '__all__'

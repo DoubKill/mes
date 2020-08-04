@@ -1,6 +1,8 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from django.http import HttpResponse
@@ -275,3 +277,11 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
                           PermissionClass(permission_required=return_permission_params(model_name)))
+
+    def create(self, request, *args, **kwargs):
+        body = request.data
+        for plan in body:
+            serializer = self.get_serializer(data=plan)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        return Response({"message": "create success"}, status=status.HTTP_201_CREATED)

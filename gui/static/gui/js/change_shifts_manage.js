@@ -34,7 +34,7 @@
             axios.get(GlobalCodesUrl, {
 
                 params: {
-                    class_name: '班次'
+                    class_name: "班次"
                 }
             }).then(function (response) {
 
