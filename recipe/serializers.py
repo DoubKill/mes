@@ -44,7 +44,7 @@ class MaterialSerializer(serializers.ModelSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=model.objects.filter(delete_flag=False),
-                fields=('material_no', 'material_name', 'used_flag'),
+                fields=('material_no', 'material_name'),
                 message="该原材料已存在"
             )
         ]
@@ -63,7 +63,8 @@ class MaterialAttributeSerializer(serializers.ModelSerializer):
 class ProductRecipeSerializer(serializers.ModelSerializer):
     material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1),
                                                   allow_empty=True, allow_null=True, required=False)
-    stage = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1))
+    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+                                               help_text='段次id')
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     stage_name = serializers.CharField(source='stage.global_name', read_only=True)
     material_material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
