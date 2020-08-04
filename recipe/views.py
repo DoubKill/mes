@@ -70,6 +70,27 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class ValidateProductVersionsView(APIView):
+    """验证版本号，创建胶料工艺信息前调用，参数：xxx/?versions=版本&factory=产地id&product_no=胶料编码"""
+
+    def get(self, request):
+        versions = self.request.query_params.get('versions')
+        factory = self.request.query_params.get('factory')
+        product_no = self.request.query_params.get('product_no')
+        if not all([versions, factory, product_no]):
+            raise ValidationError('参数不足')
+        try:
+            factory = int(factory)
+        except Exception:
+            raise ValidationError('参数错误')
+        product_info = ProductInfo.objects.filter(factory_id=factory, product_no=product_no).order_by('-versions').first()
+        if product_info:
+            if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+                return Response({'code': -1, 'message': '版本号不得小于现有版本号'})
+        return Response({'code': 0, 'message': ''})
+
+
+@method_decorator([api_recorder], name="dispatch")
 class ProductInfoViewSet(mixins.CreateModelMixin,
                          mixins.RetrieveModelMixin,
                          mixins.UpdateModelMixin,
@@ -125,7 +146,7 @@ class ProductStageInfoView(APIView):
         if not factory_id:
             raise ValidationError('缺少必填参数')
         try:
-            factory = GlobalCode.objects.get(id=factory_id)
+            factory = GlobalCode.objects.get(id=factory_id, used_flag=True, delete_flag=False)
         except Exception:
             raise ValidationError('产地不存在')
         ret = []
