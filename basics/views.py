@@ -4,16 +4,15 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
 from django.http import HttpResponse
-from django.db.models import F, Q
+from django.db.models import Q
 import json
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, EquipCategoryFilter
-from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, EquipCategoryAttribute, Equip, SysbaseEquipLevel, \
+from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
-    EquipCategoryAttributeSerializer, EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, \
-    WorkScheduleUpdateSerializer, ClassesDetailSerializer, PlanScheduleSerializer, EquipCreateAndUpdateSerializer, \
-    EquipCategoryAttributeSerializer
+    EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer, \
+    ClassesDetailSerializer, PlanScheduleSerializer, EquipCategoryAttributeSerializer
 from mes.common_code import return_permission_params, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -39,6 +38,11 @@ class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
                           PermissionClass(permission_required=return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     filter_class = GlobalCodeTypeFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.global_codes.filter().update(delete_flag=True, delete_user=request.user)
+        return super().destroy(request, *args, **kwargs)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -90,6 +94,7 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
             return WorkScheduleSerializer
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
@@ -110,6 +115,7 @@ class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     filter_class = EquipCategoryFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipCategoryListViewSet(APIView):
     def get(self, request):
         category_name = request.GET.get("category_name", None)
@@ -155,19 +161,19 @@ class EquipListViewSet(APIView):
         result_list = []
         for ele in queryset:
             result_list.append({
-                "id":ele.id,
-                "process_no":ele.category.process.global_no,
-                "process_name":ele.category.process.global_name,
-                "category_no":ele.category.category_no,
-                "category_name":ele.category.category_name,
-                "equip_no":ele.equip_no,
-                "equip_name":ele.equip_name,
-                "equip_type":ele.category.equip_type.global_name,
-                "equip_level_name":ele.equip_level.global_name,
-                "count_flag":ele.count_flag,
-                "used_flag":ele.used_flag,
-                "description":ele.description,
-                "category":ele.category.id,
+                "id": ele.id,
+                "process_no": ele.category.process.global_no,
+                "process_name": ele.category.process.global_name,
+                "category_no": ele.category.category_no,
+                "category_name": ele.category.category_name,
+                "equip_no": ele.equip_no,
+                "equip_name": ele.equip_name,
+                "equip_type": ele.category.equip_type.global_name,
+                "equip_level_name": ele.equip_level.global_name,
+                "count_flag": ele.count_flag,
+                "used_flag": ele.used_flag,
+                "description": ele.description,
+                "category": ele.category.id,
                 "equip_level": ele.equip_level.id
             })
         resp = {"results": result_list}
@@ -193,7 +199,6 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
                           PermissionClass(permission_required=return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFilter
-
 
 
 @method_decorator([api_recorder], name="dispatch")
