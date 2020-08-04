@@ -1,7 +1,7 @@
 import xlrd
 from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
-from rest_framework import mixins
+from rest_framework import mixins, status
 from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
@@ -15,7 +15,6 @@ from mes.paginations import SinglePageNumberPagination
 from system.models import GroupExtension, User, Section
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
-from basics.views import CommonDeleteMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from system.filters import UserFilter, GroupExtensionFilter
 
@@ -49,14 +48,23 @@ class UserViewSet(ModelViewSet):
     update:
         修改用户
     destroy:
-        删除用户
+        账号停用和启用
     """
     queryset = User.objects.filter(delete_flag=False)
-
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = UserFilter
+
+    def destroy(self, request, *args, **kwargs):
+        # 账号停用和启用
+        instance = self.get_object()
+        if instance.is_active:
+            instance.is_active = 0
+        else:
+            instance.is_active = 1
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_class(self):
         if self.action == 'list':
