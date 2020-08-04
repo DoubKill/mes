@@ -17,7 +17,6 @@ class GlobalCodeType(AbstractEntity):
     class Meta:
         db_table = 'global_code_type'
         verbose_name_plural = verbose_name = '公共代码类型'
-        unique_together = ("id")
 
 
 class GlobalCode(AbstractEntity):
@@ -35,7 +34,6 @@ class GlobalCode(AbstractEntity):
 
     class Meta:
         db_table = 'global_code'
-        unique_together = ("global_no", "global_name", "used_flag")
         verbose_name_plural = verbose_name = '公共代码'
 
 
