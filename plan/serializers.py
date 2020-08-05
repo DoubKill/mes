@@ -247,6 +247,16 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
         dst_date = validated_data.pop('dst_date')
         ps_obj = PlanSchedule.objects.filter(day_time=dst_date).first()
         pdp_queryset = ProductDayPlan.objects.filter(plan_schedule__day_time=src_date, delete_flag=False)
+        delete_pdp_queryset = ProductDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False)
+        if delete_pdp_queryset:
+            ProductDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False).update(delete_flag=True,
+                                                                                                      delete_user=
+                                                                                                      self.context[
+                                                                                                          'request'].user)
+            for delete_pdp_obj in delete_pdp_queryset:
+                ProductClassesPlan.objects.filter(product_day_plan=delete_pdp_obj).update(delete_flag=True,
+                                                                                          delete_user=self.context[
+                                                                                              'request'].user)
         for pdp_obj in pdp_queryset:
             instance = ProductDayPlan.objects.create(equip=pdp_obj.equip, product_master=pdp_obj.product_master,
                                                      plan_schedule=ps_obj, created_user=self.context['request'].user)
@@ -296,6 +306,18 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
         dst_date = validated_data.pop('dst_date')
         ps_obj = PlanSchedule.objects.filter(day_time=dst_date).first()
         pbdp_queryset = ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=src_date, delete_flag=False)
+        delete_pdp_queryset = ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False)
+        if delete_pdp_queryset:
+            ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False).update(
+                delete_flag=True,
+                delete_user=
+                self.context[
+                    'request'].user)
+            for delete_pdp_obj in delete_pdp_queryset:
+                ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=delete_pdp_obj).update(
+                    delete_flag=True,
+                    delete_user=self.context[
+                        'request'].user)
         for pbdp_obj in pbdp_queryset:
             instance = ProductBatchingDayPlan.objects.create(equip=pbdp_obj.equip,
                                                              product_master=pbdp_obj.product_master,
@@ -349,6 +371,18 @@ class MaterialRequisitionCopySerializer(BaseModelSerializer):
         dst_date = validated_data.pop('dst_date')
         ps_obj = PlanSchedule.objects.filter(day_time=dst_date).first()
         mr_queryset = MaterialRequisition.objects.filter(plan_schedule__day_time=src_date, delete_flag=False)
+        delete_pdp_queryset = MaterialRequisition.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False)
+        if delete_pdp_queryset:
+            MaterialRequisition.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False).update(
+                delete_flag=True,
+                delete_user=
+                self.context[
+                    'request'].user)
+            for delete_pdp_obj in delete_pdp_queryset:
+                MaterialRequisitionClasses.objects.filter(material_requisition=delete_pdp_obj).update(
+                    delete_flag=True,
+                    delete_user=self.context[
+                        'request'].user)
         for mr_obj in mr_queryset:
             instance = MaterialRequisition.objects.create(material_demanded=mr_obj.material_demanded,
                                                           count=mr_obj.count,
