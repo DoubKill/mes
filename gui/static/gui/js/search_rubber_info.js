@@ -5,6 +5,7 @@
         data: function () {
 
             return {
+                tableDataUrl: RubberMaterialUrl,
                 stage: '',
                 equipCatagory: '',
                 factory: '',

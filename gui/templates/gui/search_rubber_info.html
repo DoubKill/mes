@@ -48,19 +48,20 @@
             border
             style="width: 100%">
         <el-table-column
+                type="index"
                 label="No"
                 width="30">
         </el-table-column>
         <el-table-column
-                prop="material_no"
+                prop="stage_product_batch_no"
                 label="胶料编码">
         </el-table-column>
         <el-table-column
-                prop="material_name"
+                prop="stage_name"
                 label="段次">
         </el-table-column>
         <el-table-column
-                prop="for_short"
+                prop="dev_type_name"
                 label="炼胶机类型">
         </el-table-column>
         <el-table-column
@@ -68,45 +69,46 @@
                 label="产地">
         </el-table-column>
         <el-table-column
-                prop="density"
+                prop="versions_name"
                 label="版本"
                 width="100">
         </el-table-column>
         <el-table-column
-                prop="package_unit_name"
+                prop="product_name"
                 label="胶料名称">
         </el-table-column>
         <el-table-column
-                prop="used_flag"
+                prop="batching_weight"
                 label="配料重量">
         </el-table-column>
         <el-table-column
-                prop="created_user_name"
+                prop="production_time_interval"
                 label="配料时间">
         </el-table-column>
         <el-table-column
                 :formatter="formatter"
-                prop="created_date"
+                prop="used_type"
                 label="应用与否">
         </el-table-column>
         <el-table-column
-                prop="update_user_name"
+                prop="used_user_name"
                 label="应用人员">
         </el-table-column>
         <el-table-column
-                prop="last_updated_date"
+                prop="used_time"
                 label="应用时间">
         </el-table-column>
         <el-table-column
-                prop="last_updated_date"
+                prop="obsolete_user_name"
                 label="废弃人">
         </el-table-column>
         <el-table-column
-                prop="last_updated_date"
+                prop="obsolete_time"
                 label="废弃时间">
         </el-table-column>
 
     </el-table>
+    {% include 'gui/paginations.html' %}
 {% endblock %}
 
 
