@@ -1,0 +1,206 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="工序">
+            <el-input v-model.number="process" v-on:input="processChanged"></el-input>
+        </el-form-item>
+        <el-form-item label="设备名">
+            <el-input v-model="equip" v-on:input="equipChanged"></el-input>
+        </el-form-item>
+        <el-form-item>
+            {% if perms.system.add_equip %}
+                <el-button @click="showCreateEquipDialog">新建</el-button>
+            {% endif %}
+        </el-form-item>
+    </el-form>
+
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                prop="id"
+                label="序"
+                width="50">
+        </el-table-column>
+        <el-table-column
+                prop="process_no"
+                label="工序代码">
+        </el-table-column>
+        <el-table-column
+                prop="process_name"
+                label="工序名称">
+        </el-table-column>
+        <el-table-column
+                prop="category_no"
+                label="机型编号">
+        </el-table-column>
+        <el-table-column
+                prop="category_name"
+                label="机型名称">
+        </el-table-column>
+        <el-table-column
+                prop="equip_no"
+                label="设备代码">
+        </el-table-column>
+        <el-table-column
+                prop="equip_name"
+                label="设备名称">
+        </el-table-column>
+        <el-table-column
+                prop="equip_type"
+                label="设备类型">
+        </el-table-column>
+        <el-table-column
+                prop="equip_level_name"
+                label="设备层级">
+        </el-table-column>
+
+        <el-table-column
+                prop="count_flag"
+                label="产量计数"
+                :formatter="EquipCountFlagFormatter">
+        </el-table-column>
+        <el-table-column
+                prop="description"
+                label="备注">
+        </el-table-column>
+        <el-table-column
+                prop="used_flag"
+                label="是否启用"
+                :formatter="EquipUsedFlagFormatter">
+        </el-table-column>
+        <el-table-column label="操作">
+            <template slot-scope="scope">
+                <el-button-group>
+                    {% if perms.system.change_equip %}
+                    <el-button
+                            size="mini"
+                            @click="showEditEquipDialog(scope.row)">编辑
+                    </el-button>
+                    {% endif %}
+                    {% if perms.system.delete_equip %}
+                    <el-button
+                            size="mini"
+                            type="danger"
+                            @click="handleEquipDelete(scope.row)">删除
+                    </el-button>
+                    {% endif %}
+                </el-button-group>
+            </template>
+        </el-table-column>
+    </el-table>
+{#    {% include 'gui/paginations.html' %}#}
+
+{% endblock %}
+
+{% block dialogs %}
+    {% if perms.system.add_equip %}
+        <el-dialog title="添加设备基础信息" :visible.sync="dialogCreateEquipVisible">
+            <el-form :model="EquipForm" ref="EquipForm" :label-width="formLabelWidth">
+                <el-form-item :error="EquipFormError.equip_no" label="设备编号">
+                    <el-input v-model="EquipForm.equip_no"></el-input>
+                </el-form-item>
+                <el-form-item :error="EquipFormError.equip_name" label="设备名称">
+                    <el-input v-model="EquipForm.equip_name"></el-input>
+                </el-form-item>
+
+                <el-form-item :error="EquipFormError.count_flag" label="产量计数" :label-width="formLabelWidth">
+                    <el-switch v-model="EquipFormError.count_flag"></el-switch>
+                </el-form-item>
+
+                <el-form-item :error="EquipFormError.description" label="备注">
+                    <el-input v-model="EquipForm.description"></el-input>
+                </el-form-item>
+                <el-form-item :error="EquipFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
+                    <el-switch v-model="EquipFormError.used_flag"></el-switch>
+                </el-form-item>
+
+                <el-form-item label="设备层级" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipLevelChange" style="width: 100%"
+                               v-model="EquipForm.equip_level" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipLevelOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="设备种类" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipCategoryChange" style="width: 100%"
+                               v-model="EquipForm.category" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipCategoryOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogCreateEquipVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleCreateEquip('EquipForm')">确 定</el-button>
+            </div>
+        </el-dialog>
+    {% endif %}
+    {% if perms.system.change_equip %}
+        <el-dialog title="编辑设备基础信息" :visible.sync="dialogEditEquipVisible">
+            <el-form :model="EquipForm" ref="EquipForm" :label-width="formLabelWidth">
+            <el-form-item :error="EquipFormError.equip_no" label="设备编号">
+                    <el-input v-model="EquipForm.equip_no"></el-input>
+                </el-form-item>
+                <el-form-item :error="EquipFormError.equip_name" label="设备名称">
+                    <el-input v-model="EquipForm.equip_name"></el-input>
+                </el-form-item>
+
+                <el-form-item :error="EquipFormError.count_flag" label="产量计数" :label-width="formLabelWidth">
+                    <el-switch v-model="EquipFormError.count_flag"></el-switch>
+                </el-form-item>
+
+                <el-form-item :error="EquipFormError.description" label="备注">
+                    <el-input v-model="EquipForm.description"></el-input>
+                </el-form-item>
+                <el-form-item :error="EquipFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
+                    <el-switch v-model="EquipFormError.used_flag"></el-switch>
+                </el-form-item>
+
+                <el-form-item label="设备层级" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipLevelChange" style="width: 100%"
+                               v-model="EquipForm.equip_level" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipLevelOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="设备种类" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipCategoryChange" style="width: 100%"
+                               v-model="EquipForm.category" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipCategoryOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogEditEquipVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleEditEquip('EquipForm')">确 定</el-button>
+            </div>
+        </el-dialog>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/equip_filter.js' %}"></script>
+    <script src="{% static 'gui/js/equip_manage.js' %}"></script>
+{% endblock %}

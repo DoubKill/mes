@@ -1,0 +1,178 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+
+    <el-form :inline="true">
+        <el-form-item label="机型名称">
+            <el-input v-model="category_name" v-on:input="category_nameChanged"></el-input>
+        </el-form-item>
+        <el-form-item label="设备类型">
+            <el-input v-model="equip_type_name" v-on:input="equip_type_nameChanged"></el-input>
+        </el-form-item>
+        <el-form-item>
+            {% if perms.system.add_equipcategoryattribute %}
+                <el-button @click="showCreateEquipCateDialog">新建</el-button>
+            {% endif %}
+        </el-form-item>
+    </el-form>
+
+            <el-table
+                :data="tableData"
+                border
+                style="width: 100%">
+            <el-table-column
+                    prop="id"
+                    label="序"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="category_no"
+                    label="机型编号">
+            </el-table-column>
+            <el-table-column
+                    prop="category_name"
+                    label="机型名称">
+            </el-table-column>
+            <el-table-column
+                    prop="volume"
+                    label="容积">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_type_name"
+                    label="设备类型">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_process_no"
+                    label="工序代码">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_process_name"
+                    label="工序名称">
+            </el-table-column>
+
+            <el-table-column label="操作">
+                <template slot-scope="scope">
+                    <el-button-group>
+                        {% if perms.system.change_equipcategoryattribute %}
+                        <el-button
+                                size="mini"
+                                @click="showEditEquipCateDialog(scope.row)">编辑
+                        </el-button>
+                        {% endif %}
+                        {% if perms.system.delete_equipcategoryattribute %}
+                        <el-button
+                                size="mini"
+                                type="danger"
+                                @click="handleEquipCateDelete(scope.row)">删除
+                        </el-button>
+                        {% endif %}
+                    </el-button-group>
+                </template>
+            </el-table-column>
+            </el-table>
+
+{#        {% include 'gui/paginations.html' %}#}
+
+
+{% endblock %}
+
+{% block dialogs %}
+    {% if perms.system.add_equipcategoryattribute %}
+        <el-dialog title="添加设备种类" :visible.sync="dialogCreateEquipCateVisible">
+            <el-form :model="EquipCateForm" ref="EquipCateForm" :label-width="formLabelWidth">
+                <el-form-item :error="EquipCateFormError.category_no" label="机型编号">
+                    <el-input v-model="EquipCateForm.category_no"></el-input>
+                </el-form-item>
+                <el-form-item :error="EquipCateFormError.category_name" label="机型名称">
+                    <el-input v-model="EquipCateForm.category_name"></el-input>
+                </el-form-item>
+
+                <el-form-item :error="EquipCateFormError.volume" label="容积">
+                    <el-input v-model="EquipCateForm.volume"></el-input>
+                </el-form-item>
+
+                <el-form-item label="设备类型" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipCateChange" style="width: 100%"
+                               v-model="EquipCateForm.equip_type" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipCateOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+
+                <el-form-item label="工序" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipCateProcessChange" style="width: 100%"
+                               v-model="EquipCateForm.process" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipCateProcessOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogCreateEquipCateVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleCreateEquipCate('EquipCateForm')">确 定</el-button>
+            </div>
+        </el-dialog>
+    {% endif %}
+    {% if perms.system.change_equipcategoryattribute %}
+        <el-dialog title="编辑设备种类" :visible.sync="dialogEditEquipCateVisible">
+            <el-form :model="EquipCateForm" ref="EquipCateForm" :label-width="formLabelWidth">
+
+                <el-form-item :error="EquipCateFormError.category_no" label="机型编号">
+                    <el-input v-model="EquipCateForm.category_no"></el-input>
+                </el-form-item>
+                <el-form-item :error="EquipCateFormError.category_name" label="机型名称">
+                    <el-input v-model="EquipCateForm.category_name"></el-input>
+                </el-form-item>
+
+                <el-form-item :error="EquipCateFormError.volume" label="容积">
+                    <el-input v-model="EquipCateForm.volume"></el-input>
+                </el-form-item>
+
+                <el-form-item label="设备类型" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipCateChange" style="width: 100%"
+                               v-model="EquipCateForm.equip_type" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipCateOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+
+                <el-form-item label="工序" :label-width="formLabelWidth">
+                    <el-select @change="shiftsEquipCateProcessChange" style="width: 100%"
+                               v-model="EquipCateForm.process" placeholder="请选择">
+                        <el-option
+                                :key="item.id"
+                                :value="item.value"
+                                :label="item.label"
+                                v-for="item in EquipCateProcessOptions">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogEditEquipCateVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleEditEquipCate('EquipCateForm')">确 定</el-button>
+            </div>
+        </el-dialog>
+    {% endif %}
+{% endblock %}
+
+
+        {% block scripts %}
+        <script src="{% static 'gui/js/equip_cate_filter.js' %}"></script>
+        <script src="{% static 'gui/js/equip_category_manage.js' %}"></script>
+        {% endblock %}
