@@ -14,12 +14,14 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
 class MaterialSerializer(serializers.ModelSerializer):
-    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True,
+    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
                                                                                           delete_flag=False),
-                                                       help_text='原材料类型id')
-    package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True,
+                                                       help_text='原材料类型id',
+                                                       error_messages={'does_not_exist': '该原材料类型已被弃用或删除，操作无效'})
+    package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
                                                                                          delete_flag=False),
-                                                      help_text='包装单位id')
+                                                      help_text='包装单位id',
+                                                      error_messages={'does_not_exist': '该包装单位类型已被弃用或删除，操作无效'})
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
@@ -63,7 +65,7 @@ class MaterialAttributeSerializer(serializers.ModelSerializer):
 class ProductRecipeSerializer(serializers.ModelSerializer):
     material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1),
                                                   allow_empty=True, allow_null=True, required=False)
-    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                help_text='段次id')
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     stage_name = serializers.CharField(source='stage.global_name', read_only=True)
@@ -75,7 +77,7 @@ class ProductRecipeSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoCreateSerializer(serializers.ModelSerializer):
-    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                  help_text='产地id')
     productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"num": 编号, "material": 原材料id, 
     "stage": 段次id, "ratio": 配比}...]""")
@@ -208,7 +210,7 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoCopySerializer(serializers.ModelSerializer):
-    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                  help_text='产地id')
     product_info_id = serializers.PrimaryKeyRelatedField(queryset=ProductInfo.objects.exclude(used_type=1),
                                                          write_only=True, help_text='复制配方工艺id')
@@ -258,7 +260,7 @@ class ProductRecipeListSerializer(serializers.ModelSerializer):
 
 
 class ProductBatchingDetailSerializer(serializers.ModelSerializer):
-    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=True),
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=0),
                                                   allow_empty=True, allow_null=True, required=False)
     material_type = serializers.SerializerMethodField()
     material_name = serializers.SerializerMethodField()
@@ -326,9 +328,9 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
 
 class ProductBatchingCreateSerializer(serializers.ModelSerializer):
-    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                help_text='段次id')
-    dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=True, delete_flag=False),
+    dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                   help_text='机型id')
     batching_details = ProductBatchingDetailSerializer(many=True, help_text="""配料详情：{
                                                                                      'num': '序号',
