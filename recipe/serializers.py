@@ -296,15 +296,11 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
     update_user_name = serializers.SerializerMethodField(read_only=True)
     stage_name = serializers.CharField(source="stage.global_name")
     versions_name = serializers.CharField(source="product_info.versions")
-    used_type_flag = serializers.SerializerMethodField()
     used_time = serializers.CharField(source="product_info.used_time")
     obsolete_time = serializers.CharField(source="product_info.obsolete_time")
     used_user_name = serializers.SerializerMethodField()
     obsolete_user_name = serializers.SerializerMethodField()
-
-    @staticmethod
-    def get_used_type_flag(obj):
-        return 'Y' if obj.product_info.used_type == 3 else 'N'
+    used_type = serializers.IntegerField(source='product_info.used_type')
 
     @staticmethod
     def get_used_user_name(obj):
@@ -323,7 +319,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
         fields = ('id', 'stage_product_batch_no', 'product_name', 'dev_type_name',
                   'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
                   'created_user_name', 'created_date', 'update_user_name', 'last_updated_date',
-                  'stage_name', 'versions_name', 'used_type_flag', 'used_time', 'obsolete_time',
+                  'stage_name', 'versions_name', 'used_type', 'used_time', 'obsolete_time',
                   'used_user_name', 'obsolete_user_name')
 
 
