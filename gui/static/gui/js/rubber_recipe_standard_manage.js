@@ -21,6 +21,7 @@
                 dialogChoiceMaterials: false,
                 dialogRubberRecipeStandard: false,
                 selectingMaterial: false,
+                toggleMaterials: false,
                 carNumberOptionsNotRm: [],
                 carNumberOptionsRm: [],
                 ratioSum: 0,
@@ -50,7 +51,7 @@
                     app.materials = response.data.results;
                     for (var i = 0; i < app.materials.length; ++i) {
 
-                        app.materialById[Number(app.materials[i].id)] = app.materials[i];
+                        app.materialById[app.materials[i].id] = app.materials[i];
                     }
                 }).catch(function (error) {
 
@@ -58,7 +59,7 @@
             axios.get(GlobalCodesUrl, {
 
                 params: {
-                    class_name: "车次"
+                    class_name: "胶料段次"
                 }
             }).then(function (response) {
 
@@ -114,6 +115,7 @@
 
                 this.rubberRecipeError = "";
                 this.dialogAddRubberRecipe = true;
+                this.currentRow = null // 新建和更新标志
             },
             handleAddRubberRecipe: function () {
 
@@ -141,6 +143,8 @@
             },
             handleMaterialsSelectionChange: function (val) {
 
+                if (this.toggleMaterials)
+                    return;
                 this.selectingMaterial = true;
                 for (var i = 0; i < val.length; ++i) {
 
@@ -172,6 +176,8 @@
             handleSelectedMaterialsSelectionChange: function (val) {
 
                 if (this.selectingMaterial)
+                    return;
+                if (this.toggleMaterials)
                     return;
                 for (var i = 0; i < this.materials.length; ++i) {
 
@@ -310,7 +316,7 @@
                     } else { // rm
                         this.selectedMaterials[i].ratio_sum = this.selectedMaterials[i - 1].ratio_sum;
                     }
-
+                    console.log(this.selectedMaterials[i].ratio_sum);
                     this.selectedMaterials[i].ratio_sum = Number(this.selectedMaterials[i].ratio_sum.toFixed(2));
                 }
                 this.ratioSum = this.selectedMaterials[this.selectedMaterials.length - 1].ratio_sum;
@@ -330,16 +336,17 @@
                         app.selectedMaterials = [];
                         for (var i = 0; i < response.data.productrecipe_set.length; ++i) {
 
-                            var material_no = app.materialById[response.data.productrecipe_set[i].material] ?
-                                app.materialById[response.data.productrecipe_set[i].material].material_no : null
-                            app.selectedMaterials.push({
-                                id: response.data.productrecipe_set[i].material,
-                                car_number: response.data.productrecipe_set[i].stage_name,
-                                material_type_name: response.data.productrecipe_set[i].material_material_type,
-                                material_name: response.data.productrecipe_set[i].material_name,
-                                material_no,
-                                ratio: Number(response.data.productrecipe_set[i].ratio)
-                            });
+                            if (!response.data.productrecipe_set[i].material) {
+                                app.selectedMaterials.push({
+
+                                        car_number: response.data.productrecipe_set[i].stage_name,
+                                    });
+                                continue;
+                            }
+                            var material_ = app.materialById[response.data.productrecipe_set[i].material];
+                            material_.car_number = response.data.productrecipe_set[i].stage_name;
+                            material_.ratio = Number(response.data.productrecipe_set[i].ratio);
+                            app.selectedMaterials.push(material_);
                         }
                         if (app.selectedMaterials.length) {
 
@@ -358,29 +365,25 @@
                 if (this.selectedMaterials.length) {
 
                     var app = this;
+                    this.toggleMaterials = true;
                     setTimeout(function () {
 
-                        console
-                        console.log(app.materials);
                         for (var i = 0; i < app.selectedMaterials.length; ++i) {
 
-
                             app.$refs.materialsMultipleTable.toggleRowSelection(app.selectedMaterials[i], true);
+                            for (var j = 0; j < app.materials.length; ++j) {
 
+                                if (app.selectedMaterials[i].id && app.materials[j].id === app.selectedMaterials[i].id) {
 
-
+                                    app.$refs.allMaterialsMultipleTable.toggleRowSelection(app.materials[j], true);
+                                    break;
+                                }
+                            }
                         }
+                        app.toggleMaterials = false;
                     }, 0);
                 }
             },
-            // toggleRowSelection: function () {
-            //
-            //     for (i = 0; i < this.selectedMaterials.length; ++i) {
-            //
-            //         this.$refs.materialsMultipleTable
-            //             .toggleRowSelection(app.selectedMaterials[i], true);
-            //     }
-            // }
         }
     };
     var Ctor = Vue.extend(Main);
