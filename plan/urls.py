@@ -5,14 +5,14 @@ from plan.views import ProductDayPlanViewSet, MaterialDemandedViewSet, ProductBa
 
 router = DefaultRouter()
 
-router.register(r'product-day-plan', ProductDayPlanViewSet)
-router.register(r'material-demanded', MaterialDemandedViewSet)
-router.register(r'product-batching-day-plan', ProductBatchingDayPlanViewSet)
-router.register(r'material-requisition', MaterialRequisitionViewSet)
+router.register(r'product-day-plans', ProductDayPlanViewSet)
+router.register(r'material-demandeds', MaterialDemandedViewSet)
+router.register(r'product-batching-day-plans', ProductBatchingDayPlanViewSet)
+router.register(r'material-requisitions', MaterialRequisitionViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
     path('product-day-plans-copy/', ProductDayPlanCopyView.as_view()),
     path('product-batching-day-plans-copy/', ProductBatchingDayPlanCopyView.as_view()),
-    path('material-requisition-copy/', MaterialRequisitionCopyView.as_view()),
+    path('material-requisitions-copy/', MaterialRequisitionCopyView.as_view()),
 ]
