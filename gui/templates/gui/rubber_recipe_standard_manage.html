@@ -1,0 +1,102 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+
+    <el-form :inline="true">
+        <el-form-item style="float: right">
+            <el-button @click="showAddRubberRecipeDialog">新建</el-button>
+        </el-form-item>
+    </el-form>
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                type="index"
+                width="50"
+                label="No">
+        </el-table-column>
+        <el-table-column
+                prop="product_standard_no"
+                label="胶料编号">
+        </el-table-column>
+        <el-table-column
+                prop="product_name"
+                label="胶料名称">
+        </el-table-column>
+        <el-table-column
+                prop="factory"
+                label="产地">
+        </el-table-column>
+        <el-table-column
+                prop="used_type"
+                label="状态"
+                :formatter="usedTypeFormatter">
+        </el-table-column>
+        <el-table-column label="操作">
+            <template slot-scope="scope">
+                {% verbatim vue %}
+                    <el-button
+                            v-if="scope.row.used_type !== 5"
+                            size="mini"
+                            @click="">{{ editButtonText(scope.row) }}
+                    </el-button>
+                {% endverbatim vue %}
+            </template>
+        </el-table-column>
+        <el-table-column
+                prop="recipe_weight"
+                label="配方重量">
+        </el-table-column>
+        <el-table-column
+                prop="used_user"
+                label="应用人员">
+        </el-table-column>
+        <el-table-column
+                prop="used_time"
+                label="应用时间">
+        </el-table-column>
+        <el-table-column
+                prop="obsolete_time"
+                label="废弃时间">
+        </el-table-column>
+    </el-table>
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+{% block dialogs %}
+
+    <el-dialog title="新建胶料配方" :visible.sync="dialogAddRubberRecipe">
+        <el-form v-model="rubberRecipeForm" :label-width="formLabelWidth">
+            <el-form-item label="产地">
+                <el-select v-model="rubberRecipeForm.factory" placeholder="请选择">
+                    <el-option
+                            v-for="option in originOptions"
+                            :key="option.id"
+                            :label="option.global_name"
+                            :value="option.id">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="胶料编码" :label-width="formLabelWidth">
+                <el-input></el-input>
+            </el-form-item>
+            <el-form-item label="版本" :label-width="formLabelWidth">
+                <el-input></el-input>
+            </el-form-item>
+            <el-form-item label="胶料名称" :label-width="formLabelWidth">
+                <el-input></el-input>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogAddRubberRecipe = false">取 消</el-button>
+            <el-button type="primary" @click="">生成</el-button>
+        </div>
+    </el-dialog>
+
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/rubber_recipe_standard_manage.js' %}"></script>
+{% endblock %}

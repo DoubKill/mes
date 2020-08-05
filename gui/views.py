@@ -58,4 +58,9 @@ class EquipManageView(TitleMixin, LoginRequiredMixin, TemplateView):
 
 class MaterialBaseInfoManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/material_base_info_manage.html'
-    name_path = ['基础信息管理', '设备基础信息']
+    name_path = ['配方管理', '原材料基本信息管理']
+
+
+class RubberRecipeStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/rubber_recipe_standard_manage.html'
+    name_path = ['配方管理', '胶料配方标准管理']

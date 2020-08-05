@@ -43,17 +43,22 @@
                     <el-menu-item index="2-2">角色管理</el-menu-item>
                     <el-menu-item index="2-3">用户管理</el-menu-item>
                     <el-menu-item index="2-4">角色别用户管理</el-menu-item>
-                    {#                    <el-menu-item index="2-5">设备基础信息管理</el-menu-item>#}
                     <el-menu-item index="2-6">倒班时间管理</el-menu-item>
                     <el-menu-item index="2-7">工厂排班管理</el-menu-item>
-                    <el-menu-item index="2-8">设备管理——设备种类</el-menu-item>
-                    <el-menu-item index="2-9">设备管理——设备基础信息</el-menu-item>
+                    <el-submenu index="2-8">
+                        <template slot="title">设备管理</template>
+                        <el-menu-item index="2-8-1">设备种类</el-menu-item>
+                        <el-menu-item index="2-8-2">设备基础信息</el-menu-item>
+                    </el-submenu>
+
                 </el-submenu>
                 <el-submenu index="3">
                     <template slot="title">
                         <i class="el-icon-document"></i>
                         <span slot="title">配方管理</span>
                     </template>
+                    <el-menu-item index="3-1">原材料基本信息管理</el-menu-item>
+                    <el-menu-item index="3-2">胶料配方标准管理</el-menu-item>
                 </el-submenu>
                 <el-submenu index="4">
                     <template slot="title">
@@ -116,7 +121,10 @@
         "2-6": "{% url 'gui:change-shifts-manage' %}",
         "2-7": "{% url 'gui:factory-schedule-manage' %}",
         "2-8": "{% url 'gui:equip-category-manage' %}",
-        "2-9": "{% url 'gui:equip-manage' %}"
+        "2-8-1": "{% url 'gui:equip-category-manage' %}",
+        "2-8-2": "{% url 'gui:equip-manage' %}",
+		"3-1": "{% url 'gui:material-base-info-manage' %}",
+        "3-2": "{% url 'gui:rb-recipe-std-manage' %}"
     }
 </script>
 {% block scripts %}{% endblock %}

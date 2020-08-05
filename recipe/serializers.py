@@ -467,7 +467,6 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
 
 class ProductMasterSerializer(BaseModelSerializer):
-
     factory = serializers.CharField(source="product_info.factory.global_name")
     versions = serializers.CharField(source="product_info.versions")
     stage = serializers.CharField(source="stage.global_name")
