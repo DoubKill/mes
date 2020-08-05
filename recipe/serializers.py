@@ -308,11 +308,11 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_used_user_name(obj):
-        return obj.product_infoused_user.username if obj.product_info.used_user else None
+        return obj.product_info.used_user.username if obj.product_info.used_user else None
 
     @staticmethod
     def get_obsolete_user_name(obj):
-        return obj.product_infoobsolete_user.username if obj.product_info.obsolete_user else None
+        return obj.product_info.obsolete_user.username if obj.product_info.obsolete_user else None
 
     @staticmethod
     def get_update_user_name(obj):
@@ -464,14 +464,3 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     class Meta:
         model = ProductBatching
         fields = ('id', 'batching_details')
-
-
-class ProductMasterSerializer(BaseModelSerializer):
-    factory = serializers.CharField(source="product_info.factory.global_name")
-    versions = serializers.CharField(source="product_info.versions")
-    stage = serializers.CharField(source="stage.global_name")
-    dev_type = serializers.CharField(source="dev_type.global_name")
-
-    class Meta:
-        model = ProductBatching
-        fields = "__all__"
