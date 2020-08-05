@@ -5,7 +5,7 @@ var Equip_cate_filter = {
         return {
 
             category_name: "",
-            equip_type: "",
+            equip_type_name: "",
         }
     },
 
@@ -15,14 +15,14 @@ var Equip_cate_filter = {
 
             this.getFirstPage();
         },
-        equip_typeChanged: function () {
+        equip_type_nameChanged: function () {
 
             this.getFirstPage();
         },
         beforeGetData() {
 
             this.getParams['category_name'] = this.category_name;
-            this.getParams['equip_type'] = this.equip_type;
+            this.getParams['equip_type_name'] = this.equip_type_name;
         },
     }
 };

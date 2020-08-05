@@ -15,5 +15,6 @@ urlpatterns = [
     path('equip/category/manage/', views.EquipCategoryManageView.as_view(), name='equip-category-manage'),
     # 设备管理-设备基础信息
     path('equip/manage/', views.EquipManageView.as_view(), name='equip-manage'),
-    path('material/base/info/manage/', views.MaterialBaseInfoManageView.as_view(), name='material-base-info-manage')
+    path('material/base/info/manage/', views.MaterialBaseInfoManageView.as_view(), name='material-base-info-manage'),
+    path('rubber/recipe/standard/manage/', views.RubberRecipeStandardManageView.as_view(), name='rb-recipe-std-manage')
 ]

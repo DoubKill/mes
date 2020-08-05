@@ -62,14 +62,10 @@ class ClassesDetail(AbstractEntity):
                                       help_text='工作日程id', verbose_name='工作日程id', related_name="classesdetail_set")
     classes = models.ForeignKey('GlobalCode', models.DO_NOTHING,
                                 help_text='班次', verbose_name='班次', related_name="classes_detail")
-    # classes_name = models.CharField(max_length=64, help_text='班次名称', verbose_name='班次名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
     start_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
     end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
-
-    # classes_type_name = models.CharField(max_length=64, choices=TYPE_CHOICE,
-    #                                      help_text='类型', verbose_name='类型')
 
     def __str__(self):
         return self.classes.global_name

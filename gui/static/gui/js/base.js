@@ -2,8 +2,8 @@ const BasicsUrl = "/api/v1/basics/";
 const GlobalTypesUrl = BasicsUrl + "global-types/";
 const GlobalCodesUrl = BasicsUrl + "global-codes/";
 
-const EquipCategoryPostUpdUrl = BasicsUrl + "equips-category/";
-const EquipCategoryUrl = BasicsUrl + "equips-category-list/";
+const EquipCategoryUrl = BasicsUrl + "equips-category/";
+// const EquipCategoryUrl = BasicsUrl + "equips-category-list/";
 const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=设备类型";
 const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
 const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
@@ -17,6 +17,9 @@ const GroupUrl = SystemUrl + "group_extension/";
 const UsersByGroupUrl = SystemUrl + "personnels_groups/";
 const WorkSchedulesUrl = BasicsUrl + "work_schedules/";
 const GroupAddUserUrl = SystemUrl + "group_add_user/";
+const MaterialsUrl = "/api/v1/recipe/materials/";
+const ProductInfosUrl = "/api/v1/recipe/product-infos/";
+const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
 
 var BaseMixin = {
 
@@ -32,7 +35,7 @@ var BaseMixin = {
 
             defaultActive: "",
             formLabelWidth: "120px",
-            openeds: ["2"],
+            openeds: ["2", "3"],
         }
     },
     created: function () {
@@ -57,7 +60,7 @@ var BaseMixin = {
         currentChange: function (page) {
 
             this.beforeGetData();
-            this.getParams['page'] = page;
+            this.getParams["page"] = page;
             this.tableData = [];
             const app = this;
             axios.get(this.tableDataUrl, {

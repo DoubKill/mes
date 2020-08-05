@@ -73,7 +73,7 @@
 
                 this.clearEquipCateFormError();
                 var app = this;
-                axios.post(EquipCategoryPostUpdUrl, app.EquipCateForm)
+                axios.post(EquipCategoryUrl, app.EquipCateForm)
                     .then(function (response) {
 
                         app.dialogCreateEquipCateVisible = false;
@@ -118,7 +118,7 @@
                 // console.log(this.EquipCateForm);
                 // console.log("=============================");
 
-                axios.put(EquipCategoryPostUpdUrl + this.EquipCateForm.id + '/', this.EquipCateForm)
+                axios.put(EquipCategoryUrl + this.EquipCateForm.id + '/', this.EquipCateForm)
                     .then(function (response) {
 
                         app.dialogEditEquipCateVisible = false;
@@ -141,7 +141,7 @@
                     type: 'warning'
                 }).then(() => {
 
-                    axios.delete(EquipCategoryPostUpdUrl + row.id + '/')
+                    axios.delete(EquipCategoryUrl + row.id + '/')
                         .then(function (response) {
                             app.$message({
                                 type: 'success',
