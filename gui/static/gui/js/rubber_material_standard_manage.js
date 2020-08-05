@@ -13,28 +13,19 @@
                 RubberSiteOptions: [],
                 RubberStage: "",
                 RubberStageOptions: [],
-                dialogAddMaterialBaseInfoVisible: false,
-                dialogEditMaterialBaseInfoVisible: false,
-                packingUnitOptions: [],
-                materialBaseInfoForm: {
+                dialogAddRubberMaterial: false,
 
-                    // material_no: "",
-                    // material_name: "",
-                    // for_short: "",
-                    // density: null,
-                    // used_flag: false,
-                    // material_type: null,
-                    // package_unit: null
+                rubberMaterialForm: {
+                    factory: "",
+                    stage_product_batch_no: "",
+                    stage: "",
+                    dev_type_name: "",
                 },
-                materialBaseInfoFormError: {
-
-                    // material_no: "",
-                    // material_name: "",
-                    // for_short: "",
-                    // density: "",
-                    // used_flag: "",
-                    // material_type: "",
-                    // package_unit: ""
+                rubberMaterialFormError: {
+                    factory: "",
+                    stage_product_batch_no: "",
+                    stage: "",
+                    dev_type_name: "",
                 }
             }
         },
@@ -84,10 +75,23 @@
 
                 this.getFirstPage();
             },
-            showAddMaterialDialog: function () {
 
-                this.clearMaterialBaseInfoForm();
-                this.dialogAddMaterialBaseInfoVisible = true
+            showAddRubberMaterialDialog: function () {
+                this.rubberMatetialError = "";
+                this.dialogAddRubberMaterial = true;
+                this.currentRow = null // 新建和更新标志
+            },
+            handleAddRubberMaterial: function () {
+
+                var app = this;
+                this.rubberMatetialError = "";
+                axios.get(ValidateVersionsUrl, {
+
+                }).then(function (response) {
+
+                }).catch(function (error) {
+
+                });
             },
             clearMaterialBaseInfoForm() {
 
@@ -114,6 +118,14 @@
                     material_type: "",
                     package_unit: ""
                 }
+            },
+            RmFlagFormatter: function(row, column) {
+
+                return this.boolFormatter(row.rm_flag);
+            },
+            handleCurrentChange: function (val) {
+
+                this.currentRow = val;
             },
 
         }
