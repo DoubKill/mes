@@ -18,5 +18,7 @@ urlpatterns = [
     path('material/base/info/manage/', views.MaterialBaseInfoManageView.as_view(), name='material-base-info-manage'),
     path('rubber/recipe/standard/manage/', views.RubberRecipeStandardManageView.as_view(), name='rb-recipe-std-manage'),
     # 胶料配料标准管理
-    path('rubber/material/standard/manage/', views.RubberMaterialStandardManageView.as_view(), name='rb-material-std-manage')
+    path('rubber/material/standard/manage/', views.RubberMaterialStandardManageView.as_view(), name='rb-material-std-manage'),
+    # 查询胶料主信息
+    path('search/rubber/info/', views.SearchRubberInfoView.as_view(), name='search-rubber-info')
 ]
