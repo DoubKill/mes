@@ -28,7 +28,16 @@
                 rubberRecipeError: "",
                 carNumberIdByName: {},
                 currentRow: null,
-                materialById: {}
+                materialById: {},
+                dialogCopyRubberRecipeStandardVisible: false,
+
+                sourceFactory: "",
+                sourceProductNo: "",
+                sourceVersion: "",
+
+                newFactory: "",
+                newProductNo: "",
+                newVersion: ""
             }
         },
         created: function () {
@@ -77,7 +86,8 @@
                 }
             }).catch(function (error) {
 
-            })
+            });
+
         },
         methods: {
 
@@ -128,7 +138,7 @@
 
                     if (response.data.code === 0) {
 
-
+                        app.selectedMaterials = [];
                         app.dialogAddRubberRecipe = false;
                         app.dialogChoiceMaterials = true
 
@@ -263,6 +273,7 @@
                         confirmButtonText: '确定',
                     });
                 } else {
+
                     var app = this;
                     var productrecipe_set = [];
                     for (i = 0; i < this.selectedMaterials.length; ++i) {
@@ -279,27 +290,47 @@
                         }
                         productrecipe_set.push(productrecipe)
                     }
-                    axios.post(ProductInfosUrl, {
+                    if (this.currentRow) {
 
-                        product_no: app.rubberRecipeForm.product_no,
-                        product_name: app.rubberRecipeForm.product_name,
-                        versions: app.rubberRecipeForm.versions,
-                        precept: app.rubberRecipeForm.precept,
-                        factory: app.rubberRecipeForm.factory,
-                        productrecipe_set: productrecipe_set
-                    }).then(function (response) {
+                        axios.put(ProductInfosUrl + this.currentRow.id + "/", {
+                            productrecipe_set
 
-                        app.dialogRubberRecipeStandard = false;
-                        app.$message(app.rubberRecipeForm.product_name + "创建成功");
-                        app.currentChange(app.currentPage);
+                        }).then(function (response) {
 
-                    }).catch(function (error) {
+                            app.dialogRubberRecipeStandard = false;
+                            app.$message(app.currentRow.product_name + "修改成功");
+                            app.currentChange(app.currentPage);
+                        }).catch(function (error) {
 
-                        this.$message({
-                            message: error.response.data,
-                            type: 'error'
+                            this.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
                         });
-                    });
+                    } else {
+
+                        axios.post(ProductInfosUrl, {
+
+                            product_no: app.rubberRecipeForm.product_no,
+                            product_name: app.rubberRecipeForm.product_name,
+                            versions: app.rubberRecipeForm.versions,
+                            precept: app.rubberRecipeForm.precept,
+                            factory: app.rubberRecipeForm.factory,
+                            productrecipe_set: productrecipe_set
+                        }).then(function (response) {
+
+                            app.dialogRubberRecipeStandard = false;
+                            app.$message(app.rubberRecipeForm.product_name + "创建成功");
+                            app.currentChange(app.currentPage);
+
+                        }).catch(function (error) {
+
+                            this.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
+                        });
+                    }
                 }
             },
             carNumberChanged: function () {
@@ -316,7 +347,6 @@
                     } else { // rm
                         this.selectedMaterials[i].ratio_sum = this.selectedMaterials[i - 1].ratio_sum;
                     }
-                    console.log(this.selectedMaterials[i].ratio_sum);
                     this.selectedMaterials[i].ratio_sum = Number(this.selectedMaterials[i].ratio_sum.toFixed(2));
                 }
                 this.ratioSum = this.selectedMaterials[this.selectedMaterials.length - 1].ratio_sum;
@@ -339,8 +369,8 @@
                             if (!response.data.productrecipe_set[i].material) {
                                 app.selectedMaterials.push({
 
-                                        car_number: response.data.productrecipe_set[i].stage_name,
-                                    });
+                                    car_number: response.data.productrecipe_set[i].stage_name,
+                                });
                                 continue;
                             }
                             var material_ = app.materialById[response.data.productrecipe_set[i].material];
@@ -384,6 +414,42 @@
                     }, 0);
                 }
             },
+            copyRecipeClicked: function () {
+
+                console.log(this.currentRow)
+                var productStandardNo = this.currentRow.product_standard_no.split("-");
+                this.sourceFactory = this.currentRow.factory;
+                this.sourceProductNo = productStandardNo[1];
+                this.sourceVersion = productStandardNo[2];
+                this.newFactory = this.sourceFactory;
+                this.newProductNo = this.sourceProductNo;
+                var versionNumber = Number(this.sourceVersion);
+                if (!isNaN(versionNumber)) {
+
+                    this.newVersion = versionNumber + 1;
+                } else
+                    this.newVersion = this.sourceVersion;
+                this.dialogCopyRubberRecipeStandardVisible = true;
+            },
+            handleCopyRubberRecipeStandard: function () {
+
+
+                var app = this;
+                axios.post(CopyProductInfosUrl, {
+
+                    product_info_id: app.currentRow.id,
+                    factory: app.newFactory,
+                    versions: app.newVersion
+                }).then(function (response) {
+
+                    app.dialogCopyRubberRecipeStandardVisible = false
+                    app.$message(app.currentRow.product_standard_no + "拷贝成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+
+                    console.log(error.data)
+                });
+            }
         }
     };
     var Ctor = Vue.extend(Main);

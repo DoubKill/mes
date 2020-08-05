@@ -23,6 +23,7 @@ const GroupAddUserUrl = SystemUrl + "group_add_user/";
 const MaterialsUrl = "/api/v1/recipe/materials/";
 const ProductInfosUrl = "/api/v1/recipe/product-infos/";
 const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
+const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
 // 胶料配料标准管理接口
 const RubberMaterialUrl = "/api/v1/recipe/product-batch/";
 
