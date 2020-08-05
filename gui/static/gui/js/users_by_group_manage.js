@@ -41,7 +41,6 @@
                 }).then(function (response) {
 
                     app.usersByGroup = response.data.results;
-                    console.log(response.data.results);
                     app.selectedUsers = [];
                     for (var index in app.usersByGroup) {
                         app.selectedUsers.push(app.usersByGroup[index].id);

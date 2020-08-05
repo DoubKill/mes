@@ -116,7 +116,6 @@
                 for (var i = 0; i < app.groups.length; ++i) {
 
                     app.groupById[app.groups[i].id] = app.groups[i].global_name;
-                    // app.groupIds.push(app.groups[i].id)
                 }
             }).catch(function (error) {
 

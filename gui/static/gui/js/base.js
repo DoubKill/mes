@@ -20,8 +20,8 @@ const UsersByGroupUrl = SystemUrl + "personnels_groups/";
 const WorkSchedulesUrl = BasicsUrl + "work_schedules/";
 const GroupAddUserUrl = SystemUrl + "group_add_user/";
 const MaterialsUrl = "/api/v1/recipe/materials/";
-
 const ProductInfosUrl = "/api/v1/recipe/product-infos/";
+const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
 
 var BaseMixin = {
 
