@@ -4,12 +4,62 @@
 {% block main %}
 
     <el-form :inline="true">
-        <el-form-item style="float: right">
-            <el-button @click="">新建</el-button>
+
+
+        <el-form-item label="状态">
+            <el-select
+                    size="mini"
+                    clearable
+                    @change="RubberStateChange"
+                    v-model="RubberState" placeholder="请选择">
+                <el-option
+                        v-for="item in RubberStateOptions"
+                        :key="item.id"
+                        :label="item.global_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
         </el-form-item>
+        <el-form-item label="产地">
+            <el-select
+                    size="mini"
+                    clearable
+                    @change="RubberSiteChange"
+                    v-model="RubberSite" placeholder="请选择">
+                <el-option
+                        v-for="item in RubberSiteOptions"
+                        :key="item.id"
+                        :label="item.global_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="段次">
+            <el-select
+                    size="mini"
+                    clearable
+                    @change="RubberStageChange"
+                    v-model="RubberStage" placeholder="请选择">
+                <el-option
+                        v-for="item in RubberStageOptions"
+                        :key="item.id"
+                        :label="item.global_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+
+        <el-form-item  label="胶料编码">
+            <el-input size="small" v-model="stage_product_batch_no" v-on:input="stage_product_batch_noChanged"></el-input>
+        </el-form-item>
+
         <el-form-item style="float: right">
             <el-button @click="">配料</el-button>
         </el-form-item>
+        <el-form-item style="float: right">
+            <el-button @click="">新建</el-button>
+        </el-form-item>
+
     </el-form>
     <el-table
             highlight-current-row
@@ -23,7 +73,7 @@
                 label="No">
         </el-table-column>
         <el-table-column
-                prop="product_standard_no"
+                prop="stage_product_batch_no"
                 label="胶料编号">
         </el-table-column>
         <el-table-column
@@ -31,216 +81,228 @@
                 label="胶料名称">
         </el-table-column>
         <el-table-column
-                prop="factory"
-                label="产地">
+                prop="dev_type_name"
+                label="炼胶机类型">
         </el-table-column>
         <el-table-column
                 prop="used_type"
                 label="状态"
                 :formatter="usedTypeFormatter">
         </el-table-column>
+
+        <el-table-column
+                prop="batching_weight"
+                label="配料重量">
+        </el-table-column>
+        <el-table-column
+                prop="production_time_interval"
+                label="炼胶时间">
+        </el-table-column>
+        <el-table-column
+                prop="rm_flag"
+                label="反炼与否"
+                :formatter="EquipCountFlagFormatter">
+        </el-table-column>
+        <el-table-column
+                prop="rm_time_interval"
+                label="反炼时间">
+        </el-table-column>
+        <el-table-column
+                prop="used_user_name"
+                label="创建人员">
+        </el-table-column>
+        <el-table-column
+                prop="created_date"
+                label="创建时间">
+        </el-table-column>
+        <el-table-column
+                prop="update_user_name"
+                label="更新人员">
+        </el-table-column>
+        <el-table-column
+                prop="last_updated_date"
+                label="更新时间">
+        </el-table-column>
+
         <el-table-column label="操作">
-            <template slot-scope="scope">
-                {% verbatim vue %}
-                    <el-button
-                            v-if="scope.row.used_type !== 5"
-                            size="mini"
-                            @click="">{{ editButtonText(scope.row) }}
-                    </el-button>
-                {% endverbatim vue %}
-            </template>
+
         </el-table-column>
-        <el-table-column
-                prop="recipe_weight"
-                label="配方重量">
-        </el-table-column>
-        <el-table-column
-                prop="used_user"
-                label="应用人员">
-        </el-table-column>
-        <el-table-column
-                prop="used_time"
-                label="应用时间">
-        </el-table-column>
-        <el-table-column
-                prop="obsolete_time"
-                label="废弃时间">
-        </el-table-column>
+
     </el-table>
     {% include 'gui/paginations.html' %}
 {% endblock %}
 
 {% block dialogs %}
 
-    <el-dialog
-            :close-on-click-modal="false"
-            :close-on-press-escape="false"
-            title="新建胶料配方" :visible.sync="dialogAddRubberRecipe">
-        <el-form v-model="rubberRecipeForm" :label-width="formLabelWidth">
-            <el-form-item label="产地">
-                <el-select v-model="rubberRecipeForm.factory" placeholder="请选择">
-                    <el-option
-                            v-for="option in originOptions"
-                            :key="option.id"
-                            :label="option.global_name"
-                            :value="option.id">
-                    </el-option>
-                </el-select>
-            </el-form-item>
-            <el-form-item label="胶料编码" :label-width="formLabelWidth">
-                <el-input v-model="rubberRecipeForm.product_no"></el-input>
-            </el-form-item>
-            <el-form-item label="版本" :label-width="formLabelWidth">
-                <el-input v-model="rubberRecipeForm.versions"></el-input>
-            </el-form-item>
-            <el-form-item label="胶料名称" :label-width="formLabelWidth">
-                <el-input v-model="rubberRecipeForm.product_name"></el-input>
-            </el-form-item>
-            <el-form-item label="方案" :label-width="formLabelWidth">
-                <el-input v-model="rubberRecipeForm.precept"></el-input>
-            </el-form-item>
-            {% verbatim vue %}
-                <el-form-item>
-                    <p style="color: red">{{ rubberRecipeError }}</p>
-                </el-form-item>
-            {% endverbatim vue %}
-        </el-form>
-        <div slot="footer" class="dialog-footer">
-            <el-button @click="dialogAddRubberRecipe = false">取 消</el-button>
-            <el-button type="primary" @click="handleAddRubberRecipe">生成</el-button>
-        </div>
-    </el-dialog>
-    <el-dialog
-            @open="dialogChoiceMaterialsOpen"
-            :close-on-click-modal="false"
-            :close-on-press-escape="false"
-            width="80%" title="选择原材料" :visible.sync="dialogChoiceMaterials">
-        <el-row>
-            <el-form :inline="true">
-                <el-form-item style="float: right">
-                    <el-button @click="rmClicked">RM</el-button>
-                </el-form-item>
-                <el-form-item style="float: right">
-                    <el-button @click="selectClicked">选择</el-button>
-                </el-form-item>
-            </el-form>
-        </el-row>
-        <el-row :gutter="15">
-            <el-col :span="12">
-                <el-table
-                        ref="allMaterialsMultipleTable"
-                        border
-                        :data="materials"
-                        style="width: 100%"
-                        @selection-change="handleMaterialsSelectionChange">
-                    <el-table-column
-                            type="selection"
-                            width="55">
-                    </el-table-column>
-                    <el-table-column
-                            label="原材料代码"
-                            prop="material_no">
-                    </el-table-column>
-                    <el-table-column
-                            label="原材料名称"
-                            prop="material_name">
-                    </el-table-column>
-                </el-table>
-            </el-col>
-            <el-col :span="12">
-                <el-table
-                        ref="materialsMultipleTable"
-                        border
-                        :data="selectedMaterials"
-                        @select="handleSelect"
-                        @selection-change="handleSelectedMaterialsSelectionChange"
-                        style="width: 100%">
-                    <el-table-column
-                            type="selection"
-                            width="55">
-                    </el-table-column>
-                    <el-table-column
-                            label="原材料代码"
-                            prop="material_no">
-                    </el-table-column>
-                    <el-table-column
-                            label="原材料名称"
-                            prop="material_name">
-                    </el-table-column>
-                    <el-table-column
-                            label="车次">
-                        <template slot-scope="scope">
-                            <el-select v-model="scope.row.car_number" placeholder="请选择" v-if="scope.row.id">
-                                <el-option
-                                        :key="option.id"
-                                        :label="option.global_name"
-                                        :value="option.global_name"
-                                        v-for="option in carNumberOptionsNotRm">
-                                </el-option>
-                            </el-select>
-                            <el-select v-model="scope.row.car_number" placeholder="请选择" v-else>
-                                <el-option
-                                        :key="option.id"
-                                        :label="option.global_name"
-                                        :value="option.global_name"
-                                        v-for="option in carNumberOptionsRm">
-                                </el-option>
-                            </el-select>
-                        </template>
-                    </el-table-column>
-                </el-table>
-            </el-col>
-        </el-row>
-    </el-dialog>
-    <el-dialog
-            :close-on-click-modal="false"
-            :close-on-press-escape="false"
-            title="胶料配方标准" :visible.sync="dialogRubberRecipeStandard">
-        <el-form :inline="true">
-            <el-form-item style="float: right">
-                <el-button @click="newClicked">新建</el-button>
-            </el-form-item>
-            <el-form-item style="float: right">
-                <el-button @click="saveClicked">保存</el-button>
-            </el-form-item>
-        </el-form>
-        <table class="table table-bordered"
-               style="width: 100%; color: #909399; font-size: 14px;">
-            <thead>
-            <tr>
-                <th>S</th>
-                <th>No</th>
-                <th>段次</th>
-                <th>类别</th>
-                <th>原材料</th>
-                <th>配比</th>
-                <th>配比累计</th>
-            </tr>
-            </thead>
-            {% verbatim vue %}
-                <tbody style="color: #606266;">
-                <tr style="background: rgba(189,198,210,0.73)">
-                    <td colspan="5" style="text-align: center">配方结果</td>
-                    <td style="text-align: center">{{ ratioSum }}</td>
-                    <td></td>
-                </tr>
-                <tr v-for="material in selectedMaterials">
-                    <td></td>
-                    <td></td>
-                    <td>{{ material.car_number }}</td>
-                    <td>{{ material.material_type_name }}</td>
-                    <td>{{ material.material_name }}</td>
-                    <td style="text-align: center">
-                        <el-input-number @change="carNumberChanged"
-                                         v-if="material.car_number && material.car_number.indexOf('RM') !== 0"
-                                         :precision="2" :step="0.1" v-model.number="material.ratio"></el-input-number>
-                    </td>
-                    <td>{{ material.ratio_sum }}</td>
-                </tr>
-                </tbody>
-            {% endverbatim vue %}
-        </table>
-    </el-dialog>
+{#    <el-dialog#}
+{#            :close-on-click-modal="false"#}
+{#            :close-on-press-escape="false"#}
+{#            title="新建胶料配方" :visible.sync="dialogAddRubberRecipe">#}
+{#        <el-form v-model="rubberRecipeForm" :label-width="formLabelWidth">#}
+{#            <el-form-item label="产地">#}
+{#                <el-select v-model="rubberRecipeForm.factory" placeholder="请选择">#}
+{#                    <el-option#}
+{#                            v-for="option in originOptions"#}
+{#                            :key="option.id"#}
+{#                            :label="option.global_name"#}
+{#                            :value="option.id">#}
+{#                    </el-option>#}
+{#                </el-select>#}
+{#            </el-form-item>#}
+{#            <el-form-item label="胶料编码" :label-width="formLabelWidth">#}
+{#                <el-input v-model="rubberRecipeForm.product_no"></el-input>#}
+{#            </el-form-item>#}
+{#            <el-form-item label="版本" :label-width="formLabelWidth">#}
+{#                <el-input v-model="rubberRecipeForm.versions"></el-input>#}
+{#            </el-form-item>#}
+{#            <el-form-item label="胶料名称" :label-width="formLabelWidth">#}
+{#                <el-input v-model="rubberRecipeForm.product_name"></el-input>#}
+{#            </el-form-item>#}
+{#            <el-form-item label="方案" :label-width="formLabelWidth">#}
+{#                <el-input v-model="rubberRecipeForm.precept"></el-input>#}
+{#            </el-form-item>#}
+{#            {% verbatim vue %}#}
+{#                <el-form-item>#}
+{#                    <p style="color: red">{{ rubberRecipeError }}</p>#}
+{#                </el-form-item>#}
+{#            {% endverbatim vue %}#}
+{#        </el-form>#}
+{#        <div slot="footer" class="dialog-footer">#}
+{#            <el-button @click="dialogAddRubberRecipe = false">取 消</el-button>#}
+{#            <el-button type="primary" @click="handleAddRubberRecipe">生成</el-button>#}
+{#        </div>#}
+{#    </el-dialog>#}
+{#    <el-dialog#}
+{#            @open="dialogChoiceMaterialsOpen"#}
+{#            :close-on-click-modal="false"#}
+{#            :close-on-press-escape="false"#}
+{#            width="80%" title="选择原材料" :visible.sync="dialogChoiceMaterials">#}
+{#        <el-row>#}
+{#            <el-form :inline="true">#}
+{#                <el-form-item style="float: right">#}
+{#                    <el-button @click="rmClicked">RM</el-button>#}
+{#                </el-form-item>#}
+{#                <el-form-item style="float: right">#}
+{#                    <el-button @click="selectClicked">选择</el-button>#}
+{#                </el-form-item>#}
+{#            </el-form>#}
+{#        </el-row>#}
+{#        <el-row :gutter="15">#}
+{#            <el-col :span="12">#}
+{#                <el-table#}
+{#                        ref="allMaterialsMultipleTable"#}
+{#                        border#}
+{#                        :data="materials"#}
+{#                        style="width: 100%"#}
+{#                        @selection-change="handleMaterialsSelectionChange">#}
+{#                    <el-table-column#}
+{#                            type="selection"#}
+{#                            width="55">#}
+{#                    </el-table-column>#}
+{#                    <el-table-column#}
+{#                            label="原材料代码"#}
+{#                            prop="material_no">#}
+{#                    </el-table-column>#}
+{#                    <el-table-column#}
+{#                            label="原材料名称"#}
+{#                            prop="material_name">#}
+{#                    </el-table-column>#}
+{#                </el-table>#}
+{#            </el-col>#}
+{#            <el-col :span="12">#}
+{#                <el-table#}
+{#                        ref="materialsMultipleTable"#}
+{#                        border#}
+{#                        :data="selectedMaterials"#}
+{#                        @select="handleSelect"#}
+{#                        @selection-change="handleSelectedMaterialsSelectionChange"#}
+{#                        style="width: 100%">#}
+{#                    <el-table-column#}
+{#                            type="selection"#}
+{#                            width="55">#}
+{#                    </el-table-column>#}
+{#                    <el-table-column#}
+{#                            label="原材料代码"#}
+{#                            prop="material_no">#}
+{#                    </el-table-column>#}
+{#                    <el-table-column#}
+{#                            label="原材料名称"#}
+{#                            prop="material_name">#}
+{#                    </el-table-column>#}
+{#                    <el-table-column#}
+{#                            label="车次">#}
+{#                        <template slot-scope="scope">#}
+{#                            <el-select v-model="scope.row.car_number" placeholder="请选择" v-if="scope.row.id">#}
+{#                                <el-option#}
+{#                                        :key="option.id"#}
+{#                                        :label="option.global_name"#}
+{#                                        :value="option.global_name"#}
+{#                                        v-for="option in carNumberOptionsNotRm">#}
+{#                                </el-option>#}
+{#                            </el-select>#}
+{#                            <el-select v-model="scope.row.car_number" placeholder="请选择" v-else>#}
+{#                                <el-option#}
+{#                                        :key="option.id"#}
+{#                                        :label="option.global_name"#}
+{#                                        :value="option.global_name"#}
+{#                                        v-for="option in carNumberOptionsRm">#}
+{#                                </el-option>#}
+{#                            </el-select>#}
+{#                        </template>#}
+{#                    </el-table-column>#}
+{#                </el-table>#}
+{#            </el-col>#}
+{#        </el-row>#}
+{#    </el-dialog>#}
+{#    <el-dialog#}
+{#            :close-on-click-modal="false"#}
+{#            :close-on-press-escape="false"#}
+{#            title="胶料配方标准" :visible.sync="dialogRubberRecipeStandard">#}
+{#        <el-form :inline="true">#}
+{#            <el-form-item style="float: right">#}
+{#                <el-button @click="newClicked">新建</el-button>#}
+{#            </el-form-item>#}
+{#            <el-form-item style="float: right">#}
+{#                <el-button @click="saveClicked">保存</el-button>#}
+{#            </el-form-item>#}
+{#        </el-form>#}
+{#        <table class="table table-bordered"#}
+{#               style="width: 100%; color: #909399; font-size: 14px;">#}
+{#            <thead>#}
+{#            <tr>#}
+{#                <th>S</th>#}
+{#                <th>No</th>#}
+{#                <th>段次</th>#}
+{#                <th>类别</th>#}
+{#                <th>原材料</th>#}
+{#                <th>配比</th>#}
+{#                <th>配比累计</th>#}
+{#            </tr>#}
+{#            </thead>#}
+{#            {% verbatim vue %}#}
+{#                <tbody style="color: #606266;">#}
+{#                <tr style="background: rgba(189,198,210,0.73)">#}
+{#                    <td colspan="5" style="text-align: center">配方结果</td>#}
+{#                    <td style="text-align: center">{{ ratioSum }}</td>#}
+{#                    <td></td>#}
+{#                </tr>#}
+{#                <tr v-for="material in selectedMaterials">#}
+{#                    <td></td>#}
+{#                    <td></td>#}
+{#                    <td>{{ material.car_number }}</td>#}
+{#                    <td>{{ material.material_type_name }}</td>#}
+{#                    <td>{{ material.material_name }}</td>#}
+{#                    <td style="text-align: center">#}
+{#                        <el-input-number @change="carNumberChanged"#}
+{#                                         v-if="material.car_number && material.car_number.indexOf('RM') !== 0"#}
+{#                                         :precision="2" :step="0.1" v-model.number="material.ratio"></el-input-number>#}
+{#                    </td>#}
+{#                    <td>{{ material.ratio_sum }}</td>#}
+{#                </tr>#}
+{#                </tbody>#}
+{#            {% endverbatim vue %}#}
+{#        </table>#}
+{#    </el-dialog>#}
 {% endblock %}
 
 
@@ -249,7 +311,8 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="{% static 'gui/js/rubber_recipe_standard_manage.js' %}"></script>
+    <script src="{% static 'gui/js/rubber_material_filter.js' %}"></script>
+    <script src="{% static 'gui/js/rubber_material_standard_manage.js' %}"></script>
 {% endblock %}
 
 

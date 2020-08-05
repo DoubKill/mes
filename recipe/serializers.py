@@ -296,23 +296,19 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
     update_user_name = serializers.SerializerMethodField(read_only=True)
     stage_name = serializers.CharField(source="stage.global_name")
     versions_name = serializers.CharField(source="product_info.versions")
-    used_type_flag = serializers.SerializerMethodField()
     used_time = serializers.CharField(source="product_info.used_time")
     obsolete_time = serializers.CharField(source="product_info.obsolete_time")
     used_user_name = serializers.SerializerMethodField()
     obsolete_user_name = serializers.SerializerMethodField()
-
-    @staticmethod
-    def get_used_type_flag(obj):
-        return 'Y' if obj.product_info.used_type == 3 else 'N'
+    used_type = serializers.IntegerField(source='product_info.used_type')
 
     @staticmethod
     def get_used_user_name(obj):
-        return obj.product_infoused_user.username if obj.product_info.used_user else None
+        return obj.product_info.used_user.username if obj.product_info.used_user else None
 
     @staticmethod
     def get_obsolete_user_name(obj):
-        return obj.product_infoobsolete_user.username if obj.product_info.obsolete_user else None
+        return obj.product_info.obsolete_user.username if obj.product_info.obsolete_user else None
 
     @staticmethod
     def get_update_user_name(obj):
@@ -323,7 +319,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
         fields = ('id', 'stage_product_batch_no', 'product_name', 'dev_type_name',
                   'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
                   'created_user_name', 'created_date', 'update_user_name', 'last_updated_date',
-                  'stage_name', 'versions_name', 'used_type_flag', 'used_time', 'obsolete_time',
+                  'stage_name', 'versions_name', 'used_type', 'used_time', 'obsolete_time',
                   'used_user_name', 'obsolete_user_name')
 
 
@@ -464,14 +460,3 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     class Meta:
         model = ProductBatching
         fields = ('id', 'batching_details')
-
-
-class ProductMasterSerializer(BaseModelSerializer):
-    factory = serializers.CharField(source="product_info.factory.global_name")
-    versions = serializers.CharField(source="product_info.versions")
-    stage = serializers.CharField(source="stage.global_name")
-    dev_type = serializers.CharField(source="dev_type.global_name")
-
-    class Meta:
-        model = ProductBatching
-        fields = "__all__"
