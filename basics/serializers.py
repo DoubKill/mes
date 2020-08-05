@@ -160,8 +160,8 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
 
 class EquipSerializer(BaseModelSerializer):
     """设备序列化器"""
-    category_no = serializers.CharField(source="category.global_no", read_only=True)
-    category_name = serializers.CharField(source="category.global_name", read_only=True)
+    category_no = serializers.CharField(source="category.category_no", read_only=True)
+    category_name = serializers.CharField(source="category.category_name", read_only=True)
     equip_process_name = serializers.CharField(source="category.process.global_name", read_only=True)
     equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
     equip_type = serializers.CharField(source="category.equip_type.global_name", read_only=True)
