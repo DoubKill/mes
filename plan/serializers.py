@@ -243,7 +243,6 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-
         src_date = validated_data.pop('src_date')
         dst_date = validated_data.pop('dst_date')
         ps_obj = PlanSchedule.objects.filter(day_time=dst_date).first()
