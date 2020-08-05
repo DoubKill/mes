@@ -11,7 +11,7 @@ class DefaultPageNumberPagination(PageNumberPagination):
     """
     page_size = 10
     max_page_size = 1000
-    page_size_query_param = "limit"
+    page_size_query_param = "page_size"
     page_size_query_description = "自定义每页显示条数（最大%s条,默认%s条）" % (max_page_size, page_size)
     page_query_description = "翻页/页数"
 
@@ -29,6 +29,7 @@ class SinglePageNumberPagination(PageNumberPagination):
     """
     继承基础分页，只返回results
     """
+    page_size = 1000
     def get_paginated_response(self, data):
         return Response(OrderedDict([
             ('results', data)

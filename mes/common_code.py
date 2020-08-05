@@ -1,7 +1,18 @@
+from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
 from mes.permissions import PermissonsDispatch
 from system.models import User
+
+
+class CommonDeleteMixin(object):
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.delete_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def return_permission_params(model_name):

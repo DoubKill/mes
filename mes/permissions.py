@@ -1,19 +1,28 @@
-from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
-from django.utils import six
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import BasePermission
-
-from system.models import User
 
 
 class IsSuperUser(BasePermission):
     """
     Allows access only to superuser users.
     """
+
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_superuser)
 
+
+class ProductInfoPermissions(BasePermission):
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.is_superuser:
+            return True
+        if obj.used_type == 1:  # 当前状态是编辑
+            return '配方审核' in request.user.groups.values_list('name', flat=True)
+        elif obj.used_type == 2:  # 当前状态是校验通过
+            return '配方应用' in request.user.groups.values_list('name', flat=True)
+        elif obj.used_type == 3:  # 当前状态是应用
+            return '配方废弃' in request.user.groups.values_list('name', flat=True)
 
 
 class PermissonsDispatch(object):
@@ -30,6 +39,10 @@ class PermissonsDispatch(object):
 
     @property
     def get_user_module_permissions(self):
+        """
+        返回带模块名的用户所有权限集合
+        :return:
+        """
         return self.user.get_all_permissions()
 
     @property
@@ -63,9 +76,6 @@ class PermissonsDispatch(object):
             return self.get_user_module_permissions
         else:
             return self.get_all_permissions
-
-
-
 
 
 def PermissionClass(permission_required=None):
@@ -120,7 +130,7 @@ def PermissionClass(permission_required=None):
                 return True
             if request.user.is_superuser:
                 return True
-            permission = PermissonsDispatch(request.user)(dispatch="group")
+            permission = PermissonsDispatch(request.user)(dispatch="all")
             # 判断是否有权限
             if not set(permission_dict.get(request.method, "")) & set(permission):
                 return False
