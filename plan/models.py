@@ -123,7 +123,6 @@ class MaterialRequisition(AbstractEntity):
 
 class MaterialRequisitionClasses(AbstractEntity):
     """领料日班次计划表"""
-    # TODO:和ProductBatchingDayPlan外键关联？不是MaterialRequisition？
     material_requisition = models.ForeignKey(MaterialRequisition, on_delete=models.DO_NOTHING,
                                              help_text='领料日计划id',
                                              verbose_name='领料日计划id',
