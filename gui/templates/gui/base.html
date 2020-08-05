@@ -59,6 +59,7 @@
                     </template>
                     <el-menu-item index="3-1">原材料基本信息管理</el-menu-item>
                     <el-menu-item index="3-2">胶料配方标准管理</el-menu-item>
+                    <el-menu-item index="3-3">胶料配料标准管理</el-menu-item>
                 </el-submenu>
                 <el-submenu index="4">
                     <template slot="title">
@@ -124,9 +125,12 @@
         "2-8-1": "{% url 'gui:equip-category-manage' %}",
         "2-8-2": "{% url 'gui:equip-manage' %}",
 		"3-1": "{% url 'gui:material-base-info-manage' %}",
-        "3-2": "{% url 'gui:rb-recipe-std-manage' %}"
+        "3-2": "{% url 'gui:rb-recipe-std-manage' %}",
+        "3-3": "{% url 'gui:rb-material-std-manage' %}"
     }
 </script>
 {% block scripts %}{% endblock %}
+{% block styles %}
+{% endblock %}
 </body>
 </html>

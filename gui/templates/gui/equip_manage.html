@@ -26,11 +26,11 @@
                 width="50">
         </el-table-column>
         <el-table-column
-                prop="process_no"
+                prop="equip_process_no"
                 label="工序代码">
         </el-table-column>
         <el-table-column
-                prop="process_name"
+                prop="equip_process_name"
                 label="工序名称">
         </el-table-column>
         <el-table-column
@@ -108,14 +108,14 @@
                 </el-form-item>
 
                 <el-form-item :error="EquipFormError.count_flag" label="产量计数" :label-width="formLabelWidth">
-                    <el-switch v-model="EquipFormError.count_flag"></el-switch>
+                    <el-switch v-model="EquipForm.count_flag"></el-switch>
                 </el-form-item>
 
                 <el-form-item :error="EquipFormError.description" label="备注">
                     <el-input v-model="EquipForm.description"></el-input>
                 </el-form-item>
                 <el-form-item :error="EquipFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
-                    <el-switch v-model="EquipFormError.used_flag"></el-switch>
+                    <el-switch v-model="EquipForm.used_flag"></el-switch>
                 </el-form-item>
 
                 <el-form-item label="设备层级" :label-width="formLabelWidth">
@@ -159,14 +159,14 @@
                 </el-form-item>
 
                 <el-form-item :error="EquipFormError.count_flag" label="产量计数" :label-width="formLabelWidth">
-                    <el-switch v-model="EquipFormError.count_flag"></el-switch>
+                    <el-switch v-model="EquipForm.count_flag"></el-switch>
                 </el-form-item>
 
                 <el-form-item :error="EquipFormError.description" label="备注">
                     <el-input v-model="EquipForm.description"></el-input>
                 </el-form-item>
                 <el-form-item :error="EquipFormError.used_flag" label="是否启用" :label-width="formLabelWidth">
-                    <el-switch v-model="EquipFormError.used_flag"></el-switch>
+                    <el-switch v-model="EquipForm.used_flag"></el-switch>
                 </el-form-item>
 
                 <el-form-item label="设备层级" :label-width="formLabelWidth">

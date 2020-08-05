@@ -5,7 +5,7 @@ from django.views.generic import TemplateView
 class TitleMixin:
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data()
+        context = super().get_context_data(**kwargs)
         context['namePath'] = self.name_path
         return context
 
@@ -64,3 +64,8 @@ class MaterialBaseInfoManageView(TitleMixin, LoginRequiredMixin, TemplateView):
 class RubberRecipeStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/rubber_recipe_standard_manage.html'
     name_path = ['配方管理', '胶料配方标准管理']
+
+
+class RubberMaterialStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/rubber_material_standard_manage.html'
+    name_path = ['配方管理', '胶料配料标准管理']

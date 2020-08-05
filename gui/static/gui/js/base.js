@@ -7,10 +7,11 @@ const EquipCategoryUrl = BasicsUrl + "equips-category/";
 const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=设备类型";
 const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
 const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
+const StateGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料状态";
+const SiteGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
+const StageGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料段次";
 
-const EquipPostUrl = BasicsUrl + "equips/";
-const EquipUrl = BasicsUrl + "equips-list/";
-
+const EquipUrl = BasicsUrl + "equips/";
 
 const SystemUrl = "/api/v1/system/";
 const PersonnelsUrl = SystemUrl + "personnels/";
@@ -20,8 +21,12 @@ const UsersByGroupUrl = SystemUrl + "personnels_groups/";
 const WorkSchedulesUrl = BasicsUrl + "work_schedules/";
 const GroupAddUserUrl = SystemUrl + "group_add_user/";
 const MaterialsUrl = "/api/v1/recipe/materials/";
-
 const ProductInfosUrl = "/api/v1/recipe/product-infos/";
+const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
+const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
+// 胶料配料标准管理接口
+const RubberMaterialUrl = "/api/v1/recipe/product-batch/";
+
 
 var BaseMixin = {
 
