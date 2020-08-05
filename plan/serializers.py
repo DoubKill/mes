@@ -19,23 +19,19 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 class ProductDayPlanSerializer(BaseModelSerializer):
     """胶料日计划序列化"""
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
-                                                            help_text='{"sn":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":1,"classes_detail":1}')
-    # plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00",write_only=True)
-
-
-    # equip_no = serializers.IntegerField(source='equip.equip_no', read_only=True)
-    # product_no = serializers.IntegerField(source='product_master.stage_product_batch_no', read_only=True)
-    # batching_weight = serializers.IntegerField(source='product_master.batching_weight',read_only=True)
-    # production_time_interval=serializers.TimeField(source='product_master.batching_time_interval',read_only=True)
+                                                            help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":1,"classes_detail":1}')
+    plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
 
     class Meta:
         model = ProductDayPlan
-        # fields = '__all__'
-        fields = ('plan_date', 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
-        fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
-        # fields = ('equip', 'product_master', 'plan_schedule', 'equip_no', 'product_no', 'batching_weight','production_time_interval',
-        #           'pdp_product_classes_plan',)
+        fields = ('plan_date', 'equip', 'product_master', 'pdp_product_classes_plan',)
+        # fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_plan_date(self, value):
+        if not PlanSchedule.objects.filter(day_time=value).first():
+            raise serializers.ValidationError('当前计划时间不存在')
+        return value
 
     @atomic()
     def create(self, validated_data):
@@ -43,8 +39,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_master'] = validated_data.pop('product_master')
-        pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
-        # pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
+        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
         pdp_dic['created_user'] = self.context['request'].user
         # instance = ProductDayPlan.objects.create(**pdp_dic)
         instance = super().create(pdp_dic)
@@ -58,6 +53,11 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     @atomic()
     def update(self, instance, validated_data):
         update_pcp_list = validated_data.pop('pdp_product_classes_plan', None)
+        day_time = validated_data.pop('plan_date', None)
+        if day_time:
+            validated_data['plan_schedule'] = PlanSchedule.objects.filter(day_time=day_time).first()
+        else:
+            validated_data['plan_schedule'] = instance.plan_schedule
         validated_data['last_updated_user'] = self.context['request'].user
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
@@ -67,7 +67,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             update_pcp['last_updated_user'] = self.context['request'].user
             pcp_queryset = ProductClassesPlan.objects.filter(product_day_plan=instance)
             pcp_queryset.update(**update_pcp)
-            return pdp_obj
+        return pdp_obj
 
 
 class MaterialDemandedSerializer(BaseModelSerializer):
@@ -92,14 +92,20 @@ class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
 class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     """配料小料日计划序列化"""
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
-                                                                             help_text='{"product_master":1,"num":1,"time":"2020-12-12 12:12:12","weight":1,"unit":"1","classes_detail":1}')
+                                                                             help_text='{"product_master":1,"num":1,"time":"12:12:12","weight":1,"unit":"1","classes_detail":1}')
+    plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
 
     class Meta:
         model = ProductBatchingDayPlan
         fields = (
-            'equip', 'product_master', 'plan_schedule', 'sum', 'product_day_plan',
+            'equip', 'product_master', 'plan_date', 'sum', 'product_day_plan',
             'pdp_product_batching_classes_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_plan_date(self, value):
+        if not PlanSchedule.objects.filter(day_time=value).first():
+            raise serializers.ValidationError('当前计划时间不存在')
+        return value
 
     @atomic()
     def create(self, validated_data):
@@ -107,7 +113,8 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_master'] = validated_data.pop('product_master')
-        pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
+        # pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
+        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
         pdp_dic['sum'] = validated_data.pop('sum')
         pdp_dic['product_day_plan'] = validated_data.pop('product_day_plan')
         # instance = ProductBatchingDayPlan.objects.create(**pdp_dic)
@@ -122,8 +129,12 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
 
     @atomic()
     def update(self, instance, validated_data):
-
         update_pcp_list = validated_data.pop('pdp_product_batching_classes_plan', None)
+        day_time = validated_data.pop('plan_date', None)
+        if day_time:
+            validated_data['plan_schedule'] = PlanSchedule.objects.filter(day_time=day_time).first()
+        else:
+            validated_data['plan_schedule'] = instance.plan_schedule
         validated_data['last_updated_user'] = self.context['request'].user
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
@@ -147,12 +158,18 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
     """领料日计划序列化"""
     mr_material_requisition_classes = MaterialRequisitionClassesSerializer(many=True,
                                                                            help_text='{"product_master":1,"weight":1,"unit":"1","classes_detail":1}')
+    plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
 
     class Meta:
         model = MaterialRequisition
         fields = (
-            'material_demanded', 'count', 'plan_schedule', 'unit', 'mr_material_requisition_classes')
+            'material_demanded', 'count', 'plan_date', 'unit', 'mr_material_requisition_classes')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_plan_date(self, value):
+        if not PlanSchedule.objects.filter(day_time=value).first():
+            raise serializers.ValidationError('当前计划时间不存在')
+        return value
 
     @atomic()
     def create(self, validated_data):
@@ -160,7 +177,8 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
         pdp_dic = {}
         pdp_dic['material_demanded'] = validated_data.pop('material_demanded')
         pdp_dic['count'] = validated_data.pop('count')
-        pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
+        # pdp_dic['plan_schedule'] = validated_data.pop('plan_schedule')
+        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
         pdp_dic['unit'] = validated_data.pop('unit')
         # instance = MaterialRequisition.objects.create(**pdp_dic)
         pdp_dic['created_user'] = self.context['request'].user
@@ -176,6 +194,11 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
 
         update_pcp_list = validated_data.pop('mr_material_requisition_classes', None)
+        day_time = validated_data.pop('plan_date', None)
+        if day_time:
+            validated_data['plan_schedule'] = PlanSchedule.objects.filter(day_time=day_time).first()
+        else:
+            validated_data['plan_schedule'] = instance.plan_schedule
         validated_data['last_updated_user'] = self.context['request'].user
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
