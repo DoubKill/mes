@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'drf_yasg',  # swgger文档插件    /api/v1/docs/swagger
+    'drf_yasg',  # swagger文档插件    /api/v1/docs/swagger
     'django_filters',
     'production.apps.ProductionConfig',
     'plan.apps.PlanConfig',
@@ -59,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'mes.middlewares.OperationLogRecordMiddleware',
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -96,7 +97,7 @@ REST_FRAMEWORK = {
 }
 
 JWT_AUTH = {
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(minutes=30),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
     'JWT_ALLOW_REFRESH': True,
 }
 

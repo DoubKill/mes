@@ -3,6 +3,7 @@ var GroupsFilterMixin = {
     data: function () {
 
         return {
+
             group_code: "",
             name: "",
         }

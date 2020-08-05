@@ -175,8 +175,6 @@
 
                             }).catch(function (error) {
 
-                            console.log(error.response.data)
-
                             for (const key in app.userFormError) {
                                 if (error.response.data[key])
                                     app.userFormError[key] = error.response.data[key].join(",")

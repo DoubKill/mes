@@ -1,42 +1,22 @@
 import xlrd
 from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
+from rest_framework import mixins, status
+from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
-from django.http import HttpResponse
-import json
 
 from mes.common_code import menu
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from system.models import GroupExtension, User, Group, Section, FunctionBlock, FunctionPermission, \
-    Function, Menu
-from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, GroupSerializer, \
-    UserSerializer, UserUpdateSerializer, SectionSerializer, PermissionSerializer
-from basics.views import CommonDeleteMixin
+from system.models import GroupExtension, User, Section
+from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
+    UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from system.filters import UserFilter, GroupExtensionFilter
-
-
-# @method_decorator([api_recorder], name="dispatch")
-# class GroupViewSet(ModelViewSet):
-#     """
-#     list:
-#         角色列表
-#     create:
-#         创建角色
-#     update:
-#         修改角色
-#     destroy:
-#         删除角色
-#     """
-#     queryset = Group.objects.filter()
-#     serializer_class = GroupSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend,)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -68,14 +48,23 @@ class UserViewSet(ModelViewSet):
     update:
         修改用户
     destroy:
-        删除用户
+        账号停用和启用
     """
-    queryset = User.objects.all()
-
+    queryset = User.objects.filter(delete_flag=False)
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = UserFilter
+
+    def destroy(self, request, *args, **kwargs):
+        # 账号停用和启用
+        instance = self.get_object()
+        if instance.is_active:
+            instance.is_active = 0
+        else:
+            instance.is_active = 1
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -90,8 +79,9 @@ class UserViewSet(ModelViewSet):
             return UserSerializer
 
 
-class UserGroupsViewSet(ModelViewSet):
-    queryset = User.objects.all()
+class UserGroupsViewSet(mixins.ListModelMixin,
+                           GenericViewSet):
+    queryset = User.objects.filter(delete_flag=False)
 
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -99,14 +89,6 @@ class UserGroupsViewSet(ModelViewSet):
     pagination_class = SinglePageNumberPagination
     filter_class = UserFilter
 
-    def create(self, request, *args, **kwargs):
-        pass
-
-    def update(self, request, *args, **kwargs):
-        pass
-
-    def destroy(self, request, *args, **kwargs):
-        pass
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -121,7 +103,7 @@ class GroupExtensionViewSet(ModelViewSet):
     destroy:
         删除角色
     """
-    queryset = GroupExtension.objects.filter()
+    queryset = GroupExtension.objects.filter(delete_flag=False)
     serializer_class = GroupExtensionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -139,24 +121,12 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.action == 'partial_update':
             return GroupExtensionSerializer
 
-class GroupAddUserViewSet(APIView):
-    def put(self,request, pk:int):
-        user_set = request.GET.get('user_set',[])
-        group_ext_obj = GroupExtension.objects.filter(id=pk).first()
 
-        if len(eval(user_set)) == 0:
-            user_obj = User.objects.filter(groups__in=[pk])
-
-            for ele in user_obj:
-                ele.groups.remove(Group.objects.filter(name=group_ext_obj.name).first().id)
-
-        for user_ele in eval(user_set):
-            user_obj = User.objects.filter(id=user_ele)[0]
-            group_obj = Group.objects.filter(name=group_ext_obj.name)
-            user_obj.groups.add(*group_obj)
-
-        return HttpResponse(json.dumps("success"), status=200)
-
+@method_decorator([api_recorder], name="dispatch")
+class GroupAddUserViewSet(UpdateAPIView):
+    """控制角色中用户具体为哪些的视图"""
+    queryset = GroupExtension.objects.filter(delete_flag=False)
+    serializer_class = GroupUserUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -171,7 +141,7 @@ class SectionViewSet(ModelViewSet):
     destroy:
         删除角色
     """
-    queryset = Section.objects.filter()
+    queryset = Section.objects.filter(delete_flag=False)
     serializer_class = SectionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)

@@ -5,7 +5,7 @@ from django.views.generic import TemplateView
 class TitleMixin:
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data()
+        context = super().get_context_data(**kwargs)
         context['namePath'] = self.name_path
         return context
 
@@ -28,3 +28,44 @@ class GroupManageView(TitleMixin, LoginRequiredMixin, TemplateView):
 class UsersByGroupManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/users_by_group_manage.html'
     name_path = ['基础信息管理', '角色别用户管理']
+
+
+class EquipBaseInfoManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/equip_base_info_manage.html'
+    name_path = ['基础信息管理', '设备基础信息管理']
+
+
+# 倒班时间管理
+class ChangeShiftsManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/change_shifts_manage.html'
+    name_path = ['基础信息管理', '倒班时间管理']
+
+
+class FactoryScheduleManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/factory_schedule_manage.html'
+    name_path = ['基础信息管理', '工厂排班管理']
+
+
+class EquipCategoryManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/equip_category_manage.html'
+    name_path = ['基础信息管理', '设备种类']
+
+
+class EquipManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/equip_manage.html'
+    name_path = ['基础信息管理', '设备基础信息']
+
+
+class MaterialBaseInfoManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/material_base_info_manage.html'
+    name_path = ['配方管理', '原材料基本信息管理']
+
+
+class RubberRecipeStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/rubber_recipe_standard_manage.html'
+    name_path = ['配方管理', '胶料配方标准管理']
+
+
+class RubberMaterialStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/rubber_material_standard_manage.html'
+    name_path = ['配方管理', '胶料配料标准管理']

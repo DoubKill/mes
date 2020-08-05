@@ -1,9 +1,5 @@
-import time
 
-from django.conf import settings
 from django.db import models
-from datetime import timedelta
-MANAGED = True if settings.DEBUG else False
 from system.models import AbstractEntity
 from django.utils.translation import ugettext_lazy as _
 
@@ -19,14 +15,13 @@ class GlobalCodeType(AbstractEntity):
         return self.type_name
 
     class Meta:
-        managed = MANAGED
         db_table = 'global_code_type'
         verbose_name_plural = verbose_name = '公共代码类型'
 
 
 class GlobalCode(AbstractEntity):
     """公共代码表"""
-    global_type = models.ForeignKey('GlobalCodeType', models.DO_NOTHING, related_name="global_code",
+    global_type = models.ForeignKey('GlobalCodeType', models.DO_NOTHING, related_name="global_codes",
                                     help_text='全局类型ID', verbose_name='全局类型ID')
     global_no = models.CharField(max_length=64, help_text='公共代码编号', verbose_name='公共代码编号')
     global_name = models.CharField(max_length=64, help_text='公用代码名称', verbose_name='公用代码名称')
@@ -38,9 +33,7 @@ class GlobalCode(AbstractEntity):
         return self.global_name
 
     class Meta:
-        managed = MANAGED
         db_table = 'global_code'
-        unique_together = ("global_no", "global_name", "used_flag")
         verbose_name_plural = verbose_name = '公共代码'
 
 
@@ -55,7 +48,6 @@ class WorkSchedule(AbstractEntity):
         return self.schedule_name
 
     class Meta:
-        managed = MANAGED
         db_table = 'work_schedule'
         verbose_name_plural = verbose_name = '工作日程'
 
@@ -70,16 +62,10 @@ class ClassesDetail(AbstractEntity):
                                       help_text='工作日程id', verbose_name='工作日程id', related_name="classesdetail_set")
     classes = models.ForeignKey('GlobalCode', models.DO_NOTHING,
                                 help_text='班次', verbose_name='班次', related_name="classes_detail")
-    # classes_name = models.CharField(max_length=64, help_text='班次名称', verbose_name='班次名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
     start_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
     end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
-
-    # classes_type_name = models.CharField(max_length=64, choices=TYPE_CHOICE,
-    #                                      help_text='类型', verbose_name='类型')
-
-
 
     def __str__(self):
         return self.classes.global_name
@@ -91,7 +77,6 @@ class ClassesDetail(AbstractEntity):
     sum = property(_sum)
 
     class Meta:
-        managed = MANAGED
         db_table = 'classes_detail'
         verbose_name_plural = verbose_name = '班次条目'
 
@@ -112,17 +97,17 @@ class EquipCategoryAttribute(AbstractEntity):
         return self.category_name
 
     class Meta:
-        managed = MANAGED
         db_table = 'equip_category_attribute'
         verbose_name_plural = verbose_name = '设备种类属性'
 
 
 class Equip(AbstractEntity):
     """设备表"""
-    category = models.ForeignKey('EquipCategoryAttribute', models.DO_NOTHING, related_name='equip',
+    category = models.ForeignKey('EquipCategoryAttribute', models.DO_NOTHING, related_name='equip_c',
                                  help_text='设备种类属性', verbose_name='设备种类属性')
     parent = models.ForeignKey('self', blank=True, null=True,
-                               help_text='上层设备', verbose_name='上层设备', on_delete=models.DO_NOTHING, related_name="equip")
+                               help_text='上层设备', verbose_name='上层设备', on_delete=models.DO_NOTHING,
+                               related_name="equip_p")
     equip_no = models.CharField(max_length=64, help_text='设备编号', verbose_name='设备编号')
     equip_name = models.CharField(max_length=64, help_text='设备名称', verbose_name='设备名称')
     used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
@@ -130,14 +115,13 @@ class Equip(AbstractEntity):
                                    help_text='设备说明', verbose_name='设备说明')
     count_flag = models.BooleanField(help_text='是否产量计数', verbose_name='是否产量计数')
 
-    equip_level = models.ForeignKey('GlobalCode', models.DO_NOTHING, related_name='equip',
+    equip_level = models.ForeignKey('GlobalCode', models.DO_NOTHING, related_name='equip_l',
                                     help_text='层级', verbose_name='层级')
 
     def __str__(self):
         return self.equip_name
 
     class Meta:
-        managed = MANAGED
         db_table = 'equip'
         verbose_name_plural = verbose_name = '设备'
 
@@ -154,12 +138,11 @@ class SysbaseEquipLevel(AbstractEntity):
                                     help_text='层级', verbose_name='层级', related_name='sysbase_equip_level')
 
     class Meta:
-        managed = MANAGED
         db_table = 'sysbase_equip_level'
         verbose_name_plural = verbose_name = '设备层次'
 
 
-class PlanSchedule(models.Model):
+class PlanSchedule(AbstractEntity):
     """计划时间表"""
     TYPE_CHOICE_WEEK = (
         ('monday', '星期一'),
@@ -170,13 +153,12 @@ class PlanSchedule(models.Model):
         ('saturday', '星期六'),
         ('sunday', '星期日'),
     )
-    day_time = models.DateTimeField(help_text='日期', verbose_name='日期')
+    day_time = models.DateField(help_text='日期', verbose_name='日期')
     week_time = models.CharField(max_length=64, choices=TYPE_CHOICE_WEEK, help_text='星期', verbose_name='星期')
     work_schedule = models.ForeignKey(WorkSchedule, models.DO_NOTHING,
                                       help_text='工作日程id', verbose_name='工作日程id', related_name="plan_schedule")
 
     class Meta:
-        managed = MANAGED
         db_table = 'plan_schedule'
         verbose_name_plural = verbose_name = '计划时间'
 
@@ -194,6 +176,5 @@ class WorkSchedulePlan(AbstractEntity):
                                       help_text='计划时间id', verbose_name='计划时间id', related_name="work_schedule_plan")
 
     class Meta:
-        managed = MANAGED
         db_table = 'work_schedule_plan'
         verbose_name_plural = verbose_name = '工作日程计划'
