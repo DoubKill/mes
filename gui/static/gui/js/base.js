@@ -8,9 +8,7 @@ const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=设备类型";
 const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
 const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
 
-const EquipPostUrl = BasicsUrl + "equips/";
-const EquipUrl = BasicsUrl + "equips-list/";
-
+const EquipUrl = BasicsUrl + "equips/";
 
 const SystemUrl = "/api/v1/system/";
 const PersonnelsUrl = SystemUrl + "personnels/";

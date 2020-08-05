@@ -24,7 +24,7 @@
                     used_flag: true,
                     description:"",
                     equip_level:"",
-                    category:""
+                    category:"",
                 },
                 EquipFormError: {
                     equip_no: "",
@@ -33,7 +33,7 @@
                     used_flag: "",
                     description:"",
                     equip_level:"",
-                    category:""
+                    category:"",
                 },
                 dialogEditEquipVisible: false,
             }
@@ -68,7 +68,7 @@
                     used_flag: "",
                     description:"",
                     equip_level:"",
-                    category:""
+                    category:"",
                 }
             },
             showCreateEquipDialog: function () {
@@ -81,7 +81,7 @@
 
                 this.clearEquipFormError();
                 var app = this;
-                axios.post(EquipPostUrl, app.EquipForm)
+                axios.post(EquipUrl, app.EquipForm)
                     .then(function (response) {
 
                         app.dialogCreateEquipVisible = false;
@@ -132,7 +132,7 @@
                 // console.log(this.EquipForm);
                 // console.log("=============================");
 
-                axios.put(EquipPostUrl + this.EquipForm.id + '/', this.EquipForm)
+                axios.put(EquipUrl + this.EquipForm.id + '/', this.EquipForm)
                     .then(function (response) {
 
                         app.dialogEditEquipVisible = false;
@@ -156,7 +156,7 @@
                     type: 'warning'
                 }).then(() => {
 
-                    axios.delete(EquipPostUrl + row.id + '/')
+                    axios.delete(EquipUrl + row.id + '/')
                         .then(function (response) {
                             app.$message({
                                 type: 'success',

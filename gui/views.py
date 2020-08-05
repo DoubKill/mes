@@ -64,3 +64,8 @@ class MaterialBaseInfoManageView(TitleMixin, LoginRequiredMixin, TemplateView):
 class RubberRecipeStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/rubber_recipe_standard_manage.html'
     name_path = ['配方管理', '胶料配方标准管理']
+
+
+class RubberMaterialStandardManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/rubber_material_standard_manage.html'
+    name_path = ['配方管理', '胶料配料标准管理']
