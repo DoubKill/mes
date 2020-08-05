@@ -37,7 +37,8 @@
 
                 newFactory: "",
                 newProductNo: "",
-                newVersion: ""
+                newVersion: "",
+                originByName: {}
             }
         },
         created: function () {
@@ -51,6 +52,11 @@
             }).then(function (response) {
 
                 app.originOptions = response.data.results;
+                for (var i = 0; i < app.originOptions.length; ++i) {
+
+                    app.originByName[
+                        app.originOptions[i].global_name] = app.originOptions[i];
+                }
             }).catch(function (error) {
 
             });
@@ -222,7 +228,6 @@
                     this.selectedMaterials.splice(this.selectedMaterials.indexOf(row), 1)
                 }
             },
-
             initRatio() {
 
                 for (var i = 0; i < this.selectedMaterials.length; ++i) {
@@ -239,7 +244,6 @@
 
                 }
             },
-
             selectClicked: function () {
 
                 if (!this.selectedMaterials.length)
@@ -416,12 +420,19 @@
             },
             copyRecipeClicked: function () {
 
+                if (this.currentRow.used_type === 1) {
+
+                    this.$alert('编辑中胶料配方不可复制', '警告', {
+                        confirmButtonText: '确定',
+                    });
+                    return;
+                }
                 console.log(this.currentRow)
                 var productStandardNo = this.currentRow.product_standard_no.split("-");
                 this.sourceFactory = this.currentRow.factory;
                 this.sourceProductNo = productStandardNo[1];
                 this.sourceVersion = productStandardNo[2];
-                this.newFactory = this.sourceFactory;
+                this.newFactory = this.originByName[this.sourceFactory].id
                 this.newProductNo = this.sourceProductNo;
                 var versionNumber = Number(this.sourceVersion);
                 if (!isNaN(versionNumber)) {
@@ -432,7 +443,6 @@
                 this.dialogCopyRubberRecipeStandardVisible = true;
             },
             handleCopyRubberRecipeStandard: function () {
-
 
                 var app = this;
                 axios.post(CopyProductInfosUrl, {
@@ -447,9 +457,9 @@
                     app.currentChange(app.currentPage);
                 }).catch(function (error) {
 
-                    console.log(error.data)
+                    console.log(error.response.data)
                 });
-            }
+            },
         }
     };
     var Ctor = Vue.extend(Main);
