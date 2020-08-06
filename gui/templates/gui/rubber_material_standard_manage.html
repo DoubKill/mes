@@ -138,30 +138,61 @@
             :close-on-press-escape="false"
             title="新建胶料配料" :visible.sync="dialogAddRubberMaterial">
         <el-form v-model="rubberMaterialForm" :label-width="formLabelWidth">
+
             <el-form-item label="产地">
-                <el-select v-model="rubberMaterialForm.factory" placeholder="请选择">
+                <el-select
+                        size="mini"
+                        @change="shiftsPopupRubberSiteChange"
+                        v-model="rubberMaterialForm.factory" placeholder="请选择">
                     <el-option
-                            v-for="option in RubberSiteOptions"
-                            :key="option.id"
-                            :label="option.global_name"
-                            :value="option.id">
+                            :key="item.id"
+                            :value="item.value"
+                            :label="item.label"
+                            v-for="item in PopupRubberSiteOptions">
                     </el-option>
                 </el-select>
             </el-form-item>
-            <el-form-item label="胶料编码" :label-width="formLabelWidth">
-                <el-input v-model="rubberMaterialForm.stage_product_batch_no"></el-input>
-            </el-form-item>
-            <el-form-item label="段次" :label-width="formLabelWidth">
-                <el-input v-model="rubberMaterialForm.stage"></el-input>
+
+            <el-form-item label="胶料编码">
+                <el-select
+                        size="mini"
+                        @change="shiftsProductBatchNoChange"
+                        v-model="rubberMaterialForm.stage_product_batch_no" placeholder="请选择">
+                    <el-option
+                            :key="item.id"
+                            :value="item.value"
+                            :label="item.label"
+                            v-for="item in ProductBatchNoOptions">
+                    </el-option>
+                </el-select>
             </el-form-item>
 
-            <el-form-item label="炼胶机类型">
-                <el-select v-model="rubberMaterialForm.dev_type_name" placeholder="请选择">
+            <el-form-item label="段次">
+                <el-select
+                        size="mini"
+                        @change="shiftsStageChange"
+                        v-model="rubberMaterialForm.stage" placeholder="请选择">
                     <el-option
-                            v-for="option in DevTypeOptions"
-                            :key="option.id"
-                            :label="option.global_name"
-                            :value="option.id">
+                            :key="item.id"
+                            :value="item.value"
+                            :label="item.label"
+                            v-for="item in StageOptions">
+                    </el-option>
+
+                </el-select>
+            </el-form-item>
+
+
+            <el-form-item label="炼胶机类型" :label-width="formLabelWidth">
+                <el-select
+                        size="mini"
+                        @change="shiftsDevTypeChange"
+                        v-model="rubberMaterialForm.dev_type_name" placeholder="请选择">
+                    <el-option
+                            :key="item.id"
+                            :value="item.value"
+                            :label="item.label"
+                            v-for="item in DevTypeOptions">
                     </el-option>
                 </el-select>
             </el-form-item>

@@ -10,6 +10,7 @@ const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
 const StateGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料状态";
 const SiteGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
 const StageGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料段次";
+const DevTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=炼胶机类型";
 
 const EquipUrl = BasicsUrl + "equips/";
 
@@ -26,6 +27,8 @@ const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
 const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
 // 胶料配料标准管理接口
 const RubberMaterialUrl = "/api/v1/recipe/product-batch/";
+// 胶料配料标准管理——选择胶料编码与段次接口
+const RubberStageUrl = "/api/v1/recipe/product-stages/?factory_id=";
 
 
 var BaseMixin = {

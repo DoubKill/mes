@@ -13,6 +13,14 @@
                 RubberSiteOptions: [],
                 RubberStage: "",
                 RubberStageOptions: [],
+                factory:"",
+                PopupRubberSiteOptions:[],
+                stage_product_batch_no:"",
+                ProductBatchNoOptions:[],
+                stage:"",
+                StageOptions:[],
+                dev_type_name: "",
+                DevTypeOptions: [],
                 dialogAddRubberMaterial: false,
 
                 rubberMaterialForm: {
@@ -48,8 +56,35 @@
             }).then(function (response) {
                 app.RubberStageOptions = response.data.results;
             }).catch(function (error) {
-
             });
+
+            axios.get(SiteGlobalUrl, {
+            }).then(function (response) {
+                app.PopupRubberSite = response.data.results;
+                    for (var i = 0; i < app.PopupRubberSite.length; ++i) {
+                        var label = app.PopupRubberSite[i]["global_name"];
+                        app.PopupRubberSiteOptions.push({
+                            value: app.PopupRubberSite[i]["id"],
+                            label
+                        });
+                    }
+            }).catch(function (error) {
+            });
+
+            axios.get(DevTypeGlobalUrl, {
+            }).then(function (response) {
+                app.DevType = response.data.results;
+                    for (var i = 0; i < app.DevType.length; ++i) {
+                        var label = app.DevType[i]["global_name"];
+                        app.DevTypeOptions.push({
+                            value: app.DevType[i]["id"],
+                            label
+                        });
+                    }
+            }).catch(function (error) {
+            });
+
+
         },
         methods: {
 
@@ -74,6 +109,45 @@
             RubberStageChange: function () {
 
                 this.getFirstPage();
+            },
+            shiftsPopupRubberSiteChange(){
+                var app = this;
+                axios.get(RubberStageUrl + this.rubberMaterialForm['factory'], {}
+                ).then(function (response) {
+                    var ProductBatchNo = response.data;
+                        for (var i = 0; i < ProductBatchNo.length; ++i) {
+                            app.ProductBatchNoOptions.push({
+                                value: ProductBatchNo[i]["product_info"],
+                                label: ProductBatchNo[i]["product_no"],
+                            });
+                        }
+                }).catch(function (error) {
+                });
+            },
+            shiftsProductBatchNoChange(){
+                var app = this;
+                axios.get(RubberStageUrl + this.rubberMaterialForm['factory'], {}
+                ).then(function (response) {
+                    var Stage = response.data;
+                    for (var i = 0; i < Stage.length; ++i) {
+                        if(Stage[i]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
+                            for(var j = 0; j < Stage[i]['stages'].length; ++j){
+                                app.StageOptions.push({
+                                    value: Stage[i]['stages'][j]["stage"],
+                                    label: Stage[i]['stages'][j]["stage__global_name"],
+                                });
+                            }
+                        }
+                    }
+                }).catch(function (error) {
+                });
+            },
+
+            shiftsStageChange(){
+
+            },
+
+            shiftsDevTypeChange() {
             },
 
             showAddRubberMaterialDialog: function () {
