@@ -153,7 +153,9 @@ class ProductStageInfoView(APIView):
         products = ProductInfo.objects.filter(factory=factory).prefetch_related('productrecipe_set')
         for product in products:
             stages = product.productrecipe_set.values('stage', 'stage__global_name')
-            ret.append({'product_info': product.id, 'product_no': product.product_no, 'stages': stages})
+            ret.append({'product_info': product.id, 'versions': product.versions,
+                        'product_no': product.product_no, 'stages': stages,
+                        'product_name': product.product_name, 'used_type': product.get_used_type_display()})
         return Response(data=ret)
 
 
@@ -220,8 +222,9 @@ class PreProductBatchView(APIView):
         if not recipe:
             raise ValidationError('当前段次配方不存在')
 
-        pre_recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                                  num__lt=recipe.num).order_by('-num').first()
+        pre_recipe = ProductRecipe.objects.exclude(stage_id=stage_id).filter(product_info_id=product_info_id,
+                                                                             num__lt=recipe.num
+                                                                             ).order_by('-num').first()
         pre_recipe_data = {}
         if pre_recipe:
             pre_batch = ProductBatching.objects.filter(product_info_id=product_info_id,
