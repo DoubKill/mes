@@ -155,7 +155,9 @@ class ProductStageInfoView(APIView):
         for product in products:
             # TODO 要做distinct stage，sqlite数据库暂时不支持
             stages = product.productrecipe_set.values('stage', 'stage__global_name')
-            ret.append({'product_info': product.id, 'product_no': product.product_no, 'stages': stages})
+            ret.append({'product_info': product.id, 'versions': product.versions,
+                        'product_no': product.product_no, 'stages': stages,
+                        'product_name': product.product_name, 'used_type': product.get_used_type_display()})
         return Response(data=ret)
 
 

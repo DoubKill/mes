@@ -44,7 +44,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-        print(validated_data)
+        # print(validated_data)
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_master'] = validated_data.pop('product_master')
@@ -53,15 +53,21 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         # instance = ProductDayPlan.objects.create(**pdp_dic)
         instance = super().create(pdp_dic)
         details = validated_data['pdp_product_classes_plan']
+
         for detail in details:
             detail_dic = dict(detail)
             detail_dic['product_day_plan'] = instance
-            ProductClassesPlan.objects.create(**detail_dic, created_user=self.context['request'].user)
+            pcp_obj = ProductClassesPlan.objects.create(**detail_dic, created_user=self.context['request'].user)
+            for pbd_obj in instance.product_master.batching_details.all():
+                MaterialDemanded.objects.create(product_day_plan=instance, classes=pcp_obj.classes_detail,
+                                                material=pbd_obj.material,
+                                                material_demanded=pbd_obj.actual_weight * pcp_obj.num)
         return instance
 
     @atomic()
     def update(self, instance, validated_data):
         update_pcp_list = validated_data.pop('pdp_product_classes_plan', None)
+        instance.pdp_material_demanded.all()
         day_time = validated_data.pop('plan_date', None)
         if day_time:
             validated_data['plan_schedule'] = PlanSchedule.objects.filter(day_time=day_time).first()
@@ -77,6 +83,12 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             update_pcp['product_day_plan'] = instance
             update_pcp['last_updated_user'] = self.context['request'].user
             ProductClassesPlan.objects.create(**update_pcp)
+        instance.pdp_material_demanded.all().delete()
+        for pcp_obj in instance.pdp_product_classes_plan.all():
+            for pbd_obj in instance.product_master.batching_details.all():
+                MaterialDemanded.objects.create(product_day_plan=instance, classes=pcp_obj.classes_detail,
+                                                material=pbd_obj.material,
+                                                material_demanded=pbd_obj.actual_weight * pcp_obj.num)
         return pdp_obj
 
 
@@ -84,11 +96,14 @@ class MaterialDemandedSerializer(BaseModelSerializer):
     """原材料需求量序列化"""
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     classes_name = serializers.CharField(source='classes.classes_name', read_only=True)
+    material_type = serializers.CharField(source='material.material_type', read_only=True)
+    material_no = serializers.CharField(source='material.material_no', read_only=True)
+    material_name = serializers.CharField(source='material.material_name', read_only=True)
 
     class Meta:
         model = MaterialDemanded
-        fields = (
-            'product_day_plan', 'classes', 'material', 'material_name', 'classes_name', 'material_demanded',)
+        fields = ('id', 'material_type', 'material_no', 'material_name',
+                  'product_day_plan', 'classes', 'material', 'material_name', 'classes_name', 'material_demanded',)
         # read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
