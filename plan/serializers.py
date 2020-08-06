@@ -5,8 +5,6 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Pr
 from basics.models import PlanSchedule
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
-import datetime
-import time
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -99,7 +97,7 @@ class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
 class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     """配料小料日计划序列化"""
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
-                                                                             help_text='{"product_master":1,"num":1,"time":"12:12:12","weight":1,"unit":"1","classes_detail":1}')
+                                                                             help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":"1","classes_detail":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
 
     class Meta:
@@ -165,7 +163,7 @@ class MaterialRequisitionClassesSerializer(BaseModelSerializer):
 class MaterialRequisitionSerializer(BaseModelSerializer):
     """领料日计划序列化"""
     mr_material_requisition_classes = MaterialRequisitionClassesSerializer(many=True,
-                                                                           help_text='{"product_master":1,"weight":1,"unit":"1","classes_detail":1}')
+                                                                           help_text='{"sn":1,"weight":1,"unit":"1","classes_detail":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
 
     class Meta:
@@ -211,7 +209,7 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
             return pdp_obj
-        MaterialRequisitionClasses.objects.filter(product_batching_day_plan=instance).delete()
+        MaterialRequisitionClasses.objects.filter(material_requisition=instance).delete()
         for update_pcp in update_pcp_list:
             update_pcp = dict(update_pcp)
             update_pcp['material_requisition'] = instance
@@ -222,7 +220,7 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
 
 class ProductDayPlanCopySerializer(BaseModelSerializer):
     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
-    dst_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
     class Meta:
         model = ProductDayPlan
@@ -282,7 +280,7 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
 
 class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
-    dst_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
     class Meta:
         model = ProductBatchingDayPlan
@@ -338,7 +336,7 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
             pc_queryset = ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=pbdp_obj)
             for pc_obj in pc_queryset:
                 ProductBatchingClassesPlan.objects.create(product_batching_day_plan=instance,
-                                                          product_master=pc_obj.product_master, num=pc_obj.num,
+                                                          sn=pc_obj.sn, num=pc_obj.num,
                                                           time=pc_obj.time,
                                                           weight=pc_obj.weight, unit=pc_obj.unit,
                                                           classes_detail=pc_obj.classes_detail,
@@ -348,7 +346,7 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
 
 class MaterialRequisitionCopySerializer(BaseModelSerializer):
     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
-    dst_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
     class Meta:
         model = MaterialRequisition
@@ -404,7 +402,7 @@ class MaterialRequisitionCopySerializer(BaseModelSerializer):
             pc_queryset = MaterialRequisitionClasses.objects.filter(material_requisition=mr_obj)
             for pc_obj in pc_queryset:
                 MaterialRequisitionClasses.objects.create(material_requisition=instance,
-                                                          product_master=pc_obj.product_master,
+                                                          sn=pc_obj.sn,
                                                           weight=pc_obj.weight,
                                                           unit=pc_obj.unit,
                                                           classes_detail=pc_obj.classes_detail,
