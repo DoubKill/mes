@@ -222,8 +222,9 @@ class PreProductBatchView(APIView):
         if not recipe:
             raise ValidationError('当前段次配方不存在')
 
-        pre_recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                                  num__lt=recipe.num).order_by('-num').first()
+        pre_recipe = ProductRecipe.objects.exclude(stage_id=stage_id).filter(product_info_id=product_info_id,
+                                                                             num__lt=recipe.num
+                                                                             ).order_by('-num').first()
         pre_recipe_data = {}
         if pre_recipe:
             pre_batch = ProductBatching.objects.filter(product_info_id=product_info_id,
