@@ -8,10 +8,12 @@
             <el-button @click="showAddRubberRecipeDialog">新建</el-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button :disabled="!currentRow" @click="showRecipeClicked">配方</el-button>
+            <el-button :disabled="currentRow.used_type === -1" @click="showRubberRecipeStandardDialog">配方</el-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button :disabled="!currentRow" @click="copyRecipeClicked">复制</el-button>
+            <el-button :disabled="currentRow.used_type === -1 || currentRow.used_type === 1" @click="copyRecipeClicked">
+                复制
+            </el-button>
         </el-form-item>
     </el-form>
     <el-table
@@ -209,10 +211,10 @@
             title="胶料配方标准" :visible.sync="dialogRubberRecipeStandard">
         <el-form :inline="true">
             <el-form-item style="float: right">
-                <el-button @click="newClicked">新建</el-button>
+                <el-button v-if="currentRow.used_type === 1" @click="newClicked">新建</el-button>
             </el-form-item>
             <el-form-item style="float: right">
-                <el-button @click="saveClicked">保存</el-button>
+                <el-button v-if="currentRow.used_type === 1" @click="saveClicked">保存</el-button>
             </el-form-item>
         </el-form>
         <table class="table table-bordered"
@@ -235,14 +237,14 @@
                     <td style="text-align: center">{{ ratioSum }}</td>
                     <td></td>
                 </tr>
-                <tr v-for="material in selectedMaterials">
+                <tr v-for="(material, index ) in selectedMaterials">
                     <td></td>
-                    <td></td>
+                    <td>{{ index + 1 }}</td>
                     <td>{{ material.car_number }}</td>
                     <td>{{ material.material_type_name }}</td>
                     <td>{{ material.material_name }}</td>
                     <td style="text-align: center">
-                        <el-input-number @change="carNumberChanged"
+                        <el-input-number :disabled="currentRow.used_type !== 1" @change="carNumberChanged"
                                          v-if="material.car_number && material.car_number.indexOf('RM') !== 0"
                                          :precision="2" :step="0.1" v-model.number="material.ratio"></el-input-number>
                     </td>
@@ -290,6 +292,11 @@
                 <el-col :span="6">
                     <el-input v-model="newVersion"></el-input>
                 </el-col>
+            </el-form-item>
+            <el-form-item>
+                {% verbatim vue %}
+                <p style="color: red">{{ copyError }}</p>
+                {% endverbatim vue%}
             </el-form-item>
         </el-form>
         <div slot="footer" class="dialog-footer">

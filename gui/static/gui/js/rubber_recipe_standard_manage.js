@@ -8,13 +8,13 @@
 
                 tableDataUrl: ProductInfosUrl,
                 dialogAddRubberRecipe: false,
-                originOptions: [],
+                originOptions: [], // 产地选项
                 rubberRecipeForm: {
-                    factory: "",
-                    product_no: "",
-                    versions: "",
-                    product_name: "",
-                    precept: ""
+                    factory: "", // 产地
+                    product_no: "", // 胶料编码
+                    versions: "", // 版本
+                    product_name: "", // 胶料名称
+                    precept: "" // 方案
                 },
                 materials: [],
                 selectedMaterials: [],
@@ -27,7 +27,9 @@
                 ratioSum: 0,
                 rubberRecipeError: "",
                 carNumberIdByName: {},
-                currentRow: null,
+                currentRow: {
+                    used_type: -1
+                },
                 materialById: {},
                 dialogCopyRubberRecipeStandardVisible: false,
 
@@ -38,7 +40,8 @@
                 newFactory: "",
                 newProductNo: "",
                 newVersion: "",
-                originByName: {}
+                originByName: {},
+                copyError: ""
             }
         },
         created: function () {
@@ -130,8 +133,17 @@
             showAddRubberRecipeDialog: function () {
 
                 this.rubberRecipeError = "";
+                this.rubberRecipeForm = {
+                    factory: "", // 产地
+                    product_no: "", // 胶料编码
+                    versions: "", // 版本
+                    product_name: "", // 胶料名称
+                    precept: "" // 方案
+                };
                 this.dialogAddRubberRecipe = true;
-                this.currentRow = null // 新建和更新标志
+                this.currentRow = {
+                    used_type: -1
+                } // 新建和更新标志 -1新建 其他更新
             },
             handleAddRubberRecipe: function () {
 
@@ -246,8 +258,19 @@
             },
             selectClicked: function () {
 
+                console.log(this.selectedMaterials)
                 if (!this.selectedMaterials.length)
                     return;
+                for (var i = 0; i < this.selectedMaterials.length; ++i) {
+
+                    if (!this.selectedMaterials[i].car_number) {
+
+                        this.$alert('请选择所有原材料车次', '警告', {
+                            confirmButtonText: '确定',
+                        });
+                        return;
+                    }
+                }
                 this.initRatio();
                 this.carNumberChanged();
                 this.dialogChoiceMaterials = false;
@@ -294,7 +317,7 @@
                         }
                         productrecipe_set.push(productrecipe)
                     }
-                    if (this.currentRow) {
+                    if (this.currentRow.used_type !== -1) {
 
                         axios.put(ProductInfosUrl + this.currentRow.id + "/", {
                             productrecipe_set
@@ -337,6 +360,12 @@
                     }
                 }
             },
+            afterGetData: function () {
+
+                this.currentRow = {
+                    used_type: -1
+                }
+            },
             carNumberChanged: function () {
 
                 for (var i = 0; i < this.selectedMaterials.length; ++i) {
@@ -359,10 +388,8 @@
 
                 this.currentRow = val;
             },
-            showRecipeClicked: function () {
+            showRubberRecipeStandardDialog: function () {
 
-                if (!this.currentRow)
-                    return;
                 var app = this;
                 axios.get(ProductInfosUrl + this.currentRow.id + "/")
                     .then(function (response) {
@@ -386,8 +413,8 @@
 
                             app.initRatio();
                             app.carNumberChanged();
+                            app.dialogRubberRecipeStandard = true;
                         }
-                        app.dialogRubberRecipeStandard = true;
 
                     }).catch(function (error) {
 
@@ -420,14 +447,6 @@
             },
             copyRecipeClicked: function () {
 
-                if (this.currentRow.used_type === 1) {
-
-                    this.$alert('编辑中胶料配方不可复制', '警告', {
-                        confirmButtonText: '确定',
-                    });
-                    return;
-                }
-                console.log(this.currentRow)
                 var productStandardNo = this.currentRow.product_standard_no.split("-");
                 this.sourceFactory = this.currentRow.factory;
                 this.sourceProductNo = productStandardNo[1];
@@ -444,6 +463,7 @@
             },
             handleCopyRubberRecipeStandard: function () {
 
+                this.copyError = "";
                 var app = this;
                 axios.post(CopyProductInfosUrl, {
 
@@ -452,12 +472,13 @@
                     versions: app.newVersion
                 }).then(function (response) {
 
-                    app.dialogCopyRubberRecipeStandardVisible = false
+                    app.dialogCopyRubberRecipeStandardVisible = false;
                     app.$message(app.currentRow.product_standard_no + "拷贝成功");
                     app.currentChange(app.currentPage);
                 }).catch(function (error) {
 
-                    console.log(error.response.data)
+                    app.copyError =
+                    error.response.data.non_field_errors[0];
                 });
             },
         }
