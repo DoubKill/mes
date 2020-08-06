@@ -22,10 +22,17 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                             help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":1,"classes_detail":1}新增时是需要id,修改时需要id')
     # pdp_product_classes_plan=serializers.PrimaryKeyRelatedField(queryset=ProductClassesPlan.objects.filter(delete_flag=False))
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    product_no = serializers.CharField(source='product_master.stage_product_batch_no', read_only=True)
+    batching_weight = serializers.DecimalField(source='product_master.batching_weight', decimal_places=2, max_digits=8,
+                                               read_only=True)
+    inventory = serializers.TimeField(source='product_master.production_time_interval', read_only=True)
 
     class Meta:
         model = ProductDayPlan
-        fields = ('plan_date', 'equip', 'product_master', 'pdp_product_classes_plan',)
+        fields = ('id',
+                  'plan_date', 'equip', 'equip_no', 'product_no', 'batching_weight', 'inventory', 'product_master',
+                  'pdp_product_classes_plan')
         # fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -34,7 +41,6 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             print(123)
             raise serializers.ValidationError('当前计划时间不存在')
         return value
-
 
     @atomic()
     def create(self, validated_data):
@@ -52,7 +58,6 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             detail_dic['product_day_plan'] = instance
             ProductClassesPlan.objects.create(**detail_dic, created_user=self.context['request'].user)
         return instance
-
 
     @atomic()
     def update(self, instance, validated_data):
@@ -99,12 +104,17 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
                                                                              help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":"1","classes_detail":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    catagory_name = serializers.CharField(source='equip.category', read_only=True)
+    product_no = serializers.CharField(source='product_master.stage_product_batch_no', read_only=True)
+    batching_weight = serializers.DecimalField(source='product_master.batching_weight', decimal_places=2, max_digits=8,
+                                               read_only=True)
 
     class Meta:
         model = ProductBatchingDayPlan
-        fields = (
-            'equip', 'product_master', 'plan_date', 'sum', 'product_day_plan',
-            'pdp_product_batching_classes_plan')
+        fields = ('id', 'equip_no', 'catagory_name', 'product_no', 'batching_weight',
+                  'equip', 'product_master', 'plan_date', 'sum', 'product_day_plan',
+                  'pdp_product_batching_classes_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_plan_date(self, value):
@@ -165,11 +175,14 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
     mr_material_requisition_classes = MaterialRequisitionClassesSerializer(many=True,
                                                                            help_text='{"sn":1,"weight":1,"unit":"1","classes_detail":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    material_type = serializers.CharField(source='material_demanded.material.material_type', read_only=True)
+    material_no = serializers.CharField(source='material_demanded.material.material_no', read_only=True)
+    material_name = serializers.CharField(source='material_demanded.material.material_name', read_only=True)
 
     class Meta:
         model = MaterialRequisition
-        fields = (
-            'material_demanded', 'count', 'plan_date', 'unit', 'mr_material_requisition_classes')
+        fields = ('id', 'material_type', 'material_no', 'material_name',
+                  'material_demanded', 'count', 'plan_date', 'unit', 'mr_material_requisition_classes')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_plan_date(self, value):

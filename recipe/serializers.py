@@ -301,6 +301,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
     used_user_name = serializers.SerializerMethodField()
     obsolete_user_name = serializers.SerializerMethodField()
     used_type = serializers.IntegerField(source='product_info.used_type')
+    factory_name = serializers.CharField(source='product_info.factory.global_name')
 
     @staticmethod
     def get_used_user_name(obj):
@@ -320,7 +321,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
                   'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
                   'created_user_name', 'created_date', 'update_user_name', 'last_updated_date',
                   'stage_name', 'versions_name', 'used_type', 'used_time', 'obsolete_time',
-                  'used_user_name', 'obsolete_user_name')
+                  'used_user_name', 'obsolete_user_name', 'factory_name')
 
 
 class ProductBatchingCreateSerializer(serializers.ModelSerializer):

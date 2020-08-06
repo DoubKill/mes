@@ -83,7 +83,8 @@ class ValidateProductVersionsView(APIView):
             factory = int(factory)
         except Exception:
             raise ValidationError('参数错误')
-        product_info = ProductInfo.objects.filter(factory_id=factory, product_no=product_no).order_by('-versions').first()
+        product_info = ProductInfo.objects.filter(factory_id=factory,
+                                                  product_no=product_no).order_by('-versions').first()
         if product_info:
             if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
                 return Response({'code': -1, 'message': '版本号不得小于现有版本号'})
@@ -152,6 +153,7 @@ class ProductStageInfoView(APIView):
         ret = []
         products = ProductInfo.objects.filter(factory=factory).prefetch_related('productrecipe_set')
         for product in products:
+            # TODO 要做distinct stage，sqlite数据库暂时不支持
             stages = product.productrecipe_set.values('stage', 'stage__global_name')
             ret.append({'product_info': product.id, 'product_no': product.product_no, 'stages': stages})
         return Response(data=ret)
