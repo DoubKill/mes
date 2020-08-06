@@ -19,17 +19,26 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 class ProductDayPlanSerializer(BaseModelSerializer):
     """胶料日计划序列化"""
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
-                                                            help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":1,"classes_detail":1}')
-    plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
+                                                            help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":1,"classes_detail":1}新增时是需要id,修改时需要id')
+    # pdp_product_classes_plan=serializers.PrimaryKeyRelatedField(queryset=ProductClassesPlan.objects.filter(delete_flag=False))
+    plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    product_no = serializers.CharField(source='product_master.stage_product_batch_no', read_only=True)
+    batching_weight = serializers.DecimalField(source='product_master.batching_weight', decimal_places=2, max_digits=8,
+                                               read_only=True)
+    inventory = serializers.TimeField(source='product_master.production_time_interval', read_only=True)
 
     class Meta:
         model = ProductDayPlan
-        fields = ('plan_date', 'equip', 'product_master', 'pdp_product_classes_plan',)
+        fields = ('id',
+                  'plan_date', 'equip', 'equip_no', 'product_no', 'batching_weight', 'inventory', 'product_master',
+                  'pdp_product_classes_plan')
         # fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_plan_date(self, value):
-        if not PlanSchedule.objects.filter(day_time=value).first():
+        if not PlanSchedule.objects.filter(day_time=value):
+            print(123)
             raise serializers.ValidationError('当前计划时间不存在')
         return value
 
@@ -62,11 +71,12 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
             return pdp_obj
+        ProductClassesPlan.objects.filter(product_day_plan=instance).delete()
         for update_pcp in update_pcp_list:
             update_pcp = dict(update_pcp)
+            update_pcp['product_day_plan'] = instance
             update_pcp['last_updated_user'] = self.context['request'].user
-            pcp_queryset = ProductClassesPlan.objects.filter(product_day_plan=instance)
-            pcp_queryset.update(**update_pcp)
+            ProductClassesPlan.objects.create(**update_pcp)
         return pdp_obj
 
 
@@ -92,14 +102,19 @@ class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
 class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     """配料小料日计划序列化"""
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
-                                                                             help_text='{"product_master":1,"num":1,"time":"12:12:12","weight":1,"unit":"1","classes_detail":1}')
-    plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
+                                                                             help_text='{"sn":1,"num":1,"time":"12:12:12","weight":1,"unit":"1","classes_detail":1}')
+    plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    catagory_name = serializers.CharField(source='equip.category', read_only=True)
+    product_no = serializers.CharField(source='product_master.stage_product_batch_no', read_only=True)
+    batching_weight = serializers.DecimalField(source='product_master.batching_weight', decimal_places=2, max_digits=8,
+                                               read_only=True)
 
     class Meta:
         model = ProductBatchingDayPlan
-        fields = (
-            'equip', 'product_master', 'plan_date', 'sum', 'product_day_plan',
-            'pdp_product_batching_classes_plan')
+        fields = ('id', 'equip_no', 'catagory_name', 'product_no', 'batching_weight',
+                  'equip', 'product_master', 'plan_date', 'sum', 'product_day_plan',
+                  'pdp_product_batching_classes_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_plan_date(self, value):
@@ -139,11 +154,12 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
             return pdp_obj
+        ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance).delete()
         for update_pcp in update_pcp_list:
             update_pcp = dict(update_pcp)
+            update_pcp['product_batching_day_plan'] = instance
             update_pcp['last_updated_user'] = self.context['request'].user
-            pcp_queryset = ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance)
-            pcp_queryset.update(**update_pcp)
+            ProductBatchingClassesPlan.objects.create(**update_pcp)
         return pdp_obj
 
 
@@ -157,13 +173,16 @@ class MaterialRequisitionClassesSerializer(BaseModelSerializer):
 class MaterialRequisitionSerializer(BaseModelSerializer):
     """领料日计划序列化"""
     mr_material_requisition_classes = MaterialRequisitionClassesSerializer(many=True,
-                                                                           help_text='{"product_master":1,"weight":1,"unit":"1","classes_detail":1}')
-    plan_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
+                                                                           help_text='{"sn":1,"weight":1,"unit":"1","classes_detail":1}')
+    plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    material_type = serializers.CharField(source='material_demanded.material.material_type', read_only=True)
+    material_no = serializers.CharField(source='material_demanded.material.material_no', read_only=True)
+    material_name = serializers.CharField(source='material_demanded.material.material_name', read_only=True)
 
     class Meta:
         model = MaterialRequisition
-        fields = (
-            'material_demanded', 'count', 'plan_date', 'unit', 'mr_material_requisition_classes')
+        fields = ('id', 'material_type', 'material_no', 'material_name',
+                  'material_demanded', 'count', 'plan_date', 'unit', 'mr_material_requisition_classes')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_plan_date(self, value):
@@ -203,17 +222,18 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
         pdp_obj = super().update(instance, validated_data)
         if update_pcp_list is None:
             return pdp_obj
+        MaterialRequisitionClasses.objects.filter(material_requisition=instance).delete()
         for update_pcp in update_pcp_list:
             update_pcp = dict(update_pcp)
+            update_pcp['material_requisition'] = instance
             update_pcp['last_updated_user'] = self.context['request'].user
-            pcp_queryset = MaterialRequisitionClasses.objects.filter(material_requisition=instance)
-            pcp_queryset.update(**update_pcp)
+            MaterialRequisitionClasses.objects.create(**update_pcp)
         return pdp_obj
 
 
 class ProductDayPlanCopySerializer(BaseModelSerializer):
-    src_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
-    dst_date = serializers.DateTimeField(help_text="2020-07-31 10:50:00", write_only=True)
+    src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
     class Meta:
         model = ProductDayPlan
@@ -260,18 +280,20 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
         for pdp_obj in pdp_queryset:
             instance = ProductDayPlan.objects.create(equip=pdp_obj.equip, product_master=pdp_obj.product_master,
                                                      plan_schedule=ps_obj, created_user=self.context['request'].user)
-            pc_obj = ProductClassesPlan.objects.filter(product_day_plan=pdp_obj).first()
-            ProductClassesPlan.objects.create(product_day_plan=instance, sn=pc_obj.sn, num=pc_obj.num,
-                                              time=pc_obj.time,
-                                              weight=pc_obj.weight, unit=pc_obj.unit,
-                                              classes_detail=pc_obj.classes_detail,
-                                              created_user=self.context['request'].user)
+
+            pc_queryset = ProductClassesPlan.objects.filter(product_day_plan=pdp_obj)
+            for pc_obj in pc_queryset:
+                ProductClassesPlan.objects.create(product_day_plan=instance, sn=pc_obj.sn, num=pc_obj.num,
+                                                  time=pc_obj.time,
+                                                  weight=pc_obj.weight, unit=pc_obj.unit,
+                                                  classes_detail=pc_obj.classes_detail,
+                                                  created_user=self.context['request'].user)
         return instance
 
 
 class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
-    src_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
-    dst_date = serializers.DateTimeField(help_text="2020-07-31 10:50:00", write_only=True)
+    src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
     class Meta:
         model = ProductBatchingDayPlan
@@ -324,19 +346,20 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
                                                              plan_schedule=ps_obj, sum=pbdp_obj.sum,
                                                              product_day_plan=pbdp_obj.product_day_plan,
                                                              created_user=self.context['request'].user)
-            pc_obj = ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=pbdp_obj).first()
-            ProductBatchingClassesPlan.objects.create(product_batching_day_plan=instance,
-                                                      product_master=pc_obj.product_master, num=pc_obj.num,
-                                                      time=pc_obj.time,
-                                                      weight=pc_obj.weight, unit=pc_obj.unit,
-                                                      classes_detail=pc_obj.classes_detail,
-                                                      created_user=self.context['request'].user)
+            pc_queryset = ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=pbdp_obj)
+            for pc_obj in pc_queryset:
+                ProductBatchingClassesPlan.objects.create(product_batching_day_plan=instance,
+                                                          sn=pc_obj.sn, num=pc_obj.num,
+                                                          time=pc_obj.time,
+                                                          weight=pc_obj.weight, unit=pc_obj.unit,
+                                                          classes_detail=pc_obj.classes_detail,
+                                                          created_user=self.context['request'].user)
         return instance
 
 
 class MaterialRequisitionCopySerializer(BaseModelSerializer):
-    src_date = serializers.DateTimeField(help_text="2020-07-31 10:46:00", write_only=True)
-    dst_date = serializers.DateTimeField(help_text="2020-07-31 10:50:00", write_only=True)
+    src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
+    dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
     class Meta:
         model = MaterialRequisition
@@ -389,11 +412,12 @@ class MaterialRequisitionCopySerializer(BaseModelSerializer):
                                                           plan_schedule=ps_obj, unit=mr_obj.unit,
                                                           created_user=self.context['request'].user
                                                           )
-            pc_obj = MaterialRequisitionClasses.objects.filter(material_requisition=mr_obj).first()
-            MaterialRequisitionClasses.objects.create(material_requisition=instance,
-                                                      product_master=pc_obj.product_master,
-                                                      weight=pc_obj.weight,
-                                                      unit=pc_obj.unit,
-                                                      classes_detail=pc_obj.classes_detail,
-                                                      created_user=self.context['request'].user)
+            pc_queryset = MaterialRequisitionClasses.objects.filter(material_requisition=mr_obj)
+            for pc_obj in pc_queryset:
+                MaterialRequisitionClasses.objects.create(material_requisition=instance,
+                                                          sn=pc_obj.sn,
+                                                          weight=pc_obj.weight,
+                                                          unit=pc_obj.unit,
+                                                          classes_detail=pc_obj.classes_detail,
+                                                          created_user=self.context['request'].user)
         return instance
