@@ -66,6 +66,7 @@
                         <i class="el-icon-setting"></i>
                         <span slot="title">生产计划管理</span>
                     </template>
+                    <el-menu-item index="4-1">排产胶料日计划</el-menu-item>
                 </el-submenu>
                 <el-submenu index="5">
                     <template slot="title">
@@ -124,9 +125,10 @@
         "2-8": "{% url 'gui:equip-category-manage' %}",
         "2-8-1": "{% url 'gui:equip-category-manage' %}",
         "2-8-2": "{% url 'gui:equip-manage' %}",
-		"3-1": "{% url 'gui:material-base-info-manage' %}",
+        "3-1": "{% url 'gui:material-base-info-manage' %}",
         "3-2": "{% url 'gui:rb-recipe-std-manage' %}",
-        "3-3": "{% url 'gui:rb-material-std-manage' %}"
+        "3-3": "{% url 'gui:rb-material-std-manage' %}",
+        "4-1": "{% url 'gui:rubber-schedule-daily-plan' %}"
     }
 </script>
 {% block scripts %}{% endblock %}
