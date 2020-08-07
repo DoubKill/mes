@@ -93,7 +93,6 @@ class ClassesDetailSerializer(BaseModelSerializer):
         return object.classes.global_name
 
 
-
 class ClassesDetailUpdateSerializer(BaseModelSerializer):
     """工作日程班次条目修改序列化器"""
 
@@ -151,7 +150,6 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
     equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
 
-
     class Meta:
         model = EquipCategoryAttribute
         fields = '__all__'
@@ -171,7 +169,6 @@ class EquipSerializer(BaseModelSerializer):
         model = Equip
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-
 
 
 class EquipCreateAndUpdateSerializer(BaseModelSerializer):

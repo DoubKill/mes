@@ -45,7 +45,7 @@ class ProductClassesPlan(AbstractEntity):
 class ProductBatchingDayPlan(AbstractEntity):
     """配料小料日计划表"""
     equip = models.ForeignKey(Equip, on_delete=models.DO_NOTHING, help_text='机台id', verbose_name='机台id',
-                              related_name='equip_product_batching_day_plan')
+                              related_name='equip_product_batching_day_plan', null=True)
     product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='胶料主信息id',
                                        verbose_name='胶料主信息id',
                                        related_name='pm_product_batching_day_plan')
