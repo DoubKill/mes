@@ -38,11 +38,13 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductDayPlanFilter
     ordering_fields = ['id', 'equip__category__equip_type__global_name']
+
     # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         ProductClassesPlan.objects.filter(product_day_plan=instance).update(delete_flag=True, delete_user=request.user)
+        MaterialDemanded.objects.filter(product_day_plan=instance).update(delete_flag=True, delete_user=request.user)
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
@@ -67,6 +69,7 @@ class MaterialDemandedViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = MaterialDemandedFilter
     ordering_fields = ['id', 'product_day_plan__plan_schedule__work_schedule__schedule_name']
+
     # pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
@@ -94,12 +97,15 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductBatchingDayPlanFilter
     ordering_fields = ['id', 'equip__category__equip_type__global_name']
+
     # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         ProductBatchingClassesPlan.objects.filter(product_batching_day_plan=instance).update(delete_flag=True,
                                                                                              delete_user=request.user)
+        MaterialDemanded.objects.filter(product_batching_day_plan=instance).update(delete_flag=True,
+                                                                                   delete_user=request.user)
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
@@ -124,6 +130,7 @@ class MaterialRequisitionViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = MaterialRequisitionFilter
     ordering_fields = ['id']
+
     # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
