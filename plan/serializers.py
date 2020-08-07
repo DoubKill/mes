@@ -23,6 +23,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     # pdp_product_classes_plan=serializers.PrimaryKeyRelatedField(queryset=ProductClassesPlan.objects.filter(delete_flag=False))
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    category = serializers.CharField(source='equip.category', read_only=True)
     product_no = serializers.CharField(source='product_master.stage_product_batch_no', read_only=True)
     batching_weight = serializers.DecimalField(source='product_master.batching_weight', decimal_places=2, max_digits=8,
                                                read_only=True)
@@ -31,7 +32,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     class Meta:
         model = ProductDayPlan
         fields = ('id',
-                  'plan_date', 'equip', 'equip_no', 'product_no', 'batching_weight', 'inventory', 'product_master',
+                  'plan_date', 'equip', 'equip_no', 'category','product_no', 'batching_weight', 'inventory', 'product_master',
                   'pdp_product_classes_plan')
         # fields = ( 'equip', 'product_master', 'plan_schedule', 'pdp_product_classes_plan',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
