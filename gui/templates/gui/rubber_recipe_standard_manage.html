@@ -211,10 +211,10 @@
             title="胶料配方标准" :visible.sync="dialogRubberRecipeStandard">
         <el-form :inline="true">
             <el-form-item style="float: right">
-                <el-button v-if="currentRow.used_type === 1" @click="newClicked">新建</el-button>
+                <el-button v-if="currentRow.used_type === 1 || currentRow.used_type === -1" @click="newClicked">新建</el-button>
             </el-form-item>
             <el-form-item style="float: right">
-                <el-button v-if="currentRow.used_type === 1" @click="saveClicked">保存</el-button>
+                <el-button v-if="currentRow.used_type === 1 || currentRow.used_type === -1" @click="saveClicked">保存</el-button>
             </el-form-item>
         </el-form>
         <table class="table table-bordered"
@@ -244,7 +244,7 @@
                     <td>{{ material.material_type_name }}</td>
                     <td>{{ material.material_name }}</td>
                     <td style="text-align: center">
-                        <el-input-number :disabled="currentRow.used_type !== 1" @change="carNumberChanged"
+                        <el-input-number :disabled=" currentRow.used_type !== -1 && currentRow.used_type !== 1" @change="carNumberChanged"
                                          v-if="material.car_number && material.car_number.indexOf('RM') !== 0"
                                          :precision="2" :step="0.1" v-model.number="material.ratio"></el-input-number>
                     </td>

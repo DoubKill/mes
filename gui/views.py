@@ -79,3 +79,4 @@ class SearchRubberInfoView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/search_rubber_info.html'
     name_path = ['配方管理', '查询胶料主信息']
 
+

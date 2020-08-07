@@ -68,10 +68,9 @@ class ProductBatchingClassesPlan(AbstractEntity):
                                                   help_text='配料日计划id',
                                                   verbose_name='配料日计划id',
                                                   related_name='pdp_product_batching_classes_plan')
-    # product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='顺序',
-    #                                    verbose_name='顺序',
-    #                                    related_name='pm_product_batching_classes_plan')
-    sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
+    product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='顺序',
+                                       verbose_name='顺序',
+                                       related_name='pm_product_batching_classes_plan')
     num = models.PositiveIntegerField(verbose_name='袋数', help_text='袋数')
     time = models.TimeField(verbose_name='时间', help_text='时间')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
@@ -124,14 +123,14 @@ class MaterialRequisition(AbstractEntity):
 
 class MaterialRequisitionClasses(AbstractEntity):
     """领料日班次计划表"""
+    # TODO:和ProductBatchingDayPlan外键关联？不是MaterialRequisition？
     material_requisition = models.ForeignKey(MaterialRequisition, on_delete=models.DO_NOTHING,
                                              help_text='领料日计划id',
                                              verbose_name='领料日计划id',
                                              related_name='mr_material_requisition_classes')
-    # product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='顺序',
-    #                                    verbose_name='顺序',
-    #                                    related_name='pm_material_requisition_classes')
-    sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
+    product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='顺序',
+                                       verbose_name='顺序',
+                                       related_name='pm_material_requisition_classes')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)
     unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
