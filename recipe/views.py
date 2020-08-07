@@ -83,7 +83,8 @@ class ValidateProductVersionsView(APIView):
             factory = int(factory)
         except Exception:
             raise ValidationError('参数错误')
-        product_info = ProductInfo.objects.filter(factory_id=factory, product_no=product_no).order_by('-versions').first()
+        product_info = ProductInfo.objects.filter(factory_id=factory,
+                                                  product_no=product_no).order_by('-versions').first()
         if product_info:
             if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
                 return Response({'code': -1, 'message': '版本号不得小于现有版本号'})
@@ -146,14 +147,17 @@ class ProductStageInfoView(APIView):
         if not factory_id:
             raise ValidationError('缺少必填参数')
         try:
-            factory = GlobalCode.objects.get(id=factory_id, used_flag=True, delete_flag=False)
+            factory = GlobalCode.objects.get(id=factory_id, used_flag=0, delete_flag=False)
         except Exception:
             raise ValidationError('产地不存在')
         ret = []
         products = ProductInfo.objects.filter(factory=factory).prefetch_related('productrecipe_set')
         for product in products:
+            # TODO 要做distinct stage，sqlite数据库暂时不支持
             stages = product.productrecipe_set.values('stage', 'stage__global_name')
-            ret.append({'product_info': product.id, 'product_no': product.product_no, 'stages': stages})
+            ret.append({'product_info': product.id, 'versions': product.versions,
+                        'product_no': product.product_no, 'stages': stages,
+                        'product_name': product.product_name, 'used_type': product.get_used_type_display()})
         return Response(data=ret)
 
 
@@ -220,8 +224,9 @@ class PreProductBatchView(APIView):
         if not recipe:
             raise ValidationError('当前段次配方不存在')
 
-        pre_recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                                  num__lt=recipe.num).order_by('-num').first()
+        pre_recipe = ProductRecipe.objects.exclude(stage_id=stage_id).filter(product_info_id=product_info_id,
+                                                                             num__lt=recipe.num
+                                                                             ).order_by('-num').first()
         pre_recipe_data = {}
         if pre_recipe:
             pre_batch = ProductBatching.objects.filter(product_info_id=product_info_id,
