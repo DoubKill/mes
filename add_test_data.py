@@ -12,6 +12,7 @@ django.setup()
 from basics.models import GlobalCode, GlobalCodeType
 
 
+
 def main():
     names = ['胶料状态', '产地', '原材料包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型']
     for i, name in enumerate(names):
