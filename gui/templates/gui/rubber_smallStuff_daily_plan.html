@@ -1,0 +1,126 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="日期">
+            <el-date-picker
+                    v-model="getParams.plan_data"
+                    @change="changeData"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="机台">
+            <el-select v-model="getParams.equips"
+                       @change="changeData"
+                       clearable
+                       placeholder="请选择">
+                <el-option
+                        v-for="item in machineList"
+                        :key="item.id"
+                        :label="item.equip_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="胶料">
+            <el-select v-model="getParams.glue" placeholder="请选择">
+                <el-option
+                        v-for="item in glueList"
+                        :key="item.id"
+                        :label="item.stage_product_batch_no"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item>
+            <el-button>
+                新建
+            </el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button>
+                选择胶料
+            </el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="copyDataStuff">
+                复制
+            </el-button>
+        </el-form-item>
+    </el-form>
+    {% verbatim vue %}
+        <el-table
+                :data="tableData"
+                style="width: 100%">
+            <el-table-column
+                    prop="a"
+                    label="日期"
+                    width="180">
+            </el-table-column>
+            <el-table-column label="配送信息">
+                <el-table-column
+                        prop="list[0].b"
+                        label="姓名"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="list[0].a"
+                        label="姓名"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        label="姓名"
+                        width="180">
+                    <template slot-scope="scope">
+                        {{ Number(scope.row.list[0].a) + Number(scope.row.list[0].b)}}
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        label="操作"
+                        width="180"
+                >
+                    <template slot-scope="scope">
+                        <el-button>
+                            编辑
+                        </el-button>
+                        <el-button
+                                @click="rowDelete(scope.row)"
+                                size="mini"
+                                type="danger">
+                            删除
+                        </el-button>
+                    </template>
+                </el-table-column>
+            </el-table-column>
+        </el-table>
+    {% endverbatim vue %}
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+{% block dialogs %}
+    {% verbatim vue %}
+
+        <el-dialog
+                title="提示"
+                :visible.sync="centerDialogVisible"
+                width="30%"
+                center>
+            <span>需要注意的是内容是默认不居中的</span>
+            <span slot="footer" class="dialog-footer">
+            <el-button @click="centerDialogVisible = false">取 消</el-button>
+            <el-button type="primary" @click="centerDialogVisible = false">确 定</el-button>
+            </span>
+        </el-dialog>
+    {% endverbatim %}
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'gui/css/smallStuff.css' %}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/rubber_smallStuff_daily_plan.js' %}"></script>
+{% endblock %}
