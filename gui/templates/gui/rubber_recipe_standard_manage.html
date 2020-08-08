@@ -46,13 +46,20 @@
         </el-table-column>
         <el-table-column label="操作">
             <template slot-scope="scope">
-                {% verbatim vue %}
-                    <el-button
-                            v-if="scope.row.used_type !== 5"
-                            size="mini"
-                            @click="">{{ editButtonText(scope.row) }}
+                <el-button-group>
+                    <el-button @click="pass(scope.row)" size="mini" v-if="scope.row.used_type === 1">
+                        通过
                     </el-button>
-                {% endverbatim vue %}
+                    <el-button @click="reject(scope.row)" size="mini" v-if="scope.row.used_type === 1 || scope.row.used_type === 2">
+                        驳回
+                    </el-button>
+                    <el-button @click="apply(scope.row)" size="mini" v-if="scope.row.used_type === 2">
+                        应用
+                    </el-button>
+                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 3">
+                        废弃
+                    </el-button>
+                </el-button-group>
             </template>
         </el-table-column>
         <el-table-column
@@ -211,10 +218,12 @@
             title="胶料配方标准" :visible.sync="dialogRubberRecipeStandard">
         <el-form :inline="true">
             <el-form-item style="float: right">
-                <el-button v-if="currentRow.used_type === 1 || currentRow.used_type === -1" @click="newClicked">新建</el-button>
+                <el-button v-if="currentRow.used_type === 1 || currentRow.used_type === -1" @click="newClicked">新建
+                </el-button>
             </el-form-item>
             <el-form-item style="float: right">
-                <el-button v-if="currentRow.used_type === 1 || currentRow.used_type === -1" @click="saveClicked">保存</el-button>
+                <el-button v-if="currentRow.used_type === 1 || currentRow.used_type === -1" @click="saveClicked">保存
+                </el-button>
             </el-form-item>
         </el-form>
         <table class="table table-bordered"
@@ -244,7 +253,8 @@
                     <td>{{ material.material_type_name }}</td>
                     <td>{{ material.material_name }}</td>
                     <td style="text-align: center">
-                        <el-input-number :disabled=" currentRow.used_type !== -1 && currentRow.used_type !== 1" @change="carNumberChanged"
+                        <el-input-number :disabled=" currentRow.used_type !== -1 && currentRow.used_type !== 1"
+                                         @change="carNumberChanged"
                                          v-if="material.car_number && material.car_number.indexOf('RM') !== 0"
                                          :precision="2" :step="0.1" v-model.number="material.ratio"></el-input-number>
                     </td>
@@ -295,8 +305,8 @@
             </el-form-item>
             <el-form-item>
                 {% verbatim vue %}
-                <p style="color: red">{{ copyError }}</p>
-                {% endverbatim vue%}
+                    <p style="color: red">{{ copyError }}</p>
+                {% endverbatim vue %}
             </el-form-item>
         </el-form>
         <div slot="footer" class="dialog-footer">
