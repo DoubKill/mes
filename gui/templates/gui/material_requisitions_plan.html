@@ -1,0 +1,180 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="日期">
+            <el-date-picker
+                    type="date"
+                    placeholder="选择日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="原材料类别">
+            <el-select
+                    clearable
+                    @change="materialTypeChange"
+                    v-model="materialType" placeholder="请选择">
+                <el-option
+                        v-for="item in materialTypeOptions"
+                        :key="item.id"
+                        :label="item.global_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="原材料名称">
+            <el-input v-model="material_name" v-on:input="materialNameChanged"></el-input>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="showAddDialog">新建</el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button>
+                删除
+            </el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button>
+                复制
+            </el-button>
+        </el-form-item>
+    </el-form>
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                label="S"
+                width="30">
+        </el-table-column>
+        <el-table-column
+                type="index"
+                label="No"
+                width="30">
+        </el-table-column>
+        <el-table-column
+                prop="material_type"
+                label="原材料类别">
+        </el-table-column>
+        <el-table-column
+                prop="material_no"
+                label="原材料代码">
+        </el-table-column>
+        <el-table-column
+                prop="material_name"
+                label="原材料名称">
+        </el-table-column>
+        <el-table-column
+                prop=""
+                label="原材料库存（Kg）">
+        </el-table-column>
+        <el-table-column
+                prop=""
+                label="原材料需要量（Kg）">
+            <el-table-column
+                prop=""
+                label="早班">
+            </el-table-column>
+            <el-table-column
+                prop=""
+                label="中班">
+            </el-table-column>
+            <el-table-column
+                prop=""
+                label="晚班">
+            </el-table-column>
+            <el-table-column
+                prop=""
+                label="总计">
+            </el-table-column>
+        </el-table-column>
+        <el-table-column
+                prop=""
+                label="领料计划（Kg）">
+            <el-table-column
+                prop=""
+                label="早班">
+            </el-table-column>
+            <el-table-column
+                prop=""
+                label="中班">
+            </el-table-column>
+            <el-table-column
+                prop=""
+                label="晚班">
+            </el-table-column>
+            <el-table-column
+                prop=""
+                label="总计">
+            </el-table-column>
+        </el-table-column>
+
+
+    </el-table>
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+
+{% block dialogs %}
+    <el-dialog title="添加原材料领料计划" :visible.sync="dialogAddMaterialBaseInfoVisible">
+        <el-form v-model="materialBaseInfoForm" :label-width="formLabelWidth">
+            <el-form-item :error="materialBaseInfoFormError.material_no" label="原材料编码">
+                <el-input v-model="materialBaseInfoForm.material_no"></el-input>
+            </el-form-item>
+            <el-form-item :error="materialBaseInfoFormError.material_name" label="原材料名称">
+                <el-input v-model="materialBaseInfoForm.material_name"></el-input>
+            </el-form-item>
+            <el-form-item :error="materialBaseInfoFormError.for_short" label="原材料简称">
+                <el-input v-model="materialBaseInfoForm.for_short"></el-input>
+            </el-form-item>
+            <el-form-item :error="materialBaseInfoFormError.density" label="比重">
+                <el-input v-model="materialBaseInfoForm.density"></el-input>
+            </el-form-item>
+            <el-form-item :error="materialBaseInfoFormError.used_flag" label="是否启用">
+                <el-switch v-model="materialBaseInfoForm.used_flag">
+                </el-switch>
+            </el-form-item>
+            <el-form-item :error="materialBaseInfoFormError.material_type" label="原材料类别">
+                <el-select
+                        v-model="materialBaseInfoForm.material_type"
+                        placeholder="请选择">
+                    <el-option
+                            v-for="item in materialTypeOptions"
+                            :key="item.id"
+                            :label="item.global_name"
+                            :value="item.id">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogAddMaterialBaseInfoVisible = false">取 消</el-button>
+            <el-button type="primary" @click="handleAddMaterialBaseInfo">确 定</el-button>
+        </div>
+    </el-dialog>
+
+{% endblock %}
+
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'node_modules/bootstrap/dist/css/bootstrap.min.css' %}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/material_requisitions_plan.js' %}"></script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
