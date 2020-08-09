@@ -155,7 +155,7 @@ class ProductBatchingDetail(AbstractEntity):
 
     class Meta:
         db_table = 'product_batching_detail'
-        verbose_name_plural = verbose_name = '胶料配料标准'
+        verbose_name_plural = verbose_name = '胶料配料标准详情'
 
 
 class ProductMaster(AbstractEntity):
@@ -189,4 +189,4 @@ class ProductProcess(AbstractEntity):
 
     class Meta:
         db_table = 'product_process'
-        verbose_name_plural = verbose_name = '胶料配料标准'
+        verbose_name_plural = verbose_name = '胶料配料标准步序'
