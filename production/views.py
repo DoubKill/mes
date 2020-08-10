@@ -161,11 +161,13 @@ class ProductProcess(APIView):
 
     def get(self, request):
         params = request.query_params
-        search_time_str = params.get("search_time")
-        target_equip_no = params.get('equip_no')
-        if not re.compile(r"\d{4}-\d{2}-\d{2}", search_time_str):
-            return Response("bad search_time", status=400)
-        plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
+        # search_time_str = params.get("search_time")
+        # target_equip_no = params.get('equip_no')
+        target_equip_no = None
+        # if not re.compile(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
+        #     return Response("bad search_time", status=400)
+        # plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
+        plan_schedule = PlanSchedule.objects.filter(id=9).first()
         # day_plan_id_list = plan_schedule.ps_day_plan.filter(delete_flag=False).values_list("id", flat=True)
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {
@@ -175,13 +177,13 @@ class ProductProcess(APIView):
         plan_weight = 0
         product_no = ""
         equip_no = ""
-        for day_plan in day_plan_set:
+        for day_plan in list(day_plan_set):
             instance = {}
             plan_trains = 0
             actual_trains = 0
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
             # plan_uid_list = class_plan_set.values_list("plan_classes_uid", flat=True)
-            for class_plan in class_plan_set:
+            for class_plan in list(class_plan_set):
                 day_plan_actual = []
                 plan_weight = 0
                 if target_equip_no:
@@ -190,7 +192,11 @@ class ProductProcess(APIView):
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid)
                 if temp_ret_set:
                     actual = temp_ret_set.order_by("-created_date").first()
-                    day_plan_actual.append(actual.values("plan_trains", "actual_trains"))
+                    day_plan_actual.append({
+                        "plan_trains": actual.plan_trains,
+                        "actual_trains": actual.actual_trains,
+                        "classes": actual.classes
+                    })
                     plan_weight += actual.plan_weight
                     product_no = actual.product_no
                     equip_no = actual.equip_no
@@ -217,8 +223,3 @@ class ProductProcess(APIView):
         #         temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=uid)
         #     if temp_ret_set:
         #         actual = temp_ret_set.order_by("-created_date").first().values()
-
-
-
-
-

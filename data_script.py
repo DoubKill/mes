@@ -4,9 +4,19 @@ auther:
 datetime: 2020/8/8
 name: 
 """
+import datetime
+import os
 import uuid
+import django
 
-import requests
+
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
+django.setup()
+
+from basics.models import PlanSchedule
+from plan.models import ProductClassesPlan
+from production.models import TrainsFeedbacks
 
 
 class ScriptConfigInit(object):
@@ -88,8 +98,32 @@ def gen_uuid():
 
 
 def run():
-    print("--------start---------")
-    print("--------end-----------")
+    plan_schedule = PlanSchedule.objects.filter(id=9).first()
+    # day_plan_id_list = plan_schedule.ps_day_plan.filter(delete_flag=False).values_list("id", flat=True)
+    day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
+    for day_plan in list(day_plan_set):
+        instance = {}
+        plan_trains = 0
+        actual_trains = 0
+        class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
+        n = 0
+        for class_plan in list(class_plan_set):
+            n += 1
+            data = {
+                "plan_classes_uid": class_plan.plan_classes_uid,
+                "plan_trains": class_plan.plan_trains,
+                "actual_trains": n,
+                "bath_no": 0,
+                "equip_no": day_plan.equip.equip_no,
+                "product_no": "test-pro-1",
+                "plan_weight": class_plan.weight,
+                "actual_weight": n * 100,
+                "begin_time": datetime.datetime.now(),
+                "end_time": datetime.datetime.now(),
+                "operation_user": "string-user",
+                "classes": class_plan.classes_detail.classes.global_name
+            }
+            TrainsFeedbacks.objects.create(**data)
 
 
 if __name__ == '__main__':
