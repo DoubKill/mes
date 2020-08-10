@@ -32,6 +32,8 @@ const RubberStageUrl = "/api/v1/recipe/product-stages/?factory_id=";
 
 const MaterialRequisitions = "/api/v1/plan/product-batching-day-plans/";
 const MaterialRequisitionsCopy = "/api/v1/plan/product-batching-day-plans-copy/";
+// 领料计划接口
+const MaterialRequisitions = "/api/v1/plan/material-requisitions/";
 
 var BaseMixin = {
 

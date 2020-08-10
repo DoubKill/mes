@@ -80,7 +80,7 @@ class UserViewSet(ModelViewSet):
 
 
 class UserGroupsViewSet(mixins.ListModelMixin,
-                           GenericViewSet):
+                        GenericViewSet):
     queryset = User.objects.filter(delete_flag=False)
 
     serializer_class = UserSerializer
@@ -88,7 +88,6 @@ class UserGroupsViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend,)
     pagination_class = SinglePageNumberPagination
     filter_class = UserFilter
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -147,96 +146,18 @@ class SectionViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
 
 
-# @method_decorator([api_recorder], name="dispatch")
-# class FunctionBlockViewSet(ModelViewSet):
-#     """
-#     list:
-#         角色列表
-#     create:
-#         创建角色
-#     update:
-#         修改角色
-#     destroy:
-#         删除角色
-#     """
-#     queryset = FunctionBlock.objects.filter()
-#     serializer_class = FunctionBlockSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend,)
-
-
-# @method_decorator([api_recorder], name="dispatch")
-# class FunctionPermissionViewSet(ModelViewSet):
-#     """
-#     list:
-#         角色列表
-#     create:
-#         创建角色
-#     update:
-#         修改角色
-#     destroy:
-#         删除角色
-#     """
-#     queryset = FunctionPermission.objects.filter()
-#     serializer_class = FunctionPermissionSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend,)
-
-
-# @method_decorator([api_recorder], name="dispatch")
-# class FunctionViewSet(ModelViewSet):
-#     """
-#     list:
-#         角色列表
-#     create:
-#         创建角色
-#     update:
-#         修改角色
-#     destroy:
-#         删除角色
-#     """
-#     queryset = Function.objects.filter()
-#     serializer_class = FunctionSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend,)
-
-
-# @method_decorator([api_recorder], name="dispatch")
-# class MenuViewSet(ModelViewSet):
-#     """
-#     list:
-#         角色列表
-#     create:
-#         创建角色
-#     update:
-#         修改角色
-#     destroy:
-#         删除角色
-#     """
-#     queryset = Menu.objects.filter()
-#     serializer_class = MenuSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend,)
-
-
 class MesLogin(ObtainJSONWebToken):
     menu = {
         "basics": [
             "globalcodetype",
             "globalcode",
             "workschedule",
-            "equip",
-            # "sysbaseequiplevel",
-            "classesdetail",
-            # "workscheduleplan"
+            "equip"
         ],
         "system": {
             "user",
-            "section",
         },
         "auth": {
-            # "group",
-            "permission",
         }
 
     }

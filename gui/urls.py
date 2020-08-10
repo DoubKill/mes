@@ -22,5 +22,7 @@ urlpatterns = [
     path('rubber/schedule/daily/plan/', views.RubberScheduleDailyPlanView.as_view(), name='rubber-schedule-daily-plan'),
     path('rubber/smallStuff/daily/plan/', views.RubberSmallStuffDailyPlanView.as_view(), name='rubber-smallStuff-daily-plan'),
     # 查询胶料主信息
-    path('search/rubber/info/', views.SearchRubberInfoView.as_view(), name='search-rubber-info')
+    path('search/rubber/info/', views.SearchRubberInfoView.as_view(), name='search-rubber-info'),
+    # 排产领料计划
+    path('material/requisitions/plan', views.MaterialRequisitionsPlanView.as_view(), name='material-requisitions-plan'),
 ]
