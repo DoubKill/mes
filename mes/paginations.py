@@ -10,9 +10,9 @@ class DefaultPageNumberPagination(PageNumberPagination):
     继承基础分页，并在返回值里面新增sys_time
     """
     page_size = 10
-    max_page_size = 1000
+    # max_page_size = 1000
     page_size_query_param = "page_size"
-    page_size_query_description = "自定义每页显示条数（最大%s条,默认%s条）" % (max_page_size, page_size)
+    # page_size_query_description = "自定义每页显示条数（最大%s条,默认%s条）" % (max_page_size, page_size)
     page_query_description = "翻页/页数"
 
     def get_paginated_response(self, data):
