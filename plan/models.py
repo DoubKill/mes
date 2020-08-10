@@ -42,6 +42,7 @@ class ProductClassesPlan(AbstractEntity):
                                         null=True)
 
     class Meta:
+        unique_together = (("product_day_plan", "plan_classes_uid"),)
         db_table = 'product_classes_plan'
         verbose_name_plural = verbose_name = '胶料日班次计划'
 
