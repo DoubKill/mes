@@ -15,7 +15,7 @@ class Material(AbstractEntity):
                                       on_delete=models.DO_NOTHING, related_name='mt_materials')
     density = models.DecimalField(verbose_name='比重', help_text='比重', decimal_places=2, max_digits=8)
     package_unit = models.ForeignKey(GlobalCode, help_text='包装单位', verbose_name='包装单位',
-                                     on_delete=models.DO_NOTHING, related_name='pu_materials', blank=True, null=True)
+                                     on_delete=models.DO_NOTHING, related_name='pu_materials')
     used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
 
     def __str__(self):

@@ -4,11 +4,9 @@ from basics.models import Equip, GlobalCodeType, WorkSchedule, GlobalCode, Equip
 
 
 class EquipFilter(django_filters.rest_framework.FilterSet):
-    equip_level = django_filters.CharFilter(field_name='equip_level__global_name', lookup_expr='icontains',
-                                            help_text='设备层级')
+    equip_level = django_filters.CharFilter(field_name='equip_level__global_name', lookup_expr='icontains', help_text='设备层级')
     equip_name = django_filters.CharFilter(field_name='equip_name', lookup_expr='icontains', help_text='设备名')
-    equip_process = django_filters.CharFilter(field_name="category__process__global_name", lookup_expr='icontains',
-                                              help_text='工序')
+    equip_process = django_filters.CharFilter(field_name="category__process__global_name", lookup_expr='icontains', help_text='工序')
 
     class Meta:
         model = Equip
@@ -19,7 +17,7 @@ class GlobalCodeTypeFilter(django_filters.rest_framework.FilterSet):
     type_no = django_filters.CharFilter(field_name='type_no', lookup_expr='icontains', help_text='代码编号')
     type_name = django_filters.CharFilter(field_name='type_name', lookup_expr='icontains', help_text='代码名称')
     used_flag = django_filters.BooleanFilter(field_name='used_flag', help_text='是否启用')
-    class_name = django_filters.CharFilter(field_name='type_name', help_text='筛选班次')
+    class_name = django_filters.CharFilter(field_name='type_name',  help_text='筛选班次')
 
     class Meta:
         model = GlobalCodeType
