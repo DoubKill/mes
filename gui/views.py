@@ -84,3 +84,9 @@ class SearchRubberInfoView(TitleMixin, LoginRequiredMixin, TemplateView):
 class MaterialRequisitionsPlanView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/material_requisitions_plan.html'
     name_path = ['生产计划管理', '排产领料计划']
+
+
+# 日别胶料收皮管理
+class CollectRubberDailyManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/collect_rubber_daily_manage.html'
+    name_path = ['生产管理', '日别胶料收皮管理']

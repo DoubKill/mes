@@ -50,7 +50,8 @@
                     <el-button @click="pass(scope.row)" size="mini" v-if="scope.row.used_type === 1">
                         通过
                     </el-button>
-                    <el-button @click="reject(scope.row)" size="mini" v-if="scope.row.used_type === 1 || scope.row.used_type === 2">
+                    <el-button @click="reject(scope.row)" size="mini"
+                               v-if="scope.row.used_type === 1 || scope.row.used_type === 2">
                         驳回
                     </el-button>
                     <el-button @click="apply(scope.row)" size="mini" v-if="scope.row.used_type === 2">
@@ -148,6 +149,7 @@
         <el-row :gutter="15">
             <el-col :span="12">
                 <el-table
+                        height="250"
                         ref="allMaterialsMultipleTable"
                         border
                         :data="materials"

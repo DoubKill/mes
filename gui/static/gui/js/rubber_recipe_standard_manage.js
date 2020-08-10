@@ -63,7 +63,11 @@
             }).catch(function (error) {
 
             });
-            axios.get(MaterialsUrl)
+            axios.get(MaterialsUrl,{
+                params: {
+                    page_size: 100000000
+                }
+            })
                 .then(function (response) {
 
                     app.materials = response.data.results;
