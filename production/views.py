@@ -1,10 +1,15 @@
+import re
+
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
+from mes.common_code import get_day_plan_class_set
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
@@ -148,3 +153,24 @@ class QualityControlViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = QualityControlFilter
+
+
+class ProductProcess(APIView):
+
+    def get(self, request):
+        params = request.query_params
+        search_time_str = params.get("search_time")
+        equip_no = params.get('equip_no')
+        if not re.compile(r"\d{4}-\d{2}-\d{2}]", search_time_str):
+            return Response("bad search_time", status=400)
+        temp_set = get_day_plan_class_set(search_time_str)
+        plan_classes_uid_list = temp_set.values_list('plan_classes_uid', flat=True)
+        plan_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid__in=plan_classes_uid_list, equip_no=equip_no)
+        return_data = {}
+        for instance in temp_set:
+            uid = instance.plan_classes_uid
+
+
+
+
+
