@@ -372,6 +372,8 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         attrs['volume'] = volume
         attrs['batching_proportion'] = float(batching_weight / volume) if volume else 0
         attrs['created_user'] = self.context['request'].user
+        if attrs.get('rm_time_interval'):
+            attrs['rm_flag'] = True
         return attrs
 
     @atomic()
@@ -436,6 +438,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             attrs['volume'] = volume
             attrs['batching_proportion'] = float(batching_weight / volume) if volume else 0
             attrs['last_updated_user'] = self.context['request'].user
+            if attrs.get('rm_time_interval'):
+                attrs['rm_flag'] = True
         return attrs
 
     @atomic()
@@ -453,4 +457,5 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('id', 'batching_details')
+        fields = ('id', 'batching_details', 'rm_time_interval',
+                  'batching_time_interval', 'production_time_interval')
