@@ -20,10 +20,13 @@ urlpatterns = [
     # 胶料配料标准管理
     path('rubber/material/standard/manage/', views.RubberMaterialStandardManageView.as_view(), name='rb-material-std-manage'),
     path('rubber/schedule/daily/plan/', views.RubberScheduleDailyPlanView.as_view(), name='rubber-schedule-daily-plan'),
+    path('rubber/smallStuff/daily/plan/', views.RubberSmallStuffDailyPlanView.as_view(), name='rubber-smallStuff-daily-plan'),
     # 查询胶料主信息
     path('search/rubber/info/', views.SearchRubberInfoView.as_view(), name='search-rubber-info'),
     # 排产领料计划
     path('material/requisitions/plan', views.MaterialRequisitionsPlanView.as_view(), name='material-requisitions-plan'),
     # 密炼实绩管理
     path('banburying/performance/manage', views.BanburyingPerformanceManageView.as_view(), name='banburying-performance-manage'),
+    # 密炼LOT生产履历
+    path('internal/mixer/production', views.InternalMixerProduction.as_view(), name='internal_mixer_production')
 ]

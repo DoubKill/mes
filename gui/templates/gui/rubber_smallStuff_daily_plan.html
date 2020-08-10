@@ -1,0 +1,318 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="日期">
+            <el-date-picker
+                    v-model="getParams.plan_data"
+                    @change="changeData"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="机台">
+            <el-select v-model="getParams.equips"
+                       @change="changeData"
+                       clearable
+                       placeholder="请选择">
+                <el-option
+                        v-for="item in machineList"
+                        :key="item.id"
+                        :label="item.equip_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="胶料">
+            <el-select v-model="getParams.glue" placeholder="请选择"
+                       @change="changeData">
+                <el-option
+                        v-for="item in glueList"
+                        :key="item.id"
+                        :label="item.stage_product_batch_no"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="addRow">
+                新建
+            </el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="selectRubber">
+                选择胶料
+            </el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="copyDataStuff">
+                复制
+            </el-button>
+        </el-form-item>
+    </el-form>
+    {% verbatim vue %}
+        <el-table
+                :data="tableData"
+                style="width: 100%">
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop=""
+                    label="S"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="a"
+                    label="No">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="b"
+                    label="配料机台">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="c"
+                    label="炼胶机类型">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="d"
+                    label="配料小料编码">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="d"
+                    label="小料重量（kg）">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="c"
+                    label="当前库存（袋）">
+            </el-table-column>
+            <el-table-column label="胶料生产计划（车次）"
+                             align="center"
+                             header-align="center">
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="早班">
+                </el-table-column>
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="中班">
+                </el-table-column>
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="夜班">
+                </el-table-column>
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="日计划">
+                </el-table-column>
+
+            </el-table-column>
+            <el-table-column label="胶料生产计划（车次）">
+                <el-table-column
+                        prop="list[0].b"
+                        label="早班"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="list[0].b"
+                        label="中班"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="list[0].a"
+                        label="晚班"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        label="总计"
+                        width="180">
+                    <template slot-scope="scope">
+                        {{ Number(scope.row.list[0].a) + Number(scope.row.list[0].b)}}
+                    </template>
+                </el-table-column>
+            </el-table-column>
+            <el-table-column
+                    label="操作"
+                    width="180"
+            >
+                <template slot-scope="scope">
+                    <el-button @click="rowEdit(scope.row)">
+                        编辑
+                    </el-button>
+                    <el-button
+                            @click="rowDelete(scope.row)"
+                            size="mini"
+                            type="danger">
+                        删除
+                    </el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+    {% endverbatim vue %}
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+{% block dialogs %}
+    {% verbatim vue %}
+        <el-dialog
+                title="复制配料小料日生产计划"
+                :visible.sync="copyDialogVisible"
+                :close-on-click-modal="false"
+                :before-close="handleCloseCopy"
+        >
+            <el-form ref="formCopyData" :rules="rules" :model="formCopyData" label-width="80px">
+                <el-form-item label="来源日期" prop="src_date"
+                              :error="manageFormError.src_date">
+                    <el-date-picker
+                            @change="sourceDataChange"
+                            v-model="formCopyData.src_date"
+                            type="date"
+                            value-format="yyyy-MM-dd"
+                            placeholder="选择来源日期">
+                    </el-date-picker>
+                </el-form-item>
+                <el-form-item label="新建日期" prop="dst_date"
+                              :error="manageFormError.dst_date">
+                    <el-date-picker
+                            v-model="formCopyData.dst_date"
+                            type="date"
+                            value-format="yyyy-MM-dd"
+                            :picker-options="pickerOptionsCopy"
+                            placeholder="选择新建日期">
+                    </el-date-picker>
+                </el-form-item>
+            </el-form>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="copyDialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="copySubmit"
+                           :loading="loadingBtnCopy">确 定</el-button>
+            </span>
+        </el-dialog>
+
+        <el-dialog
+                title="选择橡胶"
+                :visible.sync="rubberDialogVisible"
+        >
+            <el-table
+                    ref="multipleTable"
+                    :data="tableDataRubber"
+                    style="width: 100%"
+                    @selection-change="handleSelectionChange">
+                <el-table-column
+                        type="selection"
+                        width="55">
+                </el-table-column>
+                <el-table-column
+                        prop="a"
+                        label="No">
+                </el-table-column>
+                <el-table-column
+                        prop="b"
+                        label="胶料编码">
+                </el-table-column>
+                <el-table-column
+                        prop="c"
+                        label="炼胶机类型">
+                </el-table-column>
+                <el-table-column
+                        prop="d"
+                        label="配料机台">
+                    <template slot-scope="scope">
+                        <el-input v-model="scope.row.input" placeholder="请输入内容"></el-input>
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="c"
+                        label="当前库存（袋）">
+                </el-table-column>
+                <el-table-column label="胶料生产计划（车次）">
+                    <el-table-column
+                            prop="name"
+                            label="早班">
+                    </el-table-column>
+                    <el-table-column
+                            prop="name"
+                            label="中班">
+                    </el-table-column>
+                    <el-table-column
+                            prop="name"
+                            label="夜班">
+                    </el-table-column>
+                    <el-table-column
+                            prop="name"
+                            label="日计划">
+                    </el-table-column>
+
+                </el-table-column>
+            </el-table>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="rubberDialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="rubberDialogSubmit">确 定</el-button>
+            </span>
+        </el-dialog>
+
+        <el-dialog
+                title="配料小料日计划"
+                :visible.sync="dialogVisibleEdit"
+                :before-close="handleCloseEdit">
+            <el-form ref="formEdit" :model="formEdit" label-width="80px">
+                <div>早班计划</div>
+                <el-form-item label="顺序">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <el-form-item label="袋数">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <div>中班计划</div>
+                <el-form-item label="顺序">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <el-form-item label="袋数">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <div>晚班计划</div>
+                <el-form-item label="顺序">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <el-form-item label="袋数">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+
+            </el-form>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="dialogVisibleEdit = false">取 消</el-button>
+                <el-button type="primary" @click="editSubmit" :loading="EditLoading">确 定</el-button>
+            </span>
+        </el-dialog>
+
+    {% endverbatim vue %}
+{% endblock %}
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'gui/css/smallStuff.css' %}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/rubber_smallStuff_daily_plan.js' %}"></script>
+{% endblock %}
