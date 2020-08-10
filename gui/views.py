@@ -79,3 +79,8 @@ class RubberScheduleDailyPlanView(TitleMixin, LoginRequiredMixin, TemplateView):
 class SearchRubberInfoView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/search_rubber_info.html'
     name_path = ['配方管理', '查询胶料主信息']
+
+
+class MaterialRequisitionsPlanView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/material_requisitions_plan.html'
+    name_path = ['生产计划管理', '排产领料计划']

@@ -147,17 +147,6 @@
 
                 this.updateFlag(row.id, false)
             },
-
-            // editButtonText: function (row) {
-            //
-            //     switch (row.used_type) {
-            //
-            //         case 1:
-            //             return "应用";
-            //         case 3:
-            //             return "废弃";
-            //     }
-            // },
             showAddRubberRecipeDialog: function () {
 
                 this.rubberRecipeError = "";

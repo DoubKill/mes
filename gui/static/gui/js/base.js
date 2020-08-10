@@ -29,7 +29,8 @@ const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
 const RubberMaterialUrl = "/api/v1/recipe/product-batch/";
 // 胶料配料标准管理——选择胶料编码与段次接口
 const RubberStageUrl = "/api/v1/recipe/product-stages/?factory_id=";
-
+// 领料计划接口
+const MaterialRequisitions = "/api/v1/plan/material-requisitions/";
 
 var BaseMixin = {
 
