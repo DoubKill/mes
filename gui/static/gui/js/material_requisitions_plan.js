@@ -1,4 +1,6 @@
 ;(function () {
+    // 复制领料日计划接口
+    const MaterialRequisitionsCopy = "/api/v1/plan/material-requisitions-copy/";
 
     var Main = {
         mixins: [BaseMixin],
@@ -7,7 +9,12 @@
             return {
 
                 tableDataUrl: MaterialRequisitions,
+                planDate: Date.now(),
                 materialType: "",
+                aaa: '10',
+                planDateOptions: [],
+                ClassesCount: [0, 1, 2],
+                ClassesOptions: ["早班", "中班", "晚班"],
                 materialTypeOptions: [],
                 dialogAddMaterialBaseInfoVisible: false,
                 materialBaseInfoForm: {
@@ -47,9 +54,20 @@
             }).catch(function (error) {
 
             });
-
+            // const  date = dayjs(this.planDate);
+            console.log(this.planDate)
         },
         methods: {
+
+            beforeGetData() {
+
+                this.getParams["material_id"] = this.materialType
+            },
+
+            materialTypeChange: function () {
+
+                this.getFirstPage();
+            },
 
             showAddDialog: function () {
 
