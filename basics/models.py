@@ -1,4 +1,3 @@
-
 from django.db import models
 from system.models import AbstractEntity
 from django.utils.translation import ugettext_lazy as _
@@ -171,7 +170,6 @@ class WorkSchedulePlan(AbstractEntity):
                               help_text='班组id', verbose_name='班组id', related_name="work_schedule_plan")
     group_name = models.CharField(max_length=64, help_text='班组名称', verbose_name='班组名称')
     rest_flag = models.BooleanField(help_text='是否休息', verbose_name='是否休息')
-    # schedule_group_id = models.IntegerField(help_text='按日期分组', verbose_name='按日期分组')
     plan_schedule = models.ForeignKey(PlanSchedule, models.DO_NOTHING,
                                       help_text='计划时间id', verbose_name='计划时间id', related_name="work_schedule_plan")
 

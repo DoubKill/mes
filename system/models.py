@@ -150,9 +150,6 @@ class GroupExtension(Group):
                                     help_text='删除人', verbose_name='删除人', on_delete=models.DO_NOTHING,
                                     related_query_name='d_%(app_label)s_%(class)ss')
 
-    # menu = models.ManyToManyField(Menu, blank=True, null=True, help_text='菜单', verbose_name='菜单')
-    # function = models.ManyToManyField(Function, blank=True, null=True, help_text='功能', verbose_name='功能')
-
     def __str__(self):
         return "{}".format(self.name)
 

@@ -27,7 +27,7 @@ class ProductClassesPlan(AbstractEntity):
                                          verbose_name='胶料日计划id',
                                          related_name='pdp_product_classes_plan')
     sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
-    num = models.PositiveIntegerField(verbose_name='车次', help_text='车次')
+    plan_trains = models.PositiveIntegerField(verbose_name='车次', help_text='车次')
     time = models.TimeField(verbose_name='时间', help_text='时间')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)
@@ -35,7 +35,7 @@ class ProductClassesPlan(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_classes_plan')
-    plan_classes_uid = models.IntegerField(verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
+    plan_classes_uid = models.CharField(max_length=64, verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
     class Meta:
         db_table = 'product_classes_plan'
@@ -68,9 +68,6 @@ class ProductBatchingClassesPlan(AbstractEntity):
                                                   help_text='配料日计划id',
                                                   verbose_name='配料日计划id',
                                                   related_name='pdp_product_batching_classes_plan')
-    # product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='顺序',
-    #                                    verbose_name='顺序',
-    #                                    related_name='pm_product_batching_classes_plan')
     sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
     num = models.PositiveIntegerField(verbose_name='袋数', help_text='袋数')
     time = models.TimeField(verbose_name='时间', help_text='时间')
@@ -80,7 +77,7 @@ class ProductBatchingClassesPlan(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_batching_classes_plan')
-    plan_classes_uid = models.IntegerField(verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
+    plan_classes_uid = models.CharField(max_length=64, verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
     class Meta:
         db_table = 'product_batching_classes_plan'
@@ -89,10 +86,14 @@ class ProductBatchingClassesPlan(AbstractEntity):
 
 class MaterialDemanded(AbstractEntity):
     """原材料需求量表"""
+    product_batching_day_plan = models.ForeignKey(ProductBatchingDayPlan, on_delete=models.DO_NOTHING,
+                                                  help_text='配料计划id',
+                                                  verbose_name='配料计划id',
+                                                  related_name='pbdp_material_demanded', null=True)
     product_day_plan = models.ForeignKey(ProductDayPlan, on_delete=models.DO_NOTHING,
                                          help_text='胶料计划id',
                                          verbose_name='胶料计划id',
-                                         related_name='pdp_material_demanded')
+                                         related_name='pdp_material_demanded', null=True)
     classes = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                 verbose_name='班次id',
                                 related_name='c_material_demanded')
@@ -128,9 +129,6 @@ class MaterialRequisitionClasses(AbstractEntity):
                                              help_text='领料日计划id',
                                              verbose_name='领料日计划id',
                                              related_name='mr_material_requisition_classes')
-    # product_master = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='顺序',
-    #                                    verbose_name='顺序',
-    #                                    related_name='pm_material_requisition_classes')
     sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)

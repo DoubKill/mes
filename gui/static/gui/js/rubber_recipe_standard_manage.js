@@ -63,7 +63,11 @@
             }).catch(function (error) {
 
             });
-            axios.get(MaterialsUrl)
+            axios.get(MaterialsUrl,{
+                params: {
+                    page_size: 100000000
+                }
+            })
                 .then(function (response) {
 
                     app.materials = response.data.results;
@@ -120,15 +124,32 @@
                         return "废弃";
                 }
             },
-            editButtonText: function (row) {
+            updateFlag(id, pass_flag) {
 
-                switch (row.used_type) {
+                var app = this;
+                axios.patch(ProductInfosUrl + id + "/", {
 
-                    case 1:
-                        return "应用";
-                    case 3:
-                        return "废弃";
-                }
+                    pass_flag
+                }).then(function (response) {
+
+                    app.currentChange(app.currentPage);
+                })
+            },
+            pass: function (row) {
+
+                this.updateFlag(row.id, true)
+            },
+            reject: function (row) {
+
+                this.updateFlag(row.id, false)
+            },
+            apply: function (row) {
+
+                this.updateFlag(row.id, true)
+            },
+            discard: function (row) {
+
+                this.updateFlag(row.id, false)
             },
             showAddRubberRecipeDialog: function () {
 
@@ -258,7 +279,6 @@
             },
             selectClicked: function () {
 
-                console.log(this.selectedMaterials)
                 if (!this.selectedMaterials.length)
                     return;
                 for (var i = 0; i < this.selectedMaterials.length; ++i) {
@@ -478,7 +498,7 @@
                 }).catch(function (error) {
 
                     app.copyError =
-                    error.response.data.non_field_errors[0];
+                        error.response.data.non_field_errors[0];
                 });
             },
         }
