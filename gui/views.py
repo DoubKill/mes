@@ -90,3 +90,9 @@ class MaterialRequisitionsPlanView(TitleMixin, LoginRequiredMixin, TemplateView)
 class CollectRubberDailyManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/collect_rubber_daily_manage.html'
     name_path = ['生产管理', '日别胶料收皮管理']
+
+
+# 密炼实绩管理
+class BanburyingPerformanceManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/banburying_performance_manage.html'
+    name_path = ['生产管理', '密炼实绩管理']

@@ -24,4 +24,6 @@ urlpatterns = [
     path('search/rubber/info/', views.SearchRubberInfoView.as_view(), name='search-rubber-info'),
     # 排产领料计划
     path('material/requisitions/plan', views.MaterialRequisitionsPlanView.as_view(), name='material-requisitions-plan'),
+    # 密炼实绩管理
+    path('banburying/performance/manage', views.BanburyingPerformanceManageView.as_view(), name='banburying-performance-manage'),
 ]
