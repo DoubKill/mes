@@ -7,7 +7,7 @@ from system.views import UserViewSet, UserGroupsViewSet, GroupExtensionViewSet, 
 
 # app_name = 'system'
 router = DefaultRouter()
-# router.register(r'group', GroupViewSet)
+
 router.register(r"personnels_groups", UserGroupsViewSet)
 
 router.register(r'personnels', UserViewSet)
@@ -15,11 +15,7 @@ router.register(r'personnels', UserViewSet)
 router.register(r'group_extension', GroupExtensionViewSet)
 
 router.register(r'section', SectionViewSet)
-# router.register(r'function_block', FunctionBlockViewSet)
 
-# router.register(r'function_permission', FunctionPermissionViewSet)
-# router.register(r'function', FunctionViewSet)
-# router.register(r'menu', MenuViewSet)
 router.register(r"permission", PermissionViewSet)
 
 
