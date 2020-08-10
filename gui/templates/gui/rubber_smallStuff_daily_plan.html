@@ -26,7 +26,8 @@
             </el-select>
         </el-form-item>
         <el-form-item label="胶料">
-            <el-select v-model="getParams.glue" placeholder="请选择">
+            <el-select v-model="getParams.glue" placeholder="请选择"
+                       @change="changeData">
                 <el-option
                         v-for="item in glueList"
                         :key="item.id"
@@ -36,7 +37,7 @@
             </el-select>
         </el-form-item>
         <el-form-item>
-            <el-button>
+            <el-button @click="addRow">
                 新建
             </el-button>
         </el-form-item>
@@ -56,29 +57,76 @@
                 :data="tableData"
                 style="width: 100%">
             <el-table-column
+                    align="center"
+                    header-align="center"
                     prop=""
                     label="S"
                     width="50">
             </el-table-column>
             <el-table-column
+                    align="center"
+                    header-align="center"
                     prop="a"
                     label="No">
             </el-table-column>
             <el-table-column
-                    prop="配料机台"
-                    label="No">
+                    align="center"
+                    header-align="center"
+                    prop="b"
+                    label="配料机台">
             </el-table-column>
             <el-table-column
-                    prop="配料小科编码"
-                    label="S">
+                    align="center"
+                    header-align="center"
+                    prop="c"
+                    label="炼胶机类型">
             </el-table-column>
             <el-table-column
-                    prop="小科重量（kg）"
-                    label="S">
+                    align="center"
+                    header-align="center"
+                    prop="d"
+                    label="配料小料编码">
             </el-table-column>
             <el-table-column
-                    prop="当前库存（袋）"
-                    label="S">
+                    align="center"
+                    header-align="center"
+                    prop="d"
+                    label="小料重量（kg）">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="c"
+                    label="当前库存（袋）">
+            </el-table-column>
+            <el-table-column label="胶料生产计划（车次）"
+                             align="center"
+                             header-align="center">
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="早班">
+                </el-table-column>
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="中班">
+                </el-table-column>
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="夜班">
+                </el-table-column>
+                <el-table-column
+                        align="center"
+                        header-align="center"
+                        prop="name"
+                        label="日计划">
+                </el-table-column>
+
             </el-table-column>
             <el-table-column label="胶料生产计划（车次）">
                 <el-table-column
@@ -103,22 +151,22 @@
                         {{ Number(scope.row.list[0].a) + Number(scope.row.list[0].b)}}
                     </template>
                 </el-table-column>
-                <el-table-column
-                        label="操作"
-                        width="180"
-                >
-                    <template slot-scope="scope">
-                        <el-button>
-                            编辑
-                        </el-button>
-                        <el-button
-                                @click="rowDelete(scope.row)"
-                                size="mini"
-                                type="danger">
-                            删除
-                        </el-button>
-                    </template>
-                </el-table-column>
+            </el-table-column>
+            <el-table-column
+                    label="操作"
+                    width="180"
+            >
+                <template slot-scope="scope">
+                    <el-button @click="rowEdit(scope.row)">
+                        编辑
+                    </el-button>
+                    <el-button
+                            @click="rowDelete(scope.row)"
+                            size="mini"
+                            type="danger">
+                        删除
+                    </el-button>
+                </template>
             </el-table-column>
         </el-table>
     {% endverbatim vue %}
@@ -156,9 +204,9 @@
                 </el-form-item>
             </el-form>
             <span slot="footer" class="dialog-footer">
-            <el-button @click="copyDialogVisible = false">取 消</el-button>
-            <el-button type="primary" @click="copySubmit"
-                       :loading="loadingBtnCopy">确 定</el-button>
+                <el-button @click="copyDialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="copySubmit"
+                           :loading="loadingBtnCopy">确 定</el-button>
             </span>
         </el-dialog>
 
@@ -167,39 +215,97 @@
                 :visible.sync="rubberDialogVisible"
         >
             <el-table
+                    ref="multipleTable"
                     :data="tableDataRubber"
-                    style="width: 100%">
+                    style="width: 100%"
+                    @selection-change="handleSelectionChange">
                 <el-table-column
-                        prop=""
-                        label="S"
-                        width="50">
+                        type="selection"
+                        width="55">
                 </el-table-column>
                 <el-table-column
-                        prop=""
-                        label="胶料编码"
-                        width="50">
+                        prop="a"
+                        label="No">
                 </el-table-column>
                 <el-table-column
-                        prop=""
-                        label="炼胶机类型"
-                        width="50">
-                </el-table-column>
-                 <el-table-column
-                        prop=""
-                        label="配料机台"
-                        width="50">
+                        prop="b"
+                        label="胶料编码">
                 </el-table-column>
                 <el-table-column
-                        prop=""
-                        label="当前库存（袋）"
-                        width="50">
+                        prop="c"
+                        label="炼胶机类型">
+                </el-table-column>
+                <el-table-column
+                        prop="d"
+                        label="配料机台">
+                    <template slot-scope="scope">
+                        <el-input v-model="scope.row.input" placeholder="请输入内容"></el-input>
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="c"
+                        label="当前库存（袋）">
+                </el-table-column>
+                <el-table-column label="胶料生产计划（车次）">
+                    <el-table-column
+                            prop="name"
+                            label="早班">
+                    </el-table-column>
+                    <el-table-column
+                            prop="name"
+                            label="中班">
+                    </el-table-column>
+                    <el-table-column
+                            prop="name"
+                            label="夜班">
+                    </el-table-column>
+                    <el-table-column
+                            prop="name"
+                            label="日计划">
+                    </el-table-column>
+
                 </el-table-column>
             </el-table>
             <span slot="footer" class="dialog-footer">
-            <el-button @click="rubberDialogVisible = false">取 消</el-button>
-            <el-button type="primary" @click="rubberDialogVisible = false">确 定</el-button>
+                <el-button @click="rubberDialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="rubberDialogSubmit">确 定</el-button>
             </span>
         </el-dialog>
+
+        <el-dialog
+                title="配料小料日计划"
+                :visible.sync="dialogVisibleEdit"
+                :before-close="handleCloseEdit">
+            <el-form ref="formEdit" :model="formEdit" label-width="80px">
+                <div>早班计划</div>
+                <el-form-item label="顺序">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <el-form-item label="袋数">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <div>中班计划</div>
+                <el-form-item label="顺序">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <el-form-item label="袋数">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <div>晚班计划</div>
+                <el-form-item label="顺序">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+                <el-form-item label="袋数">
+                    <el-input v-model="formEdit.name"></el-input>
+                </el-form-item>
+
+            </el-form>
+            <span slot="footer" class="dialog-footer">
+                <el-button @click="dialogVisibleEdit = false">取 消</el-button>
+                <el-button type="primary" @click="editSubmit" :loading="EditLoading">确 定</el-button>
+            </span>
+        </el-dialog>
+
     {% endverbatim vue %}
 {% endblock %}
 

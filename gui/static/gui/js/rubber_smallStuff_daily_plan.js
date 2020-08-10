@@ -4,7 +4,7 @@
         mixins: [BaseMixin],
         data: function () {
             return {
-                tableDataUrl: MaterialRequisitions,
+                tableDataUrl: ProductBatching,
                 machineList: [],
                 glueList: [],
                 formCopyData: {
@@ -26,13 +26,24 @@
                     ]
                 },
                 rubberDialogVisible: false,
-                tableDataRubber: []
+                tableDataRubber: [],
+                selectionRubber: [],
+                dialogVisibleEdit: false,
+                formEdit: {},
+                EditLoading: false
             }
         },
         created() {
             this.getMachineList()
             this.getGlueList()
             this.getList()
+
+            // this.tableDataRubber = [
+            //     {a: 1, b: 2, c: 3},
+            //     {a: 1, b: 2, c: 3},
+            //     {a: 1, b: 2, c: 3},
+            //     {a: 1, b: 2, c: 3}
+            // ]
         },
         methods: {
             disabledDate(time) {
@@ -66,7 +77,6 @@
                 var _this = this
                 axios.get(RubberMaterialUrl, {params: {page: 1}}).then(function (response) {
                     _this.glueList = response.data.results || [];
-                    console.log(_this.glueList)
                 }).catch(function (error) {
                 });
             },
@@ -139,6 +149,24 @@
                 this.rubberDialogVisible = true
                 // 获取胶料数据
 
+            },
+            handleSelectionChange(selection) {
+                this.selectionRubber = selection
+            },
+            rubberDialogSubmit() {
+                console.log(this.selectionRubber, 'selection')
+            },
+            rowEdit(row) {
+                this.dialogVisibleEdit = true
+            },
+            handleCloseEdit(done) {
+                done()
+            },
+            editSubmit() {
+
+            },
+            addRow() {
+                this.rowEdit()   //测试
             }
         }
     };

@@ -87,3 +87,7 @@ class SearchRubberInfoView(TitleMixin, LoginRequiredMixin, TemplateView):
 class MaterialRequisitionsPlanView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/material_requisitions_plan.html'
     name_path = ['生产计划管理', '排产领料计划']
+
+class InternalMixerProduction(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/internal_mixer_production.html'
+    name_path = ['生产管理', '密炼生产履历']
