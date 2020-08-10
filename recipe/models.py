@@ -15,7 +15,7 @@ class Material(AbstractEntity):
                                       on_delete=models.DO_NOTHING, related_name='mt_materials')
     density = models.DecimalField(verbose_name='比重', help_text='比重', decimal_places=2, max_digits=8)
     package_unit = models.ForeignKey(GlobalCode, help_text='包装单位', verbose_name='包装单位',
-                                     on_delete=models.DO_NOTHING, related_name='pu_materials')
+                                     on_delete=models.DO_NOTHING, related_name='pu_materials', blank=True, null=True)
     used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
 
     def __str__(self):
@@ -58,7 +58,7 @@ class ProductInfo(AbstractEntity):
     product_no = models.CharField(max_length=64, help_text='胶料编码', verbose_name='胶料编码')
     product_name = models.CharField(max_length=64, help_text='胶料名称', verbose_name='胶料名称')
     versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
-    precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案')
+    precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案', blank=True, null=True)
     factory = models.ForeignKey(GlobalCode, help_text='产地', verbose_name='产地',
                                 on_delete=models.DO_NOTHING, related_name='f_prods')
     used_type = models.PositiveIntegerField(help_text='使用状态', verbose_name='使用状态',

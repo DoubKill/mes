@@ -4,7 +4,7 @@ from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
@@ -14,6 +14,9 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
 class MaterialSerializer(serializers.ModelSerializer):
+    material_no = serializers.CharField(max_length=64, help_text='编码',
+                                        validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
+                                                                    message='该原材料已存在')])
     material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
                                                                                           delete_flag=False),
                                                        help_text='原材料类型id',
@@ -43,13 +46,6 @@ class MaterialSerializer(serializers.ModelSerializer):
         model = Material
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.filter(delete_flag=False),
-                fields=('material_no', 'material_name'),
-                message="该原材料已存在"
-            )
-        ]
 
 
 class MaterialAttributeSerializer(serializers.ModelSerializer):

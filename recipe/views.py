@@ -36,7 +36,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除原材料
     """
-    queryset = Material.objects.filter(delete_flag=False)
+    queryset = Material.objects.filter(delete_flag=False).order_by('created_date')
     serializer_class = MaterialSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -62,7 +62,7 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除原材料属性
     """
-    queryset = MaterialAttribute.objects.filter(delete_flag=False)
+    queryset = MaterialAttribute.objects.filter(delete_flag=False).order_by('created_date')
     serializer_class = MaterialAttributeSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -109,7 +109,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
     partial_update:
         胶料应用和废弃操作
     """
-    queryset = ProductInfo.objects.filter(delete_flag=False)
+    queryset = ProductInfo.objects.filter(delete_flag=False).order_by('created_date')
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductInfoFilter
 
@@ -184,7 +184,7 @@ class ProductBatchingViewSet(ModelViewSet):
     partial_update:
         修改胶料配料标准
     """
-    queryset = ProductBatching.objects.filter(delete_flag=False)
+    queryset = ProductBatching.objects.filter(delete_flag=False).order_by('created_date')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
