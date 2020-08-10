@@ -3,7 +3,8 @@ from django.db import models
 from basics.models import AbstractEntity
 
 class TrainsFeedbacks(AbstractEntity):
-    """车次/批次产出反馈"""
+    """车次产出反馈"""
+    # id = models.BigIntegerField(primary_key=True, auto_created=True, unique=True)
     plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
     plan_trains = models.IntegerField(help_text='计划车次', verbose_name='计划车次')
     actual_trains = models.IntegerField(help_text='实际车次', verbose_name='实际车次')
@@ -14,7 +15,8 @@ class TrainsFeedbacks(AbstractEntity):
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', verbose_name='实际重量')
     begin_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
     end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
-    operation_user = models.CharField(max_length=74, help_text='操作员', verbose_name='操作员')
+    operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员')
+    classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次')
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.bath_no}|{self.equip_no}"
@@ -26,6 +28,7 @@ class TrainsFeedbacks(AbstractEntity):
 
 class PalletFeedbacks(AbstractEntity):
     """托盘产出反馈"""
+    # id = models.BigIntegerField(primary_key=True, auto_created=True, unique=True)
     plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
     bath_no = models.IntegerField(help_text='批次', verbose_name='批次')
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
@@ -39,6 +42,8 @@ class PalletFeedbacks(AbstractEntity):
     end_trains = models.IntegerField(help_text='结束车次', verbose_name='结束车次')
     pallet_no = models.CharField(max_length=64, help_text='托盘', verbose_name='托盘')
     barcode = models.CharField(max_length=64, help_text='收皮条码', verbose_name='收皮条码')
+    classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次')
+    lot_no = models.CharField(max_length=64, help_text='追踪号', verbose_name='追踪号')
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.barcode}|{self.equip_no}"
@@ -73,7 +78,7 @@ class PlanStatus(AbstractEntity):
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
     product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
     status = models.CharField(max_length=64, help_text='状态', verbose_name='状态')
-    operation_user = models.CharField(max_length=74, help_text='操作员', verbose_name='操作员')
+    operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员')
     energy = models.DecimalField(decimal_places=2, max_digits=8, help_text='能量', verbose_name='能量')
 
     def __str__(self):

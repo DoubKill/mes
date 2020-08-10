@@ -14,10 +14,12 @@ class TrainsFeedbacksFilter(django_filters.rest_framework.FilterSet):
 class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
     """托盘产出反馈过滤器"""
     plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
+    equip_no= django_filters.CharFilter(field_name='equip_no', help_text='机号')
+    lan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
 
     class Meta:
         model = PalletFeedbacks
-        fields = ('plan_classes_uid',)
+        fields = ('plan_classes_uid', 'equip_no')
 
 
 class EquipStatusFilter(django_filters.rest_framework.FilterSet):
