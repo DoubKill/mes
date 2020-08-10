@@ -41,7 +41,7 @@
             </el-button>
         </el-form-item>
         <el-form-item>
-            <el-button>
+            <el-button @click="selectRubber">
                 选择胶料
             </el-button>
         </el-form-item>
@@ -56,23 +56,48 @@
                 :data="tableData"
                 style="width: 100%">
             <el-table-column
-                    prop="a"
-                    label="日期"
-                    width="180">
+                    prop=""
+                    label="S"
+                    width="50">
             </el-table-column>
-            <el-table-column label="配送信息">
+            <el-table-column
+                    prop="a"
+                    label="No">
+            </el-table-column>
+            <el-table-column
+                    prop="配料机台"
+                    label="No">
+            </el-table-column>
+            <el-table-column
+                    prop="配料小科编码"
+                    label="S">
+            </el-table-column>
+            <el-table-column
+                    prop="小科重量（kg）"
+                    label="S">
+            </el-table-column>
+            <el-table-column
+                    prop="当前库存（袋）"
+                    label="S">
+            </el-table-column>
+            <el-table-column label="胶料生产计划（车次）">
                 <el-table-column
                         prop="list[0].b"
-                        label="姓名"
+                        label="早班"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="list[0].b"
+                        label="中班"
                         width="180">
                 </el-table-column>
                 <el-table-column
                         prop="list[0].a"
-                        label="姓名"
+                        label="晚班"
                         width="180">
                 </el-table-column>
                 <el-table-column
-                        label="姓名"
+                        label="总计"
                         width="180">
                     <template slot-scope="scope">
                         {{ Number(scope.row.list[0].a) + Number(scope.row.list[0].b)}}
@@ -102,19 +127,80 @@
 
 {% block dialogs %}
     {% verbatim vue %}
-
         <el-dialog
-                title="提示"
-                :visible.sync="centerDialogVisible"
-                width="30%"
-                center>
-            <span>需要注意的是内容是默认不居中的</span>
+                title="复制配料小料日生产计划"
+                :visible.sync="copyDialogVisible"
+                :close-on-click-modal="false"
+                :before-close="handleCloseCopy"
+        >
+            <el-form ref="formCopyData" :rules="rules" :model="formCopyData" label-width="80px">
+                <el-form-item label="来源日期" prop="src_date"
+                              :error="manageFormError.src_date">
+                    <el-date-picker
+                            @change="sourceDataChange"
+                            v-model="formCopyData.src_date"
+                            type="date"
+                            value-format="yyyy-MM-dd"
+                            placeholder="选择来源日期">
+                    </el-date-picker>
+                </el-form-item>
+                <el-form-item label="新建日期" prop="dst_date"
+                              :error="manageFormError.dst_date">
+                    <el-date-picker
+                            v-model="formCopyData.dst_date"
+                            type="date"
+                            value-format="yyyy-MM-dd"
+                            :picker-options="pickerOptionsCopy"
+                            placeholder="选择新建日期">
+                    </el-date-picker>
+                </el-form-item>
+            </el-form>
             <span slot="footer" class="dialog-footer">
-            <el-button @click="centerDialogVisible = false">取 消</el-button>
-            <el-button type="primary" @click="centerDialogVisible = false">确 定</el-button>
+            <el-button @click="copyDialogVisible = false">取 消</el-button>
+            <el-button type="primary" @click="copySubmit"
+                       :loading="loadingBtnCopy">确 定</el-button>
             </span>
         </el-dialog>
-    {% endverbatim %}
+
+        <el-dialog
+                title="选择橡胶"
+                :visible.sync="rubberDialogVisible"
+        >
+            <el-table
+                    :data="tableDataRubber"
+                    style="width: 100%">
+                <el-table-column
+                        prop=""
+                        label="S"
+                        width="50">
+                </el-table-column>
+                <el-table-column
+                        prop=""
+                        label="胶料编码"
+                        width="50">
+                </el-table-column>
+                <el-table-column
+                        prop=""
+                        label="炼胶机类型"
+                        width="50">
+                </el-table-column>
+                 <el-table-column
+                        prop=""
+                        label="配料机台"
+                        width="50">
+                </el-table-column>
+                <el-table-column
+                        prop=""
+                        label="当前库存（袋）"
+                        width="50">
+                </el-table-column>
+            </el-table>
+            <span slot="footer" class="dialog-footer">
+            <el-button @click="rubberDialogVisible = false">取 消</el-button>
+            <el-button type="primary" @click="rubberDialogVisible = false">确 定</el-button>
+            </span>
+        </el-dialog>
+    {% endverbatim vue %}
 {% endblock %}
 
 {% block links %}
