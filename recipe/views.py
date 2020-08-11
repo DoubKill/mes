@@ -164,7 +164,7 @@ class ProductStageInfoView(APIView):
 
 class ProductRecipeListView(ListAPIView):
     """根据胶料工艺和段次获取胶料段次配方原材料信息"""
-    queryset = ProductRecipe.objects.filter(delete_flag=False).order_by('num')
+    queryset = ProductRecipe.objects.filter(delete_flag=False).order_by('sn')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductRecipeFilter
@@ -221,13 +221,13 @@ class PreProductBatchView(APIView):
         except Exception:
             raise ValidationError('参数错误')
         recipe = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                              stage_id=stage_id).order_by('-num').first()
+                                              stage_id=stage_id).order_by('-sn').first()
         if not recipe:
             raise ValidationError('当前段次配方不存在')
 
         pre_recipe = ProductRecipe.objects.exclude(stage_id=stage_id).filter(product_info_id=product_info_id,
-                                                                             num__lt=recipe.num
-                                                                             ).order_by('-num').first()
+                                                                             sn__lt=recipe.sn
+                                                                             ).order_by('-sn').first()
         pre_recipe_data = {}
         if pre_recipe:
             pre_batch = ProductBatching.objects.filter(product_info_id=product_info_id,
@@ -236,7 +236,7 @@ class PreProductBatchView(APIView):
                 raise ValidationError('请先配置上段位的配料')
             else:
                 ratio = ProductRecipe.objects.filter(product_info_id=product_info_id,
-                                                     num__lte=recipe.num
+                                                     sn__lte=recipe.sn
                                                      ).aggregate(ratio=Sum('ratio'))['ratio']
                 pre_recipe_data = OrderedDict()
                 pre_recipe_data['material_type'] = pre_batch.stage.global_name
