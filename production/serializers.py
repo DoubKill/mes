@@ -79,10 +79,6 @@ class QualityControlSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ProductClassesPlanobject(object):
-    pass
-
-
 class ProductionRecordSerializer(BaseModelSerializer):
     """密炼生产履历"""
     validtime = serializers.SerializerMethodField(read_only=True)

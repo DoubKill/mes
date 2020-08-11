@@ -335,9 +335,7 @@ class ProductActualView(APIView):
         return Response(return_data)
 
 
-class ProductionRecordViewSet(mixins.CreateModelMixin,
-                            mixins.RetrieveModelMixin,
-                            mixins.ListModelMixin,
+class ProductionRecordViewSet(mixins.ListModelMixin,
                             GenericViewSet):
 
     queryset = PalletFeedbacks.objects.filter(delete_flag=False)
