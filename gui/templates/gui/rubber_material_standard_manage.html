@@ -56,7 +56,7 @@
             <el-button  @click="showAddRubberMaterialDialog">新建</el-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button @click="showPutRubberMaterialDialog">配料</el-button>
+            <el-button :disabled="currentRow.used_type === -1"  @click="showPutRubberMaterialDialog">配料</el-button>
         </el-form-item>
 
 
@@ -124,8 +124,6 @@
                 label="更新时间">
         </el-table-column>
 
-        </el-table-column>
-
     </el-table>
     {% include 'gui/paginations.html' %}
 {% endblock %}
@@ -136,9 +134,9 @@
             :close-on-click-modal="false"
             :close-on-press-escape="false"
             title="新建胶料配料" :visible.sync="dialogAddRubberMaterial">
-        <el-form v-model="rubberMaterialForm" :label-width="formLabelWidth">
+        <el-form :model="rubberMaterialForm" :rules="rules" ref="rubberMaterialForm" :label-width="formLabelWidth">
 
-            <el-form-item label="产地">
+            <el-form-item label="产地" prop="factory">
                 <el-select
                         size="mini"
                         @change="shiftsPopupRubberSiteChange"
@@ -152,7 +150,7 @@
                 </el-select>
             </el-form-item>
 
-            <el-form-item label="胶料编码">
+            <el-form-item label="胶料编码" prop="stage_product_batch_no">
                 <el-select
                         size="mini"
                         @change="shiftsProductBatchNoChange"
@@ -166,7 +164,7 @@
                 </el-select>
             </el-form-item>
 
-            <el-form-item label="段次">
+            <el-form-item label="段次" prop="stage">
                 <el-select
                         size="mini"
                         @change="shiftsStageChange"
@@ -182,7 +180,7 @@
             </el-form-item>
 
 
-            <el-form-item label="炼胶机类型" :label-width="formLabelWidth">
+            <el-form-item label="炼胶机类型" prop="dev_type_name" :label-width="formLabelWidth">
                 <el-select
                         size="mini"
                         @change="shiftsDevTypeChange"
@@ -196,16 +194,13 @@
                 </el-select>
             </el-form-item>
 
-{#            {% verbatim vue %}#}
-{#                <el-form-item>#}
-{#                    <p style="color: red">{{ rubberMaterialError }}</p>#}
-{#                </el-form-item>#}
-{#            {% endverbatim vue %}#}
+            <el-form-item>
+                <el-button @click="dialogAddRubberMaterial = false">取 消</el-button>
+                <el-button type="primary" @click="handleAddRubberMaterial('rubberMaterialForm')">生成</el-button>
+            </el-form-item>
+
         </el-form>
-        <div slot="footer" class="dialog-footer">
-            <el-button @click="dialogAddRubberMaterial = false">取 消</el-button>
-            <el-button type="primary" @click="handleAddRubberMaterial">生成</el-button>
-        </div>
+
     </el-dialog>
     <el-dialog
 {#            @open="dialogChoiceMaterialsOpen"#}
@@ -410,7 +405,7 @@
                 <!--胶料配料标准 本段次 的数据-->
                 <tr v-for="(product_recipe_ele, index ) in PutProductRecipe">
                     <td></td>
-                    <td>{{ product_recipe_ele.num }}</td>
+                    <td>{{ product_recipe_ele.sn }}</td>
                     <td>{{ product_recipe_ele.material_type }}</td>
                     <td>{{ product_recipe_ele.material_name }}</td>
                     <td>{{ product_recipe_ele.ratio }}</td>
