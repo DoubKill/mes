@@ -1,3 +1,4 @@
+from django.http import JsonResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -127,6 +128,36 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(last_updated_user=self.request.user)
+
+
+class MaterialDemandedAPIView(APIView):
+    def get(self, request):
+        m_list = MaterialDemanded.objects.values('material').distinct()
+        response_list = []
+        for m_dict in m_list:
+            m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'])
+            response_list.append(m_dict)
+            md_obj = MaterialDemanded.objects.filter(material=m_dict['material']).first()
+            response_list[-1]['material_type'] = md_obj.material.material_type.global_name
+            response_list[-1]['material_no'] = md_obj.material.material_no
+            response_list[-1]['material_name'] = md_obj.material.material_name
+            response_list[-1]['md_material_requisition_classes'] = []
+            # for mrc_obj in md_obj.md_material_requisition_classes.all():
+            #     print(mrc_obj)
+            #     dict_key = ['早', '中', '晚']
+            #     user_dict = {dict_key[i]: mrc_obj.weight for i in range(len(md_obj.md_material_requisition_classes.all()))}
+            for i in range(len(md_obj.md_material_requisition_classes.all())):
+                dict_key = ['早', '中', '晚']
+                user_dict = {dict_key[i]: md_obj.md_material_requisition_classes.all()[i].weight}
+                response_list[-1]['md_material_requisition_classes'].append(user_dict)
+            response_list[-1]['material_demanded_list'] = []
+
+            for m_obj in m_queryset.values_list('id', 'material_demanded'):
+                dict_key = ['id', 'material_demanded']
+                user_dict = {dict_key[i]: m_obj[i] for i in range(len(m_obj))}
+                response_list[-1]['material_demanded_list'].append(user_dict)
+            # print(response_list)
+        return JsonResponse(response_list, safe=False)
 
 
 @method_decorator([api_recorder], name="dispatch")
