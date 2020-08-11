@@ -274,7 +274,7 @@ def add_plan_schedule():
                 WorkSchedulePlan.objects.create(
                     classes_detail_id=random.choice(detail_ids),
                     group_id=group_id,
-                    group_name=GroupExtension.objects.get(id=group_id).name,
+                    group_name=GlobalCode.objects.get(id=group_id).global_name,
                     rest_flag=False,
                     plan_schedule=instance
                 )

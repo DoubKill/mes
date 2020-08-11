@@ -73,8 +73,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_class = PalletFeedbacksFilter
 
 
-class EquipStatusViewSet(mixins.CreateModelMixin,
-                         mixins.RetrieveModelMixin,
+class EquipStatusViewSet(mixins.RetrieveModelMixin,
                          mixins.ListModelMixin,
                          GenericViewSet):
     """
@@ -91,6 +90,21 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = EquipStatusFilter
+
+    def list(self, request, *args, **kwargs):
+        actual_trains = request.query_params.get("actual_trains", '')
+        if "," in actual_trains:
+            train_list = actual_trains.split(",")
+            queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__in=train_list))
+        else:
+            queryset = self.filter_queryset(self.get_queryset() )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class PlanStatusViewSet(mixins.CreateModelMixin,
