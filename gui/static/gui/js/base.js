@@ -37,6 +37,10 @@ const MaterialRequisitionsCopy = "/api/v1/plan/product-batching-day-plans-copy/"
 // 领料计划接口
 const MaterialRequisitions = "/api/v1/plan/material-requisitions/";
 
+const PalletFeedBacksUrl = "/api/v1/production/pallet-feedbacks/";
+
+const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
+
 var BaseMixin = {
 
     data: function () {
@@ -51,7 +55,7 @@ var BaseMixin = {
 
             defaultActive: "",
             formLabelWidth: "120px",
-            openeds: ["2", "3"],
+            openeds: ["2", "3", "4", "5"],
         }
     },
     created: function () {

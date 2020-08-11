@@ -1,7 +1,224 @@
 {% extends 'gui/base.html' %}
 {% load static %}
 
+{% block main %}
 
+    <el-row type="flex" justify="end" style="margin-bottom: 20px">
+        <el-col>
+            <div style="float: right">
+                <el-button @click="check_">查询</el-button>
+                <el-button>修改</el-button>
+                <el-button>打印</el-button>
+                <el-button>Excel</el-button>
+                <el-button>关闭</el-button>
+            </div>
+        </el-col>
+    </el-row>
+
+    <el-form :inline="true">
+
+        <el-form-item label="日期">
+            <el-date-picker
+                    type="date"
+                    placeholder="选择日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="生产机号">
+            <el-input></el-input>
+        </el-form-item>
+        <br>
+        <el-form-item label="胶料段">
+            <el-select></el-select>
+        </el-form-item>
+        <el-form-item label="胶料规格">
+            <el-input></el-input>
+        </el-form-item>
+        <el-form-item label="快检测与否">
+            <el-select></el-select>
+        </el-form-item>
+        <el-form-item label="检测区分">
+            <el-select></el-select>
+        </el-form-item>
+        （R:胶料，M:原材料）
+    </el-form>
+
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                label="处理">
+        </el-table-column>
+        <el-table-column
+                label="收皮条码">
+        </el-table-column>
+        <el-table-column
+                label="胶料段">
+        </el-table-column>
+        <el-table-column
+                label="胶料规格">
+        </el-table-column>
+        <el-table-column
+                label="开始车次">
+        </el-table-column>
+        <el-table-column
+                label="结束车次">
+        </el-table-column>
+        <el-table-column
+                label="快检与否">
+        </el-table-column>
+        <el-table-column
+                label="打印与否">
+        </el-table-column>
+        <el-table-column
+                label="生产日期">
+        </el-table-column>
+        <el-table-column
+                label="生产机号">
+        </el-table-column>
+        <el-table-column
+                label="生产班次">
+        </el-table-column>
+        <el-table-column
+                label="检测结果">
+        </el-table-column>
+        <el-table-column
+                label="快检与否">
+        </el-table-column>
+    </el-table>
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+{% block dialogs %}
+
+    <el-dialog
+            :visible.sync="dialogRubberBarCodeInfoVisible">
+
+        <div class="border">
+            <el-row>
+                <el-col class="center" :span="24">胶料条码信息查询</el-col>
+            </el-row>
+            <div style="height: 20px"></div>
+            <el-row>
+                <el-col :span="12">
+                    胶料段：<span class="border">1MB</span>
+                </el-col>
+                <el-col :span="12">
+                    胶料规格：<span class="border">J147-03</span>
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">
+                    条码：<span class="border">H1212121212121</span>
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24" class="center border">
+                    生产信息
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="12">
+                    生产机号：<span class="border">B01</span>
+                </el-col>
+                <el-col :span="12">
+                    生产班次：<span class="border">早班</span>
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="12">
+                    生产日期：<span class="border">2014-01-01</span>
+                </el-col>
+                <el-col :span="12">
+                    生产车次：<span class="border">12</span>
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="12">
+                    标准重量：
+                </el-col>
+                <el-col :span="12">
+                    实际重量：
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">生产时间：</el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">有效时间：</el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">收皮人员：</el-col>
+            </el-row>
+        </div>
+        <div style="height: 40px"></div>
+        <div class="border">
+            <el-row>
+                <el-col :span="24" class="border center">
+                    质量信息
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">检测时间：</el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">打印时间：</el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="12">检测人员：</el-col>
+                <el-col :span="12">检测班次：</el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="24">检测机号：</el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="12">检测结果：<span class="border">
+                    一等品
+                </span>
+                </el-col>
+                <el-col :span="12">备注：</el-col>
+            </el-row>
+        </div>
+        <div style="height: 40px"></div>
+        <el-table border style="width: 100%">
+            <el-table-column
+                    label="车次">
+            </el-table-column>
+            <el-table-column
+                    label="门尼">
+            </el-table-column>
+            <el-table-column
+                    label="门尼符号">
+            </el-table-column>
+            <el-table-column
+                    label="比重">
+            </el-table-column>
+            <el-table-column
+                    label="比重符号">
+            </el-table-column>
+            <el-table-column
+                    label="判级">
+            </el-table-column>
+            <el-table-column
+                    label="符号">
+            </el-table-column>
+        </el-table>
+    </el-dialog>
+{% endblock %}
+
+{% block styles %}
+    <style>
+
+        .border {
+            border: 1px solid rgba(165, 165, 165, 0.82);
+        }
+
+        .center {
+            text-align: center
+        }
+
+    </style>
+{% endblock %}
 
 {% block scripts %}
     <script src="{% static 'gui/js/collect_rubber_daily_manage.js' %}"></script>
