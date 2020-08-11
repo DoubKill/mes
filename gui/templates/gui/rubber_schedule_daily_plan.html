@@ -5,114 +5,100 @@
     <el-form :inline="true">
         <el-form-item label="日期">
             <el-date-picker
+                    @change="queryDataChange"
+                    v-model="plan_data"
                     type="date"
+                    value-format="yyyy-MM-dd"
                     placeholder="选择日期">
             </el-date-picker>
         </el-form-item>
         <el-form-item label="机台">
-            <el-select placeholder="请选择">
-
+            <el-select
+                    @change="queryDataChange"
+                    clearable
+                    v-model="equip_no" placeholder="请选择">
+                <el-option
+                        :key="equip.id"
+                        :label="equip.equip_no"
+                        :value="equip.equip_no"
+                        v-for="equip in equips">
+                </el-option>
             </el-select>
         </el-form-item>
         <el-form-item label="胶料">
-            <el-select placeholder="请选择">
-
+            <el-select
+                    @change="queryDataChange"
+                    clearable
+                    v-model="stage_product_batch_no"
+                    placeholder="请选择">
+                <el-option
+                        :key="index"
+                        :label="no"
+                        :value="no"
+                        v-for="(no, index) in stage_product_batch_nos">
+                </el-option>
             </el-select>
         </el-form-item>
-        <el-form-item>
+        <el-form-item style="float: right">
             <el-button>
                 新建
             </el-button>
         </el-form-item>
-        <el-form-item>
+        <el-form-item style="float: right">
             <el-button>
                 删除
             </el-button>
         </el-form-item>
-        <el-form-item>
+        <el-form-item style="float: right">
             <el-button>
                 复制
             </el-button>
         </el-form-item>
     </el-form>
-    <table class="table table-bordered"
-           style="width: 100%; color: #909399; font-size: 14px;">
-        <thead>
-        <tr>
-            <th rowspan="2">S</th>
-            <th rowspan="2">No</th>
-            <th rowspan="2">机台</th>
-            <th rowspan="2">胶料编码</th>
-            <th rowspan="2">配料重量</th>
-            <th rowspan="2">配料时间</th>
-            <th rowspan="2">当前库存(吨)</th>
-            <th colspan="4">早班计划</th>
-            <th colspan="4">中班计划</th>
-            <th colspan="4">夜班计划</th>
-        </tr>
-        <tr>
-            <template v-for="i in 3">
-                <th>顺序</th>
-                <th>车次</th>
-                <th>重量(吨)</th>
-                <th>时间</th>
-            </template>
-        </tr>
-        </thead>
-    </table>
-
-    <!--
-    <table class="table table-bordered"
-           style="width: 100%; color: #909399; font-size: 14px;">
-        {% verbatim vue %}
+    {% verbatim vue %}
+        <table class="table table-bordered"
+               style="width: 100%; color: #909399; font-size: 14px;">
             <thead>
             <tr>
-                <th rowspan="2">倒班代码</th>
-                <th rowspan="2">倒班名</th>
-                <th colspan="3" v-for="class_ in classes">
-                    {{ class_.global_name }}
-                </th>
-                <th rowspan="2">操作</th>
+                <th rowspan="2">S</th>
+                <th rowspan="2">No</th>
+                <th rowspan="2">机台</th>
+                <th rowspan="2">胶料编码</th>
+                <th rowspan="2">配料重量</th>
+                <th rowspan="2">配料时间</th>
+                <th rowspan="2">当前库存(吨)</th>
+                <th colspan="4">早班计划</th>
+                <th colspan="4">中班计划</th>
+                <th colspan="4">夜班计划</th>
             </tr>
             <tr>
-                <template v-for="class_ in classes">
-                    <th>开始</th>
-                    <th>结束</th>
-                    <th>总时间</th>
+                <template v-for="_ in 3">
+                    <th>顺序</th>
+                    <th>车次</th>
+                    <th>重量(吨)</th>
+                    <th>时间</th>
                 </template>
             </tr>
             </thead>
-            <tbody style="color: #606266;">
-            <tr v-for="workSchedule in workSchedules">
-            <td>{{ workSchedule.schedule_no }}</td>
-            <td>{{ workSchedule.schedule_name }}</td>
-            <template v-for="(class_, index) in classes">
-                <td>{{ getCellText(workSchedule, index, 'start_time') }}</td>
-                <td>{{ getCellText(workSchedule, index, 'end_time') }}</td>
-                <td>{{ getCellText(workSchedule, index, 'sum') }}</td>
-            </template>
-        {% endverbatim vue %}
-        <td>
-            <el-button-group>
-                {% if perms.basics.change_workschedule %}
-                    <el-button
-                            size="mini"
-                            @click="showEditChangeShiftsManageDialog(workSchedule)">编辑
-                    </el-button>
-                {% endif %}
-                {% if perms.basics.delete_workschedule %}
-                    <el-button
-                            size="mini"
-                            type="danger"
-                            @click="handleDeleteChangeShiftsManage(workSchedule)">删除
-                    </el-button>
-                {% endif %}
-            </el-button-group>
-        </td>
-        </tr>
-        </tbody>
-    </table>
-    -->
+            <tbody>
+            <tr v-for="(data, index) in tableData">
+                <td></td>
+                <td>{{ index }}</td>
+                <td>{{ data.equip_no }}</td>
+                <td>{{ data.product_no }}</td>
+                <td>{{ data.batching_weight }}</td>
+                <td>{{ data.batching_time_interval }}</td>
+                <td></td>
+                <template v-for="plan in data.pdp_product_classes_plan">
+                    <td>{{ plan.sn }}</td>
+                    <td>{{ plan.plan_trains }}</td>
+                    <td>{{ plan.weight }}</td>
+                    <td>{{ plan.time }}</td>
+                </template>
+            </tr>
+            </tbody>
+        </table>
+    {% endverbatim vue %}
     {% include 'gui/paginations.html' %}
 
 {% endblock %}
