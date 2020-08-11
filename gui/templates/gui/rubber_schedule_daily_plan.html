@@ -6,7 +6,7 @@
         <el-form-item label="日期">
             <el-date-picker
                     @change="queryDataChange"
-                    v-model="plan_data"
+                    v-model="plan_date"
                     type="date"
                     value-format="yyyy-MM-dd"
                     placeholder="选择日期">
@@ -40,7 +40,7 @@
             </el-select>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button>
+            <el-button @click="addPlanClicked">
                 新建
             </el-button>
         </el-form-item>
@@ -100,6 +100,84 @@
         </table>
     {% endverbatim vue %}
     {% include 'gui/paginations.html' %}
+{% endblock %}
+
+{% block dialogs %}
+
+    <el-dialog title="添加胶料日计划" :visible.sync="addRubberDailyPlanDialogVisible">
+        <el-form v-model="rubberDailyPlanForm">
+            <el-form-item label="机台" :label-width="formLabelWidth">
+                <el-select v-model="rubberDailyPlanForm.equip">
+                    <el-option
+                            :key="equip.id"
+                            :label="equip.equip_no"
+                            :value="equip.id"
+                            v-for="equip in equips">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="胶料编码" :label-width="formLabelWidth">
+                <el-select v-model="rubberDailyPlanForm.product_batching">
+                    <el-option
+                            :key="productBatching.id"
+                            :label="productBatching.stage_product_batch_no"
+                            :value="productBatching.id"
+                            v-for="productBatching in productBatchings">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+            {% verbatim vue %}
+                <template v-for="(plan, index) in rubberDailyPlanForm.pdp_product_classes_plan">
+                    <el-divider>
+                        {{ getPlanText(index) }}
+                    </el-divider>
+                    <el-form-item label="顺序" :label-width="formLabelWidth">
+                        <el-input-number v-model="plan.sn"
+                                         :min="1"></el-input-number>
+                    </el-form-item>
+                    <el-form-item label="车次" :label-width="formLabelWidth">
+                        <el-input-number v-model="plan.plan_trains"
+                                         :min="1"></el-input-number>
+                    </el-form-item>
+                    <el-form-item label="时间" :label-width="formLabelWidth">
+                        <el-time-picker
+                                value-format="HH:mm:ss"
+                                format="HH:mm:ss"
+                                v-model="plan.time">
+                        </el-time-picker>
+                    </el-form-item>
+                    <el-form-item label="重量" :label-width="formLabelWidth">
+                        <el-input-number v-model="plan.weight" :precision="2" :step="0.1"></el-input-number>
+                    </el-form-item>
+                    <el-form-item label="单位" :label-width="formLabelWidth">
+                        <el-input v-model="plan.unit"></el-input>
+                    </el-form-item>
+                </template>
+            {% endverbatim vue %}
+            <!--
+            <el-divider>早班计划</el-divider>
+            <el-form-item label="顺序" :label-width="formLabelWidth">
+                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[0].sn"
+                                 :min="1"></el-input-number>
+            </el-form-item>
+            <el-divider>中班计划</el-divider>
+            <el-form-item label="顺序" :label-width="formLabelWidth">
+                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[1].sn"
+                                 :min="1"></el-input-number>
+            </el-form-item>
+            <el-divider>晚班计划</el-divider>
+            <el-form-item label="顺序" :label-width="formLabelWidth">
+                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[2].sn"
+                                 :min="1"></el-input-number>
+            </el-form-item>
+            -->
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="addRubberDailyPlanDialogVisible = false">取 消</el-button>
+            <el-button type="primary" @click="addRubberDailyPlanDialogVisible = false">确 定</el-button>
+        </div>
+    </el-dialog>
+
 
 {% endblock %}
 
