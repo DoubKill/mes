@@ -18,6 +18,11 @@ class TrainsFeedbacks(AbstractEntity):
     operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员')
     classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次')
 
+    @property
+    def time(self):
+        temp = self.end_time - self.begin_time
+        return temp.total_seconds()
+
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.bath_no}|{self.equip_no}"
 

@@ -16,7 +16,7 @@ django.setup()
 
 from basics.models import PlanSchedule
 from plan.models import ProductClassesPlan
-from production.models import TrainsFeedbacks
+from production.models import TrainsFeedbacks, PalletFeedbacks
 
 
 class ScriptConfigInit(object):
@@ -99,36 +99,62 @@ def gen_uuid():
 
 def run():
     plan_schedule_set = PlanSchedule.objects.filter(delete_flag=False)
-    # day_plan_id_list = plan_schedule.ps_day_plan.filter(delete_flag=False).values_list("id", flat=True)
-    day_plan_set = []
     for plan_schedule in plan_schedule_set:
         if plan_schedule:
             day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         else:
             continue
         for day_plan in list(day_plan_set):
-            instance = {}
-            plan_trains = 0
-            actual_trains = 0
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
-            n = 0
-            for class_plan in list(class_plan_set):
-                n += 1
-                data = {
-                    "plan_classes_uid": class_plan.plan_classes_uid,
-                    "plan_trains": class_plan.plan_trains,
-                    "actual_trains": n,
-                    "bath_no": 0,
-                    "equip_no": day_plan.equip.equip_no,
-                    "product_no": "test-pro-1",
-                    "plan_weight": class_plan.weight,
-                    "actual_weight": n * 100,
-                    "begin_time": datetime.datetime.now(),
-                    "end_time": datetime.datetime.now(),
-                    "operation_user": "string-user",
-                    "classes": class_plan.classes_detail.classes.global_name
-                }
-                TrainsFeedbacks.objects.create(**data)
+            bath_no = 1
+            for m in range(1, 26):
+                for class_plan in list(class_plan_set):
+                    class_name = class_plan.classes_detail.classes.global_name
+                    equip_no = day_plan.equip.equip_no
+                    product_no = day_plan.product_batching.product_info.product_name
+                    plan_trains = class_plan.plan_trains
+                    plan_weight = class_plan.weight
+                    time_str = '2020-08-01 08:00:00'
+                    time = datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                    if class_name == "早班":
+                        time = time
+                    elif class_name == "中班":
+                        time = time + datetime.timedelta(hours=8)
+                    else:
+                        time = time + datetime.timedelta(hours=16)
+                    train_data = {
+                        "plan_classes_uid": class_plan.plan_classes_uid,
+                        "plan_trains": plan_trains,
+                        "actual_trains": m,
+                        "bath_no": bath_no,
+                        "equip_no": equip_no,
+                        "product_no": product_no,
+                        "plan_weight": plan_weight,
+                        "actual_weight": m*5,
+                        "begin_time": time,
+                        "end_time": time + datetime.timedelta(minutes=45),
+                        "operation_user": "string-user",
+                        "classes": class_name
+                    }
+                    TrainsFeedbacks.objects.create(**train_data)
+                    if m % 5 == 0:
+                        pallet_data = {
+                                "plan_classes_uid": class_plan.plan_classes_uid,
+                                "bath_no": bath_no,
+                                "equip_no": equip_no,
+                                "product_no": product_no,
+                                "plan_weight": plan_weight*5,
+                                "actual_weight": m*5*5,
+                                "begin_time": time,
+                                "end_time": time + datetime.timedelta(minutes=45*5),
+                                "operation_user": "string-user",
+                                "begin_trains": 1,
+                                "end_trains": m,
+                                "pallet_no": f"{bath_no}|test",
+                                "barcode": "KJDL:LKYDFJM<NLIIRD"
+                            }
+                        bath_no += 1
+                        PalletFeedbacks.objects.create(**pallet_data)
 
 
 if __name__ == '__main__':
