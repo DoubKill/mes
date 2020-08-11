@@ -8,7 +8,7 @@
 
         <el-form-item label="状态">
             <el-select
-                    size="mini"
+                    style="width: 150px"
                     clearable
                     @change="RubberStateChange"
                     v-model="RubberState" placeholder="请选择">
@@ -22,7 +22,7 @@
         </el-form-item>
         <el-form-item label="产地">
             <el-select
-                    size="mini"
+                    style="width: 150px"
                     clearable
                     @change="RubberSiteChange"
                     v-model="RubberSite" placeholder="请选择">
@@ -36,7 +36,7 @@
         </el-form-item>
         <el-form-item label="段次">
             <el-select
-                    size="mini"
+                    style="width: 150px"
                     clearable
                     @change="RubberStageChange"
                     v-model="RubberStage" placeholder="请选择">
@@ -50,7 +50,7 @@
         </el-form-item>
 
         <el-form-item  label="胶料编码">
-            <el-input size="small" v-model="stage_product_batch_no" v-on:input="stage_product_batch_noChanged"></el-input>
+            <el-input style="width: 200px" v-model="stage_product_batch_no" v-on:input="stage_product_batch_noChanged"></el-input>
         </el-form-item>
         <el-form-item style="float: right">
             <el-button  @click="showAddRubberMaterialDialog">新建</el-button>
