@@ -175,8 +175,6 @@ class PlanRealityView(APIView):
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False).order_by()
         return_data = {
         }
-        product_no = ""
-        equip_no = ""
         for day_plan in list(day_plan_set):
             instance = {}
             plan_trains = 0
@@ -185,10 +183,18 @@ class PlanRealityView(APIView):
             actual_weight = 0
             plan_time = 0
             actual_time = 0
+            product_no = day_plan.product_batching.product_info.product_name
+            equip_no = day_plan.equip.equip_no
             stage = day_plan.product_batching.stage.global_name
             # 通过日计划id再去查班次计划
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
+            # 若班次计划为空则不进行后续操作
+            if not class_plan_set:
+                continue
             for class_plan in list(class_plan_set):
+                plan_trains += class_plan.plan_trains
+                plan_weight += class_plan.weight
+                plan_time += class_plan.total_time
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
                                                                   equip_no=target_equip_no)
@@ -196,22 +202,26 @@ class PlanRealityView(APIView):
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid)
                 if temp_ret_set:
                     actual = temp_ret_set.order_by("-created_date").first()
-                    equip_no = actual.equip_no
                     if equip_no not in return_data:
                         return_data[equip_no] = []
-                    product_no = actual.product_no
-                    plan_trains += actual.plan_trains
-                    plan_weight += actual.plan_weight
                     actual_trains += actual.actual_trains
                     actual_weight += actual.actual_weight
-                    plan_time += class_plan.total_time
                     actual_time = actual.time
-
+                else:
+                    if equip_no not in return_data:
+                        return_data[equip_no] = []
+                    actual_trains += 0
+                    actual_weight += 0
+                    actual_time = 0
+            if plan_weight:
+                ach_rate = actual_weight/plan_weight*100
+            else:
+                ach_rate = 0
             instance.update(equip_no=equip_no, product_no=product_no,
                             plan_trains=plan_trains, actual_trains=actual_trains,
                             plan_weight=plan_weight, actual_weight=actual_weight,
                             plan_time=plan_time, actual_time=actual_time,
-                            stage=stage, ach_rate=actual_weight/plan_weight*100,
+                            stage=stage, ach_rate=ach_rate,
                             start_rate=None)
             if equip_no not in return_data:
                 return_data[equip_no] = []
@@ -239,17 +249,22 @@ class ProductActualView(APIView):
         return_data = {
             "datas": []
         }
-        product_no = ""
-        equip_no = ""
         for day_plan in list(day_plan_set):
             instance = {}
             plan_trains = 0
             actual_trains = 0
+            plan_weight = 0
+            product_no = day_plan.product_batching.product_info.product_name
+            equip_no = day_plan.equip.equip_no
+            day_plan_actual = [None, None, None]
             # 通过日计划id再去查班次计划
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
-            day_plan_actual = []
-            plan_weight = 0
+            if not class_plan_set:
+                continue
             for class_plan in list(class_plan_set):
+                plan_trains += class_plan.plan_trains
+                plan_weight += class_plan.weight
+                class_name = class_plan.classes_detail.classes.global_name
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
                                                                   equip_no=target_equip_no)
@@ -257,17 +272,34 @@ class ProductActualView(APIView):
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid)
                 if temp_ret_set:
                     actual = temp_ret_set.order_by("-created_date").first()
-                    day_plan_actual.append({
-                        "plan_trains": actual.plan_trains,
-                        "actual_trains": actual.actual_trains,
-                        "classes": actual.classes
-                    })
-                    plan_weight += actual.plan_weight
-                    product_no = actual.product_no
-                    equip_no = actual.equip_no
-                    plan_trains += actual.plan_trains
+                    temp_class_actual = {
+                            "plan_trains": plan_trains,
+                            "actual_trains": actual.actual_trains,
+                            "classes": class_name
+                        }
+                    if class_name == "早班":
+                        day_plan_actual[0] = temp_class_actual
+                    elif class_name == "中班":
+                        day_plan_actual[1] = temp_class_actual
+                    elif class_name == "晚班":
+                        day_plan_actual[2] = temp_class_actual
+                    else:
+                        day_plan_actual.append(temp_class_actual)
                     actual_trains += actual.actual_trains
-
+                else:
+                    temp_class_actual = {
+                        "plan_trains": plan_trains,
+                        "actual_trains": 0,
+                        "classes": class_name}
+                    if class_name == "早班":
+                        day_plan_actual[0] = temp_class_actual
+                    elif class_name == "中班":
+                        day_plan_actual[1] = temp_class_actual
+                    elif class_name == "晚班":
+                        day_plan_actual[2] = temp_class_actual
+                    else:
+                        day_plan_actual.append(temp_class_actual)
+                    actual_trains += 0
             instance.update(classes_data=day_plan_actual, plan_weight=plan_weight,
                             product_no=product_no, equip_no=equip_no,
                             plan_trains=plan_trains, actual_trains=actual_trains)
