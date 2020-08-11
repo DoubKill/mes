@@ -30,4 +30,5 @@ urlpatterns = [
     path('collect/rubber/daily/manage/', views.CollectRubberDailyManageView.as_view(), name='collect-rub-daily-manage'),
     # 密炼LOT生产履历
     path('internal/mixer/production', views.InternalMixerProduction.as_view(), name='internal_mixer_production')
+
 ]
