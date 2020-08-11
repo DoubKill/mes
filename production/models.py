@@ -68,6 +68,7 @@ class EquipStatus(AbstractEntity):
     power = models.DecimalField(decimal_places=2, max_digits=8, help_text='功率', verbose_name='功率')
     pressure = models.DecimalField(decimal_places=2, max_digits=8, help_text='压力', verbose_name='压力')
     status = models.CharField(max_length=64, help_text='状态', verbose_name='状态')
+    current_trains = models.IntegerField(help_text='当前车次', verbose_name='当前车次')
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.equip_no}"
@@ -84,7 +85,6 @@ class PlanStatus(AbstractEntity):
     product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
     status = models.CharField(max_length=64, help_text='状态', verbose_name='状态')
     operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员')
-    energy = models.DecimalField(decimal_places=2, max_digits=8, help_text='能量', verbose_name='能量')
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.equip_no}|{self.product_no}"
@@ -103,6 +103,8 @@ class ExpendMaterial(AbstractEntity):
     plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', verbose_name='计划重量')
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际消耗重量', verbose_name='实际消耗重量')
     masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
+    masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
+    masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.equip_no}|{self.product_no}|{self.masterial_no}"
@@ -136,3 +138,29 @@ class QualityControl(AbstractEntity):
     class Meta:
         db_table = 'quality-control'
         verbose_name_plural = verbose_name = '质检结果'
+
+
+class MaterialTankStatus(AbstractEntity):
+    """储料罐状态"""
+
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
+    tank_type = models.CharField(max_length=64, help_text="储料罐类型", verbose_name='储料罐类型')
+    tank_name = models.CharField(max_length=64, help_text="储料罐名称", verbose_name='储料罐名称')
+    tank_no = models.CharField(max_length=64, help_text="储料罐编号", verbose_name='储料罐编号')
+    masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
+    masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
+    masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
+    used_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=0)
+    low_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='慢称值', verbose_name='慢称值')
+    advance_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='提前量', verbose_name='提前量')
+    adjust_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='调整值', verbose_name='调整值')
+    dot_time = models.DecimalField(decimal_places=2, max_digits=8, help_text='点动时间', verbose_name='电动时间')
+    fast_speed = models.DecimalField(decimal_places=2, max_digits=8, help_text='快称速度', verbose_name='快称速度')
+    low_speed = models.DecimalField(decimal_places=2, max_digits=8, help_text='慢称速度', verbose_name='慢称速度')
+
+    def __str__(self):
+        return f"{self.tank_name}|{self.tank_type}|{self.equip_no}"
+
+    class Meta:
+        db_table = 'material_tank_status'
+        verbose_name_plural = verbose_name = '储料罐状态'

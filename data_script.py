@@ -168,7 +168,8 @@ def run():
                             "energy": random.randint(50,500),
                             "power": random.randint(50,500),
                             "pressure": random.randint(80,360),
-                            "status": "running"
+                            "status": "running",
+                            "current_trains": m
                         }
                         EquipStatus.objects.create(**equip_status_data)
 
