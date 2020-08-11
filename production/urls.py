@@ -2,7 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from production.views import TrainsFeedbacksViewSet, PalletFeedbacksViewSet, EquipStatusViewSet, PlanStatusViewSet, \
-    ExpendMaterialViewSet, OperationLogViewSet, QualityControlViewSet, PlanRealityViewSet
+    ExpendMaterialViewSet, OperationLogViewSet, QualityControlViewSet, PlanRealityViewSet, ProductProcess
 
 router = DefaultRouter()
 
@@ -32,6 +32,6 @@ router.register(r'quality-control', QualityControlViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
-
-    path(r'plan-reality/', PlanRealityViewSet.as_view())
+    path(r'plan-reality/', PlanRealityViewSet.as_view()),
+    path('test', ProductProcess.as_view())
 ]
