@@ -16,7 +16,7 @@ router.register(r'materials-attribute', MaterialAttributeViewSet)
 router.register(r'product-infos', ProductInfoViewSet)
 
 # 胶料配料
-router.register(r'product-batch', ProductBatchingViewSet)
+router.register(r'product-batching', ProductBatchingViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

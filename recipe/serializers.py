@@ -13,7 +13,7 @@ from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching,
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
-class MaterialSerializer(serializers.ModelSerializer):
+class MaterialSerializer(BaseModelSerializer):
     material_no = serializers.CharField(max_length=64, help_text='编码',
                                         validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
                                                                     message='该原材料已存在')])
@@ -23,7 +23,8 @@ class MaterialSerializer(serializers.ModelSerializer):
                                                        error_messages={'does_not_exist': '该原材料类型已被弃用或删除，操作无效'})
     package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
                                                                                          delete_flag=False),
-                                                      help_text='包装单位id',
+                                                      help_text='包装单位id', required=False,
+                                                      allow_null=True, allow_empty=True,
                                                       error_messages={'does_not_exist': '该包装单位类型已被弃用或删除，操作无效'})
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
@@ -33,10 +34,6 @@ class MaterialSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_update_user_name(obj):
         return obj.last_updated_user.username if obj.last_updated_user else None
-
-    def create(self, validated_data):
-        validated_data['created_user'] = self.context['request'].user
-        return super().create(validated_data)
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
@@ -48,7 +45,7 @@ class MaterialSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MaterialAttributeSerializer(serializers.ModelSerializer):
+class MaterialAttributeSerializer(BaseModelSerializer):
     material_no = serializers.CharField(source='Material.material_no', read_only=True)
     material_name = serializers.CharField(source='Material.material_name', read_only=True)
 
@@ -58,7 +55,7 @@ class MaterialAttributeSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ProductRecipeSerializer(serializers.ModelSerializer):
+class ProductRecipeSerializer(BaseModelSerializer):
     material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=0, used_flag=1),
                                                   allow_empty=True, allow_null=True, required=False)
     stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
@@ -72,7 +69,7 @@ class ProductRecipeSerializer(serializers.ModelSerializer):
         exclude = ('product_info', 'product_recipe_no')
 
 
-class ProductInfoCreateSerializer(serializers.ModelSerializer):
+class ProductInfoCreateSerializer(BaseModelSerializer):
     factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                  help_text='产地id')
     productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"num": 编号, "material": 原材料id, 
@@ -112,7 +109,7 @@ class ProductInfoCreateSerializer(serializers.ModelSerializer):
                   'factory', 'productrecipe_set')
 
 
-class ProductInfoSerializer(serializers.ModelSerializer):
+class ProductInfoSerializer(BaseModelSerializer):
     product_standard_no = serializers.SerializerMethodField()
     factory = serializers.CharField(source='factory.global_name')
     update_user = serializers.SerializerMethodField(read_only=True)
@@ -137,7 +134,7 @@ class ProductInfoSerializer(serializers.ModelSerializer):
                   'recipe_weight', 'used_time', 'obsolete_time', 'update_user')
 
 
-class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
+class ProductInfoPartialUpdateSerializer(BaseModelSerializer):
     pass_flag = serializers.BooleanField(help_text='通过标志，1：通过, 0:驳回', write_only=True)
 
     def update(self, instance, validated_data):
@@ -171,7 +168,7 @@ class ProductInfoPartialUpdateSerializer(serializers.ModelSerializer):
         fields = ('id', 'pass_flag')
 
 
-class ProductInfoUpdateSerializer(serializers.ModelSerializer):
+class ProductInfoUpdateSerializer(BaseModelSerializer):
     product_standard_no = serializers.SerializerMethodField(read_only=True)
     productrecipe_set = ProductRecipeSerializer(many=True, required=False)
 
@@ -205,7 +202,7 @@ class ProductInfoUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ('product_name', 'recipe_weight')
 
 
-class ProductInfoCopySerializer(serializers.ModelSerializer):
+class ProductInfoCopySerializer(BaseModelSerializer):
     factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                  help_text='产地id')
     product_info_id = serializers.PrimaryKeyRelatedField(queryset=ProductInfo.objects.exclude(used_type=1),
@@ -245,7 +242,7 @@ class ProductInfoCopySerializer(serializers.ModelSerializer):
         fields = ('product_info_id', 'factory', 'versions')
 
 
-class ProductRecipeListSerializer(serializers.ModelSerializer):
+class ProductRecipeListSerializer(BaseModelSerializer):
     material_type = serializers.CharField(source='material.material_type.global_name')
     material_name = serializers.CharField(source='material.material_name')
     density = serializers.CharField(source='material.density')
@@ -255,7 +252,7 @@ class ProductRecipeListSerializer(serializers.ModelSerializer):
         fields = ('material_type', 'material', 'ratio', 'density', 'material_name')
 
 
-class ProductBatchingDetailSerializer(serializers.ModelSerializer):
+class ProductBatchingDetailSerializer(BaseModelSerializer):
     material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=1),
                                                   allow_empty=True, allow_null=True, required=False)
     material_type = serializers.SerializerMethodField()
@@ -281,11 +278,11 @@ class ProductBatchingDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductBatchingDetail
-        exclude = ('product_batching', 'density')
-        extra_kwargs = {'ratio': {'read_only': True}}
+        exclude = ('product_batching', )
+        extra_kwargs = {'ratio': {'read_only': True}, 'density': {'read_only': True}}
 
 
-class ProductBatchingListSerializer(serializers.ModelSerializer):
+class ProductBatchingListSerializer(BaseModelSerializer):
     product_name = serializers.CharField(source='product_info.product_name')
     dev_type_name = serializers.CharField(source='dev_type.global_name')
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
@@ -320,7 +317,7 @@ class ProductBatchingListSerializer(serializers.ModelSerializer):
                   'used_user_name', 'obsolete_user_name', 'factory_name')
 
 
-class ProductBatchingCreateSerializer(serializers.ModelSerializer):
+class ProductBatchingCreateSerializer(BaseModelSerializer):
     stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                help_text='段次id')
     dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
@@ -375,6 +372,8 @@ class ProductBatchingCreateSerializer(serializers.ModelSerializer):
         attrs['volume'] = volume
         attrs['batching_proportion'] = float(batching_weight / volume) if volume else 0
         attrs['created_user'] = self.context['request'].user
+        if attrs.get('rm_time_interval'):
+            attrs['rm_flag'] = True
         return attrs
 
     @atomic()
@@ -439,6 +438,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             attrs['volume'] = volume
             attrs['batching_proportion'] = float(batching_weight / volume) if volume else 0
             attrs['last_updated_user'] = self.context['request'].user
+            if attrs.get('rm_time_interval'):
+                attrs['rm_flag'] = True
         return attrs
 
     @atomic()
@@ -456,4 +457,5 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('id', 'batching_details')
+        fields = ('id', 'batching_details', 'rm_time_interval',
+                  'batching_time_interval', 'production_time_interval')
