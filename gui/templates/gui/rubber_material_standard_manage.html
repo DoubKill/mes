@@ -2,7 +2,10 @@
 {% load static %}
 
 {% block main %}
+
     <el-form :inline="true">
+
+
         <el-form-item label="状态">
             <el-select
                     size="mini"
@@ -49,13 +52,13 @@
         <el-form-item  label="胶料编码">
             <el-input size="small" v-model="stage_product_batch_no" v-on:input="stage_product_batch_noChanged"></el-input>
         </el-form-item>
+        <el-form-item style="float: right">
+            <el-button  @click="showAddRubberMaterialDialog">新建</el-button>
+        </el-form-item>
+        <el-form-item style="float: right">
+            <el-button @click="showPutRubberMaterialDialog">配料</el-button>
+        </el-form-item>
 
-        <el-form-item style="float: right">
-            <el-button @click="">配料</el-button>
-        </el-form-item>
-        <el-form-item style="float: right">
-            <el-button @click="showAddRubberMaterialDialog">新建</el-button>
-        </el-form-item>
 
     </el-form>
     <el-table
@@ -83,7 +86,8 @@
         </el-table-column>
         <el-table-column
                 prop="used_type"
-                label="状态">
+                label="状态"
+                :formatter="usedTypeFormatter">
         </el-table-column>
 
         <el-table-column
@@ -119,8 +123,6 @@
                 prop="last_updated_date"
                 label="更新时间">
         </el-table-column>
-
-        <el-table-column label="操作">
 
         </el-table-column>
 
@@ -205,6 +207,257 @@
             <el-button type="primary" @click="handleAddRubberMaterial">生成</el-button>
         </div>
     </el-dialog>
+    <el-dialog
+{#            @open="dialogChoiceMaterialsOpen"#}
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            width="90%" title="胶料配料标准" :visible.sync="dialogChoiceMaterials">
+        <el-row>
+            <el-form :inline="true">
+                <el-form-item style="float: right">
+                    <el-button size="mini" @click="saveMaterialClicked">保存</el-button>
+                </el-form-item>
+            </el-form>
+        </el-row>
+        胶料编码:&nbsp;&nbsp;&nbsp;&nbsp; <el-input size="mini" v-model="select_stage_product_batch_no" :disabled="true" style="width: 20%" ></el-input>
+        胶料名称: <el-input size="mini" v-model="select_product_name" :disabled="true" style="width: 10%" ></el-input>
+        状态: <el-input size="mini" v-model="select_status" :disabled="true" style="width: 10%" ></el-input>
+        <br><br>
+        炼胶机类型: <el-input size="mini" v-model="select_dev_type" :disabled="true" style="width: 20%" ></el-input>
+        配料重量: <el-input size="mini" v-model="select_material_weight" :disabled="true" style="width: 10%" ></el-input>
+        配料体积: <el-input size="mini" v-model="select_material_volume" :disabled="true" style="width: 10%" ></el-input>
+        胶料比重: <el-input size="mini" v-model="select_rubber_proportion" :disabled="true" style="width: 10%" ></el-input>
+        <br><br>
+        反炼与否:&nbsp;&nbsp;&nbsp;&nbsp; <el-switch v-model="select_rm_flag" active-color="#13ce66" inactive-color="#ff4949"></el-switch>
+        反炼时间: <el-time-picker size="mini" v-model="select_rm_time_interval" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+        <br><br>
+
+        <table class="table table-bordered"
+               style="width: 100%; color: #909399; font-size: 14px;">
+            <thead>
+            <tr>
+                <th>S</th>
+                <th>No</th>
+                <th>类别</th>
+                <th>原材料</th>
+                <th>配比</th>
+                <th>比重</th>
+                <th>配比体积</th>
+                <td>计算体积</td>
+                <td>计算重量</td>
+                <td>实际重量</td>
+                <td>实际体积</td>
+                <td>时间</td>
+                <td>温度(℃)</td>
+                <td>RPM</td>
+
+            </tr>
+            </thead>
+            {% verbatim vue %}
+                <tbody style="color: #606266;">
+                <!--胶料配料标准  第一行 的汇总数据-->
+                <tr style="background: rgba(189,198,210,0.73)">
+                    <td colspan="4" style="text-align: center">配方结果</td>
+                    <td style="text-align: center">{{ ratioSum }}</td>
+                    <td></td>
+                    <td style="text-align: center">{{ ratioVolumeSum }}</td>
+                    <td style="text-align: center">{{ calculateVolumeSum }}</td>
+                    <td style="text-align: center">{{ calculateWeightSum }}</td>
+                    <td style="text-align: center">{{ practicalWeightSum }}</td>
+                    <td style="text-align: center">{{ practicalVolumeSum }}</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <!--胶料配料标准 上段次 的数据-->
+                <tr v-if="selectedPreMaterials.material_type">
+                    <td></td>
+                    <td>{{ 1 }}</td>
+                    <td>{{ selectedPreMaterials.material_type }}</td>
+                    <td>{{ selectedPreMaterials.material_name }}</td>
+                    <td>{{ selectedPreMaterials.ratio }}</td>
+                    <td>{{ selectedPreMaterials.density }}</td>
+                    <td style="text-align: center">{{ selectedPreMaterials.pre_ratioVolume }}</td>
+                    <td style="text-align: center">{{ selectedPreMaterials.pre_calculateVolume }}</td>
+                    <td style="text-align: center">{{ selectedPreMaterials.pre_calculateWeight }}</td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" @change="PracticalWeightChanged" v-model.number="selectedPreMaterials.pre_practical_weight"></el-input-number>
+                    </td>
+                    <td style="text-align: center">{{ selectedPreMaterials.pre_practicalVolume }}</td>
+                    <td style="text-align: center">
+                        <el-time-picker size="mini" v-model="selectedPreMaterials.pre_time_material" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+                    </td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" v-model.number="selectedPreMaterials.pre_practical_temperature"></el-input-number>
+                    </td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" v-model.number="selectedPreMaterials.pre_practical_RPM"></el-input-number>
+                    </td>
+                </tr>
+                <!--胶料配料标准 本段次 的数据-->
+                <tr v-for="(product_recipe_ele, index ) in ProductRecipe">
+                    <td></td>
+                    <td v-if="selectedPreMaterials.material_type">{{ index + 2 }}</td>
+                    <td v-else>{{ index + 1 }}</td>
+                    <td>{{ product_recipe_ele.material_type }}</td>
+                    <td>{{ product_recipe_ele.material_name }}</td>
+                    <td>{{ product_recipe_ele.ratio }}</td>
+                    <td>{{ product_recipe_ele.density }}</td>
+                    <td style="text-align: center">{{ product_recipe_ele.ratioVolume }}</td>
+                    <td style="text-align: center">{{ product_recipe_ele.calculateVolume }}</td>
+                    <td style="text-align: center">{{ product_recipe_ele.calculateWeight }}</td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" @change="PracticalWeightChanged" v-model.number="product_recipe_ele.practical_weight"></el-input-number>
+                    </td>
+                    <td style="text-align: center">{{ product_recipe_ele.practicalVolume }}</td>
+                    <td style="text-align: center">
+                        <el-time-picker size="mini" v-model="product_recipe_ele.time_material" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+                    </td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" v-model.number="product_recipe_ele.practical_temperature"></el-input-number>
+                    </td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" v-model.number="product_recipe_ele.practical_RPM"></el-input-number>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td>排出</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td style="text-align: center">
+                        <el-time-picker size="mini" v-model="discharge_time_material" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+                    </td>
+                    <td></td>
+                    <td></td>
+                </tr>
+
+
+                </tbody>
+            {% endverbatim vue %}
+        </table>
+
+    </el-dialog>
+
+
+    <el-dialog
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            width="90%" title="胶料配料标准" :visible.sync="dialogRubberMaterialStandard">
+        <el-form :inline="true">
+            <el-form-item style="float: right">
+                <el-button @click="put_saveMaterialClicked">保存</el-button>
+            </el-form-item>
+        </el-form>
+        胶料编码:&nbsp;&nbsp;&nbsp;&nbsp; <el-input size="mini" v-model="put_select_stage_product_batch_no" :disabled="true" style="width: 20%" ></el-input>
+        胶料名称: <el-input size="mini" v-model="put_select_product_name" :disabled="true" style="width: 10%" ></el-input>
+        状态: <el-input size="mini" v-model="put_select_status" :formatter="usedTypeFormatter" :disabled="true" style="width: 10%"></el-input>
+        <br><br>
+        炼胶机类型: <el-input size="mini" v-model="put_select_dev_type" :disabled="true" style="width: 20%" ></el-input>
+        配料重量: <el-input size="mini" v-model="put_select_material_weight" :disabled="true" style="width: 10%" ></el-input>
+        配料体积: <el-input size="mini" v-model="put_select_material_volume" :disabled="true" style="width: 10%" ></el-input>
+        胶料比重: <el-input size="mini" v-model="put_select_rubber_proportion" :disabled="true" style="width: 10%" ></el-input>
+        <br><br>
+        反炼与否:&nbsp;&nbsp;&nbsp;&nbsp; <el-switch v-model="put_select_rm_flag" active-color="#13ce66" inactive-color="#ff4949"></el-switch>
+        反炼时间: <el-time-picker size="mini" v-model="put_select_rm_time_interval" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+        <br><br>
+
+        <table class="table table-bordered"
+               style="width: 100%; color: #909399; font-size: 14px;">
+            <thead>
+            <tr>
+                <th>S</th>
+                <th>No</th>
+                <th>类别</th>
+                <th>原材料</th>
+                <th>配比</th>
+                <th>比重</th>
+                <th>配比体积</th>
+                <td>计算体积</td>
+                <td>计算重量</td>
+                <td>实际重量</td>
+                <td>实际体积</td>
+                <td>时间</td>
+                <td>温度(℃)</td>
+                <td>RPM</td>
+
+            </tr>
+            </thead>
+            {% verbatim vue %}
+                <tbody style="color: #606266;">
+                <!--胶料配料标准  第一行 的汇总数据-->
+                <tr style="background: rgba(189,198,210,0.73)">
+                    <td colspan="4" style="text-align: center">配方结果</td>
+                    <td style="text-align: center">{{ put_ratioSum }}</td>
+                    <td></td>
+                    <td style="text-align: center">{{ put_ratioVolumeSum }}</td>
+                    <td style="text-align: center">{{ put_calculateVolumeSum }}</td>
+                    <td style="text-align: center">{{ put_calculateWeightSum }}</td>
+                    <td style="text-align: center">{{ put_practicalWeightSum }}</td>
+                    <td style="text-align: center">{{ put_practicalVolumeSum }}</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <!--胶料配料标准 本段次 的数据-->
+                <tr v-for="(product_recipe_ele, index ) in PutProductRecipe">
+                    <td></td>
+                    <td>{{ product_recipe_ele.num }}</td>
+                    <td>{{ product_recipe_ele.material_type }}</td>
+                    <td>{{ product_recipe_ele.material_name }}</td>
+                    <td>{{ product_recipe_ele.ratio }}</td>
+                    <td>{{ product_recipe_ele.density }}</td>
+                    <td style="text-align: center">{{ product_recipe_ele.ratio_weight }}</td>
+                    <td style="text-align: center">{{ product_recipe_ele.standard_volume }}</td>
+                    <td style="text-align: center">{{ product_recipe_ele.standard_weight }}</td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" @change="PutPracticalWeightChanged" v-model.number="product_recipe_ele.actual_weight"></el-input-number>
+                    </td>
+                    <td style="text-align: center">{{ product_recipe_ele.actual_volume }}</td>
+                    <td style="text-align: center">
+                        <el-time-picker size="mini" v-model="product_recipe_ele.time_interval" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+                    </td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" v-model.number="product_recipe_ele.temperature"></el-input-number>
+                    </td>
+                    <td style="text-align: center">
+                        <el-input-number size="mini" controls-position="right" v-model.number="product_recipe_ele.rpm"></el-input-number>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td>排出</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td style="text-align: center">
+                        <el-time-picker size="mini" v-model="put_discharge_time_material" value-format="hh:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+                    </td>
+                    <td></td>
+                    <td></td>
+                </tr>
+
+                </tbody>
+            {% endverbatim vue %}
+        </table>
+
+
+    </el-dialog>
 
 {% endblock %}
 
@@ -217,18 +470,3 @@
     <script src="{% static 'gui/js/rubber_material_filter.js' %}"></script>
     <script src="{% static 'gui/js/rubber_material_standard_manage.js' %}"></script>
 {% endblock %}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
