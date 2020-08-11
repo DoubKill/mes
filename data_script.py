@@ -6,6 +6,7 @@ name:
 """
 import datetime
 import os
+import random
 import uuid
 import django
 
@@ -16,7 +17,7 @@ django.setup()
 
 from basics.models import PlanSchedule
 from plan.models import ProductClassesPlan
-from production.models import TrainsFeedbacks, PalletFeedbacks
+from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 
 
 class ScriptConfigInit(object):
@@ -98,6 +99,9 @@ def gen_uuid():
 
 
 def run():
+    TrainsFeedbacks.objects.all().delete()
+    PalletFeedbacks.objects.all().delete()
+    EquipStatus.objects.all().delete()
     plan_schedule_set = PlanSchedule.objects.filter(delete_flag=False)
     for plan_schedule in plan_schedule_set:
         if plan_schedule:
@@ -155,6 +159,18 @@ def run():
                             }
                         bath_no += 1
                         PalletFeedbacks.objects.create(**pallet_data)
+                    for x in range(20):
+                        equip_status_data = {
+                            "plan_classes_uid": class_plan.plan_classes_uid,
+                            "equip_no": equip_no,
+                            "temperature": random.randint(300,700),
+                            "rpm": random.randint(500,2000),
+                            "energy": random.randint(50,500),
+                            "power": random.randint(50,500),
+                            "pressure": random.randint(80,360),
+                            "status": "running"
+                        }
+                        EquipStatus.objects.create(**equip_status_data)
 
 
 if __name__ == '__main__':

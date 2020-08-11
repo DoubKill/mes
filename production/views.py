@@ -7,10 +7,9 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.viewsets import GenericViewSet
 
 from basics.models import PlanSchedule
-from mes.common_code import get_day_plan_class_set, get_day_plan_class_uid_list
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter
@@ -22,7 +21,6 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
                              mixins.RetrieveModelMixin,
-                             mixins.ListModelMixin,
                              GenericViewSet):
     """
     list:
@@ -38,6 +36,21 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = TrainsFeedbacksFilter
+
+    def list(self, request, *args, **kwargs):
+        actual_trains = request.query_params.get("actual_trains", '')
+        if "," in actual_trains:
+            train_list = actual_trains.split(",")
+            queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__in=train_list))
+        else:
+            queryset = self.filter_queryset(self.get_queryset() )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class PalletFeedbacksViewSet(mixins.CreateModelMixin,

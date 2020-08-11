@@ -7,6 +7,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
 class TrainsFeedbacksSerializer(BaseModelSerializer):
     """车次/批次产出反馈"""
 
+
     class Meta:
         model = TrainsFeedbacks
         fields = "__all__"
