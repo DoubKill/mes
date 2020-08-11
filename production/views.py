@@ -160,15 +160,18 @@ class QualityControlViewSet(mixins.CreateModelMixin,
 class ProductProcess(APIView):
 
     def get(self, request):
+        # 获取url参数 search_time equip_no
         params = request.query_params
         search_time_str = params.get("search_time")
         target_equip_no = params.get('equip_no')
+        # 通过日期参数查工厂排班
         if search_time_str:
             if not re.compile(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 return Response("bad search_time", status=400)
             plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
         else:
             plan_schedule = PlanSchedule.objects.filter().first()
+        # 通过排班查日计划
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {
             "datas": []
@@ -179,8 +182,8 @@ class ProductProcess(APIView):
             instance = {}
             plan_trains = 0
             actual_trains = 0
+            # 通过日计划id再去查班次计划
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
-            # plan_uid_list = class_plan_set.values_list("plan_classes_uid", flat=True)
             day_plan_actual = []
             plan_weight = 0
             for class_plan in list(class_plan_set):
