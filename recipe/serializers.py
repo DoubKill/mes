@@ -9,7 +9,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute
+    MaterialAttribute, ProductProcess, ProductProcessDetail
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
@@ -72,7 +72,7 @@ class ProductRecipeSerializer(BaseModelSerializer):
 class ProductInfoCreateSerializer(BaseModelSerializer):
     factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                  help_text='产地id')
-    productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"num": 编号, "material": 原材料id, 
+    productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"sn": 编号, "material": 原材料id, 
     "stage": 段次id, "ratio": 配比}...]""")
 
     def validate(self, attrs):
@@ -229,7 +229,7 @@ class ProductInfoCopySerializer(BaseModelSerializer):
         validated_data['precept'] = base_product_info.precept
         instance = super().create(validated_data)
         recipes = base_product_info.productrecipe_set.filter(delete_flag=False).values(
-            'product_recipe_no', 'num', 'material_id', 'stage_id', 'ratio')
+            'product_recipe_no', 'sn', 'material_id', 'stage_id', 'ratio')
         recipes_list = []
         for recipe in recipes:
             recipe['product_info'] = instance
@@ -278,8 +278,8 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductBatchingDetail
-        exclude = ('product_batching', 'density')
-        extra_kwargs = {'ratio': {'read_only': True}}
+        exclude = ('product_batching', )
+        extra_kwargs = {'ratio': {'read_only': True}, 'density': {'read_only': True}}
 
 
 class ProductBatchingListSerializer(BaseModelSerializer):
@@ -323,7 +323,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                   help_text='机型id')
     batching_details = ProductBatchingDetailSerializer(many=True, help_text="""配料详情：{
-                                                                                     'num': '序号',
+                                                                                     'sn': '序号',
                                                                                      'material': '原材料id',
                                                                                      'ratio_weight': '配比体积',
                                                                                      'standard_volume': '标准体积',
@@ -362,9 +362,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             else:
                 detail['density'] = 0
             if detail.get('previous_product_batching'):
-                recipe_num = recipe.order_by('-num').first().num
+                recipe_num = recipe.order_by('-sn').first().sn
                 ratio = ProductRecipe.objects.filter(product_info=attrs['product_info'],
-                                                     num__lte=recipe_num
+                                                     sn__lte=recipe_num
                                                      ).aggregate(ratio=Sum('ratio'))['ratio']
                 detail['ratio'] = ratio
         attrs['manual_material_weight'] = manual_material_weight
@@ -428,9 +428,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                 else:
                     detail['density'] = 0
                 if detail.get('previous_product_batching'):
-                    recipe_num = recipe.order_by('-num').first().num
+                    recipe_num = recipe.order_by('-sn').first().sn
                     ratio = ProductRecipe.objects.filter(product_info=self.instance.product_info,
-                                                         num__lte=recipe_num
+                                                         sn__lte=recipe_num
                                                          ).aggregate(ratio=Sum('ratio'))['ratio']
                     detail['ratio'] = ratio
             attrs['manual_material_weight'] = manual_material_weight
@@ -459,3 +459,45 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
         model = ProductBatching
         fields = ('id', 'batching_details', 'rm_time_interval',
                   'batching_time_interval', 'production_time_interval')
+
+
+class ProductProcessDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ProductProcessDetail
+        exclude = ('product_process', )
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductProcessSerializer(BaseModelSerializer):
+    process_details = ProductProcessDetailSerializer(many=True, required=True)
+
+    @atomic()
+    def create(self, validated_data):
+        validated_data['created_user'] = self.context['request'].user
+        process_details = validated_data.pop('process_details', None)
+        instance = super().create(validated_data)
+        batching_detail_list = []
+        for detail in process_details:
+            detail['product_process'] = instance
+            batching_detail_list.append(ProductProcessDetail(**detail))
+        ProductProcessDetail.objects.bulk_create(batching_detail_list)
+        return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        process_details = validated_data.pop('process_details', None)
+        instance = super().update(instance, validated_data)
+        if process_details:
+            instance.process_details.all().delete()
+            batching_detail_list = []
+            for detail in process_details:
+                detail['product_batching'] = instance
+                batching_detail_list.append(ProductProcessDetail(**detail))
+            ProductProcessDetail.objects.bulk_create(batching_detail_list)
+        return instance
+
+    class Meta:
+        model = ProductProcess
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
