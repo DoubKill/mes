@@ -181,7 +181,7 @@ def add_users():
             user = User.objects.create(
                     username=name,
                     password='123456',
-                    num=i,
+                    sn=i,
                     is_leave=False,
                     section_id=random.choice(section_ids),
                 )
@@ -303,7 +303,7 @@ def add_product():
                 for k in range(random.randint(1, 4)):
                     recipe = ProductRecipe.objects.create(
                         product_recipe_no=product.product_no + '-' + stage.global_name,
-                        num=i,
+                        sn=i,
                         product_info=product,
                         material_id=random.choice(materials),
                         stage=stage,
@@ -342,7 +342,7 @@ def add_batch():
                 for mat in mat_ids:
                     ProductBatchingDetail.objects.create(
                         product_batching=instance,
-                        num=i,
+                        sn=i,
                         material_id=mat
                     )
         except Exception:

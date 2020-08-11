@@ -77,6 +77,10 @@
                         <i class="el-icon-setting"></i>
                         <span slot="title">生产管理</span>
                     </template>
+                    <el-menu-item index="5-1">密炼实绩</el-menu-item>
+                    <el-menu-item index="5-2">密炼机台别计划对比</el-menu-item>
+                    <el-menu-item index="5-3">密炼生产履历</el-menu-item>
+                    <el-menu-item index="5-4">日别胶料收皮管理</el-menu-item>
                 </el-submenu>
                 <el-menu-item index="6">
                     <template slot="title">
@@ -134,8 +138,9 @@
         "3-3": "{% url 'gui:rb-material-std-manage' %}",
         "3-4": "{% url 'gui:search-rubber-info' %}",
         "4-1": "{% url 'gui:rubber-schedule-daily-plan' %}",
+        "4-3": "{% url 'gui:material-requisitions-plan' %}",
         "4-2": "{% url 'gui:rubber-smallStuff-daily-plan' %}",
-        "4-3": "{% url 'gui:material-requisitions-plan' %}"
+        "5-4": "{% url 'gui:collect-rub-daily-manage' %}",
     }
 </script>
 {% block scripts %}{% endblock %}
