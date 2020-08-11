@@ -318,7 +318,7 @@ def add_product():
 
 
 def add_batch():
-    dev_ids = list(GlobalCode.objects.filter(global_type__type_name='设备类型').values_list('id', flat=True))
+    dev_ids = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
     time_choice = ('00:02:12', '00:01:42', '00:03:44')
     for product in ProductInfo.objects.all():
         try:

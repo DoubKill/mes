@@ -111,11 +111,12 @@ class ProductBatching(AbstractEntity):
     manual_material_weight = models.DecimalField(verbose_name='手动小料重量', help_text='手动小料重量',
                                                  decimal_places=2, max_digits=8, blank=True, null=True)
     volume = models.DecimalField(verbose_name='配料体积', help_text='配料体积', decimal_places=2, max_digits=8)
-    batching_time_interval = models.TimeField(help_text='配料时间(秒)', blank=True, null=True)
+    batching_time_interval = models.TimeField(help_text='配料时间(格式：hh:mm:ss)', blank=True, null=True)
     rm_flag = models.BooleanField(help_text='返炼与否', default=False)
-    rm_time_interval = models.TimeField(help_text='返炼时间', blank=True, null=True)
-    batching_proportion = models.DecimalField(verbose_name='配料比重', help_text='手动小料重量', decimal_places=2, max_digits=8)
-    production_time_interval = models.TimeField(help_text='炼胶时间(秒)', blank=True, null=True)
+    rm_time_interval = models.TimeField(help_text='返炼时间(格式：hh:mm:ss)', blank=True, null=True)
+    batching_proportion = models.DecimalField(verbose_name='配料比重(格式：hh:mm:ss)', help_text='手动小料重量',
+                                              decimal_places=2, max_digits=8)
+    production_time_interval = models.TimeField(help_text='炼胶时间(格式：hh:mm:ss)', blank=True, null=True)
 
     def __str__(self):
         return self.stage_product_batch_no
