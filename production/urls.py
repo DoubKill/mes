@@ -28,8 +28,10 @@ router.register(r'operation-logs', OperationLogViewSet)
 router.register(r'quality-control', QualityControlViewSet)
 
 # 密炼机台别计划对比实际
-router.register(r'plan-reality', PlanRealityViewSet)
+# router.register(r'plan-reality', PlanRealityViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+
+    path(r'plan-reality/', PlanRealityViewSet.as_view())
 ]
