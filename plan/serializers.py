@@ -2,7 +2,7 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
-from basics.models import PlanSchedule
+from basics.models import PlanSchedule, WorkSchedule, ClassesDetail
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
@@ -13,7 +13,7 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        exclude = ('product_day_plan',)
+        exclude = ('product_day_plan', 'classes_detail')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -47,20 +47,33 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             raise serializers.ValidationError('当前计划时间不存在')
         return value
 
+    def validate_pdp_product_classes_plan(self, value):
+        if len(value) != 3:
+            raise serializers.ValidationError('无效数据，必须有三条')
+        return value
+
     @atomic()
     def create(self, validated_data):
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_batching'] = validated_data.pop('product_batching')
-        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
+        plan_date = validated_data.pop('plan_date')
+        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=plan_date).first()
         pdp_dic['created_user'] = self.context['request'].user
         instance = super().create(pdp_dic)
         details = validated_data['pdp_product_classes_plan']
+        # WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first()
+        cd_queryset = ClassesDetail.objects.filter(
+            work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
         # 创建班次计划和原材料需求量
+        i = 0
+        print(details)
         for detail in details:
             detail_dic = dict(detail)
             detail_dic['plan_classes_uid'] = UUidTools.uuid1_hex()
             detail_dic['product_day_plan'] = instance
+            detail_dic['classes_detail'] = cd_queryset[i]
+            i += 1
             pcp_obj = ProductClassesPlan.objects.create(**detail_dic, created_user=self.context['request'].user)
             for pbd_obj in instance.product_batching.batching_details.all():
                 MaterialDemanded.objects.create(classes=pcp_obj.classes_detail,
@@ -98,12 +111,17 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         for c_obj in c_queryset:
             MaterialDemanded.objects.filter(plan_classes_uid=c_obj.plan_classes_uid).delete()
         c_queryset.delete()
+        cd_queryset = ClassesDetail.objects.filter(
+            work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=day_time).first())
+        i = 0
         for update_pcp in update_pcp_list:
             update_pcp = dict(update_pcp)
             update_pcp['product_day_plan'] = instance
+            update_pcp['classes_detail'] = cd_queryset[i]
             update_pcp['plan_classes_uid'] = UUidTools.uuid1_hex()
             update_pcp['last_updated_user'] = self.context['request'].user
             pcp_obj = ProductClassesPlan.objects.create(**update_pcp, created_user=self.context['request'].user)
+            i += 1
             for pbd_obj in pdp_obj.product_batching.batching_details.all():
                 MaterialDemanded.objects.create(classes=pcp_obj.classes_detail,
                                                 material=pbd_obj.material,
@@ -114,9 +132,11 @@ class ProductDayPlanSerializer(BaseModelSerializer):
 
 
 class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
+    classes = serializers.CharField(source='classes_detail.classes.global_name', read_only=True)
+
     class Meta:
         model = ProductBatchingClassesPlan
-        exclude = ('product_batching_day_plan',)
+        exclude = ('product_batching_day_plan', 'classes_detail')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -147,21 +167,32 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
             raise serializers.ValidationError('当前计划时间不存在')
         return value
 
+    def validate_pdp_product_batching_classes_plan(self, value):
+        if len(value) != 3:
+            raise serializers.ValidationError('无效数据，必须有三条')
+        return value
+
     @atomic()
     def create(self, validated_data):
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_batching'] = validated_data.pop('product_batching')
-        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=validated_data.pop('plan_date')).first()
+        plan_date = validated_data.pop('plan_date')
+        pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=plan_date).first()
         pdp_dic['bags_total_qty'] = validated_data.pop('bags_total_qty')
         pdp_dic['product_day_plan'] = validated_data.pop('product_day_plan')
         pdp_dic['created_user'] = self.context['request'].user
         instance = super().create(pdp_dic)
         details = validated_data['pdp_product_batching_classes_plan']
+        cd_queryset = ClassesDetail.objects.filter(
+            work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
+        i = 0
         for detail in details:
             detail_dic = dict(detail)
             detail_dic['plan_classes_uid'] = UUidTools.uuid1_hex()
             detail_dic['product_batching_day_plan'] = instance
+            detail_dic['classes_detail'] = cd_queryset[i]
+            i += 1
             pcp_obj = ProductBatchingClassesPlan.objects.create(**detail_dic, created_user=self.context['request'].user)
             for pbd_obj in instance.product_batching.batching_details.all():
                 MaterialDemanded.objects.create(classes=pcp_obj.classes_detail,
@@ -198,13 +229,18 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         for c_obj in c_queryset:
             MaterialDemanded.objects.filter(plan_classes_uid=c_obj.plan_classes_uid).delete()
         c_queryset.delete()
+        cd_queryset = ClassesDetail.objects.filter(
+            work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=day_time).first())
+        i = 0
         for update_pcp in update_pcp_list:
             update_pcp = dict(update_pcp)
             update_pcp['product_batching_day_plan'] = instance
+            update_pcp['classes_detail'] = cd_queryset[i]
             update_pcp['plan_classes_uid'] = UUidTools.uuid1_hex()
             update_pcp['last_updated_user'] = self.context['request'].user
             # ProductBatchingClassesPlan.objects.create(**update_pcp)
             pcp_obj = ProductBatchingClassesPlan.objects.create(**update_pcp, created_user=self.context['request'].user)
+            i += 1
             for pbd_obj in pdp_obj.product_batching.batching_details.all():
                 MaterialDemanded.objects.create(classes=pcp_obj.classes_detail,
                                                 material=pbd_obj.material,
@@ -222,7 +258,7 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
 
 class MaterialDemandedSerializer(BaseModelSerializer):
     """原材料需求量序列化"""
-    md_material_requisition_classes=MaterialRequisitionSerializer(read_only=True,many=True)
+    md_material_requisition_classes = MaterialRequisitionSerializer(read_only=True, many=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True, help_text='原材料名称')
     classes_name = serializers.CharField(source='classes.classes_name', read_only=True)
     material_type = serializers.CharField(source='material.material_type', read_only=True)
@@ -233,14 +269,57 @@ class MaterialDemandedSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialDemanded
         fields = ('id', 'material_name', 'classes_name', 'material_type', 'material_no',
-                  'classes', 'material', 'plan_schedule', 'material_demanded','md_material_requisition_classes')
+                  'classes', 'material', 'plan_schedule', 'material_demanded', 'md_material_requisition_classes')
 
 
 class MaterialRequisitionClassesSerializer(BaseModelSerializer):
+    material_id = serializers.IntegerField(help_text='需求量id', write_only=True)
+    plan_date = serializers.DateField(help_text='日期', write_only=True)
+    weights = serializers.ListField(help_text='早中晚领料计划的重量', write_only=True)
+
     class Meta:
         model = MaterialRequisitionClasses
-        exclude = ('plan_classes_uid',)
+        fields = ('material_id', 'plan_date', 'weights',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_material_id(self, value):
+        if not MaterialDemanded.objects.filter(id=value, delete_flag=False):
+            raise serializers.ValidationError('当前原材料需要量不存在')
+        return value
+
+    def validate_plan_date(self, value):
+        if not PlanSchedule.objects.filter(day_time=value).first():
+            raise serializers.ValidationError('当前计划时间不存在')
+        return value
+
+    def validate_weights(self, value):
+        if len(value) != 3:
+            raise serializers.ValidationError('无效数据，必须g有三条')
+        return value
+
+    @atomic()
+    def create(self, validated_data):
+        print(validated_data)
+        mrc_dic = {}
+        plan_date = validated_data.pop('plan_date')
+        weights = validated_data.pop('weights')
+        material_id = validated_data.pop('material_id')
+        mrc_queryset = MaterialDemanded.objects.filter(id=material_id).first().md_material_requisition_classes.all()
+        if mrc_queryset:
+            mrc_queryset.delete()
+        cd_queryset = ClassesDetail.objects.filter(
+            work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
+        i = 0
+        for weight in weights:
+            mrc_dic['plan_classes_uid'] = UUidTools.uuid1_hex()
+            mrc_dic['created_user'] = self.context['request'].user
+            mrc_dic['material_demanded'] = MaterialDemanded.objects.filter(id=material_id).first()
+            mrc_dic['weight'] = weight
+            mrc_dic['classes_detail'] = cd_queryset[i]
+            mrc_dic['unit'] = 'kg'
+            instance = super().create(mrc_dic)
+            i += 1
+        return instance
 
 
 class ProductDayPlanCopySerializer(BaseModelSerializer):

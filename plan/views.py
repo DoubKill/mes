@@ -115,6 +115,7 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除领料日班次计划
     """
+
     queryset = MaterialRequisitionClasses.objects.filter(delete_flag=False)
     serializer_class = MaterialRequisitionClassesSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
