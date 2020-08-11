@@ -1,3 +1,5 @@
+import datetime
+
 from rest_framework import serializers
 
 from mes.base_serializer import BaseModelSerializer
@@ -73,5 +75,33 @@ class QualityControlSerializer(BaseModelSerializer):
 
     class Meta:
         model = QualityControl
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductClassesPlanobject(object):
+    pass
+
+
+class ProductionRecordSerializer(BaseModelSerializer):
+    """密炼生产履历"""
+    validtime = serializers.SerializerMethodField(read_only=True)
+    class_group = serializers.SerializerMethodField(read_only=True)
+    margin = serializers.CharField(default=None, read_only=True)
+
+    def get_validtime(self, object):
+        end_time = object.end_time if object.end_time else 0
+        validtime = end_time + datetime.timedelta(days=1)
+        return validtime if validtime else ""
+
+    def get_class_group(self, object):
+        product = ProductClassesPlan.objects.filter(plan_classes_uid=object.plan_classes_uid).first()
+        if product:
+            return product.classes_detail.work_schedule_plan.all().first().group_name
+        else:
+            return None
+
+    class Meta:
+        model = PalletFeedbacks
         fields = "__all__"
         read_only_fields = COMMON_READ_ONLY_FIELDS

@@ -16,7 +16,8 @@ from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, Qua
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
-    PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer
+    PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
+    ProductionRecordSerializer
 
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
@@ -332,3 +333,15 @@ class ProductActualView(APIView):
                             plan_trains=plan_trains, actual_trains=actual_trains)
             return_data["datas"].append(instance)
         return Response(return_data)
+
+
+class ProductionRecordViewSet(mixins.CreateModelMixin,
+                            mixins.RetrieveModelMixin,
+                            mixins.ListModelMixin,
+                            GenericViewSet):
+
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    serializer_class = ProductionRecordSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    ordering_fields = ('id',)
