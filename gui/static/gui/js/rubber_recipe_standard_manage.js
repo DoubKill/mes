@@ -328,7 +328,7 @@
                         var productrecipe = {
 
                             stage: app.carNumberIdByName[app.selectedMaterials[i].car_number],
-                            num: i,
+                            sn: i,
                             ratio: app.selectedMaterials[i].ratio,
                         };
                         if (this.selectedMaterials[i].id) {
