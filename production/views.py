@@ -7,10 +7,10 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import PlanSchedule
-from mes.common_code import get_day_plan_class_set
+from mes.common_code import get_day_plan_class_set, get_day_plan_class_uid_list
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter
@@ -157,6 +157,58 @@ class QualityControlViewSet(mixins.CreateModelMixin,
     filter_class = QualityControlFilter
 
 
+class PlanRealityViewSet(APIView):
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        # search_time = params.get('search_time')
+        equip_no = params.get('equip_no')
+        # if not re.compile(r"\d{4}-\d{2}-\d{2}", search_time):
+        #     return Response("bad search_time", status=400)
+        class_plan_set = get_day_plan_class_set("2020-01-01")
+        equip_no = ""
+        product_no = ""
+        actual_weight = ""
+        actual_time = ""
+        actual_trains = 0
+        plan_weight = 0
+        plan_trains = 0
+        plan_time = ""
+        for a in class_plan_set:
+            print(a.plan_classes_uid)
+
+        return_data = {
+            "datas": []
+        }
+        instance = {}
+
+
+        for class_plan in class_plan_set:
+            if equip_no:
+                temp_ret = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
+                                                          equip_no=equip_no).order_by("-created_date").first()
+            else:
+                temp_ret = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid
+                                                          ).order_by("-created_date").first()
+            if temp_ret:
+                equip_no = temp_ret.equip_no
+                product_no = temp_ret.product_no
+                actual_weight = temp_ret.actual_weight
+                actual_time = (temp_ret.end_time - temp_ret.begin_time)
+                actual_trains = temp_ret.actual_trains
+                plan_weight = class_plan.weight
+                plan_trains = class_plan.plan_trains
+                plan_time = class_plan.time
+
+                instance.update(equip_no=equip_no, actual_weight=actual_weight, actual_time=actual_time,
+                                actual_trains=actual_trains,
+                                plan_weight=plan_weight,
+                                plan_trains=plan_trains,
+                                product_no=product_no,
+                                plan_time=plan_time, )
+                return_data["datas"].append(instance)
+        return Response(return_data)
+
+
 class ProductProcess(APIView):
 
     def get(self, request):
@@ -188,7 +240,8 @@ class ProductProcess(APIView):
             plan_weight = 0
             for class_plan in list(class_plan_set):
                 if target_equip_no:
-                    temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid, equip_no=target_equip_no)
+                    temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
+                                                                  equip_no=target_equip_no)
                 else:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid)
                 if temp_ret_set:
