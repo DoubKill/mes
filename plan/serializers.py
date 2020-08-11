@@ -33,6 +33,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                    help_text='配料时间')
 
     class Meta:
+
         model = ProductDayPlan
         fields = ('id',
                   'plan_date', 'equip', 'equip_no', 'category', 'product_no', 'batching_weight',
@@ -121,6 +122,7 @@ class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
 
 class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     """配料小料日计划序列化"""
+
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
                                                                              help_text='{"sn":1,"bags_qty":1,"unit":"1","classes_detail":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
@@ -137,7 +139,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         model = ProductBatchingDayPlan
         fields = ('id', 'equip_no', 'catagory_name', 'product_no', 'manual_material_weight',
                   'equip', 'product_batching', 'plan_date', 'bags_total_qty', 'product_day_plan',
-                  'pdp_product_batching_classes_plan')
+                  'pdp_product_batching_classes_plan', 'product_day_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_plan_date(self, value):
@@ -212,8 +214,15 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         return pdp_obj
 
 
+class MaterialRequisitionSerializer(BaseModelSerializer):
+    class Meta:
+        model = MaterialRequisitionClasses
+        fields = '__all__'
+
+
 class MaterialDemandedSerializer(BaseModelSerializer):
     """原材料需求量序列化"""
+    md_material_requisition_classes=MaterialRequisitionSerializer(read_only=True,many=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True, help_text='原材料名称')
     classes_name = serializers.CharField(source='classes.classes_name', read_only=True)
     material_type = serializers.CharField(source='material.material_type', read_only=True)
@@ -224,7 +233,7 @@ class MaterialDemandedSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialDemanded
         fields = ('id', 'material_name', 'classes_name', 'material_type', 'material_no',
-                  'classes', 'material', 'plan_schedule', 'material_demanded',)
+                  'classes', 'material', 'plan_schedule', 'material_demanded','md_material_requisition_classes')
 
 
 class MaterialRequisitionClassesSerializer(BaseModelSerializer):
@@ -365,7 +374,8 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
                     for delete_pbcp_obj in delete_pbcp_queryset:
                         if MaterialDemanded.objects.filter(plan_classes_uid=delete_pbcp_obj.plan_classes_uid,
                                                            delete_flag=False):
-                            MaterialDemanded.objects.filter(plan_classes_uid=delete_pbcp_obj.plan_classes_uid, delete_flag=False).update(
+                            MaterialDemanded.objects.filter(plan_classes_uid=delete_pbcp_obj.plan_classes_uid,
+                                                            delete_flag=False).update(
                                 delete_flag=True,
                                 delete_user=
                                 self.context[

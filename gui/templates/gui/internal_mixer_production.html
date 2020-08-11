@@ -1,0 +1,317 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="日期">
+            <el-date-picker
+                    v-model="getParams.search_date"
+                    type="daterange"
+                    range-separator="至"
+                    value-format="yyyy-MM-dd"
+                    start-placeholder="开始日期"
+                    end-placeholder="结束日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="规格">
+            <el-select v-model="getParams.norms"
+                       @change="changeNorms"
+                       clearable
+                       placeholder="请选择">
+                <el-option
+                        v-for="item in normsList"
+                        :key="item.id"
+                        :label="item.equip_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="生产机号">
+            <el-select v-model="getParams.produce" placeholder="请选择">
+                <el-option
+                        v-for="item in produceList"
+                        :key="item.id"
+                        :label="item.stage_product_batch_no"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="班">
+            <el-select v-model="getParams.group" placeholder="请选择">
+                <el-option
+                        v-for="item in groupList"
+                        :key="item.id"
+                        :label="item.stage_product_batch_no"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="clickPrint">
+                下载
+            </el-button>
+        </el-form-item>
+        <el-form-item>
+            <el-button @click="clickExcel">
+                Excel
+            </el-button>
+        </el-form-item>
+    </el-form>
+    {% verbatim vue %}
+        <el-table
+                :data="tableData"
+                style="width: 100%">
+            <el-table-column
+                    prop=""
+                    label="处理"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="机台"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="作业时间"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="班次"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="班组"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="生产时间"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="规格"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="BATNO"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="生产重量"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="余量"
+                    width="50">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="有效时间">
+                <template slot-scope="scope">
+                    {{ scope.row.time }} -- {{ scope.row.time }}
+                </template>
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="LOT NO">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="检查结果">
+            </el-table-column>
+            <el-table-column
+                    prop="equip_no"
+                    label="作业者">
+            </el-table-column>
+            <el-table-column
+                    prop=""
+                    label="操作">
+                <template slot-scope="scope">
+                    <el-button @click="clickViewRubber">
+                        查询胶料
+                    </el-button>
+                    {#                    <el-button @click="rowClickPrint">#}
+                    {#                        打印#}
+                    {#                    </el-button>#}
+                </template>
+            </el-table-column>
+        </el-table>
+    {% endverbatim vue %}
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+{% block dialogs %}
+    {% verbatim vue %}
+        <el-dialog
+                title="胶料产出反馈"
+                :visible.sync="dialogVisibleRubber">
+            <el-form :inline="true">
+                <el-form-item label="胶料区分: ">
+                    fmc
+                </el-form-item>
+                <el-form-item label="规格: ">
+                    fmc
+                </el-form-item>
+                <el-form-item label="班: ">
+                    全部
+                </el-form-item>
+                <el-form-item label="机台: ">
+                    hhh
+                </el-form-item>
+
+            </el-form>
+            <div style="color:#409EFF;cursor:pointer" @click="clickBAT">点击bat</div>
+            <el-table
+                    :data="tableDataRubber"
+                    style="width: 100%">
+                <el-table-column
+                        prop="date"
+                        label="机台">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="日期">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="班次">
+                </el-table-column>
+                <el-table-column
+                        prop="date"
+                        label="胶料编码">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="车次">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="胶">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="炭黑">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="白炭黑">
+                </el-table-column>
+                <el-table-column
+                        prop="date"
+                        label="自动药品">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="氧化锌">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="手动药品">
+                </el-table-column>
+                <el-table-column
+                        prop="date"
+                        label="油">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="偶联剂">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="时间">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="温度">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="电量">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="RPM">
+                </el-table-column>
+
+            </el-table>
+        </el-dialog>
+        <el-dialog
+                title="BAT查询"
+                :visible.sync="dialogVisibleBAT">
+            <div style="position: relative">
+                <el-form :inline="true" style="margin-right: 100px;">
+                    <el-form-item label="胶料区分: ">
+                        fmc
+                    </el-form-item>
+                    <el-form-item label="规格: ">
+                        fmc
+                    </el-form-item>
+                    <el-form-item label="班: ">
+                        全部
+                    </el-form-item>
+                    <el-form-item label="机台: ">
+                        hhh
+                    </el-form-item>
+                    <el-form-item label="机台: ">
+                        车次
+                    </el-form-item>
+
+                </el-form>
+                <el-button @click="viewGraph" style="position: absolute;right:10px;top:0">
+                    图形
+                </el-button>
+            </div>
+            <el-table
+                    :data="tableDataBAT"
+                    style="width: 100%">
+                <el-table-column
+                        prop="date"
+                        label="LOT">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="规格"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="机台">
+                </el-table-column>
+                <el-table-column
+                        prop="date"
+                        label="BAT">
+                    <template slot-scope="scope">
+                        <div style="color:#409EFF;cursor:pointer" @click="clickBAT">{{ scope.row.Bat }}</div>
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="生产重量">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="生产时间">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="班次">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="作业者">
+                </el-table-column>
+
+            </el-table>
+        </el-dialog>
+    {% endverbatim vue %}
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'gui/js/internal_mixer_production.js' %}"></script>
+{% endblock %}
