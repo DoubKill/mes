@@ -7,6 +7,7 @@
             <el-date-picker
                     v-model="planDate"
                     type="date"
+                    @change="planDateChange"
                     placeholder="选择日期">
             </el-date-picker>
         </el-form-item>
@@ -17,35 +18,24 @@
                     v-model="materialType" placeholder="请选择">
                 <el-option
                         v-for="item in materialTypeOptions"
-                        :key="item.id"
+                        :key="item.global_name"
                         :label="item.global_name"
-                        :value="item.id">
+                        :value="item.global_name">
                 </el-option>
             </el-select>
         </el-form-item>
         <el-form-item label="原材料名称">
             <el-input v-model="material_name" v-on:input="materialNameChanged"></el-input>
-        </el-form-item>
-        <el-form-item>
-            <el-button @click="showAddDialog">修改</el-button>
-        </el-form-item>
-{#        <el-form-item>#}
-{#            <el-button>#}
-{#                删除#}
-{#            </el-button>#}
-{#        </el-form-item>#}
-        <el-form-item>
-            <el-button>
-                复制
-            </el-button>
-        </el-form-item>
+        </el-form-item> v
     </el-form>
+
     <el-table
             :data="tableData"
             border
             style="width: 100%">
         <el-table-column
                 label="S"
+                prop="unit"
                 width="30">
         </el-table-column>
         <el-table-column
@@ -71,35 +61,53 @@
         </el-table-column>
         <el-table-column
                 align="center"
-                prop="mr_material_requisition_classes"
                 label="原材料需要量（Kg）">
-            <el-table-column v-for="Classes in ClassesOptions"
-                prop=""
-                :label="Classes">
+            <el-table-column
+                prop="weight[0].need_weight"
+                label="早班">
             </el-table-column>
             <el-table-column
-                prop="plan_count"
+                prop="weight[1].need_weight"
+                label="中班">
+            </el-table-column>
+            <el-table-column
+                prop="weight[2].need_weight"
+                label="晚班">
+            </el-table-column>
+            <el-table-column
+                prop="weight[0].need_weight + weight[1].need_weight + weight[2].need_weight"
                 label="总计">
             </el-table-column>
         </el-table-column>
         <el-table-column
                 align="center"
                 label="领料计划（Kg）">
-{#            <el-table-column v-for="need in mr_material_requisition_classes"#}
-{#                prop="need.need_weight"#}
-{#                label="need.classes_name">#}
-{#            </el-table-column>#}
-            <el-table-column v-for="Classes in ClassesOptions"
-                prop=""
-                :label="Classes">
-                {% verbatim vue %}
-                    {{ aaa }}
-                {% endverbatim vue %}
+            <el-table-column
+                prop="weight[0].plan_weight"
+                label="早班">
             </el-table-column>
             <el-table-column
-                prop="need_count"
+                prop="weight[1].plan_weight"
+                label="中班">
+            </el-table-column>
+            <el-table-column
+                prop="weight[2].plan_weight"
+                label="晚班">
+            </el-table-column>
+            <el-table-column
+                prop="weight[0].plan_weight + weight[1].plan_weight + weight[2].plan_weight"
                 label="总计">
             </el-table-column>
+        </el-table-column>
+        <el-table-column label="操作">
+            <template slot-scope="scope">
+                <el-button-group>
+                    <el-button type="primary"
+                            size="mini"
+                            @click="showEditDialog(scope.row)">编辑
+                    </el-button>
+                </el-button-group>
+            </template>
         </el-table-column>
 
 
@@ -109,40 +117,42 @@
 
 
 {% block dialogs %}
-    <el-dialog title="添加原材料领料计划" :visible.sync="dialogAddMaterialBaseInfoVisible">
-        <el-form v-model="materialBaseInfoForm" :label-width="formLabelWidth">
-            <el-form-item :error="materialBaseInfoFormError.material_no" label="原材料编码">
-                <el-input v-model="materialBaseInfoForm.material_no"></el-input>
+    <el-dialog title="编辑原材料领料计划" :visible.sync="dialogEditVisible" size="mini">
+        <el-form v-model="editForm" :label-width="formLabelWidth" >
+            <el-form-item label="日期：">
+                <span v-text="editForm.plan_date"></span>
             </el-form-item>
-            <el-form-item :error="materialBaseInfoFormError.material_name" label="原材料名称">
-                <el-input v-model="materialBaseInfoForm.material_name"></el-input>
+            <el-form-item label="原材料名称：">
+                <span v-text="editForm.material_name"></span>
             </el-form-item>
-            <el-form-item :error="materialBaseInfoFormError.for_short" label="原材料简称">
-                <el-input v-model="materialBaseInfoForm.for_short"></el-input>
+            <el-form-item label="早班需要量：">
+                <span v-text="editForm.weight[0].need_weight + ' Kg'"></span>
             </el-form-item>
-            <el-form-item :error="materialBaseInfoFormError.density" label="比重">
-                <el-input v-model="materialBaseInfoForm.density"></el-input>
+            <el-form-item label="早班领料计划：">
+                <el-input  v-model.number="editForm.weight[0].plan_weight" style="float: left; width: 80%"></el-input>
+                <span style="float: right; width: 18%">Kg</span>
             </el-form-item>
-            <el-form-item :error="materialBaseInfoFormError.used_flag" label="是否启用">
-                <el-switch v-model="materialBaseInfoForm.used_flag">
-                </el-switch>
+            <el-form-item label="中班需要量：">
+                <span v-text="editForm.weight[1].need_weight + ' Kg'"></span>
             </el-form-item>
-            <el-form-item :error="materialBaseInfoFormError.material_type" label="原材料类别">
-                <el-select
-                        v-model="materialBaseInfoForm.material_type"
-                        placeholder="请选择">
-                    <el-option
-                            v-for="item in materialTypeOptions"
-                            :key="item.id"
-                            :label="item.global_name"
-                            :value="item.id">
-                    </el-option>
-                </el-select>
+            <el-form-item label="中班领料计划：">
+                <el-input  v-model.number="editForm.weight[1].plan_weight" style="float: left; width: 80%"></el-input>
+                <span style="float: right; width: 18%">Kg</span>
+            </el-form-item>
+            <el-form-item label="晚班需要量：">
+                <span v-text="editForm.weight[2].need_weight + ' Kg'"></span>
+            </el-form-item>
+            <el-form-item label="晚班领料计划：">
+                <el-input  v-model.number="editForm.weight[2].plan_weight" style="float: left; width: 80%"></el-input>
+                <span style="float: right; width: 18%">Kg</span>
+            </el-form-item>
+            <el-form-item label="领料计划合计：">
+                <span v-text="editForm.weight[0].plan_weight + editForm.weight[1].plan_weight + editForm.weight[2].plan_weight"></span>
             </el-form-item>
         </el-form>
         <div slot="footer" class="dialog-footer">
-            <el-button @click="dialogAddMaterialBaseInfoVisible = false">取 消</el-button>
-            <el-button type="primary" @click="handleAddMaterialBaseInfo">确 定</el-button>
+            <el-button @click="dialogEditVisible = false">取 消</el-button>
+            <el-button type="primary" @click="saveRequisitionsPlan('editForm')">确 定</el-button>
         </div>
     </el-dialog>
 
