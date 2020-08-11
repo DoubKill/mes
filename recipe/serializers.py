@@ -72,7 +72,7 @@ class ProductRecipeSerializer(BaseModelSerializer):
 class ProductInfoCreateSerializer(BaseModelSerializer):
     factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                  help_text='产地id')
-    productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"num": 编号, "material": 原材料id, 
+    productrecipe_set = ProductRecipeSerializer(many=True, help_text="""[{"sn": 编号, "material": 原材料id, 
     "stage": 段次id, "ratio": 配比}...]""")
 
     def validate(self, attrs):
@@ -229,7 +229,7 @@ class ProductInfoCopySerializer(BaseModelSerializer):
         validated_data['precept'] = base_product_info.precept
         instance = super().create(validated_data)
         recipes = base_product_info.productrecipe_set.filter(delete_flag=False).values(
-            'product_recipe_no', 'num', 'material_id', 'stage_id', 'ratio')
+            'product_recipe_no', 'sn', 'material_id', 'stage_id', 'ratio')
         recipes_list = []
         for recipe in recipes:
             recipe['product_info'] = instance
@@ -323,7 +323,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                   help_text='机型id')
     batching_details = ProductBatchingDetailSerializer(many=True, help_text="""配料详情：{
-                                                                                     'num': '序号',
+                                                                                     'sn': '序号',
                                                                                      'material': '原材料id',
                                                                                      'ratio_weight': '配比体积',
                                                                                      'standard_volume': '标准体积',
@@ -362,9 +362,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             else:
                 detail['density'] = 0
             if detail.get('previous_product_batching'):
-                recipe_num = recipe.order_by('-num').first().num
+                recipe_num = recipe.order_by('-sn').first().sn
                 ratio = ProductRecipe.objects.filter(product_info=attrs['product_info'],
-                                                     num__lte=recipe_num
+                                                     sn__lte=recipe_num
                                                      ).aggregate(ratio=Sum('ratio'))['ratio']
                 detail['ratio'] = ratio
         attrs['manual_material_weight'] = manual_material_weight
@@ -428,9 +428,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                 else:
                     detail['density'] = 0
                 if detail.get('previous_product_batching'):
-                    recipe_num = recipe.order_by('-num').first().num
+                    recipe_num = recipe.order_by('-sn').first().sn
                     ratio = ProductRecipe.objects.filter(product_info=self.instance.product_info,
-                                                         num__lte=recipe_num
+                                                         sn__lte=recipe_num
                                                          ).aggregate(ratio=Sum('ratio'))['ratio']
                     detail['ratio'] = ratio
             attrs['manual_material_weight'] = manual_material_weight
