@@ -278,8 +278,8 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductBatchingDetail
-        exclude = ('product_batching', 'density')
-        extra_kwargs = {'ratio': {'read_only': True}}
+        exclude = ('product_batching', )
+        extra_kwargs = {'ratio': {'read_only': True}, 'density': {'read_only': True}}
 
 
 class ProductBatchingListSerializer(BaseModelSerializer):
