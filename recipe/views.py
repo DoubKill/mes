@@ -20,8 +20,9 @@ from recipe.filters import MaterialFilter, ProductInfoFilter, ProductRecipeFilte
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCreateSerializer, \
     ProductInfoUpdateSerializer, ProductInfoPartialUpdateSerializer, ProductInfoCopySerializer, \
     ProductRecipeListSerializer, ProductBatchingListSerializer, ProductBatchingCreateSerializer, \
-    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
+    MaterialAttributeSerializer, ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
+    ProductProcessSerializer
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute, ProductProcess
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -36,7 +37,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除原材料
     """
-    queryset = Material.objects.filter(delete_flag=False).order_by('created_date')
+    queryset = Material.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = MaterialSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -62,7 +63,7 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除原材料属性
     """
-    queryset = MaterialAttribute.objects.filter(delete_flag=False).order_by('created_date')
+    queryset = MaterialAttribute.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = MaterialAttributeSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -109,7 +110,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
     partial_update:
         胶料应用和废弃操作
     """
-    queryset = ProductInfo.objects.filter(delete_flag=False).order_by('created_date')
+    queryset = ProductInfo.objects.filter(delete_flag=False).order_by('-created_date')
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductInfoFilter
 
@@ -184,7 +185,7 @@ class ProductBatchingViewSet(ModelViewSet):
     partial_update:
         修改胶料配料标准
     """
-    queryset = ProductBatching.objects.filter(delete_flag=False).order_by('created_date')
+    queryset = ProductBatching.objects.filter(delete_flag=False).order_by('-created_date')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
@@ -244,3 +245,21 @@ class PreProductBatchView(APIView):
                 pre_recipe_data['material_name'] = pre_batch.stage_product_batch_no
                 pre_recipe_data['previous_product_batching'] = pre_batch.id
         return Response(pre_recipe_data)
+
+
+class ProcessStepsViewSet(ModelViewSet):
+    """
+    list:
+        胶料配料步序列表
+    retrieve:
+        胶料配料步序详情
+    create:
+        新建胶料配料步序
+    update:
+        修改胶料配料步序
+    partial_update:
+        修改胶料配料步序
+    """
+    queryset = ProductProcess.objects.filter(delete_flag=False).order_by('-created_date')
+    filter_backends = (DjangoFilterBackend,)
+    serializer_class = ProductProcessSerializer

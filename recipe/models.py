@@ -228,7 +228,8 @@ class BaseAction(AbstractEntity):
 
 
 class ProductProcessDetail(AbstractEntity):
-    product_process = models.ForeignKey(ProductProcess, help_text='步序id', on_delete=models.DO_NOTHING)
+    product_process = models.ForeignKey(ProductProcess, help_text='步序id', on_delete=models.DO_NOTHING,
+                                        related_name='process_details')
     sn = models.CharField(max_length=64, help_text='序号')
     temperature = models.DecimalField(help_text='温度', blank=True, null=True, decimal_places=2, max_digits=8)
     rpm = models.DecimalField(help_text='转速', blank=True, null=True, decimal_places=2, max_digits=8)
