@@ -6,8 +6,7 @@
 
             return {
                 tableDataUrl: ProductDayPlansUrl,
-                plan_date: null,
-                // new Date(),
+                plan_date: dayjs().format("YYYY-MM-DD"),
                 equips: [],
                 equip_no: "",
                 stage_product_batch_no: "",
@@ -21,17 +20,20 @@
                             sn: null,
                             plan_trains: null,
                             time: "00:00:00",
-                            weight: ""
+                            weight: "",
+                            unit: ""
                         }, {
                             sn: null,
                             plan_trains: null,
                             time: "00:00:00",
-                            weight: ""
+                            weight: "",
+                            unit: ""
                         }, {
                             sn: null,
                             plan_trains: null,
                             time: "00:00:00",
-                            weight: ""
+                            weight: "",
+                            unit: ""
                         }
                     ]
                 },
@@ -98,6 +100,20 @@
                     case 2:
                         return "晚班计划"
                 }
+            },
+            addRubberDailyPlan: function () {
+
+                var app = this;
+                this.rubberDailyPlanForm["plan_date"] = this.plan_date;
+                axios.post(ProductDayPlansUrl, this.rubberDailyPlanForm)
+                    .then(function (response) {
+
+                        app.currentChange(app.currentRow);
+                    }).catch(function (error) {
+
+                        console.log(error.data)
+                });
+                console.log(this.rubberDailyPlanForm)
             }
         }
     };

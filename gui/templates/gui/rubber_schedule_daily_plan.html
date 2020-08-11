@@ -154,27 +154,11 @@
                     </el-form-item>
                 </template>
             {% endverbatim vue %}
-            <!--
-            <el-divider>早班计划</el-divider>
-            <el-form-item label="顺序" :label-width="formLabelWidth">
-                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[0].sn"
-                                 :min="1"></el-input-number>
-            </el-form-item>
-            <el-divider>中班计划</el-divider>
-            <el-form-item label="顺序" :label-width="formLabelWidth">
-                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[1].sn"
-                                 :min="1"></el-input-number>
-            </el-form-item>
-            <el-divider>晚班计划</el-divider>
-            <el-form-item label="顺序" :label-width="formLabelWidth">
-                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[2].sn"
-                                 :min="1"></el-input-number>
-            </el-form-item>
-            -->
+
         </el-form>
         <div slot="footer" class="dialog-footer">
             <el-button @click="addRubberDailyPlanDialogVisible = false">取 消</el-button>
-            <el-button type="primary" @click="addRubberDailyPlanDialogVisible = false">确 定</el-button>
+            <el-button type="primary" @click="addRubberDailyPlan">确 定</el-button>
         </div>
     </el-dialog>
 
@@ -186,5 +170,6 @@
 {% endblock %}
 
 {% block scripts %}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
     <script src="{% static 'gui/js/rubber_schedule_daily_plan.js' %}"></script>
 {% endblock %}
