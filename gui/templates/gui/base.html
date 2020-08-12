@@ -77,6 +77,7 @@
                         <i class="el-icon-setting"></i>
                         <span slot="title">生产管理</span>
                     </template>
+                    <el-menu-item index="5-3">排产胶料日计划</el-menu-item>
                 </el-submenu>
                 <el-menu-item index="6">
                     <template slot="title">
@@ -86,15 +87,15 @@
                 </el-menu-item>
             </el-menu>
         </el-aside>
-        <el-main>
+        <el-main style="padding:0">
             {% block breadcrumb %}
-                <el-row type="flex" justify="space-between">
-                    <el-breadcrumb separator="/">
+                <el-row type="flex" class="rowBreadTop" justify="space-between">
+                    <el-breadcrumb separator="/" class="breadcrumbTop">
                         {% for name in namePath %}
                             <el-breadcrumb-item>{{ name }}</el-breadcrumb-item>
                         {% endfor %}
                     </el-breadcrumb>
-                    <el-dropdown>
+                    <el-dropdown class="main-dropdown">
                           <span class="el-dropdown-link">
                             用户：{{ user }}<i class="el-icon-arrow-down el-icon--right"></i>
                           </span>
@@ -135,7 +136,9 @@
         "3-4": "{% url 'gui:search-rubber-info' %}",
         "4-1": "{% url 'gui:rubber-schedule-daily-plan' %}",
         "4-2": "{% url 'gui:rubber-smallStuff-daily-plan' %}",
-        "4-3": "{% url 'gui:material-requisitions-plan' %}"
+        "4-3": "{% url 'gui:material-requisitions-plan' %}",
+        "5-3": "{% url 'gui:internal_mixer_production' %}"
+
     }
 </script>
 {% block scripts %}{% endblock %}
