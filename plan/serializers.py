@@ -6,7 +6,7 @@ from basics.models import PlanSchedule, WorkSchedule, ClassesDetail
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
-from recipe.models import ProductBatchingDetail
+from recipe.models import ProductBatchingDetail, ProductBatching
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -21,7 +21,7 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 class ProductDayPlanSerializer(BaseModelSerializer):
     """胶料日计划序列化"""
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
-                                                            help_text='{"sn":1,"plan_trains":1,"time":"12:12:12","weight":1,"unit":1,"classes_detail":1}新增时是需要id,修改时需要id')
+                                                            help_text='{"sn":1,"plan_trains":1,"time":"12:12:12","weight":1,"unit":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True, help_text='机台编号')
     category = serializers.CharField(source='equip.category', read_only=True, help_text='设备种类属性')
@@ -44,9 +44,10 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_product_batching(self, value):
-        if not ProductBatchingDetail.objects.filter(product_batching__pb_day_plan__product_batching=value).value(
-                'actual_weight'):
-            raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
+        pb_obj = value
+        for pbd_obj in pb_obj.batching_details.all():
+            if not pbd_obj.actual_weight:
+                raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
         return value
 
     def validate_plan_date(self, value):
@@ -74,7 +75,6 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
         # 创建班次计划和原材料需求量
         i = 0
-        print(details)
         for detail in details:
             detail_dic = dict(detail)
             detail_dic['plan_classes_uid'] = UUidTools.uuid1_hex()
@@ -151,7 +151,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     """配料小料日计划序列化"""
 
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
-                                                                             help_text='{"sn":1,"bags_qty":1,"unit":"1","classes_detail":1}')
+                                                                             help_text='{"sn":1,"bags_qty":1,"unit":"1"}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     plan_date_time = serializers.DateField(source='plan_schedule.day_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True, help_text='设备编号')
@@ -169,6 +169,13 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
                   'equip', 'product_batching', 'plan_date', 'bags_total_qty', 'product_day_plan',
                   'pdp_product_batching_classes_plan', 'product_day_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_product_batching(self, value):
+        pb_obj = value
+        for pbd_obj in pb_obj.batching_details.all():
+            if not pbd_obj.actual_weight:
+                raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
+        return value
 
     def validate_plan_date(self, value):
         if not PlanSchedule.objects.filter(day_time=value).first():
@@ -302,18 +309,15 @@ class MaterialRequisitionClassesSerializer(BaseModelSerializer):
 
     def validate_weights(self, value):
         if len(value) != 3:
-            raise serializers.ValidationError('无效数据，必须g有三条')
+            raise serializers.ValidationError('无效数据，必须有三条')
         return value
 
     @atomic()
     def create(self, validated_data):
-        print(validated_data)
-
         plan_date = validated_data.pop('plan_date')
         weights = validated_data.pop('weights')
         material_ids = validated_data.pop('material_ids')
         for material_id in material_ids:
-            print(material_id)
             mrc_queryset = MaterialDemanded.objects.filter(id=material_id).first().md_material_requisition_classes.all()
             if mrc_queryset:
                 mrc_queryset.delete()
@@ -321,7 +325,6 @@ class MaterialRequisitionClassesSerializer(BaseModelSerializer):
             work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
         i = 0
         for weight in weights:
-            print(weight)
             mrc_dic = {}
             mrc_dic['plan_classes_uid'] = UUidTools.uuid1_hex()
             mrc_dic['created_user'] = self.context['request'].user
@@ -330,11 +333,7 @@ class MaterialRequisitionClassesSerializer(BaseModelSerializer):
             mrc_dic['unit'] = 'kg'
             instance = MaterialRequisitionClasses.objects.create(**mrc_dic)
             for material_id in material_ids:
-                print(material_id)
-                # mrc_dic['material_demanded.set()'] = MaterialDemanded.objects.filter(id=material_id).first()
-                print(mrc_dic)
                 instance.material_demanded.add(MaterialDemanded.objects.filter(id=material_id).first())
-                # instance = super().create(mrc_dic)
             i += 1
         return instance
 
