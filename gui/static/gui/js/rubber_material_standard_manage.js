@@ -6,7 +6,7 @@
 
             return {
                 currentRow: {
-                    batching_weight: -1
+                    used_type: -1
                 },
                 tableDataUrl: RubberMaterialUrl,
                 RubberState: "",
@@ -91,6 +91,12 @@
                     stage_product_batch_no: "",
                     stage: "",
                     dev_type_name: "",
+                },
+                rules: {
+                    factory: [{ required: true, message: '请选择产地', trigger: 'change' }],
+                    stage_product_batch_no: [{ required: true, message: '请选择胶料编码', trigger: 'change' }],
+                    stage: [{ required: true, message: '请选择段次', trigger: 'change' }],
+                    dev_type_name: [{ required: true, message: '请选择炼胶机类型', trigger: 'change' }],
                 },
                 rubberMaterialFormError: {
                     factory: "",
@@ -234,8 +240,16 @@
 
             showAddRubberMaterialDialog: function () {
                 this.rubberMatetialError = "";
+                this.rubberMaterialForm = {
+                    factory: "",
+                    stage_product_batch_no: "",
+                    stage: "",
+                    dev_type_name: "",
+                };
                 this.dialogAddRubberMaterial = true;
-                this.currentRow = null // 新建和更新标志
+                this.currentRow = {
+                    used_type: -1
+                } // 新建和更新标志 -1新建 其他更新
             },
             showPutRubberMaterialDialog: function() {
                 var app = this;
@@ -244,7 +258,8 @@
                     .then(function (response) {
                         app.put_select_stage_product_batch_no = response.data['stage_product_batch_no'];
                         app.put_select_product_name = response.data['product_name'];
-                        app.put_select_status = response.data['used_type'];
+                        // app.put_select_status = response.data['used_type'];
+                        app.put_select_status = app.usedTypeChoice(response.data['used_type']);
                         app.put_select_dev_type = response.data['dev_type_name'];
                         app.put_select_material_weight = response.data['batching_weight'];
                         app.put_select_material_volume = response.data['volume'];
@@ -298,69 +313,78 @@
 
             },
 
-            handleAddRubberMaterial: function () {
+            handleAddRubberMaterial(formName) {
                 var app = this;
-                this.rubberMatetialError = "";
-                app.dialogAddRubberMaterial = false;
-                app.dialogChoiceMaterials = true;
-                //胶料配料标准要显示的标题------------------------------------------------------------------------开始
-                //以下用于拼接胶料配料的编号：格式：产地-胶料编码-段次-版本 ----------开始
-                for(var i = 0; i < app.PopupRubberSite.length; ++i){
-                    if(app.PopupRubberSite[i]["id"] == app.rubberMaterialForm['factory']){
-                        var chandi_no = app.PopupRubberSite[i]['global_no']
-                    }
-                }
-                for(var j = 0; j < app.ProductBatchNo.length; ++j){
-                    if(app.ProductBatchNo[j]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
-                        var jiaoliao_no  = app.ProductBatchNo[j]['product_no'];
-                        var jiaoliao_id  = app.ProductBatchNo[j]['product_info'];
-                        var jiaoliao_name  = app.ProductBatchNo[j]['product_name'];
-                        var peiliao_status = app.ProductBatchNo[j]['used_type'];
-                    }
-                }
-                for(var k = 0; k < app.Stage.length; ++k){
-                    if(app.Stage[k]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
-                            for(var m = 0; m < app.Stage[k]['stages'].length; ++m){
-                                if(app.Stage[k]["stages"][m]['stage'] == app.rubberMaterialForm['stage']){
-                                    var duanci_no = app.Stage[k]["stages"][m]['stage__global_name']
-                                }
-                            }
-                        }
-                }
-                for(var n = 0; n < app.ProductBatchNo.length; ++n){
-                    if(app.ProductBatchNo[n]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
-                        var version  = app.ProductBatchNo[n]['versions']
-                    }
-                }
-                app.select_stage_product_batch_no = chandi_no+'-'+jiaoliao_no+'-'+duanci_no+'-'+version;
-                //以下用于拼接胶料配料的编号：格式：产地-胶料编码-段次-版本 ----------结束
-                app.select_product_name = jiaoliao_name;
-                app.select_status = peiliao_status;
-                for(var p = 0; p < app.DevType.length; ++p){
-                    if(app.DevType[p]["id"] == app.rubberMaterialForm['dev_type_name']){
-                        var dev_type = app.DevType[p]['global_name']
-                    }
-                }
-                app.select_dev_type = dev_type;
-                //胶料配料标准要显示的标题------------------------------------------------------------------------结束
-                //当前选择的 配方和段次 是否有上段次的信息
-                axios.get(PreBatchInfoUrl + '?product_info_id='+jiaoliao_id+'&stage_id='+app.rubberMaterialForm['stage'], {}
-                ).then(function (response) {
-                    app.selectedPreMaterials = response.data;
-                    // console.log("======================");
-                    // console.log(app.selectedPreMaterials);
-                    // console.log("======================");
-                }).catch(function (error) {
+                app.$refs[formName].validate((valid) => {
+                  if (valid) {
+                      app.rubberMatetialError = "";
+                      app.dialogAddRubberMaterial = false;
+                      app.dialogChoiceMaterials = true;
+                      //胶料配料标准要显示的标题------------------------------------------------------------------------开始
+                      //以下用于拼接胶料配料的编号：格式：产地-胶料编码-段次-版本 ----------开始
+                      for(var i = 0; i < app.PopupRubberSite.length; ++i){
+                          if(app.PopupRubberSite[i]["id"] == app.rubberMaterialForm['factory']){
+                              var chandi_no = app.PopupRubberSite[i]['global_no']
+                          }
+                      }
+                      for(var j = 0; j < app.ProductBatchNo.length; ++j){
+                          if(app.ProductBatchNo[j]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
+                              var jiaoliao_no  = app.ProductBatchNo[j]['product_no'];
+                              var jiaoliao_id  = app.ProductBatchNo[j]['product_info'];
+                              var jiaoliao_name  = app.ProductBatchNo[j]['product_name'];
+                              var peiliao_status = app.ProductBatchNo[j]['used_type'];
+                          }
+                      }
+                      for(var k = 0; k < app.Stage.length; ++k){
+                          if(app.Stage[k]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
+                              for(var m = 0; m < app.Stage[k]['stages'].length; ++m){
+                                  if(app.Stage[k]["stages"][m]['stage'] == app.rubberMaterialForm['stage']){
+                                      var duanci_no = app.Stage[k]["stages"][m]['stage__global_name']
+                                  }
+                              }
+                          }
+                      }
+                      for(var n = 0; n < app.ProductBatchNo.length; ++n){
+                          if(app.ProductBatchNo[n]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
+                              var version  = app.ProductBatchNo[n]['versions']
+                          }
+                      }
+                      app.select_stage_product_batch_no = chandi_no+'-'+jiaoliao_no+'-'+duanci_no+'-'+version;
+                      //以下用于拼接胶料配料的编号：格式：产地-胶料编码-段次-版本 ----------结束
+                      app.select_product_name = jiaoliao_name;
+                      app.select_status = peiliao_status;
+                      for(var p = 0; p < app.DevType.length; ++p){
+                          if(app.DevType[p]["id"] == app.rubberMaterialForm['dev_type_name']){
+                              var dev_type = app.DevType[p]['global_name']
+                          }
+                      }
+                      app.select_dev_type = dev_type;
+                      //胶料配料标准要显示的标题------------------------------------------------------------------------结束
+                      //当前选择的 配方和段次 是否有上段次的信息
+                      axios.get(PreBatchInfoUrl + '?product_info_id='+jiaoliao_id+'&stage_id='+app.rubberMaterialForm['stage'], {}
+                      ).then(function (response) {
+                          app.selectedPreMaterials = response.data;
+                          // console.log("======================");
+                          // console.log(app.selectedPreMaterials);
+                          // console.log("======================");
+                      }).catch(function (error) {
+                      });
+                      //当前选择的 配方和段次 对应的原料信息（为该配方对应的段次 添加配料）
+                      axios.get(ProductRecipeUrl + '?product_info_id='+jiaoliao_id+'&stage_id='+app.rubberMaterialForm['stage'], {}
+                      ).then(function (response) {
+                          app.ProductRecipe = response.data;
+                          // console.log("======================");
+                          // console.log(app.ProductRecipe);
+                          // console.log("======================");
+                      }).catch(function (error) {
+                      });
+
+                  } else {
+                    console.log('error submit!!');
+                    return false;
+                  }
                 });
-                //当前选择的 配方和段次 对应的原料信息（为该配方对应的段次 添加配料）
-                axios.get(ProductRecipeUrl + '?product_info_id='+jiaoliao_id+'&stage_id='+app.rubberMaterialForm['stage'], {}
-                ).then(function (response) {
-                    app.ProductRecipe = response.data;
-                    // console.log("======================");
-                    // console.log(app.ProductRecipe);
-                    // console.log("======================");
-                }).catch(function (error) {
-                });
+
 
             },
 
@@ -471,7 +495,7 @@
                 if(this.selectedPreMaterials.material_type){
                     variate_num += 1;
                     batching_details_list.push({
-                        num: variate_num,
+                        sn: variate_num,
                         material: app.selectedPreMaterials.material,
                         ratio_weight: app.selectedPreMaterials.pre_ratioVolume,
                         standard_volume: app.selectedPreMaterials.pre_calculateVolume,
@@ -488,7 +512,7 @@
                 for (var i = 0; i < this.ProductRecipe.length; ++i) {
                     variate_num += 1;
                     var now_stage_material = {
-                        num: variate_num,
+                        sn: variate_num,
                         material: app.ProductRecipe[i].material,
                         ratio_weight: app.ProductRecipe[i].ratioVolume,
                         standard_volume: app.ProductRecipe[i].calculateVolume,
@@ -501,7 +525,7 @@
                     };
                     batching_details_list.push(now_stage_material);
                     console.log("============================================================================");
-                    console.log("序号：num："+i);
+                    console.log("序号：sn："+i);
                     console.log("原材料id：material："+app.ProductRecipe[i].material);
                     console.log("配比体积：ratio_weight"+app.ProductRecipe[i].ratioVolume);
                     console.log("计算体积：standard_volume"+app.ProductRecipe[i].calculateVolume);
@@ -547,7 +571,7 @@
                 for (var i = 0; i < this.PutProductRecipe.length; ++i) {
                     var now_stage_material = {
                         id: app.PutProductRecipe[i].id,
-                        num: app.PutProductRecipe[i].num,
+                        sn: app.PutProductRecipe[i].sn,
                         material: app.PutProductRecipe[i].material,
                         material_type: app.PutProductRecipe[i].material_type,
                         material_name: app.PutProductRecipe[i].material_name,
@@ -566,7 +590,7 @@
                     batching_details_list.push(now_stage_material);
                     console.log("============================================================================");
                     console.log("id："+app.PutProductRecipe[i].id);
-                    console.log("序号：num："+app.PutProductRecipe[i].num);
+                    console.log("序号：sn："+app.PutProductRecipe[i].sn);
                     console.log("原材料id：material："+app.PutProductRecipe[i].material);
                     console.log("配比体积：ratio_weight"+app.PutProductRecipe[i].ratio_weight);
                     console.log("计算体积：standard_volume"+app.PutProductRecipe[i].standard_volume);
@@ -601,32 +625,13 @@
 
             },
 
-            clearMaterialBaseInfoForm() {
+            afterGetData: function () {
 
-                this.materialBaseInfoForm = {
-
-                    material_no: "",
-                    material_name: "",
-                    for_short: "",
-                    density: null,
-                    used_flag: false,
-                    material_type: null,
-                    package_unit: null
-                };
-            },
-            clearMaterialBaseInfoFormError() {
-
-                this.materialBaseInfoFormError = {
-
-                    material_no: "",
-                    material_name: "",
-                    for_short: "",
-                    density: "",
-                    used_flag: "",
-                    material_type: "",
-                    package_unit: ""
+                this.currentRow = {
+                    used_type: -1
                 }
             },
+
             RmFlagFormatter: function(row, column) {
 
                 return this.boolFormatter(row.rm_flag);

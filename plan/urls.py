@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from plan.views import ProductDayPlanViewSet, MaterialDemandedViewSet, ProductBatchingDayPlanViewSet, \
-    ProductDayPlanCopyView, ProductBatchingDayPlanCopyView, MaterialRequisitionClassesViewSet
+    ProductDayPlanCopyView, ProductBatchingDayPlanCopyView, MaterialRequisitionClassesViewSet, MaterialDemandedAPIView
 
 router = DefaultRouter()
 
@@ -15,5 +15,7 @@ urlpatterns = [
     path('material-demandeds/', MaterialDemandedViewSet.as_view()),
     path('product-day-plans-copy/', ProductDayPlanCopyView.as_view()),
     path('product-batching-day-plans-copy/', ProductBatchingDayPlanCopyView.as_view()),
+    path('material-demanded-apiview/', MaterialDemandedAPIView.as_view()),
+
     # path('material-requisitions-copy/', MaterialRequisitionCopyView.as_view()),
 ]
