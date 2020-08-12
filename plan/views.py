@@ -16,10 +16,11 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Pr
     ProductBatchingClassesPlan, MaterialRequisitionClasses
 from plan.paginations import LimitOffsetPagination
 from rest_framework.views import APIView
-from basics.models import Equip
+from basics.models import Equip, PlanSchedule
 
 # Create your views here.
 from plan.uuidfield import UUidTools
+from recipe.models import Material
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -132,7 +133,21 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
 
 class MaterialDemandedAPIView(APIView):
     def get(self, request):
-        m_list = MaterialDemanded.objects.values('material').distinct()
+        filter_dict = {}
+        if request.GET.get('plan_date', None):  # 日期
+            plan_date = request.GET.get('plan_date')
+            filter_dict['plan_schedule'] = PlanSchedule.objects.filter(day_time=plan_date).first()
+        # material_type
+        if request.GET.get('material_name', None):  # 原材料名称
+            material_name = request.GET.get('material_name')
+            filter_dict['material_demanded'] = Material.objects.filter(material_name=material_name).first()
+        if request.GET.get('material_type', None):  # 公共代码GlobalCode原材料类别id
+            material_type = request.GET.get('material_type')
+            filter_dict['material_type'] = Material.objects.filter(material_type_id=material_type).first()
+        if filter_dict:
+            m_list = MaterialDemanded.objects.filter(**filter_dict).values('material').distinct()
+        else:
+            m_list = MaterialDemanded.objects.filter().values('material').distinct()
         response_list = []
         for m_dict in m_list:
             m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'])

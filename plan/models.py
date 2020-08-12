@@ -41,6 +41,11 @@ class ProductClassesPlan(AbstractEntity):
     plan_classes_uid = models.UUIDField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',
                                         null=True)
 
+    @property
+    def total_time(self):
+        return (self.time.hour * 3600 + self.time.minute*60 + self.time.second)/60
+
+
     class Meta:
         unique_together = (("product_day_plan", "plan_classes_uid"),)
         db_table = 'product_classes_plan'
