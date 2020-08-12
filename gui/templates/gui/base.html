@@ -90,15 +90,15 @@
                 </el-menu-item>
             </el-menu>
         </el-aside>
-        <el-main>
+        <el-main style="padding:0">
             {% block breadcrumb %}
-                <el-row type="flex" justify="space-between">
-                    <el-breadcrumb separator="/">
+                <el-row type="flex" class="rowBreadTop" justify="space-between">
+                    <el-breadcrumb separator="/" class="breadcrumbTop">
                         {% for name in namePath %}
                             <el-breadcrumb-item>{{ name }}</el-breadcrumb-item>
                         {% endfor %}
                     </el-breadcrumb>
-                    <el-dropdown>
+                    <el-dropdown class="main-dropdown">
                           <span class="el-dropdown-link">
                             用户：{{ user }}<i class="el-icon-arrow-down el-icon--right"></i>
                           </span>
@@ -141,6 +141,7 @@
         "4-2": "{% url 'gui:rubber-smallStuff-daily-plan' %}",
         "4-3": "{% url 'gui:material-requisitions-plan' %}",
         "5-1": "{% url 'gui:banburying-performance-manage' %}",
+        "5-3": "{% url 'gui:internal_mixer_production' %}",
         "5-4": "{% url 'gui:collect-rub-daily-manage' %}",
     }
 </script>
