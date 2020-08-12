@@ -6,7 +6,7 @@ from basics.models import PlanSchedule, WorkSchedule, ClassesDetail
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
-from recipe.models import ProductBatchingDetail
+from recipe.models import ProductBatchingDetail, ProductBatching
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -44,9 +44,12 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate_product_batching(self, value):
-        if not ProductBatchingDetail.objects.filter(product_batching__pb_day_plan__product_batching=value).value(
-                'actual_weight'):
-            raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
+        # pb_obj = ProductBatching.objects.filter(id=int(value)).first()
+        pb_obj = value
+        print(pb_obj.batching_details.all())
+        for pbd_obj in pb_obj.batching_details.all():
+            if not pbd_obj.actual_weight:
+                raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
         return value
 
     def validate_plan_date(self, value):
@@ -169,6 +172,15 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
                   'equip', 'product_batching', 'plan_date', 'bags_total_qty', 'product_day_plan',
                   'pdp_product_batching_classes_plan', 'product_day_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_product_batching(self, value):
+        # pb_obj = ProductBatching.objects.filter(id=int(value)).first()
+        pb_obj = value
+        print(pb_obj.batching_details.all())
+        for pbd_obj in pb_obj.batching_details.all():
+            if not pbd_obj.actual_weight:
+                raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
+        return value
 
     def validate_plan_date(self, value):
         if not PlanSchedule.objects.filter(day_time=value).first():
