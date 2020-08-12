@@ -19,17 +19,17 @@ class EquipStatusSerializer(BaseModelSerializer):
 
 class TrainsFeedbacksSerializer(BaseModelSerializer):
     """车次/批次产出反馈"""
-    other_params = serializers.SerializerMethodField(read_only=True)
+    equip_status = serializers.SerializerMethodField(read_only=True)
 
     def get_other_params(self, object):
-        other_params = {}
+        equip_status = {}
         plan_classes_uid = object.plan_classes_uid
         equip_no = object.equip_no
         equip = EquipStatus.objects.filter(plan_classes_uid=plan_classes_uid, equip_no=equip_no).first()
-        other_params.update(temperature=equip.temperature,
+        equip_status.update(temperature=equip.temperature,
                             energy=equip.energy,
                             rpm=equip.rpm)
-        return other_params
+        return equip_status
 
 
 

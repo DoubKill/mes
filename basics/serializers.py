@@ -82,15 +82,12 @@ class GlobalCodeSerializer(BaseModelSerializer):
 class ClassesDetailSerializer(BaseModelSerializer):
     """工作日程班次条目创建、列表、详情序列化器"""
     sum = serializers.CharField(read_only=True)
-    classes_name = serializers.SerializerMethodField(read_only=True)
+    classes_name = serializers.CharField(source="classes.global_name")
 
     class Meta:
         model = ClassesDetail
         exclude = ('work_schedule',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
-
-    def get_classes_name(self, object):
-        return object.classes.global_name
 
 
 class ClassesDetailUpdateSerializer(BaseModelSerializer):
