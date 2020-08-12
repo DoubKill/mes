@@ -6,6 +6,7 @@ from basics.models import PlanSchedule, WorkSchedule, ClassesDetail
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
+from recipe.models import ProductBatchingDetail
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -41,6 +42,12 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                   'product_batching',
                   'pdp_product_classes_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate_product_batching(self, value):
+        if not ProductBatchingDetail.objects.filter(product_batching__pb_day_plan__product_batching=value).value(
+                'actual_weight'):
+            raise serializers.ValidationError('当前胶料配料标准详情数据不存在')
+        return value
 
     def validate_plan_date(self, value):
         if not PlanSchedule.objects.filter(day_time=value):
@@ -146,7 +153,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     pdp_product_batching_classes_plan = ProductBatchingClassesPlanSerializer(many=True,
                                                                              help_text='{"sn":1,"bags_qty":1,"unit":"1","classes_detail":1}')
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
-    plan_date_time=serializers.DateField(source='plan_schedule.day_time',read_only=True)
+    plan_date_time = serializers.DateField(source='plan_schedule.day_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True, help_text='设备编号')
     catagory_name = serializers.CharField(source='equip.category', read_only=True, help_text='设备种类属性')
     product_no = serializers.CharField(source='product_batching.stage_product_batch_no', read_only=True,
@@ -158,7 +165,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductBatchingDayPlan
-        fields = ('id', 'equip_no', 'plan_date_time','catagory_name', 'product_no', 'manual_material_weight',
+        fields = ('id', 'equip_no', 'plan_date_time', 'catagory_name', 'product_no', 'manual_material_weight',
                   'equip', 'product_batching', 'plan_date', 'bags_total_qty', 'product_day_plan',
                   'pdp_product_batching_classes_plan', 'product_day_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
