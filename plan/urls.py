@@ -12,7 +12,7 @@ router.register(r'material-requisition-classes', MaterialRequisitionClassesViewS
 
 urlpatterns = [
     path('', include(router.urls)),
-    # path('material-demandeds/', MaterialDemandedViewSet.as_view()),
+    path('material-demandeds/', MaterialDemandedViewSet.as_view()),
     path('product-day-plans-copy/', ProductDayPlanCopyView.as_view()),
     path('product-batching-day-plans-copy/', ProductBatchingDayPlanCopyView.as_view()),
     path('material-demanded-apiview/', MaterialDemandedAPIView.as_view()),

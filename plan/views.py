@@ -149,6 +149,7 @@ class MaterialDemandedAPIView(APIView):
         else:
             m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule').distinct()
         response_list = []
+        print(m_list)
         for m_dict in m_list:
             m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'],
                                                          plan_schedule=m_dict['plan_schedule'])
