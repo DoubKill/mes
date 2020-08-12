@@ -176,7 +176,7 @@ class MaterialDemandedAPIView(APIView):
             response_list[-1]['md_material_requisition_classes'] = []
             for i in range(len(md_obj.md_material_requisition_classes.all())):
                 dict_key = ['早', '中', '晚']
-                user_dict = {dict_key[i]: md_obj.md_material_requisition_classes.all()[i].weight}
+                user_dict = {dict_key[i]: float(md_obj.md_material_requisition_classes.all()[i].weight)}
                 response_list[-1]['md_material_requisition_classes'].append(user_dict)
             response_list[-1]['material_demanded_list'] = []
             i = 0
