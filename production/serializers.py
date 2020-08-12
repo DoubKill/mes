@@ -21,7 +21,7 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
     """车次/批次产出反馈"""
     equip_status = serializers.SerializerMethodField(read_only=True)
 
-    def get_other_params(self, object):
+    def get_equip_status(self, object):
         equip_status = {}
         plan_classes_uid = object.plan_classes_uid
         equip_no = object.equip_no
