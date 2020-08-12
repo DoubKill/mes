@@ -5,7 +5,7 @@
     <el-form :inline="true">
         <el-form-item label="日期">
             <el-date-picker
-                    v-model="getParams.plan_data"
+                    v-model="getParams.plan_date"
                     @change="changeData"
                     type="date"
                     value-format="yyyy-MM-dd"
@@ -100,6 +100,12 @@
                     header-align="center"
                     prop="bags_total_qty"
                     label="当前库存（袋）">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    header-align="center"
+                    prop="plan_date_time"
+                    label="日期">
             </el-table-column>
             <el-table-column label="胶料生产计划（车次）"
                              align="center"
@@ -323,49 +329,47 @@
         <el-dialog
                 :title="formEdit.id?'编辑':'新建'"
                 :visible.sync="dialogVisibleEdit"
-                :before-close="handleCloseEdit">
+                :before-close="handleCloseEdit"
+                v-loading="dialogVisibleEditLoading">
             <el-form ref="formEdit" :rules="rulesEdit" :model="formEdit" label-width="100px">
                 <div v-if="!formEdit.hasOwnProperty('id')">
-                    <el-form-item label="配料机台">
-                        <el-select v-model="formEdit.equip_no"
-                                   @change="changeEquip_no"
-                                   clearable
+                    <el-form-item label="配料机台" prop="equip">
+                        <el-select v-model="formEdit.equip"
                                    placeholder="请选择">
                             <el-option
                                     v-for="item in machineList"
-                                    :key="item.equip_type_name"
-                                    :label="item.equip_type_name"
-                                    :value="item.equip_type_name">
+                                    :key="item.id"
+                                    :label="item.equip_no"
+                                    :value="item.id">
                             </el-option>
                         </el-select>
                     </el-form-item>
-                    <el-form-item label="炼胶机类型">
+                    <el-form-item label="炼胶机类型" prop="workRubberType">
+                        <el-select v-model="formEdit.workRubberType"
+                                   @change="changeWorkRubberType"
+                                   placeholder="请选择">
+                            <el-option
+                                    v-for="item in rubberTypeList"
+                                    :key="item.id"
+                                    :label="item.global_name"
+                                    :value="item.id">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="配料小料编码">
                         <el-select v-model="formEdit.category_type"
                                    @change="changeData"
                                    clearable
                                    placeholder="请选择">
                             <el-option
-                                    v-for="item in machineList"
+                                    v-for="item in addGlueList"
                                     :key="item.equip_type_name"
                                     :label="item.equip_type_name"
                                     :value="item.equip_type_name">
                             </el-option>
                         </el-select>
                     </el-form-item>
-                    <el-form-item label="配料小料编码">
-                        <el-select v-model="formEdit.category_type"
-                                   @change="changeData"
-                                   clearable
-                                   placeholder="请选择">
-                            <el-option
-                                    v-for="item in machineList"
-                                    :key="item.equip_type_name"
-                                    :label="item.equip_type_name"
-                                    :value="item.equip_type_name">
-                            </el-option>
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item label="配料小料编码">
+                    <el-form-item label="小料重量(kg)">
                     </el-form-item>
                     <el-form-item label="当前库存(袋)">
                     </el-form-item>
@@ -374,10 +378,12 @@
                     <div v-for="(item,index) in formEdit.pdp_product_batching_classes_plan" :key="index">
                         <div>{{ index===0?'早': index===1?'中':'晚'}}班计划</div>
                         <el-form-item label="顺序">
-                            <el-input v-model="item.sn"></el-input>
+                            <el-input-number :step="1" step-strictly v-model="item.sn" controls-position="right"
+                                             :min="0"></el-input-number>
                         </el-form-item>
                         <el-form-item label="袋数">
-                            <el-input v-model="item.bags_qty"></el-input>
+                            <el-input-number :step="1" step-strictly v-model="item.bags_qty" controls-position="right"
+                                             :min="0"></el-input-number>
                         </el-form-item>
                     </div>
                 </div>
