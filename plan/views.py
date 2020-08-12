@@ -165,7 +165,6 @@ class MaterialDemandedAPIView(APIView):
         else:
             m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule').distinct()
         response_list = []
-        print(m_list)
         for m_dict in m_list:
             m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'],
                                                          plan_schedule=m_dict['plan_schedule'])
@@ -176,7 +175,7 @@ class MaterialDemandedAPIView(APIView):
             response_list[-1]['material_name'] = md_obj.material.material_name
             response_list[-1]['md_material_requisition_classes'] = []
             for i in range(len(md_obj.md_material_requisition_classes.all())):
-                dict_key = ['早', '中', '晚']
+                dict_key = ['morning', 'afternoon', 'night']
                 user_dict = {dict_key[i]: float(md_obj.md_material_requisition_classes.all()[i].weight)}
                 response_list[-1]['md_material_requisition_classes'].append(user_dict)
             response_list[-1]['material_demanded_list'] = []
