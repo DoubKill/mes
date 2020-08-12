@@ -155,7 +155,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
     plan_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     plan_date_time = serializers.DateField(source='plan_schedule.day_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True, help_text='设备编号')
-    catagory_name = serializers.CharField(source='equip.category', read_only=True, help_text='设备种类属性')
+    catagory_name = serializers.CharField(source='equip.category.equip_type', read_only=True, help_text='设备种类属性')
     product_no = serializers.CharField(source='product_batching.stage_product_batch_no', read_only=True,
                                        help_text='胶料编码')
     manual_material_weight = serializers.DecimalField(source='product_batching.manual_material_weight',
