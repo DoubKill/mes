@@ -55,7 +55,7 @@ class ProductClassesPlan(AbstractEntity):
 class ProductBatchingDayPlan(AbstractEntity):
     """配料小料日计划表"""
     equip = models.ForeignKey(Equip, on_delete=models.DO_NOTHING, help_text='机台id', verbose_name='机台id',
-                              related_name='equip_product_batching_day_plan', null=True)
+                              related_name='equip_product_batching_day_plan')
     product_batching = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='配料id',
                                          verbose_name='配料id',
                                          related_name='pb_product_batching_day_plan')
@@ -65,7 +65,7 @@ class ProductBatchingDayPlan(AbstractEntity):
     bags_total_qty = models.PositiveIntegerField(verbose_name='日计划袋数', help_text='日计划袋数')
     product_day_plan = models.ForeignKey(ProductDayPlan, on_delete=models.DO_NOTHING, help_text='炼胶日计划id',
                                          verbose_name='炼胶日计划id',
-                                         related_name='pdp_product_batching_day_plan')
+                                         related_name='pdp_product_batching_day_plan', null=True,default=None)
 
     class Meta:
         db_table = 'product_batching_day_plan'

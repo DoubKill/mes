@@ -106,6 +106,21 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class ProductBatchingDayPlanManyCreate(APIView):
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+        elif isinstance(request.data, list):
+            many = True
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+        pbdp_ser = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        pbdp_ser.is_valid(raise_exception=True)
+        book_obj_or_list = pbdp_ser.save()
+        return Response(ProductBatchingDayPlanSerializer(book_obj_or_list, many=many).data)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
@@ -131,6 +146,7 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
         serializer.save(last_updated_user=self.request.user)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedAPIView(APIView):
     def get(self, request):
         filter_dict = {}
@@ -143,7 +159,7 @@ class MaterialDemandedAPIView(APIView):
             filter_dict['material_demanded'] = Material.objects.filter(material_name=material_name).first()
         if request.GET.get('material_type', None):  # 公共代码GlobalCode原材料类别id
             material_type = request.GET.get('material_type')
-            filter_dict['material_type'] = Material.objects.filter(material_type_id=material_type).first()
+            filter_dict['material'] = Material.objects.filter(material_type_id=material_type).first()
         if filter_dict:
             m_list = MaterialDemanded.objects.filter(**filter_dict).values('material', 'plan_schedule').distinct()
         else:
@@ -161,7 +177,7 @@ class MaterialDemandedAPIView(APIView):
             response_list[-1]['md_material_requisition_classes'] = []
             for i in range(len(md_obj.md_material_requisition_classes.all())):
                 dict_key = ['早', '中', '晚']
-                user_dict = {dict_key[i]: md_obj.md_material_requisition_classes.all()[i].weight}
+                user_dict = {dict_key[i]: float(md_obj.md_material_requisition_classes.all()[i].weight)}
                 response_list[-1]['md_material_requisition_classes'].append(user_dict)
             response_list[-1]['material_demanded_list'] = []
             i = 0
