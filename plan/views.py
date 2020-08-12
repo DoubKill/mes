@@ -163,7 +163,7 @@ class MaterialDemandedAPIView(APIView):
         if filter_dict:
             m_list = MaterialDemanded.objects.filter(**filter_dict).values('material', 'plan_schedule').distinct()
         else:
-            m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule').distinct()
+            m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule',).distinct()
         response_list = []
         for m_dict in m_list:
             m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'],

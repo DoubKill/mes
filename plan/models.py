@@ -20,6 +20,7 @@ class ProductDayPlan(AbstractEntity):
                                       related_name='ps_day_plan')
 
     class Meta:
+        # unique_together = (("product_batching", "plan_schedule"),)
         db_table = 'product_day_plan'
         verbose_name_plural = verbose_name = '胶料日计划'
 
@@ -43,8 +44,7 @@ class ProductClassesPlan(AbstractEntity):
 
     @property
     def total_time(self):
-        return (self.time.hour * 3600 + self.time.minute*60 + self.time.second)/60
-
+        return (self.time.hour * 3600 + self.time.minute * 60 + self.time.second) / 60
 
     class Meta:
         unique_together = (("product_day_plan", "plan_classes_uid"),)
@@ -65,7 +65,7 @@ class ProductBatchingDayPlan(AbstractEntity):
     bags_total_qty = models.PositiveIntegerField(verbose_name='日计划袋数', help_text='日计划袋数')
     product_day_plan = models.ForeignKey(ProductDayPlan, on_delete=models.DO_NOTHING, help_text='炼胶日计划id',
                                          verbose_name='炼胶日计划id',
-                                         related_name='pdp_product_batching_day_plan', null=True,default=None)
+                                         related_name='pdp_product_batching_day_plan', null=True, default=None)
 
     class Meta:
         db_table = 'product_batching_day_plan'
