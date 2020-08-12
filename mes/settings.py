@@ -25,6 +25,7 @@ SECRET_KEY = '@(e8hu481p171x)jz!40a$@gt6@_=#2_g-sscjrc531tsxz0(d'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = eval(os.environ.get('DEBUG', 'True'))
+UNIT_TEST = eval(os.environ.get('DEBUG', 'True'))
 
 ALLOWED_HOSTS = ['*']
 
@@ -90,7 +91,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
-    ) if DEBUG else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
+    ) if UNIT_TEST else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
     'DATETIME_FORMAT': "%Y-%m-%d",
@@ -247,6 +248,7 @@ AUTH_USER_MODEL = 'system.User'
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, "static/"))
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),
