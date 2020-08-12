@@ -314,7 +314,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
                   'batching_weight', 'production_time_interval', 'rm_flag', 'rm_time_interval',
                   'created_user_name', 'created_date', 'update_user_name', 'last_updated_date',
                   'stage_name', 'versions_name', 'used_type', 'used_time', 'obsolete_time',
-                  'used_user_name', 'obsolete_user_name', 'factory_name')
+                  'used_user_name', 'obsolete_user_name', 'factory_name', 'batching_time_interval')
 
 
 class ProductBatchingCreateSerializer(BaseModelSerializer):
