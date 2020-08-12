@@ -45,11 +45,11 @@
         </el-form-item>
         <el-form-item style="float: right">
             <el-checkbox-button v-model="addPlanVisible">
-                 新建
+                新建
             </el-checkbox-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button>
+            <el-button :disabled="!currentRow" @click="deletePlan">
                 删除
             </el-button>
         </el-form-item>
@@ -61,6 +61,8 @@
     </el-form>
 
     <el-table
+            highlight-current-row
+            @current-change="handleCurrentChange"
             :data="tableData"
             border
             style="width: 100%">
