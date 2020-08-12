@@ -169,6 +169,11 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
                   'equip', 'product_batching', 'plan_date', 'bags_total_qty', 'product_day_plan',
                   'pdp_product_batching_classes_plan', 'product_day_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {
+            'product_day_plan': {
+                'required': False
+            }
+        }
 
     def validate_product_batching(self, value):
         pb_obj = value
@@ -196,8 +201,11 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         plan_date = validated_data.pop('plan_date')
         pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=plan_date).first()
         pdp_dic['bags_total_qty'] = validated_data.pop('bags_total_qty')
-        pdp_dic['product_day_plan'] = validated_data.pop('product_day_plan')
+        pdp_dic['product_day_plan'] = validated_data.pop('product_day_plan', None)
+        if pdp_dic['product_day_plan'] == None:
+            pdp_dic.pop('product_day_plan')
         pdp_dic['created_user'] = self.context['request'].user
+
         instance = super().create(pdp_dic)
         details = validated_data['pdp_product_batching_classes_plan']
         cd_queryset = ClassesDetail.objects.filter(
