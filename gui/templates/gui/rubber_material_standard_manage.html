@@ -56,7 +56,7 @@
             <el-button  @click="showAddRubberMaterialDialog">新建</el-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button :disabled="currentRow.used_type === -1"  @click="showPutRubberMaterialDialog">配料</el-button>
+            <el-button :disabled="currentRow.used_type != 1"  @click="showPutRubberMaterialDialog">配料</el-button>
         </el-form-item>
 
 
