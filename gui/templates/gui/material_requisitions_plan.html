@@ -9,10 +9,10 @@
                     @change="planDateChange"
                     v-model="planDate" placeholder="请选择">
                 <el-option
-                        v-for="item in planDateOptions"
-                        :key="item"
-                        :label="item"
-                        :value="item">
+                        :key="schedule.id"
+                        :label="schedule.day_time"
+                        :value="schedule.day_time"
+                        v-for="schedule in planDateOptions">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -91,21 +91,21 @@
                 align="center"
                 label="领料计划（Kg）">
             <el-table-column
-                prop="md_material_requisition_classes[0].早"
+                prop="md_material_requisition_classes[0].morning"
                 label="早班">
             </el-table-column>
             <el-table-column
-                prop="md_material_requisition_classes[1].中"
+                prop="md_material_requisition_classes[1].afternoon"
                 label="中班">
             </el-table-column>
             <el-table-column
-                prop="md_material_requisition_classes[2].晚"
+                prop="md_material_requisition_classes[2].night"
                 label="晚班">
             </el-table-column>
             <el-table-column
                 label="总计">
                 <template slot-scope="scope">
-                    <span v-text="scope.row.md_material_requisition_classes[0].早 + scope.row.md_material_requisition_classes[1].中 + scope.row.md_material_requisition_classes[2].晚"></span>
+                    <span v-text="scope.row.md_material_requisition_classes[0].morning + scope.row.md_material_requisition_classes[1].afternoon + scope.row.md_material_requisition_classes[2].night"></span>
                 </template>
             </el-table-column>
         </el-table-column>
@@ -165,7 +165,7 @@
 {% endblock %}
 
 {% block scripts %}
-{#    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>#}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
     <script src="{% static 'gui/js/material_requisitions_plan.js' %}"></script>
 {% endblock %}
 

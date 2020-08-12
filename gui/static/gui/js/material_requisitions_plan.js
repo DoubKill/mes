@@ -9,10 +9,10 @@
                 num2: 6,
                 aaa: 10,
                 tableDataUrl: MaterialDemanded,
-                planDate: "2020-08-07",
+                planDate: dayjs().format("YYYY-MM-DD"),
                 materialType: "",
                 material_name: "",
-                planDateOptions: ["2020-08-07","2020-08-08","2020-08-09"],
+                planDateOptions: [],
                 ClassesCount: [0, 1, 2],
                 ClassesOptions: ["早班", "中班", "晚班"],
                 materialTypeOptions: [],
@@ -53,11 +53,10 @@
                 }
             }).then(function (response) {
 
-                app.planSchedules = response.data.results;
+                app.planDateOptions = response.data.results;
             }).catch(function (error) {
 
             });
-            console.log(this.planDate)
         },
         methods: {
 
@@ -108,16 +107,16 @@
 
             showEditDialog(row) {
 
-                this.clearEditFormError();
+                this.clearEditForm();
                 console.log(row.material_demanded_list[0].id)
                 this.editForm.material_ids.push(row.material_demanded_list[0].id);
                 this.editForm.material_ids.push(row.material_demanded_list[1].id);
                 this.editForm.material_ids.push(row.material_demanded_list[2].id);
                 this.editForm.material_name = row.material_name
-                this.editForm.plan_data = this.planDate;
-                this.editForm.weights.push(row.md_material_requisition_classes[0].早);
-                this.editForm.weights.push(row.md_material_requisition_classes[1].中);
-                this.editForm.weights.push(row.md_material_requisition_classes[2].晚);
+                this.editForm.plan_date = this.planDate;
+                this.editForm.weights.push(row.md_material_requisition_classes[0].morning);
+                this.editForm.weights.push(row.md_material_requisition_classes[1].afternoon);
+                this.editForm.weights.push(row.md_material_requisition_classes[2].night);
                 this.dialogEditVisible = true;
             },
 
@@ -131,7 +130,7 @@
                             .then(function (response) {
 
                                 app.dialogEditVisible = false;
-                                app.$message(app.editForm.plan_data + app.editForm.material_name + "修改成功");
+                                app.$message(app.editForm.plan_date + " " + app.editForm.material_name + " " + "修改成功");
                                 app.currentChange(app.currentPage);
 
                             }).catch(function (error) {
@@ -154,6 +153,7 @@
                 this.editForm = {
 
                     material_ids: [],
+                    material_name:"",
                     plan_date: "",
                     weights: []
                 };
