@@ -55,7 +55,6 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
 
 
 class PalletFeedbacksViewSet(mixins.CreateModelMixin,
-                             mixins.RetrieveModelMixin,
                              mixins.ListModelMixin,
                              GenericViewSet):
     """
@@ -74,7 +73,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_class = PalletFeedbacksFilter
 
 
-class EquipStatusViewSet(mixins.RetrieveModelMixin,
+class EquipStatusViewSet(mixins.CreateModelMixin,
                          mixins.ListModelMixin,
                          GenericViewSet):
     """
