@@ -258,7 +258,8 @@
                     .then(function (response) {
                         app.put_select_stage_product_batch_no = response.data['stage_product_batch_no'];
                         app.put_select_product_name = response.data['product_name'];
-                        app.put_select_status = response.data['used_type'];
+                        // app.put_select_status = response.data['used_type'];
+                        app.put_select_status = app.usedTypeChoice(response.data['used_type']);
                         app.put_select_dev_type = response.data['dev_type_name'];
                         app.put_select_material_weight = response.data['batching_weight'];
                         app.put_select_material_volume = response.data['volume'];
