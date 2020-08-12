@@ -156,7 +156,7 @@ class MaterialDemandedAPIView(APIView):
         # material_type
         if request.GET.get('material_name', None):  # 原材料名称
             material_name = request.GET.get('material_name')
-            filter_dict['material_demanded'] = Material.objects.filter(material_name=material_name).first()
+            filter_dict['material_demanded'] = Material.objects.filter(material_type__global_name=material_name).first()
         if request.GET.get('material_type', None):  # 公共代码GlobalCode原材料类别id
             material_type = request.GET.get('material_type')
             filter_dict['material'] = Material.objects.filter(material_type_id=material_type).first()
