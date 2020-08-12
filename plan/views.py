@@ -106,6 +106,21 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class ProductBatchingDayPlanManyCreate(APIView):
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+        elif isinstance(request.data, list):
+            many = True
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+        pbdp_ser = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        pbdp_ser.is_valid(raise_exception=True)
+        book_obj_or_list = pbdp_ser.save()
+        return Response(ProductBatchingDayPlanSerializer(book_obj_or_list, many=many).data)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
@@ -131,6 +146,7 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
         serializer.save(last_updated_user=self.request.user)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedAPIView(APIView):
     def get(self, request):
         filter_dict = {}
@@ -143,40 +159,35 @@ class MaterialDemandedAPIView(APIView):
             filter_dict['material_demanded'] = Material.objects.filter(material_name=material_name).first()
         if request.GET.get('material_type', None):  # 公共代码GlobalCode原材料类别id
             material_type = request.GET.get('material_type')
-            filter_dict['material_type'] = Material.objects.filter(material_type_id=material_type).first()
+            filter_dict['material'] = Material.objects.filter(material_type_id=material_type).first()
         if filter_dict:
-            m_list = MaterialDemanded.objects.filter(**filter_dict).values('material','plan_schedule').distinct()
+            m_list = MaterialDemanded.objects.filter(**filter_dict).values('material', 'plan_schedule').distinct()
         else:
-            m_list = MaterialDemanded.objects.filter().values('material','plan_schedule').distinct()
+            m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule').distinct()
         response_list = []
         print(m_list)
         for m_dict in m_list:
-            m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'],plan_schedule=m_dict['plan_schedule'])
+            m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'],
+                                                         plan_schedule=m_dict['plan_schedule'])
             response_list.append(m_dict)
             md_obj = MaterialDemanded.objects.filter(material=m_dict['material']).first()
             response_list[-1]['material_type'] = md_obj.material.material_type.global_name
             response_list[-1]['material_no'] = md_obj.material.material_no
             response_list[-1]['material_name'] = md_obj.material.material_name
             response_list[-1]['md_material_requisition_classes'] = []
-            # for mrc_obj in md_obj.md_material_requisition_classes.all():
-            #     print(mrc_obj)
-            #     dict_key = ['早', '中', '晚']
-            #     user_dict = {dict_key[i]: mrc_obj.weight for i in range(len(md_obj.md_material_requisition_classes.all()))}
             for i in range(len(md_obj.md_material_requisition_classes.all())):
                 dict_key = ['早', '中', '晚']
-                user_dict = {dict_key[i]: md_obj.md_material_requisition_classes.all()[i].weight}
+                user_dict = {dict_key[i]: float(md_obj.md_material_requisition_classes.all()[i].weight)}
                 response_list[-1]['md_material_requisition_classes'].append(user_dict)
             response_list[-1]['material_demanded_list'] = []
             i = 0
             for m_obj in m_queryset.values_list('id', 'material_demanded'):
-                print(m_queryset)
                 dict_key = ['id', 'material_demanded']
-                # user_dict = {dict_key[i]: m_obj[i] for i in range(len(m_obj))}
-                user_dict = {dict_key[0]: m_obj[0]}
-                user_dict = {dict_key[1]: m_obj[1]}
+                user_dict = {}
+                user_dict[dict_key[0]] = m_obj[0]
+                user_dict[dict_key[1]] = m_obj[1]
                 response_list[-1]['material_demanded_list'].append(user_dict)
                 i += 1
-            # print(response_list)
         return JsonResponse(response_list, safe=False)
 
 

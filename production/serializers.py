@@ -8,9 +8,30 @@ from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog
 
+class EquipStatusSerializer(BaseModelSerializer):
+    """机台状况反馈"""
+
+    class Meta:
+        model = EquipStatus
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
 
 class TrainsFeedbacksSerializer(BaseModelSerializer):
     """车次/批次产出反馈"""
+    equip_status = serializers.SerializerMethodField(read_only=True)
+
+    def get_equip_status(self, object):
+        equip_status = {}
+        plan_classes_uid = object.plan_classes_uid
+        equip_no = object.equip_no
+        equip = EquipStatus.objects.filter(plan_classes_uid=plan_classes_uid, equip_no=equip_no).first()
+        equip_status.update(temperature=equip.temperature,
+                            energy=equip.energy,
+                            rpm=equip.rpm)
+        return equip_status
+
+
 
     class Meta:
         model = TrainsFeedbacks
@@ -30,15 +51,6 @@ class PalletFeedbacksSerializer(BaseModelSerializer):
 
     class Meta:
         model = PalletFeedbacks
-        fields = "__all__"
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class EquipStatusSerializer(BaseModelSerializer):
-    """机台状况反馈"""
-
-    class Meta:
-        model = EquipStatus
         fields = "__all__"
         read_only_fields = COMMON_READ_ONLY_FIELDS
 

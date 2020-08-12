@@ -93,7 +93,7 @@ REST_FRAMEWORK = {
     ) if DEBUG else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
-    'DATETIME_FORMAT': "%Y-%m-%d",
+    'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
 }
 
 JWT_AUTH = {
@@ -247,6 +247,7 @@ AUTH_USER_MODEL = 'system.User'
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+# STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, "static/"))
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),

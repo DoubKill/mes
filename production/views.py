@@ -86,6 +86,7 @@ class EquipStatusViewSet(mixins.RetrieveModelMixin,
         创建机台状况反馈
     """
     queryset = EquipStatus.objects.filter(delete_flag=False)
+    pagination_class = None
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = EquipStatusSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -96,7 +97,7 @@ class EquipStatusViewSet(mixins.RetrieveModelMixin,
         actual_trains = request.query_params.get("actual_trains", '')
         if "," in actual_trains:
             train_list = actual_trains.split(",")
-            queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__in=train_list))
+            queryset = self.filter_queryset(self.get_queryset().filter(current_trains__in=train_list))
         else:
             queryset = self.filter_queryset(self.get_queryset() )
         page = self.paginate_queryset(queryset)
@@ -198,11 +199,12 @@ class PlanRealityView(APIView):
                 return Response("bad search_time", status=400)
             plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
         else:
-            plan_schedule = PlanSchedule.objects.filter().first()
+            plan_schedule = PlanSchedule.objects.filter(delete_flag=False).first()
         # 通过排班查日计划
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False).order_by()
         return_data = {
         }
+        datas = []
         for day_plan in list(day_plan_set):
             instance = {}
             plan_trains = 0
@@ -211,11 +213,12 @@ class PlanRealityView(APIView):
             actual_weight = 0
             plan_time = 0
             actual_time = 0
+            begin_time = None
             product_no = day_plan.product_batching.product_info.product_name
             equip_no = day_plan.equip.equip_no
             stage = day_plan.product_batching.stage.global_name
             # 通过日计划id再去查班次计划
-            class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
+            class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id).order_by("sn")
             # 若班次计划为空则不进行后续操作
             if not class_plan_set:
                 continue
@@ -230,17 +233,15 @@ class PlanRealityView(APIView):
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid)
                 if temp_ret_set:
                     actual = temp_ret_set.order_by("-created_date").first()
-                    if equip_no not in return_data:
-                        return_data[equip_no] = []
                     actual_trains += actual.actual_trains
                     actual_weight += actual.actual_weight
                     actual_time = actual.time
+                    begin_time = actual.begin_time
                 else:
-                    if equip_no not in return_data:
-                        return_data[equip_no] = []
                     actual_trains += 0
                     actual_weight += 0
                     actual_time = 0
+                    begin_time = None
             if plan_weight:
                 ach_rate = actual_weight/plan_weight*100
             else:
@@ -250,11 +251,10 @@ class PlanRealityView(APIView):
                             plan_weight=plan_weight, actual_weight=actual_weight,
                             plan_time=plan_time, actual_time=actual_time,
                             stage=stage, ach_rate=ach_rate,
-                            start_rate=None)
-            if equip_no not in return_data:
-                return_data[equip_no] = []
-            else:
-                return_data[equip_no].append(instance)
+                            start_rate=None, begin_time=begin_time)
+            datas.append(instance)
+            datas.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+        return_data["data"] = datas
         return Response(return_data)
 
 
@@ -275,7 +275,7 @@ class ProductActualView(APIView):
         # 通过排班查日计划
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {
-            "datas": []
+            "data": []
         }
         for day_plan in list(day_plan_set):
             instance = {}
@@ -331,7 +331,7 @@ class ProductActualView(APIView):
             instance.update(classes_data=day_plan_actual, plan_weight=plan_weight,
                             product_no=product_no, equip_no=equip_no,
                             plan_trains=plan_trains, actual_trains=actual_trains)
-            return_data["datas"].append(instance)
+            return_data["data"].append(instance)
         return Response(return_data)
 
 
@@ -343,3 +343,4 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
+    filter_class = PalletFeedbacksFilter
