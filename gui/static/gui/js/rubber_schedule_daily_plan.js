@@ -11,7 +11,6 @@
                 equip_no: "",
                 stage_product_batch_no: "",
                 stage_product_batch_nos: [],
-                addRubberDailyPlanDialogVisible: false,
                 rubberDailyPlanForm: {
                     equip: null,
                     product_batching: null,
@@ -21,23 +20,27 @@
                             plan_trains: null,
                             time: "00:00:00",
                             weight: "",
-                            unit: ""
+                            unit: "吨"
                         }, {
                             sn: null,
                             plan_trains: null,
                             time: "00:00:00",
                             weight: "",
-                            unit: ""
+                            unit: "吨"
                         }, {
                             sn: null,
                             plan_trains: null,
                             time: "00:00:00",
                             weight: "",
-                            unit: ""
+                            unit: "吨"
                         }
                     ]
                 },
-                productBatchings: []
+                batching_weight: "",
+                batching_time_interval: "",
+                productBatchings: [],
+                planSchedules: [],
+                productBatchingById: {}
             }
         },
         created: function () {
@@ -64,6 +67,7 @@
                 app.productBatchings = response.data.results;
                 response.data.results.forEach(function (batching) {
 
+                    app.productBatchingById[batching.id] = batching;
                     if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
 
                         app.stage_product_batch_nos.push(batching.stage_product_batch_no)
@@ -72,22 +76,70 @@
             }).catch(function (error) {
 
             });
+            axios.get(PlanScheduleUrl, {
+
+                params: {
+                    page_size: 100000000
+                }
+            }).then(function (response) {
+
+                app.planSchedules = response.data.results;
+            }).catch(function (error) {
+
+            });
         },
         methods: {
+
+            afterGetData: function () {
+
+                console.log(this.tableData)
+            },
 
             queryDataChange: function () {
 
                 this.currentChange(this.currentRow);
             },
+
             beforeGetData: function () {
 
                 this.getParams["plan_date"] = this.plan_date;
                 this.getParams["equip_no"] = this.equip_no;
                 this.getParams["product_no"] = this.stage_product_batch_no
             },
+            planTrainsChange: function (index) {
+
+                this.rubberDailyPlanForm
+                    .pdp_product_classes_plan[index].weight =
+                    this.batching_weight * this.rubberDailyPlanForm
+                        .pdp_product_classes_plan[index].plan_trains;
+                var time = this.batching_time_interval.split(":");
+                var second = Number(time[2]) + Number(time[1]) * 60 + Number(time[0]) * 60 * 60;
+                second = this.rubberDailyPlanForm
+                    .pdp_product_classes_plan[index].plan_trains * second;
+                var date = new Date(null);
+                date.setSeconds(second);
+                this.rubberDailyPlanForm.pdp_product_classes_plan[index].time =
+                    date.toISOString().substr(11, 8);
+            },
             addPlanClicked: function () {
 
-                this.addRubberDailyPlanDialogVisible = true
+                var app = this;
+                this.rubberDailyPlanForm["plan_date"] = this.plan_date;
+                axios.post(ProductDayPlansUrl, this.rubberDailyPlanForm)
+                    .then(function (response) {
+
+                        app.currentChange(app.currentRow);
+                        app.addRubberDailyPlanDialogVisible = false
+                    }).catch(function (error) {
+
+                    var text = "";
+                    for (var key in error.response.data) {
+
+                        text += error.response.data[key] + "\n";
+                    }
+                    app.$message(text);
+
+                });
             },
             getPlanText: function (index) {
 
@@ -101,19 +153,16 @@
                         return "晚班计划"
                 }
             },
-            addRubberDailyPlan: function () {
+            productBatchingChange: function () {
 
-                var app = this;
-                this.rubberDailyPlanForm["plan_date"] = this.plan_date;
-                axios.post(ProductDayPlansUrl, this.rubberDailyPlanForm)
-                    .then(function (response) {
+                console.log(this.productBatchingById)
 
-                        app.currentChange(app.currentRow);
-                    }).catch(function (error) {
+                this.batching_weight = this.productBatchingById[this.rubberDailyPlanForm.product_batching].batching_weight;
+                this.batching_time_interval = this.productBatchingById[this.rubberDailyPlanForm.product_batching].batching_time_interval;
 
-                        console.log(error.data)
-                });
-                console.log(this.rubberDailyPlanForm)
+
+                for (var i = 0; i < 3; ++i)
+                    this.planTrainsChange(i)
             }
         }
     };

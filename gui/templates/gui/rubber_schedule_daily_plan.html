@@ -4,13 +4,17 @@
 {% block main %}
     <el-form :inline="true">
         <el-form-item label="日期">
-            <el-date-picker
+            <el-select
                     @change="queryDataChange"
-                    v-model="plan_date"
-                    type="date"
-                    value-format="yyyy-MM-dd"
-                    placeholder="选择日期">
-            </el-date-picker>
+                    clearable
+                    v-model="plan_date" placeholder="请选择">
+                <el-option
+                        :key="schedule.id"
+                        :label="schedule.day_time"
+                        :value="schedule.day_time"
+                        v-for="schedule in planSchedules">
+                </el-option>
+            </el-select>
         </el-form-item>
         <el-form-item label="机台">
             <el-select
@@ -56,54 +60,103 @@
         </el-form-item>
     </el-form>
     {% verbatim vue %}
-        <table class="table table-bordered"
-               style="width: 100%; color: #909399; font-size: 14px;">
-            <thead>
-            <tr>
-                <th rowspan="2">S</th>
-                <th rowspan="2">No</th>
-                <th rowspan="2">机台</th>
-                <th rowspan="2">胶料编码</th>
-                <th rowspan="2">配料重量</th>
-                <th rowspan="2">配料时间</th>
-                <th rowspan="2">当前库存(吨)</th>
-                <th colspan="4">早班计划</th>
-                <th colspan="4">中班计划</th>
-                <th colspan="4">夜班计划</th>
-            </tr>
-            <tr>
-                <template v-for="_ in 3">
-                    <th>顺序</th>
-                    <th>车次</th>
-                    <th>重量(吨)</th>
-                    <th>时间</th>
-                </template>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="(data, index) in tableData">
-                <td></td>
-                <td>{{ index }}</td>
-                <td>{{ data.equip_no }}</td>
-                <td>{{ data.product_no }}</td>
-                <td>{{ data.batching_weight }}</td>
-                <td>{{ data.batching_time_interval }}</td>
-                <td></td>
-                <template v-for="plan in data.pdp_product_classes_plan">
-                    <td>{{ plan.sn }}</td>
-                    <td>{{ plan.plan_trains }}</td>
-                    <td>{{ plan.weight }}</td>
-                    <td>{{ plan.time }}</td>
-                </template>
-            </tr>
-            </tbody>
-        </table>
+        <div style="overflow-x: auto;clear: both">
+            <table data-toggle="table" class="table table-bordered"
+                   style="color: #909399; font-size: 14px;">
+                <thead>
+                <tr>
+                    <th rowspan="2">S</th>
+                    <th rowspan="2">No</th>
+                    <th rowspan="2">机台</th>
+                    <th rowspan="2">胶料编码</th>
+                    <th rowspan="2">配料重量</th>
+                    <th rowspan="2">配料时间</th>
+                    <th rowspan="2">当前库存(吨)</th>
+                    <th colspan="4">早班计划</th>
+                    <th colspan="4">中班计划</th>
+                    <th colspan="4">夜班计划</th>
+                </tr>
+                <tr>
+                    <template v-for="_ in 3">
+                        <th>顺序</th>
+                        <th>车次</th>
+                        <th>重量(吨)</th>
+                        <th>时间</th>
+                    </template>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="(data, index) in tableData">
+                    <td></td>
+                    <td>{{ index }}</td>
+                    <td>{{ data.equip_no }}</td>
+                    <td>{{ data.product_no }}</td>
+                    <td>{{ data.batching_weight }}</td>
+                    <td>{{ data.batching_time_interval }}</td>
+                    <td></td>
+                    <template v-for="plan in data.pdp_product_classes_plan">
+                        <td>{{ plan.sn }}</td>
+                        <td>{{ plan.plan_trains }}</td>
+                        <td>{{ plan.weight }}</td>
+                        <td>{{ plan.time }}</td>
+                    </template>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td>
+                        <el-select style="width: 150px;" v-model="rubberDailyPlanForm.equip">
+                            <el-option
+                                    :key="equip.id"
+                                    :label="equip.equip_no"
+                                    :value="equip.id"
+                                    v-for="equip in equips">
+                            </el-option>
+                        </el-select>
+                    </td>
+                    <td>
+                        <el-select @change="productBatchingChange" style="width: 150px;" v-model="rubberDailyPlanForm.product_batching">
+                            <el-option
+                                    :key="productBatching.id"
+                                    :label="productBatching.stage_product_batch_no"
+                                    :value="productBatching.id"
+                                    v-for="productBatching in productBatchings">
+                            </el-option>
+                        </el-select>
+                    </td>
+                    <td>{{ batching_weight }}</td>
+                    <td>{{ batching_time_interval }}</td>
+                    <td></td>
+                    <template v-for="(plan, index) in rubberDailyPlanForm.pdp_product_classes_plan">
+                        <td>
+                            <el-input-number v-model="plan.sn" :min="0">
+                            </el-input-number>
+                        </td>
+                        <td>
+                            <el-input-number @change="planTrainsChange(index)" v-model="plan.plan_trains"
+                                             :min="0"></el-input-number>
+                        </td>
+                        <td>
+                            {{ plan.weight }}
+                        </td>
+                        <td>
+                            {{ plan.time }}
+                        </td>
+                    </template>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+
     {% endverbatim vue %}
     {% include 'gui/paginations.html' %}
+
 {% endblock %}
 
 {% block dialogs %}
 
+    <!--
     <el-dialog title="添加胶料日计划" :visible.sync="addRubberDailyPlanDialogVisible">
         <el-form v-model="rubberDailyPlanForm">
             <el-form-item label="机台" :label-width="formLabelWidth">
@@ -161,7 +214,7 @@
             <el-button type="primary" @click="addRubberDailyPlan">确 定</el-button>
         </div>
     </el-dialog>
-
+    -->
 
 {% endblock %}
 
