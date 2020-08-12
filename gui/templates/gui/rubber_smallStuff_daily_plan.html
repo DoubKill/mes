@@ -9,30 +9,32 @@
                     @change="changeData"
                     type="date"
                     value-format="yyyy-MM-dd"
+                    :clearable="false"
                     placeholder="选择日期">
             </el-date-picker>
         </el-form-item>
         <el-form-item label="机台">
-            <el-select v-model="getParams.equips"
+            <el-select v-model="getParams.equip_no"
                        @change="changeData"
                        clearable
                        placeholder="请选择">
                 <el-option
                         v-for="item in machineList"
-                        :key="item.id"
-                        :label="item.equip_name"
-                        :value="item.id">
+                        :key="item.equip_no"
+                        :label="item.equip_no"
+                        :value="item.equip_no">
                 </el-option>
             </el-select>
         </el-form-item>
         <el-form-item label="胶料">
-            <el-select v-model="getParams.glue" placeholder="请选择"
+            <el-select v-model="getParams.product_no" placeholder="请选择"
+                       clearable
                        @change="changeData">
                 <el-option
                         v-for="item in glueList"
-                        :key="item.id"
+                        :key="item.stage_product_batch_no"
                         :label="item.stage_product_batch_no"
-                        :value="item.id">
+                        :value="item.stage_product_batch_no">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -66,37 +68,37 @@
             <el-table-column
                     align="center"
                     header-align="center"
-                    prop="a"
+                    prop="id"
                     label="No">
             </el-table-column>
             <el-table-column
                     align="center"
                     header-align="center"
-                    prop="b"
+                    prop="equip_no"
                     label="配料机台">
             </el-table-column>
             <el-table-column
                     align="center"
                     header-align="center"
-                    prop="c"
+                    prop="catagory_name"
                     label="炼胶机类型">
             </el-table-column>
             <el-table-column
                     align="center"
                     header-align="center"
-                    prop="d"
+                    prop="product_no"
                     label="配料小料编码">
             </el-table-column>
             <el-table-column
                     align="center"
                     header-align="center"
-                    prop="d"
+                    prop="manual_material_weight"
                     label="小料重量（kg）">
             </el-table-column>
             <el-table-column
                     align="center"
                     header-align="center"
-                    prop="c"
+                    prop="bags_total_qty"
                     label="当前库存（袋）">
             </el-table-column>
             <el-table-column label="胶料生产计划（车次）"
@@ -105,62 +107,85 @@
                 <el-table-column
                         align="center"
                         header-align="center"
-                        prop="name"
+                        prop="rubber_product_classes_plan[0].plan_trains"
                         label="早班">
                 </el-table-column>
                 <el-table-column
                         align="center"
                         header-align="center"
-                        prop="name"
+                        prop="rubber_product_classes_plan[1].plan_trains"
                         label="中班">
                 </el-table-column>
                 <el-table-column
                         align="center"
                         header-align="center"
-                        prop="name"
+                        prop="rubber_product_classes_plan[2].plan_trains"
                         label="夜班">
                 </el-table-column>
                 <el-table-column
                         align="center"
                         header-align="center"
-                        prop="name"
-                        label="日计划">
+                        label="总计">
+                    <el-table-column
+                            align="center"
+                            header-align="center"
+                            label="袋数">
+                        <template slot-scope="scope">
+                            {{ addBatchNum(scope.row.rubber_product_classes_plan,'plan_trains')}}
+                        </template>
+                    </el-table-column>
                 </el-table-column>
 
             </el-table-column>
-            <el-table-column label="胶料生产计划（车次）">
+            <el-table-column label="早班计划">
                 <el-table-column
-                        prop="list[0].b"
-                        label="早班"
-                        width="180">
+                        prop="pdp_product_batching_classes_plan[0].sn"
+                        label="顺序">
                 </el-table-column>
                 <el-table-column
-                        prop="list[0].b"
-                        label="中班"
-                        width="180">
+                        prop="pdp_product_batching_classes_plan[0].bags_qty"
+                        label="袋数">
+                </el-table-column>
+            </el-table-column>
+            <el-table-column label="中班计划">
+                <el-table-column
+                        prop="pdp_product_batching_classes_plan[1].sn"
+                        label="顺序">
                 </el-table-column>
                 <el-table-column
-                        prop="list[0].a"
-                        label="晚班"
-                        width="180">
+                        prop="pdp_product_batching_classes_plan[1].bags_qty"
+                        label="袋数">
+                </el-table-column>
+            </el-table-column>
+            <el-table-column label="晚班计划">
+                <el-table-column
+                        prop="pdp_product_batching_classes_plan[2].sn"
+                        label="顺序">
                 </el-table-column>
                 <el-table-column
-                        label="总计"
-                        width="180">
+                        prop="pdp_product_batching_classes_plan[2].bags_qty"
+                        label="袋数">
+                </el-table-column>
+            </el-table-column>
+            <el-table-column
+                    label="日计划">
+                <el-table-column
+                        label="袋数">
                     <template slot-scope="scope">
-                        {{ Number(scope.row.list[0].a) + Number(scope.row.list[0].b)}}
+                        {{ addBatchNum(scope.row.pdp_product_batching_classes_plan,'bags_qty')}}
                     </template>
                 </el-table-column>
             </el-table-column>
             <el-table-column
                     label="操作"
-                    width="180"
+                    width="200"
             >
                 <template slot-scope="scope">
-                    <el-button @click="rowEdit(scope.row)">
+                    <el-button size="mini" @click="rowEdit(scope.row)">
                         编辑
                     </el-button>
                     <el-button
+                            style="margin-left:0"
                             @click="rowDelete(scope.row)"
                             size="mini"
                             type="danger">
@@ -178,7 +203,6 @@
         <el-dialog
                 title="复制配料小料日生产计划"
                 :visible.sync="copyDialogVisible"
-                :close-on-click-modal="false"
                 :before-close="handleCloseCopy"
         >
             <el-form ref="formCopyData" :rules="rules" :model="formCopyData" label-width="80px">
@@ -211,9 +235,34 @@
         </el-dialog>
 
         <el-dialog
-                title="选择橡胶"
+                title="选择胶料"
                 :visible.sync="rubberDialogVisible"
+                :before-close="handleCloseRubber"
         >
+            <el-form :inline="true">
+                <el-form-item label="日期：">
+                    <el-date-picker
+                            v-model="rubberDialogParams.plan_date"
+                            @change="changeRubberDialog"
+                            type="date"
+                            :clearable="false"
+                            value-format="yyyy-MM-dd"
+                            placeholder="选择日期">
+                    </el-date-picker>
+                </el-form-item>
+                <el-form-item label="胶料：">
+                    <el-select v-model="rubberDialogParams.product_no" placeholder="请选择"
+                               clearable
+                               @change="changeRubberDialog">
+                        <el-option
+                                v-for="item in glueList"
+                                :key="item.stage_product_batch_no"
+                                :label="item.stage_product_batch_no"
+                                :value="item.stage_product_batch_no">
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+            </el-form>
             <el-table
                     ref="multipleTable"
                     :data="tableDataRubber"
@@ -224,44 +273,43 @@
                         width="55">
                 </el-table-column>
                 <el-table-column
-                        prop="a"
+                        prop="id"
                         label="No">
                 </el-table-column>
                 <el-table-column
-                        prop="b"
+                        prop="product_no"
                         label="胶料编码">
                 </el-table-column>
                 <el-table-column
-                        prop="c"
+                        prop="category"
                         label="炼胶机类型">
                 </el-table-column>
                 <el-table-column
                         prop="d"
+                        width="140"
                         label="配料机台">
                     <template slot-scope="scope">
                         <el-input v-model="scope.row.input" placeholder="请输入内容"></el-input>
                     </template>
                 </el-table-column>
-                <el-table-column
-                        prop="c"
-                        label="当前库存（袋）">
-                </el-table-column>
                 <el-table-column label="胶料生产计划（车次）">
                     <el-table-column
-                            prop="name"
+                            prop="pdp_product_classes_plan[0].plan_trains"
                             label="早班">
                     </el-table-column>
                     <el-table-column
-                            prop="name"
+                            prop="pdp_product_classes_plan[1].plan_trains"
                             label="中班">
                     </el-table-column>
                     <el-table-column
-                            prop="name"
+                            prop="pdp_product_classes_plan[2].plan_trains"
                             label="夜班">
                     </el-table-column>
                     <el-table-column
-                            prop="name"
                             label="日计划">
+                        <template slot-scope="scope">
+                            {{ addBatchNum(scope.row.pdp_product_classes_plan,'plan_trains')}}
+                        </template>
                     </el-table-column>
 
                 </el-table-column>
@@ -273,39 +321,72 @@
         </el-dialog>
 
         <el-dialog
-                title="配料小料日计划"
+                :title="formEdit.id?'编辑':'新建'"
                 :visible.sync="dialogVisibleEdit"
                 :before-close="handleCloseEdit">
-            <el-form ref="formEdit" :model="formEdit" label-width="80px">
-                <div>早班计划</div>
-                <el-form-item label="顺序">
-                    <el-input v-model="formEdit.name"></el-input>
-                </el-form-item>
-                <el-form-item label="袋数">
-                    <el-input v-model="formEdit.name"></el-input>
-                </el-form-item>
-                <div>中班计划</div>
-                <el-form-item label="顺序">
-                    <el-input v-model="formEdit.name"></el-input>
-                </el-form-item>
-                <el-form-item label="袋数">
-                    <el-input v-model="formEdit.name"></el-input>
-                </el-form-item>
-                <div>晚班计划</div>
-                <el-form-item label="顺序">
-                    <el-input v-model="formEdit.name"></el-input>
-                </el-form-item>
-                <el-form-item label="袋数">
-                    <el-input v-model="formEdit.name"></el-input>
-                </el-form-item>
-
+            <el-form ref="formEdit" :rules="rulesEdit" :model="formEdit" label-width="100px">
+                <div v-if="!formEdit.hasOwnProperty('id')">
+                    <el-form-item label="配料机台">
+                        <el-select v-model="formEdit.equip_no"
+                                   @change="changeEquip_no"
+                                   clearable
+                                   placeholder="请选择">
+                            <el-option
+                                    v-for="item in machineList"
+                                    :key="item.equip_type_name"
+                                    :label="item.equip_type_name"
+                                    :value="item.equip_type_name">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="炼胶机类型">
+                        <el-select v-model="formEdit.category_type"
+                                   @change="changeData"
+                                   clearable
+                                   placeholder="请选择">
+                            <el-option
+                                    v-for="item in machineList"
+                                    :key="item.equip_type_name"
+                                    :label="item.equip_type_name"
+                                    :value="item.equip_type_name">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="配料小料编码">
+                        <el-select v-model="formEdit.category_type"
+                                   @change="changeData"
+                                   clearable
+                                   placeholder="请选择">
+                            <el-option
+                                    v-for="item in machineList"
+                                    :key="item.equip_type_name"
+                                    :label="item.equip_type_name"
+                                    :value="item.equip_type_name">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="配料小料编码">
+                    </el-form-item>
+                    <el-form-item label="当前库存(袋)">
+                    </el-form-item>
+                </div>
+                <div>
+                    <div v-for="(item,index) in formEdit.pdp_product_batching_classes_plan" :key="index">
+                        <div>{{ index===0?'早': index===1?'中':'晚'}}班计划</div>
+                        <el-form-item label="顺序">
+                            <el-input v-model="item.sn"></el-input>
+                        </el-form-item>
+                        <el-form-item label="袋数">
+                            <el-input v-model="item.bags_qty"></el-input>
+                        </el-form-item>
+                    </div>
+                </div>
             </el-form>
             <span slot="footer" class="dialog-footer">
                 <el-button @click="dialogVisibleEdit = false">取 消</el-button>
                 <el-button type="primary" @click="editSubmit" :loading="EditLoading">确 定</el-button>
             </span>
         </el-dialog>
-
     {% endverbatim vue %}
 {% endblock %}
 
