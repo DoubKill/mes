@@ -106,6 +106,21 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class ProductBatchingDayPlanManyCreate(APIView):
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+        elif isinstance(request.data, list):
+            many = True
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+        pbdp_ser = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        pbdp_ser.is_valid(raise_exception=True)
+        book_obj_or_list = pbdp_ser.save()
+        return Response(ProductBatchingDayPlanSerializer(book_obj_or_list, many=many).data)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
@@ -131,6 +146,7 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
         serializer.save(last_updated_user=self.request.user)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedAPIView(APIView):
     def get(self, request):
         filter_dict = {}
