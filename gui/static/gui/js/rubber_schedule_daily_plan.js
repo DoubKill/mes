@@ -41,7 +41,8 @@
                 productBatchings: [],
                 planSchedules: [],
                 productBatchingById: {},
-                addPlanVisible: false
+                addPlanVisible: false,
+                currentRow: null
             }
         },
         created: function () {
@@ -129,8 +130,8 @@
                 axios.post(ProductDayPlansUrl, this.rubberDailyPlanForm)
                     .then(function (response) {
 
-                        app.currentChange(app.currentRow);
-                        app.addRubberDailyPlanDialogVisible = false
+                        app.$message("创建成功");
+                        app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
                     var text = "";
@@ -156,14 +157,41 @@
             },
             productBatchingChange: function () {
 
-                console.log(this.productBatchingById)
-
                 this.batching_weight = this.productBatchingById[this.rubberDailyPlanForm.product_batching].batching_weight;
                 this.batching_time_interval = this.productBatchingById[this.rubberDailyPlanForm.product_batching].batching_time_interval;
 
 
                 for (var i = 0; i < 3; ++i)
                     this.planTrainsChange(i)
+            },
+            handleCurrentChange(val) {
+                this.currentRow = val;
+            },
+            deletePlan: function () {
+
+                var app = this;
+                this.$confirm('此操作将永久删除' + this.currentRow.product_no + ', 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                }).then(() => {
+
+                    axios.delete(ProductDayPlansUrl + app.currentRow.id + '/')
+                        .then(function (response) {
+                            app.$message({
+                                type: 'success',
+                                message: '删除成功!'
+                            });
+                            app.currentChange(app.currentPage);
+                        }).catch(function (error) {
+
+                        app.$message.error(error);
+                    });
+
+
+                }).catch(() => {
+
+                });
             }
         }
     };
