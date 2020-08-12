@@ -41,7 +41,13 @@ class ProductClassesPlan(AbstractEntity):
     plan_classes_uid = models.UUIDField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',
                                         null=True)
 
+    @property
+    def total_time(self):
+        return (self.time.hour * 3600 + self.time.minute*60 + self.time.second)/60
+
+
     class Meta:
+        unique_together = (("product_day_plan", "plan_classes_uid"),)
         db_table = 'product_classes_plan'
         verbose_name_plural = verbose_name = '胶料日班次计划'
 
@@ -109,10 +115,10 @@ class MaterialDemanded(AbstractEntity):
 
 class MaterialRequisitionClasses(AbstractEntity):
     """领料日班次计划表"""
-    material_demanded = models.ForeignKey(MaterialDemanded, on_delete=models.DO_NOTHING,
-                                          help_text='原材料需求量id',
-                                          verbose_name='原材料需求量id',
-                                          related_name='md_material_requisition_classes')
+    material_demanded = models.ManyToManyField(MaterialDemanded,
+                                               help_text='原材料需求量id',
+                                               verbose_name='原材料需求量id',
+                                               related_name='md_material_requisition_classes')
     # sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序',null=True)
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=2, max_digits=8, blank=True, null=True)

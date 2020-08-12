@@ -26,9 +26,11 @@ const ProductInfosUrl = "/api/v1/recipe/product-infos/";
 const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
 const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
 // 胶料配料标准管理接口
-const RubberMaterialUrl = "/api/v1/recipe/product-batch/";
+const RubberMaterialUrl = "/api/v1/recipe/product-batching/";
 // 胶料配料标准管理——选择胶料编码与段次接口
-const RubberStageUrl = "/api/v1/recipe/product-stages/?factory_id=";
+const RubberStageUrl = "/api/v1/recipe/product-stages/";
+const PreBatchInfoUrl = "/api/v1/recipe/pre-batch-info/";
+const ProductRecipeUrl = "/api/v1/recipe/product-recipe/";
 
 const ProductBatching = "/api/v1/plan/product-batching-day-plans/";
 const MaterialRequisitionsCopy = "/api/v1/plan/product-batching-day-plans-copy/";
@@ -36,6 +38,10 @@ const MaterialRequisitionsCopy = "/api/v1/plan/product-batching-day-plans-copy/"
 const MaterialRequisitions = "/api/v1/plan/material-requisitions/";
 //胶料日计划
 const ProductDayPlans = "/api/v1/plan/product-day-plans/"
+
+const PalletFeedBacksUrl = "/api/v1/production/pallet-feedbacks/";
+
+const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
 
 var BaseMixin = {
 
@@ -51,7 +57,7 @@ var BaseMixin = {
 
             defaultActive: "",
             formLabelWidth: "120px",
-            openeds: ["2", "3"],
+            openeds: ["2", "3", "4", "5"],
         }
     },
     created: function () {

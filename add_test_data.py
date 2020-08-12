@@ -181,7 +181,7 @@ def add_users():
             user = User.objects.create(
                     username=name,
                     password='123456',
-                    num=i,
+                    sn=i,
                     is_leave=False,
                     section_id=random.choice(section_ids),
                 )
@@ -274,7 +274,7 @@ def add_plan_schedule():
                 WorkSchedulePlan.objects.create(
                     classes_detail_id=random.choice(detail_ids),
                     group_id=group_id,
-                    group_name=GroupExtension.objects.get(id=group_id).name,
+                    group_name=GlobalCode.objects.get(id=group_id).global_name,
                     rest_flag=False,
                     plan_schedule=instance
                 )
@@ -303,7 +303,7 @@ def add_product():
                 for k in range(random.randint(1, 4)):
                     recipe = ProductRecipe.objects.create(
                         product_recipe_no=product.product_no + '-' + stage.global_name,
-                        num=i,
+                        sn=i,
                         product_info=product,
                         material_id=random.choice(materials),
                         stage=stage,
@@ -318,7 +318,7 @@ def add_product():
 
 
 def add_batch():
-    dev_ids = list(GlobalCode.objects.filter(global_type__type_name='设备类型').values_list('id', flat=True))
+    dev_ids = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
     time_choice = ('00:02:12', '00:01:42', '00:03:44')
     for product in ProductInfo.objects.all():
         try:
@@ -342,7 +342,7 @@ def add_batch():
                 for mat in mat_ids:
                     ProductBatchingDetail.objects.create(
                         product_batching=instance,
-                        num=i,
+                        sn=i,
                         material_id=mat
                     )
         except Exception:

@@ -2,7 +2,8 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from production.views import TrainsFeedbacksViewSet, PalletFeedbacksViewSet, EquipStatusViewSet, PlanStatusViewSet, \
-    ExpendMaterialViewSet, OperationLogViewSet, QualityControlViewSet
+    ExpendMaterialViewSet, OperationLogViewSet, QualityControlViewSet, PlanRealityView, ProductActualView, \
+    ProductionRecordViewSet
 
 router = DefaultRouter()
 
@@ -27,6 +28,11 @@ router.register(r'operation-logs', OperationLogViewSet)
 # 质检结果表
 router.register(r'quality-control', QualityControlViewSet)
 
+# 密炼LOT生产履历
+router.register(r'production-record', ProductionRecordViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
+    path(r'plan-reality/', PlanRealityView.as_view()),
+    path(r'product-actual/', ProductActualView.as_view())
 ]
