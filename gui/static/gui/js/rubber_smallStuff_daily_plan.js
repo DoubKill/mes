@@ -29,8 +29,25 @@
                 tableDataRubber: [],
                 selectionRubber: [],
                 dialogVisibleEdit: false,
-                formEdit: {},
-                EditLoading: false
+                formEdit: {
+                    pdp_product_batching_classes_plan: [
+                        {},
+                        {},
+                        {}
+                    ]
+                },
+                EditLoading: false,
+                dialogVisibleAdd: false,
+                formAdd: {},
+                rubberDialogParams: {
+                    page_size: 100000000,
+                    product_no: '',
+                    plan_date: ''
+                },
+                rulesEdit: {
+                    // equip_no: {},
+                    // a: {validator: '', trigger: 'blur'}
+                }
             }
         },
         created() {
@@ -38,14 +55,19 @@
             this.getGlueList()
             this.getList()
 
-            // this.tableDataRubber = [
-            //     {a: 1, b: 2, c: 3},
-            //     {a: 1, b: 2, c: 3},
-            //     {a: 1, b: 2, c: 3},
-            //     {a: 1, b: 2, c: 3}
-            // ]
+            //设置选择胶料的默认当前日期
+            this.rubberDialogParams.plan_date = new Date()
         },
         methods: {
+            addBatchNum(arr, params) {
+                let all = null
+                let a = arr && arr[0] ? arr[0][params] : 0
+                let b = arr && arr[1] ? arr[1][params] : 0
+                let c = arr && arr[2] ? arr[2][params] : 0
+                all = Number(a) + Number(b) + Number(c)
+                all = Math.round(all * 100) / 100
+                return all
+            },
             disabledDate(time) {
                 var seven = 3600 * 1000 * 24
                 var source_data = new Date(this.formCopyData.src_date).getTime()
@@ -59,26 +81,70 @@
             },
             getList() {
                 var _this = this
-                console.log(this.getParams, 'this.getParams')
+                // console.log(this.getParams, 'this.getParams')
+                var tableData = []
+                var arr = []
                 axios.get(this.tableDataUrl, {
                     params: _this.getParams
                 }).then(function (response) {
-                    _this.tableData = response.data.results || [];
+                    tableData = response.data.results || [];
+                    _this.getRubberList(true, tableData)
                 })
             },
             getMachineList() {
                 var _this = this
-                axios.get(EquipUrl, {params: {page: 1}}).then(function (response) {
+                axios.get(EquipUrl, {params: {page_size: 100000}}).then(function (response) {
+                    console.log(response.data.results, 'machineList')
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
                 });
             },
             getGlueList() {
                 var _this = this
-                axios.get(RubberMaterialUrl, {params: {page: 1}}).then(function (response) {
-                    _this.glueList = response.data.results || [];
+                axios.get(RubberMaterialUrl, {params: {page_size: 100000}}).then(function (response) {
+                    var glueList = response.data.results || [];
+                    //去重
+                    var obj = {}
+                    var newArr = glueList.reduce(function (item, next) {
+                        obj[next.stage_product_batch_no] ? ' ' : obj[next.stage_product_batch_no] = true && item.push(next)
+                        return item;
+                    }, [])
+                    _this.glueList = newArr
                 }).catch(function (error) {
                 });
+            },
+            getRubberList(bool, tableData) {
+                /*
+                *bool true 获取全部数据
+                * 否则 使用在选择胶料弹框内，加入筛选
+                 */
+                var _this = this
+                var params = bool ? {page_size: 100000000} :
+                    _this.rubberDialogParams
+
+                if (!bool) {
+                    if (!_this.rubberDialogParams.product_no) {
+                        _this.rubberDialogParams.product_no = null
+                    }
+                }
+                axios.get(ProductDayPlans, {
+                    params
+                }).then(function (response) {
+                    _this.tableDataRubber = response.data.results || []
+                    if (bool) {
+                        var arr = response.data.results || []
+                        var productDayObj = {}
+                        arr.forEach(function (D) {
+                            productDayObj[D.id] = D.pdp_product_classes_plan
+                        })
+                        tableData.forEach(function (D) {
+                            if (productDayObj[D.id]) {
+                                D.rubber_product_classes_plan = productDayObj[D.id]
+                            }
+                        })
+                        _this.tableData = tableData
+                    }
+                })
             },
             changeData(val) {
                 this.getParams['page'] = 1
@@ -121,11 +187,16 @@
                             this.getList()
                             _this.$message.success('操作成功')
                         }).catch(function (error) {
-                            for (var key in error.response.data) {
-                                if (error.response.data[key])
-                                    _this.manageFormError[key] = error.response.data[key].join(",")
-                            }
                             _this.loadingBtnCopy = false
+                            if (Object.prototype.toString.call(error.response.data) === '[object Object]') {
+                                for (var key in error.response.data) {
+                                    if (error.response.data[key]) {
+                                        _this.manageFormError[key] = error.response.data[key].join(",")
+                                    }
+                                }
+                            } else {
+                                _this.$message.error('操作失败')
+                            }
                         });
                     } else {
                         return false;
@@ -143,30 +214,71 @@
                 }
             },
             sourceDataChange(val) {
-                this.formCopyData.dst_date = null
+                let dst_date = new Date(this.formCopyData.dst_date).getTime()
+                let src_date = new Date(this.formCopyData.src_date).getTime()
+
+                if (this.formCopyData.dst_date && dst_date < src_date) {
+                    this.formCopyData.dst_date = null
+                }
             },
             selectRubber() {
                 this.rubberDialogVisible = true
-                // 获取胶料数据
-
+                this.getRubberList(false)
+            },
+            changeRubberDialog() {
+                this.getRubberList(false)
             },
             handleSelectionChange(selection) {
                 this.selectionRubber = selection
             },
             rubberDialogSubmit() {
-                console.log(this.selectionRubber, 'selection')
+                // console.log(this.selectionRubber, 'selection')
             },
             rowEdit(row) {
                 this.dialogVisibleEdit = true
+                this.formEdit = row
             },
             handleCloseEdit(done) {
+                this.formEdit = {
+                    pdp_product_batching_classes_plan: [
+                        {},
+                        {},
+                        {}
+                    ]
+                }
                 done()
             },
             editSubmit() {
-
+                // console.log(this.formEdit, 888)
+                var obj = {}
+                obj.id = this.formEdit.product_day_plan_id
+                obj.equip_no = this.formEdit.equip_id
+                obj.equip_no = this.formEdit.equip_id
+                var _this = this
+                // axios.get(this.tableDataUrl+'/'+this.formEdit.product_day_plan_id+'/', {
+                //     params: _this.getParams
+                // }).then(function (response) {
+                //     tableData = response.data.results || [];
+                //     _this.getRubberList(true, tableData)
+                // })
             },
             addRow() {
-                this.rowEdit()   //测试
+                this.dialogVisibleEdit = true
+            },
+            handleCloseAdd(done) {
+                done()
+            },
+            addSubmit() {
+
+            },
+            handleCloseRubber(done) {
+                if (this.$refs.multipleTable) {
+                    this.$refs.multipleTable.clearSelection();
+                }
+                done()
+            },
+            changeEquip_no() {
+
             }
         }
     };
