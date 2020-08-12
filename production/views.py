@@ -253,7 +253,7 @@ class PlanRealityView(APIView):
                             start_rate=None, begin_time=begin_time)
             datas.append(instance)
             datas.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
-        return_data["datas"] = datas
+        return_data["data"] = datas
         return Response(return_data)
 
 
@@ -274,7 +274,7 @@ class ProductActualView(APIView):
         # 通过排班查日计划
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {
-            "datas": []
+            "data": []
         }
         for day_plan in list(day_plan_set):
             instance = {}
@@ -330,7 +330,7 @@ class ProductActualView(APIView):
             instance.update(classes_data=day_plan_actual, plan_weight=plan_weight,
                             product_no=product_no, equip_no=equip_no,
                             plan_trains=plan_trains, actual_trains=actual_trains)
-            return_data["datas"].append(instance)
+            return_data["data"].append(instance)
         return Response(return_data)
 
 
