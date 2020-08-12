@@ -44,6 +44,8 @@ const PalletFeedBacksUrl = "/api/v1/production/pallet-feedbacks/";
 
 const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
 
+const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
+
 var BaseMixin = {
 
     data: function () {

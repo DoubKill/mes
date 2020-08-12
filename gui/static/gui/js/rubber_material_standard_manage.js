@@ -258,7 +258,6 @@
                     .then(function (response) {
                         app.put_select_stage_product_batch_no = response.data['stage_product_batch_no'];
                         app.put_select_product_name = response.data['product_name'];
-                        app.put_select_status = response.data['used_type'];
                         // app.put_select_status = response.data['used_type'];
                         app.put_select_status = app.usedTypeChoice(response.data['used_type']);
                         app.put_select_dev_type = response.data['dev_type_name'];
@@ -318,9 +317,6 @@
                 var app = this;
                 app.$refs[formName].validate((valid) => {
                   if (valid) {
-                      app.rubberMatetialError = "";
-                      app.dialogAddRubberMaterial = false;
-                      app.dialogChoiceMaterials = true;
                       //胶料配料标准要显示的标题------------------------------------------------------------------------开始
                       //以下用于拼接胶料配料的编号：格式：产地-胶料编码-段次-版本 ----------开始
                       for(var i = 0; i < app.PopupRubberSite.length; ++i){
@@ -364,21 +360,32 @@
                       //当前选择的 配方和段次 是否有上段次的信息
                       axios.get(PreBatchInfoUrl + '?product_info_id='+jiaoliao_id+'&stage_id='+app.rubberMaterialForm['stage'], {}
                       ).then(function (response) {
-                          app.selectedPreMaterials = response.data;
-                          // console.log("======================");
-                          // console.log(app.selectedPreMaterials);
-                          // console.log("======================");
+                            app.selectedPreMaterials = response.data;
+
+                            app.rubberMatetialError = "";
+                            app.dialogAddRubberMaterial = false;
+                            app.dialogChoiceMaterials = true;
                       }).catch(function (error) {
+                          app.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
                       });
                       //当前选择的 配方和段次 对应的原料信息（为该配方对应的段次 添加配料）
                       axios.get(ProductRecipeUrl + '?product_info_id='+jiaoliao_id+'&stage_id='+app.rubberMaterialForm['stage'], {}
                       ).then(function (response) {
                           app.ProductRecipe = response.data;
-                          // console.log("======================");
-                          // console.log(app.ProductRecipe);
-                          // console.log("======================");
                       }).catch(function (error) {
+                          app.dialogAddRubberMaterial = true;
+                          app.dialogChoiceMaterials = false;
+
+                          app.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
                       });
+
+
 
                   } else {
                     console.log('error submit!!');
@@ -482,72 +489,88 @@
                 var app = this;
                 var batching_details_list = [];
                 var variate_num = 0;
-                console.log("============================================================================");
-                console.log("胶料工艺信息：product_info："+app.rubberMaterialForm['stage_product_batch_no']);
-                console.log("段次胶料标准编码：stage_product_batch_no："+app.select_stage_product_batch_no);
-                console.log("段次id：stage："+app.rubberMaterialForm['stage']);
-                console.log("机型id：dev_type："+app.rubberMaterialForm['dev_type_name']);
-                console.log("配料时间(秒)：batching_time_interval："+app.discharge_time_material);
-                console.log("返炼时间(秒)：rm_time_interval："+app.discharge_time_material);
-                console.log("炼胶时间(秒)：production_time_interval："+app.select_rm_time_interval);
-                console.log("============================================================================");
-
 
                 if(this.selectedPreMaterials.material_type){
-                    variate_num += 1;
-                    batching_details_list.push({
-                        sn: variate_num,
-                        material: app.selectedPreMaterials.material,
-                        ratio_weight: app.selectedPreMaterials.pre_ratioVolume,
-                        standard_volume: app.selectedPreMaterials.pre_calculateVolume,
-                        actual_volume: app.selectedPreMaterials.pre_practicalVolume,
-                        standard_weight: app.selectedPreMaterials.pre_calculateWeight,
-                        actual_weight: app.selectedPreMaterials.pre_practical_weight,
-                        time_interval: app.selectedPreMaterials.pre_time_material,
-                        temperature: app.selectedPreMaterials.pre_practical_temperature,
-                        rpm: app.selectedPreMaterials.pre_practical_RPM,
-                        previous_product_batching:app.selectedPreMaterials.previous_product_batching,
-                    })
+                    if(app.selectedPreMaterials.pre_practical_weight && app.selectedPreMaterials.pre_time_material && app.selectedPreMaterials.pre_practical_temperature && app.selectedPreMaterials.pre_practical_RPM){
+                            variate_num += 1;
+                            batching_details_list.push({
+                            sn: variate_num,
+                            material: app.selectedPreMaterials.material,
+                            ratio_weight: app.selectedPreMaterials.pre_ratioVolume,
+                            standard_volume: app.selectedPreMaterials.pre_calculateVolume,
+                            actual_volume: app.selectedPreMaterials.pre_practicalVolume,
+                            standard_weight: app.selectedPreMaterials.pre_calculateWeight,
+                            actual_weight: app.selectedPreMaterials.pre_practical_weight,
+                            time_interval: app.selectedPreMaterials.pre_time_material,
+                            temperature: app.selectedPreMaterials.pre_practical_temperature,
+                            rpm: app.selectedPreMaterials.pre_practical_RPM,
+                            previous_product_batching:app.selectedPreMaterials.previous_product_batching,
+                        })
+                    }
+                    else {
+                        app.$message({
+                            message: "上段次必填数据不能为空",
+                            type: 'error'
+                        });
+                        return
+                    }
+
                 }
 
                 for (var i = 0; i < this.ProductRecipe.length; ++i) {
-                    variate_num += 1;
-                    var now_stage_material = {
-                        sn: variate_num,
-                        material: app.ProductRecipe[i].material,
-                        ratio_weight: app.ProductRecipe[i].ratioVolume,
-                        standard_volume: app.ProductRecipe[i].calculateVolume,
-                        actual_volume: app.ProductRecipe[i].practicalVolume,
-                        standard_weight: app.ProductRecipe[i].calculateWeight,
-                        actual_weight: app.ProductRecipe[i].practical_weight,
-                        time_interval: app.ProductRecipe[i].time_material,
-                        temperature: app.ProductRecipe[i].practical_temperature,
-                        rpm: app.ProductRecipe[i].practical_RPM,
-                    };
-                    batching_details_list.push(now_stage_material);
-                    console.log("============================================================================");
-                    console.log("序号：sn："+i);
-                    console.log("原材料id：material："+app.ProductRecipe[i].material);
-                    console.log("配比体积：ratio_weight"+app.ProductRecipe[i].ratioVolume);
-                    console.log("计算体积：standard_volume"+app.ProductRecipe[i].calculateVolume);
-                    console.log("实际体积：actual_volume"+app.ProductRecipe[i].practicalVolume);
-                    console.log("计算重量：standard_weight"+app.ProductRecipe[i].calculateWeight);
-                    console.log("实际重量：actual_weight"+app.ProductRecipe[i].practical_weight);
-                    console.log("时间：time_interval"+app.ProductRecipe[i].time_material);
-                    console.log("温度：temperature"+app.ProductRecipe[i].practical_temperature);
-                    console.log("转速：rpm"+app.ProductRecipe[i].practical_RPM);
-                    console.log("上段位配料id：previous_product_batching"+app.selectedPreMaterials.previous_product_batching);
-                    console.log("============================================================================");
-
+                    if(app.ProductRecipe[i].calculateWeight && app.ProductRecipe[i].time_material && app.ProductRecipe[i].practical_temperature && app.ProductRecipe[i].practical_RPM){
+                        variate_num += 1;
+                        var now_stage_material = {
+                            sn: variate_num,
+                            material: app.ProductRecipe[i].material,
+                            ratio_weight: app.ProductRecipe[i].ratioVolume,
+                            standard_volume: app.ProductRecipe[i].calculateVolume,
+                            actual_volume: app.ProductRecipe[i].practicalVolume,
+                            standard_weight: app.ProductRecipe[i].calculateWeight,
+                            actual_weight: app.ProductRecipe[i].practical_weight,
+                            time_interval: app.ProductRecipe[i].time_material,
+                            temperature: app.ProductRecipe[i].practical_temperature,
+                            rpm: app.ProductRecipe[i].practical_RPM,
+                        };
+                        batching_details_list.push(now_stage_material);
+                    }
+                    else {
+                        app.$message({
+                            message: "本段次必填数据不能为空",
+                            type: 'error'
+                        });
+                        return
+                    }
                 }
+
+                if(app.discharge_time_material){
+                }
+                else {
+                    app.$message({
+                        message: "炼胶时间不能为空",
+                        type: 'error'
+                    });
+                    return
+                }
+
+                if(app.select_rm_time_interval){
+                    var variate_rm_time_interval = app.select_rm_time_interval
+                }
+                else {
+                    variate_rm_time_interval = null
+                }
+                console.log('=================================================');
+                console.log(app.select_rm_time_interval);
+                console.log('=================================================');
+
                 axios.post(RubberMaterialUrl, {
                     product_info: app.rubberMaterialForm['stage_product_batch_no'],
                     stage_product_batch_no: app.select_stage_product_batch_no,
                     stage: app.rubberMaterialForm['stage'],
                     dev_type: app.rubberMaterialForm['dev_type_name'],
                     batching_time_interval: app.discharge_time_material,
-                    rm_time_interval: app.discharge_time_material,
-                    production_time_interval: app.select_rm_time_interval,
+                    rm_time_interval: variate_rm_time_interval,
+                    production_time_interval: app.discharge_time_material,
                     batching_details: batching_details_list,
                 }).then(function (response) {
 
@@ -556,8 +579,7 @@
                     app.currentChange(app.currentPage);
 
                 }).catch(function (error) {
-
-                    this.$message({
+                    app.$message({
                         message: error.response.data,
                         type: 'error'
                     });
@@ -570,104 +592,57 @@
                 var batching_details_list = [];
 
                 for (var i = 0; i < this.PutProductRecipe.length; ++i) {
-                    var now_stage_material = {
-                        id: app.PutProductRecipe[i].id,
-                        sn: app.PutProductRecipe[i].sn,
-                        material: app.PutProductRecipe[i].material,
-                        material_type: app.PutProductRecipe[i].material_type,
-                        material_name: app.PutProductRecipe[i].material_name,
-                        ratio: app.PutProductRecipe[i].ratio,
-                        density: app.PutProductRecipe[i].density,
-                        ratio_weight: app.PutProductRecipe[i].ratio_weight,
-                        standard_volume: app.PutProductRecipe[i].standard_volume,
-                        actual_volume: app.PutProductRecipe[i].actual_volume,
-                        standard_weight: app.PutProductRecipe[i].standard_weight,
-                        actual_weight: app.PutProductRecipe[i].actual_weight,
-                        time_interval: app.PutProductRecipe[i].time_interval,
-                        temperature: app.PutProductRecipe[i].temperature,
-                        rpm: app.PutProductRecipe[i].rpm,
-                        previous_product_batching:app.PutProductRecipe[i].previous_product_batching,
-                    };
-                    batching_details_list.push(now_stage_material);
-                    console.log("============================================================================");
-                    console.log("id："+app.PutProductRecipe[i].id);
-                    console.log("序号：sn："+app.PutProductRecipe[i].sn);
-                    console.log("原材料id：material："+app.PutProductRecipe[i].material);
-                    console.log("配比体积：ratio_weight"+app.PutProductRecipe[i].ratio_weight);
-                    console.log("计算体积：standard_volume"+app.PutProductRecipe[i].standard_volume);
-                    console.log("实际体积：actual_volume"+app.PutProductRecipe[i].actual_volume);
-                    console.log("计算重量：standard_weight"+app.PutProductRecipe[i].standard_weight);
-                    console.log("实际重量：actual_weight"+app.PutProductRecipe[i].actual_weight);
-                    console.log("时间：time_interval"+app.PutProductRecipe[i].time_interval);
-                    console.log("温度：temperature"+app.PutProductRecipe[i].temperature);
-                    console.log("转速：rpm"+app.PutProductRecipe[i].rpm);
-                    console.log("上段位配料id：previous_product_batching"+app.PutProductRecipe[i].previous_product_batching);
-                    console.log("============================================================================");
+                    if(app.PutProductRecipe[i].standard_weight && app.PutProductRecipe[i].time_interval && app.PutProductRecipe[i].temperature && app.PutProductRecipe[i].rpm){
+                        var now_stage_material = {
+                            id: app.PutProductRecipe[i].id,
+                            sn: app.PutProductRecipe[i].sn,
+                            material: app.PutProductRecipe[i].material,
+                            material_type: app.PutProductRecipe[i].material_type,
+                            material_name: app.PutProductRecipe[i].material_name,
+                            ratio: app.PutProductRecipe[i].ratio,
+                            density: app.PutProductRecipe[i].density,
+                            ratio_weight: app.PutProductRecipe[i].ratio_weight,
+                            standard_volume: app.PutProductRecipe[i].standard_volume,
+                            actual_volume: app.PutProductRecipe[i].actual_volume,
+                            standard_weight: app.PutProductRecipe[i].standard_weight,
+                            actual_weight: app.PutProductRecipe[i].actual_weight,
+                            time_interval: app.PutProductRecipe[i].time_interval,
+                            temperature: app.PutProductRecipe[i].temperature,
+                            rpm: app.PutProductRecipe[i].rpm,
+                            previous_product_batching:app.PutProductRecipe[i].previous_product_batching,
+                        };
+                        batching_details_list.push(now_stage_material);
+                    }else{
+                        app.$message({
+                            message: "必填字段不能为空",
+                            type: 'error'
+                        });
+                        return
+                    }
 
                 }
-                axios.put(RubberMaterialUrl + this.currentRow.id + "/", {
-                    rm_time_interval: app.put_select_rm_time_interval,
-                    batching_time_interval: app.put_discharge_time_material,
-                    production_time_interval: app.put_discharge_time_material,
-                    batching_details:batching_details_list,
-                }).then(function (response) {
 
-                    app.dialogRubberMaterialStandard = false;
-                    app.$message(app.put_select_stage_product_batch_no + "修改成功");
-                    app.currentChange(app.currentPage);
 
-                }).catch(function (error) {
-
-                    this.$message({
-                        message: error.response.data,
+                if(app.put_discharge_time_material){
+                }
+                else {
+                    app.$message({
+                        message: "炼胶时间不能为空",
                         type: 'error'
                     });
-                });
-
-            },
-
-            put_saveMaterialClicked: function () {
-                var app = this;
-                var batching_details_list = [];
-
-                for (var i = 0; i < this.PutProductRecipe.length; ++i) {
-                    var now_stage_material = {
-                        id: app.PutProductRecipe[i].id,
-                        sn: app.PutProductRecipe[i].sn,
-                        material: app.PutProductRecipe[i].material,
-                        material_type: app.PutProductRecipe[i].material_type,
-                        material_name: app.PutProductRecipe[i].material_name,
-                        ratio: app.PutProductRecipe[i].ratio,
-                        density: app.PutProductRecipe[i].density,
-                        ratio_weight: app.PutProductRecipe[i].ratio_weight,
-                        standard_volume: app.PutProductRecipe[i].standard_volume,
-                        actual_volume: app.PutProductRecipe[i].actual_volume,
-                        standard_weight: app.PutProductRecipe[i].standard_weight,
-                        actual_weight: app.PutProductRecipe[i].actual_weight,
-                        time_interval: app.PutProductRecipe[i].time_interval,
-                        temperature: app.PutProductRecipe[i].temperature,
-                        rpm: app.PutProductRecipe[i].rpm,
-                        previous_product_batching:app.PutProductRecipe[i].previous_product_batching,
-                    };
-                    batching_details_list.push(now_stage_material);
-                    console.log("============================================================================");
-                    console.log("id："+app.PutProductRecipe[i].id);
-                    console.log("序号：sn："+app.PutProductRecipe[i].sn);
-                    console.log("原材料id：material："+app.PutProductRecipe[i].material);
-                    console.log("配比体积：ratio_weight"+app.PutProductRecipe[i].ratio_weight);
-                    console.log("计算体积：standard_volume"+app.PutProductRecipe[i].standard_volume);
-                    console.log("实际体积：actual_volume"+app.PutProductRecipe[i].actual_volume);
-                    console.log("计算重量：standard_weight"+app.PutProductRecipe[i].standard_weight);
-                    console.log("实际重量：actual_weight"+app.PutProductRecipe[i].actual_weight);
-                    console.log("时间：time_interval"+app.PutProductRecipe[i].time_interval);
-                    console.log("温度：temperature"+app.PutProductRecipe[i].temperature);
-                    console.log("转速：rpm"+app.PutProductRecipe[i].rpm);
-                    console.log("上段位配料id：previous_product_batching"+app.PutProductRecipe[i].previous_product_batching);
-                    console.log("============================================================================");
-
+                    return
                 }
+
+                if(app.put_select_rm_time_interval){
+                    var variate_put_rm_time_interval = app.put_select_rm_time_interval
+                }
+                else {
+                    variate_put_rm_time_interval = null
+                }
+
+
                 axios.put(RubberMaterialUrl + this.currentRow.id + "/", {
-                    rm_time_interval: app.put_select_rm_time_interval,
+                    rm_time_interval: variate_put_rm_time_interval,
                     batching_time_interval: app.put_discharge_time_material,
                     production_time_interval: app.put_discharge_time_material,
                     batching_details:batching_details_list,
@@ -679,7 +654,7 @@
 
                 }).catch(function (error) {
 
-                    this.$message({
+                    app.$message({
                         message: error.response.data,
                         type: 'error'
                     });
