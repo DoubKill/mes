@@ -40,7 +40,8 @@
                 batching_time_interval: "",
                 productBatchings: [],
                 planSchedules: [],
-                productBatchingById: {}
+                productBatchingById: {},
+                addPlanVisible: false
             }
         },
         created: function () {
@@ -121,7 +122,7 @@
                 this.rubberDailyPlanForm.pdp_product_classes_plan[index].time =
                     date.toISOString().substr(11, 8);
             },
-            addPlanClicked: function () {
+            addPlan: function () {
 
                 var app = this;
                 this.rubberDailyPlanForm["plan_date"] = this.plan_date;

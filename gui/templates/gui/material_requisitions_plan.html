@@ -4,12 +4,17 @@
 {% block main %}
     <el-form :inline="true">
         <el-form-item label="日期">
-            <el-date-picker
-                    v-model="planDate"
-                    type="date"
+            <el-select
+                    clearable
                     @change="planDateChange"
-                    placeholder="选择日期">
-            </el-date-picker>
+                    v-model="planDate" placeholder="请选择">
+                <el-option
+                        :key="schedule.id"
+                        :label="schedule.day_time"
+                        :value="schedule.day_time"
+                        v-for="schedule in planDateOptions">
+                </el-option>
+            </el-select>
         </el-form-item>
         <el-form-item label="原材料类别">
             <el-select
@@ -18,9 +23,9 @@
                     v-model="materialType" placeholder="请选择">
                 <el-option
                         v-for="item in materialTypeOptions"
-                        :key="item.global_name"
+                        :key="item.id"
                         :label="item.global_name"
-                        :value="item.global_name">
+                        :value="item.id">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -63,40 +68,45 @@
                 align="center"
                 label="原材料需要量（Kg）">
             <el-table-column
-                prop="weight[0].need_weight"
+                prop="material_demanded_list[0].material_demanded"
                 label="早班">
             </el-table-column>
             <el-table-column
-                prop="weight[1].need_weight"
+                prop="material_demanded_list[1].material_demanded"
                 label="中班">
             </el-table-column>
             <el-table-column
-                prop="weight[2].need_weight"
+                prop="material_demanded_list[2].material_demanded"
                 label="晚班">
             </el-table-column>
             <el-table-column
-                prop="weight[0].need_weight + weight[1].need_weight + weight[2].need_weight"
+                prop="material_demanded_list[0].material_demanded + material_demanded_list[1].material_demanded + material_demanded_list[2].material_demanded"
                 label="总计">
+                <template slot-scope="scope">
+                    <span v-text="scope.row.material_demanded_list[0].material_demanded + scope.row.material_demanded_list[1].material_demanded + scope.row.material_demanded_list[2].material_demanded"></span>
+                </template>
             </el-table-column>
         </el-table-column>
         <el-table-column
                 align="center"
                 label="领料计划（Kg）">
             <el-table-column
-                prop="weight[0].plan_weight"
+                prop="md_material_requisition_classes[0].morning"
                 label="早班">
             </el-table-column>
             <el-table-column
-                prop="weight[1].plan_weight"
+                prop="md_material_requisition_classes[1].afternoon"
                 label="中班">
             </el-table-column>
             <el-table-column
-                prop="weight[2].plan_weight"
+                prop="md_material_requisition_classes[2].night"
                 label="晚班">
             </el-table-column>
             <el-table-column
-                prop="weight[0].plan_weight + weight[1].plan_weight + weight[2].plan_weight"
                 label="总计">
+                <template slot-scope="scope">
+                    <span v-text="scope.row.md_material_requisition_classes[0].morning + scope.row.md_material_requisition_classes[1].afternoon + scope.row.md_material_requisition_classes[2].night"></span>
+                </template>
             </el-table-column>
         </el-table-column>
         <el-table-column label="操作">
@@ -118,34 +128,27 @@
 
 {% block dialogs %}
     <el-dialog title="编辑原材料领料计划" :visible.sync="dialogEditVisible" size="mini">
-        <el-form v-model="editForm" :label-width="formLabelWidth" >
+        <el-form :model="editForm" ref="editForm" :label-width="formLabelWidth" >
             <el-form-item label="日期：">
                 <span v-text="editForm.plan_date"></span>
             </el-form-item>
             <el-form-item label="原材料名称：">
                 <span v-text="editForm.material_name"></span>
             </el-form-item>
-{#            <el-form-item label="早班需u#}
             <el-form-item label="早班领料计划：">
-                <el-input  v-model.number="editForm.weight[0].plan_weight" style="float: left; width: 80%"></el-input>
+                <el-input  v-model.number="editForm.weights[0]" style="float: left; width: 80%"></el-input>
                 <span style="float: right; width: 18%">Kg</span>
             </el-form-item>
-{#            <el-form-item label="中班需要量：">#}
-{#                <span v-text="editForm.weight[1].need_weight + ' Kg'"></span>#}
-{#            </el-form-item>#}
             <el-form-item label="中班领料计划：">
-                <el-input  v-model.number="editForm.weight[1].plan_weight" style="float: left; width: 80%"></el-input>
+                <el-input  v-model.number="editForm.weights[1]" style="float: left; width: 80%"></el-input>
                 <span style="float: right; width: 18%">Kg</span>
             </el-form-item>
-{#            <el-form-item label="晚班需要量：">#}
-{#                <span v-text="editForm.weight[2].need_weight + ' Kg'"></span>#}
-{#            </el-form-item>#}
             <el-form-item label="晚班领料计划：">
-                <el-input  v-model.number="editForm.weight[2].plan_weight" style="float: left; width: 80%"></el-input>
+                <el-input  v-model.number="editForm.weights[2]" style="float: left; width: 80%"></el-input>
                 <span style="float: right; width: 18%">Kg</span>
             </el-form-item>
             <el-form-item label="领料计划合计：">
-                <span v-text="editForm.weight[0].plan_weight + editForm.weight[1].plan_weight + editForm.weight[2].plan_weight"></span>
+                <span v-text="editForm.weights[0] + editForm.weights[1] + editForm.weights[2]"></span>
             </el-form-item>
         </el-form>
         <div slot="footer" class="dialog-footer">
@@ -162,7 +165,7 @@
 {% endblock %}
 
 {% block scripts %}
-{#    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>#}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
     <script src="{% static 'gui/js/material_requisitions_plan.js' %}"></script>
 {% endblock %}
 
