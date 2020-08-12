@@ -189,6 +189,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
+        print(validated_data)
         pdp_dic = {}
         pdp_dic['equip'] = validated_data.pop('equip')
         pdp_dic['product_batching'] = validated_data.pop('product_batching')
