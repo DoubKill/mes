@@ -331,7 +331,7 @@
                 :visible.sync="dialogVisibleEdit"
                 :before-close="handleCloseEdit"
                 v-loading="dialogVisibleEditLoading">
-            <el-form ref="formEdit" :rules="rulesEdit" :model="formEdit" label-width="100px">
+            <el-form ref="formEdit" :rules="rulesEdit" :model="formEdit" label-width="120px">
                 <div v-if="!formEdit.hasOwnProperty('id')">
                     <el-form-item label="配料机台" prop="equip">
                         <el-select v-model="formEdit.equip"
@@ -345,8 +345,8 @@
                         </el-select>
                     </el-form-item>
                     <el-form-item label="炼胶机类型" prop="workRubberType">
-                        <el-select v-model="formEdit.workRubberType"
-                                   @change="changeWorkRubberType"
+                        <el-select @change="changeWorkRubberType"
+                                   v-model="formEdit.workRubberType"
                                    placeholder="请选择">
                             <el-option
                                     v-for="item in rubberTypeList"
@@ -356,20 +356,19 @@
                             </el-option>
                         </el-select>
                     </el-form-item>
-                    <el-form-item label="配料小料编码">
-                        <el-select v-model="formEdit.category_type"
-                                   @change="changeData"
-                                   clearable
+                    <el-form-item label="配料小料编码" prop="product_batching">
+                        <el-select v-model="formEdit.product_batching"
                                    placeholder="请选择">
                             <el-option
                                     v-for="item in addGlueList"
-                                    :key="item.equip_type_name"
-                                    :label="item.equip_type_name"
-                                    :value="item.equip_type_name">
+                                    :key="item.id"
+                                    :label="item.stage_product_batch_no"
+                                    :value="item.id">
                             </el-option>
                         </el-select>
                     </el-form-item>
                     <el-form-item label="小料重量(kg)">
+                        {{ smallMaterialEdit }}
                     </el-form-item>
                     <el-form-item label="当前库存(袋)">
                     </el-form-item>

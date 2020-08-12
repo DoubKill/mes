@@ -49,10 +49,12 @@
                     equip: {required: true, message: '请选择配料机台', trigger: 'change'},
                     // a: {validator: '', trigger: 'blur'}
                     workRubberType: {required: true, message: '请选择炼胶机类型', trigger: 'change'},
+                    product_batching: {required: true, message: '请选择配料小料编码', trigger: 'change'}
                 },
                 rubberTypeList: [],
                 dialogVisibleEditLoading: true,
-                addGlueList: []
+                addGlueList: [],
+                smallMaterialEdit: ''
             }
         },
         created() {
@@ -274,6 +276,7 @@
                         {}
                     ]
                 }
+                this.$refs.formEdit.resetFields();
                 done()
             },
             editSubmit() {
