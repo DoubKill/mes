@@ -4,13 +4,17 @@
 {% block main %}
     <el-form :inline="true">
         <el-form-item label="日期">
-            <el-date-picker
+            <el-select
                     @change="queryDataChange"
-                    v-model="plan_date"
-                    type="date"
-                    value-format="yyyy-MM-dd"
-                    placeholder="选择日期">
-            </el-date-picker>
+                    clearable
+                    v-model="plan_date" placeholder="请选择">
+                <el-option
+                        :key="schedule.id"
+                        :label="schedule.day_time"
+                        :value="schedule.day_time"
+                        v-for="schedule in planSchedules">
+                </el-option>
+            </el-select>
         </el-form-item>
         <el-form-item label="机台">
             <el-select
@@ -40,12 +44,12 @@
             </el-select>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button @click="addPlanClicked">
+            <el-checkbox-button v-model="addPlanVisible">
                 新建
-            </el-button>
+            </el-checkbox-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button>
+            <el-button :disabled="!currentRow" @click="deletePlan">
                 删除
             </el-button>
         </el-form-item>
@@ -55,55 +59,140 @@
             </el-button>
         </el-form-item>
     </el-form>
-    {% verbatim vue %}
-        <table class="table table-bordered"
-               style="width: 100%; color: #909399; font-size: 14px;">
-            <thead>
-            <tr>
-                <th rowspan="2">S</th>
-                <th rowspan="2">No</th>
-                <th rowspan="2">机台</th>
-                <th rowspan="2">胶料编码</th>
-                <th rowspan="2">配料重量</th>
-                <th rowspan="2">配料时间</th>
-                <th rowspan="2">当前库存(吨)</th>
-                <th colspan="4">早班计划</th>
-                <th colspan="4">中班计划</th>
-                <th colspan="4">夜班计划</th>
-            </tr>
-            <tr>
-                <template v-for="_ in 3">
-                    <th>顺序</th>
-                    <th>车次</th>
-                    <th>重量(吨)</th>
-                    <th>时间</th>
-                </template>
-            </tr>
-            </thead>
-            <tbody>
-            <tr v-for="(data, index) in tableData">
-                <td></td>
-                <td>{{ index }}</td>
-                <td>{{ data.equip_no }}</td>
-                <td>{{ data.product_no }}</td>
-                <td>{{ data.batching_weight }}</td>
-                <td>{{ data.batching_time_interval }}</td>
-                <td></td>
-                <template v-for="plan in data.pdp_product_classes_plan">
-                    <td>{{ plan.sn }}</td>
-                    <td>{{ plan.plan_trains }}</td>
-                    <td>{{ plan.weight }}</td>
-                    <td>{{ plan.time }}</td>
-                </template>
-            </tr>
-            </tbody>
-        </table>
-    {% endverbatim vue %}
+
+    <el-table
+            highlight-current-row
+            @current-change="handleCurrentChange"
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column label="S" width="30"></el-table-column>
+        <el-table-column type="index" label="No" width="50"></el-table-column>
+        <el-table-column prop="equip_no" label="机台"></el-table-column>
+        <el-table-column prop="product_no" label="胶料编码"></el-table-column>
+        <el-table-column prop="batching_weight" label="配料重量"></el-table-column>
+        <el-table-column prop="batching_time_interval" label="配料时间"></el-table-column>
+        <el-table-column label="当前库存（吨）"></el-table-column>
+        <el-table-column label="早班计划">
+            <el-table-column prop="pdp_product_classes_plan[0].sn" label="顺序">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[0].plan_trains" label="车次">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[0].weight" label="重量（吨）">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[0].time" label="时间">
+            </el-table-column>
+        </el-table-column>
+        <el-table-column label="中班计划">
+            <el-table-column prop="pdp_product_classes_plan[1].sn" label="顺序">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[1].plan_trains" label="车次">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[1].weight" label="重量（吨）">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[1].time" label="时间">
+            </el-table-column>
+        </el-table-column>
+        <el-table-column label="夜班计划">
+            <el-table-column prop="pdp_product_classes_plan[2].sn" label="顺序">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[2].plan_trains" label="车次">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量（吨）">
+            </el-table-column>
+            <el-table-column prop="pdp_product_classes_plan[2].time" label="时间">
+            </el-table-column>
+        </el-table-column>
+    </el-table>
     {% include 'gui/paginations.html' %}
+
+    {% verbatim vue %}
+        <el-card v-if="addPlanVisible">
+            <div>
+                新增计划
+                <el-button @click="addPlan" style="float: right; margin-bottom: 20px">
+                    确定
+                </el-button>
+            </div>
+            <div style="overflow-x: auto;clear: both; text-align: center">
+                <table data-toggle="table" class="table table-bordered"
+                       style="color: #909399; font-size: 14px;">
+                    <thead>
+                    <tr>
+                        <th rowspan="2">机台</th>
+                        <th rowspan="2">胶料编码</th>
+                        <th rowspan="2">配料重量</th>
+                        <th rowspan="2">配料时间</th>
+                        <th rowspan="2">当前库存(吨)</th>
+                        <th colspan="4">早班计划</th>
+                        <th colspan="4">中班计划</th>
+                        <th colspan="4">夜班计划</th>
+                    </tr>
+                    <tr>
+                        <template v-for="_ in 3">
+                            <th>顺序</th>
+                            <th>车次</th>
+                            <th>重量(吨)</th>
+                            <th>时间</th>
+                        </template>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>
+                            <el-select style="width: 150px;" v-model="rubberDailyPlanForm.equip">
+                                <el-option
+                                        :key="equip.id"
+                                        :label="equip.equip_no"
+                                        :value="equip.id"
+                                        v-for="equip in equips">
+                                </el-option>
+                            </el-select>
+                        </td>
+                        <td>
+                            <el-select @change="productBatchingChange" style="width: 200px;"
+                                       v-model="rubberDailyPlanForm.product_batching">
+                                <el-option
+                                        :key="productBatching.id"
+                                        :label="productBatching.stage_product_batch_no"
+                                        :value="productBatching.id"
+                                        v-for="productBatching in productBatchings">
+                                </el-option>
+                            </el-select>
+                        </td>
+                        <td>{{ batching_weight }}</td>
+                        <td>{{ batching_time_interval }}</td>
+                        <td></td>
+                        <template v-for="(plan, index) in rubberDailyPlanForm.pdp_product_classes_plan">
+                            <td>
+                                <el-input-number v-model="plan.sn" :min="0">
+                                </el-input-number>
+                            </td>
+                            <td>
+                                <el-input-number @change="planTrainsChange(index)" v-model="plan.plan_trains"
+                                                 :min="0"></el-input-number>
+                            </td>
+                            <td>
+                                {{ plan.weight }}
+                            </td>
+                            <td>
+                                {{ plan.time }}
+                            </td>
+                        </template>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </el-card>
+
+    {% endverbatim vue %}
+
+
 {% endblock %}
 
 {% block dialogs %}
 
+    <!--
     <el-dialog title="添加胶料日计划" :visible.sync="addRubberDailyPlanDialogVisible">
         <el-form v-model="rubberDailyPlanForm">
             <el-form-item label="机台" :label-width="formLabelWidth">
@@ -154,30 +243,14 @@
                     </el-form-item>
                 </template>
             {% endverbatim vue %}
-            <!--
-            <el-divider>早班计划</el-divider>
-            <el-form-item label="顺序" :label-width="formLabelWidth">
-                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[0].sn"
-                                 :min="1"></el-input-number>
-            </el-form-item>
-            <el-divider>中班计划</el-divider>
-            <el-form-item label="顺序" :label-width="formLabelWidth">
-                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[1].sn"
-                                 :min="1"></el-input-number>
-            </el-form-item>
-            <el-divider>晚班计划</el-divider>
-            <el-form-item label="顺序" :label-width="formLabelWidth">
-                <el-input-number v-model="rubberDailyPlanForm.pdp_product_classes_plan[2].sn"
-                                 :min="1"></el-input-number>
-            </el-form-item>
-            -->
+
         </el-form>
         <div slot="footer" class="dialog-footer">
             <el-button @click="addRubberDailyPlanDialogVisible = false">取 消</el-button>
-            <el-button type="primary" @click="addRubberDailyPlanDialogVisible = false">确 定</el-button>
+            <el-button type="primary" @click="addRubberDailyPlan">确 定</el-button>
         </div>
     </el-dialog>
-
+    -->
 
 {% endblock %}
 
@@ -186,5 +259,6 @@
 {% endblock %}
 
 {% block scripts %}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
     <script src="{% static 'gui/js/rubber_schedule_daily_plan.js' %}"></script>
 {% endblock %}
