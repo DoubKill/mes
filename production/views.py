@@ -1,5 +1,6 @@
 import re
 
+import requests
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins
@@ -343,3 +344,19 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = PalletFeedbacksFilter
+
+
+class PlanRelease(APIView):
+    """计划下达"""
+
+    def _validate(self, data):
+        """校验请求体"""
+        return data
+
+    def post(self, request):
+        plan_data = request.data
+        plan_data = self._validate(plan_data)
+        token = request.get("Auth")
+        url = "http://xxxxx"
+        ret = requests.post(url, data=plan_data)
+        # TODO
