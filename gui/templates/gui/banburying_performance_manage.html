@@ -30,9 +30,6 @@
 
         <el-form-item style="float: right">
             <el-form-item>
-                <el-button @click="showAddDialog">修改</el-button>
-            </el-form-item>
-            <el-form-item>
                 <el-button>
                     下载全部
                 </el-button>
@@ -122,6 +119,13 @@
         </el-table-column>
     </el-table>
     {% include 'gui/paginations.html' %}
+    <template>
+  <el-button type="text" @click="outerVisible = true">点击打开外层 Dialog</el-button>
+
+
+</template>
+
+
 {% endblock %}
 
 
@@ -137,7 +141,18 @@
             <el-button type="primary" @click="handleAddMaterialBaseInfo">确 定</el-button>
         </div>
     </el-dialog>
-
+    <el-dialog title="外层 Dialog" :visible.sync="outerVisible">
+    <el-dialog
+      width="30%"
+      title="内层 Dialog"
+      :visible.sync="innerVisible"
+      append-to-body>
+    </el-dialog>
+    <div slot="footer" class="dialog-footer">
+      <el-button @click="outerVisible = false">取 消</el-button>
+      <el-button type="primary" @click="innerVisible = true">打开内层 Dialog</el-button>
+    </div>
+  </el-dialog>
 {% endblock %}
 
 
@@ -146,6 +161,7 @@
 {% endblock %}
 
 {% block scripts %}
+
 {#    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>#}
     <script src="{% static 'gui/js/banburying_performance_manage.js' %}"></script>
 {% endblock %}

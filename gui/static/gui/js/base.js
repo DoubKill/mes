@@ -46,6 +46,8 @@ const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
 
 const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
 
+const ProductActualUrl = "/api/v1/production/product-actual/"
+
 var BaseMixin = {
 
     data: function () {

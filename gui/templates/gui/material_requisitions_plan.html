@@ -80,7 +80,6 @@
                 label="晚班">
             </el-table-column>
             <el-table-column
-                prop="material_demanded_list[0].material_demanded + material_demanded_list[1].material_demanded + material_demanded_list[2].material_demanded"
                 label="总计">
                 <template slot-scope="scope">
                     <span v-text="scope.row.material_demanded_list[0].material_demanded + scope.row.material_demanded_list[1].material_demanded + scope.row.material_demanded_list[2].material_demanded"></span>

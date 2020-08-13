@@ -6,7 +6,7 @@
 
             return {
 
-                // tableDataUrl: MaterialRequisitions,
+                tableDataUrl: ProductActualUrl,
                 tableData: [
                     {
                         material_type: "01",
@@ -96,7 +96,9 @@
                     used_flag: "",
                     material_type: "",
                     package_unit: ""
-                }
+                },
+                outerVisible: false,
+                innerVisible: false
             }
         },
         created: function () {
@@ -122,15 +124,15 @@
             downloadClick(rew) {
             },
             materialNameChanged() {
+                this.getFirstPage();
             },
             machineNoChange() {
+                this.getFirstPage();
             },
             showAddDialog() {
             },
-            handleAddMaterialBaseInfo() {
-            },
-            currentChange() {
-            },
+            // currentChange() {
+            // },
             // beforeGetData() {
             //
             //     this.getParams["material_id"] = this.materialType
