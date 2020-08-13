@@ -1139,8 +1139,8 @@ def add_schedules():
             for i in range(3):
                 ClassesDetail.objects.create(
                     work_schedule=schedule,
-                    classes_id=random.choice(GlobalCode.objects.filter(global_type__type_name='班次'
-                                                                       ).values_list('id', flat=True)),
+                    classes_id=GlobalCode.objects.filter(global_type__type_name='班次'
+                                                         ).values_list('id', flat=True)[i],
                     start_time=times[i],
                     end_time=times[i + 1]
                 )
@@ -1245,8 +1245,8 @@ def add_plan_schedule():
 
 def add_product():
     products = (
-    'J260', 'A019', 'A403', 'B166', 'B568', 'B635', 'C101', 'C110', 'C120', 'C140', 'C150', 'C155', 'C160', 'C180',
-    'C190', 'C195', 'EUC121')
+        'J260', 'A019', 'A403', 'B166', 'B568', 'B635', 'C101', 'C110', 'C120', 'C140', 'C150', 'C155', 'C160', 'C180',
+        'C190', 'C195', 'EUC121')
     factory_ids = list(GlobalCode.objects.filter(global_type__type_name='产地').values_list('id', flat=True))
     stages = GlobalCode.objects.filter(global_type__type_name='胶料段次')
     materials = list(Material.objects.values_list('id', flat=True))

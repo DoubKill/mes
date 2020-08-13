@@ -1,5 +1,5 @@
 ;(function () {
-
+    var unit = 'kg'
     var Main = {
         mixins: [BaseMixin],
         data: function () {
@@ -11,6 +11,7 @@
                     dst_date: null,
                     src_date: null
                 },
+                getParams: {plan_date: ''},
                 copyDialogVisible: false,
                 loadingBtnCopy: false,
                 pickerOptionsCopy: {
@@ -45,9 +46,15 @@
                     plan_date: ''
                 },
                 rulesEdit: {
-                    // equip_no: {},
+                    equip: {required: true, message: '请选择配料机台', trigger: 'change'},
                     // a: {validator: '', trigger: 'blur'}
-                }
+                    workRubberType: {required: true, message: '请选择炼胶机类型', trigger: 'change'},
+                    product_batching: {required: true, message: '请选择配料小料编码', trigger: 'change'}
+                },
+                rubberTypeList: [],
+                dialogVisibleEditLoading: true,
+                addGlueList: [],
+                smallMaterialEdit: ''
             }
         },
         created() {
@@ -55,8 +62,11 @@
             this.getGlueList()
             this.getList()
 
+            var _setDate = setDate()
+            //设置默认日期
+            this.getParams.plan_date = '2020-1-1'
             //设置选择胶料的默认当前日期
-            this.rubberDialogParams.plan_date = new Date()
+            this.rubberDialogParams.plan_date = _setDate
         },
         methods: {
             addBatchNum(arr, params) {
@@ -81,27 +91,34 @@
             },
             getList() {
                 var _this = this
-                // console.log(this.getParams, 'this.getParams')
                 var tableData = []
-                var arr = []
+                _this.getParams.page = null
                 axios.get(this.tableDataUrl, {
                     params: _this.getParams
                 }).then(function (response) {
                     tableData = response.data.results || [];
                     _this.getRubberList(true, tableData)
-                })
+                }).catch(function (error) {
+                    this.$message.error('请求错误')
+                });
             },
             getMachineList() {
                 var _this = this
                 axios.get(EquipUrl, {params: {page_size: 100000}}).then(function (response) {
-                    console.log(response.data.results, 'machineList')
+                    // console.log(response.data.results, 'machineList')
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
                 });
             },
-            getGlueList() {
+            getGlueList(dev_type) {
+                var _dev_type = dev_type ? dev_type : null
                 var _this = this
-                axios.get(RubberMaterialUrl, {params: {page_size: 100000}}).then(function (response) {
+                axios.get(RubberMaterialUrl, {
+                    params: {
+                        page_size: 1000000,
+                        dev_type: _dev_type
+                    }
+                }).then(function (response) {
                     var glueList = response.data.results || [];
                     //去重
                     var obj = {}
@@ -110,6 +127,8 @@
                         return item;
                     }, [])
                     _this.glueList = newArr
+                    //新增里面的配料小料编码数据
+                    _this.addGlueList = dev_type ? newArr : []
                 }).catch(function (error) {
                 });
             },
@@ -238,6 +257,17 @@
                 this.dialogVisibleEdit = true
                 this.formEdit = row
             },
+            getRubberTypeList() {
+                var _this = this
+                axios.get(GlobalCodesUrl, {params: {class_name: '炼胶机类型', page_size: 1000000}})
+                    .then(function (response) {
+                        _this.rubberTypeList = response.data.results || []
+                        _this.dialogVisibleEditLoading = false
+                    }).catch(function (error) {
+                    _this.$message.error(error);
+                    _this.dialogVisibleEditLoading = false
+                });
+            },
             handleCloseEdit(done) {
                 this.formEdit = {
                     pdp_product_batching_classes_plan: [
@@ -246,24 +276,62 @@
                         {}
                     ]
                 }
+                this.$refs.formEdit.resetFields();
                 done()
             },
             editSubmit() {
                 // console.log(this.formEdit, 888)
                 var obj = {}
-                obj.id = this.formEdit.product_day_plan_id
-                obj.equip_no = this.formEdit.equip_id
-                obj.equip_no = this.formEdit.equip_id
                 var _this = this
-                // axios.get(this.tableDataUrl+'/'+this.formEdit.product_day_plan_id+'/', {
-                //     params: _this.getParams
-                // }).then(function (response) {
-                //     tableData = response.data.results || [];
-                //     _this.getRubberList(true, tableData)
-                // })
+                if (this.formEdit.id) {
+                    obj.id = this.formEdit.id
+                    // 机台
+                    obj.equip = this.formEdit.equip
+                    // 配料
+                    obj.product_batching = this.formEdit.product_batching
+                    obj.plan_date = this.formEdit.plan_date_time
+                    var allNum = this.addBatchNum(this.formEdit.pdp_product_batching_classes_plan, 'bags_qty')
+                    // 日计划袋数
+                    obj.bags_total_qty = allNum
+                    // 炼胶日计划id
+                    obj.product_day_plan = this.formEdit.product_day_plan
+                    let classesArr = []
+                    this.formEdit.pdp_product_batching_classes_plan.forEach(function (D, index) {
+                        classesArr.push({
+                            sn: D.sn ? D.sn : 0,
+                            bags_qty: D.bags_qty ? D.bags_qty : 0,
+                            unit: unit
+                        })
+                    })
+                    obj.pdp_product_batching_classes_plan = classesArr
+                }
+                axios.put(this.tableDataUrl + this.formEdit.id + '/', obj).then(function (response) {
+                    _this.$message.success('修改成功')
+                    this.dialogVisibleEdit = false
+                    this.formEdit = {
+                        pdp_product_batching_classes_plan: [
+                            {},
+                            {},
+                            {}
+                        ]
+                    }
+                    this.getList()
+                }).catch(() => {
+                    _this.$message.error('修改失败')
+                });
             },
             addRow() {
                 this.dialogVisibleEdit = true
+                if (this.rubberTypeList.length === 0) {
+                    this.getRubberTypeList()
+                } else {
+                    this.dialogVisibleEditLoading = false
+                }
+            },
+            changeWorkRubberType(val) {
+                console.log(val, 'val')
+                this.getGlueList(val)
+                // this.getSmallMaterial(val)
             },
             handleCloseAdd(done) {
                 done()
@@ -284,4 +352,23 @@
     };
     var Ctor = Vue.extend(Main);
     new Ctor().$mount("#app")
+
+    function setDate(_data, bool) {
+        var date = _data ? new Date(_data) : new Date()
+        const formatObj = {
+            y: date.getFullYear(),
+            m: date.getMonth() + 1,
+            d: date.getDate(),
+            h: date.getHours(),
+            i: date.getMinutes(),
+            s: date.getSeconds(),
+            a: date.getDay()
+        }
+        if (bool) {
+            return formatObj.y + '-' + formatObj.m + '-' + formatObj.d + ' ' +
+                formatObj.h + ':' + formatObj.i + ':' + formatObj.s
+        } else {
+            return formatObj.y + '-' + formatObj.m + '-' + formatObj.d
+        }
+    }
 })();

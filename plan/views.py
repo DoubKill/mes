@@ -156,16 +156,15 @@ class MaterialDemandedAPIView(APIView):
         # material_type
         if request.GET.get('material_name', None):  # 原材料名称
             material_name = request.GET.get('material_name')
-            filter_dict['material_demanded'] = Material.objects.filter(material_name=material_name).first()
+            filter_dict['material_demanded'] = Material.objects.filter(material_type__global_name=material_name).first()
         if request.GET.get('material_type', None):  # 公共代码GlobalCode原材料类别id
             material_type = request.GET.get('material_type')
             filter_dict['material'] = Material.objects.filter(material_type_id=material_type).first()
         if filter_dict:
             m_list = MaterialDemanded.objects.filter(**filter_dict).values('material', 'plan_schedule').distinct()
         else:
-            m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule').distinct()
+            m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule',).distinct()
         response_list = []
-        print(m_list)
         for m_dict in m_list:
             m_queryset = MaterialDemanded.objects.filter(material=m_dict['material'],
                                                          plan_schedule=m_dict['plan_schedule'])
@@ -176,7 +175,7 @@ class MaterialDemandedAPIView(APIView):
             response_list[-1]['material_name'] = md_obj.material.material_name
             response_list[-1]['md_material_requisition_classes'] = []
             for i in range(len(md_obj.md_material_requisition_classes.all())):
-                dict_key = ['早', '中', '晚']
+                dict_key = ['morning', 'afternoon', 'night']
                 user_dict = {dict_key[i]: float(md_obj.md_material_requisition_classes.all()[i].weight)}
                 response_list[-1]['md_material_requisition_classes'].append(user_dict)
             response_list[-1]['material_demanded_list'] = []
