@@ -141,7 +141,6 @@
                         </template>
                     </el-table-column>
                 </el-table-column>
-
             </el-table-column>
             <el-table-column label="早班计划">
                 <el-table-column
@@ -178,7 +177,7 @@
                 <el-table-column
                         label="袋数">
                     <template slot-scope="scope">
-                        {{ addBatchNum(scope.row.pdp_product_batching_classes_plan,'bags_qty')}}
+                        {{ scope.row.bags_total_qty }}
                     </template>
                 </el-table-column>
             </el-table-column>
@@ -358,6 +357,7 @@
                     </el-form-item>
                     <el-form-item label="配料小料编码" prop="product_batching">
                         <el-select v-model="formEdit.product_batching"
+                                   @change="changeProductBatch"
                                    placeholder="请选择">
                             <el-option
                                     v-for="item in addGlueList"
@@ -367,24 +367,29 @@
                             </el-option>
                         </el-select>
                     </el-form-item>
+                    <span style="color: #999;font-size: 12px; margin-left: 120px;">请先选炼胶机类型</span>
                     <el-form-item label="小料重量(kg)">
                         {{ smallMaterialEdit }}
-                    </el-form-item>
-                    <el-form-item label="当前库存(袋)">
                     </el-form-item>
                 </div>
                 <div>
                     <div v-for="(item,index) in formEdit.pdp_product_batching_classes_plan" :key="index">
                         <div>{{ index===0?'早': index===1?'中':'晚'}}班计划</div>
                         <el-form-item label="顺序">
-                            <el-input-number :step="1" step-strictly v-model="item.sn" controls-position="right"
+                            <el-input-number :step="1" step-strictly v-model="item.sn"
+                                             controls-position="right"
                                              :min="0"></el-input-number>
                         </el-form-item>
                         <el-form-item label="袋数">
-                            <el-input-number :step="1" step-strictly v-model="item.bags_qty" controls-position="right"
+                            <el-input-number @change="editNumber" :step="1" step-strictly
+                                             v-model="item.bags_qty"
+                                             controls-position="right"
                                              :min="0"></el-input-number>
                         </el-form-item>
                     </div>
+                    <el-form-item label="当前库存(袋)">
+                        {{ formEdit.bags_total_qty || 0 }}
+                    </el-form-item>
                 </div>
             </el-form>
             <span slot="footer" class="dialog-footer">
