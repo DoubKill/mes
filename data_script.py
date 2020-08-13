@@ -155,7 +155,8 @@ def run():
                                 "begin_trains": 1,
                                 "end_trains": m,
                                 "pallet_no": f"{bath_no}|test",
-                                "barcode": "KJDL:LKYDFJM<NLIIRD"
+                                "barcode": "KJDL:LKYDFJM<NLIIRD",
+                                "classes": class_name
                             }
                         bath_no += 1
                         PalletFeedbacks.objects.create(**pallet_data)
