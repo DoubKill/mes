@@ -195,12 +195,14 @@ class PlanRealityView(APIView):
         target_equip_no = params.get('equip_no')
         # 通过日期参数查工厂排班
         if search_time_str:
-            if not re.compile(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
+            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 return Response("bad search_time", status=400)
             plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
         else:
             plan_schedule = PlanSchedule.objects.filter(delete_flag=False).first()
         # 通过排班查日计划
+        if not plan_schedule:
+            return Response("no data", status=404)
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False).order_by()
         return_data = {
         }
@@ -267,11 +269,13 @@ class ProductActualView(APIView):
         target_equip_no = params.get('equip_no')
         # 通过日期参数查工厂排班
         if search_time_str:
-            if not re.compile(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
+            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 return Response("bad search_time", status=400)
             plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
         else:
             plan_schedule = PlanSchedule.objects.filter().first()
+        if not plan_schedule:
+            return Response("no data", status=404)
         # 通过排班查日计划
         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {

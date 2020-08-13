@@ -4,7 +4,7 @@ from django.db import models
 
 class User(AbstractUser):
     """用户拓展信息"""
-    num = models.CharField(max_length=20, help_text='工号', verbose_name='工号')
+    num = models.CharField(max_length=20, help_text='工号', verbose_name='工号', unique=True)
     is_leave = models.BooleanField(help_text='是否离职', verbose_name='是否离职', default=False)
     section = models.ForeignKey("Section", blank=True, null=True, help_text='部门', verbose_name='部门',
                                 on_delete=models.DO_NOTHING)
@@ -70,7 +70,7 @@ class Section(AbstractEntity):
 
 class GroupExtension(Group):
     """组织拓展信息表"""
-    group_code = models.CharField(max_length=50, help_text='角色代码', verbose_name='角色代码')
+    group_code = models.CharField(max_length=50, help_text='角色代码', verbose_name='角色代码', unique=True)
     use_flag = models.BooleanField(help_text='是否使用', verbose_name='是否使用')
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
