@@ -11,7 +11,7 @@
                     dst_date: null,
                     src_date: null
                 },
-                getParams: {plan_date: ''},
+                getParams: {plan_date: '', page: 1},
                 copyDialogVisible: false,
                 loadingBtnCopy: false,
                 pickerOptionsCopy: {
@@ -92,11 +92,13 @@
             getList() {
                 var _this = this
                 var tableData = []
-                _this.getParams.page = null
                 axios.get(this.tableDataUrl, {
                     params: _this.getParams
                 }).then(function (response) {
                     tableData = response.data.results || [];
+                    if (_this.tableDataTotal !== response.data.count) {
+                        _this.tableDataTotal = response.data.count;
+                    }
                     _this.getRubberList(true, tableData)
                 }).catch(function (error) {
                     this.$message.error('请求错误')
@@ -105,7 +107,6 @@
             getMachineList() {
                 var _this = this
                 axios.get(EquipUrl, {params: {page_size: 100000}}).then(function (response) {
-                    // console.log(response.data.results, 'machineList')
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
                 });
@@ -171,12 +172,12 @@
             },
             rowDelete(row) {
                 var app = this;
-                this.$confirm('此操作将永久删除' + row.category_name + ', 是否继续?', '提示', {
+                this.$confirm('此操作将永久删除第' + row.id + '行数据, 是否继续?', '提示', {
                     confirmButtonText: '确定',
                     cancelButtonText: '取消',
                     type: 'warning'
                 }).then(() => {
-                    axios.delete(this.tableDataUrl + '/' + row.id + '/')
+                    axios.delete(this.tableDataUrl + row.id + '/')
                         .then(function (response) {
                             app.$message({
                                 type: 'success',
@@ -253,12 +254,19 @@
             rubberDialogSubmit() {
                 var _this = this
                 var arr = []
-
-                console.log(this.selectionRubber, 'selection')
+                var bool = false
+                if (this.selectionRubber.length === 0) {
+                    return
+                }
                 this.selectionRubber.forEach(function (D) {
                     var obj = {}
+                    if (!D.newEquip) {
+                        _this.$message.info('请选择配料机台！')
+                        bool = true
+                        return
+                    }
                     // 机台
-                    obj.equip = D.equip
+                    obj.equip = D.newEquip
                     // 配料
                     obj.product_batching = D.product_batching
                     let classesArr = []
@@ -278,14 +286,17 @@
 
                     arr.push(obj)
                 })
-                // console.log(arr, 'arr')
-                // return
+                if (bool) {
+                    return
+                }
                 axios.post(RubberSelectUrl, arr).then(function (response) {
-                    this.$message.success('添加数据成功')
-                    this.getParams['page'] = 1
-                    this.getList()
+                    _this.$message.success('添加数据成功')
+                    _this.getParams['page'] = 1
+                    _this.getList()
+                    _this.rubberDialogVisible = false
                 }).catch(function (error) {
-                    this.$message.error('请求错误')
+                    console.log(error, 'error')
+                    _this.$message.error('请求错误')
                 });
             },
             rowEdit(row) {
