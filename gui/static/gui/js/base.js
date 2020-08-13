@@ -49,8 +49,10 @@ const RubberSelectUrl = "/api/v1/plan/product-batching-day-plan-manycreate/";
 const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
 
 const ProductActualUrl = "/api/v1/production/product-actual/"
-
+//密炼实绩
 const ProductDayPlansCopyUrl = "/api/v1/plan/product-day-plans-copy/";
+const PalletFeedbacks = "/api/v1/production/pallet-feedbacks/"
+const TrainsFeedbacks = "/api/v1/production/trains-feedbacks/"
 
 var BaseMixin = {
 
