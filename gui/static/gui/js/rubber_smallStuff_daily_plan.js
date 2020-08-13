@@ -64,9 +64,9 @@
 
             var _setDate = setDate()
             //设置默认日期
-            this.getParams.plan_date = '2020-01-01'
+            this.getParams.plan_date = _setDate
             //设置选择胶料的默认当前日期
-            this.rubberDialogParams.plan_date = '2020-01-01'
+            this.rubberDialogParams.plan_date = _setDate
         },
         methods: {
             addBatchNum(arr, params) {
