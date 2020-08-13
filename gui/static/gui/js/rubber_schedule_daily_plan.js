@@ -70,10 +70,13 @@
                 addPlanVisible: false,
                 changePlanVisible: false,
                 currentRow: null,
-
+                dialogCopyVisible: false,
+                src_date: null,
+                dst_date: null
             }
         },
         created: function () {
+
 
             var app = this;
             axios.get(EquipUrl, {
@@ -274,6 +277,26 @@
 
                 });
             },
+            copyPlan: function () {
+
+                var app = this;
+                axios.post(ProductDayPlansCopyUrl, {
+                        src_date: app.src_date,
+                        dst_date: app.dst_date
+                    }
+                ).then(function (response) {
+
+                    app.$message({
+                        type: 'success',
+                        message: '复制成功!'
+                    });
+                    app.currentChange(app.currentPage);
+                    app.dialogCopyVisible = false
+                }).catch(function (error) {
+
+                    app.$message.error(JSON.stringify(error.response.data));
+                });
+            }
 
         }
     };

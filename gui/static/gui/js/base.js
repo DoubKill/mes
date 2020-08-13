@@ -47,6 +47,8 @@ const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
 const RubberSelectUrl = "/api/v1/plan/product-batching-day-plan-manycreate/";
 const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
 
+const ProductDayPlansCopyUrl = "/api/v1/plan/product-day-plans-copy/";
+
 var BaseMixin = {
 
     data: function () {
