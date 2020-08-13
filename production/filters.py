@@ -40,6 +40,8 @@ class EquipStatusFilter(django_filters.rest_framework.FilterSet):
 class PlanStatusFilter(django_filters.rest_framework.FilterSet):
     """计划状态过滤器"""
     plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号')
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
 
     class Meta:
         model = PlanStatus
@@ -49,6 +51,8 @@ class PlanStatusFilter(django_filters.rest_framework.FilterSet):
 class ExpendMaterialFilter(django_filters.rest_framework.FilterSet):
     """原材料消耗过滤器"""
     plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号')
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
 
     class Meta:
         model = ExpendMaterial
