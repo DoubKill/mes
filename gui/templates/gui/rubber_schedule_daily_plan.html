@@ -58,6 +58,11 @@
                 复制
             </el-button>
         </el-form-item>
+        <el-form-item style="float: right">
+            <el-checkbox-button v-model="changePlanVisible">
+                修改
+            </el-checkbox-button>
+        </el-form-item>
     </el-form>
 
     <el-table
@@ -107,6 +112,53 @@
     {% include 'gui/paginations.html' %}
 
     {% verbatim vue %}
+        <el-card v-if="changePlanVisible">
+            <div>
+                修改计划
+                <el-button @click="changePlan" style="float: right; margin-bottom: 20px">
+                    确定
+                </el-button>
+            </div>
+            <div style="overflow-x: auto;clear: both; text-align: center">
+                <table data-toggle="table" class="table table-bordered"
+                       style="color: #909399; font-size: 14px;">
+                    <thead>
+                    <tr>
+                        <th colspan="4">早班计划</th>
+                        <th colspan="4">中班计划</th>
+                        <th colspan="4">夜班计划</th>
+                    </tr>
+                    <tr>
+                        <template v-for="_ in 3">
+                            <th>顺序</th>
+                            <th>车次</th>
+                            <th>重量(吨)</th>
+                            <th>时间</th>
+                        </template>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <template v-for="(plan, index) in rubberDailyPlanChangeForm.pdp_product_classes_plan">
+                        <td>
+                            <el-input-number v-model="plan.sn" :min="0">
+                            </el-input-number>
+                        </td>
+                        <td>
+                            <el-input-number @change="planTrainsChangeForUpdate(index)" v-model="plan.plan_trains"
+                                             :min="0"></el-input-number>
+                        </td>
+                        <td>
+                            {{ plan.weight }}
+                        </td>
+                        <td>
+                            {{ plan.time }}
+                        </td>
+                    </template>
+                    </tbody>
+                </table>
+            </div>
+        </el-card>
+
         <el-card v-if="addPlanVisible">
             <div>
                 新增计划
@@ -184,74 +236,7 @@
                 </table>
             </div>
         </el-card>
-
     {% endverbatim vue %}
-
-
-{% endblock %}
-
-{% block dialogs %}
-
-    <!--
-    <el-dialog title="添加胶料日计划" :visible.sync="addRubberDailyPlanDialogVisible">
-        <el-form v-model="rubberDailyPlanForm">
-            <el-form-item label="机台" :label-width="formLabelWidth">
-                <el-select v-model="rubberDailyPlanForm.equip">
-                    <el-option
-                            :key="equip.id"
-                            :label="equip.equip_no"
-                            :value="equip.id"
-                            v-for="equip in equips">
-                    </el-option>
-                </el-select>
-            </el-form-item>
-            <el-form-item label="胶料编码" :label-width="formLabelWidth">
-                <el-select v-model="rubberDailyPlanForm.product_batching">
-                    <el-option
-                            :key="productBatching.id"
-                            :label="productBatching.stage_product_batch_no"
-                            :value="productBatching.id"
-                            v-for="productBatching in productBatchings">
-                    </el-option>
-                </el-select>
-            </el-form-item>
-            {% verbatim vue %}
-                <template v-for="(plan, index) in rubberDailyPlanForm.pdp_product_classes_plan">
-                    <el-divider>
-                        {{ getPlanText(index) }}
-                    </el-divider>
-                    <el-form-item label="顺序" :label-width="formLabelWidth">
-                        <el-input-number v-model="plan.sn"
-                                         :min="1"></el-input-number>
-                    </el-form-item>
-                    <el-form-item label="车次" :label-width="formLabelWidth">
-                        <el-input-number v-model="plan.plan_trains"
-                                         :min="1"></el-input-number>
-                    </el-form-item>
-                    <el-form-item label="时间" :label-width="formLabelWidth">
-                        <el-time-picker
-                                value-format="HH:mm:ss"
-                                format="HH:mm:ss"
-                                v-model="plan.time">
-                        </el-time-picker>
-                    </el-form-item>
-                    <el-form-item label="重量" :label-width="formLabelWidth">
-                        <el-input-number v-model="plan.weight" :precision="2" :step="0.1"></el-input-number>
-                    </el-form-item>
-                    <el-form-item label="单位" :label-width="formLabelWidth">
-                        <el-input v-model="plan.unit"></el-input>
-                    </el-form-item>
-                </template>
-            {% endverbatim vue %}
-
-        </el-form>
-        <div slot="footer" class="dialog-footer">
-            <el-button @click="addRubberDailyPlanDialogVisible = false">取 消</el-button>
-            <el-button type="primary" @click="addRubberDailyPlan">确 定</el-button>
-        </div>
-    </el-dialog>
-    -->
-
 {% endblock %}
 
 {% block links %}
