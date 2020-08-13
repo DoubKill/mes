@@ -35,15 +35,16 @@ const ProductRecipeUrl = "/api/v1/recipe/product-recipe/";
 const ProductBatching = "/api/v1/plan/product-batching-day-plans/";
 const MaterialRequisitionsCopy = "/api/v1/plan/product-batching-day-plans-copy/";
 // 领料计划接口
+const MaterialRequisitions = "/api/v1/plan/material-requisition-classes/";
+// const MaterialRequisitions = "/api/v1/plan/material-requisitions/";
 const MaterialDemanded = "/api/v1/plan/material-demanded-apiview/";
-const MaterialRequisitions = "/api/v1/plan/material-requisition-classes/"
-//胶料日计划
-const ProductDayPlans = "/api/v1/plan/product-day-plans/";
 
 const PalletFeedBacksUrl = "/api/v1/production/pallet-feedbacks/";
-
+//胶料日计划
 const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
 
+//排产配料小料日计划---选择胶料
+const RubberSelectUrl = "/api/v1/plan/product-batching-day-plan-manycreate/";
 const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
 
 var BaseMixin = {
