@@ -41,12 +41,16 @@ const MaterialRequisitions = "/api/v1/plan/material-requisition-classes/"
 const ProductDayPlans = "/api/v1/plan/product-day-plans/";
 
 const PalletFeedBacksUrl = "/api/v1/production/pallet-feedbacks/";
-
+//胶料日计划
 const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
 
+//排产配料小料日计划---选择胶料
+const RubberSelectUrl = "/api/v1/plan/product-batching-day-plan-manycreate/";
 const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
 
 const ProductActualUrl = "/api/v1/production/product-actual/"
+
+const ProductDayPlansCopyUrl = "/api/v1/plan/product-day-plans-copy/";
 
 var BaseMixin = {
 

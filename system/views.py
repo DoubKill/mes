@@ -76,7 +76,7 @@ class UserViewSet(ModelViewSet):
         if self.action == 'retrieve':
             return UserSerializer
         if self.action == 'partial_update':
-            return UserSerializer
+            return UserUpdateSerializer
 
 
 class UserGroupsViewSet(mixins.ListModelMixin,
@@ -118,7 +118,7 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.action == 'retrieve':
             return GroupExtensionSerializer
         if self.action == 'partial_update':
-            return GroupExtensionSerializer
+            return GroupExtensionUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
