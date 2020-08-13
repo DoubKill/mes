@@ -203,7 +203,10 @@ class PlanRealityView(APIView):
         # 通过排班查日计划
         if not plan_schedule:
             return Response("no data", status=404)
-        day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False).order_by()
+        if target_equip_no:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False, equip__equip_no=target_equip_no)
+        else:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {
         }
         datas = []
@@ -277,7 +280,10 @@ class ProductActualView(APIView):
         if not plan_schedule:
             return Response("no data", status=404)
         # 通过排班查日计划
-        day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
+        if target_equip_no:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False, equip__equip_no=target_equip_no)
+        else:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         return_data = {
             "data": []
         }
