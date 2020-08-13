@@ -54,7 +54,7 @@ class UserSerializer(BaseModelSerializer):
     def create(self, validated_data):
         partten = r"^(?![0-9]+$)(?![a-zA-Z]+$)[0-9A-Za-z]{6,16}$"
         password = validated_data.get('password')
-        if not re.compile(partten, password):
+        if not re.search(partten, password):
             raise serializers.ValidationError("请输入6~16位长度包含字母和数字的密码")
         user = super().create(validated_data)
         user.set_password(password)
