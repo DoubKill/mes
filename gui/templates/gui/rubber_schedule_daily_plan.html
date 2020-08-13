@@ -54,7 +54,7 @@
             </el-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button>
+            <el-button @click="dialogCopyVisible = true">
                 复制
             </el-button>
         </el-form-item>
@@ -64,7 +64,6 @@
             </el-checkbox-button>
         </el-form-item>
     </el-form>
-
     <el-table
             highlight-current-row
             @current-change="handleCurrentChange"
@@ -110,7 +109,6 @@
         </el-table-column>
     </el-table>
     {% include 'gui/paginations.html' %}
-
     {% verbatim vue %}
         <el-card v-if="changePlanVisible">
             <div>
@@ -237,6 +235,37 @@
             </div>
         </el-card>
     {% endverbatim vue %}
+{% endblock %}
+
+{% block dialogs %}
+
+    <el-dialog
+            :visible.sync="dialogCopyVisible"
+            title="复制胶料日生产计划">
+        <el-form>
+            <el-form-item label="来源日期">
+                <el-date-picker
+                        v-model="src_date" type="date"
+                        value-format="yyyy-MM-dd"
+                >
+
+                </el-date-picker>
+            </el-form-item>
+            <el-form-item label="新建日期">
+                <el-date-picker
+                        v-model="dst_date"
+                        type="date"
+                        value-format="yyyy-MM-dd">
+
+                </el-date-picker>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogCopyVisible = false">取 消</el-button>
+            <el-button type="primary" @click="copyPlan">确 定</el-button>
+        </div>
+    </el-dialog>
+
 {% endblock %}
 
 {% block links %}
