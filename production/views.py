@@ -190,6 +190,10 @@ class PlanRealityView(APIView):
 
     def get(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
+        return_data = {
+            "data": []
+        }
+        temp_data = {}
         params = request.query_params
         search_time_str = params.get("search_time")
         target_equip_no = params.get('equip_no')
@@ -202,13 +206,11 @@ class PlanRealityView(APIView):
             plan_schedule = PlanSchedule.objects.filter(delete_flag=False).first()
         # 通过排班查日计划
         if not plan_schedule:
-            return Response("no data", status=404)
+            return Response(return_data)
         if target_equip_no:
             day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False, equip__equip_no=target_equip_no)
         else:
             day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
-        return_data = {
-        }
         datas = []
         for day_plan in list(day_plan_set):
             instance = {}
@@ -220,8 +222,10 @@ class PlanRealityView(APIView):
             actual_time = 0
             begin_time = None
             product_no = day_plan.product_batching.product_info.product_name
-            equip_no = day_plan.equip.equip_no
             stage = day_plan.product_batching.stage.global_name
+            equip_no = day_plan.equip.equip_no
+            if equip_no not in temp_data:
+                temp_data[equip_no] = []
             # 通过日计划id再去查班次计划
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id).order_by("sn")
             # 若班次计划为空则不进行后续操作
@@ -231,6 +235,7 @@ class PlanRealityView(APIView):
                 plan_trains += class_plan.plan_trains
                 plan_weight += class_plan.weight
                 plan_time += class_plan.total_time
+                sn = class_plan.sn
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
                                                                   equip_no=target_equip_no)
@@ -257,8 +262,15 @@ class PlanRealityView(APIView):
                             plan_time=plan_time, actual_time=actual_time,
                             stage=stage, ach_rate=ach_rate,
                             start_rate=None, begin_time=begin_time)
-            datas.append(instance)
-            datas.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+            if equip_no in temp_data:
+                temp_data[equip_no].append(instance)
+        for equip_data in temp_data.values():
+            equip_data.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+            new_equip_data = []
+            for _ in equip_data:
+                _.update(sn=equip_data.index(_) + 1)
+                new_equip_data.append(_)
+            datas += new_equip_data
         return_data["data"] = datas
         return Response(return_data)
 
@@ -267,6 +279,9 @@ class ProductActualView(APIView):
 
     def get(self, request):
         # 获取url参数 search_time equip_no
+        return_data = {
+            "data": []
+        }
         params = request.query_params
         search_time_str = params.get("search_time")
         target_equip_no = params.get('equip_no')
@@ -278,15 +293,12 @@ class ProductActualView(APIView):
         else:
             plan_schedule = PlanSchedule.objects.filter().first()
         if not plan_schedule:
-            return Response("no data", status=404)
+            return Response(return_data)
         # 通过排班查日计划
         if target_equip_no:
             day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False, equip__equip_no=target_equip_no)
         else:
             day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
-        return_data = {
-            "data": []
-        }
         for day_plan in list(day_plan_set):
             instance = {}
             plan_trains = 0
