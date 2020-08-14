@@ -11,7 +11,7 @@
                 tableDataUrl: MaterialDemanded,
                 planDate: dayjs().format("YYYY-MM-DD"),
                 materialType: "",
-                material_name: "",
+                materialName: "",
                 planDateOptions: [],
                 ClassesCount: [0, 1, 2],
                 ClassesOptions: ["早班", "中班", "晚班"],
@@ -61,15 +61,13 @@
         methods: {
 
             beforeGetData() {
-                console.log(this.planDate);
                 this.getParams["plan_date"] = this.planDate;
                 this.getParams["material_type"] = this.materialType;
-                this.getParams["material_name"] = this.material_name
+                this.getParams["material_name"] = this.materialName
             },
             currentChange: function (page) {
 
                 this.beforeGetData();
-                console.log(this.getParams);
                 this.getParams["page"] = page;
                 this.tableData = [];
                 const app = this;
@@ -77,7 +75,6 @@
 
                     params: this.getParams
                 }).then(function (response) {
-                    console.log(response.data);
                     if (app.tableDataTotal !== response.data.count) {
                         app.tableDataTotal = response.data.count;
                     }
@@ -108,7 +105,6 @@
             showEditDialog(row) {
 
                 this.clearEditForm();
-                console.log(row.material_demanded_list[0].id)
                 this.editForm.material_ids.push(row.material_demanded_list[0].id);
                 this.editForm.material_ids.push(row.material_demanded_list[1].id);
                 this.editForm.material_ids.push(row.material_demanded_list[2].id);
@@ -125,7 +121,6 @@
                 var app = this;
                 this.$refs[editForm].validate((valid) => {
                     if (valid) {
-                        console.log(app.editForm)
                         axios.post(MaterialRequisitions, app.editForm)
                             .then(function (response) {
 
