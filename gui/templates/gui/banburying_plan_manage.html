@@ -5,8 +5,10 @@
     <el-form :inline="true">
         <el-form-item label="日期">
             <el-date-picker
-                    model=""
+                    v-model="search_time"
+                    @change="search_timeChange"
                     type="date"
+                    value-format="yyyy-MM-dd"
                     placeholder="选择日期">
             </el-date-picker>
         </el-form-item>
@@ -14,7 +16,7 @@
             <el-input model=""></el-input>
         </el-form-item>
         <el-form-item label="机台">
-            <el-input model="equip_no"></el-input>
+            <el-input v-model="equip_no" v-on:input="equip_noChange"></el-input>
         </el-form-item>
 
 
