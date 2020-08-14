@@ -186,9 +186,10 @@ class QualityControlViewSet(mixins.CreateModelMixin,
     filter_class = QualityControlFilter
 
 
-class PlanRealityView(APIView):
+class PlanRealityViewSet(mixins.ListModelMixin,
+                      GenericViewSet):
 
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
         return_data = {
             "data": []
@@ -235,7 +236,6 @@ class PlanRealityView(APIView):
                 plan_trains += class_plan.plan_trains
                 plan_weight += class_plan.weight
                 plan_time += class_plan.total_time
-                sn = class_plan.sn
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
                                                                   equip_no=target_equip_no)
@@ -275,9 +275,10 @@ class PlanRealityView(APIView):
         return Response(return_data)
 
 
-class ProductActualView(APIView):
+class ProductActualViewSet(mixins.ListModelMixin,
+                      GenericViewSet):
 
-    def get(self, request):
+    def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
         return_data = {
             "data": []
