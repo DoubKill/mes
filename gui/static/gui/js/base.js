@@ -54,6 +54,9 @@ const ProductDayPlansCopyUrl = "/api/v1/plan/product-day-plans-copy/";
 const PalletFeedbacksUrl = "/api/v1/production/pallet-feedbacks/"
 const TrainsFeedbacksUrl = "/api/v1/production/trains-feedbacks/"
 
+//生产管理---密炼机台别计划对比
+const BanburyPlanUrl = "/api/v1/production/plan-reality/";
+
 var BaseMixin = {
 
     data: function () {

@@ -14,6 +14,9 @@ from recipe.models import ProductBatching
 
 
 def run():
+    ProductDayPlan.objects.filter().delete()
+    ProductClassesPlan.objects.filter().delete()
+    actual_feedback = 3
     equip_set = Equip.objects.filter(equip_name__icontains="混炼")
     equip_count = equip_set.count()
     pb_set = ProductBatching.objects.filter(delete_flag=False)
@@ -22,10 +25,11 @@ def run():
     # 目前工序只有密炼
     project_list = ["密炼"]
     ws_set = WorkSchedule.objects.filter(schedule_name__in=project_list, delete_flag=False)
-    for ps in ps_set:
-        equip = equip_set[random.randint(0, equip_count-1)]
-        pb = pb_set[random.randint(0, pb_count-1)]
-        ProductDayPlan.objects.create(equip=equip, product_batching=pb, plan_schedule=ps)
+    for x in range(actual_feedback):
+        for ps in ps_set:
+            equip = equip_set[random.randint(0, equip_count-1)]
+            pb = pb_set[random.randint(0, pb_count-1)]
+            ProductDayPlan.objects.create(equip=equip, product_batching=pb, plan_schedule=ps)
     day_plan_set = ProductDayPlan.objects.filter(delete_flag=False)
     # sn的规则?
     sn = 1

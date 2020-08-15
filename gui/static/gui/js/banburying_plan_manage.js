@@ -5,129 +5,68 @@
         data: function () {
 
             return {
-
-                // tableDataUrl: MaterialRequisitions,
-                tableData: [
-                    {
-                        material_type: "01",
-                        material_no: "aaa-mm-01",
-                        standard_weight: 123,
-                        daily_plan: 123,
-                        daily_result: 123,
-                        class: {
-                            morning_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            middle_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            night_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                        }
-                    },
-                    {
-                        material_type: "01",
-                        material_no: "aaa-mm-01",
-                        standard_weight: 123,
-                        daily_plan: 123,
-                        daily_result: 123,
-                        class: {
-                            morning_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            middle_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            night_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                        }
-                    },
-                    {
-                        material_type: "01",
-                        material_no: "aaa-mm-01",
-                        standard_weight: 123,
-                        daily_plan: 123,
-                        daily_result: 123,
-                        class: {
-                            morning_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            middle_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            night_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                        }
-                    }
-                ],
-                performanceDate: Date.now(),
-                projectName: "",
-                machineNo: "",
-                machineNoOptions: [],
-                dialogAddMaterialBaseInfoVisible: false,
-                materialBaseInfoForm: {
-
-                    material_no: "",
-                    material_name: "",
-                    for_short: "",
-                    density: null,
-                    used_flag: false,
-                    material_type: null,
-                    package_unit: null
-                },
-                materialBaseInfoFormError: {
-
-                    material_no: "",
-                    material_name: "",
-                    for_short: "",
-                    density: "",
-                    used_flag: "",
-                    material_type: "",
-                    package_unit: ""
-                }
+                tableData: [],
+                search_time:null,
+                equip_no:null,
             }
         },
+
         created: function () {
 
             var app = this;
-            axios.get(GlobalCodesUrl, {
-
-                params: {
-
-                    class_name: "机台"
-                }
+            axios.get(BanburyPlanUrl, {
             }).then(function (response) {
-
-                app.machineNoOptions = response.data.results;
+                app.tableData = response.data.data;
             }).catch(function (error) {
-
             });
-            console.log(app.tableData);
+
+
         },
+
+
         methods: {
-            detailsClick(rew) {
+
+            getList() {
+                var app = this;
+                var param_url = BanburyPlanUrl;
+                if(app.search_time && app.equip_no){
+                    param_url = param_url + '?search_time=' +app.search_time + '&equip_no=' + app.equip_no
+                }
+                else if(!app.search_time && app.equip_no){
+                    param_url = param_url + '?search_time=' + '&equip_no=' + app.equip_no
+                }
+                else if(app.search_time && !app.equip_no){
+                    param_url = param_url + '?search_time=' +app.search_time + '&equip_no='
+                }
+
+                axios.get(param_url, {}
+                ).then(function (response) {
+                    app.tableData = response.data.data;
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
             },
-            downloadClick(rew) {
+
+            SearchBanburyPlan: function(){
+                this.getList()
+
             },
-            materialNameChanged() {
+
+            search_timeChange: function(){
+                this.getList()
             },
-            machineNoChange() {
+
+            equip_noChange: function() {
+                this.getList()
             },
-            showAddDialog() {
-            },
-            handleAddMaterialBaseInfo() {
+
+
+            handleCurrentChange: function (val) {
+
+                this.currentRow = val;
             },
             currentChange() {
             },
