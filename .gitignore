@@ -7,4 +7,3 @@ logs
 .svn
 *.DS_Store
 __pycache__
-static

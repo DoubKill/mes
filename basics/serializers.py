@@ -90,6 +90,16 @@ class ClassesDetailSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class ClassesSimpleSerializer(BaseModelSerializer):
+    """工作日程班次下拉列表"""
+    classes_name = serializers.CharField(source="classes.global_name")
+
+    class Meta:
+        model = ClassesDetail
+        fields = ('id', 'classes_name')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class ClassesDetailUpdateSerializer(BaseModelSerializer):
     """工作日程班次条目修改序列化器"""
 
@@ -129,10 +139,12 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
     @atomic()
     def update(self, instance, validated_data):
         classesdetail_set = validated_data.pop('classesdetail_set', None)
-        instance = super().update(instance, validated_data)
+        if len(classesdetail_set) != 3:
+            raise serializers.ValidationError("请输入正确的班次条目集合")
         for plan in classesdetail_set:
             plan_id = plan.pop('id')
             ClassesDetail.objects.filter(id=plan_id).update(**plan)
+        instance = super().update(instance, validated_data)
         return instance
 
     class Meta:

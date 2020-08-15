@@ -1,17 +1,17 @@
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status
+from rest_framework import status, mixins
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, EquipCategoryFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
     EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer, \
-    ClassesDetailSerializer, PlanScheduleSerializer, EquipCategoryAttributeSerializer
+    ClassesDetailSerializer, PlanScheduleSerializer, EquipCategoryAttributeSerializer, ClassesSimpleSerializer
 from mes.common_code import return_permission_params, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -174,22 +174,17 @@ class WorkSchedulePlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class ClassesDetailViewSet(CommonDeleteMixin, ModelViewSet):
+class ClassesDetailViewSet(mixins.ListModelMixin,
+                           GenericViewSet):
     """
     list:
         班次条目列表
-    create:
-        创建班次条目
-    update:
-        修改班次条目
-    destroy:
-        删除班次条目
     """
     queryset = ClassesDetail.objects.filter(delete_flag=False)
-    serializer_class = ClassesDetailSerializer
+    serializer_class = ClassesSimpleSerializer
     model_name = queryset.model.__name__.lower()
-    permission_classes = (IsAuthenticatedOrReadOnly,
-                          PermissionClass(permission_required=return_permission_params(model_name)))
+    pagination_class = None
+    permission_classes = (IsAuthenticatedOrReadOnly,)
 
 
 @method_decorator([api_recorder], name="dispatch")
