@@ -90,6 +90,16 @@ class ClassesDetailSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class ClassesSimpleSerializer(BaseModelSerializer):
+    """工作日程班次下拉列表"""
+    classes_name = serializers.CharField(source="classes.global_name")
+
+    class Meta:
+        model = ClassesDetail
+        fields = ('id', 'classes_name')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class ClassesDetailUpdateSerializer(BaseModelSerializer):
     """工作日程班次条目修改序列化器"""
 

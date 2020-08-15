@@ -51,8 +51,8 @@ const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
 const ProductActualUrl = "/api/v1/production/product-actual/"
 //密炼实绩
 const ProductDayPlansCopyUrl = "/api/v1/plan/product-day-plans-copy/";
-const PalletFeedbacks = "/api/v1/production/pallet-feedbacks/"
-const TrainsFeedbacks = "/api/v1/production/trains-feedbacks/"
+const PalletFeedbacksUrl = "/api/v1/production/pallet-feedbacks/"
+const TrainsFeedbacksUrl = "/api/v1/production/trains-feedbacks/"
 
 //生产管理---密炼机台别计划对比
 const BanburyPlanUrl = "/api/v1/production/plan-reality/";
