@@ -1306,6 +1306,7 @@ def add_batch():
                 for mat in mat_ids:
                     ProductBatchingDetail.objects.create(
                         product_batching=instance,
+                        actual_weight=(i + 1) * 10,
                         sn=i,
                         material_id=mat
                     )
