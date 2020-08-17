@@ -3,6 +3,7 @@
 
 {% block main %}
 
+    <!--
     <el-row type="flex" justify="end" style="margin-bottom: 20px">
         <el-col>
             <div style="float: right">
@@ -14,30 +15,32 @@
             </div>
         </el-col>
     </el-row>
+    -->
 
     <el-form :inline="true">
-
         <el-form-item label="日期">
             <el-date-picker
+                    @change="search"
+                    v-model="st"
                     type="date"
+                    value-format="yyyy-MM-dd"
                     placeholder="选择日期">
             </el-date-picker>
         </el-form-item>
         <el-form-item label="生产机号">
-            <el-input></el-input>
+            <el-input @input="search" v-model="equip_no"></el-input>
         </el-form-item>
-        <br>
         <el-form-item label="胶料段">
-            <el-select></el-select>
+            <el-input></el-input>
         </el-form-item>
         <el-form-item label="胶料规格">
-            <el-input></el-input>
+            <el-input @input="search" v-model="product_no"></el-input>
         </el-form-item>
         <el-form-item label="快检测与否">
-            <el-select></el-select>
+            <el-input></el-input>
         </el-form-item>
         <el-form-item label="检测区分">
-            <el-select></el-select>
+            <el-input></el-input>
         </el-form-item>
         （R:胶料，M:原材料）
     </el-form>
@@ -50,18 +53,24 @@
                 label="处理">
         </el-table-column>
         <el-table-column
+                width="200"
+                prop="barcode"
                 label="收皮条码">
         </el-table-column>
         <el-table-column
+                prop="stage"
                 label="胶料段">
         </el-table-column>
         <el-table-column
+                prop="product_no"
                 label="胶料规格">
         </el-table-column>
         <el-table-column
+                prop="begin_trains"
                 label="开始车次">
         </el-table-column>
         <el-table-column
+                prop="end_trains"
                 label="结束车次">
         </el-table-column>
         <el-table-column
@@ -71,12 +80,15 @@
                 label="打印与否">
         </el-table-column>
         <el-table-column
+                prop="end_time"
                 label="生产日期">
         </el-table-column>
         <el-table-column
+                prop="equip_no"
                 label="生产机号">
         </el-table-column>
         <el-table-column
+                prop="classes"
                 label="生产班次">
         </el-table-column>
         <el-table-column
