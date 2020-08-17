@@ -5,7 +5,7 @@
     <el-form :inline="true">
 
         <el-form-item label="工程名">
-            <el-input v-model="projectName" v-on:input="materialNameChanged"></el-input>
+            <el-input v-model="projectName" v-on:input="materialNameChanged" placeholder="密炼" :disabled="true"></el-input>
         </el-form-item>
         <el-form-item label="日期">
             <el-date-picker
@@ -51,12 +51,12 @@
         </el-table-column>
         <el-table-column
 {#                prop="product_no"#}
-                label="胶料代码"
-                width="140px">
+                width="140px"
+                label="胶料代码">
             <template slot-scope="scope">
                 <span style="margin-left: 10px" v-text="scope.row.product_no"></span>
-                <el-button @click="detailsClick(scope.row)" type="text" size="small" style="float: right; width: 20%">
-                    <i class="el-icon-search"></i>
+                <el-button @click="detailsClick(scope.row)" icon="el-icon-search" type="text" size="small" style="float: right; width: 30%">
+{#                    <i class="el-icon-search"></i>#}
                 </el-button>
             </template>
         </el-table-column>
@@ -125,25 +125,95 @@
 
 
 {% block dialogs %}
+    {% verbatim vue %}
         <el-dialog
                 title="胶料产出反馈"
                 :visible.sync="dialogVisibleRubber">
             <el-form :inline="true">
                 <el-form-item label="胶料区分: ">
-                    fmc
+                    {{ getDetailsParams.product_no }}
                 </el-form-item>
                 <el-form-item label="规格: ">
-                    fmc
+                    {{ getDetailsParams.product_no }}
                 </el-form-item>
                 <el-form-item label="班: ">
                     全部
                 </el-form-item>
                 <el-form-item label="机台: ">
-                    hhh
+                    {{ getDetailsParams.equip_no }}
                 </el-form-item>
 
             </el-form>
             <div style="color:#409EFF;cursor:pointer" @click="clickBAT">点击bat</div>
+            <el-table
+                    :data="tableDataBAT"
+                    style="width: 100%">
+                <el-table-column
+                        prop="date"
+                        label="LOT">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="规格"
+                        width="180">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="机台">
+                </el-table-column>
+                <el-table-column
+                        prop="date"
+                        label="BAT">
+                    <template slot-scope="scope">
+                        <div style="color:#409EFF;cursor:pointer" @click="clickBAT(scope.row)">{{ scope.row.Bat }}</div>
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="生产重量">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="生产时间">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="班次">
+                </el-table-column>
+                <el-table-column
+                        prop="address"
+                        label="作业者">
+                </el-table-column>
+
+            </el-table>
+
+        </el-dialog>
+        <el-dialog
+                title="BAT查询"
+                :visible.sync="dialogVisibleBAT">
+            <div style="position: relative">
+                <el-form :inline="true" style="margin-right: 100px;">
+                    <el-form-item label="胶料区分: ">
+                        fmc
+                    </el-form-item>
+                    <el-form-item label="规格: ">
+                        fmc
+                    </el-form-item>
+                    <el-form-item label="班: ">
+                        全部
+                    </el-form-item>
+                    <el-form-item label="机台: ">
+                        hhh
+                    </el-form-item>
+                    <el-form-item label="机台: ">
+                        车次
+                    </el-form-item>
+
+                </el-form>
+                <el-button @click="viewGraph" style="position: absolute;right:10px;top:0">
+                    图形
+                </el-button>
+            </div>
             <el-table
                     :data="tableDataRubber"
                     style="width: 100%">
@@ -219,73 +289,17 @@
             </el-table>
         </el-dialog>
         <el-dialog
-                title="BAT查询"
-                :visible.sync="dialogVisibleBAT">
-            <div style="position: relative">
-                <el-form :inline="true" style="margin-right: 100px;">
-                    <el-form-item label="胶料区分: ">
-                        fmc
-                    </el-form-item>
-                    <el-form-item label="规格: ">
-                        fmc
-                    </el-form-item>
-                    <el-form-item label="班: ">
-                        全部
-                    </el-form-item>
-                    <el-form-item label="机台: ">
-                        hhh
-                    </el-form-item>
-                    <el-form-item label="机台: ">
-                        车次
-                    </el-form-item>
-
-                </el-form>
-                <el-button @click="viewGraph" style="position: absolute;right:10px;top:0">
-                    图形
-                </el-button>
-            </div>
-            <el-table
-                    :data="tableDataBAT"
-                    style="width: 100%">
-                <el-table-column
-                        prop="date"
-                        label="LOT">
-                </el-table-column>
-                <el-table-column
-                        prop="name"
-                        label="规格"
-                        width="180">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
-                        label="机台">
-                </el-table-column>
-                <el-table-column
-                        prop="date"
-                        label="BAT">
-                    <template slot-scope="scope">
-                        <div style="color:#409EFF;cursor:pointer" @click="clickBAT">{{ scope.row.Bat }}</div>
-                    </template>
-                </el-table-column>
-                <el-table-column
-                        prop="name"
-                        label="生产重量">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
-                        label="生产时间">
-                </el-table-column>
-                <el-table-column
-                        prop="name"
-                        label="班次">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
-                        label="作业者">
-                </el-table-column>
-
-            </el-table>
+                title="分析图表"
+                :modal="false"
+                :close-on-click-modal="false"
+                :modal-append-to-body="false"
+                size="600px"
+                :visible.sync="dialogVisibleGraph"
+                @opened="opens"
+        >
+            <div ref="main" style="width: 100%;height:400px;"></div>
         </el-dialog>
+        {% endverbatim vue %}
 {% endblock %}
 
 
@@ -294,7 +308,7 @@
 {% endblock %}
 
 {% block scripts %}
-
+    <script src="{% static 'node_modules/echarts/dist/echarts.js' %}"></script>
     <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
     <script src="{% static 'gui/js/banburying_performance_manage.js' %}"></script>
 {% endblock %}
