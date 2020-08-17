@@ -106,3 +106,8 @@ class CollectRubberDailyManageView(TitleMixin, LoginRequiredMixin, TemplateView)
 class BanburyingPerformanceManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/banburying_performance_manage.html'
     name_path = ['生产管理', '密炼实绩管理']
+
+# 密炼机台别计划对比
+class BanburyingPlanManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/banburying_plan_manage.html'
+    name_path = ['生产管理', '密炼机台别计划对比']

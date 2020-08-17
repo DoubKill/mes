@@ -8,10 +8,10 @@
                 num1: 5,
                 num2: 6,
                 aaa: 10,
-                tableDataUrl: MaterialRequisitions,
-                planDate: Date.now(),
+                tableDataUrl: MaterialDemanded,
+                planDate: dayjs().format("YYYY-MM-DD"),
                 materialType: "",
-                material_name: "",
+                materialName: "",
                 planDateOptions: [],
                 ClassesCount: [0, 1, 2],
                 ClassesOptions: ["早班", "中班", "晚班"],
@@ -19,30 +19,15 @@
                 dialogEditVisible: false,
                 editForm: {
 
-                    id: "",
-                    plan_date: "2020-09-09",
-                    material_name: "",
-                    weight: [
-                        {
-                            need_weight: 10,
-                            plan_weight: 0,
-                        },
-                        {
-                            need_weight: 20,
-                            plan_weight: 0,
-                        },
-                        {
-                            need_weight: 30,
-                            plan_weight: 0,
-                        }
-                    ]
+                    material_ids: [],
+                    material_name:"",
+                    plan_date: "",
+                    weights: []
                 },
                 editFormError: {
-
-                    id: "",
+                    material_ids: "",
                     plan_date: "",
-                    material_name: "",
-                    weight: ""
+                    weights: ""
                 }
             }
         },
@@ -61,15 +46,45 @@
             }).catch(function (error) {
 
             });
-            // console.log(this.tableData)
+            axios.get(PlanScheduleUrl, {
+
+                params: {
+                    page_size: 100000000
+                }
+            }).then(function (response) {
+
+                app.planDateOptions = response.data.results;
+            }).catch(function (error) {
+
+            });
         },
         methods: {
 
             beforeGetData() {
-
-                this.getParams["plan_data"] = this.planDate;
+                this.getParams["plan_date"] = this.planDate;
                 this.getParams["material_type"] = this.materialType;
-                this.getParams["material_name"] = this.material_name
+                this.getParams["material_name"] = this.materialName
+            },
+            currentChange: function (page) {
+
+                this.beforeGetData();
+                this.getParams["page"] = page;
+                this.tableData = [];
+                const app = this;
+                axios.get(this.tableDataUrl, {
+
+                    params: this.getParams
+                }).then(function (response) {
+                    if (app.tableDataTotal !== response.data.count) {
+                        app.tableDataTotal = response.data.count;
+                    }
+                    app.tableData = response.data;
+
+                    app.afterGetData();
+
+                }).catch(function (error) {
+                    app.$message.error(error);
+                })
             },
 
             planDateChange: function () {
@@ -89,25 +104,28 @@
 
             showEditDialog(row) {
 
-                // this.clearEditFormError();
-                // this.editForm.id = row.id;
-                // this.editForm.plan_data = row.plan_data;
-                // this.editForm.material_name = row.material_name;
-                // this.editForm.weight = row.weight;
+                this.clearEditForm();
+                this.editForm.material_ids.push(row.material_demanded_list[0].id);
+                this.editForm.material_ids.push(row.material_demanded_list[1].id);
+                this.editForm.material_ids.push(row.material_demanded_list[2].id);
+                this.editForm.material_name = row.material_name
+                this.editForm.plan_date = this.planDate;
+                this.editForm.weights.push(row.md_material_requisition_classes[0].morning);
+                this.editForm.weights.push(row.md_material_requisition_classes[1].afternoon);
+                this.editForm.weights.push(row.md_material_requisition_classes[2].night);
                 this.dialogEditVisible = true;
             },
 
             saveRequisitionsPlan(editForm) {
                 this.clearEditFormError();
                 var app = this;
-                this.$refs[formName].validate((valid) => {
+                this.$refs[editForm].validate((valid) => {
                     if (valid) {
-
-                        axios.put(MaterialRequisitions + app.editForm.id + '/', app.editForm)
+                        axios.post(MaterialRequisitions, app.editForm)
                             .then(function (response) {
 
                                 app.dialogEditVisible = false;
-                                app.$message(app.editForm.plan_data + app.editForm.material_name + "修改成功");
+                                app.$message(app.editForm.plan_date + " " + app.editForm.material_name + " " + "修改成功");
                                 app.currentChange(app.currentPage);
 
                             }).catch(function (error) {
@@ -129,33 +147,19 @@
 
                 this.editForm = {
 
-                    id: "",
-                    plan_date: "2020-09-09",
-                    material_name: "",
-                    weight: [
-                        {
-                            need_weight: 0,
-                            plan_weight: 0,
-                        },
-                        {
-                            need_weight: 0,
-                            plan_weight: 0,
-                        },
-                        {
-                            need_weight: 0,
-                            plan_weight: 0,
-                        }
-                    ]
+                    material_ids: [],
+                    material_name:"",
+                    plan_date: "",
+                    weights: []
                 };
             },
             clearEditFormError() {
 
                 this.editFormError = {
 
-                    id: "",
+                    material_ids: "",
                     plan_date: "",
-                    material_name: "",
-                    weight: ""
+                    weights: ""
                 }
             },
         }

@@ -1,5 +1,6 @@
 import re
 
+import requests
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins
@@ -55,7 +56,6 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
 
 
 class PalletFeedbacksViewSet(mixins.CreateModelMixin,
-                             mixins.RetrieveModelMixin,
                              mixins.ListModelMixin,
                              GenericViewSet):
     """
@@ -74,7 +74,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_class = PalletFeedbacksFilter
 
 
-class EquipStatusViewSet(mixins.RetrieveModelMixin,
+class EquipStatusViewSet(mixins.CreateModelMixin,
                          mixins.ListModelMixin,
                          GenericViewSet):
     """
@@ -186,24 +186,32 @@ class QualityControlViewSet(mixins.CreateModelMixin,
     filter_class = QualityControlFilter
 
 
-class PlanRealityView(APIView):
+class PlanRealityViewSet(mixins.ListModelMixin,
+                      GenericViewSet):
 
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
+        return_data = {
+            "data": []
+        }
+        temp_data = {}
         params = request.query_params
         search_time_str = params.get("search_time")
         target_equip_no = params.get('equip_no')
         # 通过日期参数查工厂排班
         if search_time_str:
-            if not re.compile(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
+            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 return Response("bad search_time", status=400)
             plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
         else:
             plan_schedule = PlanSchedule.objects.filter(delete_flag=False).first()
         # 通过排班查日计划
-        day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False).order_by()
-        return_data = {
-        }
+        if not plan_schedule:
+            return Response(return_data)
+        if target_equip_no:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False, equip__equip_no=target_equip_no)
+        else:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         datas = []
         for day_plan in list(day_plan_set):
             instance = {}
@@ -215,8 +223,10 @@ class PlanRealityView(APIView):
             actual_time = 0
             begin_time = None
             product_no = day_plan.product_batching.product_info.product_name
-            equip_no = day_plan.equip.equip_no
             stage = day_plan.product_batching.stage.global_name
+            equip_no = day_plan.equip.equip_no
+            if equip_no not in temp_data:
+                temp_data[equip_no] = []
             # 通过日计划id再去查班次计划
             class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id).order_by("sn")
             # 若班次计划为空则不进行后续操作
@@ -252,31 +262,44 @@ class PlanRealityView(APIView):
                             plan_time=plan_time, actual_time=actual_time,
                             stage=stage, ach_rate=ach_rate,
                             start_rate=None, begin_time=begin_time)
-            datas.append(instance)
-            datas.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+            if equip_no in temp_data:
+                temp_data[equip_no].append(instance)
+        for equip_data in temp_data.values():
+            equip_data.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+            new_equip_data = []
+            for _ in equip_data:
+                _.update(sn=equip_data.index(_) + 1)
+                new_equip_data.append(_)
+            datas += new_equip_data
         return_data["data"] = datas
         return Response(return_data)
 
 
-class ProductActualView(APIView):
+class ProductActualViewSet(mixins.ListModelMixin,
+                      GenericViewSet):
 
-    def get(self, request):
+    def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
+        return_data = {
+            "data": []
+        }
         params = request.query_params
         search_time_str = params.get("search_time")
         target_equip_no = params.get('equip_no')
         # 通过日期参数查工厂排班
         if search_time_str:
-            if not re.compile(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
+            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 return Response("bad search_time", status=400)
             plan_schedule = PlanSchedule.objects.filter(day_time=search_time_str).first()
         else:
             plan_schedule = PlanSchedule.objects.filter().first()
+        if not plan_schedule:
+            return Response(return_data)
         # 通过排班查日计划
-        day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
-        return_data = {
-            "data": []
-        }
+        if target_equip_no:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False, equip__equip_no=target_equip_no)
+        else:
+            day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         for day_plan in list(day_plan_set):
             instance = {}
             plan_trains = 0
@@ -344,3 +367,19 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = PalletFeedbacksFilter
+
+
+class PlanRelease(APIView):
+    """计划下达"""
+
+    def _validate(self, data):
+        """校验请求体"""
+        return data
+
+    def post(self, request):
+        plan_data = request.data
+        plan_data = self._validate(plan_data)
+        token = request.get("Auth")
+        url = "http://xxxxx"
+        ret = requests.post(url, data=plan_data)
+        # TODO

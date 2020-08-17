@@ -11,7 +11,7 @@
                     dst_date: null,
                     src_date: null
                 },
-                getParams: {plan_date: ''},
+                getParams: {plan_date: '', page: 1},
                 copyDialogVisible: false,
                 loadingBtnCopy: false,
                 pickerOptionsCopy: {
@@ -64,7 +64,7 @@
 
             var _setDate = setDate()
             //设置默认日期
-            this.getParams.plan_date = '2020-1-1'
+            this.getParams.plan_date = _setDate
             //设置选择胶料的默认当前日期
             this.rubberDialogParams.plan_date = _setDate
         },
@@ -92,11 +92,13 @@
             getList() {
                 var _this = this
                 var tableData = []
-                _this.getParams.page = null
                 axios.get(this.tableDataUrl, {
                     params: _this.getParams
                 }).then(function (response) {
                     tableData = response.data.results || [];
+                    if (_this.tableDataTotal !== response.data.count) {
+                        _this.tableDataTotal = response.data.count;
+                    }
                     _this.getRubberList(true, tableData)
                 }).catch(function (error) {
                     this.$message.error('请求错误')
@@ -105,7 +107,6 @@
             getMachineList() {
                 var _this = this
                 axios.get(EquipUrl, {params: {page_size: 100000}}).then(function (response) {
-                    // console.log(response.data.results, 'machineList')
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
                 });
@@ -146,7 +147,7 @@
                         _this.rubberDialogParams.product_no = null
                     }
                 }
-                axios.get(ProductDayPlans, {
+                axios.get(ProductDayPlansUrl, {
                     params
                 }).then(function (response) {
                     _this.tableDataRubber = response.data.results || []
@@ -171,12 +172,12 @@
             },
             rowDelete(row) {
                 var app = this;
-                this.$confirm('此操作将永久删除' + row.category_name + ', 是否继续?', '提示', {
+                this.$confirm('此操作将永久删除第' + row.id + '行数据, 是否继续?', '提示', {
                     confirmButtonText: '确定',
                     cancelButtonText: '取消',
                     type: 'warning'
                 }).then(() => {
-                    axios.delete(this.tableDataUrl + '/' + row.id + '/')
+                    axios.delete(this.tableDataUrl + row.id + '/')
                         .then(function (response) {
                             app.$message({
                                 type: 'success',
@@ -251,7 +252,52 @@
                 this.selectionRubber = selection
             },
             rubberDialogSubmit() {
-                // console.log(this.selectionRubber, 'selection')
+                var _this = this
+                var arr = []
+                var bool = false
+                if (this.selectionRubber.length === 0) {
+                    return
+                }
+                this.selectionRubber.forEach(function (D) {
+                    var obj = {}
+                    if (!D.newEquip) {
+                        _this.$message.info('请选择配料机台！')
+                        bool = true
+                        return
+                    }
+                    // 机台
+                    obj.equip = D.newEquip
+                    // 配料
+                    obj.product_batching = D.product_batching
+                    let classesArr = []
+                    for (var i = 1; i < 4; i++) {
+                        classesArr.push({
+                            sn: 0,
+                            bags_qty: 0,
+                            unit: unit
+                        })
+                    }
+                    obj.pdp_product_batching_classes_plan = classesArr
+                    obj.plan_date = _this.rubberDialogParams.plan_date
+                    // 日计划袋数
+                    obj.bags_total_qty = 0
+                    // 炼胶日计划id
+                    obj.product_day_plan = D.id
+
+                    arr.push(obj)
+                })
+                if (bool) {
+                    return
+                }
+                axios.post(RubberSelectUrl, arr).then(function (response) {
+                    _this.$message.success('添加数据成功')
+                    _this.getParams['page'] = 1
+                    _this.getList()
+                    _this.rubberDialogVisible = false
+                }).catch(function (error) {
+                    console.log(error, 'error')
+                    _this.$message.error('请求错误')
+                });
             },
             rowEdit(row) {
                 this.dialogVisibleEdit = true
@@ -276,57 +322,75 @@
                         {}
                     ]
                 }
+                this.smallMaterialEdit = ''
                 this.$refs.formEdit.resetFields();
                 done()
             },
             editSubmit() {
                 // console.log(this.formEdit, 888)
-                var obj = {}
                 var _this = this
+                var obj = {}
+                // 机台
+                obj.equip = this.formEdit.equip
+                // 配料
+                obj.product_batching = this.formEdit.product_batching
+                let classesArr = []
+                this.formEdit.pdp_product_batching_classes_plan.forEach(function (D, index) {
+                    classesArr.push({
+                        sn: D.sn ? D.sn : 0,
+                        bags_qty: D.bags_qty ? D.bags_qty : 0,
+                        unit: unit
+                    })
+                })
+                obj.pdp_product_batching_classes_plan = classesArr
                 if (this.formEdit.id) {
                     obj.id = this.formEdit.id
-                    // 机台
-                    obj.equip = this.formEdit.equip
-                    // 配料
-                    obj.product_batching = this.formEdit.product_batching
                     obj.plan_date = this.formEdit.plan_date_time
                     var allNum = this.addBatchNum(this.formEdit.pdp_product_batching_classes_plan, 'bags_qty')
                     // 日计划袋数
                     obj.bags_total_qty = allNum
+                    this.formEdit.bags_total_qty = obj.bags_total_qty
                     // 炼胶日计划id
                     obj.product_day_plan = this.formEdit.product_day_plan
-                    let classesArr = []
-                    this.formEdit.pdp_product_batching_classes_plan.forEach(function (D, index) {
-                        classesArr.push({
-                            sn: D.sn ? D.sn : 0,
-                            bags_qty: D.bags_qty ? D.bags_qty : 0,
-                            unit: unit
-                        })
-                    })
-                    obj.pdp_product_batching_classes_plan = classesArr
+                } else {
+                    obj.plan_date = this.getParams.plan_date
+                    obj.bags_total_qty = this.formEdit.bags_total_qty ? this.formEdit.bags_total_qty : 0
                 }
-                axios.put(this.tableDataUrl + this.formEdit.id + '/', obj).then(function (response) {
-                    _this.$message.success('修改成功')
-                    this.dialogVisibleEdit = false
-                    this.formEdit = {
+                var way = this.formEdit.id ? 'put' : 'post'
+                var url = this.formEdit.id ? this.tableDataUrl + this.formEdit.id + '/' : this.tableDataUrl
+                axios[way](url, obj).then(function (response) {
+                    _this.$refs.formEdit.resetFields();
+                    _this.formEdit = {
                         pdp_product_batching_classes_plan: [
                             {},
                             {},
                             {}
                         ]
                     }
-                    this.getList()
-                }).catch(() => {
+                    this.smallMaterialEdit = ''
+                    _this.$message.success('修改成功')
+                    _this.dialogVisibleEdit = false
+                    _this.getList()
+                }).catch((error) => {
                     _this.$message.error('修改失败')
                 });
             },
             addRow() {
+                console.log(this.formEdit, 'this.formEdit')
                 this.dialogVisibleEdit = true
                 if (this.rubberTypeList.length === 0) {
                     this.getRubberTypeList()
                 } else {
                     this.dialogVisibleEditLoading = false
                 }
+            },
+            editNumber() {
+                var allNumber = 0
+                var val = 'pdp_product_batching_classes_plan'
+                this.formEdit[val].forEach(function (D) {
+                    allNumber += Number(D.bags_qty)
+                })
+                this.formEdit.bags_total_qty = allNumber
             },
             changeWorkRubberType(val) {
                 console.log(val, 'val')
@@ -347,8 +411,17 @@
             },
             changeEquip_no() {
 
+            },
+            changeProductBatch(val) {
+                console.log(this.addGlueList, 'addGlueList')
+                console.log(val, 'val')
+                var obj = this.addGlueList.filter(function (D) {
+                    return D.id === val
+                })
+                this.smallMaterialEdit = obj[0].batching_weight
             }
-        }
+        },
+        watch: {}
     };
     var Ctor = Vue.extend(Main);
     new Ctor().$mount("#app")

@@ -6,76 +6,11 @@
 
             return {
 
-                // tableDataUrl: MaterialRequisitions,
-                tableData: [
-                    {
-                        material_type: "01",
-                        material_no: "aaa-mm-01",
-                        standard_weight: 123,
-                        daily_plan: 123,
-                        daily_result: 123,
-                        class: {
-                            morning_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            middle_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            night_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                        }
-                    },
-                    {
-                        material_type: "01",
-                        material_no: "aaa-mm-01",
-                        standard_weight: 123,
-                        daily_plan: 123,
-                        daily_result: 123,
-                        class: {
-                            morning_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            middle_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            night_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                        }
-                    },
-                    {
-                        material_type: "01",
-                        material_no: "aaa-mm-01",
-                        standard_weight: 123,
-                        daily_plan: 123,
-                        daily_result: 123,
-                        class: {
-                            morning_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            middle_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                            night_shift: {
-                                plan: 11,
-                                result:22
-                            },
-                        }
-                    }
-                ],
-                performanceDate: Date.now(),
+                tableDataUrl: ProductActualUrl,
+                performanceDate: dayjs("2020-08-07").format("YYYY-MM-DD"),
                 projectName: "",
-                machineNo: "",
-                machineNoOptions: [],
+                equipNo: "",
+                equipNoOptions: [],
                 dialogAddMaterialBaseInfoVisible: false,
                 materialBaseInfoForm: {
 
@@ -96,7 +31,11 @@
                     used_flag: "",
                     material_type: "",
                     package_unit: ""
-                }
+                },
+                dialogVisibleRubber: false,
+                tableDataRubber: [],
+                tableDataBAT:[],
+                dialogVisibleBAT: false
             }
         },
         created: function () {
@@ -110,31 +49,61 @@
                 }
             }).then(function (response) {
 
-                app.machineNoOptions = response.data.results;
+                app.equipNoOptions = response.data.results;
             }).catch(function (error) {
 
             });
             console.log(app.tableData);
         },
         methods: {
-            detailsClick(rew) {
-            },
             downloadClick(rew) {
             },
-            materialNameChanged() {
+            performanceDateChange() {
+                this.getFirstPage();
             },
-            machineNoChange() {
+            materialNameChanged() {
+                this.getFirstPage();
+            },
+            equipNoChange() {
+                this.getFirstPage();
             },
             showAddDialog() {
             },
-            handleAddMaterialBaseInfo() {
+            currentChange: function (page) {
+
+            this.beforeGetData();
+            this.getParams["page"] = page;
+            this.tableData = [];
+            const app = this;
+            axios.get(this.tableDataUrl, {
+
+                params: this.getParams
+            }).then(function (response) {
+
+                if (app.tableDataTotal !== response.data.count) {
+                    app.tableDataTotal = response.data.count;
+                }
+                app.tableData = response.data.data;
+                app.afterGetData();
+
+            }).catch(function (error) {
+                // this.$message.error(error);
+            })
             },
-            currentChange() {
+            beforeGetData() {
+                console.log(this.planDate);
+                this.getParams["search_time"] = dayjs(this.performanceDate).format("YYYY-MM-DD");
+                this.getParams["equip_no"] = this.equipNo
             },
-            // beforeGetData() {
-            //
-            //     this.getParams["material_id"] = this.materialType
-            // },
+            detailsClick() {
+                this.dialogVisibleRubber = true
+
+            },
+            clickBAT() {
+                this.dialogVisibleBAT = true
+            },
+            viewGraph() {
+            }
         //
         //     materialTypeChange: function () {
         //
