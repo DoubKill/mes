@@ -155,19 +155,15 @@ class MaterialDemandedAPIView(APIView):
     def get(self, request):
         filter_dict = {}
         if request.GET.get('plan_date', None):  # 日期
-            plan_date = request.GET.get('plan_date')
-            filter_dict['plan_schedule'] = PlanSchedule.objects.filter(day_time=plan_date).first()
-        # material_type
+            filter_dict['plan_schedule__day_time'] = request.GET.get('plan_date')
+        if request.GET.get('material_type', None):  # 原材料类别
+            filter_dict['material__material_type__global_name__contains'] = request.GET.get('material_type')
         if request.GET.get('material_name', None):  # 原材料名称
-            material_name = request.GET.get('material_name')
-            print(material_name)
-            filter_dict['material'] = Material.objects.filter(material_name="STR20#混合物").first()
-        if request.GET.get('material_type', None):  # 公共代码GlobalCode原材料类别id
-            material_type = request.GET.get('material_type')
-            filter_dict['material'] = Material.objects.filter(material_type_id=material_type).first()
+            filter_dict['material__material_name'] = request.GET.get('material_name')
         if filter_dict:
             print(filter_dict)
             m_list = MaterialDemanded.objects.filter(**filter_dict).values('material', 'plan_schedule').distinct()
+            print(m_list)
         else:
             m_list = MaterialDemanded.objects.filter().values('material', 'plan_schedule', ).distinct()
         response_list = []
