@@ -3,14 +3,12 @@
 import datetime
 import os
 import string
-<<<<<<< HEAD
 import traceback
 
 import django
 
 import time
 import random
-=======
 import uuid
 
 import django
@@ -1334,7 +1332,6 @@ def add_batch():
             pass
 
 
-<<<<<<< HEAD
 def random_str():
     a1 = (2020, 4, 12, 0, 0, 0, 0, 0, 0)  # 设置开始日期时间元组（2020-04-12 00：00：00）
     a2 = (2020, 4, 13, 0, 0, 0, 0, 0, 0)  # 设置结束日期时间元组（2020-04-13 00：00：00）
@@ -1372,7 +1369,7 @@ def add_plan():
                     plan_classes_uid=None
                 )
                 i += 1
-=======
+
 def add_material_day_classes_plan():
     """
     根据已有信息生成胶料日计划，班次计划
@@ -1505,7 +1502,6 @@ def add_product_demo_data():
                         "current_trains": m,
                     }
                     EquipStatus.objects.create(**equip_status_data)
->>>>>>> bb9ac9cdbcc42dc962b56efc7dff05f83e91b8d6
 
 
 if __name__ == '__main__':
@@ -1520,9 +1516,6 @@ if __name__ == '__main__':
     add_plan_schedule()
     add_product()
     add_batch()
-<<<<<<< HEAD
     add_plan()
-=======
     add_material_day_classes_plan()
     add_product_demo_data()
->>>>>>> bb9ac9cdbcc42dc962b56efc7dff05f83e91b8d6
