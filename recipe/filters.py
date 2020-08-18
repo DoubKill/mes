@@ -1,6 +1,6 @@
 import django_filters
 
-from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, MaterialAttribute
+from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute
 
 
 class MaterialFilter(django_filters.rest_framework.FilterSet):
@@ -15,24 +15,13 @@ class MaterialFilter(django_filters.rest_framework.FilterSet):
 class ProductInfoFilter(django_filters.rest_framework.FilterSet):
     product_no = django_filters.CharFilter(field_name='product_no', help_text='原材料类别', lookup_expr='icontains')
     factory_id = django_filters.NumberFilter(field_name='factory_id', help_text='产地id')
-    used_type = django_filters.NumberFilter(field_name='used_type', help_text='状态')
 
     class Meta:
         model = ProductInfo
-        fields = ('product_no', 'factory_id', 'used_type')
-
-
-class ProductRecipeFilter(django_filters.rest_framework.FilterSet):
-    product_info_id = django_filters.NumberFilter(field_name='product_info_id', help_text='胶料工艺id')
-    stage_id = django_filters.NumberFilter(field_name='stage_id', help_text='段次id')
-
-    class Meta:
-        model = ProductRecipe
-        fields = ('product_info_id', 'stage_id')
+        fields = ('product_no', 'factory_id')
 
 
 class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
-    used_type = django_filters.NumberFilter(field_name='product_info__used_type', help_text='状态')
     factory_id = django_filters.NumberFilter(field_name='product_info__factory_id', help_text='产地id')
     stage_id = django_filters.NumberFilter(field_name='stage_id', help_text='段次id')
     stage_product_batch_no = django_filters.CharFilter(field_name='stage_product_batch_no', lookup_expr='icontains',
@@ -41,7 +30,7 @@ class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = ProductBatching
-        fields = ('used_type', 'factory_id', 'stage_id', 'stage_product_batch_no', 'dev_type')
+        fields = ('factory_id', 'stage_id', 'stage_product_batch_no', 'dev_type')
 
 
 class MaterialAttributeFilter(django_filters.rest_framework.FilterSet):

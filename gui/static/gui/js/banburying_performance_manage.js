@@ -7,7 +7,7 @@
             return {
 
                 tableDataUrl: ProductActualUrl,
-                performanceDate: dayjs("2020-08-07").format("YYYY-MM-DD"),
+                performanceDate: dayjs("2020-01-01").format("YYYY-MM-DD"),
                 projectName: "",
                 equipNo: "",
                 equipNoOptions: [],
