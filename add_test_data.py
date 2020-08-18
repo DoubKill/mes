@@ -5,6 +5,8 @@ import os
 import string
 import traceback
 
+import django
+
 import time
 import random
 import uuid
@@ -84,8 +86,7 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
 
 
 def add_global_codes():
-    names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
-             'SITE']
+    names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次']
     for i, name in enumerate(names):
         instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, used_flag=1)
         items = []
@@ -111,8 +112,6 @@ def add_global_codes():
             items = ['400', '500', '600']
         elif i == 10:
             items = ['1', '2', '3']
-        elif i == 11:
-            items = ['c', 'l', 'k']
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(i + 1), global_name=item, global_type=instance)
 
@@ -1115,7 +1114,7 @@ def add_sections():
 def add_users():
     section_ids = list(Section.objects.values_list('id', flat=True))
     group_ids = list(GroupExtension.objects.values_list('id', flat=True))
-    for i in range(100):
+    for i in range(500):
         name = getRandomName()
         try:
             user = User.objects.create_user(
@@ -1271,27 +1270,6 @@ def add_product():
             )
         except Exception:
             pass
-
-
-def add_product_batching():
-    factories = list(GlobalCode.objects.filter(global_type__type_name='产地').values_list('id', flat=True))
-    sites = list(GlobalCode.objects.filter(global_type__type_name='SITE').values_list('id', flat=True))
-    product_infos = list(ProductInfo.objects.values_list('id', flat=True))[:20]
-    dev_types = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
-    stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('id', flat=True))
-
-    for product_info in product_infos:
-        for stage in stages:
-            pb = ProductBatching.objects.create(
-                factory_id=random.choice(factories),
-                site_id=random.choice(sites),
-                product_info_id=product_info,
-                stage_product_batch_no='1',
-                dev_type_id=random.choice(dev_types),
-                stage_id=stage,
-                versions='01'
-            )
-            pb.stage_product_batch_no = pb.site.global_name + pb.stage.global_name + pb.product_info.product_name + '01'
 
 
 def random_str():
@@ -1467,17 +1445,16 @@ def add_product_demo_data():
 
 
 if __name__ == '__main__':
-    # add_global_codes()
-    # add_materials()
-    # add_groups()
-    # add_sections()
-    # add_users()
-    # add_schedules()
-    # add_equip_attribute()
-    # add_equips()
-    # add_plan_schedule()
-    # add_product()
-    add_product_batching()
+    add_global_codes()
+    add_materials()
+    add_groups()
+    add_sections()
+    add_users()
+    add_schedules()
+    add_equip_attribute()
+    add_equips()
+    add_plan_schedule()
+    add_product()
     # add_plan()
     # add_material_day_classes_plan()
     # add_product_demo_data()
