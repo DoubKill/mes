@@ -8,12 +8,11 @@ import uuid
 
 import django
 
-from plan.models import ProductClassesPlan, ProductDayPlan
-from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
+from plan.models import ProductClassesPlan, ProductDayPlan
+from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 from basics.models import GlobalCode, GlobalCodeType, WorkSchedule, ClassesDetail, EquipCategoryAttribute, PlanSchedule, \
     Equip, WorkSchedulePlan
 from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail
@@ -1388,7 +1387,7 @@ def add_product_demo_data():
             for m in range(1, int(plan_trains) + 1):
                 class_name = class_plan.classes_detail.classes.global_name
                 equip_no = day_plan.equip.equip_no
-                product_no = day_plan.product_batching.product_info.product_name
+                product_no = day_plan.product_batching.product_info.product_no
                 plan_weight = class_plan.weight
                 # time_str = '2020-08-01 08:00:00'
                 # time = datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")

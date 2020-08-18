@@ -43,7 +43,11 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
         actual_trains = request.query_params.get("actual_trains", '')
         if "," in actual_trains:
             train_list = actual_trains.split(",")
-            queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__in=train_list))
+            try:
+                queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__gte=train_list[0],
+                                                                           actual_trains__lte=train_list[-1]))
+            except:
+                return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
             queryset = self.filter_queryset(self.get_queryset() )
         page = self.paginate_queryset(queryset)
@@ -97,7 +101,11 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
         actual_trains = request.query_params.get("actual_trains", '')
         if "," in actual_trains:
             train_list = actual_trains.split(",")
-            queryset = self.filter_queryset(self.get_queryset().filter(current_trains__in=train_list))
+            try:
+                queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__gte=train_list[0],
+                                                                           actual_trains__lte=train_list[-1]))
+            except:
+                return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
             queryset = self.filter_queryset(self.get_queryset() )
         page = self.paginate_queryset(queryset)
