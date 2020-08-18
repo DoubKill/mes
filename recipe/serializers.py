@@ -130,12 +130,16 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     def create(self, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         instance = super().create(validated_data)
+        batching_weight = 0
         if batching_details:
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
+                batching_weight += detail.get('actual_weight', 0)
                 detail['product_batching'] = instance
                 batching_detail_list[i] = ProductBatchingDetail(**detail)
             ProductBatchingDetail.objects.bulk_create(batching_detail_list)
+        instance.batching_weight = batching_weight
+        instance.save()
         return instance
 
     class Meta:
@@ -161,13 +165,17 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     def update(self, instance, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         instance = super().update(instance, validated_data)
+        batching_weight = 0
         if batching_details is not None:
             instance.batching_details.all().delete()
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
+                batching_weight += detail.get('actual_weight', 0)
                 detail['product_batching'] = instance
                 batching_detail_list[i] = ProductBatchingDetail(**detail)
             ProductBatchingDetail.objects.bulk_create(batching_detail_list)
+        instance.batching_weight = batching_weight
+        instance.save()
         return instance
 
     class Meta:
