@@ -107,7 +107,7 @@ class ProductionRecordSerializer(BaseModelSerializer):
     def get_class_group(self, object):
         product = ProductClassesPlan.objects.filter(plan_classes_uid=object.plan_classes_uid).first()
         if product:
-            group = product.classes_detail.work_schedule_plan.all().first().group
+            group = product.classes_detail.work_schedule_plan.all().first()
             return group.group_name if group else None
         else:
             return None
