@@ -26,7 +26,6 @@
             },
             afterGetData: function () {
 
-                console.log(this.tableData)
             },
             check_() {
 
