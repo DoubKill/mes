@@ -11,16 +11,17 @@ import uuid
 
 import django
 
+from plan.models import ProductClassesPlan, ProductDayPlan
+from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from basics.models import GlobalCode, GlobalCodeType, WorkSchedule, ClassesDetail, EquipCategoryAttribute, PlanSchedule, \
     Equip, WorkSchedulePlan
-from recipe.models import Material, ProductInfo, ProductBatching
+from recipe.models import Material, ProductInfo, ProductRecipe, ProductBatching, ProductBatchingDetail
 from system.models import GroupExtension, User, Section
 from plan.models import ProductDayPlan, ProductClassesPlan
-from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 
 last_names = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '尤', '许',
               '何', '吕', '施', '张', '孔', '曹', '严', '华', '金', '魏', '陶', '姜', '戚', '谢', '邹', '喻', '柏', '水', '窦', '章',
@@ -963,6 +964,7 @@ def add_materials():
         data['material_no'] = x[2]
         data['material_name'] = x[4]
         data['material_type'] = GlobalCode.objects.filter(global_name=x[3]).first()
+        data['density'] = 1
         data['used_flag'] = 1
         try:
             Material.objects.create(**data)
@@ -1263,12 +1265,69 @@ def add_plan_schedule():
 
 def add_product():
     products = ['J260', 'A019', 'A403', 'B166', 'B568', 'B635', 'C101', 'C110', 'C120', 'C140', 'C150', 'C155', 'C160', 'C180', 'C190', 'C195', 'EUC121', 'C270', 'C280', 'C320', 'C510', 'C520', 'C530', 'C570', 'C580', 'C590', 'C610', 'C911', 'C920', 'C930', 'CEJ157', 'CJ567', 'E401', 'E503', 'E504', 'E709', 'EJ157', 'EJ167', 'EUC120', 'EUC140', 'EUC145', 'EUC170', 'EUC176', 'EUC560', 'EUC910', 'F140', 'F150', 'F970', 'F980', 'J067', 'J069', 'J155', 'J156', 'J158', 'J159', 'J160', 'J161', 'J165', 'J167', 'J168', 'J169', 'J176ST', 'J196LT', 'J265', 'J266', 'J267', 'J360', 'J367', 'J467', 'J468', 'J567', 'J667', 'J668', 'J767', 'J867', 'J868', 'J966', 'J967', 'J968', 'K101', 'K102', 'K104', 'K105', 'K106', 'K107', 'K108', 'K109', 'K111', 'K115', 'K116', 'K151', 'K201', 'K202', 'K203', 'K301', 'K302', 'K303', 'K401', 'K501', 'K502', 'K503', 'K504', 'K601', 'K602D', 'K701', 'K702', 'K703', 'K709', 'K712', 'K801', 'K902', 'K903', 'K905', 'K906', 'K907', 'K999', 'TUC516', 'U105', 'U108', 'U110', 'U115', 'U201', 'U301', 'U401', 'U501', 'U502', 'U702', 'U709', 'U712', 'Y705', 'Y722', 'Y731', 'Y746', 'Y910', 'Y918', 'Y926', 'Y927', 'Y928', 'Y935', 'Y940', 'Y947', 'Y949', 'A099', 'EUC128', 'EUC270', 'EUC280', 'C153', 'U111', 'J150', 'J152', 'J153', 'J157', 'J161ST', 'J163', 'J171', 'J173', 'J175', 'J176', 'J179', 'J261', 'J463', 'J669', 'J687', 'EUC568', 'F978', 'EUC178', 'EUC177', 'C441', 'K602', 'Z888', 'Z889', 'C102', 'C172', 'C191', 'C227', 'EUC132', 'EUC151', 'EUC161', 'EUC225', 'EUC250', 'EUC255', 'EUC711', 'EUC733', 'EUC736', 'E303', 'K103', 'K112', 'K113', 'K117', 'K305', 'K306', 'EUT181', 'EUT182', 'EUT560', 'TUT168', 'C310', 'C736', 'EUC734', 'K603', 'EUT183', 'C220', 'E101', 'K917', 'C970', 'C106', 'EUC188', 'C603', 'K713', 'K809', 'EUC169', 'EUC103', 'EUC104', 'EUC107', 'EUC108', 'EUC165', 'C442', 'K807', 'H907', 'C178', 'EUC162', 'EUC511', 'EUC166', 'K915', 'D05', 'K307', 'K308', 'E902', 'UC103', 'UC104', 'UC107', 'UC108', 'UC128', 'UC165', 'UC166', 'RC168', 'UC169', 'UC170', 'UC161', 'UC171', 'UC225', 'UC250', 'UC270', 'UC280', 'UC511', 'RC516', 'UC521', 'UC560', 'UC561', 'UC568', 'UC177', 'UC178', 'UC181', 'UC182', 'UC111', 'UC112', 'UC121', 'UC123', 'UC124', 'UC125', 'UC126', 'UC127', 'UC131', 'UC132', 'UC141', 'UC151', 'UC156', 'UC661', 'UC733', 'UC734', 'UC735', 'UC736', 'UC711', 'UC731', 'UC751', 'UC761', 'UC910', 'UC176', 'Y719', 'K121', 'C193', 'K402', 'TC190', 'C175', 'C228', 'TRC168', 'TC173', 'UC162', 'TC510', 'Y738', 'TC101', 'TC102', 'TC106', 'C173', 'TC220', 'TC228', 'TC590', 'K119', 'TUC560', 'TC193', 'TUC170', 'TC330', 'Y728', 'TC155', 'TC320', 'TC550', 'TC108', 'TUC181', 'TC180', 'WC320', 'WC101', 'WK905', 'WC510', 'U106', 'WC603', 'WK115', 'WK116', 'TUC192', 'TC603', 'TUC128', 'TUC178', 'U402', 'TC110', 'TK104', 'U915', 'TK305', 'TK307', 'TK308', 'TK402', 'TK602', 'U116', 'U203', 'X709', 'TK702', 'TK807', 'TK701', 'TE117', 'TUC182', 'TU203', 'TF160', 'TC442', 'TC610', 'Y948', 'TF221', 'TC980', 'TC227', 'TRC170', 'TC518', 'TF152', 'C905', 'EA033', 'EA035', 'TUC188', 'EA031', 'L04', 'D057', 'D071', 'TJ767', 'UC122', 'UC175', 'F160', 'E711', 'TK109', 'TK119', 'TK301', 'TK767', 'UC198', 'TJ180', 'TK504', 'K711', 'UC196', 'TUC196', 'TK110', 'TZ888', 'TK801', 'TK118', 'Z156', 'TU915', 'TU502', 'TC120', 'TK131', 'C512', 'TUC103', 'UK187', 'TUK915', 'TK713', 'UK915', 'F192', 'UK185', 'TK905', 'UK708', 'TC172', 'E501', 'TUC197', 'K122', 'TK201', 'K000', 'K001', 'HP', 'TK603', 'UK501', 'UC197', 'UC105', 'TK107', 'C330', 'TUC199', 'WRC168', 'UC199', 'UK126', 'UK118', 'J263', 'K310', 'UK111', 'UK301', 'UK402', 'UK502', 'UK702', 'TUC198', '001', 'TUK708', 'WUC178', 'WUC197', 'TUK502', 'UK767', 'WMJ000', 'TUC165', 'TUK118', 'C192', 'TK127', 'TUK301', 'TK115', 'TY728', 'TJ170', 'TJ176', 'TJ868', 'TJ182', 'TJ467', 'TK102', 'TUC169', 'UC188', 'K128', 'TUC107', 'TUC109', 'UC109']
+    factory_ids = list(GlobalCode.objects.filter(global_type__type_name='产地').values_list('id', flat=True))
+    stages = GlobalCode.objects.filter(global_type__type_name='胶料段次')
+    materials = list(Material.objects.values_list('id', flat=True))
     for i in products:
         try:
-            ProductInfo.objects.create(
+            product = ProductInfo.objects.create(
                 product_no=i,
                 product_name=i,
+                versions='01',
+                factory_id=random.choice(factory_ids),
+                used_type=1,
+                recipe_weight=0
             )
+            i = 1
+            weight = 0
+            for stage in stages:
+                for k in range(random.randint(1, 4)):
+                    recipe = ProductRecipe.objects.create(
+                        product_recipe_no=product.product_no + '-' + stage.global_name,
+                        sn=i,
+                        product_info=product,
+                        material_id=random.choice(materials),
+                        stage=stage,
+                        ratio=random.randint(10, 100)
+                    )
+                    weight += recipe.ratio
+                    i += 1
+            product.recipe_weight = weight
+            product.save()
+        except Exception:
+            pass
+
+
+def add_batch():
+    dev_ids = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
+    time_choice = ('00:02:12', '00:01:42', '00:03:44')
+    for product in ProductInfo.objects.all():
+        try:
+            for stage in product.productrecipe_set.all().values('stage__global_name', 'stage'):
+                instance = ProductBatching.objects.create(
+                    product_info=product,
+                    stage_product_batch_no=product.factory.global_no + '-' + product.product_no + '-' + stage[
+                        'stage__global_name'] + '-' + product.versions,
+                    stage_id=stage['stage'],
+                    dev_type_id=random.choice(dev_ids),
+                    batching_weight=random.randint(200, 500),
+                    manual_material_weight=random.randint(100, 300),
+                    volume=0,
+                    batching_time_interval=random.choice(time_choice),
+                    rm_flag=0,
+                    batching_proportion=0,
+                    production_time_interval=random.choice(time_choice)
+                )
+                mat_ids = ProductRecipe.objects.filter(product_info=product,
+                                                       stage_id=stage['stage']).values_list('material', flat=True)
+                i = 0
+                for mat in mat_ids:
+                    ProductBatchingDetail.objects.create(
+                        product_batching=instance,
+                        actual_weight=(i + 1) * 10,
+                        sn=i,
+                        material_id=mat
+                    )
         except Exception:
             pass
 
@@ -1480,7 +1539,14 @@ if __name__ == '__main__':
     add_equips()
     add_plan_schedule()
     add_product()
+<<<<<<< HEAD
+    add_batch()
+    add_plan()
+    add_material_day_classes_plan()
+    add_product_demo_data()
+=======
     add_product_batching()
     # add_plan()
     # add_material_day_classes_plan()
     # add_product_demo_data()
+>>>>>>> 1e87937832b137d6ff59d0bf44f4a1786daff781
