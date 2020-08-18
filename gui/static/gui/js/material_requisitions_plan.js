@@ -110,10 +110,18 @@
                 this.editForm.material_ids.push(row.material_demanded_list[2].id);
                 this.editForm.material_name = row.material_name
                 this.editForm.plan_date = this.planDate;
-                this.editForm.weights.push(row.md_material_requisition_classes[0].morning);
-                this.editForm.weights.push(row.md_material_requisition_classes[1].afternoon);
-                this.editForm.weights.push(row.md_material_requisition_classes[2].night);
+                if (row.md_material_requisition_classes[0]){
+                    this.editForm.weights.push(row.md_material_requisition_classes[0].morning);
+                    this.editForm.weights.push(row.md_material_requisition_classes[1].afternoon);
+                    this.editForm.weights.push(row.md_material_requisition_classes[2].night);
+                  }
+                else {
+                    this.editForm.weights.push(0);
+                    this.editForm.weights.push(0);
+                    this.editForm.weights.push(0);
+                }
                 this.dialogEditVisible = true;
+                console.log(this.editForm)
             },
 
             saveRequisitionsPlan(editForm) {
