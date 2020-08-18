@@ -105,7 +105,6 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
 
 class ProductBatchingListSerializer(BaseModelSerializer):
     product_name = serializers.CharField(source='product_info.product_name')
-    dev_type_name = serializers.CharField(source='dev_type.global_name')
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.CharField(source='last_updated_user.username', read_only=True)
     stage_name = serializers.CharField(source="stage.global_name")
@@ -118,13 +117,12 @@ class ProductBatchingListSerializer(BaseModelSerializer):
 class ProductBatchingCreateSerializer(BaseModelSerializer):
     stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                help_text='段次id')
-    dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
-                                                  help_text='机型id')
+    # dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
+    #                                               help_text='机型id')
 
     class Meta:
         model = ProductBatching
-        exclude = ('used_time', 'manual_material_weight', 'batching_weight')
-        read_only_fields = COMMON_READ_ONLY_FIELDS
+        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'stage', 'versions')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
@@ -155,7 +153,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('id', 'batching_details')
+        fields = ('id', 'batching_details', 'dev_type')
 
 
 class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
