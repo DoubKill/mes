@@ -10,11 +10,11 @@
                 dialogAddRubberRecipe: false,
                 originOptions: [], // 产地选项
                 rubberRecipeForm: {
-                    factory: "", // 产地
+                    // factory: "", // 产地
                     product_no: "", // 胶料编码
-                    versions: "", // 版本
+                    // versions: "", // 版本
                     product_name: "", // 胶料名称
-                    precept: "" // 方案
+                    // precept: "" // 方案
                 },
                 materials: [],
                 selectedMaterials: [],
@@ -155,11 +155,11 @@
 
                 this.rubberRecipeError = "";
                 this.rubberRecipeForm = {
-                    factory: "", // 产地
+                    // factory: "", // 产地
                     product_no: "", // 胶料编码
-                    versions: "", // 版本
+                    // versions: "", // 版本
                     product_name: "", // 胶料名称
-                    precept: "" // 方案
+                    // precept: "" // 方案
                 };
                 this.dialogAddRubberRecipe = true;
                 this.currentRow = {
@@ -360,9 +360,9 @@
 
                             product_no: app.rubberRecipeForm.product_no,
                             product_name: app.rubberRecipeForm.product_name,
-                            versions: app.rubberRecipeForm.versions,
-                            precept: app.rubberRecipeForm.precept,
-                            factory: app.rubberRecipeForm.factory,
+                            // versions: app.rubberRecipeForm.versions,
+                            // precept: app.rubberRecipeForm.precept,
+                            // factory: app.rubberRecipeForm.factory,
                             productrecipe_set: productrecipe_set
                         }).then(function (response) {
 
