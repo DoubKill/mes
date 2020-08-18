@@ -20,7 +20,7 @@ router.register(r'product-infos', ProductInfoViewSet)
 router.register(r'product-batching', ProductBatchingViewSet)
 
 # 胶料步序
-router.register(r'process_steps', ProcessStepsViewSet)
+router.register(r'process-steps', ProcessStepsViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
