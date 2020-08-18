@@ -1,8 +1,8 @@
 # -*- coding: UTF-8 -*-
 """
-auther: 
+auther: liwei
 datetime: 2020/8/8
-name: 
+name: 生产数据模拟脚本
 """
 import datetime
 import time as t
@@ -19,6 +19,18 @@ django.setup()
 from basics.models import PlanSchedule
 from plan.models import ProductClassesPlan, ProductDayPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
+
+
+class ProductDataEmulator():
+
+    def __init__(self, *args, **kwargs):
+        self.plan_train = kwargs.get("plan_train")
+
+    @staticmethod
+    def init_datatable(self):
+        pass
+
+
 
 
 def gen_uuid():
