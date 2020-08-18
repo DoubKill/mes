@@ -72,7 +72,7 @@ class ProductBatching(AbstractEntity):
     product_info = models.ForeignKey(ProductInfo, help_text='胶料工艺信息', on_delete=models.DO_NOTHING)
     precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案', blank=True, null=True)
     stage_product_batch_no = models.CharField(max_length=63, help_text='胶料配方编码')
-    dev_type = models.ForeignKey(GlobalCode, help_text='机型', on_delete=models.DO_NOTHING)
+    dev_type = models.ForeignKey(GlobalCode, help_text='机型', on_delete=models.DO_NOTHING, blank=True, null=True)
     stage = models.ForeignKey(GlobalCode, help_text='段次', verbose_name='段次',
                               on_delete=models.DO_NOTHING, related_name='stage_batches')
     versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
