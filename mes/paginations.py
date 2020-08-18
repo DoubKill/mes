@@ -29,7 +29,7 @@ class SinglePageNumberPagination(PageNumberPagination):
     """
     继承基础分页，只返回results
     """
-    page_size = 1000
+    page_size = 10000000
     def get_paginated_response(self, data):
         return Response(OrderedDict([
             ('results', data)

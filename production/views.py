@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from basics.models import PlanSchedule
+from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter
@@ -90,7 +91,7 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
         创建机台状况反馈
     """
     queryset = EquipStatus.objects.filter(delete_flag=False)
-    pagination_class = None
+    pagination_class = SinglePageNumberPagination
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = EquipStatusSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
