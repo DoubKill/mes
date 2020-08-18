@@ -1291,7 +1291,9 @@ def add_product_batching():
                 stage_id=stage,
                 versions='01'
             )
-            pb.stage_product_batch_no = pb.site.global_name + pb.stage.global_name + pb.product_info.product_name + '01'
+            pb.stage_product_batch_no = pb.site.global_name + '-' + pb.stage.global_name + '+' +\
+                                            pb.product_info.product_name + '-' '01'
+            pb.save()
 
 
 def random_str():
@@ -1331,6 +1333,7 @@ def add_plan():
                     plan_classes_uid=None
                 )
                 i += 1
+
 
 def add_material_day_classes_plan():
     """
@@ -1467,16 +1470,16 @@ def add_product_demo_data():
 
 
 if __name__ == '__main__':
-    # add_global_codes()
-    # add_materials()
-    # add_groups()
-    # add_sections()
-    # add_users()
-    # add_schedules()
-    # add_equip_attribute()
-    # add_equips()
-    # add_plan_schedule()
-    # add_product()
+    add_global_codes()
+    add_materials()
+    add_groups()
+    add_sections()
+    add_users()
+    add_schedules()
+    add_equip_attribute()
+    add_equips()
+    add_plan_schedule()
+    add_product()
     add_product_batching()
     # add_plan()
     # add_material_day_classes_plan()

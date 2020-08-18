@@ -108,6 +108,11 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.CharField(source='last_updated_user.username', read_only=True)
     stage_name = serializers.CharField(source="stage.global_name")
+    site_name = serializers.CharField(source="site.global_name")
+    dev_type_name = serializers.SerializerMethodField()
+
+    def get_dev_type_name(self, obj):
+        return obj.dev_type.global_name if obj.dev_type else None
 
     class Meta:
         model = ProductBatching
@@ -117,12 +122,26 @@ class ProductBatchingListSerializer(BaseModelSerializer):
 class ProductBatchingCreateSerializer(BaseModelSerializer):
     stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
                                                help_text='段次id')
-    # dev_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
-    #                                               help_text='机型id')
+    batching_details = ProductBatchingDetailSerializer(many=True, required=False,
+                                                       help_text="""
+                                                           [{"sn": 序号, "material":原材料id, 
+                                                           "actual_weight":重量, "error_range":误差值}]""")
+
+    def create(self, validated_data):
+        batching_details = validated_data.pop('batching_details', None)
+        instance = super().create(validated_data)
+        if batching_details:
+            batching_detail_list = [None] * len(batching_details)
+            for i, detail in enumerate(batching_details):
+                detail['product_batching'] = instance
+                batching_detail_list[i] = ProductBatchingDetail(**detail)
+            ProductBatchingDetail.objects.bulk_create(batching_detail_list)
+        return instance
 
     class Meta:
         model = ProductBatching
-        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'stage', 'versions')
+        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
+                  'stage', 'versions', 'batching_details')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
@@ -142,7 +161,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     def update(self, instance, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         instance = super().update(instance, validated_data)
-        if 'batching_details' is not None:
+        if batching_details is not None:
             instance.batching_details.all().delete()
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
@@ -153,7 +172,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('id', 'batching_details', 'dev_type')
+        fields = ('id', 'batching_details', 'dev_type', 'production_time_interval')
 
 
 class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
@@ -164,23 +183,25 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
         if pass_flag:
             if instance.used_type == 1:  # 审核通过
                 instance.used_type = 2
-            elif instance.used_type == 2:  # 应用
-                # 废弃旧版本
-                ProductInfo.objects.filter(used_type=3,
-                                           product_no=instance.product_no,
-                                           factory=instance.factory
-                                           ).update(used_type=5,
-                                                    obsolete_time=datetime.now())
+            elif instance.used_type == 2:  # 审核通过
                 instance.used_type = 3
+            elif instance.used_type == 3:  # 启用
+                # 废弃旧版本
+                # ProductInfo.objects.filter(used_type=4,
+                #                            product_no=instance.product_no,
+                #                            factory=instance.factory
+                #                            ).update(used_type=6,
+                #                                     obsolete_time=datetime.now())
+                instance.used_type = 4
                 instance.used_user = self.context['request'].user
                 instance.used_time = datetime.now()
         else:
-            if instance.used_type == 3:  # 废弃
+            if instance.used_type == 4:  # 弃用
                 instance.obsolete_user = self.context['request'].user
-                instance.used_type = 5
+                instance.used_type = 6
                 instance.obsolete_time = datetime.now()
             else:  # 驳回
-                instance.used_type = 4
+                instance.used_type = 5
         instance.last_updated_user = self.context['request'].user
         instance.save()
         return instance
