@@ -112,6 +112,19 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductInfoFilter
 
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(),)
+
+    def list(self, request, *args, **kwargs):
+        if self.request.query_params.get('all'):
+            data = self.queryset.values('id', 'product_no', 'product_name')
+            return Response(data)
+        else:
+            return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductInfoCopyView(CreateAPIView):
