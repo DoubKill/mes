@@ -13,10 +13,12 @@ from mes.derorators import api_recorder
 from mes.permissions import ProductBatchingPermissions
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
     MaterialAttributeFilter
-from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
+from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCopySerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
-    ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, ProductBatchingPartialUpdateSerializer
-from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ProductBatchingDetail
+    ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, ProductProcessSerializer, \
+    ProductBatchingPartialUpdateSerializer, ProcessDetailSerializer
+from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ProductProcess, \
+    ProductBatchingDetail, ProductProcessDetail
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -177,3 +179,41 @@ class ProductBatchingViewSet(ModelViewSet):
         instance.save()
         instance.batching_details.filter().update(delete_flag=True, delete_user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProcessStepsViewSet(ModelViewSet):
+    """
+    list:
+        胶料配料步序列表
+    retrieve:
+        胶料配料步序
+    create:
+        新建胶料配料步序
+    update:
+        修改胶料配料步序
+    partial_update:
+        修改胶料配料步序
+    """
+    queryset = ProductProcess.objects.filter(delete_flag=False).order_by('-created_date')
+    filter_backends = (DjangoFilterBackend,)
+    serializer_class = ProductProcessSerializer
+
+
+class ProductProcessDetailViewSet(ModelViewSet):
+    """
+    list:
+        胶料配料步序详情列表
+    retrieve:
+        胶料配料步序详情详情
+    create:
+        新建胶料配料步序详情
+    update:
+        修改胶料配料步序详情
+    partial_update:
+        修改胶料配料步序详情
+    delete:
+        删除胶料配料步序详情
+    """
+    queryset = ProductProcessDetail.objects.filter(delete_flag=False).order_by('-created_date')
+    filter_backends = (DjangoFilterBackend,)
+    serializer_class = ProcessDetailSerializer

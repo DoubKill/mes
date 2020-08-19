@@ -7,7 +7,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute
+    MaterialAttribute, ProductProcess, ProductProcessDetail
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
@@ -127,6 +127,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                                                            [{"sn": 序号, "material":原材料id, 
                                                            "actual_weight":重量, "error_range":误差值}]""")
 
+    @atomic()
     def create(self, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         instance = super().create(validated_data)
@@ -140,12 +141,13 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             ProductBatchingDetail.objects.bulk_create(batching_detail_list)
         instance.batching_weight = batching_weight
         instance.save()
+        # TODO 将胶料当做原材料新建一份
         return instance
 
     class Meta:
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
-                  'stage', 'versions', 'batching_details')
+                  'stage', 'versions', 'batching_details', 'equip_no')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
@@ -217,3 +219,53 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductInfo
         fields = ('id', 'pass_flag')
+
+
+class ProductProcessDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ProductProcessDetail
+        exclude = ('product_process', )
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProcessDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ProductProcessDetail
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductProcessSerializer(BaseModelSerializer):
+    process_details = ProductProcessDetailSerializer(many=True, required=False)
+
+    @atomic()
+    def create(self, validated_data):
+        validated_data['created_user'] = self.context['request'].user
+        process_details = validated_data.pop('process_details', None)
+        instance = super().create(validated_data)
+        batching_detail_list = []
+        for detail in process_details:
+            detail['product_process'] = instance
+            batching_detail_list.append(ProductProcessDetail(**detail))
+        ProductProcessDetail.objects.bulk_create(batching_detail_list)
+        return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        process_details = validated_data.pop('process_details', None)
+        instance = super().update(instance, validated_data)
+        if process_details:
+            instance.process_details.all().delete()
+            batching_detail_list = []
+            for detail in process_details:
+                detail['product_batching'] = instance
+                batching_detail_list.append(ProductProcessDetail(**detail))
+            ProductProcessDetail.objects.bulk_create(batching_detail_list)
+        return instance
+
+    class Meta:
+        model = ProductProcess
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
