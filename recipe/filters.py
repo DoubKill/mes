@@ -13,12 +13,12 @@ class MaterialFilter(django_filters.rest_framework.FilterSet):
 
 
 class ProductInfoFilter(django_filters.rest_framework.FilterSet):
-    product_no = django_filters.CharFilter(field_name='product_no', help_text='原材料类别', lookup_expr='icontains')
-    factory_id = django_filters.NumberFilter(field_name='factory_id', help_text='产地id')
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料编码', lookup_expr='icontains')
+    product_name = django_filters.CharFilter(field_name='product_name', help_text='胶料名称', lookup_expr='icontains')
 
     class Meta:
         model = ProductInfo
-        fields = ('product_no', 'factory_id')
+        fields = ('product_no', 'product_name')
 
 
 class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
