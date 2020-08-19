@@ -7,7 +7,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute, ProductProcess, ProductProcessDetail
+    MaterialAttribute
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 
@@ -217,45 +217,3 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductInfo
         fields = ('id', 'pass_flag')
-
-
-class ProductProcessDetailSerializer(BaseModelSerializer):
-
-    class Meta:
-        model = ProductProcessDetail
-        exclude = ('product_process', )
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class ProductProcessSerializer(BaseModelSerializer):
-    process_details = ProductProcessDetailSerializer(many=True, required=True)
-
-    @atomic()
-    def create(self, validated_data):
-        validated_data['created_user'] = self.context['request'].user
-        process_details = validated_data.pop('process_details', None)
-        instance = super().create(validated_data)
-        batching_detail_list = []
-        for detail in process_details:
-            detail['product_process'] = instance
-            batching_detail_list.append(ProductProcessDetail(**detail))
-        ProductProcessDetail.objects.bulk_create(batching_detail_list)
-        return instance
-
-    @atomic()
-    def update(self, instance, validated_data):
-        process_details = validated_data.pop('process_details', None)
-        instance = super().update(instance, validated_data)
-        if process_details:
-            instance.process_details.all().delete()
-            batching_detail_list = []
-            for detail in process_details:
-                detail['product_batching'] = instance
-                batching_detail_list.append(ProductProcessDetail(**detail))
-            ProductProcessDetail.objects.bulk_create(batching_detail_list)
-        return instance
-
-    class Meta:
-        model = ProductProcess
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
