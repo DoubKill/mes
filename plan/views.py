@@ -29,7 +29,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     list:
         胶料日计划列表
     create:
-        新建胶料日计划
+        新建胶料日计划（单增），暂且不用，
     update:
         修改原胶料日计划
     destroy:
@@ -43,6 +43,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     ordering_fields = ['id', 'equip__category__equip_type__global_name']
 
     def destroy(self, request, *args, **kwargs):
+        """"胶料计划删除 先删除胶料计划，随后删除胶料计划对应的班次日计划和原材料需求量表"""
         instance = self.get_object()
         for pcp_obj in instance.pdp_product_classes_plan.all():
             MaterialDemanded.objects.filter(
@@ -60,7 +61,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 class MaterialDemandedViewSet(ListAPIView):
     """
     list:
-        原材料需求量列表
+        原材料需求量列表，暂时没用到 先留着
     """
     queryset = MaterialDemanded.objects.filter(delete_flag=False)
     serializer_class = MaterialDemandedSerializer
@@ -75,7 +76,7 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     list:
         配料小料日计划列表
     create:
-        新建配料小料日计划
+        新建配料小料日计划(这里的增是单增)
     update:
         修改配料小料日计划
     destroy:
@@ -91,6 +92,7 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     # pagination_class = LimitOffsetPagination
 
     def destroy(self, request, *args, **kwargs):
+        """"删除配料小料计划  随后还要删除配料小料的日班次计划和原材料需求量计划"""
         instance = self.get_object()
         for pbcp_obj in instance.pdp_product_batching_classes_plan.all():
             MaterialDemanded.objects.filter(
@@ -107,7 +109,8 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductBatchingDayPlanManyCreate(APIView):
-    '''小料计划群增接口'''
+    """配料小料计划群增接口"""
+
     def post(self, request, *args, **kwargs):
         if isinstance(request.data, dict):
             many = False
@@ -123,7 +126,8 @@ class ProductBatchingDayPlanManyCreate(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductDayPlanManyCreate(APIView):
-    '''胶料计划群增接口'''
+    """胶料计划群增接口"""
+
     def post(self, request, *args, **kwargs):
         if isinstance(request.data, dict):
             many = False
@@ -139,7 +143,7 @@ class ProductDayPlanManyCreate(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
-    """
+    """暂时都没用得到 先留着
     list:
         领料日班次计划列表
     create:
@@ -165,12 +169,11 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedAPIView(APIView):
-    '''
-    原材料需求量展示
-    '''
+    """原材料需求量展示 三合一 一个原材料对应着早中晚三个班次的计划 三条整合成一条 并且每个班次计划还对应着三条领料班次计划 也整合到一起"""
 
     def get(self, request):
         filter_dict = {}
+        """筛选功能"""
         if request.GET.get('plan_date', None):  # 日期
             filter_dict['plan_schedule__day_time'] = request.GET.get('plan_date')
         if request.GET.get('material_type', None):  # 原材料类别
@@ -193,12 +196,14 @@ class MaterialDemandedAPIView(APIView):
             response_list[-1]['material_no'] = md_obj.material.material_no
             response_list[-1]['material_name'] = md_obj.material.material_name
             response_list[-1]['md_material_requisition_classes'] = []
+            """整合原材料班次计划的三条领料班次计划"""
             for i in range(len(md_obj.md_material_requisition_classes.all())):
                 dict_key = ['morning', 'afternoon', 'night']
                 user_dict = {dict_key[i]: float(md_obj.md_material_requisition_classes.all()[i].weight)}
                 response_list[-1]['md_material_requisition_classes'].append(user_dict)
             response_list[-1]['material_demanded_list'] = []
             i = 0
+            """整合原材料对应的三条班次计划"""
             for m_obj in m_queryset.values_list('id', 'material_demanded'):
                 dict_key = ['id', 'material_demanded']
                 user_dict = {}
