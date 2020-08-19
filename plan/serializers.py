@@ -30,7 +30,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     batching_weight = serializers.DecimalField(source='product_batching.batching_weight', decimal_places=2,
                                                max_digits=8,
                                                read_only=True, help_text='配料重量')
-    batching_time_interval = serializers.TimeField(source='product_batching.batching_time_interval', read_only=True,
+    production_time_interval = serializers.DecimalField(source='product_batching.production_time_interval', read_only=True,
                                                    help_text='配料时间')
 
     class Meta:
@@ -38,7 +38,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         model = ProductDayPlan
         fields = ('id',
                   'plan_date', 'equip', 'equip_no', 'category', 'product_no', 'batching_weight',
-                  'batching_time_interval',
+                  'production_time_interval',
                   'product_batching',
                   'pdp_product_classes_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
