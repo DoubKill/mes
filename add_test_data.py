@@ -963,7 +963,6 @@ def add_materials():
         data['material_no'] = x[2]
         data['material_name'] = x[4]
         data['material_type'] = GlobalCode.objects.filter(global_name=x[3]).first()
-        data['density'] = 1
         data['used_flag'] = 1
         try:
             Material.objects.create(**data)
