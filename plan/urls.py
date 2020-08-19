@@ -13,7 +13,6 @@ router.register(r'product-batching-day-plans', ProductBatchingDayPlanViewSet)
 
 # 领料班次计划
 router.register(r'material-requisition-classes', MaterialRequisitionClassesViewSet)
-# router.register(r'material-requisitions', MaterialRequisitionViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -23,6 +22,4 @@ urlpatterns = [
     path('material-demanded-apiview/', MaterialDemandedAPIView.as_view()),  # 原材料需求量展示
     path('product-batching-day-plan-manycreate/', ProductBatchingDayPlanManyCreate.as_view()),  # 群增小料日计划
     path('product-day-plan-manycreate/', ProductDayPlanManyCreate.as_view()),  # 群增胶料日计划
-
-    # path('material-requisitions-copy/', MaterialRequisitionCopyView.as_view()),
 ]
