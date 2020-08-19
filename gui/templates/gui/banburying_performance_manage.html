@@ -55,7 +55,7 @@
                 label="胶料代码">
             <template slot-scope="scope">
                 <span style="margin-left: 10px" v-text="scope.row.product_no"></span>
-                <el-button @click="detailsClick(scope.row)" icon="el-icon-search" type="text" size="small" style="float: right; width: 30%">
+                <el-button @click="clickProductNo(scope.row)" icon="el-icon-search" type="text" size="small" style="float: right; width: 30%">
 {#                    <i class="el-icon-search"></i>#}
                 </el-button>
             </template>
@@ -131,62 +131,66 @@
                 :visible.sync="dialogVisibleRubber">
             <el-form :inline="true">
                 <el-form-item label="胶料区分: ">
-                    {{ getDetailsParams.product_no }}
+                    {{ palletFeedObj.hasOwnProperty("stage")?palletFeedObj.stage:'--'}}
                 </el-form-item>
-                <el-form-item label="规格: ">
-                    {{ getDetailsParams.product_no }}
+                <el-form-item label="胶料编码: ">
+                    {{ palletFeedObj.product_no }}
                 </el-form-item>
-                <el-form-item label="班: ">
-                    全部
+                <el-form-item label="班次: ">
+                    {{ palletFeedObj.classes }}
                 </el-form-item>
                 <el-form-item label="机台: ">
-                    {{ getDetailsParams.equip_no }}
+                    {{ palletFeedObj.equip_no }}
                 </el-form-item>
 
             </el-form>
-            <div style="color:#409EFF;cursor:pointer" @click="clickBAT">点击bat</div>
             <el-table
-                    :data="tableDataBAT"
+                    :data="palletFeedList"
+                    border
                     style="width: 100%">
                 <el-table-column
-                        prop="date"
+                        prop="lot_no"
                         label="LOT">
-                </el-table-column>
-                <el-table-column
-                        prop="name"
-                        label="规格"
-                        width="180">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
-                        label="机台">
-                </el-table-column>
-                <el-table-column
-                        prop="date"
-                        label="BAT">
                     <template slot-scope="scope">
-                        <div style="color:#409EFF;cursor:pointer" @click="clickBAT(scope.row)">{{ scope.row.Bat }}</div>
+                        {{ scope.row.LOT||'--' }}
                     </template>
                 </el-table-column>
                 <el-table-column
-                        prop="name"
+                        prop="product_no"
+                        label="胶料编码">
+                </el-table-column>
+                <el-table-column
+                        prop="equip_no"
+                        label="机台">
+                </el-table-column>
+
+                <el-table-column
+                        label="BAT">
+                    <template slot-scope="scope">
+                        <div style="color:#1989fa;cursor:pointer"
+                             @click="clickBAT(scope.row)">
+                            {{ scope.row.begin_trains }}--{{ scope.row.end_trains }}</div>
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="actual_weight"
                         label="生产重量">
                 </el-table-column>
                 <el-table-column
-                        prop="address"
                         label="生产时间">
+                    <template slot-scope="scope">
+                        {{ scope.row.end_time.split(' ')[1]}}
+                    </template>
                 </el-table-column>
                 <el-table-column
-                        prop="name"
+                        prop="classes"
                         label="班次">
                 </el-table-column>
                 <el-table-column
-                        prop="address"
+                        prop="operation_user"
                         label="作业者">
                 </el-table-column>
-
             </el-table>
-
         </el-dialog>
         <el-dialog
                 title="BAT查询"
@@ -194,19 +198,19 @@
             <div style="position: relative">
                 <el-form :inline="true" style="margin-right: 100px;">
                     <el-form-item label="胶料区分: ">
-                        fmc
+                        {{ BATObj.stage }}
                     </el-form-item>
-                    <el-form-item label="规格: ">
-                        fmc
+                    <el-form-item label="胶料编码: ">
+                        {{ BATObj.product_no }}
                     </el-form-item>
-                    <el-form-item label="班: ">
-                        全部
-                    </el-form-item>
-                    <el-form-item label="机台: ">
-                        hhh
+                    <el-form-item label="班次: ">
+                        {{ BATObj.classes }}
                     </el-form-item>
                     <el-form-item label="机台: ">
-                        车次
+                        {{ BATObj.equip_no }}
+                    </el-form-item>
+                    <el-form-item label="车次: ">
+                        {{ BATObj.begin_trains }} -- {{ BATObj.end_trains }}
                     </el-form-item>
 
                 </el-form>
@@ -215,88 +219,67 @@
                 </el-button>
             </div>
             <el-table
-                    :data="tableDataRubber"
+                    :data="BATList"
                     style="width: 100%">
                 <el-table-column
-                        prop="date"
+                        prop="equip_no"
                         label="机台">
                 </el-table-column>
                 <el-table-column
                         prop="name"
                         label="日期">
+                    <template slot-scope="scope">
+                        {{ scope.row.end_time.split(' ')[0] }}
+                    </template>
                 </el-table-column>
                 <el-table-column
-                        prop="address"
+                        prop="classes"
                         label="班次">
                 </el-table-column>
                 <el-table-column
-                        prop="date"
+                        prop="product_no"
                         label="胶料编码">
                 </el-table-column>
                 <el-table-column
-                        prop="name"
+                        prop="actual_trains"
                         label="车次">
                 </el-table-column>
                 <el-table-column
-                        prop="address"
+                        prop="actual_weight"
                         label="胶">
                 </el-table-column>
                 <el-table-column
-                        prop="name"
-                        label="炭黑">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
-                        label="白炭黑">
-                </el-table-column>
-                <el-table-column
-                        prop="date"
-                        label="自动药品">
-                </el-table-column>
-                <el-table-column
-                        prop="name"
-                        label="氧化锌">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
-                        label="手动药品">
-                </el-table-column>
-                <el-table-column
-                        prop="date"
-                        label="油">
-                </el-table-column>
-                <el-table-column
-                        prop="name"
-                        label="偶联剂">
-                </el-table-column>
-                <el-table-column
-                        prop="address"
+                        prop="end_time-begin-time"
                         label="时间">
+                    <template slot-scope="scope">
+                        {{ scope.row.begin_time }} -- {{ scope.row.end_time }}
+                    </template>
                 </el-table-column>
                 <el-table-column
-                        prop="name"
+                        prop="equip_status.temperature"
                         label="温度">
                 </el-table-column>
                 <el-table-column
-                        prop="address"
+                        prop="equip_status.energy"
                         label="电量">
                 </el-table-column>
                 <el-table-column
-                        prop="address"
+                        prop="equip_status.rpm"
                         label="RPM">
                 </el-table-column>
-
             </el-table>
         </el-dialog>
+
         <el-dialog
                 title="分析图表"
-                :modal="false"
+                :modal="true"
                 :close-on-click-modal="false"
                 :modal-append-to-body="false"
-                size="600px"
+                width="600px"
                 :visible.sync="dialogVisibleGraph"
                 @opened="opens"
         >
+            <div style="margin: 0 0 20px 5px;">2020-12-12</div>
             <div ref="main" style="width: 100%;height:400px;"></div>
         </el-dialog>
         {% endverbatim vue %}

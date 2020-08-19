@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from basics.models import PlanSchedule
+from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter
@@ -43,7 +44,11 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
         actual_trains = request.query_params.get("actual_trains", '')
         if "," in actual_trains:
             train_list = actual_trains.split(",")
-            queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__in=train_list))
+            try:
+                queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__gte=train_list[0],
+                                                                           actual_trains__lte=train_list[-1]))
+            except:
+                return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
             queryset = self.filter_queryset(self.get_queryset() )
         page = self.paginate_queryset(queryset)
@@ -85,8 +90,8 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
     create:
         创建机台状况反馈
     """
-    queryset = EquipStatus.objects.filter(delete_flag=False)
-    pagination_class = None
+    queryset = EquipStatus.objects.filter(delete_flag=False).order_by("-created_date")
+    pagination_class = SinglePageNumberPagination
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = EquipStatusSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -97,7 +102,11 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
         actual_trains = request.query_params.get("actual_trains", '')
         if "," in actual_trains:
             train_list = actual_trains.split(",")
-            queryset = self.filter_queryset(self.get_queryset().filter(current_trains__in=train_list))
+            try:
+                queryset = self.filter_queryset(self.get_queryset().filter(current_trains__gte=train_list[0],
+                                                                           current_trains__lte=train_list[-1]))
+            except:
+                return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
             queryset = self.filter_queryset(self.get_queryset() )
         page = self.paginate_queryset(queryset)

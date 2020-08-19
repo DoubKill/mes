@@ -5,10 +5,14 @@ import os
 import string
 import traceback
 
-import django
-
 import time
 import random
+import uuid
+
+import django
+
+from plan.models import ProductClassesPlan, ProductDayPlan
+from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
@@ -81,7 +85,8 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
 
 
 def add_global_codes():
-    names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次']
+    names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
+             'SITE']
     for i, name in enumerate(names):
         instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, used_flag=1)
         items = []
@@ -107,6 +112,8 @@ def add_global_codes():
             items = ['400', '500', '600']
         elif i == 10:
             items = ['1', '2', '3']
+        elif i == 11:
+            items = ['c', 'l', 'k']
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(i + 1), global_name=item, global_type=instance)
 
@@ -1110,7 +1117,7 @@ def add_sections():
 def add_users():
     section_ids = list(Section.objects.values_list('id', flat=True))
     group_ids = list(GroupExtension.objects.values_list('id', flat=True))
-    for i in range(500):
+    for i in range(100):
         name = getRandomName()
         try:
             user = User.objects.create_user(
@@ -1325,6 +1332,29 @@ def add_batch():
             pass
 
 
+def add_product_batching():
+    factories = list(GlobalCode.objects.filter(global_type__type_name='产地').values_list('id', flat=True))
+    sites = list(GlobalCode.objects.filter(global_type__type_name='SITE').values_list('id', flat=True))
+    product_infos = list(ProductInfo.objects.values_list('id', flat=True))[:20]
+    dev_types = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
+    stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('id', flat=True))
+
+    for product_info in product_infos:
+        for stage in stages:
+            pb = ProductBatching.objects.create(
+                factory_id=random.choice(factories),
+                site_id=random.choice(sites),
+                product_info_id=product_info,
+                stage_product_batch_no='1',
+                dev_type_id=random.choice(dev_types),
+                stage_id=stage,
+                versions='01'
+            )
+            pb.stage_product_batch_no = pb.site.global_name + '-' + pb.stage.global_name + '+' +\
+                                            pb.product_info.product_name + '-' '01'
+            pb.save()
+
+
 def random_str():
     a1 = (2020, 4, 12, 0, 0, 0, 0, 0, 0)  # 设置开始日期时间元组（2020-04-12 00：00：00）
     a2 = (2020, 4, 13, 0, 0, 0, 0, 0, 0)  # 设置结束日期时间元组（2020-04-13 00：00：00）
@@ -1364,6 +1394,140 @@ def add_plan():
                 i += 1
 
 
+def add_material_day_classes_plan():
+    """
+    根据已有信息生成胶料日计划，班次计划
+    :return: None
+    """
+    ProductDayPlan.objects.filter().delete()
+    ProductClassesPlan.objects.filter().delete()
+    actual_feedback = 3
+    equip_set = Equip.objects.filter(equip_name__icontains="混炼")
+    equip_count = equip_set.count()
+    pb_set = ProductBatching.objects.filter(delete_flag=False)
+    pb_count = pb_set.count()
+    ps_set = PlanSchedule.objects.filter(delete_flag=False)
+    # 目前工序只有密炼
+    project_list = ["密炼"]
+    ws_set = WorkSchedule.objects.filter(schedule_name__in=project_list, delete_flag=False)
+    for x in range(actual_feedback):
+        for ps in ps_set:
+            equip = equip_set[random.randint(0, equip_count - 1)]
+            pb = pb_set[random.randint(0, pb_count - 1)]
+            ProductDayPlan.objects.create(equip=equip, product_batching=pb, plan_schedule=ps)
+    day_plan_set = ProductDayPlan.objects.filter(delete_flag=False)
+    # sn的规则?
+    sn = 1
+    init_ps_id = None
+    for day_plan in day_plan_set:
+        if init_ps_id == day_plan.plan_schedule:
+            sn += 1
+        else:
+            init_ps_id = day_plan.plan_schedule
+        for ws in ws_set:
+            mn_uid = None
+            an_uid = None
+            nt_uid = None
+            for cs in ws.classesdetail_set.filter(delete_flag=False):
+                cs_name = cs.classes.global_name
+                if cs_name == "早班":
+                    uid = mn_uid if mn_uid else uuid.uuid1()
+                elif cs_name == "中班":
+                    uid = an_uid if an_uid else uuid.uuid1()
+                elif cs_name == "晚班":
+                    uid = nt_uid if nt_uid else uuid.uuid1()
+                else:
+                    # 暂不做其他班次的处理
+                    continue
+                ProductClassesPlan.objects.create(sn=sn, product_day_plan=day_plan, plan_classes_uid=uid,
+                                                  classes_detail=cs, unit="kg", plan_trains=50, weight=250,
+                                                  time=datetime.datetime.now())
+
+
+def add_product_demo_data():
+    TrainsFeedbacks.objects.all().delete()
+    PalletFeedbacks.objects.all().delete()
+    EquipStatus.objects.all().delete()
+
+    # plan_schedule_set = PlanSchedule.objects.filter(delete_flag=False)
+    # for plan_schedule in plan_schedule_set:
+    #     if plan_schedule:
+    #         day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
+    #     else:
+    #         continue
+    day_plan_set = ProductDayPlan.objects.filter(delete_flag=False)
+    for day_plan in list(day_plan_set):
+        class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
+        bath_no = 1
+        for class_plan in list(class_plan_set):
+            plan_trains = class_plan.plan_trains
+            start_time = class_plan.classes_detail.start_time
+            for m in range(1, int(plan_trains) + 1):
+                class_name = class_plan.classes_detail.classes.global_name
+                equip_no = day_plan.equip.equip_no
+                product_no = day_plan.product_batching.product_info.product_name
+                plan_weight = class_plan.weight
+                # time_str = '2020-08-01 08:00:00'
+                # time = datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                # if class_name == "早班":
+                #     time = time
+                # elif class_name == "中班":
+                #     time = time + datetime.timedelta(hours=8)
+                # else:
+                #     time = time + datetime.timedelta(hours=16)
+                end_time = start_time + datetime.timedelta(seconds=150)
+                train_data = {
+                    "plan_classes_uid": class_plan.plan_classes_uid,
+                    "plan_trains": plan_trains,
+                    "actual_trains": m,
+                    "bath_no": bath_no,
+                    "equip_no": equip_no,
+                    "product_no": product_no,
+                    "plan_weight": plan_weight,
+                    "actual_weight": m * 5,
+                    "begin_time": start_time,
+                    "end_time": end_time,
+                    "operation_user": "string-user",
+                    "classes": class_name
+                }
+                start_time = end_time
+                TrainsFeedbacks.objects.create(**train_data)
+                if m % 5 == 0:
+                    end_time = start_time + datetime.timedelta(seconds=150 * 5)
+                    pallet_data = {
+                        "plan_classes_uid": class_plan.plan_classes_uid,
+                        "bath_no": bath_no,
+                        "equip_no": equip_no,
+                        "product_no": product_no,
+                        "plan_weight": plan_weight * 5,
+                        "actual_weight": m * 5 * 5,
+                        "begin_time": start_time,
+                        "end_time": end_time,
+                        "operation_user": "string-user",
+                        "begin_trains": 1,
+                        "end_trains": m,
+                        "pallet_no": f"{bath_no}|test",
+                        "barcode": "KJDL:LKYDFJM<NLIIRD",
+                        "classes": class_name
+                    }
+                    start_time = end_time
+                    bath_no += 1
+                    PalletFeedbacks.objects.create(**pallet_data)
+                for x in range(5):
+                    equip_status_data = {
+                        "plan_classes_uid": class_plan.plan_classes_uid,
+                        "equip_no": equip_no,
+                        "temperature": random.randint(300, 700),
+                        "rpm": random.randint(500, 2000),
+                        "energy": random.randint(50, 500),
+                        "power": random.randint(50, 500),
+                        "pressure": random.randint(80, 360),
+                        "status": "running",
+                        "current_trains": m,
+                    }
+                    EquipStatus.objects.create(**equip_status_data)
+
+
 if __name__ == '__main__':
     add_global_codes()
     add_materials()
@@ -1375,5 +1539,14 @@ if __name__ == '__main__':
     add_equips()
     add_plan_schedule()
     add_product()
+<<<<<<< HEAD
     add_batch()
     add_plan()
+    add_material_day_classes_plan()
+    add_product_demo_data()
+=======
+    add_product_batching()
+    # add_plan()
+    # add_material_day_classes_plan()
+    # add_product_demo_data()
+>>>>>>> 1e87937832b137d6ff59d0bf44f4a1786daff781

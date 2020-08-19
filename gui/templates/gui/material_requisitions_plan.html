@@ -23,9 +23,9 @@
                     v-model="materialType" placeholder="请选择">
                 <el-option
                         v-for="item in materialTypeOptions"
-                        :key="item.id"
+                        :key="item.global_name"
                         :label="item.global_name"
-                        :value="item.id">
+                        :value="item.global_name">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -103,7 +103,7 @@
             </el-table-column>
             <el-table-column
                 label="总计">
-                <template slot-scope="scope">
+                <template slot-scope="scope" v-if="scope.row.md_material_requisition_classes[0]">
                     <span v-text="scope.row.md_material_requisition_classes[0].morning + scope.row.md_material_requisition_classes[1].afternoon + scope.row.md_material_requisition_classes[2].night"></span>
                 </template>
             </el-table-column>
@@ -147,7 +147,10 @@
                 <span style="float: right; width: 18%">Kg</span>
             </el-form-item>
             <el-form-item label="领料计划合计：">
-                <span v-text="editForm.weights[0] + editForm.weights[1] + editForm.weights[2]"></span>
+                <template v-if="editForm.weights.length == 3">
+                    <span v-text="editForm.weights[0] + editForm.weights[1] + editForm.weights[2]"></span>
+                    <span>  Kg</span>
+                </template>
             </el-form-item>
         </el-form>
         <div slot="footer" class="dialog-footer">
