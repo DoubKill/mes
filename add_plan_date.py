@@ -14,10 +14,12 @@ from recipe.models import ProductBatching
 from plan.models import ProductDayPlan, ProductClassesPlan, ProductBatchingDayPlan, ProductBatchingClassesPlan, \
     MaterialDemanded, MaterialRequisitionClasses
 from plan.uuidfield import UUidTools
-import time
+from django.db.transaction import atomic
 
+
+@atomic()
 def add_product_day_plan():
-    for i in range(9, 21):
+    for i in range(19, 21):
         for pd_obj in ProductBatching.objects.filter().all():
             for ps_obj in PlanSchedule.objects.filter().all():
                 instance = ProductDayPlan.objects.create(equip_id=i, product_batching=pd_obj, plan_schedule=ps_obj)
