@@ -107,6 +107,7 @@ class ProductBatchingDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductBatchingDayPlanManyCreate(APIView):
+    '''小料计划群增接口'''
     def post(self, request, *args, **kwargs):
         if isinstance(request.data, dict):
             many = False
@@ -118,6 +119,22 @@ class ProductBatchingDayPlanManyCreate(APIView):
         pbdp_ser.is_valid(raise_exception=True)
         book_obj_or_list = pbdp_ser.save()
         return Response(ProductBatchingDayPlanSerializer(book_obj_or_list, many=many).data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductDayPlanManyCreate(APIView):
+    '''胶料计划群增接口'''
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+        elif isinstance(request.data, list):
+            many = True
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+        pbdp_ser = ProductDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        pbdp_ser.is_valid(raise_exception=True)
+        book_obj_or_list = pbdp_ser.save()
+        return Response(ProductDayPlanSerializer(book_obj_or_list, many=many).data)
 
 
 @method_decorator([api_recorder], name="dispatch")
