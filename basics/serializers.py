@@ -101,7 +101,7 @@ class ClassesSimpleSerializer(BaseModelSerializer):
 
     class Meta:
         model = ClassesDetail
-        fields = ('id', 'classes_name')
+        fields = ('id', 'classes_name', 'work_schedule_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
