@@ -25,7 +25,8 @@
                     schedule_name: "",
                     description: "",
                 },
-                classes: []
+                classes: [],
+                EditTimeSet: {}
             }
         },
         created: function () {
@@ -52,13 +53,15 @@
                     schedule_no: "",
                     schedule_name: "",
                     description: "",
-                    classesdetail_set: []
+                    classesdetail_set: [
+
+                    ]
                 };
                 for (var i = 0; i < this.classes.length; ++i) {
 
                     this.changeShiftsManageForm.classesdetail_set.push({
 
-                        times: "",
+                        times: [],
                         description: "",
                         classes_name: this.classes[i].global_name,
                         classes: this.classes[i].id
@@ -92,7 +95,6 @@
                 }
             },
             handleCreateChangeShifts() {
-
                 this.clearChangeShiftsManageFormError();
                 this.adjustTimes();
                 var app = this;
@@ -116,16 +118,22 @@
                 for (var i = 0; i < workSchedule.classesdetail_set.length; ++i) {
 
                     this.changeShiftsManageForm.classesdetail_set[i].times = [
-                        new Date(workSchedule.classesdetail_set[i].start_time),
-                        new Date(workSchedule.classesdetail_set[i].end_time)];
+                        new Date("2020/01/01 " + workSchedule.classesdetail_set[i].start_time),
+                        new Date("2020/01/01 " + workSchedule.classesdetail_set[i].end_time)];
                 }
                 this.dialogEditChangeShiftsManageVisible = true;
+                console.log(this.changeShiftsManageForm)
             },
             handleEditChangeShifts() {
 
                 this.clearChangeShiftsManageFormError();
-                this.adjustTimes();
+                // this.adjustTimes();
                 var app = this;
+                for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
+
+                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0].substring(11);
+                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1].substring(11);
+                };
                 axios.put(WorkSchedulesUrl + this.changeShiftsManageForm.id + "/", this.changeShiftsManageForm)
                     .then(function (response) {
 
