@@ -153,7 +153,7 @@
                 app.PopupRubberSITEOptions = response.data.results;
             }).catch(function (error) {
             });
-            axios.get(ProductInfosUrl, {
+            axios.get(ProductInfosUrl + '?all=1', {
             }).then(function (response) {
                 app.ProductBatchNoOptions = response.data.results;
             }).catch(function (error) {
@@ -225,6 +225,24 @@
 
             shiftsDevTypeChange() {
             },
+
+            rubber_no_querySearchAsync(queryString, cb) {
+                var app = this;
+                var search_rubber_no = app.ProductBatchNoOptions;
+                console.log("=================================");
+                console.log(app.ProductBatchNoOptions);
+                console.log("=================================");
+
+                var results = queryString ? search_rubber_no.filter(this.rubber_no_createFilter(queryString)) : search_rubber_no;
+                // 调用 callback 返回建议列表的数据
+                cb(results);
+            },
+            rubber_no_createFilter(queryString) {
+                return (search_rubber_no) => {
+                  return (search_rubber_no.product_name.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+                };
+            },
+
             GenerateRubberMaterialNOChanged() {
                 var app = this;
                 var SITE_name = "";
@@ -245,11 +263,7 @@
                     }
                 }
                 if(app.rubberMaterialForm.rubber_no){
-                    for(var m=0; m<app.ProductBatchNoOptions.length; ++m){
-                        if(app.ProductBatchNoOptions[m]["id"] == app.rubberMaterialForm.rubber_no){
-                              product_name = app.ProductBatchNoOptions[m]['product_name']
-                          }
-                    }
+                    product_name = app.rubberMaterialForm.rubber_no
                 }
 
                 app.rubberMaterialForm.generate_material_no = SITE_name + '-' + stage_name +'-'+ product_name+'-' + app.rubberMaterialForm.version;
@@ -282,7 +296,7 @@
                         app.put_select_dev_type = response.data['dev_type_name'];
 
                         app.put_select_material_weight = response.data['batching_weight'];
-                        app.put_select_rm_time_interval = response.data['rm_time_interval'];
+                        app.put_select_rm_time_interval = response.data['production_time_interval'];
                         if(response.data.batching_details.length ==0){
                             app.PutProductRecipe = [{
                                 sn:null,
@@ -422,10 +436,24 @@
                 var app = this;
                 app.$refs[formName].validate((valid) => {
                   if (valid) {
+                      console.log('=============================');
+                      console.log(app.rubberMaterialForm['rubber_no']);
+                      console.log('=============================');
+                      var v_product_info = "";
+                      //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
+                        for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
+                            if(app.ProductBatchNoOptions[j]['product_name'] == app.rubberMaterialForm['rubber_no']){
+                                v_product_info = app.ProductBatchNoOptions[j]['id'];
+                                break
+                            }
+                        }
+                        console.log('=============================');
+                      console.log(v_product_info);
+                      console.log('=============================');
                       axios.post(RubberMaterialUrl, {
                             factory: app.rubberMaterialForm['factory'],
                             site: app.rubberMaterialForm['SITE'],
-                            product_info: app.rubberMaterialForm['rubber_no'],
+                            product_info: v_product_info,
                             precept: app.rubberMaterialForm['scheme'],
                             stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
                             stage: app.rubberMaterialForm['stage'],
@@ -629,10 +657,18 @@
                         return
                     }
                 }
+                var v_product_info = "";
+                  //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
+                for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
+                    if(app.ProductBatchNoOptions[j]['product_name'] == app.rubberMaterialForm['rubber_no']){
+                        v_product_info = app.ProductBatchNoOptions[j]['id'];
+                        break
+                    }
+                }
                 axios.post(RubberMaterialUrl, {
                     factory: app.rubberMaterialForm['factory'],
                     site: app.rubberMaterialForm['SITE'],
-                    product_info: app.rubberMaterialForm['rubber_no'],
+                    product_info: v_product_info,
                     precept: app.rubberMaterialForm['scheme'],
                     stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
                     stage: app.rubberMaterialForm['stage'],
@@ -688,6 +724,8 @@
                 console.log(batching_details_list);
                 console.log('=======================================mod_put    ');
                 axios.put(RubberMaterialUrl + this.currentRow.id + "/", {
+                    dev_type: app.put_select_dev_type,
+                    production_time_interval: app.put_select_rm_time_interval,
                     batching_details: batching_details_list,
                 }).then(function (response) {
 
