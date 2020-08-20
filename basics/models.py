@@ -37,9 +37,9 @@ class GlobalCode(AbstractEntity):
 
 
 class WorkSchedule(AbstractEntity):
-    """工作日程"""
-    schedule_no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
-    schedule_name = models.CharField(max_length=64, help_text='名称', verbose_name='名称')
+    """倒班管理"""
+    schedule_no = models.CharField(max_length=64, help_text='倒班编号', verbose_name='倒班编号', unique=True)
+    schedule_name = models.CharField(max_length=64, help_text='倒班名称', verbose_name='倒班名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
 
@@ -48,11 +48,11 @@ class WorkSchedule(AbstractEntity):
 
     class Meta:
         db_table = 'work_schedule'
-        verbose_name_plural = verbose_name = '工作日程'
+        verbose_name_plural = verbose_name = '倒班管理'
 
 
 class ClassesDetail(AbstractEntity):
-    """班次条目"""
+    """倒班条目"""
     TYPE_CHOICE = (
         ('normal', '正常'),
         ('rest', '休假'),
@@ -63,21 +63,15 @@ class ClassesDetail(AbstractEntity):
                                 help_text='班次', verbose_name='班次', related_name="classes_detail")
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
-    start_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
-    end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
+    start_time = models.TimeField(help_text='开始时间', verbose_name='开始时间')
+    end_time = models.TimeField(help_text='结束时间', verbose_name='结束时间')
 
     def __str__(self):
         return self.classes.global_name
 
-    def _sum(self):
-        temp = self.end_time - self.start_time
-        return temp.total_seconds()
-
-    sum = property(_sum)
-
     class Meta:
         db_table = 'classes_detail'
-        verbose_name_plural = verbose_name = '班次条目'
+        verbose_name_plural = verbose_name = '倒班条目'
 
 
 class EquipCategoryAttribute(AbstractEntity):
@@ -142,28 +136,18 @@ class SysbaseEquipLevel(AbstractEntity):
 
 
 class PlanSchedule(AbstractEntity):
-    """计划时间表"""
-    TYPE_CHOICE_WEEK = (
-        ('monday', '星期一'),
-        ('tuesday', '星期二'),
-        ('wednesday', '星期三'),
-        ('thursday', '星期四'),
-        ('friday', '星期五'),
-        ('saturday', '星期六'),
-        ('sunday', '星期日'),
-    )
+    """排班管理"""
     day_time = models.DateField(help_text='日期', verbose_name='日期')
-    week_time = models.CharField(max_length=64, choices=TYPE_CHOICE_WEEK, help_text='星期', verbose_name='星期')
     work_schedule = models.ForeignKey(WorkSchedule, models.DO_NOTHING,
                                       help_text='工作日程id', verbose_name='工作日程id', related_name="plan_schedule")
 
     class Meta:
         db_table = 'plan_schedule'
-        verbose_name_plural = verbose_name = '计划时间'
+        verbose_name_plural = verbose_name = '排班管理'
 
 
 class WorkSchedulePlan(AbstractEntity):
-    """工作日程计划"""
+    """排班详情"""
     classes_detail = models.ForeignKey(ClassesDetail, models.DO_NOTHING,
                                        help_text='班次id', verbose_name='班次id', related_name="work_schedule_plan")
     group = models.ForeignKey(GlobalCode, models.DO_NOTHING,
@@ -175,4 +159,4 @@ class WorkSchedulePlan(AbstractEntity):
 
     class Meta:
         db_table = 'work_schedule_plan'
-        verbose_name_plural = verbose_name = '工作日程计划'
+        verbose_name_plural = verbose_name = '排班详情'

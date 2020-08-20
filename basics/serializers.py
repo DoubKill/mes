@@ -16,6 +16,11 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
                                           UniqueValidator(queryset=GlobalCodeType.objects.filter(delete_flag=False),
                                                           message='该代码类型名称已存在'),
                                       ])
+    type_no = serializers.CharField(max_length=64,
+                                    validators=[
+                                        UniqueValidator(queryset=GlobalCodeType.objects.all(),
+                                                        message='该代码类型编号已存在'),
+                                    ])
 
     def update(self, instance, validated_data):
         if 'used_flag' in validated_data:
@@ -81,7 +86,6 @@ class GlobalCodeSerializer(BaseModelSerializer):
 
 class ClassesDetailSerializer(BaseModelSerializer):
     """工作日程班次条目创建、列表、详情序列化器"""
-    sum = serializers.CharField(read_only=True)
     classes_name = serializers.CharField(source="classes.global_name")
 
     class Meta:
