@@ -232,6 +232,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             actual_time = 0
             begin_time = None
             product_no = day_plan.product_batching.product_info.product_no
+            stage = day_plan.product_batching.stage.global_name
             equip_no = day_plan.equip.equip_no
             if equip_no not in temp_data:
                 temp_data[equip_no] = []

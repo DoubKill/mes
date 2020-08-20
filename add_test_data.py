@@ -1397,15 +1397,18 @@ def add_product_demo_data():
     #         continue
     day_plan_set = ProductDayPlan.objects.filter(delete_flag=False)
     for day_plan in list(day_plan_set):
+        date = day_plan.plan_schedule.day_time
         class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
         bath_no = 1
         for class_plan in list(class_plan_set):
             plan_trains = class_plan.plan_trains
-            start_time = class_plan.classes_detail.start_time
+            temp_start_time = class_plan.classes_detail.start_time
+            start_time = f"{date} {temp_start_time}"
+            start_time = datetime.datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
             for m in range(1, int(plan_trains) + 1):
                 class_name = class_plan.classes_detail.classes.global_name
                 equip_no = day_plan.equip.equip_no
-                product_no = day_plan.product_batching.product_info.product_name
+                product_no = day_plan.product_batching.product_info.product_no
                 plan_weight = class_plan.weight
                 # time_str = '2020-08-01 08:00:00'
                 # time = datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
@@ -1466,34 +1469,35 @@ def add_product_demo_data():
                         "current_trains": m,
                     }
                     EquipStatus.objects.create(**equip_status_data)
+                    time.sleep(0.001)
 
 
 if __name__ == '__main__':
-    # add_global_codes()
-    # print("global_codes is ok")
-    # add_materials()
-    # print("materials is ok")
-    # add_groups()
-    # print("groups is ok")
-    # add_sections()
-    # print("sections is ok")
-    # add_users()
-    # print("users is ok")
-    # add_schedules()
-    # print("schedules is ok")
-    # add_equip_attribute()
-    # print("equip_attribute is ok")
-    # add_equips()
-    # print("equips is ok")
-    # add_plan_schedule()
-    # print("plan_schedule is ok")
-    # add_product()
-    # print("product is ok")
-    # add_product_batching()
-    # print("product_batching is ok")
+    add_global_codes()
+    print("global_codes is ok")
+    add_materials()
+    print("materials is ok")
+    add_groups()
+    print("groups is ok")
+    add_sections()
+    print("sections is ok")
+    add_users()
+    print("users is ok")
+    add_schedules()
+    print("schedules is ok")
+    add_equip_attribute()
+    print("equip_attribute is ok")
+    add_equips()
+    print("equips is ok")
+    add_plan_schedule()
+    print("plan_schedule is ok")
+    add_product()
+    print("product is ok")
+    add_product_batching()
+    print("product_batching is ok")
     # add_plan()
     # print("plan is ok")
     add_material_day_classes_plan()
     print("material_day_classes_plan is ok")
-    # add_product_demo_data()
+    add_product_demo_data()
     print("product_demo_data is ok")
