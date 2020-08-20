@@ -157,6 +157,7 @@
             </div>
         </el-card>
 
+
         <el-card v-if="addPlanVisible">
             <div>
                 新增计划
@@ -170,9 +171,9 @@
                     <thead>
                     <tr>
                         <th rowspan="2">机台</th>
-                        <th rowspan="2">胶料编码</th>
-                        <th rowspan="2">配料重量</th>
-                        <th rowspan="2">配料时间</th>
+                        <th rowspan="2">胶料配方编码</th>
+                        <th rowspan="2">配料重量（吨）</th>
+                        <th rowspan="2">炼胶时间（分钟）</th>
                         <th rowspan="2">当前库存(吨)</th>
                         <th colspan="4">早班计划</th>
                         <th colspan="4">中班计划</th>
@@ -182,7 +183,7 @@
                         <template v-for="_ in 3">
                             <th>顺序</th>
                             <th>车次</th>
-                            <th>重量(吨)</th>
+                            <th>重量</th>
                             <th>时间</th>
                         </template>
                     </tr>
@@ -240,15 +241,73 @@
 {% block dialogs %}
 
     <el-dialog
+            width="90%"
+{#            :visible.sync="addPlanVisible"#}
+            title="添加胶料日生产计划">
+        <div>
+            <el-button @click="addOnePlan">添加</el-button>
+            <el-button>保存</el-button>
+        </div>
+        <el-table
+                :data="plansForAdd"
+                border>
+            <el-table-column label="机台" width="150">
+                <template slot-scope="scope">
+                    <el-select v-model="scope.row.equip">
+                        <el-option
+                                :key="equip.id"
+                                :label="equip.equip_no"
+                                :value="equip.id"
+                                v-for="equip in equips">
+                        </el-option>
+                    </el-select>
+                </template>
+            </el-table-column>
+            <el-table-column label="胶料配方编码" width="150">
+                <template slot-scope="scope">
+                    <el-select v-model="scope.row.product_batching">
+                        <el-option
+                                :key="productBatching.id"
+                                :label="productBatching.stage_product_batch_no"
+                                :value="productBatching.id"
+                                v-for="productBatching in productBatchings">
+                        </el-option>
+                    </el-select>
+                </template>
+            </el-table-column>
+            <el-table-column label="配料重量（吨）"></el-table-column>
+            <el-table-column label="炼胶时间（分钟）"></el-table-column>
+            <el-table-column label="当前库存（吨）"></el-table-column>
+            <el-table-column label="早班计划">
+                <el-table-column label="顺序"></el-table-column>
+                <el-table-column label="车次"></el-table-column>
+                <el-table-column label="重量"></el-table-column>
+                <el-table-column label="时间"></el-table-column>
+            </el-table-column>
+            <el-table-column label="中班计划">
+                <el-table-column label="顺序"></el-table-column>
+                <el-table-column label="车次"></el-table-column>
+                <el-table-column label="重量"></el-table-column>
+                <el-table-column label="时间"></el-table-column>
+            </el-table-column>
+            <el-table-column label="晚班计划">
+                <el-table-column label="顺序"></el-table-column>
+                <el-table-column label="车次"></el-table-column>
+                <el-table-column label="重量"></el-table-column>
+                <el-table-column label="时间"></el-table-column>
+            </el-table-column>
+
+        </el-table>
+    </el-dialog>
+
+    <el-dialog
             :visible.sync="dialogCopyVisible"
             title="复制胶料日生产计划">
         <el-form>
             <el-form-item label="来源日期">
                 <el-date-picker
                         v-model="src_date" type="date"
-                        value-format="yyyy-MM-dd"
-                >
-
+                        value-format="yyyy-MM-dd">
                 </el-date-picker>
             </el-form-item>
             <el-form-item label="新建日期">

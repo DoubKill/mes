@@ -72,7 +72,8 @@
                 currentRow: null,
                 dialogCopyVisible: false,
                 src_date: null,
-                dst_date: null
+                dst_date: null,
+                plansForAdd: []
             }
         },
         created: function () {
@@ -98,6 +99,7 @@
 
                 app.stage_product_batch_nos = [];
                 app.productBatchings = response.data.results;
+                console.log(app.productBatchings);
                 response.data.results.forEach(function (batching) {
 
                     app.productBatchingById[batching.id] = batching;
@@ -296,6 +298,11 @@
 
                     app.$message.error(JSON.stringify(error.response.data));
                 });
+            },
+            addOnePlan() {
+                this.plansForAdd.push({
+
+                })
             }
 
         }

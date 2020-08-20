@@ -30,15 +30,16 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     batching_weight = serializers.DecimalField(source='product_batching.batching_weight', decimal_places=2,
                                                max_digits=8,
                                                read_only=True, help_text='配料重量')
-    batching_time_interval = serializers.TimeField(source='product_batching.batching_time_interval', read_only=True,
-                                                   help_text='配料时间')
+    production_time_interval = serializers.DecimalField(source='product_batching.production_time_interval',
+                                                        read_only=True,
+                                                        help_text='配料时间', decimal_places=2, max_digits=10)
 
     class Meta:
 
         model = ProductDayPlan
         fields = ('id',
                   'plan_date', 'equip', 'equip_no', 'category', 'product_no', 'batching_weight',
-                  'batching_time_interval',
+                  'production_time_interval',
                   'product_batching',
                   'pdp_product_classes_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
@@ -68,12 +69,13 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         plan_date = validated_data.pop('plan_date')
         pdp_dic['plan_schedule'] = PlanSchedule.objects.filter(day_time=plan_date).first()
         pdp_dic['created_user'] = self.context['request'].user
+        # 创建胶料日计划
         instance = super().create(pdp_dic)
         details = validated_data['pdp_product_classes_plan']
         # WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first()
         cd_queryset = ClassesDetail.objects.filter(
             work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
-        # 创建班次计划和原材料需求量
+        # 创建胶料日班次班次计划和原材料需求量
         i = 0
         for detail in details:
             detail_dic = dict(detail)
@@ -100,7 +102,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             validated_data['plan_schedule'] = instance.plan_schedule
         validated_data['last_updated_user'] = self.context['request'].user
         pdp_obj = super().update(instance, validated_data)
-        # 若没有修改班级计划
+        # 若没有修改胶料日班次计划
         if update_pcp_list is None or len(update_pcp_list) == 0:
             c_queryset = pdp_obj.pdp_product_classes_plan.all()
             for c_obj in c_queryset:
@@ -205,12 +207,13 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         if pdp_dic['product_day_plan'] == None:
             pdp_dic.pop('product_day_plan')
         pdp_dic['created_user'] = self.context['request'].user
-
+        # 创建配料小料日计划
         instance = super().create(pdp_dic)
         details = validated_data['pdp_product_batching_classes_plan']
         cd_queryset = ClassesDetail.objects.filter(
             work_schedule=WorkSchedule.objects.filter(plan_schedule__day_time=plan_date).first())
         i = 0
+        # 创建配料小料日班次计划和原材料需求量
         for detail in details:
             detail_dic = dict(detail)
             detail_dic['plan_classes_uid'] = UUidTools.uuid1_hex()
@@ -236,6 +239,7 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
             validated_data['plan_schedule'] = instance.plan_schedule
         validated_data['last_updated_user'] = self.context['request'].user
         pdp_obj = super().update(instance, validated_data)
+        # 若没有配料小料日班次计划
         if update_pcp_list is None:
             c_queryset = pdp_obj.pdp_product_batching_classes_plan.all()
             for c_obj in c_queryset:
@@ -281,7 +285,7 @@ class MaterialRequisitionSerializer(BaseModelSerializer):
 
 
 class MaterialDemandedSerializer(BaseModelSerializer):
-    """原材料需求量序列化"""
+    """原材料需求量序列化 暂时没用到"""
     md_material_requisition_classes = MaterialRequisitionSerializer(read_only=True, many=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True, help_text='原材料名称')
     classes_name = serializers.CharField(source='classes.classes_name', read_only=True)
@@ -297,6 +301,7 @@ class MaterialDemandedSerializer(BaseModelSerializer):
 
 
 class MaterialRequisitionClassesSerializer(BaseModelSerializer):
+    """领料计划的序列化"""
     material_ids = serializers.ListField(help_text='三个需求量id', write_only=True)
     plan_date = serializers.DateField(help_text='日期', write_only=True)
     weights = serializers.ListField(help_text='早中晚领料计划的重量', write_only=True)
@@ -348,6 +353,7 @@ class MaterialRequisitionClassesSerializer(BaseModelSerializer):
 
 
 class ProductDayPlanCopySerializer(BaseModelSerializer):
+    """胶料日计划的复制序列化"""
     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
 
@@ -368,6 +374,9 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
         instance = PlanSchedule.objects.filter(day_time=value)
         if not instance:
             raise serializers.ValidationError('新建的日期没有计划时间')
+        delete_pdp_queryset = ProductDayPlan.objects.filter(plan_schedule__day_time=value, delete_flag=False)
+        if delete_pdp_queryset:
+            raise serializers.ValidationError('新建的日期当天已经有胶料日计划了')
         return value
 
     def validate(self, attrs):
@@ -384,6 +393,7 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
         ps_obj = PlanSchedule.objects.filter(day_time=dst_date).first()
         pdp_queryset = ProductDayPlan.objects.filter(plan_schedule__day_time=src_date, delete_flag=False)
         delete_pdp_queryset = ProductDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False)
+        # 如果新建日期当天有计划的话，是会被覆盖掉的
         if delete_pdp_queryset:
             ProductDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False).update(delete_flag=True,
                                                                                                       delete_user=
@@ -405,6 +415,7 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
                                                       delete_flag=False).update(delete_flag=True,
                                                                                 delete_user=self.context[
                                                                                     'request'].user)
+        # 实现复制功能 创建了胶料日计划 胶料日班次计划 原材料需求量
         for pdp_obj in pdp_queryset:
             instance = ProductDayPlan.objects.create(equip=pdp_obj.equip, product_batching=pdp_obj.product_batching,
                                                      plan_schedule=ps_obj, created_user=self.context['request'].user)
@@ -448,6 +459,9 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
         instance = PlanSchedule.objects.filter(day_time=value)
         if not instance:
             raise serializers.ValidationError('新建的日期没有计划时间')
+        delete_pdp_queryset = ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=value, delete_flag=False)
+        if delete_pdp_queryset:
+            raise serializers.ValidationError('新建的日期已经有配料小料日计划了')
         return value
 
     def validate(self, attrs):
@@ -465,6 +479,7 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
         ps_obj = PlanSchedule.objects.filter(day_time=dst_date).first()
         pbdp_queryset = ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=src_date, delete_flag=False)
         delete_pdp_queryset = ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False)
+        # 如果新建日期有配料小料日计划就删除
         if delete_pdp_queryset:
             ProductBatchingDayPlan.objects.filter(plan_schedule__day_time=dst_date, delete_flag=False).update(
                 delete_flag=True,
@@ -489,6 +504,7 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
                         delete_flag=True,
                         delete_user=self.context[
                             'request'].user)
+        # 复制配料小料日计划 配料小料日班次计划 原材料需求量
         for pbdp_obj in pbdp_queryset:
             instance = ProductBatchingDayPlan.objects.create(equip=pbdp_obj.equip,
                                                              product_batching=pbdp_obj.product_batching,
