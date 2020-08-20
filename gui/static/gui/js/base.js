@@ -44,7 +44,7 @@ const ProductDayPlans = "/api/v1/plan/product-day-plans/";
 const PalletFeedBacksUrl = "/api/v1/production/pallet-feedbacks/";
 //胶料日计划
 const ProductDayPlansUrl = "/api/v1/plan/product-day-plans/";
-
+const ProductDayPlanManyCreateUrl = "/api/v1/plan/product-day-plan-manycreate/" ;
 //排产配料小料日计划---选择胶料
 const RubberSelectUrl = "/api/v1/plan/product-batching-day-plan-manycreate/";
 const PlanScheduleUrl = "/api/v1/basics/plan-schedule/";
