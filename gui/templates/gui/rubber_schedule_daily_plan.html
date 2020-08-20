@@ -70,19 +70,18 @@
             :data="tableData"
             border
             style="width: 100%">
-        <el-table-column label="S" width="30"></el-table-column>
         <el-table-column type="index" label="No" width="50"></el-table-column>
         <el-table-column prop="equip_no" label="机台"></el-table-column>
-        <el-table-column prop="product_no" label="胶料编码"></el-table-column>
-        <el-table-column prop="batching_weight" label="配料重量"></el-table-column>
-        <el-table-column prop="batching_time_interval" label="配料时间"></el-table-column>
+        <el-table-column prop="product_no" label="胶料配方编码"></el-table-column>
+        <el-table-column prop="batching_weight" label="配料重量（吨）"></el-table-column>
+        <el-table-column prop="production_time_interval" label="炼胶时间（分钟）"></el-table-column>
         <el-table-column label="当前库存（吨）"></el-table-column>
         <el-table-column label="早班计划">
             <el-table-column prop="pdp_product_classes_plan[0].sn" label="顺序">
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[0].plan_trains" label="车次">
             </el-table-column>
-            <el-table-column prop="pdp_product_classes_plan[0].weight" label="重量（吨）">
+            <el-table-column prop="pdp_product_classes_plan[0].weight" label="重量">
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[0].time" label="时间">
             </el-table-column>
@@ -92,7 +91,7 @@
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[1].plan_trains" label="车次">
             </el-table-column>
-            <el-table-column prop="pdp_product_classes_plan[1].weight" label="重量（吨）">
+            <el-table-column prop="pdp_product_classes_plan[1].weight" label="重量">
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[1].time" label="时间">
             </el-table-column>
@@ -102,7 +101,7 @@
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[2].plan_trains" label="车次">
             </el-table-column>
-            <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量（吨）">
+            <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量">
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[2].time" label="时间">
             </el-table-column>
@@ -157,7 +156,7 @@
             </div>
         </el-card>
 
-
+        <!--
         <el-card v-if="addPlanVisible">
             <div>
                 新增计划
@@ -235,18 +234,19 @@
                 </table>
             </div>
         </el-card>
+        -->
     {% endverbatim vue %}
 {% endblock %}
 
 {% block dialogs %}
-
     <el-dialog
             width="90%"
-{#            :visible.sync="addPlanVisible"#}
+            :visible.sync="addPlanVisible"
             title="添加胶料日生产计划">
-        <div>
+        <div style="margin-bottom: 15px">
             <el-button @click="addOnePlan">添加</el-button>
-            <el-button>保存</el-button>
+            <el-button @click="batchSave">保存</el-button>
+            <el-button @click="statistic">统计</el-button>
         </div>
         <el-table
                 :data="plansForAdd"
@@ -263,9 +263,9 @@
                     </el-select>
                 </template>
             </el-table-column>
-            <el-table-column label="胶料配方编码" width="150">
+            <el-table-column label="胶料配方编码" width="180">
                 <template slot-scope="scope">
-                    <el-select v-model="scope.row.product_batching">
+                    <el-select @change="productBatchingChanged(scope.row)" v-model="scope.row.product_batching">
                         <el-option
                                 :key="productBatching.id"
                                 :label="productBatching.stage_product_batch_no"
@@ -275,28 +275,92 @@
                     </el-select>
                 </template>
             </el-table-column>
-            <el-table-column label="配料重量（吨）"></el-table-column>
-            <el-table-column label="炼胶时间（分钟）"></el-table-column>
+            <el-table-column prop="batching_weight" label="配料重量（吨）"></el-table-column>
+            <el-table-column prop="production_time_interval" label="炼胶时间（分钟）"></el-table-column>
             <el-table-column label="当前库存（吨）"></el-table-column>
             <el-table-column label="早班计划">
-                <el-table-column label="顺序"></el-table-column>
-                <el-table-column label="车次"></el-table-column>
-                <el-table-column label="重量"></el-table-column>
-                <el-table-column label="时间"></el-table-column>
+                <el-table-column label="顺序" width="210">
+                    <template slot-scope="scope">
+                        <el-input-number v-model.number="scope.row.pdp_product_classes_plan[0].sn"
+                                         :min="0"></el-input-number>
+                    </template>
+                </el-table-column>
+                <el-table-column label="车次" width="210">
+                    <template slot-scope="scope">
+                        <el-input-number @change="planTrainsChanged(scope.row, 0)"
+                                         v-model.number="scope.row.pdp_product_classes_plan[0].plan_trains"
+                                         :min="0"></el-input-number>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[0].weight" label="重量"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[0].time" label="时间"></el-table-column>
             </el-table-column>
             <el-table-column label="中班计划">
-                <el-table-column label="顺序"></el-table-column>
-                <el-table-column label="车次"></el-table-column>
-                <el-table-column label="重量"></el-table-column>
-                <el-table-column label="时间"></el-table-column>
+                <el-table-column label="顺序" width="210">
+                    <template slot-scope="scope">
+                        <el-input-number v-model.number="scope.row.pdp_product_classes_plan[1].sn"
+                                         :min="0"></el-input-number>
+                    </template>
+                </el-table-column>
+                <el-table-column label="车次" width="210">
+                    <template slot-scope="scope">
+                        <el-input-number @change="planTrainsChanged(scope.row, 1)"
+                                         v-model.number="scope.row.pdp_product_classes_plan[1].plan_trains"
+                                         :min="0"></el-input-number>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[1].weight" label="重量"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[1].time" label="时间"></el-table-column>
             </el-table-column>
             <el-table-column label="晚班计划">
-                <el-table-column label="顺序"></el-table-column>
-                <el-table-column label="车次"></el-table-column>
-                <el-table-column label="重量"></el-table-column>
-                <el-table-column label="时间"></el-table-column>
+                <el-table-column label="顺序" width="210">
+                    <template slot-scope="scope">
+                        <el-input-number v-model.number="scope.row.pdp_product_classes_plan[2].sn"
+                                         :min="0"></el-input-number>
+                    </template>
+                </el-table-column>
+                <el-table-column label="车次" width="210">
+                    <template slot-scope="scope">
+                        <el-input-number @change="planTrainsChanged(scope.row, 2)"
+                                         v-model.number="scope.row.pdp_product_classes_plan[2].plan_trains"
+                                         :min="0"></el-input-number>
+                    </template>
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[2].time" label="时间"></el-table-column>
             </el-table-column>
+        </el-table>
+        <h5>小计</h5>
+        <el-table
+                :data="statisticData"
+                border>
+            <el-table-column prop="equip_no" label="机台" width="330"></el-table-column>
+            <el-table-column prop="batching_weight" label="配料重量（吨）"></el-table-column>
+            <el-table-column prop="production_time_interval" label="炼胶时间（分钟）"></el-table-column>
+            <el-table-column label="当前库存（吨）"></el-table-column>
 
+            <el-table-column label="早班计划">
+                <el-table-column width="210"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[0].plan_trains" label="车次" width="210"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[0].weight" label="重量"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[0].time" label="时间"></el-table-column>
+            </el-table-column>
+            <el-table-column label="中班计划">
+                <el-table-column prop="pdp_product_classes_plan[1].sn" label="顺序" width="210">
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[1].plan_trains" label="车次" width="210">
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[1].weight" label="重量"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[1].time" label="时间"></el-table-column>
+            </el-table-column>
+            <el-table-column label="晚班计划">
+                <el-table-column prop="pdp_product_classes_plan[2].sn" label="顺序" width="210">
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[2].plan_trains" label="车次" width="210">
+                </el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量"></el-table-column>
+                <el-table-column prop="pdp_product_classes_plan[2].time" label="时间"></el-table-column>
+            </el-table-column>
         </el-table>
     </el-dialog>
 
@@ -315,7 +379,6 @@
                         v-model="dst_date"
                         type="date"
                         value-format="yyyy-MM-dd">
-
                 </el-date-picker>
             </el-form-item>
         </el-form>

@@ -8,6 +8,7 @@
                 tableDataUrl: ProductDayPlansUrl,
                 plan_date: dayjs().format("YYYY-MM-DD"),
                 equips: [],
+                equipById: {},
                 equip_no: "",
                 stage_product_batch_no: "",
                 stage_product_batch_nos: [],
@@ -73,7 +74,8 @@
                 dialogCopyVisible: false,
                 src_date: null,
                 dst_date: null,
-                plansForAdd: []
+                plansForAdd: [],
+                statisticData: []
             }
         },
         created: function () {
@@ -87,6 +89,10 @@
             }).then(function (response) {
 
                 app.equips = response.data.results;
+                app.equips.forEach(function (equip) {
+
+                    app.equipById[equip.id] = equip;
+                })
             }).catch(function (error) {
 
             });
@@ -99,7 +105,6 @@
 
                 app.stage_product_batch_nos = [];
                 app.productBatchings = response.data.results;
-                console.log(app.productBatchings);
                 response.data.results.forEach(function (batching) {
 
                     app.productBatchingById[batching.id] = batching;
@@ -230,7 +235,6 @@
                 this.batching_weight = this.productBatchingById[this.rubberDailyPlanForm.product_batching].batching_weight;
                 this.batching_time_interval = this.productBatchingById[this.rubberDailyPlanForm.product_batching].batching_time_interval;
 
-
                 for (var i = 0; i < 3; ++i)
                     this.planTrainsChange(i)
             },
@@ -300,11 +304,117 @@
                 });
             },
             addOnePlan() {
-                this.plansForAdd.push({
 
-                })
+                if (this.plansForAdd.length) {
+
+                    var objString = JSON.stringify(this.plansForAdd[this.plansForAdd.length - 1]);
+                    this.plansForAdd.push(JSON.parse(objString));
+                } else {
+
+                    var pdp_product_classes_plan = [];
+                    for (var i = 0; i < 3; i++) {
+
+                        pdp_product_classes_plan.push({
+                            plan_trains: 0,
+                            sn: 0,
+                            unit: "吨",
+                            time: 0,
+                            weight: 0,
+                        })
+                    }
+                    this.plansForAdd.push({
+                        plan_date: this.plan_date,
+                        pdp_product_classes_plan
+                    })
+                }
+            },
+            productBatchingChanged(planForAdd) {
+
+                planForAdd["batching_weight"] = this.productBatchingById[planForAdd.product_batching].batching_weight;
+                planForAdd["production_time_interval"] = this.productBatchingById[planForAdd.product_batching].production_time_interval;
+                for (var i = 0; i < 3; i++) {
+                    this.planTrainsChanged(planForAdd, i)
+                }
+            },
+            planTrainsChanged(planForAdd, columnIndex) {
+
+                planForAdd["pdp_product_classes_plan"][columnIndex]["time"] =
+                    (planForAdd["production_time_interval"]
+                        * planForAdd["pdp_product_classes_plan"][columnIndex]["plan_trains"]).toFixed(2);
+
+                planForAdd["pdp_product_classes_plan"][columnIndex]["weight"] =
+                    (planForAdd["batching_weight"]
+                        * planForAdd["pdp_product_classes_plan"][columnIndex]["plan_trains"]).toFixed(2);
+            },
+            statistic() {
+
+                this.statisticData = [];
+                var plansByEquip = {};
+                this.plansForAdd.forEach(function (plan) {
+
+                    if (!plansByEquip[plan.equip]) {
+
+                        plansByEquip[plan.equip] = []
+                    }
+                    plansByEquip[plan.equip].push(plan);
+                });
+                for (var equipId in plansByEquip) {
+                    var plans = plansByEquip[equipId];
+                    var batching_weight = 0;
+                    var production_time_interval = 0;
+                    var pdp_product_classes_plan = [];
+                    for (var i = 0; i < 3; i++) {
+
+                        pdp_product_classes_plan.push({
+                            plan_trains: 0,
+                            weight: 0,
+                            time: 0,
+                        })
+                    }
+                    plans.forEach(function (plan) {
+
+                        batching_weight += Number(plan.batching_weight);
+                        production_time_interval += Number(plan.production_time_interval);
+                        for (var i = 0; i < 3; i++) {
+
+                            var class_plan = plan.pdp_product_classes_plan[i];
+                            pdp_product_classes_plan[i].plan_trains += class_plan.plan_trains;
+                            pdp_product_classes_plan[i].weight += class_plan.weight;
+                            pdp_product_classes_plan[i].time += class_plan.time
+                        }
+                    });
+                    batching_weight = batching_weight.toFixed(3);
+                    production_time_interval = production_time_interval.toFixed(2);
+                    var equip = this.equipById[equipId];
+                    this.statisticData.push({
+                        equip_no: equip.equip_no,
+                        batching_weight,
+                        production_time_interval,
+                        pdp_product_classes_plan
+                    });
+                }
+            },
+            batchSave() {
+
+                console.log(this.plansForAdd);
+                var app = this;
+                axios.post(ProductDayPlanManyCreateUrl, this.plansForAdd)
+                    .then(function (response) {
+
+                        app.addPlanVisible = false;
+                        app.$message("创建成功");
+                        app.currentChange(app.currentPage);
+                    }).catch(function (error) {
+
+                    var text = "";
+                    for (var key in error.response.data) {
+
+                        text += error.response.data[key] + "\n";
+                    }
+                    app.$message(text);
+
+                });
             }
-
         }
     };
     var Ctor = Vue.extend(Main);
