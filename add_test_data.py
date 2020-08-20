@@ -1143,8 +1143,8 @@ def add_schedules():
                 schedule_no=str(random.randint(100, 999)),
                 schedule_name=name
             )
-            times = ['2020-06-01 00:00:01', '2020-06-01 08:00:00',
-                     '2020-06-01 16:00:00', '2020-06-01 23:00:59']
+            times = ['00:00:01', '08:00:00',
+                     '16:00:00', '23:00:59']
             for i in range(3):
                 ClassesDetail.objects.create(
                     work_schedule=schedule,
@@ -1244,7 +1244,6 @@ def add_plan_schedule():
         try:
             instance = PlanSchedule.objects.create(
                 day_time=time,
-                week_time=random.choice(PlanSchedule.TYPE_CHOICE_WEEK)[0],
                 work_schedule_id=random.choice(ids)
             )
             for j in range(3):
@@ -1270,6 +1269,29 @@ def add_product():
             )
         except Exception:
             pass
+
+
+def add_product_batching():
+    factories = list(GlobalCode.objects.filter(global_type__type_name='产地').values_list('id', flat=True))
+    sites = list(GlobalCode.objects.filter(global_type__type_name='SITE').values_list('id', flat=True))
+    product_infos = list(ProductInfo.objects.values_list('id', flat=True))[:20]
+    dev_types = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
+    stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('id', flat=True))
+
+    for product_info in product_infos:
+        for stage in stages:
+            pb = ProductBatching.objects.create(
+                factory_id=random.choice(factories),
+                site_id=random.choice(sites),
+                product_info_id=product_info,
+                stage_product_batch_no='1',
+                dev_type_id=random.choice(dev_types),
+                stage_id=stage,
+                versions='01'
+            )
+            pb.stage_product_batch_no = pb.site.global_name + '-' + pb.stage.global_name + '+' +\
+                                            pb.product_info.product_name + '-' '01'
+            pb.save()
 
 
 def random_str():
@@ -1309,6 +1331,7 @@ def add_plan():
                     plan_classes_uid=None
                 )
                 i += 1
+
 
 def add_material_day_classes_plan():
     """
@@ -1455,6 +1478,8 @@ if __name__ == '__main__':
     add_equips()
     add_plan_schedule()
     add_product()
+
+    add_product_batching()
     # add_plan()
-    # add_material_day_classes_plan()
-    # add_product_demo_data()
+    add_material_day_classes_plan()
+    add_product_demo_data()

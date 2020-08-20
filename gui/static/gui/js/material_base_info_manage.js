@@ -17,7 +17,7 @@
                     material_no: "",
                     material_name: "",
                     for_short: "",
-                    density: null,
+                    // density: null,
                     used_flag: false,
                     material_type: null,
                     package_unit: null
@@ -27,7 +27,7 @@
                     material_no: "",
                     material_name: "",
                     for_short: "",
-                    density: "",
+                    // density: "",
                     used_flag: "",
                     material_type: "",
                     package_unit: ""
@@ -88,7 +88,7 @@
                     material_no: "",
                     material_name: "",
                     for_short: "",
-                    density: null,
+                    // density: null,
                     used_flag: false,
                     material_type: null,
                     package_unit: null
@@ -101,7 +101,7 @@
                     material_no: "",
                     material_name: "",
                     for_short: "",
-                    density: "",
+                    // density: "",
                     used_flag: "",
                     material_type: "",
                     package_unit: ""

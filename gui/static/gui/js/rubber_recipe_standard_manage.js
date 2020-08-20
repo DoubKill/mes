@@ -10,11 +10,11 @@
                 dialogAddRubberRecipe: false,
                 originOptions: [], // 产地选项
                 rubberRecipeForm: {
-                    factory: "", // 产地
+                    // factory: "", // 产地
                     product_no: "", // 胶料编码
-                    versions: "", // 版本
+                    // versions: "", // 版本
                     product_name: "", // 胶料名称
-                    precept: "" // 方案
+                    // precept: "" // 方案
                 },
                 materials: [],
                 selectedMaterials: [],
@@ -63,7 +63,7 @@
             }).catch(function (error) {
 
             });
-            axios.get(MaterialsUrl,{
+            axios.get(MaterialsUrl, {
                 params: {
                     page_size: 100000000
                 }
@@ -155,11 +155,11 @@
 
                 this.rubberRecipeError = "";
                 this.rubberRecipeForm = {
-                    factory: "", // 产地
+                    // factory: "", // 产地
                     product_no: "", // 胶料编码
-                    versions: "", // 版本
+                    // versions: "", // 版本
                     product_name: "", // 胶料名称
-                    precept: "" // 方案
+                    // precept: "" // 方案
                 };
                 this.dialogAddRubberRecipe = true;
                 this.currentRow = {
@@ -169,26 +169,45 @@
             handleAddRubberRecipe: function () {
 
                 var app = this;
-                this.rubberRecipeError = "";
-                axios.get(ValidateVersionsUrl, {
+                axios.post(ProductInfosUrl, {
 
-                    params: this.rubberRecipeForm
+                    product_no: app.rubberRecipeForm.product_no,
+                    product_name: app.rubberRecipeForm.product_name,
+
                 }).then(function (response) {
 
-                    if (response.data.code === 0) {
-
-                        app.selectedMaterials = [];
-                        app.dialogAddRubberRecipe = false;
-                        app.dialogChoiceMaterials = true
-
-                    } else {
-
-                        app.rubberRecipeError = response.data.message
-                    }
+                    app.$message(app.rubberRecipeForm.product_name + "创建成功");
+                    app.currentChange(app.currentPage);
+                    app.dialogAddRubberRecipe = false;
                 }).catch(function (error) {
 
-                    app.rubberRecipeError = error.response.data.join(",");
+                    this.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
                 });
+
+
+                // this.rubberRecipeError = "";
+                // axios.get(ValidateVersionsUrl, {
+                //
+                //     params: this.rubberRecipeForm
+                // }).then(function (response) {
+                //
+                //     if (response.data.code === 0) {
+                //
+                //         app.selectedMaterials = [];
+                //         app.dialogAddRubberRecipe = false;
+                //         app.dialogChoiceMaterials = true
+                //
+                //     } else {
+                //
+                //         app.rubberRecipeError = response.data.message
+                //     }
+                // }).catch(function (error) {
+                //
+                //     app.rubberRecipeError = error.response.data.join(",");
+                // });
             },
             handleMaterialsSelectionChange: function (val) {
 
@@ -360,9 +379,9 @@
 
                             product_no: app.rubberRecipeForm.product_no,
                             product_name: app.rubberRecipeForm.product_name,
-                            versions: app.rubberRecipeForm.versions,
-                            precept: app.rubberRecipeForm.precept,
-                            factory: app.rubberRecipeForm.factory,
+                            // versions: app.rubberRecipeForm.versions,
+                            // precept: app.rubberRecipeForm.precept,
+                            // factory: app.rubberRecipeForm.factory,
                             productrecipe_set: productrecipe_set
                         }).then(function (response) {
 
@@ -382,6 +401,7 @@
             },
             afterGetData: function () {
 
+                console.log(this.tableData)
                 this.currentRow = {
                     used_type: -1
                 }

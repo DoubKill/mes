@@ -87,10 +87,7 @@ class ProductBatching(AbstractEntity):
     used_time = models.DateTimeField(help_text='发行时间', verbose_name='发行时间', blank=True, null=True)
     production_time_interval = models.DecimalField(help_text='炼胶时间(分)', blank=True, null=True,
                                                    decimal_places=2, max_digits=8)
-    temperature = models.DecimalField(verbose_name='温度', help_text='温度',
-                                      decimal_places=2, max_digits=8, blank=True, null=True)
-    rpm = models.DecimalField(verbose_name='转速', help_text='转速',
-                              decimal_places=2, max_digits=8, blank=True, null=True)
+    equip_no = models.CharField(max_length=64, help_text='机台编号', blank=True, null=True)
 
     def __str__(self):
         return self.stage_product_batch_no
@@ -164,7 +161,8 @@ class ProductProcessDetail(AbstractEntity):
     power = models.DecimalField(help_text='功率', blank=True, null=True, decimal_places=2, max_digits=8)
     pressure = models.DecimalField(help_text='压力', blank=True, null=True, decimal_places=2, max_digits=8)
     condition = models.ForeignKey(BaseCondition, help_text='条件id', blank=True, null=True, on_delete=models.DO_NOTHING)
-    time = models.PositiveIntegerField(help_text='时间', blank=True, null=True)
+    time = models.DecimalField(help_text='时间(分钟)', decimal_places=2, max_digits=8,
+                               blank=True, null=True)
     action = models.ForeignKey(BaseAction, help_text='基本动作id', blank=True, null=True, on_delete=models.DO_NOTHING)
     time_unit = models.CharField(max_length=4, help_text='时间单位', blank=True, null=True)
 
