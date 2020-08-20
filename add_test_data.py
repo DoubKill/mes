@@ -1340,8 +1340,8 @@ def add_material_day_classes_plan():
     根据已有信息生成胶料日计划，班次计划
     :return: None
     """
-    ProductDayPlan.objects.filter().delete()
     ProductClassesPlan.objects.filter().delete()
+    ProductDayPlan.objects.filter().delete()
     actual_feedback = 3
     equip_set = Equip.objects.filter(equip_name__icontains="混炼")
     equip_count = equip_set.count()
@@ -1471,16 +1471,30 @@ def add_product_demo_data():
 
 if __name__ == '__main__':
     add_global_codes()
+    print("global_codes is ok")
     add_materials()
+    print("materials is ok")
     add_groups()
+    print("groups is ok")
     add_sections()
+    print("sections is ok")
     add_users()
+    print("users is ok")
     add_schedules()
+    print("schedules is ok")
     add_equip_attribute()
+    print("equip_attribute is ok")
     add_equips()
+    print("equips is ok")
     add_plan_schedule()
+    print("plan_schedule is ok")
     add_product()
+    print("product is ok")
     add_product_batching()
-    add_plan()
+    print("product_batching is ok")
+    # add_plan()
+    # print("plan is ok")
     add_material_day_classes_plan()
+    print("material_day_classes_plan is ok")
     add_product_demo_data()
+    print("product_demo_data is ok")
