@@ -13,7 +13,7 @@ router.register(r'global-types', GlobalCodeTypeViewSet)
 # 公共代码
 router.register(r'global-codes', GlobalCodeViewSet)
 
-# 工作日程
+# 倒班管理
 router.register(r'work_schedules', WorkScheduleViewSet)
 
 # 设备种类
@@ -25,10 +25,7 @@ router.register(r'equips', EquipViewSet)
 # 班次下来列表接口
 router.register(r'classes', ClassesDetailViewSet)
 
-# 班次条目
-router.register(r'schedule-classes', WorkScheduleViewSet)
-
-# 计划时间
+# 排班管理
 router.register(r'plan-schedule', PlanScheduleViewSet)
 
 urlpatterns = [

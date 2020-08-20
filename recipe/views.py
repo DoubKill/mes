@@ -13,7 +13,7 @@ from mes.derorators import api_recorder
 from mes.permissions import ProductBatchingPermissions
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
     MaterialAttributeFilter
-from recipe.serializers import MaterialSerializer, ProductInfoSerializer, ProductInfoCopySerializer, \
+from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, ProductProcessSerializer, \
     ProductBatchingPartialUpdateSerializer, ProcessDetailSerializer
@@ -125,7 +125,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'product_no', 'product_name')
-            return Response(data)
+            return Response({'result': data})
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

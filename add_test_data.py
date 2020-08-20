@@ -1144,8 +1144,8 @@ def add_schedules():
                 schedule_no=str(random.randint(100, 999)),
                 schedule_name=name
             )
-            times = ['2020-06-01 00:00:01', '2020-06-01 08:00:00',
-                     '2020-06-01 16:00:00', '2020-06-01 23:00:59']
+            times = ['00:00:01', '08:00:00',
+                     '16:00:00', '23:00:59']
             for i in range(3):
                 ClassesDetail.objects.create(
                     work_schedule=schedule,
@@ -1245,7 +1245,6 @@ def add_plan_schedule():
         try:
             instance = PlanSchedule.objects.create(
                 day_time=time,
-                week_time=random.choice(PlanSchedule.TYPE_CHOICE_WEEK)[0],
                 work_schedule_id=random.choice(ids)
             )
             for j in range(3):
@@ -1481,6 +1480,6 @@ if __name__ == '__main__':
     add_plan_schedule()
     add_product()
     add_product_batching()
-    add_plan()
-    add_material_day_classes_plan()
-    add_product_demo_data()
+    # add_plan()
+    # add_material_day_classes_plan()
+    # add_product_demo_data()
