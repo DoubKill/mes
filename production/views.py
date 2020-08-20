@@ -90,7 +90,7 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
     create:
         创建机台状况反馈
     """
-    queryset = EquipStatus.objects.filter(delete_flag=False).order_by("-created_date")
+    queryset = EquipStatus.objects.filter(delete_flag=False).order_by("created_date")
     pagination_class = SinglePageNumberPagination
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = EquipStatusSerializer
@@ -231,7 +231,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             plan_time = 0
             actual_time = 0
             begin_time = None
-            product_no = day_plan.product_batching.product_info.product_name
+            product_no = day_plan.product_batching.product_info.product_no
             stage = day_plan.product_batching.stage.global_name
             equip_no = day_plan.equip.equip_no
             if equip_no not in temp_data:
@@ -314,7 +314,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             plan_trains = 0
             actual_trains = 0
             plan_weight = 0
-            product_no = day_plan.product_batching.product_info.product_name
+            product_no = day_plan.product_batching.product_info.product_no
             equip_no = day_plan.equip.equip_no
             day_plan_actual = [None, None, None]
             # 通过日计划id再去查班次计划
