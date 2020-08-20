@@ -1,5 +1,10 @@
 ;(function () {
-
+    var echartsTime = []
+    var echartsTemprature = []
+    var echartsPower = []
+    var echartsEnergy = []
+    var echartsPressure = []
+    var echartsRpm = []
     var Main = {
         mixins: [BaseMixin],
         data: function () {
@@ -7,50 +12,55 @@
             return {
 
                 tableDataUrl: ProductActualUrl,
-                performanceDate: dayjs("2020-08-07").format("YYYY-MM-DD"),
+                performanceDate: dayjs("2020-01-01").format("YYYY-MM-DD"),
                 projectName: "",
                 equipNo: "",
                 equipNoOptions: [],
                 dialogAddMaterialBaseInfoVisible: false,
-                materialBaseInfoForm: {
-
-                    material_no: "",
-                    material_name: "",
-                    for_short: "",
-                    density: null,
-                    used_flag: false,
-                    material_type: null,
-                    package_unit: null
-                },
-                getDetailsParams: {},
+                // materialBaseInfoForm: {
+                //
+                //     material_no: "",
+                //     material_name: "",
+                //     for_short: "",
+                //     density: null,
+                //     used_flag: false,
+                //     material_type: null,
+                //     package_unit: null
+                // },
+                // getParams: {
+                //     page: 1,
+                //     equip_no: null,
+                //     product_no: null,
+                //     plan_classes_uid: null,
+                //     st: '',
+                //     et: ''
+                // },
+                palletFeedObj: {},
+                palletFeedList: [],
+                BATObj: {},
+                BATList: [],
                 dialogVisibleRubber: false,
                 tableDataRubber: [],
                 tableDataBAT:[],
                 dialogVisibleBAT: false,
-                getBATParams: {},
                 dialogVisibleGraph: false,
                 option1: {
-                     title: {
-                         text: '折线图堆叠',
-                         // left: "center",
-                     },
+                    title: {
+                        text: '折线图堆叠'
+                    },
                     tooltip: {
                         trigger: 'axis'
                     },
                     legend: {
-                         // icon:'circle',
-                         selectedMode: 'single',//单选
-                        // data: ['温度', '功率', '能量', '压力', '转速']
+                        selectedMode: 'single',//单选
                     },
                     grid: {
-                         // show: true,
                         left: '5%',
                         right: '8%',
                         bottom: '5%',
                         containLabel: true
                     },
                     toolbox: {
-                        // left: 'center',
                         feature: {
                             dataZoom: {
                                 yAxisIndex: 'none'
@@ -60,46 +70,46 @@
                         }
                     },
                     xAxis: {
-                         name: '车次',
+                        name: '时间',
                         // nameLocation: 'start',
                         nameTextStyle: {
-                             fontWeight: 'bold',
-                             fontSize: 18
+                            fontWeight: 'bold',
+                            fontSize: 12
                         },
                         type: 'category',
                         boundaryGap: false,
-                        data: ['一', '二', '三', '四', '五', '六', '七']
+                        data: echartsTime
                     },
                     yAxis: [{
-                             position:'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} ℃'
-                            }
-                        },
+                        position: 'left',
+                        type: 'value',
+                        axisLabel: {
+                            formatter: '{value} ℃'
+                        }
+                    },
                         {
-                            position:'left',
+                            position: 'left',
                             type: 'value',
                             axisLabel: {
                                 formatter: '{value} W'
                             }
                         },
                         {
-                            position:'left',
+                            position: 'left',
                             type: 'value',
                             axisLabel: {
                                 formatter: '{value} J'
                             }
                         },
                         {
-                            position:'left',
+                            position: 'left',
                             type: 'value',
                             axisLabel: {
                                 formatter: '{value} Pa'
                             }
                         },
                         {
-                            position:'left',
+                            position: 'left',
                             type: 'value',
                             axisLabel: {
                                 formatter: '{value} rps'
@@ -112,68 +122,40 @@
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex:'0',
-                            data: [120, 132, 101, 134, 90, 230, 210],
-                            // markLine: {
-                            //     silent: true,
-                            //     data: [{
-                            //         yAxis: 50
-                            //     }, {
-                            //         yAxis: 100
-                            //     }, {
-                            //         yAxis: 150
-                            //     }, {
-                            //         yAxis: 200
-                            //     }, {
-                            //         yAxis: 300
-                            //     }]
-                            // }
+                            yAxisIndex: '0',
+                            data: echartsTemprature
                         },
                         {
                             name: '功率',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex:'1',
-                            data: [220, 182, 191, 234, 290, 330, 310],
-                            // markLine: {
-                            //     silent: true,
-                            //     data: [{
-                            //         yAxis: 50
-                            //     }, {
-                            //         yAxis: 100
-                            //     }, {
-                            //         yAxis: 150
-                            //     }, {
-                            //         yAxis: 200
-                            //     }, {
-                            //         yAxis: 300
-                            //     }]
-                            // }
+                            yAxisIndex: '1',
+                            data: echartsPower
                         },
                         {
                             name: '能量',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex:'2',
-                            data: [150, 232, 201, 154, 190, 330, 410]
+                            yAxisIndex: '2',
+                            data: echartsEnergy
                         },
                         {
                             name: '压力',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex:'3',
-                            data: [320, 332, 301, 334, 390, 330, 320]
+                            yAxisIndex: '3',
+                            data: echartsPressure
                         },
                         {
                             name: '转速',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex:'4',
-                            data: [820, 932, 901, 934, 1290, 1330, 1320]
+                            yAxisIndex: '4',
+                            data: echartsRpm
                         }
                     ]
                 }
@@ -208,7 +190,68 @@
             equipNoChange() {
                 this.getFirstPage();
             },
-            showAddDialog() {
+            clickProductNo(row) {
+                this.dialogVisibleRubber = true
+                this.palletFeedObj = row
+                this.getRubberCoding()
+            },
+            getRubberCoding() {
+                var _this = this
+                axios.get(PalletFeedBacksUrl, {
+                    params: {
+                        product_no: _this.palletFeedObj.product_no,
+                        // plan_classes_uid: _this.palletFeedObj.plan_classes_uid,
+                        equip_no: _this.palletFeedObj.equip_no
+                    }
+                }).then(function (response) {
+                    _this.palletFeedList = response.data.results || [];
+                }).catch(function (error) {
+                });
+            },
+            clickBAT(row) {
+                this.dialogVisibleBAT = true
+                this.BATObj = row
+                this.getBATList()
+            },
+            getBATList() {
+                var _this = this
+                axios.get(TrainsFeedbacksUrl, {
+                    params: {
+                        plan_classes_uid: _this.BATObj.plan_classes_uid,
+                        equip_no: _this.BATObj.equip_no,
+                        actual_trains: _this.BATObj.begin_trains + ',' + _this.BATObj.end_trains
+                    }
+                }).then(function (response) {
+                    _this.BATList = response.data.results || [];
+                }).catch(function (error) {
+                });
+            },
+            viewGraph() {
+                this.dialogVisibleGraph = true
+                this.getEchartsList()
+            },
+            getEchartsList() {
+                var _this = this
+                axios.get(EchartsListUrl, {
+                    params: {
+                        product_no: _this.BATObj.product_no,
+                        plan_classes_uid: _this.BATObj.plan_classes_uid,
+                        equip_no: _this.BATObj.equip_no,
+                        actual_trains: _this.BATObj.begin_trains + ',' + _this.BATObj.end_trains
+                    }
+                }).then(function (response) {
+                    var results = response.data.results
+                    results.forEach(function (D) {
+                        var created_date = D.created_date.split(' ')[1]
+                        echartsTime.push(created_date)
+                        echartsTemprature.push(D.temperature)
+                        echartsPower.push(D.power)
+                        echartsEnergy.push(D.energy)
+                        echartsPressure.push(D.pressure)
+                        echartsRpm.push(D.rpm)
+                    })
+                }).catch(function (error) {
+                });
             },
             currentChange: function (page) {
 
@@ -250,20 +293,21 @@
                 });
                 this.dialogVisibleRubber = true
             },
-            clickBAT(row) {
-                this.getBATParams['product_no'] = row.product_no
-                this.getBATParams['equip_no'] = row.equip_no
-                const app = this;
-                axios.get(this.TrainsFeedbacksUrl, {
-                    params: this.getBATParams
-                }).then(function (response) {
 
-                    app.tableDataBAT = response.data.results;
-
-                }).catch(function (error) {
-                });
-                this.dialogVisibleBAT = true
-            },
+            // clickBAT(row) {
+            //     this.getBATParams['product_no'] = row.product_no
+            //     this.getBATParams['equip_no'] = row.equip_no
+            //     const app = this;
+            //     axios.get(this.TrainsFeedbacksUrl, {
+            //         params: this.getBATParams
+            //     }).then(function (response) {
+            //
+            //         app.tableDataBAT = response.data.results;
+            //
+            //     }).catch(function (error) {
+            //     });
+            //     this.dialogVisibleBAT = true
+            // },
             opens () {
                 this.$nextTick(() => {
                     this.pie1()
@@ -272,9 +316,9 @@
             pie1(){
                 echarts.init(this.$refs.main).setOption(this.option1)
             },
-            viewGraph() {
-                this.dialogVisibleGraph = true;
-            }
+            // viewGraph() {
+            //     this.dialogVisibleGraph = true;
+            // }
 
         }
     };
