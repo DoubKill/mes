@@ -50,6 +50,7 @@ def run():
     #         continue
     day_plan_set = ProductDayPlan.objects.filter(delete_flag=False)
     for day_plan in list(day_plan_set):
+        date = day_plan.plan_schedule.day_time
         class_plan_set = ProductClassesPlan.objects.filter(product_day_plan=day_plan.id)
         bath_no = 1
         for class_plan in list(class_plan_set):

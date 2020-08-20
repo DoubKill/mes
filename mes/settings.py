@@ -103,94 +103,94 @@ JWT_AUTH = {
 }
 
 LOGGING_DIR = os.environ.get('LOGGING_DIR', os.path.join(BASE_DIR, 'logs'))
-#
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': False,
-#     'formatters': {
-#         'verbose': {
-#             'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
-#         },
-#         'simple': {
-#             'format': '%(levelname)s %(message)s'
-#         },
-#         'standard': {
-#             'format': '%(asctime)s [%(threadName)s:%(thread)d] [%(name)s:%(lineno)d] '
-#                       '[%(module)s:%(funcName)s] [%(levelname)s]- %(message)s'
-#         },
-#         'django_request': {
-#             'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s'
-#                       ' status_code:%(status_code)d',
-#             'datefmt': '%Y-%m-%d %H:%M:%S'
-#         },
-#         'django_db_backends': {
-#             'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s',
-#             'datefmt': '%Y-%m-%d %H:%M:%S'
-#         },
-#     },
-#     'filters': {
-#         'require_debug_true': {
-#             '()': 'django.utils.log.RequireDebugTrue',
-#         },
-#
-#     },
-#     'handlers': {
-#         'console': {
-#             'level': 'DEBUG',
-#             'filters': ['require_debug_true'],
-#             'class': 'logging.StreamHandler',
-#             'formatter': 'standard'
-#         },
-#         'django_db_backends': {
-#             'level': 'DEBUG',
-#             'filters': ['require_debug_true'],
-#             'class': 'logging.StreamHandler',
-#             'formatter': 'django_db_backends'
-#         },
-#         'django_request': {
-#             'level': 'DEBUG',
-#             'filters': ['require_debug_true'],
-#             'class': 'logging.StreamHandler',
-#             'formatter': 'django_request'
-#         },
-#         'timedRotatingFile': {
-#             'level': 'DEBUG',
-#             'class': 'logging.handlers.TimedRotatingFileHandler',
-#             'filename': os.path.join(LOGGING_DIR, 'api_log.log'),
-#             'when': 'D',
-#             'backupCount': 10,
-#             'formatter': 'standard',
-#         },
-#         'errorFile': {
-#             'level': 'DEBUG',
-#             'class': 'logging.handlers.TimedRotatingFileHandler',
-#             'filename': os.path.join(LOGGING_DIR, 'error.log'),
-#             'when': 'D',
-#             'backupCount': 10,
-#             'formatter': 'standard',
-#         },
-#     },
-#     'loggers': {
-#         'django.db.backends': {
-#             'handlers': ['django_db_backends'],
-#             'propagate': True,
-#             'level': 'DEBUG' if DEBUG else 'INFO',
-#         },
-#         'django.request': {
-#             'handlers': ['django_request'],
-#             'level': 'ERROR',
-#             'propagate': False,
-#         },
-#         'api_log': {
-#             'handlers': ['timedRotatingFile'],
-#             'level': 'DEBUG' if DEBUG else 'INFO',
-#         },
-#         'error_log': {
-#             'handlers': ['errorFile'],
-#             'level': 'DEBUG' if DEBUG else 'INFO',
-#         }
-#     },
-# }
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+        'standard': {
+            'format': '%(asctime)s [%(threadName)s:%(thread)d] [%(name)s:%(lineno)d] '
+                      '[%(module)s:%(funcName)s] [%(levelname)s]- %(message)s'
+        },
+        'django_request': {
+            'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s'
+                      ' status_code:%(status_code)d',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+        'django_db_backends': {
+            'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard'
+        },
+        'django_db_backends': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'django_db_backends'
+        },
+        'django_request': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'django_request'
+        },
+        'timedRotatingFile': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'api_log.log'),
+            'when': 'D',
+            'backupCount': 10,
+            'formatter': 'standard',
+        },
+        'errorFile': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'error.log'),
+            'when': 'D',
+            'backupCount': 10,
+            'formatter': 'standard',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['django_db_backends'],
+            'propagate': True,
+            'level': 'DEBUG' if DEBUG else 'INFO',
+        },
+        'django.request': {
+            'handlers': ['django_request'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'api_log': {
+            'handlers': ['timedRotatingFile'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+        },
+        'error_log': {
+            'handlers': ['errorFile'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+        }
+    },
+}
 
 
 if DEBUG:
