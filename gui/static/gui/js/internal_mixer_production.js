@@ -1,10 +1,4 @@
 ;(function () {
-    var echartsTime = []
-    var echartsTemprature = []
-    var echartsPower = []
-    var echartsEnergy = []
-    var echartsPressure = []
-    var echartsRpm = []
     var Main = {
         mixins: [BaseMixin],
         data: function () {
@@ -71,7 +65,7 @@
                         },
                         type: 'category',
                         boundaryGap: false,
-                        data: echartsTime
+                        data: []
                     },
                     yAxis: [{
                         position: 'left',
@@ -116,7 +110,7 @@
                             smooth: true,
                             stack: '总量',
                             yAxisIndex: '0',
-                            data: echartsTemprature
+                            data: []
                         },
                         {
                             name: '功率',
@@ -124,7 +118,7 @@
                             smooth: true,
                             stack: '总量',
                             yAxisIndex: '1',
-                            data: echartsPower
+                            data: []
                         },
                         {
                             name: '能量',
@@ -132,7 +126,7 @@
                             smooth: true,
                             stack: '总量',
                             yAxisIndex: '2',
-                            data: echartsEnergy
+                            data: []
                         },
                         {
                             name: '压力',
@@ -140,7 +134,7 @@
                             smooth: true,
                             stack: '总量',
                             yAxisIndex: '3',
-                            data: echartsPressure
+                            data: []
                         },
                         {
                             name: '转速',
@@ -148,7 +142,7 @@
                             smooth: true,
                             stack: '总量',
                             yAxisIndex: '4',
-                            data: echartsRpm
+                            data: []
                         }
                     ]
                 },
@@ -283,19 +277,27 @@
                     results.forEach(function (D) {
                         if (D.hasOwnProperty('created_date')) {
                             var created_dates = D.created_date.split(' ')[1]
-                            echartsTime.push(created_dates)
+                            _this.option1.xAxis.data.push(created_dates)
                         }
-                        echartsTemprature.push(D.temperature)
-                        echartsPower.push(D.power)
-                        echartsEnergy.push(D.energy)
-                        echartsPressure.push(D.pressure)
-                        echartsRpm.push(D.rpm)
+                        _this.option1.series[0].data.push(D.temperature)
+                        _this.option1.series[1].data.push(D.power)
+                        _this.option1.series[2].data.push(D.energy)
+                        _this.option1.series[3].data.push(D.pressure)
+                        _this.option1.series[4].data.push(D.rpm)
                     })
                     this.echartsList = results
-
-                    echarts.init(this.$refs.main).setOption(this.option1)
                 }).catch(function (error) {
                 });
+            },
+            handleCloseGraph(done) {
+                var _this = this
+                _this.option1.xAxis.data = []
+                _this.option1.series[0].data = []
+                _this.option1.series[1].data = []
+                _this.option1.series[2].data = []
+                _this.option1.series[3].data = []
+                _this.option1.series[4].data = []
+                done()
             },
             changeSearch() {
                 // console.log(this.search_date)
@@ -313,8 +315,9 @@
                 return setDate(add, true)
             },
             opens() {
-                this.$nextTick(() => {
-                    // echarts.init(this.$refs.main).setOption(this.option1)
+                var _this = this
+                this.$nextTick(function () {
+                    echarts.init(_this.$refs.main).setOption(_this.option1)
                 })
             }
         }
