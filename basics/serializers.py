@@ -97,10 +97,11 @@ class ClassesDetailSerializer(BaseModelSerializer):
 class ClassesSimpleSerializer(BaseModelSerializer):
     """工作日程班次下拉列表"""
     classes_name = serializers.CharField(source="classes.global_name")
+    work_schedule_name = serializers.CharField(source="work_schedule.schedule_name" ,read_only=True)
 
     class Meta:
         model = ClassesDetail
-        fields = ('id', 'classes_name')
+        fields = ('id', 'classes_name', 'work_schedule_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
