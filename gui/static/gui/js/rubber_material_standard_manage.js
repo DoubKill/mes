@@ -16,18 +16,32 @@
                 RubberStage: "",
                 RubberStageOptions: [],
                 factory:"",
-                PopupRubberSiteOptions:[],
+                PopupRubberSITEOptions:[],
                 stage_product_batch_no:"",
                 ProductBatchNoOptions:[],
                 stage:"",
                 StageOptions:[],
                 dev_type_name: "",
                 DevTypeOptions: [],
+                RawMaterialOptions: [],
+                NewRowMaterial:[{
+                    sn_ele:null,
+                    material_type:null,
+                    material_name:null,
+                    practical_weight:null}
+                ],
+                PutProductRecipe:[{
+                    sn:null,
+                    material_type:null,
+                    material_name:null,
+                    actual_weight:null}
+                ],
 
-                PopupRubberSite:[],
+                PopupRubberSITE:[],
                 DevType:[],
                 ProductBatchNo:[],
                 Stage:[],
+                generate_material_no:"",
                 //反炼与否和时间
                 select_rm_flag:false,
                 select_rm_time_interval:"",
@@ -75,7 +89,6 @@
 
                 selectedPreMaterials:[],
                 ProductRecipe:[],
-                PutProductRecipe:[],
                 pre_time_material:"",
                 time_material:"",
                 //排出行对应的时间---炼胶时间
@@ -85,6 +98,10 @@
                 dialogAddRubberMaterial: false,
                 dialogRubberMaterialStandard:false,
                 dialogChoiceMaterials:false,
+                NewdialogChoiceMaterials:false,
+                sn:null,
+                material_type:null,
+                material_name:null,
 
                 rubberMaterialForm: {
                     factory: "",
@@ -94,15 +111,19 @@
                 },
                 rules: {
                     factory: [{ required: true, message: '请选择产地', trigger: 'change' }],
-                    stage_product_batch_no: [{ required: true, message: '请选择胶料编码', trigger: 'change' }],
+                    SITE: [{ required: true, message: '请选择SITE', trigger: 'change' }],
+                    rubber_no: [{ required: true, message: '请选择胶料编码', trigger: 'change' }],
                     stage: [{ required: true, message: '请选择段次', trigger: 'change' }],
-                    dev_type_name: [{ required: true, message: '请选择炼胶机类型', trigger: 'change' }],
+                    version: [{ required: true, message: '请选择版本', trigger: 'blur' }],
+                    scheme: [{ required: true, message: '请选择方案', trigger: 'blur' }]
                 },
                 rubberMaterialFormError: {
                     factory: "",
-                    stage_product_batch_no: "",
+                    SITE: "",
+                    rubber_no: "",
                     stage: "",
-                    dev_type_name: "",
+                    version: "",
+                    scheme: "",
                 }
             }
         },
@@ -127,30 +148,29 @@
             }).catch(function (error) {
             });
 
-            axios.get(SiteGlobalUrl, {
+            axios.get(SITEGlobalUrl, {
             }).then(function (response) {
-                app.PopupRubberSite = response.data.results;
-                    for (var i = 0; i < app.PopupRubberSite.length; ++i) {
-                        app.PopupRubberSiteOptions.push({
-                            value: app.PopupRubberSite[i]["id"],
-                            label: app.PopupRubberSite[i]["global_name"],
-                        });
-                    }
+                app.PopupRubberSITEOptions = response.data.results;
+            }).catch(function (error) {
+            });
+            axios.get(ProductInfosUrl, {
+            }).then(function (response) {
+                app.ProductBatchNoOptions = response.data.results;
             }).catch(function (error) {
             });
 
+
             axios.get(DevTypeGlobalUrl, {
             }).then(function (response) {
-                app.DevType = response.data.results;
-                    for (var i = 0; i < app.DevType.length; ++i) {
-                        var label = app.DevType[i]["global_name"];
-                        app.DevTypeOptions.push({
-                            value: app.DevType[i]["id"],
-                            label
-                        });
-                    }
+                app.DevTypeOptions = response.data.results;
             }).catch(function (error) {
             });
+            axios.get(MaterialsUrl, {
+            }).then(function (response) {
+                app.RawMaterialOptions = response.data.results;
+            }).catch(function (error) {
+            });
+
 
 
         },
@@ -198,44 +218,41 @@
 
                 this.getFirstPage();
             },
-            shiftsPopupRubberSiteChange(){
-                var app = this;
-                axios.get(RubberStageUrl + '?factory_id=' +this.rubberMaterialForm['factory'], {}
-                ).then(function (response) {
-                    app.ProductBatchNo = response.data;
-                        for (var i = 0; i < app.ProductBatchNo.length; ++i) {
-                            app.ProductBatchNoOptions.push({
-                                value: app.ProductBatchNo[i]["product_info"],
-                                label: app.ProductBatchNo[i]["product_no"],
-                            });
-                        }
-                }).catch(function (error) {
-                });
-            },
-            shiftsProductBatchNoChange(){
-                var app = this;
-                axios.get(RubberStageUrl + '?factory_id=' + this.rubberMaterialForm['factory'], {}
-                ).then(function (response) {
-                    app.Stage = response.data;
-                    for (var i = 0; i < app.Stage.length; ++i) {
-                        if(app.Stage[i]["product_info"] == app.rubberMaterialForm['stage_product_batch_no']){
-                            for(var j = 0; j < app.Stage[i]['stages'].length; ++j){
-                                app.StageOptions.push({
-                                    value: app.Stage[i]['stages'][j]["stage"],
-                                    label: app.Stage[i]['stages'][j]["stage__global_name"],
-                                });
-                            }
-                        }
-                    }
-                }).catch(function (error) {
-                });
-            },
 
             shiftsStageChange(){
 
             },
 
             shiftsDevTypeChange() {
+            },
+            GenerateRubberMaterialNOChanged() {
+                var app = this;
+                var SITE_name = "";
+                var stage_name = "";
+                var product_name = "";
+                if(app.rubberMaterialForm.SITE){
+                    for(var i=0; i<app.PopupRubberSITEOptions.length; ++i){
+                        if(app.PopupRubberSITEOptions[i]["id"] == app.rubberMaterialForm.SITE){
+                              SITE_name = app.PopupRubberSITEOptions[i]['global_name']
+                          }
+                    }
+                }
+                if(app.rubberMaterialForm.stage){
+                    for(var j=0; j<app.RubberStageOptions.length; ++j){
+                        if(app.RubberStageOptions[j]["id"] == app.rubberMaterialForm.stage){
+                              stage_name = app.RubberStageOptions[j]['global_name']
+                          }
+                    }
+                }
+                if(app.rubberMaterialForm.rubber_no){
+                    for(var m=0; m<app.ProductBatchNoOptions.length; ++m){
+                        if(app.ProductBatchNoOptions[m]["id"] == app.rubberMaterialForm.rubber_no){
+                              product_name = app.ProductBatchNoOptions[m]['product_name']
+                          }
+                    }
+                }
+
+                app.rubberMaterialForm.generate_material_no = SITE_name + '-' + stage_name +'-'+ product_name+'-' + app.rubberMaterialForm.version;
             },
 
             showAddRubberMaterialDialog: function () {
@@ -256,18 +273,25 @@
                 app.dialogRubberMaterialStandard = true;
                 axios.get(RubberMaterialUrl + this.currentRow.id + "/")
                     .then(function (response) {
+                        console.log('================================mod_get');
+                        console.log(response.data.batching_details);
+                        console.log('================================mod_get');
                         app.put_select_stage_product_batch_no = response.data['stage_product_batch_no'];
                         app.put_select_product_name = response.data['product_name'];
-                        // app.put_select_status = response.data['used_type'];
                         app.put_select_status = app.usedTypeChoice(response.data['used_type']);
                         app.put_select_dev_type = response.data['dev_type_name'];
+
                         app.put_select_material_weight = response.data['batching_weight'];
-                        app.put_select_material_volume = response.data['volume'];
-                        app.put_select_rubber_proportion = response.data['batching_proportion'];
-                        app.put_select_rm_flag = response.data['rm_flag'];
                         app.put_select_rm_time_interval = response.data['rm_time_interval'];
-                        app.PutProductRecipe = response.data.batching_details;
-                        app.put_discharge_time_material = response.data['production_time_interval'];
+                        if(response.data.batching_details.length ==0){
+                            app.PutProductRecipe = [{
+                                sn:null,
+                                material_type:null,
+                                material_name:null,
+                                actual_weight:null}]
+                        }else{
+                            app.PutProductRecipe = response.data.batching_details;
+                        }
 
                     }).catch(function (error) {
 
@@ -385,7 +409,39 @@
                             });
                       });
 
+                  } else {
+                    console.log('error submit!!');
+                    return false;
+                  }
+                });
 
+
+            },
+
+            NewhandleAddRubberMaterial(formName) {
+                var app = this;
+                app.$refs[formName].validate((valid) => {
+                  if (valid) {
+                      axios.post(RubberMaterialUrl, {
+                            factory: app.rubberMaterialForm['factory'],
+                            site: app.rubberMaterialForm['SITE'],
+                            product_info: app.rubberMaterialForm['rubber_no'],
+                            precept: app.rubberMaterialForm['scheme'],
+                            stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
+                            stage: app.rubberMaterialForm['stage'],
+                            versions: app.rubberMaterialForm['version'],
+                        }).then(function (response) {
+
+                            app.dialogAddRubberMaterial = false;
+                            app.$message(app.rubberMaterialForm['generate_material_no'] + "保存成功");
+                            app.currentChange(app.currentPage);
+
+                        }).catch(function (error) {
+                            app.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
+                        });
 
                   } else {
                     console.log('error submit!!');
@@ -394,6 +450,21 @@
                 });
 
 
+            },
+
+            NewAddMaterial(formName) {
+                var app = this;
+                app.$refs[formName].validate((valid) => {
+                  if (valid) {
+                        app.dialogAddRubberMaterial = false;
+                        app.NewdialogChoiceMaterials = true;
+                        app.select_stage_product_batch_no = app.rubberMaterialForm['generate_material_no'];
+                        app.select_product_name = app.rubberMaterialForm['rubber_no'];
+                  } else {
+                    console.log('error submit!!');
+                    return false;
+                  }
+                });
             },
 
             //胶料配料标准 本段 的数据
@@ -483,6 +554,154 @@
 
                     this.calculateWeightSum = variate_calculateWeight;
                 }
+            },
+
+            NewMaterialChange: function(row) {
+                var app = this;
+                for(var i=0; i<app.RawMaterialOptions.length; ++i){
+                    if(app.RawMaterialOptions[i]["id"] == row.material_name){
+                          // row.sn_ele = app.NewRowMaterial.length;
+                          row.material_type = app.RawMaterialOptions[i]['material_type_name']
+                      }
+                }
+            },
+            PutNewMaterialChange: function(row) {
+                var app = this;
+                for(var i=0; i<app.RawMaterialOptions.length; ++i){
+                    if(app.RawMaterialOptions[i]["id"] == row.material_name){
+                          // row.sn = app.PutProductRecipe.length;
+                          row.material_type = app.RawMaterialOptions[i]['material_type_name']
+                      }
+                }
+            },
+
+            NewPracticalWeightChanged: function () {
+                var app = this;
+                this.NewRowMaterial.push({
+                    sn:"",
+                    material_type:"",
+                    material_name:"",
+                    practical_weight:""
+                });
+                var material_weight = 0;
+                for(var i=0; i<app.NewRowMaterial.length; ++i){
+                    material_weight += app.NewRowMaterial[i]['practical_weight']
+                }
+                app.select_material_weight = material_weight;
+                app.practicalWeightSum = material_weight;
+            },
+            PutNewPracticalWeightChanged: function () {
+                var app = this;
+                this.PutProductRecipe.push({
+                    sn:"",
+                    material_type:"",
+                    material_name:"",
+                    actual_weight:""
+                });
+                var material_weight = 0;
+                for(var i=0; i<app.PutProductRecipe.length; ++i){
+                    material_weight += app.PutProductRecipe[i]['actual_weight']
+                }
+                app.put_select_material_weight = material_weight;
+                app.put_practicalWeightSum = material_weight;
+            },
+
+            NewsaveMaterialClicked: function () {
+                var app = this;
+                var batching_details_list = [];
+                var variate_num = 0;
+
+                for (var i = 0; i < this.NewRowMaterial.length -1; ++i) {
+                    if(app.NewRowMaterial[i].material_name && app.NewRowMaterial[i].practical_weight){
+                        variate_num += 1;
+                        var now_stage_material = {
+                            sn: i+1,
+                            material:app.NewRowMaterial[i].material_name,
+                            actual_weight:app.NewRowMaterial[i].practical_weight,
+                        };
+                        batching_details_list.push(now_stage_material);
+                    }
+                    else {
+                        app.$message({
+                            message: "必填数据不能为空",
+                            type: 'error'
+                        });
+                        return
+                    }
+                }
+                axios.post(RubberMaterialUrl, {
+                    factory: app.rubberMaterialForm['factory'],
+                    site: app.rubberMaterialForm['SITE'],
+                    product_info: app.rubberMaterialForm['rubber_no'],
+                    precept: app.rubberMaterialForm['scheme'],
+                    stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
+                    stage: app.rubberMaterialForm['stage'],
+                    versions: app.rubberMaterialForm['version'],
+                    batching_details: batching_details_list,
+                }).then(function (response) {
+
+                    app.NewdialogChoiceMaterials = false;
+                    app.$message(app.rubberMaterialForm['generate_material_no'] + "保存成功");
+                    app.currentChange(app.currentPage);
+
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+
+            },
+
+            PutNewsaveMaterialClicked: function () {
+                var app = this;
+                var batching_details_list = [];
+                var ele_material = "";
+                //循环整个表格
+                for (var i = 0; i < this.PutProductRecipe.length; ++i) {
+                    //只有原材料和实际重量两个必选项都填写时，才能往batching_details_list中push
+                    if(app.PutProductRecipe[i].material_name && app.PutProductRecipe[i].actual_weight){
+                        ele_material = app.PutProductRecipe[i].material_name;
+                        //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
+                        for(var j = 0; j < app.RawMaterialOptions.length; ++j){
+                            if(app.RawMaterialOptions[j]['material_name'] == app.PutProductRecipe[i].material_name){
+                                ele_material = app.RawMaterialOptions[j]['id'];
+                                break
+                            }
+                        }
+
+                        var now_stage_material = {
+                            sn: i+1,
+                            material:ele_material,
+                            actual_weight:app.PutProductRecipe[i].actual_weight,
+                        };
+                        batching_details_list.push(now_stage_material);
+
+                    }
+                    else {
+                    }
+                }
+
+
+
+                console.log('=======================================mod_put');
+                console.log(batching_details_list);
+                console.log('=======================================mod_put    ');
+                axios.put(RubberMaterialUrl + this.currentRow.id + "/", {
+                    batching_details: batching_details_list,
+                }).then(function (response) {
+
+                    app.dialogRubberMaterialStandard = false;
+                    app.$message(app.put_select_stage_product_batch_no + "保存成功");
+                    app.currentChange(app.currentPage);
+
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+
             },
 
             saveMaterialClicked: function () {
