@@ -45,6 +45,36 @@
             <el-table-column prop="plan_weight" label="重量"></el-table-column>
         </el-table-column>
 
+        <el-table-column align="center" label="数量">
+            <el-table-column prop="plan_trains" label="计划"></el-table-column>
+            <el-table-column prop="actual_trains" label="实绩"></el-table-column>
+        </el-table-column>
+
+        <el-table-column align="center" label="重量">
+            <el-table-column prop="plan_weight" label="计划"></el-table-column>
+            <el-table-column prop="actual_weight" label="实绩"></el-table-column>
+
+            <el-table-column prop="ach_rate" label="达成率">
+                <template slot-scope="scope">
+                    <el-progress :text-inside="true" :stroke-width="15" :percentage="scope.row.ach_rate" :color="customColorMethod"></el-progress>
+                </template>
+
+            </el-table-column>
+        </el-table-column>
+
+        <el-table-column align="center" label="时间">
+            <el-table-column prop="plan_time" label="计划"></el-table-column>
+            <el-table-column prop="actual_time" label="实绩"></el-table-column>
+        </el-table-column>
+
+        <el-table-column align="center" label="分析">
+            <el-table-column prop="start_rate" label="启动率"></el-table-column>
+        </el-table-column>
+
+
+
+
+        <!--
         <el-table-column align="center" label="计划">
             <el-table-column prop="plan_trains" label="数量"></el-table-column>
             <el-table-column prop="plan_weight" label="重量"></el-table-column>
@@ -61,6 +91,7 @@
             <el-table-column prop="start_rate" label="启动率"></el-table-column>
             <el-table-column prop="ach_rate" label="达成率"></el-table-column>
         </el-table-column>
+        -->
 
     </el-table>
 
