@@ -151,7 +151,8 @@
                             data: echartsRpm
                         }
                     ]
-                }
+                },
+                echartsList: []
             }
         },
         created() {
@@ -161,11 +162,10 @@
             this.getClassesList()   //获取班次列表
 
             var _setDateCurrent = setDate()
-            // this.getParams.st = _setDateCurrent + " 00:00:00"
-            // this.getParams.et = _setDateCurrent + ' 23:59:59'
-            // this.search_date = [this.getParams.st, this.getParams.et]
-            this.getParams.st = '2020-06-01' + " 00:00:00"
-            this.getParams.et = '2020-06-01' + ' 23:59:59'
+            this.getParams.st = _setDateCurrent + " 00:00:00"
+            this.getParams.et = _setDateCurrent + ' 23:59:59'
+            // this.getParams.st = '2020-06-01' + " 00:00:00"
+            // this.getParams.et = '2020-06-01' + ' 23:59:59'
             this.search_date = [this.getParams.st, this.getParams.et]
         },
         methods: {
@@ -175,6 +175,7 @@
                     params: _this.getParams
                 }).then(function (response) {
                     _this.tableData = response.data.results || [];
+
                     if (_this.tableDataTotal !== response.data.count) {
                         _this.tableDataTotal = response.data.count;
                     }
@@ -280,19 +281,24 @@
                 }).then(function (response) {
                     var results = response.data.results
                     results.forEach(function (D) {
-                        var created_date = D.created_date.split(' ')[1]
-                        echartsTime.push(created_date)
+                        if (D.hasOwnProperty('created_date')) {
+                            var created_dates = D.created_date.split(' ')[1]
+                            echartsTime.push(created_dates)
+                        }
                         echartsTemprature.push(D.temperature)
                         echartsPower.push(D.power)
                         echartsEnergy.push(D.energy)
                         echartsPressure.push(D.pressure)
                         echartsRpm.push(D.rpm)
                     })
+                    this.echartsList = results
+
+                    echarts.init(this.$refs.main).setOption(this.option1)
                 }).catch(function (error) {
                 });
             },
             changeSearch() {
-                console.log(this.search_date)
+                // console.log(this.search_date)
                 if (this.search_date) {
                     this.getParams.st = this.search_date[0]
                     this.getParams.et = this.search_date[1]
@@ -308,7 +314,7 @@
             },
             opens() {
                 this.$nextTick(() => {
-                    echarts.init(this.$refs.main).setOption(this.option1)
+                    // echarts.init(this.$refs.main).setOption(this.option1)
                 })
             }
         }
