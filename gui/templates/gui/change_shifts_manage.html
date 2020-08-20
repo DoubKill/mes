@@ -121,15 +121,15 @@
                     <div v-for="(classesdetail, index) in changeShiftsManageForm.classesdetail_set">
                         <el-divider>{{ classesdetail.classes_name }}</el-divider>
                         <el-form-item label="时间范围" :label-width="formLabelWidth">
-                            <el-date-picker
-                                    style="width: 100%"
-                                    type="datetimerange"
+                            <el-time-picker
+                                    is-range
+                                    style="width: auto"
                                     range-separator="至"
-                                    start-placeholder="开始日期"
-                                    end-placeholder="结束日期"
-                                    value-format="yyyy-MM-ddTHH:mm:mm"
+                                    start-placeholder="开始时间"
+                                    end-placeholder="结束时间"
+                                    value-format="HH:mm:mm"
                                     v-model="classesdetail.times">
-                            </el-date-picker>
+                            </el-time-picker>
                         </el-form-item>
                         <el-form-item label="描述" :label-width="formLabelWidth">
                             <el-input v-model="classesdetail.description"></el-input>
