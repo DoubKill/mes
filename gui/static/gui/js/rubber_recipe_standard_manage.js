@@ -41,7 +41,9 @@
                 newProductNo: "",
                 newVersion: "",
                 originByName: {},
-                copyError: ""
+                copyError: "",
+                productNo: "",
+                productName: "",
             }
         },
         created: function () {
@@ -103,7 +105,14 @@
 
         },
         methods: {
-
+            productNoChange() {
+                this.getParams["product_no"] = this.productNo
+                this.getFirstPage()
+            },
+            productNameChange() {
+                this.getParams["product_name"] = this.productName
+                this.getFirstPage()
+            },
             usedTypeFormatter: function (row, column) {
 
                 return this.usedTypeChoice(row.used_type);
