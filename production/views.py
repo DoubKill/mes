@@ -231,8 +231,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             plan_time = 0
             actual_time = 0
             begin_time = None
-            product_no = day_plan.product_batching.product_info.product_name
-            stage = day_plan.product_batching.stage.global_name
+            product_no = day_plan.product_batching.product_info.product_no
             equip_no = day_plan.equip.equip_no
             if equip_no not in temp_data:
                 temp_data[equip_no] = []
@@ -314,7 +313,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             plan_trains = 0
             actual_trains = 0
             plan_weight = 0
-            product_no = day_plan.product_batching.product_info.product_name
+            product_no = day_plan.product_batching.product_info.product_no
             equip_no = day_plan.equip.equip_no
             day_plan_actual = [None, None, None]
             # 通过日计划id再去查班次计划
