@@ -16,6 +16,11 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
                                           UniqueValidator(queryset=GlobalCodeType.objects.filter(delete_flag=False),
                                                           message='该代码类型名称已存在'),
                                       ])
+    type_no = serializers.CharField(max_length=64,
+                                    validators=[
+                                        UniqueValidator(queryset=GlobalCodeType.objects.all(),
+                                                        message='该代码类型编号已存在'),
+                                    ])
 
     def update(self, instance, validated_data):
         if 'used_flag' in validated_data:
