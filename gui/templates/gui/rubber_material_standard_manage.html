@@ -179,18 +179,30 @@
             </el-form-item>
 
             <el-form-item label="胶料编码" prop="rubber_no">
-                <el-select
-                        @change="GenerateRubberMaterialNOChanged"
+                <el-autocomplete
+                        style="width: 31%"
                         size="mini"
-                        v-model="rubberMaterialForm.rubber_no" placeholder="请选择">
-                    <el-option
-                            v-for="item in ProductBatchNoOptions"
-                            :key="item.id"
-                            :value="item.id"
-                            :label="item.product_name">
-                    </el-option>
-                </el-select>
+                        value-key = "product_name"
+                        v-model="rubberMaterialForm.rubber_no"
+                        :fetch-suggestions="rubber_no_querySearchAsync"
+                        placeholder="请输入内容"
+                ></el-autocomplete>
             </el-form-item>
+
+{#            <el-form-item label="胶料编码" prop="rubber_no">#}
+{#                <el-select#}
+{#                        @change="GenerateRubberMaterialNOChanged"#}
+{#                        size="mini"#}
+{#                        v-model="rubberMaterialForm.rubber_no" placeholder="请选择">#}
+{#                    <el-option#}
+{#                            v-for="item in ProductBatchNoOptions"#}
+{#                            :key="item.id"#}
+{#                            :value="item.id"#}
+{#                            :label="item.product_name">#}
+{#                    </el-option>#}
+{#                </el-select>#}
+{#            </el-form-item>#}
+
 
             <el-form-item label="段次" prop="stage">
                 <el-select
@@ -240,24 +252,9 @@
         胶料名称: <el-input size="mini" v-model="select_product_name" :disabled="true" style="width: 10%" ></el-input>
         状态: <el-input size="mini" v-model="select_status" :disabled="true" style="width: 10%" ></el-input>
         <br><br>
-        <el-form :inline="true">
-        <el-form-item label="炼胶机类型">
-            <el-select
-                    size="mini"
-                    clearable
-                    v-model="RubberSite" placeholder="请选择">
-                <el-option
-                        v-for="item in DevTypeOptions"
-                        :key="item.id"
-                        :label="item.global_name"
-                        :value="item.id">
-                </el-option>
-            </el-select>
-        </el-form-item>
+        炼胶机类型: <el-input size="mini" v-model="RubberSite" :disabled="true" style="width: 10%" ></el-input>
         配料重量: <el-input size="mini" v-model="select_material_weight" :disabled="true" style="width: 10%" ></el-input>
-        炼胶时间: <el-time-picker size="mini" v-model="select_rm_time_interval" value-format="HH:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
-
-        </el-form>
+        炼胶时间: <el-time-picker size="mini" :disabled="true" v-model="select_rm_time_interval" value-format="HH:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
 
         <br><br>
 
@@ -280,7 +277,8 @@
                     <td style="text-align: center">{{ practicalWeightSum }}</td>
                 </tr>
                 <tr v-for="(new_material_ele, index) in NewRowMaterial" :key="index">
-                    <td>{{ new_material_ele.sn_ele }}</td>
+                    <!--<td>{{ new_material_ele.sn_ele }}</td>-->
+                    <td>{{ index + 1 }}
                     <td>{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
                         <el-form>
@@ -331,11 +329,24 @@
         胶料名称: <el-input size="mini" v-model="put_select_product_name" :disabled="true" style="width: 10%" ></el-input>
         状态: <el-input size="mini" v-model="put_select_status" :disabled="true" style="width: 10%" ></el-input>
         <br><br>
-        炼胶机类型:<el-input size="mini" v-model="put_select_dev_type" :disabled="true" style="width: 20%" ></el-input>
-
+        <el-form :inline="true">
+        <el-form-item label="炼胶机类型">
+            <el-select
+                    size="mini"
+                    clearable
+                    v-model="put_select_dev_type" placeholder="请选择">
+                <el-option
+                        v-for="item in DevTypeOptions"
+                        :key="item.id"
+                        :label="item.global_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
         配料重量: <el-input size="mini" v-model="put_select_material_weight" :disabled="true" style="width: 10%" ></el-input>
-        炼胶时间: <el-time-picker size="mini" v-model="put_select_rm_time_interval" value-format="HH:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+        炼胶时间: <el-input-number size="mini" controls-position="right"  v-model.number="put_select_rm_time_interval"></el-input-number>
 
+        </el-form>
         <br><br>
 
 
@@ -357,7 +368,8 @@
                     <td style="text-align: center">{{ put_practicalWeightSum }}</td>
                 </tr>
                 <tr v-for="(new_material_ele, index) in PutProductRecipe" :key="index">
-                    <td>{{ new_material_ele.sn }}</td>
+                    <!--<td>{{ new_material_ele.sn }}</td>-->
+                    <td>{{ index + 1 }}</td>
                     <td>{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
                         <el-form>
