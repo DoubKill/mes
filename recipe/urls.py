@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ProductBatchingViewSet, MaterialAttributeViewSet, \
-    ValidateProductVersionsView
+    ValidateProductVersionsView, ProcessStepsViewSet, ProductProcessDetailViewSet
 
 router = DefaultRouter()
 
@@ -18,6 +18,12 @@ router.register(r'product-infos', ProductInfoViewSet)
 
 # 胶料配料
 router.register(r'product-batching', ProductBatchingViewSet)
+
+# 胶料步序
+router.register(r'process-steps', ProcessStepsViewSet)
+
+# 胶料步序详情
+router.register(r'process-steps-details', ProductProcessDetailViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

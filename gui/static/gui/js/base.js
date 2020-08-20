@@ -9,6 +9,7 @@ const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
 const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
 const StateGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料状态";
 const SiteGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
+const SITEGlobalUrl = BasicsUrl + "global-codes/?class_name=SITE";
 const StageGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料段次";
 const DevTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=炼胶机类型";
 

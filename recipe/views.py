@@ -15,8 +15,10 @@ from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFil
     MaterialAttributeFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
-    ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, ProductBatchingPartialUpdateSerializer
-from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ProductBatchingDetail
+    ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, ProductProcessSerializer, \
+    ProductBatchingPartialUpdateSerializer, ProcessDetailSerializer
+from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ProductProcess, \
+    ProductBatchingDetail, ProductProcessDetail
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -123,7 +125,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'product_no', 'product_name')
-            return Response(data)
+            return Response({'results': data})
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -177,3 +179,41 @@ class ProductBatchingViewSet(ModelViewSet):
         instance.save()
         instance.batching_details.filter().update(delete_flag=True, delete_user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ProcessStepsViewSet(ModelViewSet):
+    """
+    list:
+        胶料配料步序列表
+    retrieve:
+        胶料配料步序
+    create:
+        新建胶料配料步序
+    update:
+        修改胶料配料步序
+    partial_update:
+        修改胶料配料步序
+    """
+    queryset = ProductProcess.objects.filter(delete_flag=False).order_by('-created_date')
+    filter_backends = (DjangoFilterBackend,)
+    serializer_class = ProductProcessSerializer
+
+
+class ProductProcessDetailViewSet(ModelViewSet):
+    """
+    list:
+        胶料配料步序详情列表
+    retrieve:
+        胶料配料步序详情详情
+    create:
+        新建胶料配料步序详情
+    update:
+        修改胶料配料步序详情
+    partial_update:
+        修改胶料配料步序详情
+    delete:
+        删除胶料配料步序详情
+    """
+    queryset = ProductProcessDetail.objects.filter(delete_flag=False).order_by('-created_date')
+    filter_backends = (DjangoFilterBackend,)
+    serializer_class = ProcessDetailSerializer
