@@ -50,7 +50,7 @@ class UserViewSet(ModelViewSet):
     destroy:
         账号停用和启用
     """
-    queryset = User.objects.filter(delete_flag=False)
+    queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -81,7 +81,7 @@ class UserViewSet(ModelViewSet):
 
 class UserGroupsViewSet(mixins.ListModelMixin,
                         GenericViewSet):
-    queryset = User.objects.filter(delete_flag=False)
+    queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
 
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
@@ -102,7 +102,7 @@ class GroupExtensionViewSet(ModelViewSet):
     destroy:
         删除角色
     """
-    queryset = GroupExtension.objects.filter(delete_flag=False)
+    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
     serializer_class = GroupExtensionSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -113,10 +113,8 @@ class GroupExtensionViewSet(ModelViewSet):
             return GroupExtensionSerializer
         if self.action == 'create':
             return GroupExtensionSerializer
-        if self.action == 'update':
+        elif self.action == 'update':
             return GroupExtensionUpdateSerializer
-        if self.action == 'retrieve':
-            return GroupExtensionSerializer
         if self.action == 'partial_update':
             return GroupExtensionUpdateSerializer
 
@@ -124,7 +122,7 @@ class GroupExtensionViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class GroupAddUserViewSet(UpdateAPIView):
     """控制角色中用户具体为哪些的视图"""
-    queryset = GroupExtension.objects.filter(delete_flag=False)
+    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
     serializer_class = GroupUserUpdateSerializer
 
 

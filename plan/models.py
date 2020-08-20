@@ -34,7 +34,7 @@ class ProductClassesPlan(AbstractEntity):
     plan_trains = models.PositiveIntegerField(verbose_name='车次', help_text='车次')
     time = models.DecimalField(help_text='时间（分钟）', blank=True, null=True, decimal_places=2, max_digits=8)
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
-                                 decimal_places=2, max_digits=8, blank=True, null=True)
+                                 decimal_places=3, max_digits=8, blank=True, null=True)
     unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
@@ -131,39 +131,3 @@ class MaterialRequisitionClasses(AbstractEntity):
     class Meta:
         db_table = 'material_requisition_classes'
         verbose_name_plural = verbose_name = '领料日班次计划'
-
-
-'''
-class MaterialRequisition(AbstractEntity):
-    """领料日计划表"""
-    material_demanded = models.ForeignKey(MaterialDemanded, on_delete=models.DO_NOTHING, help_text='计划原材料需求量id',
-                                          verbose_name='计划原材料需求量id',
-                                          related_name='md_material_requisition')
-    count = models.PositiveIntegerField(verbose_name='总计', help_text='总计')
-    plan_schedule = models.ForeignKey(PlanSchedule, on_delete=models.DO_NOTHING, help_text='排班计划id',
-                                      verbose_name='排班计划id',
-                                      related_name='ps_material_requisition')
-    unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
-
-    class Meta:
-        db_table = 'material_requisition'
-        verbose_name_plural = verbose_name = '领料日计划'
-'''
-
-'''
-class MaterialStorage(AbstractEntity):
-    """物料库存表"""
-    material = models.ForeignKey(Material, on_delete=models.DO_NOTHING, help_text='物料id',
-                                 verbose_name='物料id',
-                                 related_name='m_material_storage')
-    qty = models.PositiveIntegerField(help_text='库存数量', verbose_name='库存数量')
-    qty_unit = models.CharField(max_length=8, help_text='数量单位', verbose_name='数量单位')
-    weight = models.DecimalField(verbose_name='库存重量', help_text='库存重量',
-                                 decimal_places=2, max_digits=8, blank=True, null=True)
-
-    weight_unit = models.CharField(max_length=8, help_text='重量单位', verbose_name='重量单位')
-
-    class Meta:
-        db_table = 'material_storage'
-        verbose_name_plural = verbose_name = '物料库存表'
-'''

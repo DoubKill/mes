@@ -78,7 +78,7 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除工作日程
     """
-    queryset = WorkSchedule.objects.filter(delete_flag=False)
+    queryset = WorkSchedule.objects.filter(delete_flag=False).prefetch_related('classesdetail_set__classes')
     serializer_class = WorkScheduleSerializer
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
@@ -105,7 +105,7 @@ class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除设备种类
     """
-    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False)
+    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False).select_related('equip_type', 'process')
     serializer_class = EquipCategoryAttributeSerializer
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
@@ -126,7 +126,8 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除设备
     """
-    queryset = Equip.objects.filter(delete_flag=False)
+    queryset = Equip.objects.filter(delete_flag=False).select_related('category__equip_type',
+                                                                      'category__process', 'equip_level')
     serializer_class = EquipSerializer
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
@@ -180,7 +181,7 @@ class ClassesDetailViewSet(mixins.ListModelMixin,
     list:
         班次条目列表
     """
-    queryset = ClassesDetail.objects.filter(delete_flag=False)
+    queryset = ClassesDetail.objects.filter(delete_flag=False).select_related('classes')
     serializer_class = ClassesSimpleSerializer
     model_name = queryset.model.__name__.lower()
     pagination_class = None
@@ -199,7 +200,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除计划时间
     """
-    queryset = PlanSchedule.objects.filter()
+    queryset = PlanSchedule.objects.filter(delete_flag=False).prefetch_related('work_schedule_plan')
     serializer_class = PlanScheduleSerializer
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticatedOrReadOnly,
