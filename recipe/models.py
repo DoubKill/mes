@@ -56,6 +56,27 @@ class ProductInfo(AbstractEntity):
         verbose_name_plural = verbose_name = '胶料代码'
 
 
+class ProductRecipe(AbstractEntity):
+    """胶料段次配方标准"""
+    product_recipe_no = models.CharField(max_length=64, help_text='胶料标准编号', verbose_name='胶料标准编号')
+    sn = models.PositiveIntegerField(verbose_name='序号', help_text='序号')
+    product_info = models.ForeignKey(ProductInfo, verbose_name='胶料工艺', help_text='胶料工艺',
+                                     on_delete=models.DO_NOTHING)
+    material = models.ForeignKey(Material, verbose_name='原材料', help_text='原材料',
+                                 on_delete=models.DO_NOTHING, blank=True, null=True)
+    stage = models.ForeignKey(GlobalCode, help_text='段次', verbose_name='段次',
+                              on_delete=models.DO_NOTHING)
+    ratio = models.DecimalField(verbose_name='配比', help_text='配比',
+                                decimal_places=2, max_digits=8, blank=True, null=True)
+
+    def __str__(self):
+        return self.product_recipe_no
+
+    class Meta:
+        db_table = 'product_recipe'
+        verbose_name_plural = verbose_name = '胶料段次配方标准'
+
+
 class ProductBatching(AbstractEntity):
     """胶料配料标准"""
     USE_TYPE_CHOICE = (
@@ -103,7 +124,8 @@ class ProductBatchingDetail(AbstractEntity):
     sn = models.PositiveIntegerField(verbose_name='序号', help_text='序号')
     material = models.ForeignKey(Material, verbose_name='原材料', help_text='原材料', on_delete=models.DO_NOTHING)
     actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=3, max_digits=8)
-    error_range = models.DecimalField(help_text='误差值范围', decimal_places=3, max_digits=8, default=0)
+    standard_error = models.DecimalField(help_text='误差值范围', decimal_places=3, max_digits=8, default=0)
+    auto_flag = models.BooleanField(help_text='手动与否', default=True)
 
     class Meta:
         db_table = 'product_batching_detail'
