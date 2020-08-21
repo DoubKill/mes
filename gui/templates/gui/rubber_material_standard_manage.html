@@ -122,7 +122,7 @@
                     <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 2 | scope.row.used_type === 3">
                         驳回
                     </el-button>
-                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 4">
+                    <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 4">
                         废弃
                     </el-button>
                 </el-button-group>
