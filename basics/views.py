@@ -207,12 +207,3 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
                           PermissionClass(permission_required=return_permission_params(model_name)))
     filter_fields = ('day_time', )
     filter_backends = (DjangoFilterBackend,)
-
-    @atomic()
-    def create(self, request, *args, **kwargs):
-        body = request.data
-        for plan in body:
-            serializer = self.get_serializer(data=plan)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-        return Response({"message": "create success"}, status=status.HTTP_201_CREATED)

@@ -144,11 +144,12 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
     @atomic()
     def update(self, instance, validated_data):
         classesdetail_set = validated_data.pop('classesdetail_set', None)
-        if len(classesdetail_set) != 3:
-            raise serializers.ValidationError("请输入正确的班次条目集合")
         for plan in classesdetail_set:
-            plan_id = plan.pop('id')
-            ClassesDetail.objects.filter(id=plan_id).update(**plan)
+            plan_id = plan.pop('id', None)
+            if plan_id:  # 有id的数据代表更新
+                ClassesDetail.objects.filter(id=plan_id).update(**plan)
+            else:  # 否则新建
+                ClassesDetail.objects.create(**plan)
         instance = super().update(instance, validated_data)
         return instance
 
@@ -205,6 +206,7 @@ class SysbaseEquipLevelSerializer(BaseModelSerializer):
 
 class WorkSchedulePlanSerializer(BaseModelSerializer):
     """工作日程计划序列化器"""
+    classes_detail_name = serializers.CharField(source='classes_detail.classes.global_name', read_only=True)
 
     class Meta:
         model = WorkSchedulePlan

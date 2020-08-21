@@ -1,6 +1,6 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
-from plan.views import ProductDayPlanViewSet, MaterialDemandedViewSet, ProductBatchingDayPlanViewSet, \
+from plan.views import ProductDayPlanViewSet, ProductBatchingDayPlanViewSet, \
     ProductDayPlanCopyView, ProductBatchingDayPlanCopyView, MaterialRequisitionClassesViewSet, MaterialDemandedAPIView, \
     ProductBatchingDayPlanManyCreate, ProductDayPlanManyCreate
 
@@ -16,7 +16,6 @@ router.register(r'material-requisition-classes', MaterialRequisitionClassesViewS
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('material-demandeds/', MaterialDemandedViewSet.as_view()),  # 也是原材料需求量展示 暂时不用先放着
     path('product-day-plans-copy/', ProductDayPlanCopyView.as_view()),  # 胶料日计划复制
     path('product-batching-day-plans-copy/', ProductBatchingDayPlanCopyView.as_view()),  # 小料日计划复制
     path('material-demanded-apiview/', MaterialDemandedAPIView.as_view()),  # 原材料需求量展示

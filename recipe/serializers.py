@@ -27,11 +27,7 @@ class MaterialSerializer(BaseModelSerializer):
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
-    update_user_name = serializers.SerializerMethodField(read_only=True)
-
-    @staticmethod
-    def get_update_user_name(obj):
-        return obj.last_updated_user.username if obj.last_updated_user else None
+    update_user_name = serializers.CharField(source='last_updated_user.username', default=None, read_only=True)
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user

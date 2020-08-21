@@ -3,8 +3,6 @@ from system.models import AbstractEntity
 from basics.models import Equip, PlanSchedule, ClassesDetail
 from recipe.models import ProductBatching, Material
 import uuid
-from plan.uuidfield import UUidTools
-import time
 
 
 # Create your models here.
