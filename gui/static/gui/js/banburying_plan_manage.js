@@ -5,64 +5,23 @@
         data: function () {
 
             return {
-                tableData: [{
-                        "equip_no":"1#HWN-1",
-                        "sn":1,
-                        "product_no":"product_no_1",
-                        "stage":"stage_1",
-                        "actual_time":"70",
-                        "plan_weight":"190",
-                        "plan_trains":"200",
-                        "actual_trains":"190",
-                        "actual_weight":"200",
-                        "ach_rate":100,
-                        "plan_time":"80",
-                        "start_rate":60
-                    },
-                    {
-                        "equip_no":"1#HWN-2",
-                        "sn":2,
-                        "product_no":"product_no_2",
-                        "stage":"stage_2",
-                        "actual_time":"60",
-                        "plan_weight":"200",
-                        "plan_trains":"210",
-                        "actual_trains":"200",
-                        "actual_weight":"210",
-                        "ach_rate":60,
-                        "plan_time":"60",
-                        "start_rate":60
-                    },
-                    {
-                        "equip_no":"2#HWN-1",
-                        "sn":1,
-                        "product_no":"product_no_3",
-                        "stage":"stage_1",
-                        "actual_time":"60",
-                        "plan_weight":"300",
-                        "plan_trains":"310",
-                        "actual_trains":"300",
-                        "actual_weight":"310",
-                        "ach_rate":19,
-                        "plan_time":"90",
-                        "start_rate":60
-                    }],
+                tableData: [],
                 search_time:null,
                 equip_no:null,
             }
         },
 
-        // created: function () {
-        //
-        //     var app = this;
-        //     axios.get(BanburyPlanUrl, {
-        //     }).then(function (response) {
-        //         app.tableData = response.data.data;
-        //     }).catch(function (error) {
-        //     });
-        //
-        //
-        // },
+        created: function () {
+
+            var app = this;
+            axios.get(BanburyPlanUrl, {
+            }).then(function (response) {
+                app.tableData = response.data.data;
+            }).catch(function (error) {
+            });
+
+
+        },
 
 
         methods: {
