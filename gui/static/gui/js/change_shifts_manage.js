@@ -17,7 +17,15 @@
                     schedule_no: "",
                     schedule_name: "",
                     description: "",
-                    classesdetail_set: []
+                    period: 0,
+                    classesdetail_set: [{
+                        times: [new Date(),
+                            new Date()],
+                        description: "",
+                        classes_name: "",
+                        classes: null
+                    }
+                    ]
                 },
                 changeShiftsManageFormError: {
 
@@ -26,7 +34,6 @@
                     description: "",
                 },
                 classes: [],
-                EditTimeSet: {}
             }
         },
         created: function () {
@@ -53,15 +60,15 @@
                     schedule_no: "",
                     schedule_name: "",
                     description: "",
-                    classesdetail_set: [
-
-                    ]
+                    period: 0,
+                    classesdetail_set: []
                 };
                 for (var i = 0; i < this.classes.length; ++i) {
 
                     this.changeShiftsManageForm.classesdetail_set.push({
 
-                        times: [],
+                        times: [new Date(),
+                            new Date()],
                         description: "",
                         classes_name: this.classes[i].global_name,
                         classes: this.classes[i].id
@@ -86,15 +93,20 @@
                 this.initChangeShiftsManageForm();
                 this.dialogCreateChangeShiftsManageVisible = true;
             },
+            format(date) {
+
+                return dayjs(date).format("HH:mm:ss")
+            },
             adjustTimes() {
 
                 for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
-                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
-                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
+                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[0]);
+                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[1]);
                 }
             },
             handleCreateChangeShifts() {
+
                 this.clearChangeShiftsManageFormError();
                 this.adjustTimes();
                 var app = this;
@@ -106,6 +118,7 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
+                    app.$message.error(JSON.stringify(error.response.data));
                     for (var key in app.changeShiftsManageFormError) {
                         if (error.response.data[key])
                             app.changeShiftsManageFormError[key] = error.response.data[key].join(",")
@@ -114,26 +127,26 @@
             },
             showEditChangeShiftsManageDialog(workSchedule) {
 
+                this.clearChangeShiftsManageFormError();
                 this.changeShiftsManageForm = Object.assign({}, workSchedule);
-                for (var i = 0; i < workSchedule.classesdetail_set.length; ++i) {
+                for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
-                    this.changeShiftsManageForm.classesdetail_set[i].times = [
-                        new Date("2020/01/01 " + workSchedule.classesdetail_set[i].start_time),
-                        new Date("2020/01/01 " + workSchedule.classesdetail_set[i].end_time)];
+                    Vue.set(this.changeShiftsManageForm.classesdetail_set[i], "times", [
+
+                            this.changeShiftsManageForm.classesdetail_set[i].start_time,
+                            this.changeShiftsManageForm.classesdetail_set[i].end_time]);
                 }
                 this.dialogEditChangeShiftsManageVisible = true;
-                console.log(this.changeShiftsManageForm)
             },
             handleEditChangeShifts() {
 
                 this.clearChangeShiftsManageFormError();
-                // this.adjustTimes();
                 var app = this;
                 for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
-                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0].substring(11);
-                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1].substring(11);
-                };
+                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
+                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
+                }
                 axios.put(WorkSchedulesUrl + this.changeShiftsManageForm.id + "/", this.changeShiftsManageForm)
                     .then(function (response) {
 

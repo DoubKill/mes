@@ -10,6 +10,7 @@
                 equip_no: null,
                 product_no: null,
                 st: null,
+                currentPalletFeedbacks: null
             }
         },
         methods: {
@@ -27,8 +28,9 @@
             afterGetData: function () {
 
             },
-            check_() {
+            check_(row) {
 
+                this.currentPalletFeedbacks = row;
                 this.dialogRubberBarCodeInfoVisible = true
             }
         }
