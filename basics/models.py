@@ -40,6 +40,7 @@ class WorkSchedule(AbstractEntity):
     """倒班管理"""
     schedule_no = models.CharField(max_length=64, help_text='倒班编号', verbose_name='倒班编号', unique=True)
     schedule_name = models.CharField(max_length=64, help_text='倒班名称', verbose_name='倒班名称')
+    period = models.PositiveIntegerField(help_text='周期天数', verbose_name='周期天数', default=0)
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
 
