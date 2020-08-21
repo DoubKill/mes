@@ -154,16 +154,17 @@
                         _this.tableDataTotal = response.data.count;
                     }
                 }).catch(function (error) {
-                    if (Object.prototype.toString.call(error.response.data) === '[object Object]') {
-                        let arr = error.response.data
-                        let str = ''
-                        arr.forEach(element => {
-                            str += element + ';'
-                        });
-                        _this.$message.error(str)
-                    } else {
+                    console.log(error,'getlist')
+                    // if (Object.prototype.toString.call(error.response.data) === '[object Object]') {
+                    //     let arr = error.response.data
+                    //     let str = ''
+                    //     arr.forEach(element => {
+                    //         str += element + ';'
+                    //     });
+                    //     _this.$message.error(str)
+                    // } else {
                         _this.$message.error('操作失败')
-                    }
+                    // }
                 });
             },
             getGlueList() {
