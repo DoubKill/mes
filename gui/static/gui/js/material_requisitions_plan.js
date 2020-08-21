@@ -57,7 +57,6 @@
             }).catch(function (error) {
 
             });
-            this.currentChange(1)
             console.log(this.tableData, "this.tableData")
         },
         methods: {
@@ -82,8 +81,8 @@
                     if (app.tableDataTotal !== response.data.count) {
                         app.tableDataTotal = response.data.count;
                     }
-                    console.log(response.results, "response.results")
-                    app.tableData = response.results;
+                    console.log(response.data.results, "response.results")
+                    app.tableData = response.data.results;
                     console.log(app.tableData, "app.tableData")
                     app.afterGetData();
 
