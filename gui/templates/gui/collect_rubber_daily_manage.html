@@ -3,20 +3,6 @@
 
 {% block main %}
 
-    <!--
-    <el-row type="flex" justify="end" style="margin-bottom: 20px">
-        <el-col>
-            <div style="float: right">
-                <el-button @click="check_">查询</el-button>
-                <el-button>修改</el-button>
-                <el-button>打印</el-button>
-                <el-button>Excel</el-button>
-                <el-button>关闭</el-button>
-            </div>
-        </el-col>
-    </el-row>
-    -->
-
     <el-form :inline="true">
         <el-form-item label="日期">
             <el-date-picker
@@ -56,6 +42,11 @@
                 width="200"
                 prop="barcode"
                 label="收皮条码">
+            {% verbatim vue %}
+            <template slot-scope="scope">
+                <el-link @click.prevent="check_(scope.row)" type="primary">{{ scope.row.barcode }}</el-link>
+            </template>
+            {% endverbatim vue %}
         </el-table-column>
         <el-table-column
                 prop="stage"
@@ -102,10 +93,8 @@
 {% endblock %}
 
 {% block dialogs %}
-
-    <el-dialog
-            :visible.sync="dialogRubberBarCodeInfoVisible">
-
+{% verbatim vue %}
+    <el-dialog :visible.sync="dialogRubberBarCodeInfoVisible">
         <div class="border">
             <el-row>
                 <el-col class="center" :span="24">胶料条码信息查询</el-col>
@@ -113,15 +102,15 @@
             <div style="height: 20px"></div>
             <el-row>
                 <el-col :span="12">
-                    胶料段：<span class="border">1MB</span>
+                    胶料段：<span class="border">{{ currentPalletFeedbacks ? currentPalletFeedbacks.stage : "" }}</span>
                 </el-col>
                 <el-col :span="12">
-                    胶料规格：<span class="border">J147-03</span>
+                    胶料规格：<span class="border">{{ currentPalletFeedbacks ? currentPalletFeedbacks.product_no : "" }}</span>
                 </el-col>
             </el-row>
             <el-row>
                 <el-col :span="24">
-                    条码：<span class="border">H1212121212121</span>
+                    条码：<span class="border">{{ currentPalletFeedbacks ? currentPalletFeedbacks.barcode : "" }} </span>
                 </el-col>
             </el-row>
             <el-row>
@@ -131,26 +120,26 @@
             </el-row>
             <el-row>
                 <el-col :span="12">
-                    生产机号：<span class="border">B01</span>
+                    生产机号：<span class="border">{{ currentPalletFeedbacks ?  currentPalletFeedbacks.equip_no : ""}}</span>
                 </el-col>
                 <el-col :span="12">
-                    生产班次：<span class="border">早班</span>
-                </el-col>
-            </el-row>
-            <el-row>
-                <el-col :span="12">
-                    生产日期：<span class="border">2014-01-01</span>
-                </el-col>
-                <el-col :span="12">
-                    生产车次：<span class="border">12</span>
+                    生产班次：<span class="border">{{ currentPalletFeedbacks ? currentPalletFeedbacks.classes : "" }}</span>
                 </el-col>
             </el-row>
             <el-row>
                 <el-col :span="12">
-                    标准重量：
+                    生产日期：<span class="border">{{ currentPalletFeedbacks ? currentPalletFeedbacks.end_time : ""}}</span>
                 </el-col>
                 <el-col :span="12">
-                    实际重量：
+                    生产车次：<span class="border"></span>
+                </el-col>
+            </el-row>
+            <el-row>
+                <el-col :span="12">
+                    标准重量：{{ currentPalletFeedbacks ? currentPalletFeedbacks.plan_weight : "" }}
+                </el-col>
+                <el-col :span="12">
+                    实际重量：{{  currentPalletFeedbacks ? currentPalletFeedbacks.actual_weight : "" }}
                 </el-col>
             </el-row>
             <el-row>
@@ -160,7 +149,7 @@
                 <el-col :span="24">有效时间：</el-col>
             </el-row>
             <el-row>
-                <el-col :span="24">收皮人员：</el-col>
+                <el-col :span="24">收皮人员：{{ currentPalletFeedbacks ? currentPalletFeedbacks.operation_user : ""}}</el-col>
             </el-row>
         </div>
         <div style="height: 40px"></div>
@@ -185,7 +174,6 @@
             </el-row>
             <el-row>
                 <el-col :span="12">检测结果：<span class="border">
-                    一等品
                 </span>
                 </el-col>
                 <el-col :span="12">备注：</el-col>
@@ -216,6 +204,7 @@
             </el-table-column>
         </el-table>
     </el-dialog>
+{% endverbatim vue %}
 {% endblock %}
 
 {% block styles %}
