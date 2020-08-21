@@ -90,22 +90,22 @@
                 align="center"
                 label="领料计划（Kg）">
             <el-table-column
-                prop="md_material_requisition_classes[0].早班"
+{#                prop="md_material_requisition_classes[0].早班"#}
                 label="早班">
             </el-table-column>
             <el-table-column
-                prop="md_material_requisition_classes[1].中班"
+{#                prop="md_material_requisition_classes[1].中班"#}
                 label="中班">
             </el-table-column>
             <el-table-column
-                prop="md_material_requisition_classes[2].晚班"
+{#                prop="md_material_requisition_classes[2].晚班"#}
                 label="晚班">
             </el-table-column>
             <el-table-column
                 label="总计">
-                <template slot-scope="scope" v-if="scope.row.md_material_requisition_classes[0]">
-                    <span v-text="scope.row.md_material_requisition_classes[0].早班 + scope.row.md_material_requisition_classes[1].中班 + scope.row.md_material_requisition_classes[2].晚班"></span>
-                </template>
+{#                <template slot-scope="scope" v-if="scope.row.md_material_requisition_classes[0]">#}
+{#                    <span v-text="scope.row.md_material_requisition_classes[0].早班 + scope.row.md_material_requisition_classes[1].中班 + scope.row.md_material_requisition_classes[2].晚班"></span>#}
+{#                </template>#}
             </el-table-column>
         </el-table-column>
         <el-table-column label="操作">

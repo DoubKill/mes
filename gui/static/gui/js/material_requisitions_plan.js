@@ -49,7 +49,7 @@
             axios.get(PlanScheduleUrl, {
 
                 params: {
-                    page_size: 'all'
+                    all: 1
                 }
             }).then(function (response) {
 
@@ -57,6 +57,7 @@
             }).catch(function (error) {
 
             });
+            this.currentChange(1)
         },
         methods: {
 
