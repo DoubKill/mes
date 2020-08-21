@@ -462,7 +462,7 @@
                 var app = this;
                 var batching_details_list = [];
 
-                for (var i = 0; i < this.NewRowMaterial.length -1; ++i) {
+                for (var i = 0; i < this.NewRowMaterial.length; ++i) {
                     if(app.NewRowMaterial[i].material_name && app.NewRowMaterial[i].practical_weight){
                         // post_ele_material = app.NewRowMaterial[i].material_name;
                         //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
