@@ -203,11 +203,12 @@
                             _this.copyDialogVisible = false
                             _this.loadingBtnCopy = false
 
-                            this.getParams['page'] = 1
-                            this.getList()
+                            _this.getParams['page'] = 1
+                            _this.getList()
                             _this.$message.success('操作成功')
                         }).catch(function (error) {
                             _this.loadingBtnCopy = false
+                            // console.log(error.response.data,88888)
                             if (Object.prototype.toString.call(error.response.data) === '[object Object]') {
                                 for (var key in error.response.data) {
                                     if (error.response.data[key]) {
