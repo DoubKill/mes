@@ -6,8 +6,8 @@
 
             return {
                 currentPage:1,
-                pageSize:null,
-                tableDataTotal:null,
+                raw_material_pageSize: 10,
+                raw_material_tableDataTotal: 0,
                 currentRow: {
                     used_type: -1
                 },
@@ -201,7 +201,7 @@
                 }).then(function (response) {
                     app.RawMaterialOptions = response.data.results;
                     app.tableRawMaterialData = response.data.results;
-                    app.tableDataTotal = response.data.count;
+                    app.raw_material_tableDataTotal = response.data.count;
                 }).catch(function (error) {
                 });
             },
@@ -216,14 +216,44 @@
                     case 1:
                         return "编辑";
                     case 2:
-                        return "通过";
+                        return "提交";
                     case 3:
-                        return "应用";
+                        return "校对";
                     case 4:
-                        return "驳回";
+                        return "启用";
                     case 5:
+                        return "驳回";
+                    case 6:
                         return "废弃";
                 }
+            },
+            status_true: function(row) {
+                var app = this;
+                axios.patch(RubberMaterialUrl + row.id + "/", {
+                    pass_flag:true
+                }).then(function (response) {
+                    app.$message("状态切换成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+            },
+            status_false: function(row) {
+                var app = this;
+                axios.patch(RubberMaterialUrl + row.id + "/", {
+                    pass_flag:false
+                }).then(function (response) {
+                    app.$message("状态切换成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
             },
 
             formatter: function (row, column) {

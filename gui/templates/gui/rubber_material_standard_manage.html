@@ -110,22 +110,19 @@
         <el-table-column label="操作">
             <template slot-scope="scope">
                 <el-button-group>
-                    <el-button @click="pass(scope.row)" size="mini" v-if="scope.row.used_type === 1">
-                        编辑
-                    </el-button>
-                    <el-button @click="reject(scope.row)" size="mini" v-if="scope.row.used_type === 2">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 1">
                         提交
                     </el-button>
-                    <el-button @click="apply(scope.row)" size="mini" v-if="scope.row.used_type === 3">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 2">
                         校对
                     </el-button>
-                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 4">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 3">
                         启用
                     </el-button>
-                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 5">
+                    <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 2 | scope.row.used_type === 3">
                         驳回
                     </el-button>
-                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 6">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 4">
                         废弃
                     </el-button>
                 </el-button-group>
@@ -450,8 +447,8 @@
     <el-pagination
         @current-change="raw_material_handleCurrentChange"
         :current-page.sync="currentPage"
-        :page-size="pageSize"
-        :total="tableDataTotal"
+        :page-size="raw_material_pageSize"
+        :total="raw_material_tableDataTotal"
         layout="total, prev, pager, next">
     </el-pagination>
 
