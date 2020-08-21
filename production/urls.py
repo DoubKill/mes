@@ -31,10 +31,10 @@ router.register(r'quality-control', QualityControlViewSet)
 # 密炼LOT生产履历
 router.register(r'production-record', ProductionRecordViewSet)
 
-# 密炼实绩
+# 密炼机台别计划对比
 router.register(r'plan-reality', PlanRealityViewSet, basename="plan-reality")
 
-# 密炼机台别计划对比
+# 密炼实绩
 router.register(r'product-actual', ProductActualViewSet, basename="product-actual")
 
 urlpatterns = [

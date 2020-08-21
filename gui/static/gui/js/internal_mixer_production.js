@@ -39,7 +39,8 @@
                         trigger: 'axis'
                     },
                     legend: {
-                        selectedMode: 'single',//单选
+                        data: ['温度', '功率', '能量', '压力', '转速']
+                        // selectedMode: 'single',//单选
                     },
                     grid: {
                         left: '5%',
@@ -52,8 +53,9 @@
                             dataZoom: {
                                 yAxisIndex: 'none'
                             },
-                            restore: {},
-                            saveAsImage: {}
+                            // magicType: {show: true, type: ['line', 'bar']},
+                            restore: {show: true},
+                            saveAsImage: {show: true}
                         }
                     },
                     xAxis: {
@@ -67,49 +69,30 @@
                         boundaryGap: false,
                         data: []
                     },
-                    yAxis: [{
-                        position: 'left',
-                        type: 'value',
-                        axisLabel: {
-                            formatter: '{value} ℃'
-                        }
-                    },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} W'
-                            }
-                        },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} J'
-                            }
-                        },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} Pa'
-                            }
-                        },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} rps'
-                            }
-                        },
-                    ],
+                    yAxis: {type: 'value'}
+                    //     [
+                    //     {
+                    //         type: 'value',
+                    //         name: '',
+                    //         axisLabel: {
+                    //             formatter: '{value}'
+                    //         }
+                    //     },
+                    //     {
+                    //         type: 'value',
+                    //         name: '',
+                    //         axisLabel: {
+                    //             formatter: '{value}'
+                    //         }
+                    //     }
+                    // ]
+                    ,
                     series: [
                         {
                             name: '温度',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '0',
                             data: []
                         },
                         {
@@ -117,7 +100,6 @@
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '1',
                             data: []
                         },
                         {
@@ -125,7 +107,6 @@
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '2',
                             data: []
                         },
                         {
@@ -133,7 +114,6 @@
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '3',
                             data: []
                         },
                         {
@@ -141,7 +121,7 @@
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '4',
+                            // yAxisIndex: 1,
                             data: []
                         }
                     ]
@@ -156,9 +136,9 @@
             this.getClassesList()   //获取班次列表
 
             var _setDateCurrent = setDate()
-            this.getParams.st = _setDateCurrent + " 00:00:00"
+            // this.getParams.st = _setDateCurrent + " 00:00:00"
             this.getParams.et = _setDateCurrent + ' 23:59:59'
-            // this.getParams.st = '2020-06-01' + " 00:00:00"
+            this.getParams.st = '2020-06-01' + " 00:00:00"
             // this.getParams.et = '2020-06-01' + ' 23:59:59'
             this.search_date = [this.getParams.st, this.getParams.et]
         },

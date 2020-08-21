@@ -46,7 +46,7 @@
                 <el-option
                         v-for="item in classesList"
                         :key="item.id"
-                        :label="item.classes_name"
+                        :label="item.work_schedule_name+'-'+item.classes_name"
                         :value="item.id">
                 </el-option>
             </el-select>
