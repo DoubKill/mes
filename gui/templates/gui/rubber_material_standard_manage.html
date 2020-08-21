@@ -189,21 +189,6 @@
                 ></el-autocomplete>
             </el-form-item>
 
-{#            <el-form-item label="胶料编码" prop="rubber_no">#}
-{#                <el-select#}
-{#                        @change="GenerateRubberMaterialNOChanged"#}
-{#                        size="mini"#}
-{#                        v-model="rubberMaterialForm.rubber_no" placeholder="请选择">#}
-{#                    <el-option#}
-{#                            v-for="item in ProductBatchNoOptions"#}
-{#                            :key="item.id"#}
-{#                            :value="item.id"#}
-{#                            :label="item.product_name">#}
-{#                    </el-option>#}
-{#                </el-select>#}
-{#            </el-form-item>#}
-
-
             <el-form-item label="段次" prop="stage">
                 <el-select
                         @change="GenerateRubberMaterialNOChanged"
@@ -220,7 +205,7 @@
             <el-form-item label="版本" prop="version">
                 <el-input style="width: 31%" size="mini" v-model="rubberMaterialForm.version" placeholder="版本" v-on:input="GenerateRubberMaterialNOChanged"></el-input>
             </el-form-item>
-            <el-form-item label="方案" prop="scheme">
+            <el-form-item label="方案">
             <el-input style="width: 31%" size="mini" v-model="rubberMaterialForm.scheme" placeholder="方案"></el-input>
             </el-form-item>
             <el-form-item label="胶料配方编码">
@@ -278,25 +263,16 @@
                 </tr>
                 <tr v-for="(new_material_ele, index) in NewRowMaterial" :key="index">
                     <!--<td>{{ new_material_ele.sn_ele }}</td>-->
+                    <td v-show='false'>{{ new_material_ele.material }}</td>
                     <td>{{ index + 1 }}
                     <td>{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
-                        <el-form>
-                        <el-form-item label="">
-                            <el-select
-                                    @change="NewMaterialChange(new_material_ele)"
-                                    size="mini"
-                                    clearable
-                                    v-model="new_material_ele.material_name" placeholder="请选择">
-                                <el-option
-                                        v-for="item in RawMaterialOptions"
-                                        :key="item.id"
-                                        :label="item.material_name"
-                                        :value="item.id">
-                                </el-option>
-                            </el-select>
-                        </el-form-item>
-                        </el-form>
+                        <div style="margin-top: 15px;">
+                          <el-input v-model="new_material_ele.material_name"  class="input-with-select" :disabled="true">
+                            <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
+                          </el-input>
+                        </div>
+
                     </td>
                     <td style="text-align: center">
                         <el-input-number size="mini" controls-position="right" @change="NewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.practical_weight"></el-input-number>
@@ -308,7 +284,7 @@
         </table>
         <el-form>
             <el-form-item style="text-align: center">
-                <el-button  @click="NewPracticalWeightChanged">插入一行</el-button>
+                <el-button  @click="insert_NewPracticalWeightChanged">插入一行</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
@@ -369,9 +345,17 @@
                 </tr>
                 <tr v-for="(new_material_ele, index) in PutProductRecipe" :key="index">
                     <!--<td>{{ new_material_ele.sn }}</td>-->
+                    <td v-show='false'>{{ new_material_ele.material }}</td>
                     <td>{{ index + 1 }}</td>
                     <td>{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
+                        <div style="margin-top: 15px;">
+                          <el-input v-model="new_material_ele.material_name"  class="input-with-select" :disabled="true">
+                            <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
+                          </el-input>
+                        </div>
+
+                        <!--
                         <el-form>
                         <el-form-item label="">
                             <el-select
@@ -388,6 +372,7 @@
                             </el-select>
                         </el-form-item>
                         </el-form>
+                        -->
                     </td>
                     <td style="text-align: center">
                         <el-input-number size="mini" controls-position="right" @change="PutNewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.actual_weight"></el-input-number>
@@ -402,10 +387,81 @@
         </table>
         <el-form>
             <el-form-item style="text-align: center">
-                <el-button  @click="PutNewPracticalWeightChanged">插入一行</el-button>
+                <el-button  @click="insert_PutNewPracticalWeightChanged">插入一行</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
+
+
+
+    <el-dialog
+            :close-on-click-modal="false"
+            :close-on-press-escape="false"
+            width="70%" title="原材料选择" :visible.sync="dialogRawMaterialSync">
+
+        <el-form :inline="true">
+            <el-form-item label="原材料类型">
+                <el-select
+                        clearable
+                        v-model="pop_up_raw_material_type" placeholder="请选择">
+                    <el-option
+                            v-for="item in DevTypeOptions"
+                            :key="item.id"
+                            :label="item.global_name"
+                            :value="item.id">
+                    </el-option>
+                </el-select>
+            </el-form-item>
+            原材料编号:<el-input  v-model="pop_up_raw_material_no" style="width: 20%" ></el-input>
+            原材料名称:<el-input  v-model="pop_up_raw_material_name" style="width: 20%" ></el-input>
+        </el-form>
+
+
+        <el-table
+            highlight-current-row
+            @current-change="raw_material_handleCurrentChange"
+            :data="tableRawMaterialData"
+            border
+            style="width: 100%">
+        <el-table-column
+                label="S"
+                width="30">
+        </el-table-column>
+        <el-table-column
+                prop="material_no"
+                label="原材料代码">
+        </el-table-column>
+        <el-table-column
+                prop="material_name"
+                label="原材料名称">
+        </el-table-column>
+        <el-table-column
+                prop="material_type_name"
+                label="原材料类别">
+        </el-table-column>
+        <el-table-column label="操作">
+            <template slot-scope="scope">
+                <el-button-group>
+                    <el-button
+                            size="mini"
+                            @click="handleMaterialSelect(scope.row)">选中
+                    </el-button>
+                </el-button-group>
+            </template>
+        </el-table-column>
+    </el-table>
+
+    <el-pagination
+        @current-change="raw_material_handleCurrentChange"
+        :current-page.sync="currentPage"
+        :page-size="pageSize"
+        :total="tableDataTotal"
+        layout="total, prev, pager, next">
+    </el-pagination>
+
+    </el-dialog>
+
+
 
 
 {% endblock %}

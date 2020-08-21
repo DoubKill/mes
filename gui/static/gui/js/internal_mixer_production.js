@@ -136,9 +136,9 @@
             this.getClassesList()   //获取班次列表
 
             var _setDateCurrent = setDate()
-            // this.getParams.st = _setDateCurrent + " 00:00:00"
+            this.getParams.st = _setDateCurrent + " 00:00:00"
             this.getParams.et = _setDateCurrent + ' 23:59:59'
-            this.getParams.st = '2020-06-01' + " 00:00:00"
+            // this.getParams.st = '2020-06-01' + " 00:00:00"
             // this.getParams.et = '2020-06-01' + ' 23:59:59'
             this.search_date = [this.getParams.st, this.getParams.et]
         },
@@ -154,7 +154,17 @@
                         _this.tableDataTotal = response.data.count;
                     }
                 }).catch(function (error) {
-                    this.$message.error('请求错误')
+                    console.log(error,'getlist')
+                    // if (Object.prototype.toString.call(error.response.data) === '[object Object]') {
+                    //     let arr = error.response.data
+                    //     let str = ''
+                    //     arr.forEach(element => {
+                    //         str += element + ';'
+                    //     });
+                    //     _this.$message.error(str)
+                    // } else {
+                        _this.$message.error('操作失败')
+                    // }
                 });
             },
             getGlueList() {
