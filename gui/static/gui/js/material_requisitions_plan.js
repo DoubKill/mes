@@ -58,6 +58,7 @@
 
             });
             this.currentChange(1)
+            console.log(this.tableData, "this.tableData")
         },
         methods: {
 
@@ -70,7 +71,9 @@
 
                 this.beforeGetData();
                 this.getParams["page"] = page;
+                console.log(this.tableData, '1111111111111')
                 this.tableData = [];
+                console.log(this.tableData, '2222222222222')
                 const app = this;
                 axios.get(this.tableDataUrl, {
 
@@ -79,8 +82,9 @@
                     if (app.tableDataTotal !== response.data.count) {
                         app.tableDataTotal = response.data.count;
                     }
+                    console.log(response.results, "response.results")
                     app.tableData = response.results;
-
+                    console.log(app.tableData, "app.tableData")
                     app.afterGetData();
 
                 }).catch(function (error) {
