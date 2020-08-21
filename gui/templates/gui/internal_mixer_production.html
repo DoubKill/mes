@@ -46,7 +46,7 @@
                 <el-option
                         v-for="item in classesList"
                         :key="item.id"
-                        :label="item.classes_name"
+                        :label="item.work_schedule_name+'-'+item.classes_name"
                         :value="item.id">
                 </el-option>
             </el-select>
@@ -281,8 +281,8 @@
                 width="600px"
                 :visible.sync="dialogVisibleGraph"
                 @opened="opens"
+                :before-close="handleCloseGraph"
         >
-            <div style="margin: 0 0 20px 5px;">2020-12-12</div>
             <div ref="main" style="width: 100%;height:400px;"></div>
         </el-dialog>
     {% endverbatim vue %}

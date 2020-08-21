@@ -33,7 +33,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除原材料
     """
-    queryset = Material.objects.filter(delete_flag=False).order_by('-created_date')
+    queryset = Material.objects.filter(delete_flag=False).select_related('material_type').order_by('-created_date')
     serializer_class = MaterialSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -148,7 +148,8 @@ class ProductBatchingViewSet(ModelViewSet):
     partial_update:
         配料审批
     """
-    queryset = ProductBatching.objects.filter(delete_flag=False).order_by('-created_date')
+    queryset = ProductBatching.objects.filter(delete_flag=False).select_related("factory", "site", "dev_type", "stage",
+                                                                                "product_info").order_by('-created_date')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
@@ -194,7 +195,8 @@ class ProcessStepsViewSet(ModelViewSet):
     partial_update:
         修改胶料配料步序
     """
-    queryset = ProductProcess.objects.filter(delete_flag=False).order_by('-created_date')
+    queryset = ProductProcess.objects.filter(delete_flag=False
+                                             ).select_related("equip", "product_batching").order_by('-created_date')
     filter_backends = (DjangoFilterBackend,)
     serializer_class = ProductProcessSerializer
 

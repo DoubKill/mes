@@ -6,14 +6,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
-from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
-from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductBatchingDayPlanFilter
-from plan.serializers import ProductDayPlanSerializer, MaterialDemandedSerializer, ProductBatchingDayPlanSerializer, \
+from plan.filters import ProductDayPlanFilter, ProductBatchingDayPlanFilter
+from plan.serializers import ProductDayPlanSerializer, ProductBatchingDayPlanSerializer, \
     ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer, MaterialRequisitionClassesSerializer
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
@@ -33,7 +33,9 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除胶料日计划
     """
-    queryset = ProductDayPlan.objects.filter(delete_flag=False)
+    queryset = ProductDayPlan.objects.filter(delete_flag=False).select_related(
+        'equip__category', 'plan_schedule', 'product_batching').prefetch_related(
+        'pdp_product_classes_plan__classes_detail', 'pdp_product_batching_day_plan')
     serializer_class = ProductDayPlanSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
@@ -53,19 +55,6 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
         instance.delete_user = request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialDemandedViewSet(ListAPIView):
-    """
-    list:
-        原材料需求量列表，暂时没用到 先留着
-    """
-    queryset = MaterialDemanded.objects.filter(delete_flag=False)
-    serializer_class = MaterialDemandedSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    filter_backends = (DjangoFilterBackend, OrderingFilter)
-    filter_class = MaterialDemandedFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -153,8 +142,6 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
     serializer_class = MaterialRequisitionClassesSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
-
-    # pagination_class = LimitOffsetPagination
 
     def perform_create(self, serializer):
         serializer.save(created_user=self.request.user, plan_classes_uid=UUidTools.uuid1_hex())
