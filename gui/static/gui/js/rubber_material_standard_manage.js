@@ -15,7 +15,19 @@
                 tableDataUrl: RubberMaterialUrl,
                 tableRawMaterialData: [],
                 RubberState: "",
-                RubberStateOptions: [],
+                RubberStateOptions: [{
+                      value: 1, label: '编辑'
+                    }, {
+                      value: 2, label: '提交'
+                    }, {
+                      value: 3, label: '校对'
+                    }, {
+                      value: 4, label: '启用'
+                    }, {
+                      value: 5, label: '驳回'
+                    }, {
+                      value: 6, label: '废弃'
+                    }],
                 RubberSite: "",
                 RubberSiteOptions: [],
                 RubberStage: "",
@@ -147,11 +159,11 @@
         created: function () {
 
             var app = this;
-            axios.get(StateGlobalUrl, {
-            }).then(function (response) {
-                app.RubberStateOptions = response.data.results;
-            }).catch(function (error) {
-            });
+            // axios.get(StateGlobalUrl, {
+            // }).then(function (response) {
+            //     app.RubberStateOptions = response.data.results;
+            // }).catch(function (error) {
+            // });
 
             axios.get(SiteGlobalUrl, {
             }).then(function (response) {
@@ -296,7 +308,7 @@
             },
             rubber_no_createFilter(queryString) {
                 return (search_rubber_no) => {
-                  return (search_rubber_no.product_name.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+                  return (search_rubber_no.product_no.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
                 };
             },
 

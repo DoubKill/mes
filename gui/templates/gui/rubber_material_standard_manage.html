@@ -14,9 +14,9 @@
                     v-model="RubberState" placeholder="请选择">
                 <el-option
                         v-for="item in RubberStateOptions"
-                        :key="item.id"
-                        :label="item.global_name"
-                        :value="item.id">
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -179,7 +179,7 @@
                 <el-autocomplete
                         style="width: 31%"
                         size="mini"
-                        value-key = "product_name"
+                        value-key = "product_no"
                         v-model="rubberMaterialForm.rubber_no"
                         :fetch-suggestions="rubber_no_querySearchAsync"
                         placeholder="请输入内容"
