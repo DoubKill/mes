@@ -200,10 +200,24 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除计划时间
     """
-    queryset = PlanSchedule.objects.filter(delete_flag=False).prefetch_related('work_schedule_plan')
+    queryset = PlanSchedule.objects.filter(delete_flag=False
+                                           ).prefetch_related('work_schedule_plan__classes_detail__classes')
     serializer_class = PlanScheduleSerializer
     model_name = queryset.model.__name__.lower()
-    permission_classes = (IsAuthenticatedOrReadOnly,
-                          PermissionClass(permission_required=return_permission_params(model_name)))
     filter_fields = ('day_time', )
     filter_backends = (DjangoFilterBackend,)
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(),
+                    PermissionClass(permission_required=return_permission_params(self.model_name))())
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'day_time', 'work_schedule')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
