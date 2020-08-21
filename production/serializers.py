@@ -48,7 +48,13 @@ class PalletFeedbacksSerializer(BaseModelSerializer):
     def get_stage(self, object):
         plan_classes_uid = object.plan_classes_uid if object.plan_classes_uid else 0
         productclassesplan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
-        stage = productclassesplan.product_day_plan.product_batching.stage.global_name
+        if productclassesplan:
+            try:
+                stage = productclassesplan.product_day_plan.product_batching.stage.global_name
+            except:
+                stage = None
+        else:
+            stage = None
         return stage if stage else ""
 
     class Meta:

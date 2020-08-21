@@ -1499,5 +1499,5 @@ if __name__ == '__main__':
     # print("plan is ok")
     add_material_day_classes_plan()
     print("material_day_classes_plan is ok")
-    add_product_demo_data()
+    # add_product_demo_data()
     print("product_demo_data is ok")

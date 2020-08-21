@@ -1,10 +1,4 @@
 ;(function () {
-    var echartsTime = []
-    var echartsTemprature = []
-    var echartsPower = []
-    var echartsEnergy = []
-    var echartsPressure = []
-    var echartsRpm = []
     var Main = {
         mixins: [BaseMixin],
         data: function () {
@@ -45,7 +39,8 @@
                         trigger: 'axis'
                     },
                     legend: {
-                        selectedMode: 'single',//单选
+                        data: ['温度', '功率', '能量', '压力', '转速']
+                        // selectedMode: 'single',//单选
                     },
                     grid: {
                         left: '5%',
@@ -58,8 +53,9 @@
                             dataZoom: {
                                 yAxisIndex: 'none'
                             },
-                            restore: {},
-                            saveAsImage: {}
+                            // magicType: {show: true, type: ['line', 'bar']},
+                            restore: {show: true},
+                            saveAsImage: {show: true}
                         }
                     },
                     xAxis: {
@@ -71,87 +67,66 @@
                         },
                         type: 'category',
                         boundaryGap: false,
-                        data: echartsTime
+                        data: []
                     },
-                    yAxis: [{
-                        position: 'left',
-                        type: 'value',
-                        axisLabel: {
-                            formatter: '{value} ℃'
-                        }
-                    },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} W'
-                            }
-                        },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} J'
-                            }
-                        },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} Pa'
-                            }
-                        },
-                        {
-                            position: 'left',
-                            type: 'value',
-                            axisLabel: {
-                                formatter: '{value} rps'
-                            }
-                        },
-                    ],
+                    yAxis: {type: 'value'}
+                    //     [
+                    //     {
+                    //         type: 'value',
+                    //         name: '',
+                    //         axisLabel: {
+                    //             formatter: '{value}'
+                    //         }
+                    //     },
+                    //     {
+                    //         type: 'value',
+                    //         name: '',
+                    //         axisLabel: {
+                    //             formatter: '{value}'
+                    //         }
+                    //     }
+                    // ]
+                    ,
                     series: [
                         {
                             name: '温度',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '0',
-                            data: echartsTemprature
+                            data: []
                         },
                         {
                             name: '功率',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '1',
-                            data: echartsPower
+                            data: []
                         },
                         {
                             name: '能量',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '2',
-                            data: echartsEnergy
+                            data: []
                         },
                         {
                             name: '压力',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '3',
-                            data: echartsPressure
+                            data: []
                         },
                         {
                             name: '转速',
                             type: 'line',
                             smooth: true,
                             stack: '总量',
-                            yAxisIndex: '4',
-                            data: echartsRpm
+                            // yAxisIndex: 1,
+                            data: []
                         }
                     ]
-                }
+                },
+                echartsList: []
             }
         },
         created() {
@@ -162,10 +137,9 @@
 
             var _setDateCurrent = setDate()
             // this.getParams.st = _setDateCurrent + " 00:00:00"
-            // this.getParams.et = _setDateCurrent + ' 23:59:59'
-            // this.search_date = [this.getParams.st, this.getParams.et]
+            this.getParams.et = _setDateCurrent + ' 23:59:59'
             this.getParams.st = '2020-06-01' + " 00:00:00"
-            this.getParams.et = '2020-06-01' + ' 23:59:59'
+            // this.getParams.et = '2020-06-01' + ' 23:59:59'
             this.search_date = [this.getParams.st, this.getParams.et]
         },
         methods: {
@@ -175,6 +149,7 @@
                     params: _this.getParams
                 }).then(function (response) {
                     _this.tableData = response.data.results || [];
+
                     if (_this.tableDataTotal !== response.data.count) {
                         _this.tableDataTotal = response.data.count;
                     }
@@ -280,19 +255,32 @@
                 }).then(function (response) {
                     var results = response.data.results
                     results.forEach(function (D) {
-                        var created_date = D.created_date.split(' ')[1]
-                        echartsTime.push(created_date)
-                        echartsTemprature.push(D.temperature)
-                        echartsPower.push(D.power)
-                        echartsEnergy.push(D.energy)
-                        echartsPressure.push(D.pressure)
-                        echartsRpm.push(D.rpm)
+                        if (D.hasOwnProperty('created_date')) {
+                            var created_dates = D.created_date.split(' ')[1]
+                            _this.option1.xAxis.data.push(created_dates)
+                        }
+                        _this.option1.series[0].data.push(D.temperature)
+                        _this.option1.series[1].data.push(D.power)
+                        _this.option1.series[2].data.push(D.energy)
+                        _this.option1.series[3].data.push(D.pressure)
+                        _this.option1.series[4].data.push(D.rpm)
                     })
+                    this.echartsList = results
                 }).catch(function (error) {
                 });
             },
+            handleCloseGraph(done) {
+                var _this = this
+                _this.option1.xAxis.data = []
+                _this.option1.series[0].data = []
+                _this.option1.series[1].data = []
+                _this.option1.series[2].data = []
+                _this.option1.series[3].data = []
+                _this.option1.series[4].data = []
+                done()
+            },
             changeSearch() {
-                console.log(this.search_date)
+                // console.log(this.search_date)
                 if (this.search_date) {
                     this.getParams.st = this.search_date[0]
                     this.getParams.et = this.search_date[1]
@@ -307,8 +295,9 @@
                 return setDate(add, true)
             },
             opens() {
-                this.$nextTick(() => {
-                    echarts.init(this.$refs.main).setOption(this.option1)
+                var _this = this
+                this.$nextTick(function () {
+                    echarts.init(_this.$refs.main).setOption(_this.option1)
                 })
             }
         }

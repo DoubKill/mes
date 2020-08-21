@@ -184,7 +184,7 @@ class ClassesDetailViewSet(mixins.ListModelMixin,
     queryset = ClassesDetail.objects.filter(delete_flag=False).select_related('classes')
     serializer_class = ClassesSimpleSerializer
     model_name = queryset.model.__name__.lower()
-    pagination_class = None
+    pagination_class = SinglePageNumberPagination
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
 
