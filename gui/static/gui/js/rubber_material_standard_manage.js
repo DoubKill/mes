@@ -24,6 +24,7 @@
                 PopupRubberSITEOptions:[],
                 stage_product_batch_no:"",
                 ProductBatchNoOptions:[],
+                materialTypeOptions:[],
                 stage:"",
                 StageOptions:[],
                 dev_type_name: "",
@@ -58,6 +59,8 @@
                 select_material_weight:null,
                 select_material_volume:null,
                 select_rubber_proportion:null,
+                auto_flag_radio:true,
+                auto_flag:true,
 
                 ratioSum:null,
                 ratioVolumeSum:null,
@@ -136,6 +139,9 @@
                 pop_up_raw_material_name:"",
                 raw_material_index:null,
                 put_raw_material_index:null,
+                materialType:null,
+                search_material_no:null,
+                search_material_name:null,
             }
         },
         created: function () {
@@ -176,6 +182,13 @@
                 app.DevTypeOptions = response.data.results;
             }).catch(function (error) {
             });
+
+            axios.get(MaterialTypelUrl, {
+            }).then(function (response) {
+                app.materialTypeOptions = response.data.results;
+            }).catch(function (error) {
+            });
+
             app.get_raw_material()
 
 
@@ -219,7 +232,7 @@
             },
             beforeGetData() {
                 this.getParams["used_type"] = this.RubberState;
-                this.getParams["factory_id"] = this.RubberSite;
+                this.getParams["site"] = this.RubberSite;
                 this.getParams["stage_id"] = this.RubberStage;
                 this.getParams['stage_product_batch_no'] = this.stage_product_batch_no;
             },
@@ -311,15 +324,7 @@
 
                         app.put_select_material_weight = response.data['batching_weight'];
                         app.put_select_rm_time_interval = response.data['production_time_interval'];
-                        if(response.data.batching_details.length ==0){
-                            app.PutProductRecipe = [{
-                                sn:null,
-                                material_type:null,
-                                material_name:null,
-                                actual_weight:null}]
-                        }else{
-                            app.PutProductRecipe = response.data.batching_details;
-                        }
+                        app.PutProductRecipe = response.data.batching_details;
 
                     }).catch(function (error) {
 
@@ -428,6 +433,7 @@
                 this.NewRowMaterial.push({
                     sn:"",
                     material_type:"",
+                    auto_flag_radio:true,
                     material_name:"",
                     practical_weight:""
                 });
@@ -446,6 +452,7 @@
                 this.PutProductRecipe.push({
                     sn:"",
                     material_type:"",
+                    auto_flag:true,
                     material_name:"",
                     actual_weight:""
                 });
@@ -454,23 +461,17 @@
             NewsaveMaterialClicked: function () {
                 var app = this;
                 var batching_details_list = [];
-                var post_ele_material = "";
 
                 for (var i = 0; i < this.NewRowMaterial.length -1; ++i) {
                     if(app.NewRowMaterial[i].material_name && app.NewRowMaterial[i].practical_weight){
                         // post_ele_material = app.NewRowMaterial[i].material_name;
                         //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
-                        for(var j = 0; j < app.RawMaterialOptions.length; ++j){
-                            if(app.RawMaterialOptions[j]['material_name'] == app.NewRowMaterial[i].material_name){
-                                post_ele_material = app.RawMaterialOptions[j]['id'];
-                                break
-                            }
-                        }
                         console.log('============================================');
-                        console.log(app.NewRowMaterial[i].material);
+                        console.log(app.NewRowMaterial[i].auto_flag_radio);
                         console.log('============================================');
                         var now_stage_material = {
                             sn: i+1,
+                            auto_flag:app.NewRowMaterial[i].auto_flag_radio,
                             material:app.NewRowMaterial[i].material,
                             actual_weight:app.NewRowMaterial[i].practical_weight,
                         };
@@ -526,6 +527,7 @@
 
                         var now_stage_material = {
                             sn: i+1,
+                            auto_flag: app.PutProductRecipe[i].auto_flag,
                             material:app.PutProductRecipe[i].material,
                             actual_weight:app.PutProductRecipe[i].actual_weight,
                         };
@@ -606,6 +608,45 @@
                 this.raw_material_currentRow = val;
                 this.get_raw_material(val)
             },
+
+            getList() {
+                var app = this;
+                var param_url = MaterialsUrl;
+                // if(app.search_time && app.equip_no){
+                //     param_url = param_url + '?search_time=' +app.search_time + '&equip_no=' + app.equip_no
+                // }
+                // else if(!app.search_time && app.equip_no){
+                //     param_url = param_url + '?search_time=' + '&equip_no=' + app.equip_no
+                // }
+                // else if(app.search_time && !app.equip_no){
+                //     param_url = param_url + '?search_time=' +app.search_time + '&equip_no='
+                // }
+
+                var v_material_type_id = app.materialType?app.materialType:'';
+                var v_search_material_no = app.search_material_no?app.search_material_no:'';
+                var v_search_material_name = app.search_material_name?app.search_material_name:'';
+                param_url = param_url + '?material_type_id=' + v_material_type_id + '&material_no=' + v_search_material_no + '&material_name=' + v_search_material_name;
+
+                axios.get(param_url, {}
+                ).then(function (response) {
+                    app.tableRawMaterialData = response.data.results;
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+            },
+            materialTypeChange: function(){
+                this.getList()
+            },
+            search_material_no_Change: function(){
+                this.getList()
+            },
+            search_material_name_Change: function(){
+                this.getList()
+            },
+
 
         }
     };
