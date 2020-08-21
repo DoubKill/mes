@@ -49,7 +49,7 @@
             axios.get(PlanScheduleUrl, {
 
                 params: {
-                    page_size: 100000000
+                    all: 1
                 }
             }).then(function (response) {
 
@@ -78,8 +78,7 @@
                     if (app.tableDataTotal !== response.data.count) {
                         app.tableDataTotal = response.data.count;
                     }
-                    app.tableData = response.data;
-
+                    app.tableData = response.data.results;
                     app.afterGetData();
 
                 }).catch(function (error) {
@@ -111,9 +110,9 @@
                 this.editForm.material_name = row.material_name
                 this.editForm.plan_date = this.planDate;
                 if (row.md_material_requisition_classes[0]){
-                    this.editForm.weights.push(row.md_material_requisition_classes[0].morning);
-                    this.editForm.weights.push(row.md_material_requisition_classes[1].afternoon);
-                    this.editForm.weights.push(row.md_material_requisition_classes[2].night);
+                    this.editForm.weights.push(row.md_material_requisition_classes[0].早班);
+                    this.editForm.weights.push(row.md_material_requisition_classes[1].中班);
+                    this.editForm.weights.push(row.md_material_requisition_classes[2].晚班);
                   }
                 else {
                     this.editForm.weights.push(0);

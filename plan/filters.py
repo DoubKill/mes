@@ -17,7 +17,8 @@ class MaterialDemandedFilter(django_filters.rest_framework.FilterSet):
     """原材料需求量过滤器"""
     plan_date = django_filters.DateTimeFilter(field_name='plan_schedule__day_time', help_text='日期')
     material_type = django_filters.CharFilter(field_name='material__material_type__global_name', help_text='原材料类别')
-    material_name = django_filters.CharFilter(field_name='material__material_name', help_text='原材料名称')
+    material_name = django_filters.CharFilter(field_name='material__material_name', help_text='原材料名称',
+                                              lookup_expr='icontains')
 
     class Meta:
         model = MaterialDemanded

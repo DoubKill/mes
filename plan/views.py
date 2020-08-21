@@ -6,13 +6,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
-from plan.filters import ProductDayPlanFilter, ProductBatchingDayPlanFilter
+from plan.filters import ProductDayPlanFilter, ProductBatchingDayPlanFilter, MaterialDemandedFilter
 from plan.serializers import ProductDayPlanSerializer, ProductBatchingDayPlanSerializer, \
     ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer, MaterialRequisitionClassesSerializer
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
@@ -151,25 +151,33 @@ class MaterialRequisitionClassesViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class MaterialDemandedAPIView(APIView):
-    """原材料需求量展示，参数：plan_date=YYYY-mm-dd"""
-    # plan_date = 2020 - 0
-    # 8 - 20 & material_type = & material_name = & page = 1
-    def get(self, request):
-        day_time = self.request.query_params.get('plan_date')
-        if not day_time:
-            raise ValidationError('参数不足')
-        try:
-            datetime.strptime(day_time, '%Y-%m-%d')
-        except Exception:
-            raise ValidationError('参数错误')
-        a = MaterialDemanded.objects.filter(
-            plan_schedule__day_time=day_time
-        ).select_related('material', 'classes__classes').values('material__material_name',
-                                                                'material__material_type__global_name',
-                                                                'classes__classes__global_name'
-                                                                ).annotate(a=Sum('material_demanded'))
-        return Response(a)
+class MaterialDemandedAPIView(ListAPIView):
+    """原材料需求量展示，plan_date参数必填"""
+
+    queryset = MaterialDemanded.objects.all()
+    filter_backends = (DjangoFilterBackend, )
+    filter_class = MaterialDemandedFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        data = queryset.filter(**kwargs).select_related('material', 'classes__classes').\
+            values('material__material_name', 'material__material_no',
+                   'material__material_type__global_name', 'classes__classes__global_name'
+                   ).annotate(num=Sum('material_demanded'))
+        materials = []
+        ret = {}
+        for item in data:
+            if item['material__material_name'] not in materials:
+                ret[item['material__material_name']] = {
+                    'material_no': item['material__material_no'],
+                    'material_name': item['material__material_name'],
+                    "material_type": item['material__material_type__global_name'],
+                    "class_details": {item['classes__classes__global_name']: item['num']}}
+                materials.append(item['material__material_name'])
+            else:
+                ret[item['material__material_name']]['class_details'][item['classes__classes__global_name']] = item['num']
+        page = self.paginate_queryset(list(ret.values()))
+        return self.get_paginated_response(page)
 
 
 @method_decorator([api_recorder], name="dispatch")

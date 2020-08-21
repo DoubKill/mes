@@ -12,6 +12,7 @@ const SiteGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
 const SITEGlobalUrl = BasicsUrl + "global-codes/?class_name=SITE";
 const StageGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料段次";
 const DevTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=炼胶机类型";
+const MaterialTypelUrl = BasicsUrl + "global-codes/?class_name=原材料类别";
 
 const EquipUrl = BasicsUrl + "equips/";
 

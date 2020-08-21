@@ -68,21 +68,21 @@
                 align="center"
                 label="原材料需要量（Kg）">
             <el-table-column
-                prop="material_demanded_list[0].material_demanded"
+                prop="class_details.早班"
                 label="早班">
             </el-table-column>
             <el-table-column
-                prop="material_demanded_list[1].material_demanded"
+                prop="class_details.中班"
                 label="中班">
             </el-table-column>
             <el-table-column
-                prop="material_demanded_list[2].material_demanded"
+                prop="class_details.晚班"
                 label="晚班">
             </el-table-column>
             <el-table-column
                 label="总计">
                 <template slot-scope="scope">
-                    <span v-text="scope.row.material_demanded_list[0].material_demanded + scope.row.material_demanded_list[1].material_demanded + scope.row.material_demanded_list[2].material_demanded"></span>
+                    <span v-text="scope.row.class_details.早班 + scope.row.class_details.中班 + scope.row.class_details.晚班"></span>
                 </template>
             </el-table-column>
         </el-table-column>
@@ -90,34 +90,34 @@
                 align="center"
                 label="领料计划（Kg）">
             <el-table-column
-                prop="md_material_requisition_classes[0].morning"
+{#                prop="md_material_requisition_classes[0].早班"#}
                 label="早班">
             </el-table-column>
             <el-table-column
-                prop="md_material_requisition_classes[1].afternoon"
+{#                prop="md_material_requisition_classes[1].中班"#}
                 label="中班">
             </el-table-column>
             <el-table-column
-                prop="md_material_requisition_classes[2].night"
+{#                prop="md_material_requisition_classes[2].晚班"#}
                 label="晚班">
             </el-table-column>
             <el-table-column
                 label="总计">
-                <template slot-scope="scope" v-if="scope.row.md_material_requisition_classes[0]">
-                    <span v-text="scope.row.md_material_requisition_classes[0].morning + scope.row.md_material_requisition_classes[1].afternoon + scope.row.md_material_requisition_classes[2].night"></span>
-                </template>
+{#                <template slot-scope="scope" v-if="scope.row.md_material_requisition_classes[0]">#}
+{#                    <span v-text="scope.row.md_material_requisition_classes[0].早班 + scope.row.md_material_requisition_classes[1].中班 + scope.row.md_material_requisition_classes[2].晚班"></span>#}
+{#                </template>#}
             </el-table-column>
         </el-table-column>
-        <el-table-column label="操作">
-            <template slot-scope="scope">
-                <el-button-group>
-                    <el-button type="primary"
-                            size="mini"
-                            @click="showEditDialog(scope.row)">编辑
-                    </el-button>
-                </el-button-group>
-            </template>
-        </el-table-column>
+{#        <el-table-column label="操作">#}
+{#            <template slot-scope="scope">#}
+{#                <el-button-group>#}
+{#                    <el-button type="primary"#}
+{#                            size="mini"#}
+{#                            @click="showEditDialog(scope.row)">编辑#}
+{#                    </el-button>#}
+{#                </el-button-group>#}
+{#            </template>#}
+{#        </el-table-column>#}
 
 
     </el-table>

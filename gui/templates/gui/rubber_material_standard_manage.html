@@ -20,14 +20,14 @@
                 </el-option>
             </el-select>
         </el-form-item>
-        <el-form-item label="产地">
+        <el-form-item label="SITE">
             <el-select
                     style="width: 150px"
                     clearable
                     @change="RubberSiteChange"
                     v-model="RubberSite" placeholder="请选择">
                 <el-option
-                        v-for="item in RubberSiteOptions"
+                        v-for="item in PopupRubberSITEOptions"
                         :key="item.id"
                         :label="item.global_name"
                         :value="item.id">
@@ -82,7 +82,7 @@
         </el-table-column>
         <el-table-column
                 prop="site_name"
-                label="产地">
+                label="site">
         </el-table-column>
         <el-table-column
                 prop="stage_name"
@@ -110,22 +110,19 @@
         <el-table-column label="操作">
             <template slot-scope="scope">
                 <el-button-group>
-                    <el-button @click="pass(scope.row)" size="mini" v-if="scope.row.used_type === 1">
-                        编辑
-                    </el-button>
-                    <el-button @click="reject(scope.row)" size="mini" v-if="scope.row.used_type === 2">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 1">
                         提交
                     </el-button>
-                    <el-button @click="apply(scope.row)" size="mini" v-if="scope.row.used_type === 3">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 2">
                         校对
                     </el-button>
-                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 4">
+                    <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 3">
                         启用
                     </el-button>
-                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 5">
+                    <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 2 | scope.row.used_type === 3">
                         驳回
                     </el-button>
-                    <el-button @click="discard(scope.row)" size="mini" v-if="scope.row.used_type === 6">
+                    <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 4">
                         废弃
                     </el-button>
                 </el-button-group>
@@ -248,26 +245,33 @@
                style="width: 100%; color: #909399; font-size: 14px;">
             <thead>
             <tr>
-                <th>No</th>
-                <th>类别</th>
-                <th>原材料</th>
-                <td>实际重量</td>
+                <th style="text-align: center">No</th>
+                <th style="text-align: center">类别</th>
+                <th style="text-align: center">自动与否</th>
+                <th style="text-align: center">原材料</th>
+                <td style="text-align: center">实际重量</td>
             </tr>
             </thead>
             {% verbatim vue %}
                 <tbody style="color: #606266;">
                 <!--胶料配料标准  第一行 的汇总数据-->
                 <tr style="background: rgba(189,198,210,0.73)">
-                    <td colspan="3" style="text-align: center">配方结果</td>
+                    <td colspan="4" style="text-align: center">配方结果</td>
                     <td style="text-align: center">{{ practicalWeightSum }}</td>
                 </tr>
                 <tr v-for="(new_material_ele, index) in NewRowMaterial" :key="index">
                     <!--<td>{{ new_material_ele.sn_ele }}</td>-->
                     <td v-show='false'>{{ new_material_ele.material }}</td>
-                    <td>{{ index + 1 }}
-                    <td>{{ new_material_ele.material_type }}</td>
+                    <td style="text-align: center">{{ index + 1 }}
+                    <td style="text-align: center">{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
-                        <div style="margin-top: 15px;">
+                        <template>
+                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="true">自动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="false">手动</el-radio>
+                        </template>
+                    </td>
+                    <td style="text-align: center">
+                        <div style="margin-top: 12px;">
                           <el-input v-model="new_material_ele.material_name"  class="input-with-select" :disabled="true">
                             <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
                           </el-input>
@@ -330,49 +334,37 @@
                style="width: 100%; color: #909399; font-size: 14px;">
             <thead>
             <tr>
-                <th>No</th>
-                <th>类别</th>
-                <th>原材料</th>
-                <td>实际重量</td>
+                <th style="text-align: center">No</th>
+                <th style="text-align: center">类别</th>
+                <th style="text-align: center">自动与否</th>
+                <th style="text-align: center">原材料</th>
+                <td style="text-align: center">实际重量</td>
             </tr>
             </thead>
             {% verbatim vue %}
                 <tbody style="color: #606266;">
                 <!--胶料配料标准  第一行 的汇总数据-->
                 <tr style="background: rgba(189,198,210,0.73)">
-                    <td colspan="3" style="text-align: center">配方结果</td>
+                    <td colspan="4" style="text-align: center">配方结果</td>
                     <td style="text-align: center">{{ put_practicalWeightSum }}</td>
                 </tr>
                 <tr v-for="(new_material_ele, index) in PutProductRecipe" :key="index">
                     <!--<td>{{ new_material_ele.sn }}</td>-->
                     <td v-show='false'>{{ new_material_ele.material }}</td>
-                    <td>{{ index + 1 }}</td>
-                    <td>{{ new_material_ele.material_type }}</td>
+                    <td style="text-align: center">{{ index + 1 }}</td>
+                    <td style="text-align: center">{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
-                        <div style="margin-top: 15px;">
+                        <template>
+                          <el-radio v-model="new_material_ele.auto_flag" :label="true">自动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag" :label="false">手动</el-radio>
+                        </template>
+                    </td>
+                    <td style="text-align: center">
+                        <div style="margin-top: 12px;">
                           <el-input v-model="new_material_ele.material_name"  class="input-with-select" :disabled="true">
                             <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
                           </el-input>
                         </div>
-
-                        <!--
-                        <el-form>
-                        <el-form-item label="">
-                            <el-select
-                                    @change="PutNewMaterialChange(new_material_ele)"
-                                    size="mini"
-                                    clearable
-                                    v-model="new_material_ele.material_name" placeholder="请选择">
-                                <el-option
-                                        v-for="item in RawMaterialOptions"
-                                        :key="item.id"
-                                        :label="item.material_name"
-                                        :value="item.id">
-                                </el-option>
-                            </el-select>
-                        </el-form-item>
-                        </el-form>
-                        -->
                     </td>
                     <td style="text-align: center">
                         <el-input-number size="mini" controls-position="right" @change="PutNewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.actual_weight"></el-input-number>
@@ -400,20 +392,21 @@
             width="70%" title="原材料选择" :visible.sync="dialogRawMaterialSync">
 
         <el-form :inline="true">
-            <el-form-item label="原材料类型">
+            <el-form-item label="原材料类别">
                 <el-select
                         clearable
-                        v-model="pop_up_raw_material_type" placeholder="请选择">
+                        @change="materialTypeChange"
+                        v-model="materialType" placeholder="请选择">
                     <el-option
-                            v-for="item in DevTypeOptions"
+                            v-for="item in materialTypeOptions"
                             :key="item.id"
                             :label="item.global_name"
                             :value="item.id">
                     </el-option>
                 </el-select>
             </el-form-item>
-            原材料编号:<el-input  v-model="pop_up_raw_material_no" style="width: 20%" ></el-input>
-            原材料名称:<el-input  v-model="pop_up_raw_material_name" style="width: 20%" ></el-input>
+            原材料编号:<el-input  v-model="search_material_no" v-on:input="search_material_no_Change" style="width: 20%" ></el-input>
+            原材料名称:<el-input  v-model="search_material_name" v-on:input="search_material_name_Change" style="width: 20%" ></el-input>
         </el-form>
 
 
@@ -454,8 +447,8 @@
     <el-pagination
         @current-change="raw_material_handleCurrentChange"
         :current-page.sync="currentPage"
-        :page-size="pageSize"
-        :total="tableDataTotal"
+        :page-size="raw_material_pageSize"
+        :total="raw_material_tableDataTotal"
         layout="total, prev, pager, next">
     </el-pagination>
 

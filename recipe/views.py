@@ -126,13 +126,8 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'product_no', 'product_name')
             return Response({'results': data})
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        else:
+            return super().list(request, *args, **kwargs)
 
 
 class ProductBatchingViewSet(ModelViewSet):
