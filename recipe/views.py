@@ -143,13 +143,24 @@ class ProductBatchingViewSet(ModelViewSet):
     partial_update:
         配料审批
     """
+    # TODO 配方下载功能（只能下载应用状态的配方，并去除当前计划中的配方）
     queryset = ProductBatching.objects.filter(delete_flag=False).select_related("factory", "site", "dev_type", "stage",
                                                                                 "product_info").order_by('-created_date')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'stage_product_batch_no')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
     def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
         if self.action == 'partial_update':
             return (ProductBatchingPermissions(),
                     IsAuthenticatedOrReadOnly())
