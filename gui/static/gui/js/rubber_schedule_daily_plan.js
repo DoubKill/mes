@@ -84,7 +84,8 @@
             var app = this;
             axios.get(EquipUrl, {
                 params: {
-                    page_size: 100000000
+                    all: 1
+                    // page_size: 100000000
                 }
             }).then(function (response) {
 
@@ -99,7 +100,8 @@
             axios.get(RubberMaterialUrl, {
 
                 params: {
-                    page_size: 100000000
+                    all: 1
+                    // page_size: 100000000
                 }
             }).then(function (response) {
 
