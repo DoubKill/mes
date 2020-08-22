@@ -97,7 +97,7 @@ class ClassesDetailSerializer(BaseModelSerializer):
 class ClassesSimpleSerializer(BaseModelSerializer):
     """工作日程班次下拉列表"""
     classes_name = serializers.CharField(source="classes.global_name")
-    work_schedule_name = serializers.CharField(source="work_schedule.schedule_name" ,read_only=True)
+    work_schedule_name = serializers.CharField(source="work_schedule.schedule_name", read_only=True)
 
     class Meta:
         model = ClassesDetail
@@ -117,7 +117,9 @@ class ClassesDetailUpdateSerializer(BaseModelSerializer):
 class WorkScheduleSerializer(BaseModelSerializer):
     """日程创建、列表、详情序列化器"""
     classesdetail_set = ClassesDetailSerializer(many=True,
-                                                help_text="""[{"classes":班次id,"classes_name":班次名称,"start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""", )
+                                                help_text="""[{"classes":班次id,"classes_name":班次名称,
+                                                "start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12",
+                                                "classes_type_name":"正常"}]""", )
 
     @atomic()
     def create(self, validated_data):
@@ -139,7 +141,9 @@ class WorkScheduleSerializer(BaseModelSerializer):
 class WorkScheduleUpdateSerializer(BaseModelSerializer):
     """日程修改序列化器"""
     classesdetail_set = ClassesDetailUpdateSerializer(many=True,
-                                                      help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,"start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""")
+                                                      help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,
+                                                      "start_time":"2020-12-12 12:12:12",
+                                                      "end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""")
 
     @atomic()
     def update(self, instance, validated_data):
@@ -217,12 +221,24 @@ class WorkSchedulePlanSerializer(BaseModelSerializer):
 class PlanScheduleSerializer(BaseModelSerializer):
     """计划时间排班序列化器"""
     work_schedule_plan = WorkSchedulePlanSerializer(many=True,
-                                                    help_text="""{"work_schedule_plan":[{"classes_detail":1,"group":1,"group_name":"a班","rest_flag":0},{"classes_detail":2,"group":2,"group_name":"b班","rest_flag":0},{"classes_detail":3,"group":3,"group_name":"c班","rest_flag":0}],"day_time":"2020-07-25 15:55:50","week_time":"monday","work_schedule":1}""")
+                                                    help_text="""
+                                                    {"work_schedule_plan":[{"classes_detail":1,"group":1,
+                                                    "group_name":"a班","rest_flag":0},{"classes_detail":2,"group":2,
+                                                    "group_name":"b班","rest_flag":0},{"classes_detail":3,"group":3,
+                                                    "group_name":"c班","rest_flag":0}],"day_time":"2020-07-25 15:55:50",
+                                                    "week_time":"monday","work_schedule":1}""")
 
     class Meta:
         model = PlanSchedule
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def validate(self, attrs):
+        day_time = attrs['work_schedule']
+        work_schedule = attrs['work_schedule']
+        if PlanSchedule.objects.filter(day_time=day_time, work_schedule=work_schedule).exists():
+            raise serializers.ValidationError('当前日期已存在此倒班')
+        return attrs
 
     @atomic()
     def create(self, validated_data):

@@ -140,7 +140,7 @@ class PlanSchedule(AbstractEntity):
     """排班管理"""
     day_time = models.DateField(help_text='日期', verbose_name='日期')
     work_schedule = models.ForeignKey(WorkSchedule, models.DO_NOTHING,
-                                      help_text='工作日程id', verbose_name='工作日程id', related_name="plan_schedule")
+                                      help_text='倒班id', verbose_name='工作日程id', related_name="plan_schedule")
 
     class Meta:
         db_table = 'plan_schedule'

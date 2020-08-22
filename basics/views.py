@@ -64,6 +64,20 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     pagination_class = SinglePageNumberPagination
     filter_class = GlobalCodeFilter
 
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'global_no', 'global_name', 'global_type__type_name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
