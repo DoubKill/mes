@@ -67,7 +67,8 @@
             });
             axios.get(MaterialsUrl, {
                 params: {
-                    page_size: 100000000
+                    all: 1
+                    // page_size: 100000000
                 }
             })
                 .then(function (response) {
