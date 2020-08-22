@@ -285,7 +285,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
 
 
 class ProductActualViewSet(mixins.ListModelMixin,
-                      GenericViewSet):
+                           GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
@@ -311,10 +311,11 @@ class ProductActualViewSet(mixins.ListModelMixin,
             day_plan_set = plan_schedule.ps_day_plan.filter(delete_flag=False)
         for day_plan in list(day_plan_set):
             instance = {}
-            plan_trains = 0
+            plan_trains_all = 0
+            plan_weight_all = 0
             actual_trains = 0
             plan_weight = 0
-            product_no = day_plan.product_batching.product_info.product_no
+            product_no = day_plan.product_batching.product_info.product_name
             equip_no = day_plan.equip.equip_no
             day_plan_actual = [None, None, None]
             # 通过日计划id再去查班次计划
@@ -322,8 +323,10 @@ class ProductActualViewSet(mixins.ListModelMixin,
             if not class_plan_set:
                 continue
             for class_plan in list(class_plan_set):
-                plan_trains += class_plan.plan_trains
-                plan_weight += class_plan.weight
+                plan_trains = class_plan.plan_trains
+                plan_trains_all += class_plan.plan_trains
+                plan_weight = class_plan.weight
+                plan_weight_all += class_plan.weight
                 class_name = class_plan.classes_detail.classes.global_name
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
@@ -333,10 +336,10 @@ class ProductActualViewSet(mixins.ListModelMixin,
                 if temp_ret_set:
                     actual = temp_ret_set.order_by("-created_date").first()
                     temp_class_actual = {
-                            "plan_trains": plan_trains,
-                            "actual_trains": actual.actual_trains,
-                            "classes": class_name
-                        }
+                        "plan_trains": plan_trains,
+                        "actual_trains": actual.actual_trains,
+                        "classes": class_name
+                    }
                     if class_name == "早班":
                         day_plan_actual[0] = temp_class_actual
                     elif class_name == "中班":
@@ -360,9 +363,9 @@ class ProductActualViewSet(mixins.ListModelMixin,
                     else:
                         day_plan_actual.append(temp_class_actual)
                     actual_trains += 0
-            instance.update(classes_data=day_plan_actual, plan_weight=plan_weight,
+            instance.update(classes_data=day_plan_actual, plan_weight=plan_weight_all,
                             product_no=product_no, equip_no=equip_no,
-                            plan_trains=plan_trains, actual_trains=actual_trains)
+                            plan_trains=plan_trains_all, actual_trains=actual_trains)
             return_data["data"].append(instance)
         return Response(return_data)
 
