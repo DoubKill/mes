@@ -1,7 +1,5 @@
-import uuid
 import time
-
-i = 0
+import uuid
 
 
 class UUidTools(object):
@@ -9,6 +7,4 @@ class UUidTools(object):
 
     @staticmethod
     def uuid1_hex():
-        global i
-        i += 1
-        return uuid.uuid1(i)
+        return uuid.uuid1(int(time.time()))
