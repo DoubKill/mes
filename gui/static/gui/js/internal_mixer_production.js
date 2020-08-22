@@ -171,7 +171,7 @@
                 var _this = this
                 axios.get(RubberMaterialUrl, {
                     params: {
-                        page_size: 10000000
+                        all: 1
                     }
                 }).then(function (response) {
                     var glueList = response.data.results || [];
@@ -187,7 +187,9 @@
             },
             getMachineList() {
                 var _this = this
-                axios.get(EquipUrl, {params: {page_size: 1000000}}).then(function (response) {
+                axios.get(EquipUrl, {params: {
+                    all: 1
+                }}).then(function (response) {
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
                 });
