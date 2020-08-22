@@ -14,9 +14,9 @@
                     v-model="RubberState" placeholder="请选择">
                 <el-option
                         v-for="item in RubberStateOptions"
-                        :key="item.id"
-                        :label="item.global_name"
-                        :value="item.id">
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -68,46 +68,57 @@
             border
             style="width: 100%">
         <el-table-column
+                align="center"
                 type="index"
                 width="50"
                 label="No">
         </el-table-column>
         <el-table-column
+                align="center"
+                width="160%"
                 prop="stage_product_batch_no"
                 label="胶料配方编号">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="product_name"
                 label="胶料编码">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="site_name"
                 label="site">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="stage_name"
                 label="段次">
         </el-table-column>
 
         <el-table-column
+                align="center"
+                width="100%"
                 prop="dev_type_name"
                 label="炼胶机类型">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="batching_weight"
                 label="配料重量">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="production_time_interval"
                 label="炼胶时间">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="used_type"
                 label="状态"
                 :formatter="usedTypeFormatter">
         </el-table-column>
 
-        <el-table-column label="操作">
+        <el-table-column align="center" label="操作">
             <template slot-scope="scope">
                 <el-button-group>
                     <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 1">
@@ -129,10 +140,12 @@
             </template>
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="created_username"
                 label="创建者">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="created_date"
                 label="创建时间">
         </el-table-column>
@@ -179,7 +192,7 @@
                 <el-autocomplete
                         style="width: 31%"
                         size="mini"
-                        value-key = "product_name"
+                        value-key = "product_no"
                         v-model="rubberMaterialForm.rubber_no"
                         :fetch-suggestions="rubber_no_querySearchAsync"
                         placeholder="请输入内容"
@@ -272,7 +285,7 @@
                     </td>
                     <td style="text-align: center">
                         <div style="margin-top: 12px;">
-                          <el-input v-model="new_material_ele.material_name"  class="input-with-select" :disabled="true">
+                          <el-input v-model="new_material_ele.material_name" size="mini" style="width: 70%" class="input-with-select" :disabled="true">
                             <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
                           </el-input>
                         </div>
@@ -361,7 +374,7 @@
                     </td>
                     <td style="text-align: center">
                         <div style="margin-top: 12px;">
-                          <el-input v-model="new_material_ele.material_name"  class="input-with-select" :disabled="true">
+                          <el-input v-model="new_material_ele.material_name" size="mini" style="width: 70%" class="input-with-select" :disabled="true">
                             <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
                           </el-input>
                         </div>
@@ -417,22 +430,26 @@
             border
             style="width: 100%">
         <el-table-column
+                align="center"
                 label="S"
                 width="30">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="material_no"
                 label="原材料代码">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="material_name"
                 label="原材料名称">
         </el-table-column>
         <el-table-column
+                align="center"
                 prop="material_type_name"
                 label="原材料类别">
         </el-table-column>
-        <el-table-column label="操作">
+        <el-table-column align="center" label="操作">
             <template slot-scope="scope">
                 <el-button-group>
                     <el-button
