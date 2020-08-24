@@ -384,7 +384,7 @@
                             {}
                         ]
                     }
-                    this.smallMaterialEdit = ''
+                    _this.smallMaterialEdit = ''
                     _this.$message.success('修改成功')
                     _this.dialogVisibleEdit = false
                     _this.getList()
@@ -430,8 +430,6 @@
 
             },
             changeProductBatch(val) {
-                console.log(this.addGlueList, 'addGlueList')
-                console.log(val, 'val')
                 var obj = this.addGlueList.filter(function (D) {
                     return D.id === val
                 })
