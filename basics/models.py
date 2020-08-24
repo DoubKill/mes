@@ -149,14 +149,15 @@ class PlanSchedule(AbstractEntity):
 
 class WorkSchedulePlan(AbstractEntity):
     """排班详情"""
-    classes_detail = models.ForeignKey(ClassesDetail, models.DO_NOTHING,
-                                       help_text='班次id', verbose_name='班次id', related_name="work_schedule_plan")
-    group = models.ForeignKey(GlobalCode, models.DO_NOTHING,
-                              help_text='班组id', verbose_name='班组id', related_name="work_schedule_plan")
-    group_name = models.CharField(max_length=64, help_text='班组名称', verbose_name='班组名称')
+    classes = models.ForeignKey(GlobalCode, models.DO_NOTHING,
+                                help_text='班次', verbose_name='班次', related_name="class_work_plans")
     rest_flag = models.BooleanField(help_text='是否休息', verbose_name='是否休息')
     plan_schedule = models.ForeignKey(PlanSchedule, models.DO_NOTHING,
                                       help_text='计划时间id', verbose_name='计划时间id', related_name="work_schedule_plan")
+    group = models.ForeignKey(GlobalCode, models.DO_NOTHING,
+                              help_text='班组id', verbose_name='班组id', related_name="group_plans")
+    start_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
+    end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
 
     class Meta:
         db_table = 'work_schedule_plan'

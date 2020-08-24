@@ -1,6 +1,6 @@
 from django.db import models
 from system.models import AbstractEntity
-from basics.models import Equip, PlanSchedule, ClassesDetail
+from basics.models import Equip, PlanSchedule, ClassesDetail, WorkSchedulePlan
 from recipe.models import ProductBatching, Material
 import uuid
 
@@ -34,11 +34,11 @@ class ProductClassesPlan(AbstractEntity):
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=3, max_digits=8, blank=True, null=True)
     unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
-    classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
-                                       verbose_name='班次id',
-                                       related_name='cd_product_classes_plan')
+    work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.DO_NOTHING, help_text='班次id',
+                                           verbose_name='排班详情id', related_name='cd_product_classes_plan')
     plan_classes_uid = models.UUIDField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',
                                         null=True)
+    note = models.CharField(max_length=64, help_text='备注', blank=True, null=True)
 
     @property
     def total_time(self):
@@ -94,17 +94,16 @@ class ProductBatchingClassesPlan(AbstractEntity):
 
 class MaterialDemanded(AbstractEntity):
     """原材料需求量表"""
-    classes = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
-                                verbose_name='班次id',
-                                related_name='c_material_demanded')
+    work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.DO_NOTHING, help_text='班次id',
+                                           verbose_name='排班详情id')
     material = models.ForeignKey(Material, on_delete=models.DO_NOTHING, help_text='原材料id',
                                  verbose_name='原材料id',
                                  related_name='m_material_demanded')
     material_demanded = models.PositiveIntegerField(verbose_name='原材料需求重量', help_text='原材料需求重量')
     plan_classes_uid = models.CharField(max_length=128, verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
-    plan_schedule = models.ForeignKey(PlanSchedule, on_delete=models.DO_NOTHING, help_text='排班计划id',
-                                      verbose_name='排班计划id',
-                                      related_name='ps_material_demanded')
+    # plan_schedule = models.ForeignKey(PlanSchedule, on_delete=models.DO_NOTHING, help_text='排班计划id',
+    #                                   verbose_name='排班计划id',
+    #                                   related_name='ps_material_demanded')
 
     class Meta:
         db_table = 'material_demanded'

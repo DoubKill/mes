@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from django.db.models import F
 from rest_framework import serializers
 from django.db.transaction import atomic
@@ -118,7 +120,7 @@ class WorkScheduleSerializer(BaseModelSerializer):
     """日程创建、列表、详情序列化器"""
     classesdetail_set = ClassesDetailSerializer(many=True,
                                                 help_text="""[{"classes":班次id,"classes_name":班次名称,
-                                                "start_time":"2020-12-12 12:12:12","end_time":"2020-12-12 12:12:12",
+                                                "start_time":"12:12:12","end_time":"12:12:12",
                                                 "classes_type_name":"正常"}]""", )
 
     @atomic()
@@ -142,8 +144,8 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
     """日程修改序列化器"""
     classesdetail_set = ClassesDetailUpdateSerializer(many=True,
                                                       help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,
-                                                      "start_time":"2020-12-12 12:12:12",
-                                                      "end_time":"2020-12-12 12:12:12","classes_type_name":"正常"}]""")
+                                                      "start_time":"12:12:12", "end_time":"12:12:12",
+                                                      "classes_type_name":"正常"}]""")
 
     @atomic()
     def update(self, instance, validated_data):
@@ -210,23 +212,21 @@ class SysbaseEquipLevelSerializer(BaseModelSerializer):
 
 class WorkSchedulePlanSerializer(BaseModelSerializer):
     """工作日程计划序列化器"""
-    classes_detail_name = serializers.CharField(source='classes_detail.classes.global_name', read_only=True)
+    classes_name = serializers.CharField(source='classes.global_name', read_only=True)
+    group_name = serializers.CharField(source='group.global_name', read_only=True)
 
     class Meta:
         model = WorkSchedulePlan
         exclude = ('plan_schedule',)
-        read_only_fields = COMMON_READ_ONLY_FIELDS
+        read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
+                            'delete_flag', 'created_user', 'last_updated_user',
+                            'delete_user', 'start_time', 'end_time')
 
 
 class PlanScheduleSerializer(BaseModelSerializer):
     """计划时间排班序列化器"""
     work_schedule_plan = WorkSchedulePlanSerializer(many=True,
-                                                    help_text="""
-                                                    {"work_schedule_plan":[{"classes_detail":1,"group":1,
-                                                    "group_name":"a班","rest_flag":0},{"classes_detail":2,"group":2,
-                                                    "group_name":"b班","rest_flag":0},{"classes_detail":3,"group":3,
-                                                    "group_name":"c班","rest_flag":0}],"day_time":"2020-07-25 15:55:50",
-                                                    "week_time":"monday","work_schedule":1}""")
+                                                    help_text="""{"classes":班次id, "rest_flag":0, "group":班组id""")
 
     class Meta:
         model = PlanSchedule
@@ -234,7 +234,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate(self, attrs):
-        day_time = attrs['work_schedule']
+        day_time = attrs['day_time']
         work_schedule = attrs['work_schedule']
         if PlanSchedule.objects.filter(day_time=day_time, work_schedule=work_schedule).exists():
             raise serializers.ValidationError('当前日期已存在此倒班')
@@ -242,10 +242,26 @@ class PlanScheduleSerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
+        day_time = validated_data['day_time']
         work_schedule_plan = validated_data.pop('work_schedule_plan', None)
         instance = super().create(validated_data)
         work_schedule_plan_list = []
+        morning_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
+                                                     classes__global_name='早班').first()
+        evening_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
+                                                     classes__global_name='晚班').first()
         for plan in work_schedule_plan:
+            classes = plan['classes']
+            class_detail = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
+                                                        classes=plan['classes']).first()
+            if not class_detail:
+                raise serializers.ValidationError('暂无此班次倒班数据')
+            if classes.global_name == '晚班':  # 晚班的结束时间小于等于早班的开始时间，日期则加一天
+                if all([morning_class, evening_class]):
+                    if evening_class.end_time <= morning_class.start_time:
+                        day_time = (day_time + timedelta(days=1)).strftime("%Y-%m-%d")
+            plan['start_time'] = str(day_time) + ' ' + str(class_detail.start_time)
+            plan['end_time'] = str(day_time) + ' ' + str(class_detail.end_time)
             plan['plan_schedule'] = instance
             work_schedule_plan_list.append(WorkSchedulePlan(**plan))
         WorkSchedulePlan.objects.bulk_create(work_schedule_plan_list)

@@ -22,9 +22,9 @@
                     v-model="equipNo" placeholder="请选择">
                 <el-option
                         v-for="item in equipNoOptions"
-                        :key="item.id"
-                        :label="item.global_name"
-                        :value="item.id">
+                        :key="item.equip_no"
+                        :label="item.equip_no"
+                        :value="item.equip_no">
                 </el-option>
             </el-select>
         </el-form-item>
@@ -191,6 +191,13 @@
                         label="作业者">
                 </el-table-column>
             </el-table>
+            <el-pagination
+                @current-change="getRubberCoding"
+                :current-page.sync="currentPage"
+                :page-size="pageSize"
+                :total="tableDataTotal"
+                layout="total, prev, pager, next">
+            </el-pagination>
         </el-dialog>
         <el-dialog
                 title="BAT查询"

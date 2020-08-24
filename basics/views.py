@@ -227,7 +227,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
         删除计划时间
     """
     queryset = PlanSchedule.objects.filter(delete_flag=False
-                                           ).prefetch_related('work_schedule_plan__classes_detail__classes')
+                                           ).prefetch_related('work_schedule_plan__classes')
     serializer_class = PlanScheduleSerializer
     model_name = queryset.model.__name__.lower()
     filter_fields = ('day_time', )
