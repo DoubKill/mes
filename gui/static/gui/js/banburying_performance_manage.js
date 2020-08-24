@@ -10,9 +10,8 @@
         data: function () {
 
             return {
-
                 tableDataUrl: ProductActualUrl,
-                performanceDate: dayjs("2020-01-01").format("YYYY-MM-DD"),
+                performanceDate: dayjs("2020-08-01").format("YYYY-MM-DD"),
                 projectName: "",
                 equipNo: "",
                 equipNoOptions: [],
@@ -164,11 +163,11 @@
         created: function () {
 
             var app = this;
-            axios.get(GlobalCodesUrl, {
+            axios.get(EquipUrl, {
 
                 params: {
 
-                    class_name: "机台"
+                    all: 1
                 }
             }).then(function (response) {
 
@@ -193,18 +192,22 @@
             clickProductNo(row) {
                 this.dialogVisibleRubber = true
                 this.palletFeedObj = row
-                this.getRubberCoding()
+                this.getRubberCoding(1)
             },
-            getRubberCoding() {
+            getRubberCoding(page) {
                 var _this = this
                 axios.get(PalletFeedBacksUrl, {
                     params: {
                         product_no: _this.palletFeedObj.product_no,
                         // plan_classes_uid: _this.palletFeedObj.plan_classes_uid,
-                        equip_no: _this.palletFeedObj.equip_no
+                        equip_no: _this.palletFeedObj.equip_no,
+                        page: page
                     }
                 }).then(function (response) {
                     _this.palletFeedList = response.data.results || [];
+                    if (_this.tableDataTotal !== response.data.count) {
+                        _this.tableDataTotal = response.data.count;
+                    }
                 }).catch(function (error) {
                 });
             },
@@ -256,7 +259,7 @@
             currentChange: function (page) {
 
             this.beforeGetData();
-            this.getParams["page"] = page;
+            // this.getParams["page"] = page;
             this.tableData = [];
             const app = this;
             axios.get(this.tableDataUrl, {
@@ -264,9 +267,9 @@
                 params: this.getParams
             }).then(function (response) {
 
-                if (app.tableDataTotal !== response.data.count) {
-                    app.tableDataTotal = response.data.count;
-                }
+                // if (app.tableDataTotal !== response.data.count) {
+                //     app.tableDataTotal = response.data.count;
+                // }
                 app.tableData = response.data.data;
                 app.afterGetData();
 
