@@ -1,9 +1,7 @@
-from datetime import datetime
 
 from django.db.models import Sum
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -103,10 +101,10 @@ class ProductBatchingDayPlanManyCreate(APIView):
             many = True
         else:
             return Response(data={'detail': '数据有误'}, status=400)
-        pbdp_ser = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
-        pbdp_ser.is_valid(raise_exception=True)
-        book_obj_or_list = pbdp_ser.save()
-        return Response(ProductBatchingDayPlanSerializer(book_obj_or_list, many=many).data)
+        s = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.validated_data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -120,10 +118,10 @@ class ProductDayPlanManyCreate(APIView):
             many = True
         else:
             return Response(data={'detail': '数据有误'}, status=400)
-        pbdp_ser = ProductDayPlanSerializer(data=request.data, many=many, context={'request': request})
-        pbdp_ser.is_valid(raise_exception=True)
-        book_obj_or_list = pbdp_ser.save()
-        return Response(ProductDayPlanSerializer(book_obj_or_list, many=many).data)
+        s = ProductDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.validated_data)
 
 
 @method_decorator([api_recorder], name="dispatch")

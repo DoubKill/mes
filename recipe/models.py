@@ -102,7 +102,9 @@ class ProductBatching(AbstractEntity):
     batching_weight = models.DecimalField(verbose_name='配料重量', help_text='配料重量',
                                           decimal_places=3, max_digits=8, default=0)
     manual_material_weight = models.DecimalField(verbose_name='手动小料重量', help_text='手动小料重量',
-                                                 decimal_places=3, max_digits=8, blank=True, null=True)
+                                                 decimal_places=3, max_digits=8, default=0)
+    auto_material_weight = models.DecimalField(verbose_name='自动小料重量', help_text='自动小料重量',
+                                               decimal_places=3, max_digits=8, default=0)
     volume = models.DecimalField(verbose_name='配料体积', help_text='配料体积', decimal_places=2, max_digits=8,
                                  blank=True, null=True)
     used_time = models.DateTimeField(help_text='发行时间', verbose_name='发行时间', blank=True, null=True)
