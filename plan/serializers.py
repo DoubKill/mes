@@ -2,7 +2,7 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
-from basics.models import PlanSchedule, WorkSchedule, ClassesDetail, GlobalCode
+from basics.models import PlanSchedule, WorkSchedule, ClassesDetail, GlobalCode, WorkSchedulePlan
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
@@ -15,7 +15,7 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        exclude = ('product_day_plan', 'classes_detail')
+        exclude = ('product_day_plan', 'work_schedule_plan')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -24,7 +24,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     pdp_product_classes_plan = ProductClassesPlanSerializer(many=True,
                                                             help_text="""
                                                             {"sn":1,"plan_trains":1,"classes":班次id
-                                                            "time":"12:12:12","weight":1,"unit":1}
+                                                            "time":"12.5","weight":1,"unit":1,"note":备注}
                                                             """)
     plan_date = serializers.DateField(help_text="计划日期， 格式：2020-07-31", write_only=True)
     work_schedule = serializers.PrimaryKeyRelatedField(queryset=WorkSchedule.objects.all(),
@@ -49,7 +49,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
 
     def validate(self, attrs):
         plan_date = attrs.pop('plan_date')
-        work_schedule = attrs.get('work_schedule')
+        work_schedule = attrs.pop('work_schedule')
         plan_schedule = PlanSchedule.objects.filter(day_time=plan_date, work_schedule=work_schedule).first()
         if not plan_schedule:
             raise serializers.ValidationError('当前日期暂无排班数据')
@@ -59,25 +59,25 @@ class ProductDayPlanSerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-        work_schedule = validated_data.pop('work_schedule')
         details = validated_data.pop('pdp_product_classes_plan', None)
         # 创建胶料日计划
         instance = super().create(validated_data)
         # 创建胶料日班次班次计划和原材料需求量
         for detail in details:
             classes = detail.pop('classes')
-            class_details = ClassesDetail.objects.filter(work_schedule=work_schedule,
-                                                         classes=classes).first()
+            work_schedule_plan = WorkSchedulePlan.objects.filter(classes=classes,
+                                                                 plan_schedule=instance.plan_schedule).first()
+            if not work_schedule_plan:
+                raise serializers.ValidationError('暂无该班次排班数据')
             detail['plan_classes_uid'] = UUidTools.uuid1_hex()
             detail['product_day_plan'] = instance
-            detail['classes_detail'] = class_details
+            detail['work_schedule_plan'] = work_schedule_plan
             pcp_obj = ProductClassesPlan.objects.create(**detail, created_user=self.context['request'].user)
             for pbd_obj in instance.product_batching.batching_details.all():
-                MaterialDemanded.objects.create(classes=pcp_obj.classes_detail,
+                MaterialDemanded.objects.create(work_schedule_plan=pcp_obj.work_schedule_plan,
                                                 material=pbd_obj.material,
                                                 material_demanded=pbd_obj.actual_weight * pcp_obj.plan_trains,
-                                                plan_classes_uid=pcp_obj.plan_classes_uid,
-                                                plan_schedule=instance.plan_schedule)
+                                                plan_classes_uid=pcp_obj.plan_classes_uid)
         return instance
 
     @atomic()
