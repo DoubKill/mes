@@ -41,7 +41,8 @@
                 dialogVisibleAdd: false,
                 formAdd: {},
                 rubberDialogParams: {
-                    page_size: 100000000,
+                    all: 1,
+                    // page_size: 100000000,
                     product_no: '',
                     plan_date: ''
                 },
@@ -106,7 +107,12 @@
             },
             getMachineList() {
                 var _this = this
-                axios.get(EquipUrl, {params: {page_size: 100000}}).then(function (response) {
+                axios.get(EquipUrl, {
+                    params: {
+                        all: 1
+                        // page_size: 100000
+                    }
+                }).then(function (response) {
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
                 });
@@ -116,7 +122,8 @@
                 var _this = this
                 axios.get(RubberMaterialUrl, {
                     params: {
-                        page_size: 1000000,
+                        all: 1,
+                        // page_size: 1000000,
                         dev_type: _dev_type
                     }
                 }).then(function (response) {
@@ -139,7 +146,10 @@
                 * 否则 使用在选择胶料弹框内，加入筛选
                  */
                 var _this = this
-                var params = bool ? {page_size: 100000000} :
+                var params = bool ? {
+                        all: 1
+                        // page_size: 100000000
+                    } :
                     _this.rubberDialogParams
 
                 if (!bool) {
@@ -306,7 +316,13 @@
             },
             getRubberTypeList() {
                 var _this = this
-                axios.get(GlobalCodesUrl, {params: {class_name: '炼胶机类型', page_size: 1000000}})
+                axios.get(GlobalCodesUrl, {
+                    params: {
+                        class_name: '炼胶机类型',
+                        // page_size: 1000000
+                        all: 1
+                    }
+                })
                     .then(function (response) {
                         _this.rubberTypeList = response.data.results || []
                         _this.dialogVisibleEditLoading = false

@@ -75,16 +75,17 @@
                 src_date: null,
                 dst_date: null,
                 plansForAdd: [],
-                statisticData: []
+                statisticData: [],
+                equipIdForAdd: null
             }
         },
         created: function () {
 
-
             var app = this;
             axios.get(EquipUrl, {
                 params: {
-                    page_size: 100000000
+                    all: 1
+                    // page_size: 100000000
                 }
             }).then(function (response) {
 
@@ -99,7 +100,8 @@
             axios.get(RubberMaterialUrl, {
 
                 params: {
-                    page_size: 100000000
+                    all: 1
+                    // page_size: 100000000
                 }
             }).then(function (response) {
 
@@ -119,7 +121,8 @@
             axios.get(PlanScheduleUrl, {
 
                 params: {
-                    page_size: 100000000
+                    // page_size: 100000000
+                    all: 1
                 }
             }).then(function (response) {
 
@@ -305,28 +308,66 @@
             },
             addOnePlan() {
 
-                if (this.plansForAdd.length) {
+                if (!this.equipIdForAdd) {
+                    return;
+                }
+                var pdp_product_classes_plan = [];
+                for (var i = 0; i < 3; i++) {
 
-                    var objString = JSON.stringify(this.plansForAdd[this.plansForAdd.length - 1]);
-                    this.plansForAdd.push(JSON.parse(objString));
-                } else {
-
-                    var pdp_product_classes_plan = [];
-                    for (var i = 0; i < 3; i++) {
-
-                        pdp_product_classes_plan.push({
-                            plan_trains: 0,
-                            sn: 0,
-                            unit: "吨",
-                            time: 0,
-                            weight: 0,
-                        })
-                    }
-                    this.plansForAdd.push({
-                        plan_date: this.plan_date,
-                        pdp_product_classes_plan
+                    pdp_product_classes_plan.push({
+                        plan_trains: 0,
+                        sn: 0,
+                        unit: "吨",
+                        time: 0,
+                        weight: 0,
                     })
                 }
+                var plan =
+                    {
+                        equip_: this.equipById[this.equipIdForAdd],
+                        equip: this.equipIdForAdd,
+                        plan_date: this.plan_date,
+                        pdp_product_classes_plan
+                    };
+                if (this.equipFirstIndexInPlansForAdd() === -1) {
+
+                    this.plansForAdd.push(plan);
+                    var planForSum = JSON.parse(JSON.stringify(plan));
+                    planForSum["sum"] = true;
+                    planForSum["equip_"].equip_no = "小计";
+                    this.plansForAdd.push(planForSum)
+                } else {
+
+                    var lastIndex = this.equipLastIndexInPlansForAdd();
+                    this.plansForAdd.splice(lastIndex, 0, plan)
+                }
+            },
+            equipLastIndexInPlansForAdd() {
+
+                for (var i = 0; i < this.plansForAdd.length; i++) {
+
+                    if (this.plansForAdd[i].equip_.id === this.equipIdForAdd) {
+
+                        var last = true;
+                        for (var j = i + 1; j < this.plansForAdd.length; j++) {
+
+                            if (this.plansForAdd[j] === this.equipIdForAdd)
+                                last = false
+                        }
+                        if (last)
+                            return i;
+                    }
+                }
+                return -1;
+            },
+            equipFirstIndexInPlansForAdd() {
+
+                for (var i = 0; i < this.plansForAdd.length; i++) {
+
+                    if (this.plansForAdd[i].equip_.id === this.equipIdForAdd)
+                        return i
+                }
+                return -1;
             },
             productBatchingChanged(planForAdd) {
 
@@ -345,20 +386,27 @@
                 planForAdd["pdp_product_classes_plan"][columnIndex]["weight"] =
                     (planForAdd["batching_weight"]
                         * planForAdd["pdp_product_classes_plan"][columnIndex]["plan_trains"]).toFixed(2);
+                this.statistic();
             },
             statistic() {
 
-                this.statisticData = [];
                 var plansByEquip = {};
+                var planSumByEquipId = {};
                 this.plansForAdd.forEach(function (plan) {
 
-                    if (!plansByEquip[plan.equip]) {
+                    if (!plan.sum) {
 
-                        plansByEquip[plan.equip] = []
+                        if (!plansByEquip[plan.equip]) {
+
+                            plansByEquip[plan.equip] = []
+                        }
+                        plansByEquip[plan.equip].push(plan);
+                    } else {
+                        planSumByEquipId[plan.equip] = plan;
                     }
-                    plansByEquip[plan.equip].push(plan);
                 });
                 for (var equipId in plansByEquip) {
+
                     var plans = plansByEquip[equipId];
                     var batching_weight = 0;
                     var production_time_interval = 0;
@@ -378,27 +426,36 @@
                         for (var i = 0; i < 3; i++) {
 
                             var class_plan = plan.pdp_product_classes_plan[i];
-                            pdp_product_classes_plan[i].plan_trains += class_plan.plan_trains;
-                            pdp_product_classes_plan[i].weight += class_plan.weight;
-                            pdp_product_classes_plan[i].time += class_plan.time
+                            pdp_product_classes_plan[i].plan_trains += Number(class_plan.plan_trains);
+                            pdp_product_classes_plan[i].weight += Number(class_plan.weight);
+                            pdp_product_classes_plan[i].time += Number(class_plan.time);
                         }
                     });
+                    for (i = 0; i < 3; i++) {
+
+                        pdp_product_classes_plan[i].weight = pdp_product_classes_plan[i].weight.toFixed(2);
+                        pdp_product_classes_plan[i].time = pdp_product_classes_plan[i].time.toFixed(2);
+                    }
                     batching_weight = batching_weight.toFixed(3);
                     production_time_interval = production_time_interval.toFixed(2);
                     var equip = this.equipById[equipId];
-                    this.statisticData.push({
-                        equip_no: equip.equip_no,
-                        batching_weight,
-                        production_time_interval,
-                        pdp_product_classes_plan
-                    });
+                    planSumByEquipId[equipId].batching_weight = batching_weight;
+                    planSumByEquipId[equipId].production_time_interval = production_time_interval;
+                    planSumByEquipId[equipId].pdp_product_classes_plan = pdp_product_classes_plan;
                 }
             },
             batchSave() {
 
-                console.log(this.plansForAdd);
                 var app = this;
-                axios.post(ProductDayPlanManyCreateUrl, this.plansForAdd)
+                var plansForAdd_ = [];
+                this.plansForAdd.forEach(function (plan) {
+
+                    if (!plan.sum) {
+
+                        plansForAdd_.push(plan)
+                    }
+                });
+                axios.post(ProductDayPlanManyCreateUrl, plansForAdd_)
                     .then(function (response) {
 
                         app.addPlanVisible = false;
@@ -406,15 +463,19 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
-                    var text = "";
-                    for (var key in error.response.data) {
-
-                        text += error.response.data[key] + "\n";
-                    }
-                    app.$message(text);
-
+                    app.$message(JSON.stringify(error.response.data));
+                    //
+                    // var text = "";
+                    // for (var key in error.response.data) {
+                    //
+                    //     text += error.response.data[key] + "\n";
+                    // }
+                    // app.$message(text);
                 });
-            }
+            },
+            arraySpanMethod({row, column, rowIndex, columnIndex}) {
+
+            },
         }
     };
     var Ctor = Vue.extend(Main);

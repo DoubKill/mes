@@ -72,7 +72,7 @@
             style="width: 100%">
         <el-table-column type="index" label="No" width="50"></el-table-column>
         <el-table-column prop="equip_no" label="机台"></el-table-column>
-        <el-table-column prop="product_no" label="胶料配方编码"></el-table-column>
+        <el-table-column width="150" prop="product_no" label="胶料配方编码"></el-table-column>
         <el-table-column prop="batching_weight" label="配料重量（吨）"></el-table-column>
         <el-table-column prop="production_time_interval" label="炼胶时间（分钟）"></el-table-column>
         <el-table-column label="当前库存（吨）"></el-table-column>
@@ -156,85 +156,6 @@
             </div>
         </el-card>
 
-        <!--
-        <el-card v-if="addPlanVisible">
-            <div>
-                新增计划
-                <el-button @click="addPlan" style="float: right; margin-bottom: 20px">
-                    确定
-                </el-button>
-            </div>
-            <div style="overflow-x: auto;clear: both; text-align: center">
-                <table data-toggle="table" class="table table-bordered"
-                       style="color: #909399; font-size: 14px;">
-                    <thead>
-                    <tr>
-                        <th rowspan="2">机台</th>
-                        <th rowspan="2">胶料配方编码</th>
-                        <th rowspan="2">配料重量（吨）</th>
-                        <th rowspan="2">炼胶时间（分钟）</th>
-                        <th rowspan="2">当前库存(吨)</th>
-                        <th colspan="4">早班计划</th>
-                        <th colspan="4">中班计划</th>
-                        <th colspan="4">夜班计划</th>
-                    </tr>
-                    <tr>
-                        <template v-for="_ in 3">
-                            <th>顺序</th>
-                            <th>车次</th>
-                            <th>重量</th>
-                            <th>时间</th>
-                        </template>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr>
-                        <td>
-                            <el-select style="width: 150px;" v-model="rubberDailyPlanForm.equip">
-                                <el-option
-                                        :key="equip.id"
-                                        :label="equip.equip_no"
-                                        :value="equip.id"
-                                        v-for="equip in equips">
-                                </el-option>
-                            </el-select>
-                        </td>
-                        <td>
-                            <el-select @change="productBatchingChange" style="width: 200px;"
-                                       v-model="rubberDailyPlanForm.product_batching">
-                                <el-option
-                                        :key="productBatching.id"
-                                        :label="productBatching.stage_product_batch_no"
-                                        :value="productBatching.id"
-                                        v-for="productBatching in productBatchings">
-                                </el-option>
-                            </el-select>
-                        </td>
-                        <td>{{ batching_weight }}</td>
-                        <td>{{ batching_time_interval }}</td>
-                        <td></td>
-                        <template v-for="(plan, index) in rubberDailyPlanForm.pdp_product_classes_plan">
-                            <td>
-                                <el-input-number v-model="plan.sn" :min="0">
-                                </el-input-number>
-                            </td>
-                            <td>
-                                <el-input-number @change="planTrainsChange(index)" v-model="plan.plan_trains"
-                                                 :min="0"></el-input-number>
-                            </td>
-                            <td>
-                                {{ plan.weight }}
-                            </td>
-                            <td>
-                                {{ plan.time }}
-                            </td>
-                        </template>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-        </el-card>
-        -->
     {% endverbatim vue %}
 {% endblock %}
 
@@ -244,27 +165,25 @@
             :visible.sync="addPlanVisible"
             title="添加胶料日生产计划">
         <div style="margin-bottom: 15px">
+            <el-select placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
+                <el-option
+                        :key="equip.id"
+                        :label="equip.equip_no"
+                        :value="equip.id"
+                        v-for="equip in equips">
+                </el-option>
+            </el-select>
+            <el-button style="float: right" @click="batchSave">保存</el-button>
             <el-button @click="addOnePlan">添加</el-button>
-            <el-button @click="batchSave">保存</el-button>
-            <el-button @click="statistic">统计</el-button>
         </div>
         <el-table
+                :span-method="arraySpanMethod"
                 :data="plansForAdd"
                 border>
-            <el-table-column label="机台" width="150">
-                <template slot-scope="scope">
-                    <el-select v-model="scope.row.equip">
-                        <el-option
-                                :key="equip.id"
-                                :label="equip.equip_no"
-                                :value="equip.id"
-                                v-for="equip in equips">
-                        </el-option>
-                    </el-select>
-                </template>
+            <el-table-column prop="equip_.equip_no" label="机台" width="150">
             </el-table-column>
-            <el-table-column label="胶料配方编码" width="180">
-                <template slot-scope="scope">
+            <el-table-column  label="胶料配方编码" width="180">
+                <template v-if="!scope.row.sum" slot-scope="scope">
                     <el-select @change="productBatchingChanged(scope.row)" v-model="scope.row.product_batching">
                         <el-option
                                 :key="productBatching.id"
@@ -280,14 +199,14 @@
             <el-table-column label="当前库存（吨）"></el-table-column>
             <el-table-column label="早班计划">
                 <el-table-column label="顺序" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="!scope.row.sum" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[0].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
                     <template slot-scope="scope">
-                        <el-input-number @change="planTrainsChanged(scope.row, 0)"
+                        <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 0)"
                                          v-model.number="scope.row.pdp_product_classes_plan[0].plan_trains"
                                          :min="0"></el-input-number>
                     </template>
@@ -296,15 +215,15 @@
                 <el-table-column prop="pdp_product_classes_plan[0].time" label="时间"></el-table-column>
             </el-table-column>
             <el-table-column label="中班计划">
-                <el-table-column label="顺序" width="210">
-                    <template slot-scope="scope">
+                <el-table-column  label="顺序" width="210">
+                    <template v-if="!scope.row.sum" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[1].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
                     <template slot-scope="scope">
-                        <el-input-number @change="planTrainsChanged(scope.row, 1)"
+                        <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 1)"
                                          v-model.number="scope.row.pdp_product_classes_plan[1].plan_trains"
                                          :min="0"></el-input-number>
                     </template>
@@ -314,49 +233,17 @@
             </el-table-column>
             <el-table-column label="晚班计划">
                 <el-table-column label="顺序" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="!scope.row.sum"  slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[2].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
                     <template slot-scope="scope">
-                        <el-input-number @change="planTrainsChanged(scope.row, 2)"
+                        <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 2)"
                                          v-model.number="scope.row.pdp_product_classes_plan[2].plan_trains"
                                          :min="0"></el-input-number>
                     </template>
-                </el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量"></el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[2].time" label="时间"></el-table-column>
-            </el-table-column>
-        </el-table>
-        <h5>小计</h5>
-        <el-table
-                :data="statisticData"
-                border>
-            <el-table-column prop="equip_no" label="机台" width="330"></el-table-column>
-            <el-table-column prop="batching_weight" label="配料重量（吨）"></el-table-column>
-            <el-table-column prop="production_time_interval" label="炼胶时间（分钟）"></el-table-column>
-            <el-table-column label="当前库存（吨）"></el-table-column>
-
-            <el-table-column label="早班计划">
-                <el-table-column width="210"></el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[0].plan_trains" label="车次" width="210"></el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[0].weight" label="重量"></el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[0].time" label="时间"></el-table-column>
-            </el-table-column>
-            <el-table-column label="中班计划">
-                <el-table-column prop="pdp_product_classes_plan[1].sn" label="顺序" width="210">
-                </el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[1].plan_trains" label="车次" width="210">
-                </el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[1].weight" label="重量"></el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[1].time" label="时间"></el-table-column>
-            </el-table-column>
-            <el-table-column label="晚班计划">
-                <el-table-column prop="pdp_product_classes_plan[2].sn" label="顺序" width="210">
-                </el-table-column>
-                <el-table-column prop="pdp_product_classes_plan[2].plan_trains" label="车次" width="210">
                 </el-table-column>
                 <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量"></el-table-column>
                 <el-table-column prop="pdp_product_classes_plan[2].time" label="时间"></el-table-column>

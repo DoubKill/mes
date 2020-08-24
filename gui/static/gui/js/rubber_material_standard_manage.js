@@ -6,8 +6,8 @@
 
             return {
                 currentPage:1,
-                pageSize:null,
-                tableDataTotal:null,
+                raw_material_pageSize: 10,
+                raw_material_tableDataTotal: 0,
                 currentRow: {
                     used_type: -1
                 },
@@ -15,7 +15,19 @@
                 tableDataUrl: RubberMaterialUrl,
                 tableRawMaterialData: [],
                 RubberState: "",
-                RubberStateOptions: [],
+                RubberStateOptions: [{
+                      value: 1, label: '编辑'
+                    }, {
+                      value: 2, label: '提交'
+                    }, {
+                      value: 3, label: '校对'
+                    }, {
+                      value: 4, label: '启用'
+                    }, {
+                      value: 5, label: '驳回'
+                    }, {
+                      value: 6, label: '废弃'
+                    }],
                 RubberSite: "",
                 RubberSiteOptions: [],
                 RubberStage: "",
@@ -147,11 +159,11 @@
         created: function () {
 
             var app = this;
-            axios.get(StateGlobalUrl, {
-            }).then(function (response) {
-                app.RubberStateOptions = response.data.results;
-            }).catch(function (error) {
-            });
+            // axios.get(StateGlobalUrl, {
+            // }).then(function (response) {
+            //     app.RubberStateOptions = response.data.results;
+            // }).catch(function (error) {
+            // });
 
             axios.get(SiteGlobalUrl, {
             }).then(function (response) {
@@ -201,7 +213,7 @@
                 }).then(function (response) {
                     app.RawMaterialOptions = response.data.results;
                     app.tableRawMaterialData = response.data.results;
-                    app.tableDataTotal = response.data.count;
+                    app.raw_material_tableDataTotal = response.data.count;
                 }).catch(function (error) {
                 });
             },
@@ -216,14 +228,44 @@
                     case 1:
                         return "编辑";
                     case 2:
-                        return "通过";
+                        return "提交";
                     case 3:
-                        return "应用";
+                        return "校对";
                     case 4:
-                        return "驳回";
+                        return "启用";
                     case 5:
+                        return "驳回";
+                    case 6:
                         return "废弃";
                 }
+            },
+            status_true: function(row) {
+                var app = this;
+                axios.patch(RubberMaterialUrl + row.id + "/", {
+                    pass_flag:true
+                }).then(function (response) {
+                    app.$message("状态切换成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+            },
+            status_false: function(row) {
+                var app = this;
+                axios.patch(RubberMaterialUrl + row.id + "/", {
+                    pass_flag:false
+                }).then(function (response) {
+                    app.$message("状态切换成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
             },
 
             formatter: function (row, column) {
@@ -266,7 +308,7 @@
             },
             rubber_no_createFilter(queryString) {
                 return (search_rubber_no) => {
-                  return (search_rubber_no.product_name.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+                  return (search_rubber_no.product_no.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
                 };
             },
 
