@@ -43,12 +43,12 @@
         </el-form-item>
         <el-form-item label="班次">
             <el-select v-model="getParams.classes" placeholder="请选择"
-            clearable>
+            clearable @change="changeSearch">
                 <el-option
                         v-for="item in classesList"
                         :key="item.id"
                         :label="item.work_schedule_name+'-'+item.classes_name"
-                        :value="item.id">
+                        :value="item.classes_name">
                 </el-option>
             </el-select>
         </el-form-item>
