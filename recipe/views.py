@@ -81,7 +81,8 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ValidateProductVersionsView(APIView):
-    """验证版本号，创建胶料工艺信息前调用，参数：xxx/?factory=产地id&site=SITEid&product_info=胶料代码id&versions=版本号"""
+    """验证版本号，创建胶料工艺信息前调用，
+    参数：xxx/?factory=产地id&site=SITEid&product_info=胶料代码id&versions=版本号&stage=段次id"""
 
     def get(self, request):
         factory = self.request.query_params.get('factory')
