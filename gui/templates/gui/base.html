@@ -60,7 +60,7 @@
                     <el-menu-item index="3-1">原材料基本信息管理</el-menu-item>
                     <el-menu-item index="3-2">胶料代码管理</el-menu-item>
                     <el-menu-item index="3-3">胶料配料标准管理</el-menu-item>
-{#                    <el-menu-item index="3-4">查询胶料主信息</el-menu-item>#}
+                    <el-menu-item index="3-4">配料小料标准</el-menu-item>
                 </el-submenu>
                 <el-submenu index="4">
                     <template slot="title">
@@ -136,7 +136,7 @@
         "3-1": "{% url 'gui:material-base-info-manage' %}",
         "3-2": "{% url 'gui:rb-recipe-std-manage' %}",
         "3-3": "{% url 'gui:rb-material-std-manage' %}",
-        {#"3-4": "{% url 'gui:search-rubber-info' %}",#}
+        "3-4": "{% url 'gui:search-rubber-info' %}",
         "4-1": "{% url 'gui:rubber-schedule-daily-plan' %}",
         "4-2": "{% url 'gui:rubber-smallStuff-daily-plan' %}",
         "4-3": "{% url 'gui:material-requisitions-plan' %}",
