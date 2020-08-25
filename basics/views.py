@@ -192,7 +192,7 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'equip_no', 'equip_name')
+            data = queryset.values('id', 'equip_no', 'equip_name', 'category')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -287,7 +287,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PlanScheduleManyCreate(APIView):
-    """[{"work_schedule_plan": {"classes": '班次id', "rest_flag": 0, "group": '班组id'},
+    """[{"work_schedule_plan": [{"classes": '班次id', "rest_flag": 0, "group": '班组id'}],
      'day_time': '日期',
      'work_schedule': '倒班id'}...]"""
 
