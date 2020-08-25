@@ -173,23 +173,12 @@
                         v-for="equip in equips">
                 </el-option>
             </el-select>
-            <el-select v-model="workScheduleId" style="margin-right: 10px" placeholder="工作日程">
+            <el-select v-model="planScheduleId" placeholder="计划时间">
                 <el-option
-                        :key="workSchedule.id"
-                        :label="workSchedule.schedule_name"
-                        :value="workSchedule.id"
-                        v-for="workSchedule in workSchedules">
-                </el-option>
-            </el-select>
-            <el-select
-                    @change="queryDataChange"
-                    clearable
-                    v-model="plan_date_for_create" placeholder="请选择日期">
-                <el-option
-                        :key="schedule.id"
-                        :label="schedule.day_time"
-                        :value="schedule.day_time"
-                        v-for="schedule in planSchedules">
+                        :key="planSchedule.id"
+                        :label="planSchedule.day_time"
+                        :value="planSchedule.id"
+                        v-for="planSchedule in planSchedules">
                 </el-option>
             </el-select>
 

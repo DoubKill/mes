@@ -66,7 +66,6 @@
                 batching_weight_for_update: "",
                 batching_time_interval_for_update: "",
                 productBatchings: [],
-                planSchedules: [],
                 productBatchingById: {},
                 addPlanVisible: false,
                 changePlanVisible: false,
@@ -77,9 +76,10 @@
                 plansForAdd: [],
                 statisticData: [],
                 equipIdForAdd: null,
-                workSchedules: [],
-                workScheduleId: null,
-                plan_date_for_create: dayjs().format("YYYY-MM-DD")
+                planScheduleId: null,
+                planSchedules: [],
+                plan_date_for_create: dayjs().format("YYYY-MM-DD"),
+                workSchedules: []
             }
         },
         created: function () {
@@ -103,7 +103,8 @@
             axios.get(RubberMaterialUrl, {
 
                 params: {
-                    all: 1
+                    all: 1,
+                    used_type: 4
                     // page_size: 100000000
                 }
             }).then(function (response) {
@@ -141,7 +142,6 @@
             }).then(function (response) {
 
                 app.workSchedules = response.data.results;
-                console.log(app.workSchedules)
             }).catch(function (error) {
 
             })
@@ -326,10 +326,16 @@
                 if (!this.equipIdForAdd) {
                     return;
                 }
+
+                var planSchedule = this.planSchedules.find(planSchedule => {
+
+                    return planSchedule.id === this.planScheduleId
+                });
                 var workSchedule = this.workSchedules.find(workSchedule => {
 
-                    return workSchedule.id === this.workScheduleId
+                    return workSchedule.id === planSchedule.work_schedule
                 });
+                var classesdetail_set_ = workSchedule.classesdetail_set;
                 var pdp_product_classes_plan = [];
                 for (var i = 0; i < 3; i++) {
                     pdp_product_classes_plan.push({
@@ -338,7 +344,7 @@
                         unit: "吨",
                         time: 0,
                         weight: 0,
-                        classes: workSchedule.classesdetail_set[i].classes
+                        classes: classesdetail_set_[i].classes
                     })
                 }
                 var plan =
@@ -346,7 +352,7 @@
                         equip_: this.equipById[this.equipIdForAdd],
                         equip: this.equipIdForAdd,
                         plan_date: this.plan_date_for_create,
-                        work_schedule: this.workScheduleId,
+                        plan_schedule: this.planScheduleId,
                         pdp_product_classes_plan
                     };
                 if (this.equipFirstIndexInPlansForAdd() === -1) {
@@ -475,6 +481,7 @@
                         plansForAdd_.push(plan)
                     }
                 });
+                console.log(plansForAdd_);
                 if (!plansForAdd_.length)
                     return;
                 axios.post(ProductDayPlanManyCreateUrl, plansForAdd_)
