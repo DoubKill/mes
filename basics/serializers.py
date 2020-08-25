@@ -227,6 +227,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     """计划时间排班序列化器"""
     work_schedule_plan = WorkSchedulePlanSerializer(many=True,
                                                     help_text="""{"classes":班次id, "rest_flag":0, "group":班组id""")
+    work_schedule_name = serializers.CharField(source='work_schedule.schedule_name', read_only=True)
 
     class Meta:
         model = PlanSchedule
