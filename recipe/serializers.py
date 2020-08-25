@@ -109,7 +109,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     update_user_name = serializers.CharField(source='last_updated_user.username', read_only=True)
     stage_name = serializers.CharField(source="stage.global_name")
     site_name = serializers.CharField(source="site.global_name")
-    dev_type_name = serializers.CharField(source='dev_type.global_name', default=None, read_only=True)
+    dev_type_name = serializers.CharField(source='dev_type.category_name', default=None, read_only=True)
 
     class Meta:
         model = ProductBatching
@@ -160,7 +160,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
-                  'stage', 'versions', 'batching_details', 'equip')
+                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
