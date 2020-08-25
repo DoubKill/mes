@@ -3,7 +3,16 @@
 
 {% block main %}
     <el-form :inline="true">
+
         <el-form-item label="日期">
+            <el-date-picker
+                    v-model="plan_date"
+                    @change="queryDataChange"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
+            <!--
             <el-select
                     @change="queryDataChange"
                     clearable
@@ -15,6 +24,7 @@
                         v-for="schedule in planSchedules">
                 </el-option>
             </el-select>
+            -->
         </el-form-item>
         <el-form-item label="机台">
             <el-select

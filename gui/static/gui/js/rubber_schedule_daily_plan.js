@@ -508,7 +508,6 @@
                 if (!plansForAdd_.length)
                     return;
 
-                console.log(plansForAdd_);
                 axios.post(ProductDayPlanManyCreateUrl, plansForAdd_)
                     .then(function (response) {
 
