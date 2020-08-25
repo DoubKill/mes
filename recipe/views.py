@@ -157,8 +157,9 @@ class ProductBatchingViewSet(ModelViewSet):
         配料审批
     """
     # TODO 配方下载功能（只能下载应用状态的配方，并去除当前计划中的配方）
-    queryset = ProductBatching.objects.filter(delete_flag=False).select_related("factory", "site", "dev_type", "stage",
-                                                                                "product_info").order_by('-created_date')
+    queryset = ProductBatching.objects.filter(delete_flag=False).select_related("factory", "site",
+                                                                                "dev_type", "stage", "product_info"
+                                                                                ).order_by('-created_date')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter

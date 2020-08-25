@@ -110,7 +110,7 @@ class ProductBatching(AbstractEntity):
     used_time = models.DateTimeField(help_text='发行时间', verbose_name='发行时间', blank=True, null=True)
     production_time_interval = models.DecimalField(help_text='炼胶时间(分)', blank=True, null=True,
                                                    decimal_places=2, max_digits=8)
-    equip_no = models.CharField(max_length=64, help_text='机台编号', blank=True, null=True)
+    equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.DO_NOTHING)
 
     def __str__(self):
         return self.stage_product_batch_no
