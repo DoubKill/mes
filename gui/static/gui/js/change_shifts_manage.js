@@ -85,8 +85,8 @@
                 };
             },
             afterGetData: function () {
-
                 this.workSchedules = this.tableData;
+                console.log(this.workSchedules)
             },
             showDialogCreateChangeShiftsManage() {
 
@@ -133,8 +133,8 @@
 
                     Vue.set(this.changeShiftsManageForm.classesdetail_set[i], "times", [
 
-                            this.changeShiftsManageForm.classesdetail_set[i].start_time,
-                            this.changeShiftsManageForm.classesdetail_set[i].end_time]);
+                        this.changeShiftsManageForm.classesdetail_set[i].start_time,
+                        this.changeShiftsManageForm.classesdetail_set[i].end_time]);
                 }
                 this.dialogEditChangeShiftsManageVisible = true;
             },

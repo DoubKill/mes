@@ -173,6 +173,26 @@
                         v-for="equip in equips">
                 </el-option>
             </el-select>
+            <el-select v-model="workScheduleId" style="margin-right: 10px" placeholder="工作日程">
+                <el-option
+                        :key="workSchedule.id"
+                        :label="workSchedule.schedule_name"
+                        :value="workSchedule.id"
+                        v-for="workSchedule in workSchedules">
+                </el-option>
+            </el-select>
+            <el-select
+                    @change="queryDataChange"
+                    clearable
+                    v-model="plan_date_for_create" placeholder="请选择日期">
+                <el-option
+                        :key="schedule.id"
+                        :label="schedule.day_time"
+                        :value="schedule.day_time"
+                        v-for="schedule in planSchedules">
+                </el-option>
+            </el-select>
+
             <el-button style="float: right" @click="batchSave">保存</el-button>
             <el-button @click="addOnePlan">添加</el-button>
         </div>
@@ -182,7 +202,7 @@
                 border>
             <el-table-column prop="equip_.equip_no" label="机台" width="150">
             </el-table-column>
-            <el-table-column  label="胶料配方编码" width="180">
+            <el-table-column label="胶料配方编码" width="180">
                 <template v-if="!scope.row.sum" slot-scope="scope">
                     <el-select @change="productBatchingChanged(scope.row)" v-model="scope.row.product_batching">
                         <el-option
@@ -215,7 +235,7 @@
                 <el-table-column prop="pdp_product_classes_plan[0].time" label="时间"></el-table-column>
             </el-table-column>
             <el-table-column label="中班计划">
-                <el-table-column  label="顺序" width="210">
+                <el-table-column label="顺序" width="210">
                     <template v-if="!scope.row.sum" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[1].sn"
                                          :min="0"></el-input-number>
@@ -233,7 +253,7 @@
             </el-table-column>
             <el-table-column label="晚班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum"  slot-scope="scope">
+                    <template v-if="!scope.row.sum" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[2].sn"
                                          :min="0"></el-input-number>
                     </template>

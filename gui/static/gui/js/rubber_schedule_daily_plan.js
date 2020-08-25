@@ -76,7 +76,10 @@
                 dst_date: null,
                 plansForAdd: [],
                 statisticData: [],
-                equipIdForAdd: null
+                equipIdForAdd: null,
+                workSchedules: [],
+                workScheduleId: null,
+                plan_date_for_create: dayjs().format("YYYY-MM-DD")
             }
         },
         created: function () {
@@ -130,6 +133,18 @@
             }).catch(function (error) {
 
             });
+            axios.get(WorkSchedulesUrl, {
+                params: {
+
+                    all: 1
+                }
+            }).then(function (response) {
+
+                app.workSchedules = response.data.results;
+                console.log(app.workSchedules)
+            }).catch(function (error) {
+
+            })
         },
         methods: {
 
@@ -311,22 +326,27 @@
                 if (!this.equipIdForAdd) {
                     return;
                 }
+                var workSchedule = this.workSchedules.find(workSchedule => {
+
+                    return workSchedule.id === this.workScheduleId
+                });
                 var pdp_product_classes_plan = [];
                 for (var i = 0; i < 3; i++) {
-
                     pdp_product_classes_plan.push({
                         plan_trains: 0,
                         sn: 0,
                         unit: "吨",
                         time: 0,
                         weight: 0,
+                        classes: workSchedule.classesdetail_set[i].classes
                     })
                 }
                 var plan =
                     {
                         equip_: this.equipById[this.equipIdForAdd],
                         equip: this.equipIdForAdd,
-                        plan_date: this.plan_date,
+                        plan_date: this.plan_date_for_create,
+                        work_schedule: this.workScheduleId,
                         pdp_product_classes_plan
                     };
                 if (this.equipFirstIndexInPlansForAdd() === -1) {
@@ -455,6 +475,8 @@
                         plansForAdd_.push(plan)
                     }
                 });
+                if (!plansForAdd_.length)
+                    return;
                 axios.post(ProductDayPlanManyCreateUrl, plansForAdd_)
                     .then(function (response) {
 
@@ -463,14 +485,10 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
-                    app.$message(JSON.stringify(error.response.data));
-                    //
-                    // var text = "";
-                    // for (var key in error.response.data) {
-                    //
-                    //     text += error.response.data[key] + "\n";
-                    // }
-                    // app.$message(text);
+                    app.$alert(JSON.stringify(error.response.data.join(",").trim()), '错误', {
+                        confirmButtonText: '确定',
+                    });
+
                 });
             },
             arraySpanMethod({row, column, rowIndex, columnIndex}) {
