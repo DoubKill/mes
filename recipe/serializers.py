@@ -109,7 +109,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     update_user_name = serializers.CharField(source='last_updated_user.username', read_only=True)
     stage_name = serializers.CharField(source="stage.global_name")
     site_name = serializers.CharField(source="site.global_name")
-    dev_type_name = serializers.CharField(source='dev_type.global_name', default=None, read_only=True)
+    dev_type_name = serializers.CharField(source='dev_type.category_name', default=None, read_only=True)
 
     class Meta:
         model = ProductBatching
@@ -123,6 +123,17 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                                                        help_text="""
                                                            [{"sn": 序号, "material":原材料id, "auto_flag": true,
                                                            "actual_weight":重量, "standard_error":误差值}]""")
+
+    def validate(self, attrs):
+        product_batching = ProductBatching.objects.filter(factory=attrs['factory'],
+                                                          site=attrs['site'],
+                                                          stage=attrs['stage'],
+                                                          product_info=attrs['product_info']
+                                                          ).order_by('-versions').first()
+        if product_batching:
+            if product_batching.versions >= attrs['versions']:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+                raise serializers.ValidationError('该配方版本号不得小于现有版本号')
+        return attrs
 
     @atomic()
     def create(self, validated_data):
@@ -160,7 +171,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
-                  'stage', 'versions', 'batching_details', 'equip')
+                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
@@ -178,6 +189,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     @atomic()
     def update(self, instance, validated_data):
+        if instance.used_type != 1:
+            raise serializers.ValidationError('只有编辑状态的配方才可修改')
         batching_details = validated_data.pop('batching_details', None)
         instance = super().update(instance, validated_data)
         batching_weight = manual_material_weight = auto_material_weight = 0
