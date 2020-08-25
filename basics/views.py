@@ -1,6 +1,7 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
@@ -73,7 +74,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'global_no', 'global_name', 'global_type__type_name')
+            data = queryset.filter(used_flag=0).values('id', 'global_no', 'global_name', 'global_type__type_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -98,6 +99,27 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
                           PermissionClass(return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     filter_class = WorkScheduleFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(),
+                    PermissionClass(return_permission_params(self.model_name))())
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.plan_schedule.exists():
+            raise ValidationError('该倒班已管理排班计划，不可删除')
+        return super(WorkScheduleViewSet, self).destroy(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.action in ['update', 'partial_update']:
@@ -134,8 +156,8 @@ class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'category_no', 'category_name')
-            return Response({'results': data})
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
         else:
             return super().list(request, *args, **kwargs)
 

@@ -107,15 +107,6 @@ class ClassesSimpleSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class ClassesDetailUpdateSerializer(BaseModelSerializer):
-    """工作日程班次条目修改序列化器"""
-
-    class Meta:
-        model = ClassesDetail
-        exclude = ('work_schedule',)
-        extra_kwargs = {'id': {'read_only': False}}
-
-
 class WorkScheduleSerializer(BaseModelSerializer):
     """日程创建、列表、详情序列化器"""
     classesdetail_set = ClassesDetailSerializer(many=True,
@@ -142,20 +133,23 @@ class WorkScheduleSerializer(BaseModelSerializer):
 
 class WorkScheduleUpdateSerializer(BaseModelSerializer):
     """日程修改序列化器"""
-    classesdetail_set = ClassesDetailUpdateSerializer(many=True,
+    classesdetail_set = ClassesDetailSerializer(many=True,
                                                       help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,
                                                       "start_time":"12:12:12", "end_time":"12:12:12",
                                                       "classes_type_name":"正常"}]""")
 
     @atomic()
     def update(self, instance, validated_data):
+        if instance.plan_schedule.exists():
+            raise serializers.ValidationError('该倒班已管理排班计划，不可修改')
         classesdetail_set = validated_data.pop('classesdetail_set', None)
-        for plan in classesdetail_set:
-            plan_id = plan.pop('id', None)
-            if plan_id:  # 有id的数据代表更新
-                ClassesDetail.objects.filter(id=plan_id).update(**plan)
-            else:  # 否则新建
-                ClassesDetail.objects.create(**plan)
+        if classesdetail_set is not None:
+            instance.classesdetail_set.all().delete()
+            classes_details_list = []
+            for plan in classesdetail_set:
+                plan['work_schedule'] = instance
+                classes_details_list.append(ClassesDetail(**plan))
+            ClassesDetail.objects.bulk_create(classes_details_list)
         instance = super().update(instance, validated_data)
         return instance
 
