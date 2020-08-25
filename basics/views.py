@@ -243,7 +243,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'day_time', 'work_schedule')
-            return Response({'results': data})
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
         else:
             return super().list(request, *args, **kwargs)
