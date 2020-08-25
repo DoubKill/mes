@@ -217,11 +217,12 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_type = 3
             elif instance.used_type == 3:  # 启用
                 # 废弃旧版本
-                # ProductInfo.objects.filter(used_type=4,
-                #                            product_no=instance.product_no,
-                #                            factory=instance.factory
-                #                            ).update(used_type=6,
-                #                                     obsolete_time=datetime.now())
+                ProductBatching.objects.filter(used_type=4,
+                                               site=instance.site,
+                                               product_info=instance.product_info,
+                                               factory=instance.factory,
+                                               stage=instance.stage
+                                               ).update(used_type=6, used_time=datetime.now())
                 instance.used_type = 4
                 instance.used_user = self.context['request'].user
                 instance.used_time = datetime.now()

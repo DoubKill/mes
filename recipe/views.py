@@ -87,21 +87,23 @@ class ValidateProductVersionsView(APIView):
         factory = self.request.query_params.get('factory')
         site = self.request.query_params.get('site')
         product_info = self.request.query_params.get('product_info')
+        stage = self.request.query_params.get('stage')
         versions = self.request.query_params.get('versions')
-        if not all([versions, factory, site, product_info]):
+        if not all([versions, factory, site, product_info, stage]):
             raise ValidationError('参数不足')
         try:
+            stage = int(stage)
             site = int(site)
             product_info = int(product_info)
             factory = int(factory)
         except Exception:
             raise ValidationError('参数错误')
-        product_batching = ProductBatching.objects.filter(factory_id=factory, site_id=site,
+        product_batching = ProductBatching.objects.filter(factory_id=factory, site_id=site, stage_id=stage,
                                                           product_info_id=product_info
                                                           ).order_by('-versions').first()
         if product_batching:
             if product_batching.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
-                return Response({'code': -1, 'message': '版本号不得小于现有版本号'})
+                return Response({'code': -1, 'message': '该配方版本号不得小于现有版本号'})
         return Response({'code': 0, 'message': ''})
 
 
