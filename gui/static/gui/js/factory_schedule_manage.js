@@ -64,14 +64,18 @@
                         group_infos: []
                     };
                     var classes = this.classesByIndex[i % workSchedule.period];
-                    console.log(classes);
                     for (var j = 0; j < classes.length; j++) {
-                        var class_ =  JSON.parse(JSON.stringify(classes[j]));
+                        var class_ = JSON.parse(JSON.stringify(classes[j]));
                         Vue.set(class_, 'is_rest', false);
                         if (class_.group) {
                             class_.group_name = this.groupById[class_.group];
-                            console.log(
-                            this.groupById[class_.group])
+                        } else {
+
+                            this.$alert('必须选择所有班组', '错误', {
+                                confirmButtonText: '确定',
+                            });
+                            this.scheduleData = [];
+                            return;
                         }
                         row.group_infos.push(class_)
                     }
@@ -100,6 +104,44 @@
                     date = date.add(1, 'day');
                 }
                 this.classData = classDate_;
+            },
+            savePlanSchedules() {
+
+                var planSchedules = [];
+                var workSchedule = this.workSchedules[this.workScheduleIndex];
+                console.log(this.scheduleData);
+                for (var i = 0; i < this.scheduleData.length; i++) {
+
+                    var oneSchedule = this.scheduleData[i];
+                    var work_schedule_plan = [];
+                    for (var j = 0; j < oneSchedule.group_infos.length; j++) {
+
+                        var group_info = oneSchedule.group_infos[j];
+                        work_schedule_plan.push({
+
+                            classes: group_info.classes,
+                            rest_flag: group_info.is_rest,
+                            group: group_info.group
+                        })
+                    }
+                    planSchedules.push({
+                        day_time: oneSchedule.production_time,
+                        work_schedule: workSchedule.id,
+                        work_schedule_plan
+                    })
+                }
+                var app = this;
+                axios.post(PlanSchedulesUrl, planSchedules)
+                    .then(function (response) {
+
+                        app.$message("排班创建成功");
+                    }).catch(function (error) {
+
+                    app.$alert(error.response.data, '错误', {
+                        confirmButtonText: '确定',
+                    });
+
+                });
             }
         },
         created: function () {

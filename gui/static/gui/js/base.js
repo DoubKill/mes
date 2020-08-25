@@ -62,6 +62,9 @@ const InternalMixerUrl = "/api/v1/production/production-record/"
 const ClassesListUrl = '/api/v1/basics/classes/'
 const EchartsListUrl = "/api/v1/production/equip-status/"
 
+const PlanSchedulesUrl = "/api/v1/basics/plan-schedules/";
+
+
 var BaseMixin = {
 
     data: function () {
