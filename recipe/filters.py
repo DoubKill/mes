@@ -30,7 +30,9 @@ class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
                                                        help_text='胶料编码')
     dev_type = django_filters.NumberFilter(field_name='dev_type_id', help_text='炼胶机类型id')
     site = django_filters.NumberFilter(field_name='site', help_text='SITE')
-    used_type = django_filters.NumberFilter(field_name='used_type', help_text='状态')
+    used_type = django_filters.NumberFilter(field_name='used_type', help_text=""" (1, '编辑'), (2, '提交'), (3, '校对'), 
+                                                                                  (4, '启用'), (5, '驳回'), (6, '废弃')
+                                                                              """)
     stage_id = django_filters.NumberFilter(field_name='stage_id', help_text='段次id')
 
     class Meta:
