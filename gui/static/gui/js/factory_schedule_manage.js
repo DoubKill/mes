@@ -47,14 +47,11 @@
             },
             generateScheduling() {
 
-                this.groupIds = [];
-                for (var i = 0;
-                     i < this.workSchedules[this.workScheduleIndex].classesdetail_set.length; ++i) {
-                    this.groupIds.push(this.workSchedules[this.workScheduleIndex].classesdetail_set[i].group);
-                }
-                this.scheduleData = [];
                 var date = dayjs(this.startTime);
-                for (var j = 0; j < 360; ++j) {
+                var dayToNextMonth = date.endOf('month').diff(date, 'day');
+                this.scheduleData = [];
+                var workSchedule = this.workSchedules[this.workScheduleIndex];
+                for (var i = 0; i <= dayToNextMonth; i++) {
 
                     var day = date.get('day');
                     var row = {
@@ -63,30 +60,64 @@
                         day_of_the_week: "星期" + this.dayOfWeek(day),
                         group_infos: []
                     };
-                    for (var k = 0; k < this.groupIds.length; ++k) {
-
-
-                        row['group_infos'].push({
-                                group_id: this.groupIds[k],
-                                group_name: this.groupById[this.groupIds[k]],
-                                start_time: this.classData[k].start_time,
-                                end_time: this.classData[k].end_time,
-                                is_rest: false
-                            }
-                        )
-                    }
-                    if ((j + 1) % Number(this.changeShiftsPeriod) === 0) {
-
-                        var id = this.groupIds.pop();
-                        this.groupIds.unshift(id)
-                    }
                     this.scheduleData.push(row);
                     date = date.add(1, 'day');
                 }
+
+                // console.log(date.endOf('month'), "end")
+                // this.groupIds = [];
+                // for (var i = 0;
+                //      i < this.workSchedules[this.workScheduleIndex].classesdetail_set.length; ++i) {
+                //     this.groupIds.push(this.workSchedules[this.workScheduleIndex].classesdetail_set[i].group);
+                // }
+                // this.scheduleData = [];
+                // var date = dayjs(this.startTime);
+                // console.log(date.endOf('month'), "end")
+                // for (var j = 0; j < 30; ++j) {
+                //
+                //     var day = date.get('day');
+                //     var row = {
+                //
+                //         production_time: date.format('YYYY-MM-DD'),
+                //         day_of_the_week: "星期" + this.dayOfWeek(day),
+                //         group_infos: []
+                //     };
+                //     for (var k = 0; k < this.groupIds.length; ++k) {
+                //
+                //         row['group_infos'].push({
+                //                 group_id: this.groupIds[k],
+                //                 group_name: this.groupById[this.groupIds[k]],
+                //                 start_time: this.classData[k].start_time,
+                //                 end_time: this.classData[k].end_time,
+                //                 is_rest: false
+                //             }
+                //         )
+                //     }
+                //     if ((j + 1) % Number(this.changeShiftsPeriod) === 0) {
+                //
+                //         var id = this.groupIds.pop();
+                //         this.groupIds.unshift(id)
+                //     }
+                //     this.scheduleData.push(row);
+                //     date = date.add(1, 'day');
+                // }
             },
             shiftsTimeChange() {
 
-                this.classData = this.workSchedules[this.workScheduleIndex].classesdetail_set;
+                var date = dayjs(this.startTime);
+                var workSchedule = this.workSchedules[this.workScheduleIndex];
+                var classDate_ = [];
+                for (var i = 0; i < workSchedule.period; i++) {
+
+                    for (var k = 0; k < workSchedule.classesdetail_set.length; k++) {
+
+                        var classesdetail = workSchedule.classesdetail_set[k];
+                        classesdetail.date = date.format('YYYY-MM-DD');
+                        classDate_.push(JSON.parse(JSON.stringify(classesdetail)));
+                    }
+                    date = date.add(1, 'day');
+                }
+                this.classData = classDate_;
             }
         },
         created: function () {
