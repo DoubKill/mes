@@ -121,7 +121,7 @@ class ProductDayPlanManyCreate(APIView):
         s = ProductDayPlanSerializer(data=request.data, many=many, context={'request': request})
         s.is_valid(raise_exception=True)
         s.save()
-        return Response(s.validated_data)
+        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
