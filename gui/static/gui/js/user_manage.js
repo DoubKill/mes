@@ -58,7 +58,7 @@
         created: function () {
 
             var app = this;
-            axios.get(GroupUrl)
+            axios.get(GroupUrl + '?all=1')
                 .then(function (response) {
 
                     app.groups = response.data.results;

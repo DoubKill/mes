@@ -41,7 +41,8 @@
 
                 params: {
 
-                    class_name: "原材料类别"
+                    class_name: "原材料类别",
+                    all:1
                 }
             }).then(function (response) {
 
