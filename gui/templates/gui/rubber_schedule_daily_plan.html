@@ -173,10 +173,18 @@
                         v-for="equip in equips">
                 </el-option>
             </el-select>
-            <el-select v-model="planScheduleId" placeholder="计划时间">
+            <el-date-picker
+                    style="margin-right: 10px"
+                    @change="getPlanSchedules"
+                    v-model="day_time"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
+            <el-select v-model="planScheduleId" placeholder="倒班规则">
                 <el-option
                         :key="planSchedule.id"
-                        :label="planSchedule.day_time"
+                        :label="planSchedule.work_schedule_name"
                         :value="planSchedule.id"
                         v-for="planSchedule in planSchedules">
                 </el-option>
@@ -208,13 +216,13 @@
             <el-table-column label="当前库存（吨）"></el-table-column>
             <el-table-column label="早班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum" slot-scope="scope">
+                    <template v-if="!scope.row.sum && scope.row.pdp_product_classes_plan[0].enable" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[0].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="scope.row.pdp_product_classes_plan[0].enable" slot-scope="scope">
                         <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 0)"
                                          v-model.number="scope.row.pdp_product_classes_plan[0].plan_trains"
                                          :min="0"></el-input-number>
@@ -225,13 +233,13 @@
             </el-table-column>
             <el-table-column label="中班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum" slot-scope="scope">
+                    <template v-if="!scope.row.sum && scope.row.pdp_product_classes_plan[1].enable" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[1].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="scope.row.pdp_product_classes_plan[1].enable" slot-scope="scope">
                         <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 1)"
                                          v-model.number="scope.row.pdp_product_classes_plan[1].plan_trains"
                                          :min="0"></el-input-number>
@@ -242,13 +250,13 @@
             </el-table-column>
             <el-table-column label="晚班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum" slot-scope="scope">
+                    <template v-if="!scope.row.sum && scope.row.pdp_product_classes_plan[2].enable" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[2].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="scope.row.pdp_product_classes_plan[2].enable" slot-scope="scope">
                         <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 2)"
                                          v-model.number="scope.row.pdp_product_classes_plan[2].plan_trains"
                                          :min="0"></el-input-number>

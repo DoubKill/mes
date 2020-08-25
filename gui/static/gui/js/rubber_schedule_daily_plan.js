@@ -79,7 +79,8 @@
                 planScheduleId: null,
                 planSchedules: [],
                 plan_date_for_create: dayjs().format("YYYY-MM-DD"),
-                workSchedules: []
+                workSchedules: [],
+                day_time: ""
             }
         },
         created: function () {
@@ -122,21 +123,9 @@
             }).catch(function (error) {
 
             });
-            axios.get(PlanScheduleUrl, {
-
-                params: {
-                    // page_size: 100000000
-                    all: 1
-                }
-            }).then(function (response) {
-
-                app.planSchedules = response.data.results;
-            }).catch(function (error) {
-
-            });
+            this.getPlanSchedules();
             axios.get(WorkSchedulesUrl, {
                 params: {
-
                     all: 1
                 }
             }).then(function (response) {
@@ -148,6 +137,23 @@
         },
         methods: {
 
+            getPlanSchedules() {
+
+                var app = this;
+                axios.get(PlanScheduleUrl, {
+
+                    params: {
+                        all: 1,
+                        day_time: this.day_time
+                    }
+                }).then(function (response) {
+
+                    app.planSchedules = response.data.results;
+                    app.planScheduleId = null
+                }).catch(function (error) {
+
+                });
+            },
             queryDataChange: function () {
 
                 this.currentChange(this.currentPage);
@@ -326,7 +332,6 @@
                 if (!this.equipIdForAdd) {
                     return;
                 }
-
                 var planSchedule = this.planSchedules.find(planSchedule => {
 
                     return planSchedule.id === this.planScheduleId
@@ -335,25 +340,33 @@
 
                     return workSchedule.id === planSchedule.work_schedule
                 });
+                if (!planSchedule.work_schedule_plan.length) {
+                    this.$alert(planSchedule.work_schedule_name + '无排班', '错误', {
+                        confirmButtonText: '确定',
+                    });
+                    return;
+                }
                 var classesdetail_set_ = workSchedule.classesdetail_set;
                 var pdp_product_classes_plan = [];
                 for (var i = 0; i < 3; i++) {
+
+                    var enable = !!planSchedule.work_schedule_plan[i];
                     pdp_product_classes_plan.push({
                         plan_trains: 0,
                         sn: 0,
                         unit: "吨",
-                        time: 0,
-                        weight: 0,
-                        classes: classesdetail_set_[i].classes
+                        time: enable ? 0 : '',
+                        weight: enable ? 0 : '',
+                        classes: classesdetail_set_[i].classes,
+                        enable
                     })
                 }
                 var plan =
                     {
                         equip_: this.equipById[this.equipIdForAdd],
                         equip: this.equipIdForAdd,
-                        plan_date: this.plan_date_for_create,
                         plan_schedule: this.planScheduleId,
-                        pdp_product_classes_plan
+                        pdp_product_classes_plan,
                     };
                 if (this.equipFirstIndexInPlansForAdd() === -1) {
 
@@ -404,6 +417,9 @@
                 }
             },
             planTrainsChanged(planForAdd, columnIndex) {
+
+                if (!planForAdd["pdp_product_classes_plan"][columnIndex].enable)
+                    return;
 
                 planForAdd["pdp_product_classes_plan"][columnIndex]["time"] =
                     (planForAdd["production_time_interval"]
@@ -478,12 +494,21 @@
 
                     if (!plan.sum) {
 
-                        plansForAdd_.push(plan)
+                        var plan_ = JSON.parse(JSON.stringify(plan));
+                        plan_.pdp_product_classes_plan = [];
+                        for (var i = 0; i < plan.pdp_product_classes_plan.length; i++) {
+
+                            if (plan.pdp_product_classes_plan[i].enable) {
+                                plan_.pdp_product_classes_plan.push(plan.pdp_product_classes_plan[i])
+                            }
+                        }
+                        plansForAdd_.push(plan_)
                     }
                 });
-                console.log(plansForAdd_);
                 if (!plansForAdd_.length)
                     return;
+
+                console.log(plansForAdd_);
                 axios.post(ProductDayPlanManyCreateUrl, plansForAdd_)
                     .then(function (response) {
 
