@@ -4,6 +4,7 @@ from rest_framework import mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, EquipCategoryFilter
@@ -282,3 +283,22 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': serializer.data})
         else:
             return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlanScheduleManyCreate(APIView):
+    """[{"work_schedule_plan": {"classes": '班次id', "rest_flag": 0, "group": '班组id'},
+     'day_time': '日期',
+     'work_schedule': '倒班id'}...]"""
+
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+        elif isinstance(request.data, list):
+            many = True
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+        s = PlanScheduleSerializer(data=request.data, many=many, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response('新建成功')
