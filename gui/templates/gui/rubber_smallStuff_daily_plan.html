@@ -94,6 +94,9 @@
                     header-align="center"
                     prop="manual_material_weight"
                     label="小料重量（kg）">
+                <template slot-scope="scope">
+                    {{ scope.row.manual_material_weight||'--' }}
+                </template>
             </el-table-column>
             <el-table-column
                     align="center"
@@ -332,7 +335,6 @@
                 <el-button type="primary" @click="rubberDialogSubmit">确 定</el-button>
             </span>
         </el-dialog>
-
         <el-dialog
                 :title="formEdit.id?'编辑':'新建'"
                 :visible.sync="dialogVisibleEdit"

@@ -1,9 +1,7 @@
-from datetime import datetime
 
 from django.db.models import Sum
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -35,7 +33,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = ProductDayPlan.objects.filter(delete_flag=False).select_related(
         'equip__category', 'plan_schedule', 'product_batching').prefetch_related(
-        'pdp_product_classes_plan__classes_detail', 'pdp_product_batching_day_plan')
+        'pdp_product_classes_plan__work_schedule_plan', 'pdp_product_batching_day_plan')
     serializer_class = ProductDayPlanSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
@@ -103,10 +101,10 @@ class ProductBatchingDayPlanManyCreate(APIView):
             many = True
         else:
             return Response(data={'detail': '数据有误'}, status=400)
-        pbdp_ser = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
-        pbdp_ser.is_valid(raise_exception=True)
-        book_obj_or_list = pbdp_ser.save()
-        return Response(ProductBatchingDayPlanSerializer(book_obj_or_list, many=many).data)
+        s = ProductBatchingDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.validated_data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -120,10 +118,10 @@ class ProductDayPlanManyCreate(APIView):
             many = True
         else:
             return Response(data={'detail': '数据有误'}, status=400)
-        pbdp_ser = ProductDayPlanSerializer(data=request.data, many=many, context={'request': request})
-        pbdp_ser.is_valid(raise_exception=True)
-        book_obj_or_list = pbdp_ser.save()
-        return Response(ProductDayPlanSerializer(book_obj_or_list, many=many).data)
+        s = ProductDayPlanSerializer(data=request.data, many=many, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.validated_data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -162,7 +160,7 @@ class MaterialDemandedAPIView(ListAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         data = queryset.filter(**kwargs).select_related('material', 'classes__classes').\
             values('material__material_name', 'material__material_no',
-                   'material__material_type__global_name', 'classes__classes__global_name'
+                   'material__material_type__global_name', 'work_schedule_plan__classes__global_name'
                    ).annotate(num=Sum('material_demanded'))
         materials = []
         ret = {}
@@ -172,10 +170,11 @@ class MaterialDemandedAPIView(ListAPIView):
                     'material_no': item['material__material_no'],
                     'material_name': item['material__material_name'],
                     "material_type": item['material__material_type__global_name'],
-                    "class_details": {item['classes__classes__global_name']: item['num']}}
+                    "class_details": {item['work_schedule_plan__classes__global_name']: item['num']}}
                 materials.append(item['material__material_name'])
             else:
-                ret[item['material__material_name']]['class_details'][item['classes__classes__global_name']] = item['num']
+                ret[item['material__material_name']
+                    ]['class_details'][item['work_schedule_plan__classes__global_name']] = item['num']
         page = self.paginate_queryset(list(ret.values()))
         return self.get_paginated_response(page)
 
