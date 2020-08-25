@@ -39,12 +39,13 @@ class ProductDayPlanSerializer(BaseModelSerializer):
     production_time_interval = serializers.DecimalField(source='product_batching.production_time_interval',
                                                         read_only=True,
                                                         help_text='配料时间', decimal_places=2, max_digits=10)
+    dev_type_name = serializers.CharField(source='product_batching.dev_type.global_name', read_only=True)
 
     class Meta:
         model = ProductDayPlan
         fields = ('id', 'work_schedule', 'plan_date', 'equip', 'equip_no', 'category',
                   'product_no', 'batching_weight', 'production_time_interval', 'product_batching',
-                  'pdp_product_classes_plan')
+                  'pdp_product_classes_plan', 'dev_type_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate(self, attrs):
