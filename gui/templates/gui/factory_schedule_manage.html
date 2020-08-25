@@ -17,6 +17,7 @@
                     </el-form-item>
                     <el-form-item label="开始时间" :label-width="formLabelWidth">
                         <el-date-picker style="width: 100%"
+                                        @change="shiftsTimeChange"
                                         v-model="startTime"
                                         type="date"
                                         placeholder="选择日期">
@@ -88,7 +89,7 @@
     <el-row>
         <el-form>
             <el-form-item>
-                <el-button @click="" style="float: right">保存</el-button>
+                <el-button @click="savePlanSchedules" style="float: right">保存</el-button>
             </el-form-item>
         </el-form>
 
