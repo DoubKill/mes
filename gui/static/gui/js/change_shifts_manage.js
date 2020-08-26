@@ -98,7 +98,6 @@
             },
             afterGetData: function () {
                 this.workSchedules = this.tableData;
-                console.log(this.workSchedules)
             },
             showDialogCreateChangeShiftsManage() {
 
@@ -188,6 +187,8 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
+                        // console.log(error.response.data)
+                    app.$message.error(error.response.data.join(","));
                     for (var key in app.changeShiftsManageFormError) {
                         if (error.response.data[key])
                             app.changeShiftsManageFormError[key] = error.response.data[key].join(",")

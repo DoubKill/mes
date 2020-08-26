@@ -12,19 +12,6 @@
                     value-format="yyyy-MM-dd"
                     placeholder="选择日期">
             </el-date-picker>
-            <!--
-            <el-select
-                    @change="queryDataChange"
-                    clearable
-                    v-model="plan_date" placeholder="请选择">
-                <el-option
-                        :key="schedule.id"
-                        :label="schedule.day_time"
-                        :value="schedule.day_time"
-                        v-for="schedule in planSchedules">
-                </el-option>
-            </el-select>
-            -->
         </el-form-item>
         <el-form-item label="机台">
             <el-select
@@ -115,6 +102,14 @@
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[2].time" label="时间">
             </el-table-column>
+        </el-table-column>
+        <el-table-column label="发送到上辅机">
+            <template slot-scope="scope">
+                <el-button
+                        size="mini"
+                        @click="sendToAu(scope.row)">发送
+                </el-button>
+            </template>
         </el-table-column>
     </el-table>
     {% include 'gui/paginations.html' %}
