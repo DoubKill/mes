@@ -58,7 +58,6 @@ class SystemSync(object):
 
     # 获取当前系统状态
     @property
-    @classmethod
     def if_system_online(cls):
         config_value = SystemConfig.objects.filter(config_name="system_name").first().config_value
         child_system = ChildSystemInfo.objects.filter(system_name=config_value).first()
@@ -81,8 +80,12 @@ class SystemSync(object):
                 body_data = instance.content
                 address = instance.dst_address
                 method = instance.method
+                headers = {
+                    "Content-Type": "application/json; charset=UTF-8",
+                    "TAG": True
+                }
                 try:
-                    ret = requests.request(method, address, json=json.loads(body_data))
+                    ret = requests.request(method, address, json=json.loads(body_data), headers=headers)
                 except Exception as e:
                     logger.error(f"{address}|网络异常，详情：{e}")
                     continue
@@ -104,9 +107,11 @@ class SystemSync(object):
 
 @one_instance
 def run():
-    while True:
-        time.sleep(3)
-    pass
+    # while True:
+    #     time.sleep(3)
+    # pass
+    runner = SystemSync()
+    runner.sync()
 
 if __name__ == '__main__':
     run()
