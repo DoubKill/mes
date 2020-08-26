@@ -209,8 +209,10 @@ class ProductBatchingViewSet(ModelViewSet):
 
 class RecipeNoticeAPiView(APIView):
     """配方数据下发至上辅机（只有应用状态的配方才可下发）"""
+    permission_classes = ()
+    authentication_classes = ()
 
-    def get(self, request):
+    def post(self, request):
         product_batching_id = self.request.query_params.get('product_batching_id')
         if not product_batching_id:
             raise ValidationError('缺失参数')
@@ -222,7 +224,7 @@ class RecipeNoticeAPiView(APIView):
             raise ValidationError('只有应用状态的配方才可下发至上辅机')
         interface = ProductBatchingSyncInterface(instance=product_batching)
         try:
-            ret = interface.request()
+            interface.request()
         except Exception as e:
             raise ValidationError(e)
-        return Response(ret)
+        return Response('发送成功', status=status.HTTP_200_OK)
