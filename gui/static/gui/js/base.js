@@ -29,6 +29,8 @@ const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
 const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
 // 胶料配料标准管理接口
 const RubberMaterialUrl = "/api/v1/recipe/product-batching/";
+//配方数据发送至上辅机接口
+const SendAuxiliaryUrl = "/api/v1/recipe/recipe-notice/";
 // 胶料配料标准管理——选择胶料编码与段次接口
 const RubberStageUrl = "/api/v1/recipe/product-stages/";
 const PreBatchInfoUrl = "/api/v1/recipe/pre-batch-info/";
