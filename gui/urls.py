@@ -10,6 +10,7 @@ urlpatterns = [
     path('equip/base/info/manage/', views.EquipBaseInfoManageView.as_view(), name='equip-base-info-manage'),
     path('change/shifts/manage/', views.ChangeShiftsManageView.as_view(), name='change-shifts-manage'),
     path('factory/schedule/manage/', views.FactoryScheduleManageView.as_view(), name='factory-schedule-manage'),
+    path('factory/schedule/result/', views.FactoryScheduleResult.as_view(), name='factory-schedule-result'),
     path('accounts/', include('django.contrib.auth.urls')),
     # 设备管理-设备种类
     path('equip/category/manage/', views.EquipCategoryManageView.as_view(), name='equip-category-manage'),

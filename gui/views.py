@@ -46,6 +46,11 @@ class FactoryScheduleManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     name_path = ['基础信息管理', '工厂排班管理']
 
 
+class FactoryScheduleResult(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/factory_schedule_result.html'
+    name_path = ['基础信息管理', '工厂排班结果']
+
+
 class EquipCategoryManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/equip_category_manage.html'
     name_path = ['基础信息管理', '设备种类']
@@ -106,6 +111,7 @@ class CollectRubberDailyManageView(TitleMixin, LoginRequiredMixin, TemplateView)
 class BanburyingPerformanceManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/banburying_performance_manage.html'
     name_path = ['生产管理', '密炼实绩管理']
+
 
 # 密炼机台别计划对比
 class BanburyingPlanManageView(TitleMixin, LoginRequiredMixin, TemplateView):

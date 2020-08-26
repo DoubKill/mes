@@ -45,6 +45,7 @@
                     <el-menu-item index="2-4">角色别用户管理</el-menu-item>
                     <el-menu-item index="2-6">倒班时间管理</el-menu-item>
                     <el-menu-item index="2-7">工厂排班管理</el-menu-item>
+                    <el-menu-item index="2-9">工厂排班结果</el-menu-item>
                     <el-submenu index="2-8">
                         <template slot="title">设备管理</template>
                         <el-menu-item index="2-8-1">设备种类</el-menu-item>
@@ -133,6 +134,7 @@
         "2-8": "{% url 'gui:equip-category-manage' %}",
         "2-8-1": "{% url 'gui:equip-category-manage' %}",
         "2-8-2": "{% url 'gui:equip-manage' %}",
+        "2-9": "{% url 'gui:factory-schedule-result' %}",
         "3-1": "{% url 'gui:material-base-info-manage' %}",
         "3-2": "{% url 'gui:rb-recipe-std-manage' %}",
         "3-3": "{% url 'gui:rb-material-std-manage' %}",
