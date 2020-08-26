@@ -63,7 +63,7 @@
     </el-form>
     <el-table
             highlight-current-row
-            @current-change="handleCurrentChange"
+            @row-click="handleCurrentChange"
             :data="tableData"
             border
             style="width: 100%">
@@ -434,7 +434,6 @@
 
         <el-table
             highlight-current-row
-            @current-change="raw_material_handleCurrentChange"
             :data="tableRawMaterialData"
             border
             style="width: 100%">
