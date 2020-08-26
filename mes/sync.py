@@ -39,19 +39,10 @@ class BaseInterface(object):
             res = requests.post(self.endpoint+self.Backend.path, headers=headers, json=kwargs)
         except Exception as err:
             logger.error(err)
-            raise
+            raise Exception('上辅机服务错误')
         logger.info(res.text)
-        if res.status_code != 200:
-            raise Exception("Http request status code:%d" % res.status_code)
-        try:
-            json_resp = res.json()
-        except Exception:
-            raise Exception("Response is not a json format")
-        code = json_resp.get('code', None)
-        message = json_resp.get('message', "未知错误")
-        if code is None or int(code) != 0:
-            raise Exception("API Error, code:{}, message:{}".format(code, message))
-        return json_resp.get('data')
+        if res.status_code != 201:
+            raise Exception(res.text)
 
 
 class ProductBatchingDetailSerializer(serializers.ModelSerializer):
@@ -65,7 +56,6 @@ class ProductBatchingDetailSerializer(serializers.ModelSerializer):
 class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
     """配方同步序列化器"""
     created_date = serializers.SerializerMethodField()
-    created_user = serializers.CharField(source='created_user.username')
     factory = serializers.CharField(source='factory.global_no')
     site = serializers.CharField(source='site.global_no')
     product_info = serializers.CharField(source='product_info.product_no')
@@ -84,11 +74,11 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
         return datetime.strftime(obj.used_time, '%Y-%m-%d %H:%M:%S')
 
     class Backend:
-        path = 'api/v1/recipe/product-batching/'
+        path = 'api/v1/recipe/recipe-receive/'
 
     class Meta:
         model = ProductBatching
-        fields = ('created_date', 'created_user', 'factory', 'site', 'product_info',
+        fields = ('created_date', 'factory', 'site', 'product_info',
                   'dev_type', 'stage', 'equip', 'used_time', 'precept', 'stage_product_batch_no',
                   'versions', 'used_type', 'batching_weight', 'manual_material_weight',
                   'auto_material_weight', 'production_time_interval', 'batching_details')
