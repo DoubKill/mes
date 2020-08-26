@@ -176,12 +176,12 @@
                 }).then(function (response) {
                     var glueList = response.data.results || [];
                     //去重
-                    var obj = {}
-                    var newArr = glueList.reduce(function (item, next) {
-                        obj[next.product_name] ? ' ' : obj[next.product_name] = true && item.push(next)
-                        return item;
-                    }, [])
-                    _this.glueList = newArr
+                    // var obj = {}
+                    // var newArr = glueList.reduce(function (item, next) {
+                    //     obj[next.stage_product_batch_no] ? ' ' : obj[next.stage_product_batch_no] = true && item.push(next)
+                    //     return item;
+                    // }, [])
+                    _this.glueList = glueList
                 }).catch(function (error) {
                 });
             },

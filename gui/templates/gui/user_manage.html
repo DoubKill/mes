@@ -64,11 +64,14 @@
                             </el-button>
                         {% endif %}
                         {% if perms.system.delete_user %}
-                            <el-button
-                                    size="mini"
-                                    type="danger"
-                                    @click="handleUserDelete(scope.row)">删除
-                            </el-button>
+                            {% verbatim vue %}
+                                <el-button
+                                        size="mini"
+                                        type="danger"
+                                        @click="handleUserDelete(scope.row)">
+                                    {{ scope.row.is_active?'停用':'启用' }}
+                                </el-button>
+                            {% endverbatim vue %}
                         {% endif %}
                     </el-button-group>
                 </template>

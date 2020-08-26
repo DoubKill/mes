@@ -59,7 +59,7 @@ const TrainsFeedbacksUrl = "/api/v1/production/trains-feedbacks/"
 //生产管理---密炼机台别计划对比
 const BanburyPlanUrl = "/api/v1/production/plan-reality/";
 const InternalMixerUrl = "/api/v1/production/production-record/"
-const ClassesListUrl = '/api/v1/basics/classes/'
+const ClassesListUrl = '/api/v1/basics/classes/?all=1'
 const EchartsListUrl = "/api/v1/production/equip-status/"
 
 const PlanSchedulesUrl = "/api/v1/basics/plan-schedules/";
