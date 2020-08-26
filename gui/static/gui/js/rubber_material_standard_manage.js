@@ -370,15 +370,15 @@
                 axios.get(RubberMaterialUrl + this.currentRow.id + "/")
                     .then(function (response) {
                         console.log('================================mod_get');
-                        console.log(response.data.batching_details);
+                        console.log(response.data);
                         console.log('================================mod_get');
                         app.put_select_stage_product_batch_no = response.data['stage_product_batch_no'];
                         app.put_select_product_name = response.data['product_name'];
                         app.put_select_status = app.usedTypeChoice(response.data['used_type']);
-                        app.put_select_dev_type = response.data['dev_type_name'];
-
+                        app.put_select_dev_type = response.data['dev_type'];
                         app.put_select_material_weight = response.data['batching_weight'];
                         app.put_select_rm_time_interval = response.data['production_time_interval'];
+                        app.put_practicalWeightSum = response.data['batching_weight'];
                         app.PutProductRecipe = response.data.batching_details;
 
                     }).catch(function (error) {
