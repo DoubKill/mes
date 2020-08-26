@@ -267,6 +267,19 @@
                     });
                 });
             },
+            send_auxiliary: function(row) {
+                var app = this;
+                axios.post(SendAuxiliaryUrl + '?product_batching_id=' + row.id + '&product_no=' + row.stage_product_batch_no, {
+                }).then(function (response) {
+                    app.$message("发送至上辅机成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+            },
 
             formatter: function (row, column) {
 

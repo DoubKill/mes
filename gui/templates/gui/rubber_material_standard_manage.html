@@ -149,6 +149,15 @@
                 prop="created_date"
                 label="创建时间">
         </el-table-column>
+        <el-table-column align="center" label="发送到上辅机">
+            <template slot-scope="scope">
+                <el-button-group>
+                    <el-button @click="send_auxiliary(scope.row)" size="mini" v-if="scope.row.used_type === 4">
+                        发送
+                    </el-button>
+                </el-button-group>
+            </template>
+        </el-table-column>
 
     </el-table>
     {% include 'gui/paginations.html' %}
