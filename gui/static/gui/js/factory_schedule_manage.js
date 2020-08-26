@@ -187,7 +187,7 @@
             }).catch(function (error) {
 
             });
-            axios.get(WorkSchedulesUrl)
+            axios.get(WorkSchedulesUrl + '?all=1')
                 .then(function (response) {
 
                     app.workSchedules = response.data.results;
