@@ -525,6 +525,10 @@
             arraySpanMethod({row, column, rowIndex, columnIndex}) {
 
             },
+            sendToAu(plan) {
+
+                console.log(plan)
+            }
         }
     };
     var Ctor = Vue.extend(Main);
