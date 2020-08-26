@@ -189,7 +189,7 @@
             });
 
 
-            axios.get(DevTypeGlobalUrl, {
+            axios.get(EquipCategoryUrl + '?all=1', {
             }).then(function (response) {
                 app.DevTypeOptions = response.data.results;
             }).catch(function (error) {
@@ -379,40 +379,55 @@
                 var app = this;
                 app.$refs[formName].validate((valid) => {
                   if (valid) {
+
+
                       console.log('=============================');
                       console.log(app.rubberMaterialForm['rubber_no']);
                       console.log('=============================');
                       var v_product_info = "";
                       //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
-                        for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
+                      for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
                             if(app.ProductBatchNoOptions[j]['product_name'] == app.rubberMaterialForm['rubber_no']){
                                 v_product_info = app.ProductBatchNoOptions[j]['id'];
                                 break
                             }
-                        }
-                        console.log('=============================');
+                      }
+                      console.log('=============================');
                       console.log(v_product_info);
                       console.log('=============================');
-                      axios.post(RubberMaterialUrl, {
-                            factory: app.rubberMaterialForm['factory'],
-                            site: app.rubberMaterialForm['SITE'],
-                            product_info: v_product_info,
-                            precept: app.rubberMaterialForm['scheme'],
-                            stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
-                            stage: app.rubberMaterialForm['stage'],
-                            versions: app.rubberMaterialForm['version'],
-                        }).then(function (response) {
+                      //点击生成之前进行版本验证
+                      var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + v_product_info + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
+                      axios.get(v_validate_version_url, {}
+                        ).then(function (response) {
+                              axios.post(RubberMaterialUrl, {
+                                    factory: app.rubberMaterialForm['factory'],
+                                    site: app.rubberMaterialForm['SITE'],
+                                    product_info: v_product_info,
+                                    precept: app.rubberMaterialForm['scheme'],
+                                    stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
+                                    stage: app.rubberMaterialForm['stage'],
+                                    versions: app.rubberMaterialForm['version'],
+                                }).then(function (response) {
 
-                            app.dialogAddRubberMaterial = false;
-                            app.$message(app.rubberMaterialForm['generate_material_no'] + "保存成功");
-                            app.currentChange(app.currentPage);
+                                    app.dialogAddRubberMaterial = false;
+                                    app.$message(app.rubberMaterialForm['generate_material_no'] + "保存成功");
+                                    app.currentChange(app.currentPage);
 
+                                }).catch(function (error) {
+
+                                    app.$message({
+                                        message: error.response.data,
+                                        type: 'error'
+                                    });
+                                });
                         }).catch(function (error) {
                             app.$message({
                                 message: error.response.data,
                                 type: 'error'
                             });
                         });
+
+
 
                   } else {
                     console.log('error submit!!');
@@ -427,13 +442,31 @@
                 var app = this;
                 app.$refs[formName].validate((valid) => {
                   if (valid) {
-                        app.dialogAddRubberMaterial = false;
-                        app.NewdialogChoiceMaterials = true;
-                        app.select_stage_product_batch_no = app.rubberMaterialForm['generate_material_no'];
-                        app.select_product_name = app.rubberMaterialForm['rubber_no'];
-                        app.select_material_weight = null;
-                        app.practicalWeightSum = null;
-                        app.NewRowMaterial = [];
+                      //点击生成之前进行版本验证
+                      var v_product_info = "";
+                      //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
+                      for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
+                            if(app.ProductBatchNoOptions[j]['product_name'] == app.rubberMaterialForm['rubber_no']){
+                                v_product_info = app.ProductBatchNoOptions[j]['id'];
+                                break
+                            }
+                      }
+                      var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + v_product_info + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
+                      axios.get(v_validate_version_url, {}
+                        ).then(function (response) {
+                            app.dialogAddRubberMaterial = false;
+                            app.NewdialogChoiceMaterials = true;
+                            app.select_stage_product_batch_no = app.rubberMaterialForm['generate_material_no'];
+                            app.select_product_name = app.rubberMaterialForm['rubber_no'];
+                            app.select_material_weight = null;
+                            app.practicalWeightSum = null;
+                            app.NewRowMaterial = [];
+                        }).catch(function (error) {
+                            app.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
+                        });
                   } else {
                     console.log('error submit!!');
                     return false;
