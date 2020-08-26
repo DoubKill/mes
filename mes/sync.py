@@ -82,3 +82,16 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
                   'dev_type', 'stage', 'equip', 'used_time', 'precept', 'stage_product_batch_no',
                   'versions', 'used_type', 'batching_weight', 'manual_material_weight',
                   'auto_material_weight', 'production_time_interval', 'batching_details')
+
+
+class ProductObsoleteInterface(serializers.ModelSerializer, BaseInterface):
+    """
+    配方弃用
+    """
+
+    class Backend:
+        path = 'api/v1/recipe/recipe-obsolete/'
+
+    class Meta:
+        model = ProductBatching
+        fields = ('stage_product_batch_no', )
