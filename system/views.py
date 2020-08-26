@@ -94,7 +94,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
 class GroupExtensionViewSet(ModelViewSet):
     """
     list:
-        角色列表
+        角色列表,xxx?all=1查询所有
     create:
         创建角色
     update:
@@ -107,6 +107,20 @@ class GroupExtensionViewSet(ModelViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = GroupExtensionFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(), )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.action == 'list':

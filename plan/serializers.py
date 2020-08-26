@@ -26,9 +26,9 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                             {"sn":1,"plan_trains":1,"classes":班次id
                                                             "time":"12.5","weight":1,"unit":1,"note":备注}
                                                             """)
-    plan_date = serializers.DateField(help_text="计划日期， 格式：2020-07-31", write_only=True)
-    work_schedule = serializers.PrimaryKeyRelatedField(queryset=WorkSchedule.objects.all(),
-                                                       help_text='倒班管理id', write_only=True)
+    # plan_date = serializers.DateField(help_text="计划日期， 格式：2020-07-31", write_only=True)
+    # work_schedule = serializers.PrimaryKeyRelatedField(queryset=WorkSchedule.objects.all(),
+    #                                                    help_text='倒班管理id', write_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True, help_text='机台编号')
     category = serializers.CharField(source='equip.category', read_only=True, help_text='设备种类属性')
     product_no = serializers.CharField(source='product_batching.stage_product_batch_no', read_only=True,
@@ -43,20 +43,10 @@ class ProductDayPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductDayPlan
-        fields = ('id', 'work_schedule', 'plan_date', 'equip', 'equip_no', 'category',
+        fields = ('id', 'equip', 'equip_no', 'category', 'plan_schedule',
                   'product_no', 'batching_weight', 'production_time_interval', 'product_batching',
                   'pdp_product_classes_plan', 'dev_type_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
-
-    def validate(self, attrs):
-        plan_date = attrs.pop('plan_date')
-        work_schedule = attrs.pop('work_schedule')
-        plan_schedule = PlanSchedule.objects.filter(day_time=plan_date, work_schedule=work_schedule).first()
-        if not plan_schedule:
-            raise serializers.ValidationError('当前日期暂无排班数据')
-        attrs['plan_schedule'] = plan_schedule
-        attrs['created_user'] = self.context['request'].user
-        return attrs
 
     @atomic()
     def create(self, validated_data):

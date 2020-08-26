@@ -1,8 +1,10 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, EquipCategoryFilter
@@ -73,7 +75,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'global_no', 'global_name', 'global_type__type_name')
+            data = queryset.filter(used_flag=0).values('id', 'global_no', 'global_name', 'global_type__type_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -99,6 +101,27 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = WorkScheduleFilter
 
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(),
+                    PermissionClass(return_permission_params(self.model_name))())
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.plan_schedule.exists():
+            raise ValidationError('该倒班已管理排班计划，不可删除')
+        return super(WorkScheduleViewSet, self).destroy(request, *args, **kwargs)
+
     def get_serializer_class(self):
         if self.action in ['update', 'partial_update']:
             return WorkScheduleUpdateSerializer
@@ -121,10 +144,23 @@ class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipCategoryAttribute.objects.filter(delete_flag=False).select_related('equip_type', 'process')
     serializer_class = EquipCategoryAttributeSerializer
     model_name = queryset.model.__name__.lower()
-    permission_classes = (IsAuthenticatedOrReadOnly,
-                          PermissionClass(return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipCategoryFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticatedOrReadOnly(),
+                    PermissionClass(return_permission_params(self.model_name))())
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
+        else:
+            return super().list(request, *args, **kwargs)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -156,7 +192,7 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'equip_no', 'equip_name')
+            data = queryset.values('id', 'equip_no', 'equip_name', 'category')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -243,7 +279,26 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'day_time', 'work_schedule')
-            return Response({'results': data})
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
         else:
             return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlanScheduleManyCreate(APIView):
+    """[{"work_schedule_plan": [{"classes": '班次id', "rest_flag": 0, "group": '班组id'}],
+     'day_time': '日期',
+     'work_schedule': '倒班id'}...]"""
+
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+        elif isinstance(request.data, list):
+            many = True
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+        s = PlanScheduleSerializer(data=request.data, many=many, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response('新建成功')

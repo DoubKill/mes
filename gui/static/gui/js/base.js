@@ -4,15 +4,15 @@ const GlobalCodesUrl = BasicsUrl + "global-codes/";
 
 const EquipCategoryUrl = BasicsUrl + "equips-category/";
 // const EquipCategoryUrl = BasicsUrl + "equips-category-list/";
-const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=设备类型";
-const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
-const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
-const StateGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料状态";
-const SiteGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
-const SITEGlobalUrl = BasicsUrl + "global-codes/?class_name=SITE";
-const StageGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料段次";
-const DevTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=炼胶机类型";
-const MaterialTypelUrl = BasicsUrl + "global-codes/?class_name=原材料类别";
+const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=设备类型";
+const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=工序";
+const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=产地";
+const StateGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=胶料状态";
+const SiteGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=产地";
+const SITEGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=SITE";
+const StageGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=胶料段次";
+const DevTypeGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=炼胶机类型";
+const MaterialTypelUrl = BasicsUrl + "global-codes/?all=1&class_name=原材料类别";
 
 const EquipUrl = BasicsUrl + "equips/";
 
@@ -61,6 +61,9 @@ const BanburyPlanUrl = "/api/v1/production/plan-reality/";
 const InternalMixerUrl = "/api/v1/production/production-record/"
 const ClassesListUrl = '/api/v1/basics/classes/?all=1'
 const EchartsListUrl = "/api/v1/production/equip-status/"
+
+const PlanSchedulesUrl = "/api/v1/basics/plan-schedules/";
+
 
 var BaseMixin = {
 

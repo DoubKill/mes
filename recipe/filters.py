@@ -25,7 +25,7 @@ class ProductInfoFilter(django_filters.rest_framework.FilterSet):
 
 
 class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
-    factory_id = django_filters.NumberFilter(field_name='product_info__factory_id', help_text='产地id')
+    factory_id = django_filters.NumberFilter(field_name='factory_id', help_text='产地id')
     stage_product_batch_no = django_filters.CharFilter(field_name='stage_product_batch_no', lookup_expr='icontains',
                                                        help_text='胶料编码')
     dev_type = django_filters.NumberFilter(field_name='dev_type_id', help_text='炼胶机类型id')

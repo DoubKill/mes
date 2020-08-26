@@ -97,8 +97,8 @@
                 };
             },
             afterGetData: function () {
-
                 this.workSchedules = this.tableData;
+                console.log(this.workSchedules)
             },
             showDialogCreateChangeShiftsManage() {
 

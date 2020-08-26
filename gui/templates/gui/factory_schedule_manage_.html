@@ -17,7 +17,6 @@
                     </el-form-item>
                     <el-form-item label="开始时间" :label-width="formLabelWidth">
                         <el-date-picker style="width: 100%"
-                                        @change="shiftsTimeChange"
                                         v-model="startTime"
                                         type="date"
                                         placeholder="选择日期">
@@ -50,8 +49,8 @@
                         border
                         style="width: 100%">
                     <el-table-column
-                            prop="date"
-                            label="日期"
+                            prop="classes_name"
+                            label="班次"
                             width="180">
                     </el-table-column>
                     <el-table-column
@@ -62,11 +61,6 @@
                     <el-table-column
                             prop="end_time"
                             label="结束"
-                            width="180">
-                    </el-table-column>
-                    <el-table-column
-                            prop="classes_name"
-                            label="班次"
                             width="180">
                     </el-table-column>
                     <el-table-column label="班组">
@@ -89,7 +83,7 @@
     <el-row>
         <el-form>
             <el-form-item>
-                <el-button @click="savePlanSchedules" style="float: right">保存</el-button>
+                <el-button @click="" style="float: right">保存</el-button>
             </el-form-item>
         </el-form>
 
