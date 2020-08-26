@@ -209,7 +209,12 @@
         methods: {
             get_raw_material(val=1){
                 var app=this;
-                 axios.get(MaterialsUrl + '?page=' + val, {
+                this.getParams["page"] = val;
+                this.getParams["material_type_id"] = app.materialType?app.materialType:'';
+                this.getParams["material_no"] = app.search_material_no?app.search_material_no:'';
+                this.getParams["material_name"] = app.search_material_name?app.search_material_name:'';
+                 axios.get(MaterialsUrl, {
+                     params: this.getParams
                 }).then(function (response) {
                     app.RawMaterialOptions = response.data.results;
                     app.tableRawMaterialData = response.data.results;
@@ -689,7 +694,6 @@
                 app.dialogRawMaterialSync = false;
             },
             handleCurrentChange: function (val) {
-
                 this.currentRow = val;
             },
             raw_material_handleCurrentChange: function (val) {
@@ -697,42 +701,14 @@
                 this.get_raw_material(val)
             },
 
-            getList() {
-                var app = this;
-                var param_url = MaterialsUrl;
-                // if(app.search_time && app.equip_no){
-                //     param_url = param_url + '?search_time=' +app.search_time + '&equip_no=' + app.equip_no
-                // }
-                // else if(!app.search_time && app.equip_no){
-                //     param_url = param_url + '?search_time=' + '&equip_no=' + app.equip_no
-                // }
-                // else if(app.search_time && !app.equip_no){
-                //     param_url = param_url + '?search_time=' +app.search_time + '&equip_no='
-                // }
-
-                var v_material_type_id = app.materialType?app.materialType:'';
-                var v_search_material_no = app.search_material_no?app.search_material_no:'';
-                var v_search_material_name = app.search_material_name?app.search_material_name:'';
-                param_url = param_url + '?material_type_id=' + v_material_type_id + '&material_no=' + v_search_material_no + '&material_name=' + v_search_material_name;
-
-                axios.get(param_url, {}
-                ).then(function (response) {
-                    app.tableRawMaterialData = response.data.results;
-                }).catch(function (error) {
-                    app.$message({
-                        message: error.response.data,
-                        type: 'error'
-                    });
-                });
-            },
             materialTypeChange: function(){
-                this.getList()
+                this.get_raw_material()
             },
             search_material_no_Change: function(){
-                this.getList()
+                this.get_raw_material()
             },
             search_material_name_Change: function(){
-                this.getList()
+                this.get_raw_material()
             },
 
 
