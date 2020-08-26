@@ -34,6 +34,14 @@
                     description: "",
                 },
                 classes: [],
+                rules: {
+                    schedule_no: [
+                        {required: true, message: '请输入倒班代码', trigger: 'blur'}
+                    ],
+                    schedule_name: [
+                        {required: true, message: '请输入倒班名', trigger: 'blur'}
+                    ]
+                }
             }
         },
         created: function () {
@@ -74,6 +82,10 @@
                         classes: this.classes[i].id
                     })
                 }
+                this.changeShiftsManageForm.classesdetail_set[0].times = [
+                    new Date(),
+                    new Date()
+                ]
             },
             clearChangeShiftsManageFormError() {
 
@@ -94,34 +106,55 @@
                 this.dialogCreateChangeShiftsManageVisible = true;
             },
             format(date) {
-
+                if (!date) {
+                    return ''
+                }
                 return dayjs(date).format("HH:mm:ss")
             },
             adjustTimes() {
-
-                for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
-
-                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[0]);
-                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[1]);
-                }
+                var _this = this
+                this.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
+                    data.start_time = data.times && data.times.length > 0 ? _this.format(data.times[0]) : ''
+                    data.end_time = data.times && data.times.length > 0 ? _this.format(data.times[1]) : ''
+                })
+                // for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
+                //     this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[0]);
+                //     this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[1]);
+                // }
             },
             handleCreateChangeShifts() {
-
-                this.clearChangeShiftsManageFormError();
-                this.adjustTimes();
                 var app = this;
-                axios.post(WorkSchedulesUrl, this.changeShiftsManageForm)
-                    .then(function (response) {
+                this.$refs['shiftsManageForm'].validate(function (valid) {
+                    if (valid) {
+                        app.clearChangeShiftsManageFormError();
+                        app.adjustTimes();
+                        var obj = {}
+                        obj = JSON.parse(JSON.stringify(app.changeShiftsManageForm))
+                        let newarr = obj.classesdetail_set.filter(function (data, index) {
+                            return data.times && data.times.length > 1
+                        })
+                        if (newarr.length === 0 || !newarr) {
+                            app.$message.info('请填写一个班次')
+                            return
+                        }
+                        obj.classesdetail_set = newarr
 
-                        app.dialogCreateChangeShiftsManageVisible = false;
-                        app.$message(app.changeShiftsManageForm.schedule_name + "创建成功");
-                        app.currentChange(app.currentPage);
-                    }).catch(function (error) {
+                        axios.post(WorkSchedulesUrl, obj)
+                            .then(function (response) {
 
-                    app.$message.error(JSON.stringify(error.response.data));
-                    for (var key in app.changeShiftsManageFormError) {
-                        if (error.response.data[key])
-                            app.changeShiftsManageFormError[key] = error.response.data[key].join(",")
+                                app.dialogCreateChangeShiftsManageVisible = false;
+                                app.$message.success(app.changeShiftsManageForm.schedule_name + "创建成功");
+                                app.currentChange(app.currentPage);
+                            }).catch(function (error) {
+
+                            app.$message.error(JSON.stringify(error.response.data));
+                            for (var key in app.changeShiftsManageFormError) {
+                                if (error.response.data[key])
+                                    app.changeShiftsManageFormError[key] = error.response.data[key].join(",")
+                            }
+                        });
+                    } else {
+                        return false;
                     }
                 });
             },
@@ -133,8 +166,8 @@
 
                     Vue.set(this.changeShiftsManageForm.classesdetail_set[i], "times", [
 
-                            this.changeShiftsManageForm.classesdetail_set[i].start_time,
-                            this.changeShiftsManageForm.classesdetail_set[i].end_time]);
+                        this.changeShiftsManageForm.classesdetail_set[i].start_time,
+                        this.changeShiftsManageForm.classesdetail_set[i].end_time]);
                 }
                 this.dialogEditChangeShiftsManageVisible = true;
             },

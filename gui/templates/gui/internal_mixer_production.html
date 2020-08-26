@@ -22,9 +22,9 @@
                        @change="changeSearch">
                 <el-option
                         v-for="item in glueList"
-                        :key="item.product_name"
-                        :label="item.product_name"
-                        :value="item.product_name">
+                        :key="item.id"
+                        :label="item.stage_product_batch_no"
+                        :value="item.stage_product_batch_no">
                 </el-option>
             </el-select>
         </el-form-item>
