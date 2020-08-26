@@ -7,11 +7,13 @@ from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
+from mes.sync import ProductObsoleteInterface
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 logger = logging.getLogger('api_log')
+sync_logger = logging.getLogger('sync_log')
 
 
 class MaterialSerializer(BaseModelSerializer):
@@ -244,6 +246,10 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.obsolete_user = self.context['request'].user
                 instance.used_type = 6
                 instance.obsolete_time = datetime.now()
+                try:
+                    ProductObsoleteInterface(instance=instance).request()
+                except Exception as e:
+                    sync_logger.error(e)
             else:  # 驳回
                 instance.used_type = 5
         instance.last_updated_user = self.context['request'].user
@@ -251,5 +257,5 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
         return instance
 
     class Meta:
-        model = ProductInfo
+        model = ProductBatching
         fields = ('id', 'pass_flag')
