@@ -1,3 +1,4 @@
+import datetime
 import re
 
 import requests
@@ -50,7 +51,7 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
-            queryset = self.filter_queryset(self.get_queryset() )
+            queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -108,7 +109,7 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
-            queryset = self.filter_queryset(self.get_queryset() )
+            queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -196,7 +197,7 @@ class QualityControlViewSet(mixins.CreateModelMixin,
 
 
 class PlanRealityViewSet(mixins.ListModelMixin,
-                      GenericViewSet):
+                         GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
@@ -262,7 +263,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                     actual_time = 0
                     begin_time = None
             if plan_weight:
-                ach_rate = actual_weight/plan_weight*100
+                ach_rate = actual_weight / plan_weight * 100
             else:
                 ach_rate = 0
             instance.update(equip_no=equip_no, product_no=product_no,
@@ -274,7 +275,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             if equip_no in temp_data:
                 temp_data[equip_no].append(instance)
         for equip_data in temp_data.values():
-            equip_data.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+            equip_data.sort(key=lambda x: (x.get("equip_no"), x.get("begin_time")))
             new_equip_data = []
             for _ in equip_data:
                 _.update(sn=equip_data.index(_) + 1)
@@ -286,6 +287,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
 
 class ProductActualViewSet(mixins.ListModelMixin,
                            GenericViewSet):
+    """密炼实绩"""
 
     def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
@@ -369,29 +371,52 @@ class ProductActualViewSet(mixins.ListModelMixin,
             return_data["data"].append(instance)
         return Response(return_data)
 
+    def list_bak(self, request, *args, **kwargs):
+        params = request.query_params
+        day_time = params.get("search_time", str(datetime.date.today() - datetime.timedelta(days=1)))
+        if day_time:
+            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", day_time):
+                return Response("bad search_time", status=400)
+        equip_no = params.get('equip_no')
+        if equip_no:
+            equip_no_str = f" and e.equip_no={equip_no}"
+        else:
+            equip_no_str = ""
+        sql_str = f"""
+            select pdp.id,
+            pb.stage_product_batch_no as product_no,
+            tf.plan_trains,
+            tf.actual_trains,
+            e.equip_no,
+            gc.global_name,
+            SUM(pcp.plan_trains) as plan_trains_all,
+            sum(tf.actual_trains) as actual_trains_all,
+            sum(pcp.time) as plan_time_all,
+            sum(pcp.weight) as plan_weight_all,
+            SUM(tf.actual_trains) as actual_weight_all,
+            (sum(julianday(tf.end_time)- julianday(tf.begin_time)))*86400 as actual_time_all
+            --        timediff(tf.end_time, tf.begin_time) as ac_time
+            
+            from product_day_plan as pdp
+            left join plan_schedule ps on pdp.plan_schedule_id = ps.id
+            left join equip e on pdp.equip_id = e.id
+            left join product_classes_plan pcp on pdp.id = pcp.product_day_plan_id
+            left join trains_feedbacks tf on pcp.plan_classes_uid = tf.plan_classes_uid
+            left join product_batching pb on pb.id = pdp.product_batching_id
+            left join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
+            left join global_code gc on wsp.classes_id = gc.id
+            where ps.day_time = '{day_time}'{equip_no_str} 
+            group by e.equip_no, gc.global_name order by e.equip_no, tf.pro;
+        """
+        query_set = TrainsFeedbacks.objects.raw(sql_str)
+        return
+
 
 class ProductionRecordViewSet(mixins.ListModelMixin,
-                            GenericViewSet):
-
+                              GenericViewSet):
     queryset = PalletFeedbacks.objects.filter(delete_flag=False)
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = PalletFeedbacksFilter
-
-
-class PlanRelease(APIView):
-    """计划下达"""
-
-    def _validate(self, data):
-        """校验请求体"""
-        return data
-
-    def post(self, request):
-        plan_data = request.data
-        plan_data = self._validate(plan_data)
-        token = request.get("Auth")
-        url = "http://xxxxx"
-        ret = requests.post(url, data=plan_data)
-        # TODO
