@@ -117,3 +117,14 @@ class BanburyingPerformanceManageView(TitleMixin, LoginRequiredMixin, TemplateVi
 class BanburyingPlanManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/banburying_plan_manage.html'
     name_path = ['生产管理', '密炼机台别计划对比']
+
+# 原料库存管理
+class MaterialRpertoryManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/material_repertory_manage.html'
+    name_path = ['库存管理', '原料库存']
+
+
+# 胶料库存管理
+class RubberRepertoryManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/rubber_repertory_manage.html'
+    name_path = ['库存管理', '胶料库存']

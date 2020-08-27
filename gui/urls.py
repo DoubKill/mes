@@ -32,5 +32,9 @@ urlpatterns = [
     path('banburying/plan/manage', views.BanburyingPlanManageView.as_view(), name='banburying-plan-manage'),
     path('collect/rubber/daily/manage/', views.CollectRubberDailyManageView.as_view(), name='collect-rub-daily-manage'),
     # 密炼LOT生产履历
-    path('internal/mixer/production', views.InternalMixerProduction.as_view(), name='internal_mixer_production')
+    path('internal/mixer/production', views.InternalMixerProduction.as_view(), name='internal_mixer_production'),
+    # 原料库存管理
+    path('material/repertory/manage/', views.MaterialRpertoryManageView.as_view(), name='material-repertory-manage'),
+    # 胶料库存管理
+    path('rubber/repertory/manage/', views.RubberRepertoryManageView.as_view(), name='rubber-repertory-manage'),
 ]
