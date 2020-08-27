@@ -172,7 +172,7 @@
             :visible.sync="addPlanVisible"
             title="添加胶料日生产计划">
         <div style="margin-bottom: 15px">
-            <el-select @change="equipChanged" filterable placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
+            <el-select filterable placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
                 <el-option
                         :key="equip.id"
                         :label="equip.equip_no"
@@ -204,7 +204,7 @@
                 :span-method="arraySpanMethod"
                 :data="plansForAdd"
                 border>
-            <el-table-column prop="equip_.equip_no" label="机台" width="150">
+            <el-table-column fixed prop="equip_.equip_no" label="机台" width="150">
             </el-table-column>
             <el-table-column label="胶料配方编码" width="180">
                 <template v-if="!scope.row.sum" slot-scope="scope">
@@ -213,7 +213,7 @@
                                 :key="productBatching.id"
                                 :label="productBatching.stage_product_batch_no"
                                 :value="productBatching.id"
-                                v-for="productBatching in productBatchings">
+                                v-for="productBatching in scope.row.productBatchings">
                         </el-option>
                     </el-select>
                 </template>
