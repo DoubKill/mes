@@ -11,7 +11,7 @@ import uuid
 import django
 
 from add_test_data import random_str
-from basics.models import Equip, PlanSchedule
+from basics.models import Equip, PlanSchedule, WorkSchedulePlan
 from recipe.models import ProductBatching
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
@@ -21,6 +21,7 @@ from plan.models import ProductClassesPlan, ProductDayPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus
 from system.models import User
 from django.db.transaction import atomic
+from plan.uuidfield import UUidTools
 
 
 def strtoint(equip_no):
@@ -48,11 +49,18 @@ def add_product_plan():
     e_set = Equip.objects.all()[:3]
     p_set = ProductBatching.objects.all()[:3]
     ps_set = PlanSchedule.objects.all()[:3]
+    ws_set = WorkSchedulePlan.objects.all()[:3]
+
+    i = 1
     for e_obj in e_set:
         for p_obj in p_set:
             for ps_obj in ps_set:
-                ProductDayPlan.objects.create(equip=e_obj, product_batching=p_obj, plan_schedule=ps_obj)
-
+                pdp_obj = ProductDayPlan.objects.create(equip=e_obj, product_batching=p_obj, plan_schedule=ps_obj)
+                for ws_obj in ws_set:
+                    ProductClassesPlan.objects.create(product_day_plan=pdp_obj, sn=i, plan_trains=i, time=i,
+                                                      weight=i, unit='包', work_schedule_plan=ws_obj,
+                                                      plan_classes_uid=UUidTools.uuid1_hex(),note='备注')
+                    i += 1
 
 
 def add_product():
@@ -105,5 +113,6 @@ def add_product():
 
 
 if __name__ == '__main__':
+    add_product_plan()
     add_product()
     # add_work()
