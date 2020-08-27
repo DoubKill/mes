@@ -232,7 +232,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             plan_time = 0
             actual_time = 0
             begin_time = None
-            product_no = day_plan.product_batching.product_info.product_no
+            product_no = day_plan.product_batching.stage_product_batch_no
             stage = day_plan.product_batching.stage.global_name
             equip_no = day_plan.equip.equip_no
             if equip_no not in temp_data:
@@ -317,7 +317,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             plan_weight_all = 0
             actual_trains = 0
             plan_weight = 0
-            product_no = day_plan.product_batching.product_info.product_name
+            product_no = day_plan.product_batching.stage_product_batch_no
             equip_no = day_plan.equip.equip_no
             day_plan_actual = [None, None, None]
             # 通过日计划id再去查班次计划
@@ -329,7 +329,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                 plan_trains_all += class_plan.plan_trains
                 plan_weight = class_plan.weight
                 plan_weight_all += class_plan.weight
-                class_name = class_plan.classes_detail.classes.global_name
+                class_name = class_plan.work_schedule_plan.classes.global_name
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
                                                                   equip_no=target_equip_no)

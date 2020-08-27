@@ -1357,9 +1357,10 @@ def add_material_day_classes_plan():
     pb_set = ProductBatching.objects.filter(delete_flag=False)
     pb_count = pb_set.count()
     ps_set = PlanSchedule.objects.filter(delete_flag=False)
+    ps_id_list = list(ps_set.values_list("id", flat=True))
     # 目前工序只有密炼
-    project_list = ["密炼"]
-    ws_set = WorkSchedule.objects.filter(schedule_name__in=project_list, delete_flag=False)
+    # project_list = ["密炼"]
+    wsp_set = WorkSchedulePlan.objects.filter(plan_schedule_id__in=ps_id_list, delete_flag=False)
     for x in range(actual_feedback):
         for ps in ps_set:
             equip = equip_set[random.randint(0, equip_count - 1)]
@@ -1374,24 +1375,23 @@ def add_material_day_classes_plan():
             sn += 1
         else:
             init_ps_id = day_plan.plan_schedule
-        for ws in ws_set:
+        for wsp in wsp_set:
             mn_uid = None
             an_uid = None
             nt_uid = None
-            for cs in ws.classesdetail_set.filter(delete_flag=False):
-                cs_name = cs.classes.global_name
-                if cs_name == "早班":
-                    uid = mn_uid if mn_uid else uuid.uuid1()
-                elif cs_name == "中班":
-                    uid = an_uid if an_uid else uuid.uuid1()
-                elif cs_name == "晚班":
-                    uid = nt_uid if nt_uid else uuid.uuid1()
-                else:
-                    # 暂不做其他班次的处理
-                    continue
-                ProductClassesPlan.objects.create(sn=sn, product_day_plan=day_plan, plan_classes_uid=uid,
-                                                  classes_detail=cs, unit="kg", plan_trains=50, weight=250,
-                                                  time=45)
+            cs_name = wsp.classes.global_name
+            if cs_name == "早班":
+                uid = mn_uid if mn_uid else uuid.uuid1()
+            elif cs_name == "中班":
+                uid = an_uid if an_uid else uuid.uuid1()
+            elif cs_name == "晚班":
+                uid = nt_uid if nt_uid else uuid.uuid1()
+            else:
+                # 暂不做其他班次的处理
+                continue
+            ProductClassesPlan.objects.create(sn=sn, product_day_plan=day_plan, plan_classes_uid=uid,
+                                              work_schedule_plan=wsp, unit="kg", plan_trains=50, weight=250,
+                                              time=45)
 
 
 def add_product_demo_data():
@@ -1483,31 +1483,31 @@ def add_product_demo_data():
 
 
 if __name__ == '__main__':
-    add_global_codes()
-    print("global_codes is ok")
-    add_materials()
-    print("materials is ok")
-    add_groups()
-    print("groups is ok")
-    add_sections()
-    print("sections is ok")
-    add_users()
-    print("users is ok")
-    add_schedules()
-    print("schedules is ok")
-    add_equip_attribute()
-    print("equip_attribute is ok")
-    add_equips()
-    print("equips is ok")
-    add_plan_schedule()
-    print("plan_schedule is ok")
-    add_product()
-    print("product is ok")
-    add_product_batching()
-    print("product_batching is ok")
+    # add_global_codes()
+    # print("global_codes is ok")
+    # add_materials()
+    # print("materials is ok")
+    # add_groups()
+    # print("groups is ok")
+    # add_sections()
+    # print("sections is ok")
+    # add_users()
+    # print("users is ok")
+    # add_schedules()
+    # print("schedules is ok")
+    # add_equip_attribute()
+    # print("equip_attribute is ok")
+    # add_equips()
+    # print("equips is ok")
+    # add_plan_schedule()
+    # print("plan_schedule is ok")
+    # add_product()
+    # print("product is ok")
+    # add_product_batching()
+    # print("product_batching is ok")
     # add_plan()
     # print("plan is ok")
-    # add_material_day_classes_plan()
+    add_material_day_classes_plan()
     print("material_day_classes_plan is ok")
     # add_product_demo_data()
-    print("product_demo_data is ok")
+    # print("product_demo_data is ok")
