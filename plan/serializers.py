@@ -2,12 +2,14 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
 
+from mes.sync import BaseInterface
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
 from basics.models import PlanSchedule, WorkSchedule, ClassesDetail, GlobalCode, WorkSchedulePlan
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
+from datetime import datetime
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -476,6 +478,28 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
         return instance
 
 
+'''
+{
+    'created_date': '',
+    'equip': '',
+    'product_batching': '',
+    'plan_schedule': '',
+    'pdp_product_classes_plan': [
+        {
+            'created_date': '',
+            'sn': '',
+            'plan_trains': '',
+            'time': '',
+            'weight': '',
+            'unit': '',
+            'work_schedule_plan': '',
+            'plan_classes_uid': '',
+            'note': '',
+        }
+        ......
+    ],
+}
+'''
 # class MaterialRequisitionCopySerializer(BaseModelSerializer):
 #     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
 #     dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
