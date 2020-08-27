@@ -1247,14 +1247,17 @@ def add_plan_schedule():
     classes_ids = list(GlobalCode.objects.filter(global_type__type_name='班次').values_list('id', flat=True))
     times = ['00:00:01', '08:00:00',
              '16:00:00', '23:00:59']
+    # k = 1
     for i, day_time in enumerate(day_times):
         try:
             instance = PlanSchedule.objects.create(
+                # plan_schedule_no=i,
                 day_time=day_time,
                 work_schedule_id=random.choice(ids)
             )
             for j in range(3):
                 WorkSchedulePlan.objects.create(
+                    # work_schedule_plan_no=k,
                     classes_id=classes_ids[j],
                     group_id=group_ids[j],
                     rest_flag=False,
@@ -1262,6 +1265,7 @@ def add_plan_schedule():
                     start_time=day_time + ' ' + times[j],
                     end_time=day_time + ' ' + times[j+1],
                 )
+            # k += 1
         except Exception:
             pass
 
