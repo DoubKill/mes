@@ -26,6 +26,12 @@
                     equip_level:"",
                     category:"",
                 },
+                equip_rules:{
+                    equip_no: [{ required: true, message: '请输入设备编号', trigger: 'blur' }],
+                    equip_name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
+                    equip_level: [{ required: true, message: '请选择设备层级', trigger: 'change' }],
+                    category: [{ required: true, message: '请选择设备种类', trigger: 'change' }],
+                },
                 EquipFormError: {
                     equip_no: "",
                     equip_name: "",
@@ -77,49 +83,40 @@
                 this.clearEquipFormError();
                 this.dialogCreateEquipVisible = true;
             },
-            handleCreateEquip: function () {
-
-                this.clearEquipFormError();
+            handleCreateEquip(formName) {
                 var app = this;
-                axios.post(EquipUrl, app.EquipForm)
-                    .then(function (response) {
+                app.$refs[formName].validate((valid) => {
+                  if (valid) {
 
-                        app.dialogCreateEquipVisible = false;
-                        app.$message(app.EquipForm.equip_name + "创建成功");
-                        app.currentChange(app.currentPage);
+                        this.clearEquipFormError();
+                        var app = this;
+                        axios.post(EquipUrl, app.EquipForm)
+                            .then(function (response) {
 
-                    }).catch(function (error) {
+                                app.dialogCreateEquipVisible = false;
+                                app.$message(app.EquipForm.equip_name + "创建成功");
+                                app.currentChange(app.currentPage);
 
-                    for (var key in app.EquipFormError) {
-                        if (error.response.data[key])
-                            app.EquipFormError[key] = error.response.data[key].join(",")
-                    }
-                })
+                            }).catch(function (error) {
+
+                            for (var key in app.EquipFormError) {
+                                if (error.response.data[key])
+                                    app.EquipFormError[key] = error.response.data[key].join(",")
+                            }
+                        })
+                  }else {
+                    console.log('error submit!!');
+                    return false;
+                  }
+                });
             },
             showEditEquipDialog: function (row) {
-                // var row_equip_custom = {};
-                // for (var key in row) {
-                //     row_equip_custom[key] = row[key];
-                //     if(key == "process_name"){
-                //         row_equip_custom['category'] = " 工序: "+ row[key]
-                //     }
-                //     if(key == "equip_type"){
-                //         row_equip_custom['category'] = "  设备类型: " + row[key] + row_equip_custom['category']
-                //     }
-                //     if(key == "category_name"){
-                //         row_equip_custom['category'] = "  机型名称: " + row[key] + row_equip_custom['category']
-                //     }
-                //     if(key == "category_no"){
-                //         row_equip_custom['category'] = "  机型编号: " + row[key] + row_equip_custom['category']
-                //     }
-                //
-                // }
                 this.clearEquipForm();
                 this.clearEquipFormError();
                 this.EquipForm = Object.assign({}, row);
-                // console.log("==========================================================");
-                // console.log(row);
-                // console.log("==========================================================");
+                console.log("==========================================================");
+                console.log(row);
+                console.log("==========================================================");
                 this.dialogEditEquipVisible = true;
             },
 
@@ -196,7 +193,7 @@
                     // console.log("==================");
                     for (var i = 0; i < app.EquipLevel.length; ++i) {
 
-                        var label = app.EquipLevel[i]["global_no"] + "——" + app.EquipLevel[i]["global_name"];
+                        var label =app.EquipLevel[i]["global_name"];
                         app.EquipLevelOptions.push({
                             value: app.EquipLevel[i]["id"],
                             label

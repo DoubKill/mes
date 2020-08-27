@@ -101,28 +101,29 @@
             }).catch(function (error) {
 
             });
-            axios.get(RubberMaterialUrl, {
-
-                params: {
-                    all: 1,
-                    used_type: 4
-                    // page_size: 100000000
-                }
-            }).then(function (response) {
-
-                app.stage_product_batch_nos = [];
-                app.productBatchings = response.data.results;
-                response.data.results.forEach(function (batching) {
-
-                    app.productBatchingById[batching.id] = batching;
-                    if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
-
-                        app.stage_product_batch_nos.push(batching.stage_product_batch_no)
-                    }
-                });
-            }).catch(function (error) {
-
-            });
+            // this.getProductBatchings();
+            // axios.get(RubberMaterialUrl, {
+            //
+            //     params: {
+            //         all: 1,
+            //         used_type: 4
+            //         // page_size: 100000000
+            //     }
+            // }).then(function (response) {
+            //
+            //     app.stage_product_batch_nos = [];
+            //     app.productBatchings = response.data.results;
+            //     response.data.results.forEach(function (batching) {
+            //
+            //         app.productBatchingById[batching.id] = batching;
+            //         if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
+            //
+            //             app.stage_product_batch_nos.push(batching.stage_product_batch_no)
+            //         }
+            //     });
+            // }).catch(function (error) {
+            //
+            // });
             this.getPlanSchedules();
             axios.get(WorkSchedulesUrl, {
                 params: {
@@ -136,7 +137,35 @@
             })
         },
         methods: {
+            getProductBatchings() {
 
+                var app = this;
+                axios.get(RubberMaterialUrl, {
+
+                    params: {
+                        all: 1,
+                        used_type: 4,
+                        dev_type: app.equipById[app.equipIdForAdd].category
+                    }
+                }).then(function (response) {
+
+                    app.stage_product_batch_nos = [];
+                    app.productBatchings = response.data.results;
+                    response.data.results.forEach(function (batching) {
+
+                        app.productBatchingById[batching.id] = batching;
+                        if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
+
+                            app.stage_product_batch_nos.push(batching.stage_product_batch_no)
+                        }
+                    });
+                }).catch(function (error) {
+
+                });
+            },
+            equipChanged() {
+                this.getProductBatchings()
+            },
             getPlanSchedules() {
 
                 var app = this;
@@ -406,7 +435,7 @@
                 }
                 this.statistic();
             },
-            planTrainsChanged(planForAdd, columnIndex, sum=true) {
+            planTrainsChanged(planForAdd, columnIndex, sum = true) {
 
                 if (!planForAdd["pdp_product_classes_plan"][columnIndex].enable)
                     return;
@@ -473,8 +502,8 @@
                                 app.$alert('机台' + plan.equip_.equip_no
                                     + planSchedule.work_schedule_plan[i].classes_name
                                     + '计划时间大于排班时间' + '(计划时间' + pdp_product_classes_plan[i].time + '分钟'
-                                + ' 排班时间' + workSchedulePlanTimeSpan + '分钟' +
-                                ')', '警告', {
+                                    + ' 排班时间' + workSchedulePlanTimeSpan + '分钟' +
+                                    ')', '警告', {
                                     confirmButtonText: '确定',
                                 });
                             }
