@@ -48,7 +48,8 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'material_no', 'material_name', 'material_type__global_name')
+            data = queryset.filter(used_flag=1).values('id', 'material_no',
+                                                       'material_name', 'material_type__global_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
