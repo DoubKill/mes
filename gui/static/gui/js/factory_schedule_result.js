@@ -11,9 +11,6 @@
 
         },
         methods: {
-            afterGetData: function () {
-                console.log(this.tableData)
-            },
         }
     };
     var Ctor = Vue.extend(Main);
