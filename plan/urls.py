@@ -2,7 +2,7 @@ from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from plan.views import ProductDayPlanViewSet, ProductBatchingDayPlanViewSet, \
     ProductDayPlanCopyView, ProductBatchingDayPlanCopyView, MaterialRequisitionClassesViewSet, MaterialDemandedAPIView, \
-    ProductBatchingDayPlanManyCreate, ProductDayPlanManyCreate
+    ProductBatchingDayPlanManyCreate, ProductDayPlanManyCreate, ProductDayPlanAPiView
 
 router = DefaultRouter()
 # 胶料日计划
@@ -21,4 +21,5 @@ urlpatterns = [
     path('material-demanded-apiview/', MaterialDemandedAPIView.as_view()),  # 原材料需求量展示
     path('product-batching-day-plan-manycreate/', ProductBatchingDayPlanManyCreate.as_view()),  # 群增小料日计划
     path('product-day-plan-manycreate/', ProductDayPlanManyCreate.as_view()),  # 群增胶料日计划
+    path('product-day-plan-notice/', ProductDayPlanAPiView.as_view()),  # 计划下发至上辅机
 ]
