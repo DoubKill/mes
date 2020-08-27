@@ -21,8 +21,8 @@ var Equip_filter = {
         },
         beforeGetData() {
 
-            this.getParams['process'] = this.process;
-            this.getParams['equip'] = this.equip;
+            this.getParams['equip_process'] = this.process;
+            this.getParams['equip_name'] = this.equip;
         },
     }
 };

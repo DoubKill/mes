@@ -1,11 +1,15 @@
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
+
+from mes.sync import BaseInterface
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
 from basics.models import PlanSchedule, WorkSchedule, ClassesDetail, GlobalCode, WorkSchedulePlan
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
+from datetime import datetime
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -47,6 +51,13 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                   'product_no', 'batching_weight', 'production_time_interval', 'product_batching',
                   'pdp_product_classes_plan', 'dev_type_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('equip', 'product_batching', 'plan_schedule'),
+                message="当天该机台已有相同的胶料计划数据，请修改后重试!"
+            )
+        ]
 
     @atomic()
     def create(self, validated_data):
@@ -467,6 +478,28 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
         return instance
 
 
+'''
+{
+    'created_date': '',
+    'equip': '',
+    'product_batching': '',
+    'plan_schedule': '',
+    'pdp_product_classes_plan': [
+        {
+            'created_date': '',
+            'sn': '',
+            'plan_trains': '',
+            'time': '',
+            'weight': '',
+            'unit': '',
+            'work_schedule_plan': '',
+            'plan_classes_uid': '',
+            'note': '',
+        }
+        ......
+    ],
+}
+'''
 # class MaterialRequisitionCopySerializer(BaseModelSerializer):
 #     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
 #     dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
