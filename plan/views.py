@@ -1,7 +1,7 @@
-
 from django.db.models import Sum
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
+from mes.sync import ProductDayPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, ProductBatchingDayPlanFilter, MaterialDemandedFilter
 from plan.serializers import ProductDayPlanSerializer, ProductBatchingDayPlanSerializer, \
     ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer, MaterialRequisitionClassesSerializer
@@ -153,12 +154,12 @@ class MaterialDemandedAPIView(ListAPIView):
     """原材料需求量展示，plan_date参数必填"""
 
     queryset = MaterialDemanded.objects.all()
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDemandedFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        data = queryset.filter(**kwargs).select_related('material', 'classes__classes').\
+        data = queryset.filter(**kwargs).select_related('material', 'classes__classes'). \
             values('material__material_name', 'material__material_no',
                    'material__material_type__global_name', 'work_schedule_plan__classes__global_name'
                    ).annotate(num=Sum('material_demanded'))
@@ -174,7 +175,7 @@ class MaterialDemandedAPIView(ListAPIView):
                 materials.append(item['material__material_name'])
             else:
                 ret[item['material__material_name']
-                    ]['class_details'][item['work_schedule_plan__classes__global_name']] = item['num']
+                ]['class_details'][item['work_schedule_plan__classes__global_name']] = item['num']
         page = self.paginate_queryset(list(ret.values()))
         return self.get_paginated_response(page)
 
@@ -191,3 +192,25 @@ class ProductBatchingDayPlanCopyView(CreateAPIView):
     """复制配料小料日计划"""
     serializer_class = ProductBatchingDayPlanCopySerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
+
+
+class ProductDayPlanAPiView(APIView):
+    """计划数据下发至上辅机"""
+    permission_classes = ()
+    authentication_classes = ()
+
+    def post(self, request):
+        product_day_id = self.request.query_params.get('product_day_id')
+        print(product_day_id)
+        if not product_day_id:
+            raise ValidationError('缺失参数')
+        try:
+            product_day = ProductDayPlan.objects.get(id=int(product_day_id))
+        except Exception:
+            raise ValidationError('该计划不存在')
+        interface = ProductDayPlanSyncInterface(instance=product_day)
+        # try:
+        interface.request()
+        # except Exception as e:
+            # raise ValidationError(e)
+        return Response('发送成功', status=status.HTTP_200_OK)
