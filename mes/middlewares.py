@@ -1,9 +1,11 @@
+import json
+
 from django.http import HttpResponse
 from django.utils.deprecation import MiddlewareMixin
 
-from mes.conf import PROJECT_API_TREE
+from mes.conf import PROJECT_API_TREE, SYNC_SYSTEM_NAME
 from production.utils import OpreationLogRecorder
-from system.models import SystemConfig, ChildSystemInfo
+from system.models import SystemConfig, ChildSystemInfo, AsyncUpdateContent
 
 
 class DisableCSRF(MiddlewareMixin):
@@ -60,3 +62,18 @@ class SyncMiddleware(MiddlewareMixin):
             # 若为基础数据同步需判断是否联网
             if not self.if_system_online:
                 return HttpResponse(f"系统处于非联网/独立状态，请检查系统联网配置后重试", status=400)
+
+    def process_response(self, request, response):
+        model_name = getattr(response, "model_name", None)
+        if model_name:
+            child_system = ChildSystemInfo.objects.filter(system_name=SYNC_SYSTEM_NAME).first()
+            if child_system:
+                link_address = child_system.link_address
+                url = request.get_full_path()
+                method = request.method
+                dst_address = f"https://{link_address}{url}"
+                content = json.dumps(request.POST.dict())
+                AsyncUpdateContent.objects.create(content=content, method=method, src_table_name=model_name,
+                                                  dst_address=dst_address)
+
+        return response

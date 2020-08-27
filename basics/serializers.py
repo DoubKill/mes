@@ -49,6 +49,8 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
 
 class GlobalCodeSerializer(BaseModelSerializer):
     """公共代码序列化器"""
+    global_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
+        queryset=GlobalCode.objects.all(), message='该公共代码编号已存在')])
 
     @staticmethod
     def validate_global_type(global_type):
@@ -77,13 +79,6 @@ class GlobalCodeSerializer(BaseModelSerializer):
         model = GlobalCode
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.filter(delete_flag=False),
-                fields=('global_no', 'global_name', 'global_type', 'used_flag'),
-                message="该公共代码已存在"
-            )
-        ]
 
 
 class ClassesDetailSerializer(BaseModelSerializer):
@@ -164,6 +159,8 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
     equip_process_name = serializers.CharField(source="process.global_name", read_only=True)
     equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
     equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
+    category_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
+                                         queryset=EquipCategoryAttribute.objects.all(), message='该设备属性编号已存在')])
 
     class Meta:
         model = EquipCategoryAttribute
@@ -179,6 +176,9 @@ class EquipSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
     equip_type = serializers.CharField(source="category.equip_type.global_name", read_only=True)
     equip_level_name = serializers.CharField(source="equip_level.global_name", read_only=True)
+    equip_no = serializers.CharField(max_length=64,
+                                     validators=[UniqueValidator(
+                                         queryset=Equip.objects.all(), message='该设备编号已存在')])
 
     class Meta:
         model = Equip
