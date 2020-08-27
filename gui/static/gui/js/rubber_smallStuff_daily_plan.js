@@ -59,8 +59,6 @@
             }
         },
         created() {
-            this.getMachineList()
-            this.getGlueList()
             this.getList()
 
             var _setDate = setDate()
@@ -148,7 +146,6 @@
                 var _this = this
                 var params = bool ? {
                         all: 1
-                        // page_size: 100000000
                     } :
                     _this.rubberDialogParams
 
@@ -410,9 +407,7 @@
                 this.formEdit.bags_total_qty = allNumber
             },
             changeWorkRubberType(val) {
-                console.log(val, 'val')
                 this.getGlueList(val)
-                // this.getSmallMaterial(val)
             },
             handleCloseAdd(done) {
                 done()
@@ -434,6 +429,14 @@
                     return D.id === val
                 })
                 this.smallMaterialEdit = obj[0].batching_weight
+            },
+            equipVisibleChange(bool) {
+                if (!bool || this.machineList.length > 0) return
+                this.getMachineList()
+            },
+            glueVisibleChange(bool) {
+                if (!bool || this.glueList.length > 0) return
+                this.getGlueList()
             }
         },
         watch: {}

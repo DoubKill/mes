@@ -19,6 +19,7 @@
         <el-form-item label="胶料">
             <el-select v-model="getParams.product_no" placeholder="请选择"
                        clearable
+                       @visible-change="productVisibleChange"
                        @change="changeSearch">
                 <el-option
                         v-for="item in glueList"
@@ -31,6 +32,7 @@
         <el-form-item label="机台">
             <el-select v-model="getParams.equip_no"
                        @change="changeSearch"
+                       @visible-change="machineVisibleChange"
                        clearable
                        placeholder="请选择">
                 <el-option
@@ -43,7 +45,8 @@
         </el-form-item>
         <el-form-item label="班次">
             <el-select v-model="getParams.classes" placeholder="请选择"
-            clearable @change="changeSearch">
+                       clearable @change="changeSearch"
+                       @visible-change="classesVisibleChange">
                 <el-option
                         v-for="item in classesList"
                         :key="item.id"
