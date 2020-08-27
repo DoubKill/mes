@@ -210,6 +210,7 @@
             get_raw_material(val=1){
                 var app=this;
                 this.getParams["page"] = val;
+                this.getParams["used_flag"] = true;
                 this.getParams["material_type_id"] = app.materialType?app.materialType:'';
                 this.getParams["material_no"] = app.search_material_no?app.search_material_no:'';
                 this.getParams["material_name"] = app.search_material_name?app.search_material_name:'';
@@ -528,7 +529,7 @@
                     material_type:"",
                     auto_flag_radio:true,
                     material_name:"",
-                    practical_weight:""
+                    // practical_weight:""
                 });
             },
             PutNewPracticalWeightChanged: function () {
@@ -547,7 +548,7 @@
                     material_type:"",
                     auto_flag:true,
                     material_name:"",
-                    actual_weight:""
+                    // actual_weight:""
                 });
             },
 
@@ -664,6 +665,20 @@
                 }
 
                 app.dialogRawMaterialSync = true;
+            },
+            del_raw_material_row: function(new_material_ele, index){
+                var app = this;
+                if(new_material_ele.hasOwnProperty("practical_weight")){
+                    app.raw_material_index = index;
+                    app.NewRowMaterial.splice(index,1);
+                    var material_weight = 0;
+                    for(var i=0; i<app.NewRowMaterial.length; ++i){
+                        material_weight += app.NewRowMaterial[i]['practical_weight']
+                    }
+                    app.select_material_weight = material_weight;
+                    app.practicalWeightSum = material_weight;
+                }else {
+                }
             },
 
             afterGetData: function () {
