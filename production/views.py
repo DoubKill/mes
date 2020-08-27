@@ -50,7 +50,7 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
-            queryset = self.filter_queryset(self.get_queryset() )
+            queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -108,7 +108,7 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
-            queryset = self.filter_queryset(self.get_queryset() )
+            queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -196,7 +196,7 @@ class QualityControlViewSet(mixins.CreateModelMixin,
 
 
 class PlanRealityViewSet(mixins.ListModelMixin,
-                      GenericViewSet):
+                         GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
@@ -262,7 +262,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                     actual_time = 0
                     begin_time = None
             if plan_weight:
-                ach_rate = actual_weight/plan_weight*100
+                ach_rate = actual_weight / plan_weight * 100
             else:
                 ach_rate = 0
             instance.update(equip_no=equip_no, product_no=product_no,
@@ -274,7 +274,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             if equip_no in temp_data:
                 temp_data[equip_no].append(instance)
         for equip_data in temp_data.values():
-            equip_data.sort(key=lambda x:(x.get("equip_no"), x.get("begin_time")))
+            equip_data.sort(key=lambda x: (x.get("equip_no"), x.get("begin_time")))
             new_equip_data = []
             for _ in equip_data:
                 _.update(sn=equip_data.index(_) + 1)
@@ -371,8 +371,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
 
 
 class ProductionRecordViewSet(mixins.ListModelMixin,
-                            GenericViewSet):
-
+                              GenericViewSet):
     queryset = PalletFeedbacks.objects.filter(delete_flag=False)
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
@@ -395,3 +394,65 @@ class PlanRelease(APIView):
         url = "http://xxxxx"
         ret = requests.post(url, data=plan_data)
         # TODO
+
+
+class MaterialInventory(GenericViewSet,
+                        mixins.ListModelMixin, ):
+
+    def get_queryset(self):
+        return
+
+    def list(self, request, *args, **kwargs):
+        results = [{"sn": 1,
+                    "id": 1,
+                    "material_id": 1,
+                    "material_no": "C9001",
+                    "material_name": "C9001",
+                    "material_type_id": 1,
+                    "material_type": "天然胶",
+                    "qty": 11,
+                    "unit": "吨",
+                    "unit_weight": 1,
+                    "total_weight": 1,
+                    "need_weight": 1,
+                    "site": "安吉仓库",
+                    "standard_flag": True,
+                    }, {"sn": 2,
+                        "id": 2,
+                        "material_id": 2,
+                        "material_no": "C9002",
+                        "material_name": "C9002",
+                        "material_type_id": 1,
+                        "material_type": "天然胶",
+                        "qty": 11,
+                        "unit": "吨",
+                        "unit_weight": 1,
+                        "total_weight": 1,
+                        "need_weight": 1,
+                        "site": "安吉仓库",
+                        "standard_flag": False,
+                        }]
+        return Response({'results': results})
+
+
+class ProductInventory(GenericViewSet,
+                       mixins.ListModelMixin, ):
+
+    def get_queryset(self):
+        return
+
+    def list(self, request, *args, **kwargs):
+        results = [{
+            "sn": 1,
+            "material_no": "c-1MB-C9001-01",
+            "material_name": "c-1MB-C9001-01",
+            "material_type": "1MB",
+            "qty": 11,
+            "unit": "吨",
+            "unit_weight": 1,
+            "total_weight": 1,
+            "need_weight": 1,
+            "standard_flag": True,
+            "site": "立库",
+        }]
+        return Response({'results': results})

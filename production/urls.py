@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from production.views import TrainsFeedbacksViewSet, PalletFeedbacksViewSet, EquipStatusViewSet, PlanStatusViewSet, \
     ExpendMaterialViewSet, OperationLogViewSet, QualityControlViewSet, \
-    ProductionRecordViewSet, PlanRealityViewSet, ProductActualViewSet
+    ProductionRecordViewSet, PlanRealityViewSet, ProductActualViewSet, MaterialInventory, ProductInventory
 
 router = DefaultRouter()
 
@@ -36,6 +36,9 @@ router.register(r'plan-reality', PlanRealityViewSet, basename="plan-reality")
 
 # 密炼实绩
 router.register(r'product-actual', ProductActualViewSet, basename="product-actual")
+
+router.register(r'material-inventory', MaterialInventory, basename="material-inventory")
+router.register(r'product-inventory', ProductInventory, basename="product-inventory")
 
 urlpatterns = [
     path('', include(router.urls)),
