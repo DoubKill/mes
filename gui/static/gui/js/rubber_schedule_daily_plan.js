@@ -327,15 +327,13 @@
                     app.$message.error(JSON.stringify(error.response.data));
                 });
             },
-            addOnePlan() {
+            async addOnePlan() {
 
                 if (!this.equipIdForAdd) {
                     return;
                 }
-                var planSchedule = this.planSchedules.find(planSchedule => {
-
-                    return planSchedule.id === this.planScheduleId
-                });
+                let res = await axios.get(PlanScheduleUrl + this.planScheduleId + "/");
+                let planSchedule = res.data;
                 var workSchedule = this.workSchedules.find(workSchedule => {
 
                     return workSchedule.id === planSchedule.work_schedule
@@ -516,9 +514,15 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
-                    app.$alert(JSON.stringify(error.response.data.join(",").trim()), '错误', {
-                        confirmButtonText: '确定',
-                    });
+                    error.response.data.forEach(function (err) {
+
+                        if (err["product_batching"]) {
+                            app.$alert("胶料配方编码是必填项。", '错误', {
+                                confirmButtonText: '确定',
+                            });
+                        }
+                    })
+
 
                 });
             },
@@ -528,7 +532,12 @@
             sendToAu(plan) {
 
                 console.log(plan)
-            }
+            },
+            showAddPlansDialog() {
+
+                this.plansForAdd = []
+                this.addPlanVisible = true;
+            },
         }
     };
     var Ctor = Vue.extend(Main);

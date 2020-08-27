@@ -29,12 +29,14 @@
                             <el-option
                                     :key="item.value"
                                     :value="item.value"
-                                    :label="item.label"
+                                    :label="item.schedule_name"
                                     v-for="item in workScheduleOptions">
                             </el-option>
                         </el-select>
                     </el-form-item>
                     <el-form-item label="倒班周期" :label-width="formLabelWidth">
+                        <el-input-number v-model.number="changeShiftsPeriod" ></el-input-number>
+                        <!--
                         <el-select v-model="changeShiftsPeriod" style="width: 100%" placeholder="请选择">
                             <el-option
                                     :key="period.id"
@@ -43,6 +45,7 @@
                                     v-for="period in changeShiftsPeriods">
                             </el-option>
                         </el-select>
+                        -->
                     </el-form-item>
                 </el-form>
                 <el-table

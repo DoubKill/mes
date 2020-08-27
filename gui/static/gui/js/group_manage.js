@@ -24,7 +24,6 @@
             }
         },
         methods: {
-
             clearGroupForm: function () {
 
                 this.groupForm = {
