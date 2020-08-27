@@ -9,6 +9,7 @@ import re
 from django.contrib.auth.models import Permission
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
+from rest_framework.validators import UniqueValidator
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -25,7 +26,10 @@ class UserUpdateSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
     username = serializers.CharField(required=False)
     password = serializers.CharField(required=False)
-    num = serializers.CharField(required=False)
+    num = serializers.CharField(required=False, validators=[
+        UniqueValidator(queryset=User.objects.all(),
+                        message='该用户工号已存在'),
+    ])
 
     def to_representation(self, instance):
         instance = super().to_representation(instance)

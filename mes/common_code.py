@@ -1,10 +1,8 @@
-from rest_framework import status
+from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
-from basics.models import PlanSchedule
 from mes.permissions import PermissonsDispatch
-from plan.models import ProductClassesPlan
 from system.models import User
 
 
@@ -16,6 +14,21 @@ class CommonDeleteMixin(object):
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
+class SyncCreateMixin(mixins.CreateModelMixin):
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        setattr(response, "model_name", self.queryset.model.__name__)
+        return response
+
+
+class SyncUpdateMixin(mixins.UpdateModelMixin):
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        setattr(response, "model_name", self.queryset.model.__name__)
+        return response
 
 def return_permission_params(model_name):
     """
@@ -58,16 +71,3 @@ def menu(request, menu, temp, format):
 
     temp.data.update({"menu": data})
     return temp
-
-
-def get_day_plan_class_set(time_str):
-    plan_schedule = PlanSchedule.objects.filter(day_time=time_str).first()
-    day_plan_id_list = plan_schedule.ps_day_plan.filter(delete_flag=False).values_list("id", flat=True)
-    day_class_plan_set = ProductClassesPlan.objects.filter(product_day_plan__in=day_plan_id_list)
-    return day_class_plan_set
-
-def get_day_plan_class_uid_list(time_str):
-    plan_schedule = PlanSchedule.objects.filter(day_time=time_str).first()
-    day_plan_id_list = plan_schedule.ps_day_plan.filter(delete_flag=False).values_list("id", flat=True)
-    day_class_plan_uid_list = ProductClassesPlan.objects.filter(product_day_plan__in=day_plan_id_list).values_list("plan_classes_uid", flat=True)
-    return day_class_plan_uid_list
