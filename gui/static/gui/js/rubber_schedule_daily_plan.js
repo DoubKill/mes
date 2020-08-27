@@ -327,6 +327,18 @@
                     app.$message.error(JSON.stringify(error.response.data));
                 });
             },
+            deleteOnPlan(plan) {
+
+                this.plansForAdd.splice(
+                this.plansForAdd.indexOf(plan), 1);
+                var plans =this.plansForAdd.filter(plan_ => {
+                    return plan_.equip === plan.equip
+                });
+                if (plans.length === 1) {
+                    this.plansForAdd.splice(plans[0], 1);
+                }
+                this.statistic();
+            },
             async addOnePlan() {
 
                 if (!this.equipIdForAdd) {
