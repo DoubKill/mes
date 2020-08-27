@@ -16,7 +16,7 @@
             var app = this;
             axios.get(BanburyPlanUrl, {
             }).then(function (response) {
-                app.tableData = response.data.data;
+                app.tableData = response.data.results;
             }).catch(function (error) {
             });
 
