@@ -49,6 +49,8 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
 
 class GlobalCodeSerializer(BaseModelSerializer):
     """公共代码序列化器"""
+    global_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
+        queryset=GlobalCode.objects.all(), message='该公共代码编号已存在')])
 
     @staticmethod
     def validate_global_type(global_type):
@@ -77,13 +79,6 @@ class GlobalCodeSerializer(BaseModelSerializer):
         model = GlobalCode
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.filter(delete_flag=False),
-                fields=('global_no', 'global_name', 'global_type', 'used_flag'),
-                message="该公共代码已存在"
-            )
-        ]
 
 
 class ClassesDetailSerializer(BaseModelSerializer):
@@ -105,15 +100,6 @@ class ClassesSimpleSerializer(BaseModelSerializer):
         model = ClassesDetail
         fields = ('id', 'classes_name', 'work_schedule_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class ClassesDetailUpdateSerializer(BaseModelSerializer):
-    """工作日程班次条目修改序列化器"""
-
-    class Meta:
-        model = ClassesDetail
-        exclude = ('work_schedule',)
-        extra_kwargs = {'id': {'read_only': False}}
 
 
 class WorkScheduleSerializer(BaseModelSerializer):
@@ -142,20 +128,23 @@ class WorkScheduleSerializer(BaseModelSerializer):
 
 class WorkScheduleUpdateSerializer(BaseModelSerializer):
     """日程修改序列化器"""
-    classesdetail_set = ClassesDetailUpdateSerializer(many=True,
+    classesdetail_set = ClassesDetailSerializer(many=True,
                                                       help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,
                                                       "start_time":"12:12:12", "end_time":"12:12:12",
                                                       "classes_type_name":"正常"}]""")
 
     @atomic()
     def update(self, instance, validated_data):
+        if instance.plan_schedule.exists():
+            raise serializers.ValidationError('该倒班已关联排班计划，不可修改')
         classesdetail_set = validated_data.pop('classesdetail_set', None)
-        for plan in classesdetail_set:
-            plan_id = plan.pop('id', None)
-            if plan_id:  # 有id的数据代表更新
-                ClassesDetail.objects.filter(id=plan_id).update(**plan)
-            else:  # 否则新建
-                ClassesDetail.objects.create(**plan)
+        if classesdetail_set is not None:
+            instance.classesdetail_set.all().delete()
+            classes_details_list = []
+            for plan in classesdetail_set:
+                plan['work_schedule'] = instance
+                classes_details_list.append(ClassesDetail(**plan))
+            ClassesDetail.objects.bulk_create(classes_details_list)
         instance = super().update(instance, validated_data)
         return instance
 
@@ -170,6 +159,8 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
     equip_process_name = serializers.CharField(source="process.global_name", read_only=True)
     equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
     equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
+    category_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
+                                         queryset=EquipCategoryAttribute.objects.all(), message='该设备属性编号已存在')])
 
     class Meta:
         model = EquipCategoryAttribute
@@ -185,6 +176,9 @@ class EquipSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
     equip_type = serializers.CharField(source="category.equip_type.global_name", read_only=True)
     equip_level_name = serializers.CharField(source="equip_level.global_name", read_only=True)
+    equip_no = serializers.CharField(max_length=64,
+                                     validators=[UniqueValidator(
+                                         queryset=Equip.objects.all(), message='该设备编号已存在')])
 
     class Meta:
         model = Equip
@@ -227,6 +221,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     """计划时间排班序列化器"""
     work_schedule_plan = WorkSchedulePlanSerializer(many=True,
                                                     help_text="""{"classes":班次id, "rest_flag":0, "group":班组id""")
+    work_schedule_name = serializers.CharField(source='work_schedule.schedule_name', read_only=True)
 
     class Meta:
         model = PlanSchedule

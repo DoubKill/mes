@@ -3,22 +3,20 @@
 
 {% block main %}
     <el-form :inline="true">
+
         <el-form-item label="日期">
-            <el-select
+            <el-date-picker
+                    v-model="plan_date"
                     @change="queryDataChange"
-                    clearable
-                    v-model="plan_date" placeholder="请选择">
-                <el-option
-                        :key="schedule.id"
-                        :label="schedule.day_time"
-                        :value="schedule.day_time"
-                        v-for="schedule in planSchedules">
-                </el-option>
-            </el-select>
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
         </el-form-item>
         <el-form-item label="机台">
             <el-select
                     @change="queryDataChange"
+                    filterable
                     clearable
                     v-model="equip_no" placeholder="请选择">
                 <el-option
@@ -32,6 +30,7 @@
         <el-form-item label="胶料">
             <el-select
                     @change="queryDataChange"
+                    filterable
                     clearable
                     v-model="stage_product_batch_no"
                     placeholder="请选择">
@@ -44,9 +43,9 @@
             </el-select>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-checkbox-button v-model="addPlanVisible">
+            <el-button @click="showAddPlansDialog">
                 新建
-            </el-checkbox-button>
+            </el-button>
         </el-form-item>
         <el-form-item style="float: right">
             <el-button :disabled="!currentRow" @click="deletePlan">
@@ -105,6 +104,14 @@
             </el-table-column>
             <el-table-column prop="pdp_product_classes_plan[2].time" label="时间">
             </el-table-column>
+        </el-table-column>
+        <el-table-column label="发送到上辅机">
+            <template slot-scope="scope">
+                <el-button
+                        size="mini"
+                        @click="sendToAu(scope.row)">发送
+                </el-button>
+            </template>
         </el-table-column>
     </el-table>
     {% include 'gui/paginations.html' %}
@@ -165,7 +172,7 @@
             :visible.sync="addPlanVisible"
             title="添加胶料日生产计划">
         <div style="margin-bottom: 15px">
-            <el-select placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
+            <el-select filterable placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
                 <el-option
                         :key="equip.id"
                         :label="equip.equip_no"
@@ -173,23 +180,20 @@
                         v-for="equip in equips">
                 </el-option>
             </el-select>
-            <el-select v-model="workScheduleId" style="margin-right: 10px" placeholder="工作日程">
+            <el-date-picker
+                    style="margin-right: 10px"
+                    @change="getPlanSchedules"
+                    v-model="day_time"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
+            <el-select filterable v-model="planScheduleId" placeholder="倒班规则">
                 <el-option
-                        :key="workSchedule.id"
-                        :label="workSchedule.schedule_name"
-                        :value="workSchedule.id"
-                        v-for="workSchedule in workSchedules">
-                </el-option>
-            </el-select>
-            <el-select
-                    @change="queryDataChange"
-                    clearable
-                    v-model="plan_date_for_create" placeholder="请选择日期">
-                <el-option
-                        :key="schedule.id"
-                        :label="schedule.day_time"
-                        :value="schedule.day_time"
-                        v-for="schedule in planSchedules">
+                        :key="planSchedule.id"
+                        :label="planSchedule.work_schedule__schedule_name"
+                        :value="planSchedule.id"
+                        v-for="planSchedule in planSchedules">
                 </el-option>
             </el-select>
 
@@ -219,13 +223,13 @@
             <el-table-column label="当前库存（吨）"></el-table-column>
             <el-table-column label="早班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum" slot-scope="scope">
+                    <template v-if="!scope.row.sum && scope.row.pdp_product_classes_plan[0].enable" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[0].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="scope.row.pdp_product_classes_plan[0].enable" slot-scope="scope">
                         <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 0)"
                                          v-model.number="scope.row.pdp_product_classes_plan[0].plan_trains"
                                          :min="0"></el-input-number>
@@ -236,13 +240,13 @@
             </el-table-column>
             <el-table-column label="中班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum" slot-scope="scope">
+                    <template v-if="!scope.row.sum && scope.row.pdp_product_classes_plan[1].enable" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[1].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="scope.row.pdp_product_classes_plan[1].enable" slot-scope="scope">
                         <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 1)"
                                          v-model.number="scope.row.pdp_product_classes_plan[1].plan_trains"
                                          :min="0"></el-input-number>
@@ -253,13 +257,13 @@
             </el-table-column>
             <el-table-column label="晚班计划">
                 <el-table-column label="顺序" width="210">
-                    <template v-if="!scope.row.sum" slot-scope="scope">
+                    <template v-if="!scope.row.sum && scope.row.pdp_product_classes_plan[2].enable" slot-scope="scope">
                         <el-input-number v-model.number="scope.row.pdp_product_classes_plan[2].sn"
                                          :min="0"></el-input-number>
                     </template>
                 </el-table-column>
                 <el-table-column label="车次" width="210">
-                    <template slot-scope="scope">
+                    <template v-if="scope.row.pdp_product_classes_plan[2].enable" slot-scope="scope">
                         <el-input-number :disabled="scope.row.sum" @change="planTrainsChanged(scope.row, 2)"
                                          v-model.number="scope.row.pdp_product_classes_plan[2].plan_trains"
                                          :min="0"></el-input-number>
@@ -267,6 +271,11 @@
                 </el-table-column>
                 <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量"></el-table-column>
                 <el-table-column prop="pdp_product_classes_plan[2].time" label="时间"></el-table-column>
+            </el-table-column>
+            <el-table-column label="操作" >
+                <template v-if="!scope.row.sum" slot-scope="scope">
+                    <el-button type="danger" @click="deleteOnPlan(scope.row)">删除</el-button>
+                </template>
             </el-table-column>
         </el-table>
     </el-dialog>

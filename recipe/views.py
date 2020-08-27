@@ -11,6 +11,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.permissions import ProductBatchingPermissions
+from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
     MaterialAttributeFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
@@ -47,7 +48,8 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'material_no', 'material_name', 'material_type__global_name')
+            data = queryset.filter(used_flag=1).values('id', 'material_no',
+                                                       'material_name', 'material_type__global_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -104,7 +106,8 @@ class ValidateProductVersionsView(APIView):
                                                           ).order_by('-versions').first()
         if product_batching:
             if product_batching.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
-                return Response({'code': -1, 'message': '该配方版本号不得小于现有版本号'})
+                return Response({'code': -1, 'message': '该配方版本号不得小于现有版本号'},
+                                status=status.HTTP_400_BAD_REQUEST)
         return Response({'code': 0, 'message': ''})
 
 
@@ -203,3 +206,26 @@ class ProductBatchingViewSet(ModelViewSet):
         instance.save()
         instance.batching_details.filter().update(delete_flag=True, delete_user=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RecipeNoticeAPiView(APIView):
+    """配方数据下发至上辅机（只有应用状态的配方才可下发）"""
+    permission_classes = ()
+    authentication_classes = ()
+
+    def post(self, request):
+        product_batching_id = self.request.query_params.get('product_batching_id')
+        if not product_batching_id:
+            raise ValidationError('缺失参数')
+        try:
+            product_batching = ProductBatching.objects.get(id=product_batching_id)
+        except Exception:
+            raise ValidationError('该配方不存在')
+        if not product_batching.used_type == 4:
+            raise ValidationError('只有应用状态的配方才可下发至上辅机')
+        interface = ProductBatchingSyncInterface(instance=product_batching)
+        try:
+            interface.request()
+        except Exception as e:
+            raise ValidationError(e)
+        return Response('发送成功', status=status.HTTP_200_OK)

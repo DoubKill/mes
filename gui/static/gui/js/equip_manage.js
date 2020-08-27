@@ -205,7 +205,7 @@
                 }).catch(function (error) {
 
             });
-            axios.get(EquipCategoryUrl)
+            axios.get(EquipCategoryUrl + '?all=1')
                 .then(function (response) {
 
                     app.EquipCategory = response.data.results;

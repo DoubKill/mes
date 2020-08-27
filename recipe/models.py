@@ -1,12 +1,12 @@
 
 from django.db import models
-from basics.models import GlobalCode, Equip
+from basics.models import GlobalCode, Equip, EquipCategoryAttribute
 from system.models import AbstractEntity, User
 
 
 class Material(AbstractEntity):
     """原材料信息"""
-    material_no = models.CharField(max_length=64, help_text='原材料编码', verbose_name='原材料编码')
+    material_no = models.CharField(max_length=64, help_text='原材料编码', verbose_name='原材料编码', unique=True)
     material_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
     for_short = models.CharField(max_length=64, help_text='原材料简称', verbose_name='原材料简称', blank=True, null=True)
     material_type = models.ForeignKey(GlobalCode, help_text='原材料类别', verbose_name='原材料类别',
@@ -36,7 +36,7 @@ class MaterialAttribute(AbstractEntity):
 class MaterialSupplier(AbstractEntity):
     """原材料供应商"""
     material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.DO_NOTHING)
-    supplier_no = models.IntegerField(help_text='供应商编码', verbose_name='供应商编码')
+    supplier_no = models.IntegerField(help_text='供应商编码', verbose_name='供应商编码', unique=True)
 
     class Meta:
         db_table = 'material_supplier'
@@ -45,7 +45,7 @@ class MaterialSupplier(AbstractEntity):
 
 class ProductInfo(AbstractEntity):
     """胶料工艺信息"""
-    product_no = models.CharField(max_length=64, help_text='胶料编码', verbose_name='胶料编码')
+    product_no = models.CharField(max_length=64, help_text='胶料编码', verbose_name='胶料编码', unique=True)
     product_name = models.CharField(max_length=64, help_text='胶料名称', verbose_name='胶料名称')
 
     def __str__(self):
@@ -93,8 +93,9 @@ class ProductBatching(AbstractEntity):
                              on_delete=models.DO_NOTHING, related_name='s_batching')
     product_info = models.ForeignKey(ProductInfo, help_text='胶料工艺信息', on_delete=models.DO_NOTHING)
     precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案', blank=True, null=True)
-    stage_product_batch_no = models.CharField(max_length=63, help_text='胶料配方编码')
-    dev_type = models.ForeignKey(GlobalCode, help_text='机型', on_delete=models.DO_NOTHING, blank=True, null=True)
+    stage_product_batch_no = models.CharField(max_length=63, help_text='胶料配方编码', unique=True)
+    dev_type = models.ForeignKey(EquipCategoryAttribute, help_text='机型', on_delete=models.DO_NOTHING, blank=True,
+                                 null=True)
     stage = models.ForeignKey(GlobalCode, help_text='段次', verbose_name='段次',
                               on_delete=models.DO_NOTHING, related_name='stage_batches')
     versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
@@ -107,7 +108,12 @@ class ProductBatching(AbstractEntity):
                                                decimal_places=3, max_digits=8, default=0)
     volume = models.DecimalField(verbose_name='配料体积', help_text='配料体积', decimal_places=2, max_digits=8,
                                  blank=True, null=True)
-    used_time = models.DateTimeField(help_text='发行时间', verbose_name='发行时间', blank=True, null=True)
+    used_user = models.ForeignKey(User, help_text='启用人', blank=True, null=True,
+                                  on_delete=models.DO_NOTHING, related_name='used_batching')
+    used_time = models.DateTimeField(help_text='启用时间', verbose_name='启用时间', blank=True, null=True)
+    obsolete_user = models.ForeignKey(User, help_text='弃用人', blank=True, null=True,
+                                      on_delete=models.DO_NOTHING, related_name='obsolete_batching')
+    obsolete_time = models.DateTimeField(help_text='弃用时间', verbose_name='弃用时间', blank=True, null=True)
     production_time_interval = models.DecimalField(help_text='炼胶时间(分)', blank=True, null=True,
                                                    decimal_places=2, max_digits=8)
     equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.DO_NOTHING)

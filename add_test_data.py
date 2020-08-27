@@ -11,6 +11,7 @@ import uuid
 
 import django
 
+from plan.uuidfield import UUidTools
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
@@ -86,6 +87,7 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
 def add_global_codes():
     names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
              'SITE']
+    j = 1
     for i, name in enumerate(names):
         instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, used_flag=1)
         items = []
@@ -112,9 +114,10 @@ def add_global_codes():
         elif i == 10:
             items = ['1', '2', '3']
         elif i == 11:
-            items = ['c', 'l', 'k']
+            items = ['C', 'L', 'K']
         for item in items:
-            GlobalCode.objects.get_or_create(global_no=str(i + 1), global_name=item, global_type=instance)
+            GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
+            j += 1
 
 
 def add_materials():
@@ -1141,6 +1144,7 @@ def add_schedules():
     for name in ['密炼', '快检', '设备', '机械']:
         try:
             schedule = WorkSchedule.objects.create(
+                period=2,
                 schedule_no=str(random.randint(100, 999)),
                 schedule_name=name
             )
@@ -1161,16 +1165,17 @@ def add_schedules():
 def add_equip_attribute():
     equip_type_ids = list(GlobalCode.objects.filter(global_type__type_name='设备类型').values_list('id', flat=True))
     process_ids = list(GlobalCode.objects.filter(global_type__type_name='工序').values_list('id', flat=True))
-
+    j = 1000
     for i in range(10):
         try:
             EquipCategoryAttribute.objects.create(
                 equip_type_id=random.choice(equip_type_ids),
-                category_no=random.randint(1000, 9000),
+                category_no=j,
                 category_name='设备型号{}'.format(i),
                 volume=random.choice([400, 500, 600, 700, 800]),
                 process_id=random.choice(process_ids)
             )
+            j += 1
         except Exception:
             pass
 
@@ -1231,31 +1236,36 @@ def get_date(start_time, interval):
     c = []
     for i in range(interval):
         c.append((datetime.strptime(start_time, '%Y-%m-%d') + timedelta(days=i)).strftime("%Y-%m-%d"))
-    print(c)
     return c
 
 
 def add_plan_schedule():
     ids = list(WorkSchedule.objects.values_list('id', flat=True))
-    times = get_date("2020-8-1", 365)
+    day_times = get_date("2020-8-1", 365)
     group_ids = list(GlobalCode.objects.filter(global_type__type_name='班组').values_list('id', flat=True))
 
-    detail_ids = list(ClassesDetail.objects.values_list('id', flat=True))
-    for i, time in enumerate(times):
+    classes_ids = list(GlobalCode.objects.filter(global_type__type_name='班次').values_list('id', flat=True))
+    times = ['00:00:01', '08:00:00',
+             '16:00:00', '23:00:59']
+    # k = 1
+    for i, day_time in enumerate(day_times):
         try:
             instance = PlanSchedule.objects.create(
-                day_time=time,
+                # plan_schedule_no=i,
+                day_time=day_time,
                 work_schedule_id=random.choice(ids)
             )
             for j in range(3):
-                group_id = random.choice(group_ids)
                 WorkSchedulePlan.objects.create(
-                    classes_detail_id=random.choice(detail_ids),
-                    group_id=group_id,
-                    group_name=GlobalCode.objects.get(id=group_id).global_name,
+                    # work_schedule_plan_no=k,
+                    classes_id=classes_ids[j],
+                    group_id=group_ids[j],
                     rest_flag=False,
-                    plan_schedule=instance
+                    plan_schedule=instance,
+                    start_time=day_time + ' ' + times[j],
+                    end_time=day_time + ' ' + times[j+1],
                 )
+            # k += 1
         except Exception:
             pass
 
@@ -1276,7 +1286,7 @@ def add_product_batching():
     factories = list(GlobalCode.objects.filter(global_type__type_name='产地').values_list('id', flat=True))
     sites = list(GlobalCode.objects.filter(global_type__type_name='SITE').values_list('id', flat=True))
     product_infos = list(ProductInfo.objects.values_list('id', flat=True))[:20]
-    dev_types = list(GlobalCode.objects.filter(global_type__type_name='炼胶机类型').values_list('id', flat=True))
+    dev_types = list(EquipCategoryAttribute.objects.values_list('id', flat=True))
     stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('id', flat=True))
 
     for product_info in product_infos:
@@ -1290,7 +1300,7 @@ def add_product_batching():
                 stage_id=stage,
                 versions='01'
             )
-            pb.stage_product_batch_no = pb.site.global_name + '-' + pb.stage.global_name + '+' +\
+            pb.stage_product_batch_no = pb.site.global_name + '-' + pb.stage.global_name + '-' +\
                                             pb.product_info.product_name + '-' '01'
             pb.save()
 
@@ -1329,7 +1339,7 @@ def add_plan():
                     weight=random.randint(100, 500),
                     unit='kg',
                     classes_detail_id=random.choice(classes_details),
-                    plan_classes_uid=None
+                    plan_classes_uid=UUidTools.uuid1_hex()
                 )
                 i += 1
 
@@ -1497,7 +1507,7 @@ if __name__ == '__main__':
     print("product_batching is ok")
     # add_plan()
     # print("plan is ok")
-    add_material_day_classes_plan()
+    # add_material_day_classes_plan()
     print("material_day_classes_plan is ok")
     # add_product_demo_data()
     print("product_demo_data is ok")

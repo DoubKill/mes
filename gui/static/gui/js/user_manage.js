@@ -58,7 +58,7 @@
         created: function () {
 
             var app = this;
-            axios.get(GroupUrl)
+            axios.get(GroupUrl + '?all=1')
                 .then(function (response) {
 
                     app.groups = response.data.results;
@@ -128,6 +128,7 @@
 
                             }).catch(function (error) {
 
+                            app.$message(error.response.data.join(","));
                             for (const key in app.userFormError) {
                                 if (error.response.data[key])
                                     app.userFormError[key] = error.response.data[key].join(",")
@@ -189,9 +190,9 @@
             },
 
             handleUserDelete: function (row) {
-
+                var boolStr = row.is_active ? '停用' : '启用'
                 var app = this;
-                this.$confirm('此操作将永久删除' + row.username + ', 是否继续?', '提示', {
+                this.$confirm('确定' + boolStr + row.username + ', 是否继续?', '提示', {
                     confirmButtonText: '确定',
                     cancelButtonText: '取消',
                     type: 'warning'
@@ -201,7 +202,7 @@
                         .then(function (response) {
                             app.$message({
                                 type: 'success',
-                                message: '删除成功!'
+                                message: '操作成功!'
                             });
                             app.currentChange(app.currentPage);
                         }).catch(function (error) {

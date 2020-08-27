@@ -63,7 +63,7 @@
     </el-form>
     <el-table
             highlight-current-row
-            @current-change="handleCurrentChange"
+            @row-click="handleCurrentChange"
             :data="tableData"
             border
             style="width: 100%">
@@ -148,6 +148,15 @@
                 align="center"
                 prop="created_date"
                 label="创建时间">
+        </el-table-column>
+        <el-table-column align="center" label="发送到上辅机">
+            <template slot-scope="scope">
+                <el-button-group>
+                    <el-button @click="send_auxiliary(scope.row)" size="mini" v-if="scope.row.used_type === 4">
+                        发送
+                    </el-button>
+                </el-button-group>
+            </template>
         </el-table-column>
 
     </el-table>
@@ -331,7 +340,7 @@
                 <el-option
                         v-for="item in DevTypeOptions"
                         :key="item.id"
-                        :label="item.global_name"
+                        :label="item.category_name"
                         :value="item.id">
                 </el-option>
             </el-select>
@@ -425,7 +434,6 @@
 
         <el-table
             highlight-current-row
-            @current-change="raw_material_handleCurrentChange"
             :data="tableRawMaterialData"
             border
             style="width: 100%">

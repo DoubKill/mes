@@ -189,7 +189,7 @@
             });
 
 
-            axios.get(DevTypeGlobalUrl, {
+            axios.get(EquipCategoryUrl + '?all=1', {
             }).then(function (response) {
                 app.DevTypeOptions = response.data.results;
             }).catch(function (error) {
@@ -209,7 +209,12 @@
         methods: {
             get_raw_material(val=1){
                 var app=this;
-                 axios.get(MaterialsUrl + '?page=' + val, {
+                this.getParams["page"] = val;
+                this.getParams["material_type_id"] = app.materialType?app.materialType:'';
+                this.getParams["material_no"] = app.search_material_no?app.search_material_no:'';
+                this.getParams["material_name"] = app.search_material_name?app.search_material_name:'';
+                 axios.get(MaterialsUrl, {
+                     params: this.getParams
                 }).then(function (response) {
                     app.RawMaterialOptions = response.data.results;
                     app.tableRawMaterialData = response.data.results;
@@ -259,6 +264,19 @@
                     pass_flag:false
                 }).then(function (response) {
                     app.$message("状态切换成功");
+                    app.currentChange(app.currentPage);
+                }).catch(function (error) {
+                    app.$message({
+                        message: error.response.data,
+                        type: 'error'
+                    });
+                });
+            },
+            send_auxiliary: function(row) {
+                var app = this;
+                axios.post(SendAuxiliaryUrl + '?product_batching_id=' + row.id + '&product_no=' + row.stage_product_batch_no, {
+                }).then(function (response) {
+                    app.$message("发送至上辅机成功");
                     app.currentChange(app.currentPage);
                 }).catch(function (error) {
                     app.$message({
@@ -357,15 +375,15 @@
                 axios.get(RubberMaterialUrl + this.currentRow.id + "/")
                     .then(function (response) {
                         console.log('================================mod_get');
-                        console.log(response.data.batching_details);
+                        console.log(response.data);
                         console.log('================================mod_get');
                         app.put_select_stage_product_batch_no = response.data['stage_product_batch_no'];
                         app.put_select_product_name = response.data['product_name'];
                         app.put_select_status = app.usedTypeChoice(response.data['used_type']);
-                        app.put_select_dev_type = response.data['dev_type_name'];
-
+                        app.put_select_dev_type = response.data['dev_type'];
                         app.put_select_material_weight = response.data['batching_weight'];
                         app.put_select_rm_time_interval = response.data['production_time_interval'];
+                        app.put_practicalWeightSum = response.data['batching_weight'];
                         app.PutProductRecipe = response.data.batching_details;
 
                     }).catch(function (error) {
@@ -379,40 +397,55 @@
                 var app = this;
                 app.$refs[formName].validate((valid) => {
                   if (valid) {
+
+
                       console.log('=============================');
                       console.log(app.rubberMaterialForm['rubber_no']);
                       console.log('=============================');
                       var v_product_info = "";
                       //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
-                        for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
+                      for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
                             if(app.ProductBatchNoOptions[j]['product_name'] == app.rubberMaterialForm['rubber_no']){
                                 v_product_info = app.ProductBatchNoOptions[j]['id'];
                                 break
                             }
-                        }
-                        console.log('=============================');
+                      }
+                      console.log('=============================');
                       console.log(v_product_info);
                       console.log('=============================');
-                      axios.post(RubberMaterialUrl, {
-                            factory: app.rubberMaterialForm['factory'],
-                            site: app.rubberMaterialForm['SITE'],
-                            product_info: v_product_info,
-                            precept: app.rubberMaterialForm['scheme'],
-                            stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
-                            stage: app.rubberMaterialForm['stage'],
-                            versions: app.rubberMaterialForm['version'],
-                        }).then(function (response) {
+                      //点击生成之前进行版本验证
+                      var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + v_product_info + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
+                      axios.get(v_validate_version_url, {}
+                        ).then(function (response) {
+                              axios.post(RubberMaterialUrl, {
+                                    factory: app.rubberMaterialForm['factory'],
+                                    site: app.rubberMaterialForm['SITE'],
+                                    product_info: v_product_info,
+                                    precept: app.rubberMaterialForm['scheme'],
+                                    stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
+                                    stage: app.rubberMaterialForm['stage'],
+                                    versions: app.rubberMaterialForm['version'],
+                                }).then(function (response) {
 
-                            app.dialogAddRubberMaterial = false;
-                            app.$message(app.rubberMaterialForm['generate_material_no'] + "保存成功");
-                            app.currentChange(app.currentPage);
+                                    app.dialogAddRubberMaterial = false;
+                                    app.$message(app.rubberMaterialForm['generate_material_no'] + "保存成功");
+                                    app.currentChange(app.currentPage);
 
+                                }).catch(function (error) {
+
+                                    app.$message({
+                                        message: error.response.data,
+                                        type: 'error'
+                                    });
+                                });
                         }).catch(function (error) {
                             app.$message({
                                 message: error.response.data,
                                 type: 'error'
                             });
                         });
+
+
 
                   } else {
                     console.log('error submit!!');
@@ -427,13 +460,31 @@
                 var app = this;
                 app.$refs[formName].validate((valid) => {
                   if (valid) {
-                        app.dialogAddRubberMaterial = false;
-                        app.NewdialogChoiceMaterials = true;
-                        app.select_stage_product_batch_no = app.rubberMaterialForm['generate_material_no'];
-                        app.select_product_name = app.rubberMaterialForm['rubber_no'];
-                        app.select_material_weight = null;
-                        app.practicalWeightSum = null;
-                        app.NewRowMaterial = [];
+                      //点击生成之前进行版本验证
+                      var v_product_info = "";
+                      //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
+                      for(var j = 0; j < app.ProductBatchNoOptions.length; ++j){
+                            if(app.ProductBatchNoOptions[j]['product_name'] == app.rubberMaterialForm['rubber_no']){
+                                v_product_info = app.ProductBatchNoOptions[j]['id'];
+                                break
+                            }
+                      }
+                      var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + v_product_info + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
+                      axios.get(v_validate_version_url, {}
+                        ).then(function (response) {
+                            app.dialogAddRubberMaterial = false;
+                            app.NewdialogChoiceMaterials = true;
+                            app.select_stage_product_batch_no = app.rubberMaterialForm['generate_material_no'];
+                            app.select_product_name = app.rubberMaterialForm['rubber_no'];
+                            app.select_material_weight = null;
+                            app.practicalWeightSum = null;
+                            app.NewRowMaterial = [];
+                        }).catch(function (error) {
+                            app.$message({
+                                message: error.response.data,
+                                type: 'error'
+                            });
+                        });
                   } else {
                     console.log('error submit!!');
                     return false;
@@ -643,7 +694,6 @@
                 app.dialogRawMaterialSync = false;
             },
             handleCurrentChange: function (val) {
-
                 this.currentRow = val;
             },
             raw_material_handleCurrentChange: function (val) {
@@ -651,42 +701,14 @@
                 this.get_raw_material(val)
             },
 
-            getList() {
-                var app = this;
-                var param_url = MaterialsUrl;
-                // if(app.search_time && app.equip_no){
-                //     param_url = param_url + '?search_time=' +app.search_time + '&equip_no=' + app.equip_no
-                // }
-                // else if(!app.search_time && app.equip_no){
-                //     param_url = param_url + '?search_time=' + '&equip_no=' + app.equip_no
-                // }
-                // else if(app.search_time && !app.equip_no){
-                //     param_url = param_url + '?search_time=' +app.search_time + '&equip_no='
-                // }
-
-                var v_material_type_id = app.materialType?app.materialType:'';
-                var v_search_material_no = app.search_material_no?app.search_material_no:'';
-                var v_search_material_name = app.search_material_name?app.search_material_name:'';
-                param_url = param_url + '?material_type_id=' + v_material_type_id + '&material_no=' + v_search_material_no + '&material_name=' + v_search_material_name;
-
-                axios.get(param_url, {}
-                ).then(function (response) {
-                    app.tableRawMaterialData = response.data.results;
-                }).catch(function (error) {
-                    app.$message({
-                        message: error.response.data,
-                        type: 'error'
-                    });
-                });
-            },
             materialTypeChange: function(){
-                this.getList()
+                this.get_raw_material()
             },
             search_material_no_Change: function(){
-                this.getList()
+                this.get_raw_material()
             },
             search_material_name_Change: function(){
-                this.getList()
+                this.get_raw_material()
             },
 
 

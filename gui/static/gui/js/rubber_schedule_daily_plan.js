@@ -66,7 +66,6 @@
                 batching_weight_for_update: "",
                 batching_time_interval_for_update: "",
                 productBatchings: [],
-                planSchedules: [],
                 productBatchingById: {},
                 addPlanVisible: false,
                 changePlanVisible: false,
@@ -77,9 +76,11 @@
                 plansForAdd: [],
                 statisticData: [],
                 equipIdForAdd: null,
+                planScheduleId: null,
+                planSchedules: [],
+                plan_date_for_create: dayjs().format("YYYY-MM-DD"),
                 workSchedules: [],
-                workScheduleId: null,
-                plan_date_for_create: dayjs().format("YYYY-MM-DD")
+                day_time: ""
             }
         },
         created: function () {
@@ -103,7 +104,8 @@
             axios.get(RubberMaterialUrl, {
 
                 params: {
-                    all: 1
+                    all: 1,
+                    used_type: 4
                     // page_size: 100000000
                 }
             }).then(function (response) {
@@ -121,33 +123,37 @@
             }).catch(function (error) {
 
             });
-            axios.get(PlanScheduleUrl, {
-
-                params: {
-                    // page_size: 100000000
-                    all: 1
-                }
-            }).then(function (response) {
-
-                app.planSchedules = response.data.results;
-            }).catch(function (error) {
-
-            });
+            this.getPlanSchedules();
             axios.get(WorkSchedulesUrl, {
                 params: {
-
                     all: 1
                 }
             }).then(function (response) {
 
                 app.workSchedules = response.data.results;
-                console.log(app.workSchedules)
             }).catch(function (error) {
 
             })
         },
         methods: {
 
+            getPlanSchedules() {
+
+                var app = this;
+                axios.get(PlanScheduleUrl, {
+
+                    params: {
+                        all: 1,
+                        day_time: this.day_time
+                    }
+                }).then(function (response) {
+
+                    app.planSchedules = response.data.results;
+                    app.planScheduleId = null
+                }).catch(function (error) {
+
+                });
+            },
             queryDataChange: function () {
 
                 this.currentChange(this.currentPage);
@@ -321,33 +327,56 @@
                     app.$message.error(JSON.stringify(error.response.data));
                 });
             },
-            addOnePlan() {
+            deleteOnPlan(plan) {
+
+                this.plansForAdd.splice(
+                this.plansForAdd.indexOf(plan), 1);
+                var plans =this.plansForAdd.filter(plan_ => {
+                    return plan_.equip === plan.equip
+                });
+                if (plans.length === 1) {
+                    this.plansForAdd.splice(plans[0], 1);
+                }
+                this.statistic();
+            },
+            async addOnePlan() {
 
                 if (!this.equipIdForAdd) {
                     return;
                 }
+                let res = await axios.get(PlanScheduleUrl + this.planScheduleId + "/");
+                let planSchedule = res.data;
                 var workSchedule = this.workSchedules.find(workSchedule => {
 
-                    return workSchedule.id === this.workScheduleId
+                    return workSchedule.id === planSchedule.work_schedule
                 });
+                if (!planSchedule.work_schedule_plan.length) {
+                    this.$alert(planSchedule.work_schedule_name + '无排班', '错误', {
+                        confirmButtonText: '确定',
+                    });
+                    return;
+                }
+                var classesdetail_set_ = workSchedule.classesdetail_set;
                 var pdp_product_classes_plan = [];
                 for (var i = 0; i < 3; i++) {
+
+                    var enable = !!planSchedule.work_schedule_plan[i];
                     pdp_product_classes_plan.push({
                         plan_trains: 0,
                         sn: 0,
                         unit: "吨",
-                        time: 0,
-                        weight: 0,
-                        classes: workSchedule.classesdetail_set[i].classes
+                        time: enable ? 0 : '',
+                        weight: enable ? 0 : '',
+                        classes: classesdetail_set_[i].classes,
+                        enable
                     })
                 }
                 var plan =
                     {
                         equip_: this.equipById[this.equipIdForAdd],
                         equip: this.equipIdForAdd,
-                        plan_date: this.plan_date_for_create,
-                        work_schedule: this.workScheduleId,
-                        pdp_product_classes_plan
+                        plan_schedule: this.planScheduleId,
+                        pdp_product_classes_plan,
                     };
                 if (this.equipFirstIndexInPlansForAdd() === -1) {
 
@@ -398,6 +427,9 @@
                 }
             },
             planTrainsChanged(planForAdd, columnIndex) {
+
+                if (!planForAdd["pdp_product_classes_plan"][columnIndex].enable)
+                    return;
 
                 planForAdd["pdp_product_classes_plan"][columnIndex]["time"] =
                     (planForAdd["production_time_interval"]
@@ -472,11 +504,20 @@
 
                     if (!plan.sum) {
 
-                        plansForAdd_.push(plan)
+                        var plan_ = JSON.parse(JSON.stringify(plan));
+                        plan_.pdp_product_classes_plan = [];
+                        for (var i = 0; i < plan.pdp_product_classes_plan.length; i++) {
+
+                            if (plan.pdp_product_classes_plan[i].enable) {
+                                plan_.pdp_product_classes_plan.push(plan.pdp_product_classes_plan[i])
+                            }
+                        }
+                        plansForAdd_.push(plan_)
                     }
                 });
                 if (!plansForAdd_.length)
                     return;
+
                 axios.post(ProductDayPlanManyCreateUrl, plansForAdd_)
                     .then(function (response) {
 
@@ -485,14 +526,29 @@
                         app.currentChange(app.currentPage);
                     }).catch(function (error) {
 
-                    app.$alert(JSON.stringify(error.response.data.join(",").trim()), '错误', {
-                        confirmButtonText: '确定',
-                    });
+                    error.response.data.forEach(function (err) {
+
+                        if (err["product_batching"]) {
+                            app.$alert("胶料配方编码是必填项。", '错误', {
+                                confirmButtonText: '确定',
+                            });
+                        }
+                    })
+
 
                 });
             },
             arraySpanMethod({row, column, rowIndex, columnIndex}) {
 
+            },
+            sendToAu(plan) {
+
+                console.log(plan)
+            },
+            showAddPlansDialog() {
+
+                this.plansForAdd = []
+                this.addPlanVisible = true;
             },
         }
     };

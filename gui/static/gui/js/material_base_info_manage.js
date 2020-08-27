@@ -41,7 +41,8 @@
 
                 params: {
 
-                    class_name: "原材料类别"
+                    class_name: "原材料类别",
+                    all:1
                 }
             }).then(function (response) {
 
@@ -149,7 +150,7 @@
                             app.currentChange(app.currentPage);
                         }).catch(function (error) {
 
-                        app.$message.error(error);
+                        app.$message.error(error.response.data.join(","));
                     });
 
 

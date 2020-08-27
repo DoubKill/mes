@@ -1,0 +1,66 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="原材料类别">
+            <el-select
+                    clearable
+                    @change="materialTypeChange"
+                    v-model="materialType" placeholder="请选择">
+                <el-option
+                        v-for="item in materialTypeOptions"
+                        :key="item.id"
+                        :label="item.global_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+        </el-form-item>
+    </el-form>
+
+
+
+    <el-table
+            highlight-current-row
+            @current-change="handleCurrentChange"
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column prop="sn" label="No" align="center"></el-table-column>
+        <el-table-column prop="material_type" label="原材料类型" align="center"></el-table-column>
+        <el-table-column prop="material_no" label="原材料编码" align="center"></el-table-column>
+        <el-table-column prop="material_name" label="原材料名称" align="center"></el-table-column>
+        <el-table-column prop="site" label="产地" align="center"></el-table-column>
+        <el-table-column prop="qty" label="库存数" align="center"></el-table-column>
+        <el-table-column prop="unit" label="单位" align="center"></el-table-column>
+        <el-table-column prop="unit_weight" label="单位重量" align="center"></el-table-column>
+        <el-table-column prop="total_weight" label="总重量" align="center"></el-table-column>
+        <el-table-column prop="standard_flag" label="品质状态" align="center" :formatter="StandardFlagFormatter"></el-table-column>
+    </el-table>
+
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+
+{% block dialogs %}
+{% endblock %}
+
+
+{% block scripts %}
+    <script src="{% static 'gui/js/material_repertory_manage.js' %}"></script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,6 +1,6 @@
 import django_filters
 
-from basics.models import Equip, GlobalCodeType, WorkSchedule, GlobalCode, EquipCategoryAttribute
+from basics.models import Equip, GlobalCodeType, WorkSchedule, GlobalCode, EquipCategoryAttribute, ClassesDetail
 
 
 class EquipFilter(django_filters.rest_framework.FilterSet):
@@ -55,3 +55,13 @@ class EquipCategoryFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipCategoryAttribute
         fields = ('category_name', 'equip_type_name')
+
+
+
+
+class ClassDetailFilter(django_filters.rest_framework.FilterSet):
+    schedule_name = django_filters.CharFilter(field_name='work_schedule__schedule_name', help_text='日程名称')
+
+    class Meta:
+        model = ClassesDetail
+        fields = ('schedule_name',)

@@ -4,15 +4,15 @@ const GlobalCodesUrl = BasicsUrl + "global-codes/";
 
 const EquipCategoryUrl = BasicsUrl + "equips-category/";
 // const EquipCategoryUrl = BasicsUrl + "equips-category-list/";
-const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=设备类型";
-const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?class_name=工序";
-const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
-const StateGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料状态";
-const SiteGlobalUrl = BasicsUrl + "global-codes/?class_name=产地";
-const SITEGlobalUrl = BasicsUrl + "global-codes/?class_name=SITE";
-const StageGlobalUrl = BasicsUrl + "global-codes/?class_name=胶料段次";
-const DevTypeGlobalUrl = BasicsUrl + "global-codes/?class_name=炼胶机类型";
-const MaterialTypelUrl = BasicsUrl + "global-codes/?class_name=原材料类别";
+const EquipTypeGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=设备类型";
+const EquipProcessGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=工序";
+const EquipLevelGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=产地";
+const StateGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=胶料状态";
+const SiteGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=产地";
+const SITEGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=SITE";
+const StageGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=胶料段次";
+const DevTypeGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=炼胶机类型";
+const MaterialTypelUrl = BasicsUrl + "global-codes/?all=1&class_name=原材料类别";
 
 const EquipUrl = BasicsUrl + "equips/";
 
@@ -29,6 +29,8 @@ const ValidateVersionsUrl = "/api/v1/recipe/validate-versions";
 const CopyProductInfosUrl = "/api/v1/recipe/copy-product-infos/";
 // 胶料配料标准管理接口
 const RubberMaterialUrl = "/api/v1/recipe/product-batching/";
+//配方数据发送至上辅机接口
+const SendAuxiliaryUrl = "/api/v1/recipe/recipe-notice/";
 // 胶料配料标准管理——选择胶料编码与段次接口
 const RubberStageUrl = "/api/v1/recipe/product-stages/";
 const PreBatchInfoUrl = "/api/v1/recipe/pre-batch-info/";
@@ -59,8 +61,15 @@ const TrainsFeedbacksUrl = "/api/v1/production/trains-feedbacks/"
 //生产管理---密炼机台别计划对比
 const BanburyPlanUrl = "/api/v1/production/plan-reality/";
 const InternalMixerUrl = "/api/v1/production/production-record/"
-const ClassesListUrl = '/api/v1/basics/classes/'
+const ClassesListUrl = '/api/v1/basics/classes/?all=1'
 const EchartsListUrl = "/api/v1/production/equip-status/"
+
+const PlanSchedulesUrl = "/api/v1/basics/plan-schedules/";
+
+//库存管理---原料库存
+const MaterialRepertoryUrl = '/api/v1/inventory/material-inventory/';
+//库存管理---胶料库存
+const RubberRepertoryUrl = '/api/v1/inventory/product-inventory/';
 
 var BaseMixin = {
 

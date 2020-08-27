@@ -60,7 +60,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'mes.middlewares.OperationLogRecordMiddleware',
+    'mes.middlewares.SyncMiddleware',
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -91,7 +91,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
-    ) if DEBUG else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
+    ),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
     'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
@@ -169,6 +169,22 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'standard',
         },
+        'syncFile': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'sync.log'),
+            'when': 'D',
+            'backupCount': 10,
+            'formatter': 'standard',
+        },
+        'asyncFile':{
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'async.log'),
+            'when': 'D',
+            'backupCount': 10,
+            'formatter': 'standard',
+        },
     },
     'loggers': {
         'django.db.backends': {
@@ -188,7 +204,15 @@ LOGGING = {
         'error_log': {
             'handlers': ['errorFile'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-        }
+        },
+        'sync_log': {
+            'handlers': ['syncFile'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+        },
+        'async_log':{
+            'handlers': ['asyncFile'],
+            'level': 'INFO',
+        },
     },
 }
 
@@ -297,3 +321,6 @@ CORS_ALLOW_CREDENTIALS = True
 # 允许所有主机执行跨站点请求，默认为False
 # 如果没设置该参数，则必须设置白名单，运行部分白名单的主机才能执行跨站点请求
 CORS_ORIGIN_ALLOW_ALL = True
+
+# 上辅机部署地址
+AUXILIARY_URL = os.environ.get('AUXILIARY_URL', 'http://127.0.0.1:9000/')
