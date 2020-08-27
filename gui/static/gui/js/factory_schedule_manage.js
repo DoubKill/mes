@@ -109,7 +109,6 @@
 
                 var planSchedules = [];
                 var workSchedule = this.workSchedules[this.workScheduleIndex];
-                console.log(this.scheduleData);
                 for (var i = 0; i < this.scheduleData.length; i++) {
 
                     var oneSchedule = this.scheduleData[i];
@@ -137,7 +136,7 @@
                         app.$message("排班创建成功");
                     }).catch(function (error) {
 
-                    app.$alert(error.response.data, '错误', {
+                    app.$alert("当前日期已存在此倒班", '错误', {
                         confirmButtonText: '确定',
                     });
 
@@ -206,7 +205,8 @@
                         app.workScheduleOptions.push({
 
                             value: i,
-                            label
+                            label,
+                            schedule_name:  app.workSchedules[i].schedule_name
                         });
                     }
                 }).catch(function (error) {

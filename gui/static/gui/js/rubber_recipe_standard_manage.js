@@ -16,6 +16,10 @@
                     product_name: "", // 胶料名称
                     // precept: "" // 方案
                 },
+                rubberRecipeFormError: {
+                    product_no: "",
+                    product_name: ""
+                },
                 materials: [],
                 selectedMaterials: [],
                 dialogChoiceMaterials: false,
@@ -178,6 +182,10 @@
             },
             handleAddRubberRecipe: function () {
 
+                this.rubberRecipeFormError = {
+                    product_no: "",
+                    product_name: ""
+                };
                 var app = this;
                 axios.post(ProductInfosUrl, {
 
@@ -191,10 +199,8 @@
                     app.dialogAddRubberRecipe = false;
                 }).catch(function (error) {
 
-                    this.$message({
-                        message: error.response.data,
-                        type: 'error'
-                    });
+                    app.rubberRecipeFormError.product_no = error.response.data.product_no.join(",")
+                    app.rubberRecipeFormError.product_name = error.response.data.product_name.join(",")
                 });
 
 

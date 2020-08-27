@@ -136,7 +136,7 @@
                     </el-form-item>
                     <el-form-item label="周期天数"
                                   :label-width="formLabelWidth">
-                        <el-input v-model="changeShiftsManageForm.period"></el-input>
+                        <el-input-number :min="1" :max="30" v-model.number="changeShiftsManageForm.period"></el-input-number>
                     </el-form-item>
                     <div v-for="(classesdetail, index) in changeShiftsManageForm.classesdetail_set">
                         <el-divider>{{ classesdetail.classes_name }}</el-divider>
@@ -147,7 +147,7 @@
                                     range-separator="至"
                                     start-placeholder="开始时间"
                                     end-placeholder="结束时间"
-                                    value-format="HH:mm:mm"
+                                    value-format="HH:mm:ss"
                                     v-model="classesdetail.times">
                             </el-time-picker>
                         </el-form-item>

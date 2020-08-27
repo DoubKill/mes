@@ -16,6 +16,7 @@
         <el-form-item label="机台">
             <el-select
                     @change="queryDataChange"
+                    filterable
                     clearable
                     v-model="equip_no" placeholder="请选择">
                 <el-option
@@ -29,6 +30,7 @@
         <el-form-item label="胶料">
             <el-select
                     @change="queryDataChange"
+                    filterable
                     clearable
                     v-model="stage_product_batch_no"
                     placeholder="请选择">
@@ -41,9 +43,9 @@
             </el-select>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-checkbox-button v-model="addPlanVisible">
+            <el-button @click="showAddPlansDialog">
                 新建
-            </el-checkbox-button>
+            </el-button>
         </el-form-item>
         <el-form-item style="float: right">
             <el-button :disabled="!currentRow" @click="deletePlan">
@@ -170,7 +172,7 @@
             :visible.sync="addPlanVisible"
             title="添加胶料日生产计划">
         <div style="margin-bottom: 15px">
-            <el-select placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
+            <el-select filterable placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
                 <el-option
                         :key="equip.id"
                         :label="equip.equip_no"
@@ -189,7 +191,7 @@
             <el-select v-model="planScheduleId" placeholder="倒班规则">
                 <el-option
                         :key="planSchedule.id"
-                        :label="planSchedule.work_schedule_name"
+                        :label="planSchedule.work_schedule__schedule_name"
                         :value="planSchedule.id"
                         v-for="planSchedule in planSchedules">
                 </el-option>

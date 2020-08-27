@@ -128,6 +128,7 @@
 
                             }).catch(function (error) {
 
+                            app.$message(error.response.data.join(","));
                             for (const key in app.userFormError) {
                                 if (error.response.data[key])
                                     app.userFormError[key] = error.response.data[key].join(",")
@@ -189,7 +190,7 @@
             },
 
             handleUserDelete: function (row) {
-                var boolStr = row.is_active?'停用' : '启用'
+                var boolStr = row.is_active ? '停用' : '启用'
                 var app = this;
                 this.$confirm('确定' + boolStr + row.username + ', 是否继续?', '提示', {
                     confirmButtonText: '确定',
