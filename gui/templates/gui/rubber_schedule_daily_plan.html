@@ -188,7 +188,7 @@
                     value-format="yyyy-MM-dd"
                     placeholder="选择日期">
             </el-date-picker>
-            <el-select v-model="planScheduleId" placeholder="倒班规则">
+            <el-select filterable v-model="planScheduleId" placeholder="倒班规则">
                 <el-option
                         :key="planSchedule.id"
                         :label="planSchedule.work_schedule__schedule_name"
@@ -271,6 +271,11 @@
                 </el-table-column>
                 <el-table-column prop="pdp_product_classes_plan[2].weight" label="重量"></el-table-column>
                 <el-table-column prop="pdp_product_classes_plan[2].time" label="时间"></el-table-column>
+            </el-table-column>
+            <el-table-column label="操作" >
+                <template v-if="!scope.row.sum" slot-scope="scope">
+                    <el-button type="danger" @click="deleteOnPlan(scope.row)">删除</el-button>
+                </template>
             </el-table-column>
         </el-table>
     </el-dialog>

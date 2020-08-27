@@ -150,7 +150,7 @@
                             app.currentChange(app.currentPage);
                         }).catch(function (error) {
 
-                        app.$message.error(error);
+                        app.$message.error(error.response.data.join(","));
                     });
 
 
