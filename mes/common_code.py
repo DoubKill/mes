@@ -16,7 +16,7 @@ class CommonDeleteMixin(object):
 
 
 class SyncCreateMixin(mixins.CreateModelMixin):
-
+    # 创建时需记录同步数据的接口请继承该创建插件
     def create(self, request, *args, **kwargs):
         response = super().create(request, *args, **kwargs)
         setattr(response, "model_name", self.queryset.model.__name__)
@@ -24,7 +24,7 @@ class SyncCreateMixin(mixins.CreateModelMixin):
 
 
 class SyncUpdateMixin(mixins.UpdateModelMixin):
-
+    # 更新时需记录同步数据的接口请继承该更新插件
     def update(self, request, *args, **kwargs):
         response = super().update(request, *args, **kwargs)
         setattr(response, "model_name", self.queryset.model.__name__)
