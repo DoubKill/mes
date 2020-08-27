@@ -84,16 +84,12 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
                '乾', '坤']
 
 
-def gen_unique_no(prefix):
-    now = datetime.datetime.now()
-    return "{}-{}".format(prefix, now.strftime("%Y%m%d-%H%M%S%f")[:18])
-
-
 def add_global_codes():
     names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
              'SITE']
+    j = 1
     for i, name in enumerate(names):
-        instance, _ = GlobalCodeType.objects.get_or_create(type_no=gen_unique_no('GT'), type_name=name, used_flag=1)
+        instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, used_flag=1)
         items = []
         if i == 1:
             items = ['安吉', '下沙', '杭州', '泰国']
@@ -118,9 +114,10 @@ def add_global_codes():
         elif i == 10:
             items = ['1', '2', '3']
         elif i == 11:
-            items = ['c', 'l', 'k']
+            items = ['C', 'L', 'K']
         for item in items:
-            GlobalCode.objects.get_or_create(global_no=gen_unique_no('GB'), global_name=item, global_type=instance)
+            GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
+            j += 1
 
 
 def add_materials():
@@ -966,7 +963,7 @@ def add_materials():
              0.0, 0.0, 'Y', '蔡葵', '2017-10-19', '13:37']]
     for x in data:
         data = dict()
-        data['material_no'] = gen_unique_no('MT')
+        data['material_no'] = x[2]
         data['material_name'] = x[4]
         data['material_type'] = GlobalCode.objects.filter(global_name=x[3]).first()
         data['used_flag'] = 1
@@ -1075,7 +1072,7 @@ def add_groups():
             ['', '', '7A', '分厂储运', '分厂储运部', 'Y'], ['', '', '99', '测试', '测试', 'Y']]
     for x in data:
         try:
-            name, _ = GroupExtension.objects.get_or_create(name=x[3], group_code=gen_unique_no('GP'), use_flag=1)
+            name, _ = GroupExtension.objects.get_or_create(name=x[3], group_code=x[2], use_flag=1)
         except Exception:
             pass
 
@@ -1147,6 +1144,7 @@ def add_schedules():
     for name in ['密炼', '快检', '设备', '机械']:
         try:
             schedule = WorkSchedule.objects.create(
+                period=2,
                 schedule_no=str(random.randint(100, 999)),
                 schedule_name=name
             )
@@ -1167,16 +1165,17 @@ def add_schedules():
 def add_equip_attribute():
     equip_type_ids = list(GlobalCode.objects.filter(global_type__type_name='设备类型').values_list('id', flat=True))
     process_ids = list(GlobalCode.objects.filter(global_type__type_name='工序').values_list('id', flat=True))
-
+    j = 1000
     for i in range(10):
         try:
             EquipCategoryAttribute.objects.create(
                 equip_type_id=random.choice(equip_type_ids),
-                category_no=gen_unique_no('EQA'),
+                category_no=j,
                 category_name='设备型号{}'.format(i),
                 volume=random.choice([400, 500, 600, 700, 800]),
                 process_id=random.choice(process_ids)
             )
+            j += 1
         except Exception:
             pass
 
@@ -1221,7 +1220,7 @@ def add_equips():
         try:
             Equip.objects.create(
                 category_id=random.choice(attr_ids),
-                equip_no=gen_unique_no('EQ'),
+                equip_no=item[0],
                 equip_name=item[1],
                 used_flag=True,
                 count_flag=True,
@@ -1237,30 +1236,31 @@ def get_date(start_time, interval):
     c = []
     for i in range(interval):
         c.append((datetime.strptime(start_time, '%Y-%m-%d') + timedelta(days=i)).strftime("%Y-%m-%d"))
-    print(c)
     return c
 
 
 def add_plan_schedule():
     ids = list(WorkSchedule.objects.values_list('id', flat=True))
-    times = get_date("2020-8-1", 365)
+    day_times = get_date("2020-8-1", 365)
     group_ids = list(GlobalCode.objects.filter(global_type__type_name='班组').values_list('id', flat=True))
 
-    detail_ids = list(ClassesDetail.objects.values_list('id', flat=True))
-    for i, time in enumerate(times):
+    classes_ids = list(GlobalCode.objects.filter(global_type__type_name='班次').values_list('id', flat=True))
+    times = ['00:00:01', '08:00:00',
+             '16:00:00', '23:00:59']
+    for i, day_time in enumerate(day_times):
         try:
             instance = PlanSchedule.objects.create(
-                day_time=time,
+                day_time=day_time,
                 work_schedule_id=random.choice(ids)
             )
             for j in range(3):
-                group_id = random.choice(group_ids)
                 WorkSchedulePlan.objects.create(
-                    classes_detail_id=random.choice(detail_ids),
-                    group_id=group_id,
-                    group_name=GlobalCode.objects.get(id=group_id).global_name,
+                    classes_id=classes_ids[j],
+                    group_id=group_ids[j],
                     rest_flag=False,
-                    plan_schedule=instance
+                    plan_schedule=instance,
+                    start_time=day_time + ' ' + times[j],
+                    end_time=day_time + ' ' + times[j+1],
                 )
         except Exception:
             pass
@@ -1503,7 +1503,7 @@ if __name__ == '__main__':
     print("product_batching is ok")
     # add_plan()
     # print("plan is ok")
-    add_material_day_classes_plan()
+    # add_material_day_classes_plan()
     print("material_day_classes_plan is ok")
     # add_product_demo_data()
     print("product_demo_data is ok")

@@ -141,7 +141,7 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
     @atomic()
     def update(self, instance, validated_data):
         if instance.plan_schedule.exists():
-            raise serializers.ValidationError('该倒班已管理排班计划，不可修改')
+            raise serializers.ValidationError('该倒班已关联排班计划，不可修改')
         classesdetail_set = validated_data.pop('classesdetail_set', None)
         if classesdetail_set is not None:
             instance.classesdetail_set.all().delete()
