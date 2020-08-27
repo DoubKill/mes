@@ -3,6 +3,7 @@
         mixins: [BaseMixin],
         data: function () {
             return {
+                loadingInput: false,
                 tableDataUrl: InternalMixerUrl,
                 tableData: [],
                 search_date: [],
@@ -131,9 +132,6 @@
         },
         created() {
             this.getList()
-            this.getGlueList()  //获取胶料列表
-            this.getMachineList()  //获取机台列表
-            this.getClassesList()   //获取班次列表
 
             var _setDateCurrent = setDate()
             this.getParams.st = _setDateCurrent + " 00:00:00"
@@ -154,7 +152,7 @@
                         _this.tableDataTotal = response.data.count;
                     }
                 }).catch(function (error) {
-                    console.log(error,'getlist')
+                    console.log(error, 'getlist')
                     // if (Object.prototype.toString.call(error.response.data) === '[object Object]') {
                     //     let arr = error.response.data
                     //     let str = ''
@@ -163,7 +161,7 @@
                     //     });
                     //     _this.$message.error(str)
                     // } else {
-                        _this.$message.error('操作失败')
+                    _this.$message.error('操作失败')
                     // }
                 });
             },
@@ -182,23 +180,31 @@
                     //     return item;
                     // }, [])
                     _this.glueList = glueList
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             getMachineList() {
                 var _this = this
-                axios.get(EquipUrl, {params: {
-                    all: 1
-                }}).then(function (response) {
+                axios.get(EquipUrl, {
+                    params: {
+                        all: 1
+                    }
+                }).then(function (response) {
                     _this.machineList = response.data.results || [];
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             getClassesList() {
                 var _this = this
-                axios.get(ClassesListUrl).then(function (response) {
+                axios.get(ClassesListUrl, {params: {schedule_name: '密炼'}}).then(function (response) {
                     _this.classesList = response.data.results || [];
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             clickPrint() {
@@ -311,6 +317,21 @@
                 this.$nextTick(function () {
                     echarts.init(_this.$refs.main).setOption(_this.option1)
                 })
+            },
+            machineVisibleChange(bool) {
+                if (!bool || this.machineList.length > 0) return
+                this.loadingInput = true
+                this.getMachineList()  //获取机台列表
+            },
+            productVisibleChange(bool) {
+                if (!bool || this.glueList.length > 0) return
+                this.loadingInput = true
+                this.getGlueList()  //获取胶料列表
+            },
+            classesVisibleChange(bool) {
+                if (!bool || this.classesList.length > 0) return
+                this.loadingInput = true
+                this.getClassesList()   //获取班次列表
             }
         }
     }

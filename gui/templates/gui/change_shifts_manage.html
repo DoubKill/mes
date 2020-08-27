@@ -74,7 +74,7 @@
         {% verbatim vue %}
             <el-dialog title="添加倒班时间" :visible.sync="dialogCreateChangeShiftsManageVisible">
                 <el-form :model="changeShiftsManageForm" ref="shiftsManageForm"
-                 :rules="rules">
+                         :rules="rules">
                     <el-form-item :error="changeShiftsManageFormError.schedule_no" label="倒班代码"
                                   :label-width="formLabelWidth" prop="schedule_no">
                         <el-input v-model="changeShiftsManageForm.schedule_no"></el-input>
@@ -96,6 +96,7 @@
                     <div v-for="(classesdetail, index) in changeShiftsManageForm.classesdetail_set">
                         <el-divider>{{ classesdetail.classes_name }}</el-divider>
                         <el-form-item label="时间范围" :label-width="formLabelWidth">
+                            <!--
                             <el-time-picker
                                     is-range
                                     style="width: auto"
@@ -103,6 +104,18 @@
                                     start-placeholder="开始时间"
                                     end-placeholder="结束时间"
                                     v-model="classesdetail.times">
+                            </el-time-picker>
+                            -->
+                            <el-time-picker
+                                    value-format="HH:mm:ss"
+                                    v-model="classesdetail.times[0]"
+                                    placeholder="开始时间">
+                            </el-time-picker>
+                            <span>至</span>
+                            <el-time-picker
+                                    value-format="HH:mm:ss"
+                                    v-model="classesdetail.times[1]"
+                                    placeholder="结束时间">
                             </el-time-picker>
                         </el-form-item>
                         <el-form-item label="描述" :label-width="formLabelWidth">
@@ -136,11 +149,24 @@
                     </el-form-item>
                     <el-form-item label="周期天数"
                                   :label-width="formLabelWidth">
-                        <el-input-number :min="1" :max="30" v-model.number="changeShiftsManageForm.period"></el-input-number>
+                        <el-input-number :min="1" :max="30"
+                                         v-model.number="changeShiftsManageForm.period"></el-input-number>
                     </el-form-item>
                     <div v-for="(classesdetail, index) in changeShiftsManageForm.classesdetail_set">
                         <el-divider>{{ classesdetail.classes_name }}</el-divider>
                         <el-form-item label="时间范围" :label-width="formLabelWidth">
+                            <el-time-picker
+                                    value-format="HH:mm:ss"
+                                    v-model="classesdetail.times[0]"
+                                    placeholder="开始时间">
+                            </el-time-picker>
+                            <span>至</span>
+                            <el-time-picker
+                                    value-format="HH:mm:ss"
+                                    v-model="classesdetail.times[1]"
+                                    placeholder="结束时间">
+                            </el-time-picker>
+                            <!--
                             <el-time-picker
                                     is-range
                                     style="width: auto"
@@ -150,6 +176,7 @@
                                     value-format="HH:mm:ss"
                                     v-model="classesdetail.times">
                             </el-time-picker>
+                            -->
                         </el-form-item>
                         <el-form-item label="描述" :label-width="formLabelWidth">
                             <el-input v-model="classesdetail.description"></el-input>
