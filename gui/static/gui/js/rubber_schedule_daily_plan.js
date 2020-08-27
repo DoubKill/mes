@@ -101,28 +101,29 @@
             }).catch(function (error) {
 
             });
-            axios.get(RubberMaterialUrl, {
-
-                params: {
-                    all: 1,
-                    used_type: 4
-                    // page_size: 100000000
-                }
-            }).then(function (response) {
-
-                app.stage_product_batch_nos = [];
-                app.productBatchings = response.data.results;
-                response.data.results.forEach(function (batching) {
-
-                    app.productBatchingById[batching.id] = batching;
-                    if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
-
-                        app.stage_product_batch_nos.push(batching.stage_product_batch_no)
-                    }
-                });
-            }).catch(function (error) {
-
-            });
+            // this.getProductBatchings();
+            // axios.get(RubberMaterialUrl, {
+            //
+            //     params: {
+            //         all: 1,
+            //         used_type: 4
+            //         // page_size: 100000000
+            //     }
+            // }).then(function (response) {
+            //
+            //     app.stage_product_batch_nos = [];
+            //     app.productBatchings = response.data.results;
+            //     response.data.results.forEach(function (batching) {
+            //
+            //         app.productBatchingById[batching.id] = batching;
+            //         if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
+            //
+            //             app.stage_product_batch_nos.push(batching.stage_product_batch_no)
+            //         }
+            //     });
+            // }).catch(function (error) {
+            //
+            // });
             this.getPlanSchedules();
             axios.get(WorkSchedulesUrl, {
                 params: {
@@ -136,7 +137,35 @@
             })
         },
         methods: {
+            getProductBatchings() {
 
+                var app = this;
+                axios.get(RubberMaterialUrl, {
+
+                    params: {
+                        all: 1,
+                        used_type: 4,
+                        dev_type: app.equipById[app.equipIdForAdd].category
+                    }
+                }).then(function (response) {
+
+                    app.stage_product_batch_nos = [];
+                    app.productBatchings = response.data.results;
+                    response.data.results.forEach(function (batching) {
+
+                        app.productBatchingById[batching.id] = batching;
+                        if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
+
+                            app.stage_product_batch_nos.push(batching.stage_product_batch_no)
+                        }
+                    });
+                }).catch(function (error) {
+
+                });
+            },
+            equipChanged() {
+                this.getProductBatchings()
+            },
             getPlanSchedules() {
 
                 var app = this;
@@ -221,26 +250,6 @@
                     app.$message(text);
 
                 })
-            },
-            addPlan: function () {
-
-                var app = this;
-                this.rubberDailyPlanForm["plan_date"] = this.plan_date;
-                axios.post(ProductDayPlansUrl, this.rubberDailyPlanForm)
-                    .then(function (response) {
-
-                        app.$message("创建成功");
-                        app.currentChange(app.currentPage);
-                    }).catch(function (error) {
-
-                    var text = "";
-                    for (var key in error.response.data) {
-
-                        text += error.response.data[key] + "\n";
-                    }
-                    app.$message(text);
-
-                });
             },
             getPlanText: function (index) {
 
@@ -327,11 +336,10 @@
                     app.$message.error(JSON.stringify(error.response.data));
                 });
             },
-            deleteOnPlan(plan) {
+            deleteOnePlan(plan) {
 
-                this.plansForAdd.splice(
-                this.plansForAdd.indexOf(plan), 1);
-                var plans =this.plansForAdd.filter(plan_ => {
+                this.plansForAdd.splice(this.plansForAdd.indexOf(plan), 1);
+                var plans = this.plansForAdd.filter(plan_ => {
                     return plan_.equip === plan.equip
                 });
                 if (plans.length === 1) {
@@ -423,10 +431,11 @@
                 planForAdd["batching_weight"] = this.productBatchingById[planForAdd.product_batching].batching_weight;
                 planForAdd["production_time_interval"] = this.productBatchingById[planForAdd.product_batching].production_time_interval;
                 for (var i = 0; i < 3; i++) {
-                    this.planTrainsChanged(planForAdd, i)
+                    this.planTrainsChanged(planForAdd, i, false)
                 }
+                this.statistic();
             },
-            planTrainsChanged(planForAdd, columnIndex) {
+            planTrainsChanged(planForAdd, columnIndex, sum = true) {
 
                 if (!planForAdd["pdp_product_classes_plan"][columnIndex].enable)
                     return;
@@ -438,7 +447,8 @@
                 planForAdd["pdp_product_classes_plan"][columnIndex]["weight"] =
                     (planForAdd["batching_weight"]
                         * planForAdd["pdp_product_classes_plan"][columnIndex]["plan_trains"]).toFixed(2);
-                this.statistic();
+                if (sum)
+                    this.statistic();
             },
             statistic() {
 
@@ -471,8 +481,11 @@
                             time: 0,
                         })
                     }
-                    plans.forEach(function (plan) {
+                    var app = this;
+                    plans.forEach(async function (plan) {
 
+                        let res = await axios.get(PlanScheduleUrl + plan.plan_schedule + "/");
+                        let planSchedule = res.data;
                         batching_weight += Number(plan.batching_weight);
                         production_time_interval += Number(plan.production_time_interval);
                         for (var i = 0; i < 3; i++) {
@@ -481,13 +494,26 @@
                             pdp_product_classes_plan[i].plan_trains += Number(class_plan.plan_trains);
                             pdp_product_classes_plan[i].weight += Number(class_plan.weight);
                             pdp_product_classes_plan[i].time += Number(class_plan.time);
+                            var workSchedulePlanTimeSpan =
+                                dayjs(planSchedule.work_schedule_plan[i].end_time).diff(
+                                    dayjs(planSchedule.work_schedule_plan[i].start_time), "minute")
+                            if (pdp_product_classes_plan[i].time > workSchedulePlanTimeSpan) {
+
+                                app.$alert('机台' + plan.equip_.equip_no
+                                    + planSchedule.work_schedule_plan[i].classes_name
+                                    + '计划时间大于排班时间' + '(计划时间' + pdp_product_classes_plan[i].time + '分钟'
+                                    + ' 排班时间' + workSchedulePlanTimeSpan + '分钟' +
+                                    ')', '警告', {
+                                    confirmButtonText: '确定',
+                                });
+                            }
                         }
                     });
-                    for (i = 0; i < 3; i++) {
-
-                        pdp_product_classes_plan[i].weight = pdp_product_classes_plan[i].weight.toFixed(2);
-                        pdp_product_classes_plan[i].time = pdp_product_classes_plan[i].time.toFixed(2);
-                    }
+                    // for (i = 0; i < 3; i++) {
+                    //
+                    //     pdp_product_classes_plan[i].weight = pdp_product_classes_plan[i].weight.toFixed(2);
+                    //     pdp_product_classes_plan[i].time = pdp_product_classes_plan[i].time.toFixed(2);
+                    // }
                     batching_weight = batching_weight.toFixed(3);
                     production_time_interval = production_time_interval.toFixed(2);
                     var equip = this.equipById[equipId];

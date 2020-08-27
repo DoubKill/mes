@@ -4,22 +4,19 @@
 {% block main %}
     <el-form :inline="true">
         <el-form-item label="日期">
-            <el-select
-                    clearable
+            <el-date-picker
+                    v-model="planDate"
                     @change="planDateChange"
-                    v-model="planDate" placeholder="请选择">
-                <el-option
-                        :key="schedule.id"
-                        :label="schedule.day_time"
-                        :value="schedule.day_time"
-                        v-for="schedule in planDateOptions">
-                </el-option>
-            </el-select>
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
         </el-form-item>
         <el-form-item label="原材料类别">
             <el-select
                     clearable
                     @change="materialTypeChange"
+                    @visible-change="materialTypeVisibleChange"
                     v-model="materialType" placeholder="请选择">
                 <el-option
                         v-for="item in materialTypeOptions"

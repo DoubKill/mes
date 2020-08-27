@@ -172,7 +172,7 @@
             :visible.sync="addPlanVisible"
             title="添加胶料日生产计划">
         <div style="margin-bottom: 15px">
-            <el-select filterable placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
+            <el-select @change="equipChanged" filterable placeholder="请选择机台" style="margin-right: 10px" v-model="equipIdForAdd">
                 <el-option
                         :key="equip.id"
                         :label="equip.equip_no"
@@ -274,7 +274,7 @@
             </el-table-column>
             <el-table-column label="操作" >
                 <template v-if="!scope.row.sum" slot-scope="scope">
-                    <el-button type="danger" @click="deleteOnPlan(scope.row)">删除</el-button>
+                    <el-button type="danger" @click="deleteOnePlan(scope.row)">删除</el-button>
                 </template>
             </el-table-column>
         </el-table>

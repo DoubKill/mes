@@ -162,20 +162,6 @@
         },
         created: function () {
 
-            var app = this;
-            axios.get(EquipUrl, {
-
-                params: {
-
-                    all: 1
-                }
-            }).then(function (response) {
-
-                app.equipNoOptions = response.data.results;
-            }).catch(function (error) {
-
-            });
-            console.log(app.tableData);
         },
         methods: {
             downloadClick(rew) {
@@ -185,6 +171,23 @@
             },
             materialNameChanged() {
                 this.getFirstPage();
+            },
+            equipNoVisibleChange(bool) {
+                if(bool){
+                    var app = this;
+                    axios.get(EquipUrl, {
+
+                        params: {
+
+                            all: 1
+                        }
+                    }).then(function (response) {
+
+                        app.equipNoOptions = response.data.results;
+                    }).catch(function (error) {
+
+                    });
+                }
             },
             equipNoChange() {
                 this.getFirstPage();

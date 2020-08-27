@@ -24,6 +24,13 @@
                     equip_type: "",
                     process: "",
                 },
+                equipcate_rules: {
+                    category_no: [{ required: true, message: '请输入机型编号', trigger: 'blur' }],
+                    category_name: [{ required: true, message: '请输入机型名称', trigger: 'blur' }],
+                    volume: [{ required: true, message: '请输入容积', trigger: 'blur' }],
+                    equip_type: [{ required: true, message: '请选择设备类型', trigger: 'change' }],
+                    process: [{ required: true, message: '请选择工序', trigger: 'change' }],
+                },
                 EquipCateFormError: {
                     category_no: "",
                     category_name: "",
@@ -69,37 +76,33 @@
                 this.clearEquipCateFormError();
                 this.dialogCreateEquipCateVisible = true;
             },
-            handleCreateEquipCate: function () {
-
-                this.clearEquipCateFormError();
+            handleCreateEquipCate(formName){
                 var app = this;
-                axios.post(EquipCategoryUrl, app.EquipCateForm)
-                    .then(function (response) {
+                app.$refs[formName].validate((valid) => {
+                  if (valid) {
+                      this.clearEquipCateFormError();
+                      var app = this;
+                      axios.post(EquipCategoryUrl, app.EquipCateForm)
+                          .then(function (response) {
 
-                        app.dialogCreateEquipCateVisible = false;
-                        app.$message(app.EquipCateForm.category_name + "创建成功");
-                        app.currentChange(app.currentPage);
+                              app.dialogCreateEquipCateVisible = false;
+                              app.$message(app.EquipCateForm.category_name + "创建成功");
+                              app.currentChange(app.currentPage);
 
-                    }).catch(function (error) {
+                          }).catch(function (error) {
 
-                    for (var key in app.EquipCateFormError) {
-                        if (error.response.data[key])
-                            app.EquipCateFormError[key] = error.response.data[key].join(",")
-                    }
-                })
+                          for (var key in app.EquipCateFormError) {
+                              if (error.response.data[key])
+                                  app.EquipCateFormError[key] = error.response.data[key].join(",")
+                          }
+                      })
+                  }else {
+                    console.log('error submit!!');
+                    return false;
+                  }
+                });
             },
             showEditEquipCateDialog: function (row) {
-                // var row_custom = {};
-                // for (var key in row) {
-                //     row_custom[key] = row[key];
-                //     if(key == "global_no"){
-                //         row_custom['process'] = row[key]
-                //     }
-                //     if(key == "global_name"){
-                //         row_custom['process'] = row_custom["process"] + "——" + row[key]
-                //     }
-                // }
-
                 this.clearEquipCateForm();
                 this.clearEquipCateFormError();
                 this.EquipCateForm = Object.assign({}, row);
@@ -110,26 +113,28 @@
             },
 
 
-            handleEditEquipCate: function () {
+            handleEditEquipCate(formName) {
+                var app = this;
+                app.$refs[formName].validate((valid) => {
+                  if (valid) {
+                            const app = this;
+                            axios.put(EquipCategoryUrl + this.EquipCateForm.id + '/', this.EquipCateForm)
+                                .then(function (response) {
 
-                const app = this;
+                                    app.dialogEditEquipCateVisible = false;
+                                    app.$message(app.EquipCateForm.category_name + "修改成功");
+                                    app.currentChange(app.currentPage);
+                                }).catch(function (error) {
+                                for (var key in app.EquipCateFormError) {
 
-                // console.log("=============================");
-                // console.log(this.EquipCateForm);
-                // console.log("=============================");
-
-                axios.put(EquipCategoryUrl + this.EquipCateForm.id + '/', this.EquipCateForm)
-                    .then(function (response) {
-
-                        app.dialogEditEquipCateVisible = false;
-                        app.$message(app.EquipCateForm.category_name + "修改成功");
-                        app.currentChange(app.currentPage);
-                    }).catch(function (error) {
-                    for (var key in app.EquipCateFormError) {
-
-                        if (error.response.data[key])
-                            app.EquipCateFormError[key] = error.response.data[key].join(",")
-                    }
+                                    if (error.response.data[key])
+                                        app.EquipCateFormError[key] = error.response.data[key].join(",")
+                                }
+                            });
+                  }else {
+                    console.log('error submit!!');
+                    return false;
+                  }
                 });
             },
             handleEquipCateDelete: function (row) {
@@ -174,7 +179,7 @@
                     // console.log("==================");
                     for (var i = 0; i < app.EquipCate.length; ++i) {
 
-                        var label = app.EquipCate[i]["global_no"] + "——" + app.EquipCate[i]["global_name"];
+                        var label = app.EquipCate[i]["global_name"];
                         app.EquipCateOptions.push({
                             value: app.EquipCate[i]["id"],
                             label
@@ -189,7 +194,7 @@
                     app.EquipCateProcess = response.data.results;
                     for (var i = 0; i < app.EquipCateProcess.length; ++i) {
 
-                        var label = app.EquipCateProcess[i]["global_no"] + "——"+ app.EquipCateProcess[i]["global_name"];
+                        var label = app.EquipCateProcess[i]["global_name"];
                         app.EquipCateProcessOptions.push({
                             value: app.EquipCateProcess[i]["id"],
                             label
