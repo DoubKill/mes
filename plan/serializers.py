@@ -1,5 +1,7 @@
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator
+
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
 from basics.models import PlanSchedule, WorkSchedule, ClassesDetail, GlobalCode, WorkSchedulePlan
@@ -47,6 +49,13 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                   'product_no', 'batching_weight', 'production_time_interval', 'product_batching',
                   'pdp_product_classes_plan', 'dev_type_name')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.filter(delete_flag=False),
+                fields=('equip', 'product_batching', 'plan_schedule'),
+                message="当天该机台已有相同的胶料计划数据，请修改后重试!"
+            )
+        ]
 
     @atomic()
     def create(self, validated_data):
