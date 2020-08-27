@@ -18,6 +18,7 @@
                        @change="changeData"
                        @visible-change="equipVisibleChange"
                        clearable
+                       :loading="loadingInput"
                        placeholder="请选择">
                 <el-option
                         v-for="item in machineList"
@@ -30,6 +31,7 @@
         <el-form-item label="胶料">
             <el-select v-model="getParams.product_no" placeholder="请选择"
                        clearable
+                       :loading="loadingInput"
                        @visible-change="glueVisibleChange"
                        @change="changeData">
                 <el-option

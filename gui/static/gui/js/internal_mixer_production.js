@@ -3,6 +3,7 @@
         mixins: [BaseMixin],
         data: function () {
             return {
+                loadingInput: false,
                 tableDataUrl: InternalMixerUrl,
                 tableData: [],
                 search_date: [],
@@ -179,7 +180,9 @@
                     //     return item;
                     // }, [])
                     _this.glueList = glueList
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             getMachineList() {
@@ -190,14 +193,18 @@
                     }
                 }).then(function (response) {
                     _this.machineList = response.data.results || [];
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             getClassesList() {
                 var _this = this
                 axios.get(ClassesListUrl, {params: {schedule_name: '密炼'}}).then(function (response) {
                     _this.classesList = response.data.results || [];
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             clickPrint() {
@@ -313,14 +320,17 @@
             },
             machineVisibleChange(bool) {
                 if (!bool || this.machineList.length > 0) return
+                this.loadingInput = true
                 this.getMachineList()  //获取机台列表
             },
             productVisibleChange(bool) {
                 if (!bool || this.glueList.length > 0) return
+                this.loadingInput = true
                 this.getGlueList()  //获取胶料列表
             },
             classesVisibleChange(bool) {
                 if (!bool || this.classesList.length > 0) return
+                this.loadingInput = true
                 this.getClassesList()   //获取班次列表
             }
         }
