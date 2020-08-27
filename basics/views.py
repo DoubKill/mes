@@ -252,6 +252,7 @@ class ClassesDetailViewSet(mixins.ListModelMixin,
     filter_backends = (DjangoFilterBackend,)
     filter_class = ClassDetailFilter
 
+
 @method_decorator([api_recorder], name="dispatch")
 class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     """
@@ -264,8 +265,9 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除计划时间
     """
-    queryset = PlanSchedule.objects.filter(delete_flag=False
-                                           ).prefetch_related('work_schedule_plan__classes')
+    queryset = PlanSchedule.objects.filter(
+        delete_flag=False).select_related('work_schedule').prefetch_related('work_schedule_plan__classes',
+                                                                            'work_schedule_plan__group')
     serializer_class = PlanScheduleSerializer
     model_name = queryset.model.__name__.lower()
     filter_fields = ('day_time', )
@@ -281,8 +283,8 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            serializer = self.get_serializer(queryset, many=True)
-            return Response({'results': serializer.data})
+            data = queryset.values('id', 'work_schedule__schedule_name')
+            return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
 
