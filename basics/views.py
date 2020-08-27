@@ -193,7 +193,7 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'equip_no', 'equip_name', 'category')
+            data = queryset.filter(used_flag=1).values('id', 'equip_no', 'equip_name', 'category')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
