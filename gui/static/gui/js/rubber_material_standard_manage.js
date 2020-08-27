@@ -578,6 +578,7 @@
                         });
                         return
                     }
+
                 }
                 var v_product_info = "";
                   //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
@@ -696,15 +697,37 @@
             handleMaterialSelect(row) {
                 var app = this;
                 //胶料配料post
+                console.log('====================');
+                console.log(app.NewRowMaterial);
+                console.log(app.PutProductRecipe);
                 if(app.raw_material_index != null){
+                    for(var i = 0; i < app.NewRowMaterial.length; ++i){
+                        if(app.NewRowMaterial[i]["material"] == row.id){
+                            app.$message({
+                                message: "不能选择相同的原料",
+                                type: 'error'
+                            });
+                            return
+                        }
+                    }
                     app.NewRowMaterial[app.raw_material_index].material_name = row.material_name;
                     app.NewRowMaterial[app.raw_material_index].material = row.id;
                     app.NewRowMaterial[app.raw_material_index].material_type = row.material_type_name;
                 }else {
+                    for(var j = 0; j < app.PutProductRecipe.length; ++j){
+                        if(app.PutProductRecipe[j]["material"] == row.id){
+                            app.$message({
+                                message: "不能选择相同的原料",
+                                type: 'error'
+                            });
+                            return;
+                        }
+                    }
                     //胶料配料put
                     app.PutProductRecipe[app.put_raw_material_index].material_name = row.material_name;
                     app.PutProductRecipe[app.put_raw_material_index].material = row.id;
                     app.PutProductRecipe[app.put_raw_material_index].material_type = row.material_type_name;
+
                 }
                 app.dialogRawMaterialSync = false;
             },
