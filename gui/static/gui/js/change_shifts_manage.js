@@ -112,7 +112,7 @@
                 return dayjs(date).format("HH:mm:ss")
             },
             adjustTimes() {
-                var _this = this
+                var _this = this;
                 this.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
                     data.start_time = data.times && data.times.length > 0 ? _this.format(data.times[0]) : ''
                     data.end_time = data.times && data.times.length > 0 ? _this.format(data.times[1]) : ''
