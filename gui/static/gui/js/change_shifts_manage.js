@@ -98,6 +98,7 @@
             },
             afterGetData: function () {
                 this.workSchedules = this.tableData;
+                console.log(this.workSchedules)
             },
             showDialogCreateChangeShiftsManage() {
 
@@ -160,7 +161,8 @@
             showEditChangeShiftsManageDialog(workSchedule) {
 
                 this.clearChangeShiftsManageFormError();
-                this.changeShiftsManageForm = Object.assign({}, workSchedule);
+                // this.changeShiftsManageForm = Object.assign({}, workSchedule);
+                this.changeShiftsManageForm = JSON.parse(JSON.stringify(workSchedule));
                 for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
                     Vue.set(this.changeShiftsManageForm.classesdetail_set[i], "times", [
@@ -174,10 +176,16 @@
 
                 this.clearChangeShiftsManageFormError();
                 var app = this;
+                console.log(this.changeShiftsManageForm.classesdetail_set)
                 for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
-                    this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
-                    this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
+                    if (this.changeShiftsManageForm.classesdetail_set[i].times) {
+                        this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
+                        this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
+                    }
+                    else {
+                        this.changeShiftsManageForm.classesdetail_set.splice(i, 1)
+                    }
                 }
                 axios.put(WorkSchedulesUrl + this.changeShiftsManageForm.id + "/", this.changeShiftsManageForm)
                     .then(function (response) {
@@ -222,10 +230,21 @@
             },
             getCellText(workSchedule, index, key) {
 
-                if (workSchedule.classesdetail_set &&
-                    index < workSchedule.classesdetail_set.length
-                    && workSchedule.classesdetail_set[index][key])
-                    return workSchedule.classesdetail_set[index][key];
+                var class_name = '晚班';
+                switch (index) {
+                    case 0:
+                        class_name = '早班';
+                        break;
+                    case 1:
+                        class_name = '中班';
+                        break
+                }
+                var classesdetail = workSchedule.classesdetail_set.find(detail => {
+                    return detail.classes_name === class_name
+                });
+                if (classesdetail) {
+                    return classesdetail[key]
+                }
             }
         }
     };

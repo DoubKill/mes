@@ -34,18 +34,7 @@
         created: function () {
 
             var app = this;
-            axios.get(GlobalCodesUrl, {
 
-                params: {
-
-                    class_name: "原材料类别"
-                }
-            }).then(function (response) {
-
-                app.materialTypeOptions = response.data.results;
-            }).catch(function (error) {
-
-            });
             axios.get(PlanScheduleUrl, {
 
                 params: {
@@ -82,7 +71,6 @@
                     app.afterGetData();
 
                 }).catch(function (error) {
-                    app.$message.error(error);
                 })
             },
 
@@ -91,6 +79,23 @@
                 this.getFirstPage();
             },
 
+            materialTypeVisibleChange(bool) {
+                if(bool){
+                    var app = this;
+                    axios.get(GlobalCodesUrl, {
+
+                        params: {
+
+                            class_name: "原材料类别"
+                        }
+                    }).then(function (response) {
+
+                    app.materialTypeOptions = response.data.results;
+                    }).catch(function (error) {
+
+                    });
+                }
+            },
             materialTypeChange: function () {
 
                 this.getFirstPage();
