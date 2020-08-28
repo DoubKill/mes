@@ -106,7 +106,7 @@ class ValidateProductVersionsView(APIView):
                                                           ).order_by('-versions').first()
         if product_batching:
             if product_batching.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
-                raise ValidationError('该配方版本号不得小于现有版本号')
+                raise ValidationError({'versions': '该配方版本号不得小于现有版本号'})
         return Response('OK')
 
 

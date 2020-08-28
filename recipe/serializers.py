@@ -23,12 +23,12 @@ class MaterialSerializer(BaseModelSerializer):
     material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
                                                                                           delete_flag=False),
                                                        help_text='原材料类型id',
-                                                       error_messages={'does_not_exist': '该原材料类型已被弃用或删除，操作无效'})
+                                                       error_messages={'does_not_exist': 'object does not exist'})
     package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
                                                                                          delete_flag=False),
                                                       help_text='包装单位id', required=False,
                                                       allow_null=True, allow_empty=True,
-                                                      error_messages={'does_not_exist': '该包装单位类型已被弃用或删除，操作无效'})
+                                                      error_messages={'does_not_exist': 'object does not exist'})
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)

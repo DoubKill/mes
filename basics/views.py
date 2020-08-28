@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, EquipCategoryFilter, \
-    ClassDetailFilter
+    ClassDetailFilter, PlanScheduleFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
@@ -272,6 +272,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     model_name = queryset.model.__name__.lower()
     filter_fields = ('day_time', )
     filter_backends = (DjangoFilterBackend,)
+    filter_class = PlanScheduleFilter
 
     def get_permissions(self):
         if self.request.query_params.get('all'):
@@ -283,7 +284,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'work_schedule__schedule_name')
+            data = queryset.values('id', 'work_schedule__schedule_name', 'day_time')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)

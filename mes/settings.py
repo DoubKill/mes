@@ -255,7 +255,26 @@ DATABASES = {
 #             'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
 #             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
 #         }
-#     }
+
+
+if DEBUG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+            'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
+            'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
+            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mes@2020'),  # 密码
+            'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
+            'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
