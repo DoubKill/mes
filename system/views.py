@@ -271,9 +271,13 @@ class LoginView(ObtainJSONWebToken):
                     permissions_tree[first_key][second_key].append(op_value)
                 else:
                     permissions_tree[first_key][second_key] = [op_value]
-            auth = permissions_tree.pop("auth")
-            # 合并auth与system
-            permissions_tree["system"].update(**auth)
+            if permissions_tree.get("auth"):
+                auth = permissions_tree.pop("auth")
+                # 合并auth与system
+                if permissions_tree.get("system"):
+                    permissions_tree["system"].update(**auth)
+                else:
+                    permissions_tree["system"] = auth
             return Response({"results": permissions_tree,
                              "username": user.username,
                              "token": token})
