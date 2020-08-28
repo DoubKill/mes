@@ -20,7 +20,7 @@ class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
     product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
     st = django_filters.DateTimeFilter(field_name="end_time", help_text='生产时间', lookup_expr="gte")
     et = django_filters.DateTimeFilter(field_name="end_time", help_text='生产时间', lookup_expr="lte")
-    classes = django_filters.DateTimeFilter(field_name="classes", help_text='班次')
+    classes = django_filters.CharFilter(field_name="classes", help_text='班次')
 
     class Meta:
         model = PalletFeedbacks

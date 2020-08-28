@@ -210,6 +210,7 @@
             get_raw_material(val=1){
                 var app=this;
                 this.getParams["page"] = val;
+                this.getParams["used_flag"] = true;
                 this.getParams["material_type_id"] = app.materialType?app.materialType:'';
                 this.getParams["material_no"] = app.search_material_no?app.search_material_no:'';
                 this.getParams["material_name"] = app.search_material_name?app.search_material_name:'';
@@ -528,7 +529,7 @@
                     material_type:"",
                     auto_flag_radio:true,
                     material_name:"",
-                    practical_weight:""
+                    // practical_weight:""
                 });
             },
             PutNewPracticalWeightChanged: function () {
@@ -547,7 +548,7 @@
                     material_type:"",
                     auto_flag:true,
                     material_name:"",
-                    actual_weight:""
+                    // actual_weight:""
                 });
             },
 
@@ -577,6 +578,7 @@
                         });
                         return
                     }
+
                 }
                 var v_product_info = "";
                   //判断表格中每一行中的下拉框中的数据：是用户所选，还是默认展示
@@ -665,6 +667,20 @@
 
                 app.dialogRawMaterialSync = true;
             },
+            del_raw_material_row: function(new_material_ele, index){
+                var app = this;
+                if(new_material_ele.hasOwnProperty("practical_weight")){
+                    app.raw_material_index = index;
+                    app.NewRowMaterial.splice(index,1);
+                    var material_weight = 0;
+                    for(var i=0; i<app.NewRowMaterial.length; ++i){
+                        material_weight += app.NewRowMaterial[i]['practical_weight']
+                    }
+                    app.select_material_weight = material_weight;
+                    app.practicalWeightSum = material_weight;
+                }else {
+                }
+            },
 
             afterGetData: function () {
 
@@ -681,15 +697,37 @@
             handleMaterialSelect(row) {
                 var app = this;
                 //胶料配料post
+                console.log('====================');
+                console.log(app.NewRowMaterial);
+                console.log(app.PutProductRecipe);
                 if(app.raw_material_index != null){
+                    for(var i = 0; i < app.NewRowMaterial.length; ++i){
+                        if(app.NewRowMaterial[i]["material"] == row.id){
+                            app.$message({
+                                message: "不能选择相同的原料",
+                                type: 'error'
+                            });
+                            return
+                        }
+                    }
                     app.NewRowMaterial[app.raw_material_index].material_name = row.material_name;
                     app.NewRowMaterial[app.raw_material_index].material = row.id;
                     app.NewRowMaterial[app.raw_material_index].material_type = row.material_type_name;
                 }else {
+                    for(var j = 0; j < app.PutProductRecipe.length; ++j){
+                        if(app.PutProductRecipe[j]["material"] == row.id){
+                            app.$message({
+                                message: "不能选择相同的原料",
+                                type: 'error'
+                            });
+                            return;
+                        }
+                    }
                     //胶料配料put
                     app.PutProductRecipe[app.put_raw_material_index].material_name = row.material_name;
                     app.PutProductRecipe[app.put_raw_material_index].material = row.id;
                     app.PutProductRecipe[app.put_raw_material_index].material_type = row.material_type_name;
+
                 }
                 app.dialogRawMaterialSync = false;
             },

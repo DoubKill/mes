@@ -19,8 +19,8 @@
                     description: "",
                     period: 0,
                     classesdetail_set: [{
-                        times: [new Date(),
-                            new Date()],
+                        times: [dayjs().format("HH:mm:ss"),
+                            dayjs().format("HH:mm:ss")],
                         description: "",
                         classes_name: "",
                         classes: null
@@ -75,17 +75,17 @@
 
                     this.changeShiftsManageForm.classesdetail_set.push({
 
-                        times: [new Date(),
-                            new Date()],
+                        times: [dayjs().format("HH:mm:ss"),
+                           dayjs().format("HH:mm:ss")],
                         description: "",
                         classes_name: this.classes[i].global_name,
                         classes: this.classes[i].id
                     })
                 }
-                this.changeShiftsManageForm.classesdetail_set[0].times = [
-                    new Date(),
-                    new Date()
-                ]
+                // this.changeShiftsManageForm.classesdetail_set[0].times = [
+                //     new Date(),
+                //     new Date()
+                // ]
             },
             clearChangeShiftsManageFormError() {
 
@@ -98,7 +98,7 @@
             },
             afterGetData: function () {
                 this.workSchedules = this.tableData;
-                console.log(this.workSchedules)
+                // console.log(this.workSchedules)
             },
             showDialogCreateChangeShiftsManage() {
 
@@ -112,7 +112,7 @@
                 return dayjs(date).format("HH:mm:ss")
             },
             adjustTimes() {
-                var _this = this
+                var _this = this;
                 this.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
                     data.start_time = data.times && data.times.length > 0 ? _this.format(data.times[0]) : ''
                     data.end_time = data.times && data.times.length > 0 ? _this.format(data.times[1]) : ''
@@ -127,7 +127,11 @@
                 this.$refs['shiftsManageForm'].validate(function (valid) {
                     if (valid) {
                         app.clearChangeShiftsManageFormError();
-                        app.adjustTimes();
+                        // app.adjustTimes();
+                        app.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
+                            data.start_time = data.times && data.times.length > 0 ? data.times[0] : ''
+                            data.end_time = data.times && data.times.length > 0 ? data.times[1] : ''
+                        })
                         var obj = {}
                         obj = JSON.parse(JSON.stringify(app.changeShiftsManageForm))
                         let newarr = obj.classesdetail_set.filter(function (data, index) {
@@ -139,6 +143,7 @@
                         }
                         obj.classesdetail_set = newarr
 
+                        console.log(obj);
                         axios.post(WorkSchedulesUrl, obj)
                             .then(function (response) {
 
@@ -182,8 +187,7 @@
                     if (this.changeShiftsManageForm.classesdetail_set[i].times) {
                         this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
                         this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
-                    }
-                    else {
+                    } else {
                         this.changeShiftsManageForm.classesdetail_set.splice(i, 1)
                     }
                 }

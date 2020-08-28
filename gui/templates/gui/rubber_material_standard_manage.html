@@ -168,10 +168,11 @@
     <el-dialog
             :close-on-click-modal="false"
             :close-on-press-escape="false"
-            title="新建胶料配料" :visible.sync="dialogAddRubberMaterial">
+            title="新建胶料配方" :visible.sync="dialogAddRubberMaterial">
         <el-form :model="rubberMaterialForm" :rules="rules" ref="rubberMaterialForm" :label-width="formLabelWidth">
             <el-form-item label="工厂" prop="factory">
                 <el-select
+                        style="width: 100%"
                         size="mini"
                         v-model="rubberMaterialForm.factory" placeholder="请选择">
                     <el-option
@@ -185,6 +186,7 @@
 
             <el-form-item label="SITE" prop="SITE">
                 <el-select
+                        style="width: 100%"
                         @change="GenerateRubberMaterialNOChanged"
                         size="mini"
                         v-model="rubberMaterialForm.SITE" placeholder="请选择">
@@ -199,7 +201,7 @@
 
             <el-form-item label="胶料编码" prop="rubber_no">
                 <el-autocomplete
-                        style="width: 31%"
+                        style="width: 100%"
                         size="mini"
                         value-key = "product_no"
                         v-model="rubberMaterialForm.rubber_no"
@@ -210,6 +212,7 @@
 
             <el-form-item label="段次" prop="stage">
                 <el-select
+                        style="width: 100%"
                         @change="GenerateRubberMaterialNOChanged"
                         size="mini"
                         v-model="rubberMaterialForm.stage" placeholder="请选择">
@@ -222,13 +225,13 @@
                 </el-select>
             </el-form-item>
             <el-form-item label="版本" prop="version">
-                <el-input style="width: 31%" size="mini" v-model="rubberMaterialForm.version" placeholder="版本" v-on:input="GenerateRubberMaterialNOChanged"></el-input>
+                <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.version" placeholder="版本" v-on:input="GenerateRubberMaterialNOChanged"></el-input>
             </el-form-item>
             <el-form-item label="方案">
-            <el-input style="width: 31%" size="mini" v-model="rubberMaterialForm.scheme" placeholder="方案"></el-input>
+            <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.scheme" placeholder="方案"></el-input>
             </el-form-item>
             <el-form-item label="胶料配方编码">
-            <el-input style="width: 31%" size="mini" v-model="rubberMaterialForm.generate_material_no" :disabled="true" placeholder=""></el-input>
+            <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.generate_material_no" :disabled="true" placeholder=""></el-input>
             </el-form-item>
             <el-form-item>
                 <!--<el-button @click="dialogAddRubberMaterial = false">取 消</el-button>-->
@@ -272,6 +275,7 @@
                 <th style="text-align: center">自动与否</th>
                 <th style="text-align: center">原材料</th>
                 <td style="text-align: center">实际重量</td>
+                <td style="text-align: center">操作</td>
             </tr>
             </thead>
             {% verbatim vue %}
@@ -280,6 +284,7 @@
                 <tr style="background: rgba(189,198,210,0.73)">
                     <td colspan="4" style="text-align: center">配方结果</td>
                     <td style="text-align: center">{{ practicalWeightSum }}</td>
+                    <td></td>
                 </tr>
                 <tr v-for="(new_material_ele, index) in NewRowMaterial" :key="index">
                     <!--<td>{{ new_material_ele.sn_ele }}</td>-->
@@ -302,6 +307,9 @@
                     </td>
                     <td style="text-align: center">
                         <el-input-number size="mini" controls-position="right" @change="NewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.practical_weight"></el-input-number>
+                    </td>
+                    <td style="text-align: center">
+                        <el-button size="mini" v-on:click="del_raw_material_row(new_material_ele, index)">删除</el-button>
                     </td>
                 </tr>
 

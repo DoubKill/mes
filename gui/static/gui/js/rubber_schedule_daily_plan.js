@@ -65,7 +65,7 @@
                 batching_time_interval: "",
                 batching_weight_for_update: "",
                 batching_time_interval_for_update: "",
-                productBatchings: [],
+                // productBatchings: [],
                 productBatchingById: {},
                 addPlanVisible: false,
                 changePlanVisible: false,
@@ -101,29 +101,6 @@
             }).catch(function (error) {
 
             });
-            axios.get(RubberMaterialUrl, {
-
-                params: {
-                    all: 1,
-                    used_type: 4
-                    // page_size: 100000000
-                }
-            }).then(function (response) {
-
-                app.stage_product_batch_nos = [];
-                app.productBatchings = response.data.results;
-                response.data.results.forEach(function (batching) {
-
-                    app.productBatchingById[batching.id] = batching;
-                    if (app.stage_product_batch_nos.indexOf(batching.stage_product_batch_no) === -1) {
-
-                        app.stage_product_batch_nos.push(batching.stage_product_batch_no)
-                    }
-                });
-            }).catch(function (error) {
-
-            });
-            this.getPlanSchedules();
             axios.get(WorkSchedulesUrl, {
                 params: {
                     all: 1
@@ -313,8 +290,8 @@
                 var plans = this.plansForAdd.filter(plan_ => {
                     return plan_.equip === plan.equip
                 });
-                if (plans.length === 1) {
-                    this.plansForAdd.splice(plans[0], 1);
+                if (plans.length === 1 && plans[0].sum) {
+                    this.plansForAdd.splice(this.plansForAdd.indexOf(plans[0]), 1);
                 }
                 this.statistic();
             },
@@ -357,6 +334,22 @@
                         plan_schedule: this.planScheduleId,
                         pdp_product_classes_plan,
                     };
+                var app = this;
+                axios.get(RubberMaterialUrl, {
+                    params: {
+                        all: 1,
+                        used_type: 4,
+                        dev_type: app.equipById[app.equipIdForAdd].category
+                    }
+                }).then(function (response) {
+
+                    Vue.set(plan, 'productBatchings', response.data.results);
+                    response.data.results.forEach(function (batching) {
+                        //
+                        app.productBatchingById[batching.id] = batching;
+                    })
+                });
+
                 if (this.equipFirstIndexInPlansForAdd() === -1) {
 
                     this.plansForAdd.push(plan);
@@ -406,7 +399,7 @@
                 }
                 this.statistic();
             },
-            planTrainsChanged(planForAdd, columnIndex, sum=true) {
+            planTrainsChanged(planForAdd, columnIndex, sum = true) {
 
                 if (!planForAdd["pdp_product_classes_plan"][columnIndex].enable)
                     return;
@@ -421,7 +414,7 @@
                 if (sum)
                     this.statistic();
             },
-            statistic() {
+            async statistic() {
 
                 var plansByEquip = {};
                 var planSumByEquipId = {};
@@ -444,7 +437,7 @@
                     var batching_weight = 0;
                     var production_time_interval = 0;
                     var pdp_product_classes_plan = [];
-                    for (var i = 0; i < 3; i++) {
+                    for (var j = 0; j < 3; j++) {
 
                         pdp_product_classes_plan.push({
                             plan_trains: 0,
@@ -453,8 +446,9 @@
                         })
                     }
                     var app = this;
-                    plans.forEach(async function (plan) {
+                    for (var k = 0; k < plans.length; k++) {
 
+                        var plan = plans[k];
                         let res = await axios.get(PlanScheduleUrl + plan.plan_schedule + "/");
                         let planSchedule = res.data;
                         batching_weight += Number(plan.batching_weight);
@@ -473,18 +467,19 @@
                                 app.$alert('机台' + plan.equip_.equip_no
                                     + planSchedule.work_schedule_plan[i].classes_name
                                     + '计划时间大于排班时间' + '(计划时间' + pdp_product_classes_plan[i].time + '分钟'
-                                + ' 排班时间' + workSchedulePlanTimeSpan + '分钟' +
-                                ')', '警告', {
+                                    + ' 排班时间' + workSchedulePlanTimeSpan + '分钟' +
+                                    ')', '警告', {
                                     confirmButtonText: '确定',
                                 });
                             }
                         }
-                    });
+                    }
                     // for (i = 0; i < 3; i++) {
                     //
                     //     pdp_product_classes_plan[i].weight = pdp_product_classes_plan[i].weight.toFixed(2);
                     //     pdp_product_classes_plan[i].time = pdp_product_classes_plan[i].time.toFixed(2);
                     // }
+
                     batching_weight = batching_weight.toFixed(3);
                     production_time_interval = production_time_interval.toFixed(2);
                     var equip = this.equipById[equipId];
@@ -525,6 +520,17 @@
 
                     error.response.data.forEach(function (err) {
 
+                        if (err["pdp_product_classes_plan"]) {
+
+                            for (var i = 0; i < err["pdp_product_classes_plan"].length; i++) {
+
+                                if (err["pdp_product_classes_plan"][i].weight) {
+                                    app.$alert(err["pdp_product_classes_plan"][i].weight.join(","), '错误', {
+                                        confirmButtonText: '确定',
+                                    });
+                                }
+                            }
+                        }
                         if (err["product_batching"]) {
                             app.$alert("胶料配方编码是必填项。", '错误', {
                                 confirmButtonText: '确定',

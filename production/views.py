@@ -1,4 +1,5 @@
 import json
+import datetime
 import re
 
 import requests
@@ -232,7 +233,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             plan_time = 0
             actual_time = 0
             begin_time = None
-            product_no = day_plan.product_batching.product_info.product_no
+            product_no = day_plan.product_batching.stage_product_batch_no
             stage = day_plan.product_batching.stage.global_name
             equip_no = day_plan.equip.equip_no
             if equip_no not in temp_data:
@@ -287,6 +288,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
 
 class ProductActualViewSet(mixins.ListModelMixin,
                            GenericViewSet):
+    """密炼实绩"""
 
     def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
@@ -316,7 +318,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             plan_weight_all = 0
             actual_trains = 0
             plan_weight = 0
-            product_no = day_plan.product_batching.product_info.product_name
+            product_no = day_plan.product_batching.stage_product_batch_no
             equip_no = day_plan.equip.equip_no
             day_plan_actual = [None, None, None]
             # 通过日计划id再去查班次计划
@@ -328,7 +330,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                 plan_trains_all += class_plan.plan_trains
                 plan_weight = class_plan.weight
                 plan_weight_all += class_plan.weight
-                class_name = class_plan.classes_detail.classes.global_name
+                class_name = class_plan.work_schedule_plan.classes.global_name
                 if target_equip_no:
                     temp_ret_set = TrainsFeedbacks.objects.filter(plan_classes_uid=class_plan.plan_classes_uid,
                                                                   equip_no=target_equip_no)
@@ -369,6 +371,46 @@ class ProductActualViewSet(mixins.ListModelMixin,
                             plan_trains=plan_trains_all, actual_trains=actual_trains)
             return_data["data"].append(instance)
         return Response(return_data)
+
+    def list_bak(self, request, *args, **kwargs):
+        params = request.query_params
+        day_time = params.get("search_time", str(datetime.date.today() - datetime.timedelta(days=1)))
+        if day_time:
+            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", day_time):
+                return Response("bad search_time", status=400)
+        equip_no = params.get('equip_no')
+        if equip_no:
+            equip_no_str = f" and e.equip_no={equip_no}"
+        else:
+            equip_no_str = ""
+        sql_str = f"""
+            select pdp.id,
+            pb.stage_product_batch_no as product_no,
+            tf.plan_trains,
+            tf.actual_trains,
+            e.equip_no,
+            gc.global_name,
+            SUM(pcp.plan_trains) as plan_trains_all,
+            sum(tf.actual_trains) as actual_trains_all,
+            sum(pcp.time) as plan_time_all,
+            sum(pcp.weight) as plan_weight_all,
+            SUM(tf.actual_trains) as actual_weight_all,
+            (sum(julianday(tf.end_time)- julianday(tf.begin_time)))*86400 as actual_time_all
+            --        timediff(tf.end_time, tf.begin_time) as ac_time
+            
+            from product_day_plan as pdp
+            left join plan_schedule ps on pdp.plan_schedule_id = ps.id
+            left join equip e on pdp.equip_id = e.id
+            left join product_classes_plan pcp on pdp.id = pcp.product_day_plan_id
+            left join trains_feedbacks tf on pcp.plan_classes_uid = tf.plan_classes_uid
+            left join product_batching pb on pb.id = pdp.product_batching_id
+            left join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
+            left join global_code gc on wsp.classes_id = gc.id
+            where ps.day_time = '{day_time}'{equip_no_str} 
+            group by e.equip_no, gc.global_name order by e.equip_no, tf.pro;
+        """
+        query_set = TrainsFeedbacks.objects.raw(sql_str)
+        return
 
 
 class ProductionRecordViewSet(mixins.ListModelMixin,

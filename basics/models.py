@@ -138,7 +138,7 @@ class SysbaseEquipLevel(AbstractEntity):
 
 class PlanSchedule(AbstractEntity):
     """排班管理"""
-    # plan_schedule_no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
+    plan_schedule_no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
     day_time = models.DateField(help_text='日期', verbose_name='日期')
     work_schedule = models.ForeignKey(WorkSchedule, models.DO_NOTHING,
                                       help_text='倒班id', verbose_name='工作日程id', related_name="plan_schedule")
@@ -150,7 +150,7 @@ class PlanSchedule(AbstractEntity):
 
 class WorkSchedulePlan(AbstractEntity):
     """排班详情"""
-    # work_schedule_plan_no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
+    work_schedule_plan_no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
     classes = models.ForeignKey(GlobalCode, models.DO_NOTHING,
                                 help_text='班次', verbose_name='班次', related_name="class_work_plans")
     rest_flag = models.BooleanField(help_text='是否休息', verbose_name='是否休息')
