@@ -207,6 +207,7 @@
                         v-model="rubberMaterialForm.rubber_no"
                         :fetch-suggestions="rubber_no_querySearchAsync"
                         placeholder="请输入内容"
+                        @select="RecipehandleSelect"
                 ></el-autocomplete>
             </el-form-item>
 
@@ -293,8 +294,8 @@
                     <td style="text-align: center">{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
                         <template>
-                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="true">自动</el-radio>
-                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="false">手动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="1">自动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="2">手动</el-radio>
                         </template>
                     </td>
                     <td style="text-align: center">
@@ -385,8 +386,8 @@
                     <td style="text-align: center">{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
                         <template>
-                          <el-radio v-model="new_material_ele.auto_flag" :label="true">自动</el-radio>
-                          <el-radio v-model="new_material_ele.auto_flag" :label="false">手动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag" :label="1">自动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag" :label="2">手动</el-radio>
                         </template>
                     </td>
                     <td style="text-align: center">
