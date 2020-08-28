@@ -92,7 +92,7 @@ def add_product():
                                                begin_time=datetime.datetime.now(),
                                                end_time=datetime.datetime.now(),
                                                operation_user=user_name,
-                                               begin_trains=i, end_trains=1,
+                                               begin_trains=i-1, end_trains=i,
                                                pallet_no='托盘（虽然我也不知道是啥意思）',
                                                barcode=i * 100,
                                                classes=pcp_obj.work_schedule_plan.classes.global_name,
