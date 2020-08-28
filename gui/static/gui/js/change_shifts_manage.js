@@ -19,8 +19,8 @@
                     description: "",
                     period: 0,
                     classesdetail_set: [{
-                        times: [dayjs().format("HH:mm:ss"),
-                            dayjs().format("HH:mm:ss")],
+                        start_time: null,
+                        end_time: null,
                         description: "",
                         classes_name: "",
                         classes: null
@@ -75,17 +75,13 @@
 
                     this.changeShiftsManageForm.classesdetail_set.push({
 
-                        times: [dayjs().format("HH:mm:ss"),
-                           dayjs().format("HH:mm:ss")],
+                        start_time: null,
+                        end_time: null,
                         description: "",
                         classes_name: this.classes[i].global_name,
                         classes: this.classes[i].id
                     })
                 }
-                // this.changeShiftsManageForm.classesdetail_set[0].times = [
-                //     new Date(),
-                //     new Date()
-                // ]
             },
             clearChangeShiftsManageFormError() {
 
@@ -98,53 +94,58 @@
             },
             afterGetData: function () {
                 this.workSchedules = this.tableData;
-                // console.log(this.workSchedules)
             },
             showDialogCreateChangeShiftsManage() {
 
                 this.initChangeShiftsManageForm();
                 this.dialogCreateChangeShiftsManageVisible = true;
             },
-            format(date) {
-                if (!date) {
-                    return ''
-                }
-                return dayjs(date).format("HH:mm:ss")
-            },
-            adjustTimes() {
-                var _this = this;
-                this.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
-                    data.start_time = data.times && data.times.length > 0 ? _this.format(data.times[0]) : ''
-                    data.end_time = data.times && data.times.length > 0 ? _this.format(data.times[1]) : ''
-                })
-                // for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
-                //     this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[0]);
-                //     this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[1]);
-                // }
-            },
+            // format(date) {
+            //     if (!date) {
+            //         return ''
+            //     }
+            //     return dayjs(date).format("HH:mm:ss")
+            // },
+            // adjustTimes() {
+            //     var _this = this;
+            //     this.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
+            //         data.start_time = data.times && data.times.length > 0 ? _this.format(data.times[0]) : ''
+            //         data.end_time = data.times && data.times.length > 0 ? _this.format(data.times[1]) : ''
+            //     })
+            //     // for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
+            //     //     this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[0]);
+            //     //     this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.format(this.changeShiftsManageForm.classesdetail_set[i].times[1]);
+            //     // }
+            // },
             handleCreateChangeShifts() {
                 var app = this;
                 this.$refs['shiftsManageForm'].validate(function (valid) {
                     if (valid) {
                         app.clearChangeShiftsManageFormError();
-                        // app.adjustTimes();
-                        app.changeShiftsManageForm.classesdetail_set.forEach(function (data, index) {
-                            data.start_time = data.times && data.times.length > 0 ? data.times[0] : ''
-                            data.end_time = data.times && data.times.length > 0 ? data.times[1] : ''
-                        })
-                        var obj = {}
-                        obj = JSON.parse(JSON.stringify(app.changeShiftsManageForm))
-                        let newarr = obj.classesdetail_set.filter(function (data, index) {
-                            return data.times && data.times.length > 1
-                        })
-                        if (newarr.length === 0 || !newarr) {
-                            app.$message.info('请填写一个班次')
-                            return
-                        }
-                        obj.classesdetail_set = newarr
+                        console.log(app.changeShiftsManageForm, "app.changeShiftsManageForm");
+                        for (var i = 0; i < app.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
-                        console.log(obj);
-                        axios.post(WorkSchedulesUrl, obj)
+                            if (app.changeShiftsManageForm.classesdetail_set[i].start_time
+                                && app.changeShiftsManageForm.classesdetail_set[i].end_time
+                            ) {
+                            } else {
+                                app.changeShiftsManageForm.classesdetail_set.splice(i, 1)
+                                --i;
+                            }
+                        }
+
+                        // var obj = {}
+                        // obj = JSON.parse(JSON.stringify(app.changeShiftsManageForm))
+                        // let newarr = obj.classesdetail_set.filter(function (data, index) {
+                        //     return data.times && data.times.length > 1
+                        // })
+                        // if (newarr.length === 0 || !newarr) {
+                        //     app.$message.info('请填写一个班次')
+                        //     return
+                        // }
+                        // obj.classesdetail_set = newarr
+
+                        axios.post(WorkSchedulesUrl, app.changeShiftsManageForm)
                             .then(function (response) {
 
                                 app.dialogCreateChangeShiftsManageVisible = false;
@@ -168,29 +169,40 @@
                 this.clearChangeShiftsManageFormError();
                 // this.changeShiftsManageForm = Object.assign({}, workSchedule);
                 this.changeShiftsManageForm = JSON.parse(JSON.stringify(workSchedule));
-                for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
-
-                    Vue.set(this.changeShiftsManageForm.classesdetail_set[i], "times", [
-
-                        this.changeShiftsManageForm.classesdetail_set[i].start_time,
-                        this.changeShiftsManageForm.classesdetail_set[i].end_time]);
-                }
+                // for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
+                //
+                //     Vue.set(this.changeShiftsManageForm.classesdetail_set[i], "times", [
+                //
+                //         this.changeShiftsManageForm.classesdetail_set[i].start_time,
+                //         this.changeShiftsManageForm.classesdetail_set[i].end_time]);
+                // }
                 this.dialogEditChangeShiftsManageVisible = true;
             },
             handleEditChangeShifts() {
 
                 this.clearChangeShiftsManageFormError();
                 var app = this;
-                console.log(this.changeShiftsManageForm.classesdetail_set)
-                for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
+                for (var i = 0; i < app.changeShiftsManageForm.classesdetail_set.length; ++i) {
 
-                    if (this.changeShiftsManageForm.classesdetail_set[i].times) {
-                        this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
-                        this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
+                    if (app.changeShiftsManageForm.classesdetail_set[i].start_time
+                        && app.changeShiftsManageForm.classesdetail_set[i].end_time
+                    ) {
+                        // app.changeShiftsManageForm.classesdetail_set[i]['start_time'] = app.changeShiftsManageForm.classesdetail_set[i].times[0];
+                        // app.changeShiftsManageForm.classesdetail_set[i]['end_time'] = app.changeShiftsManageForm.classesdetail_set[i].times[1];
                     } else {
-                        this.changeShiftsManageForm.classesdetail_set.splice(i, 1)
+                        app.changeShiftsManageForm.classesdetail_set.splice(i, 1);
+                        --i;
                     }
                 }
+                // for (var i = 0; i < this.changeShiftsManageForm.classesdetail_set.length; ++i) {
+                //
+                //     if (this.changeShiftsManageForm.classesdetail_set[i].times) {
+                //         this.changeShiftsManageForm.classesdetail_set[i]['start_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[0];
+                //         this.changeShiftsManageForm.classesdetail_set[i]['end_time'] = this.changeShiftsManageForm.classesdetail_set[i].times[1];
+                //     } else {
+                //         this.changeShiftsManageForm.classesdetail_set.splice(i, 1)
+                //     }
+                // }
                 axios.put(WorkSchedulesUrl + this.changeShiftsManageForm.id + "/", this.changeShiftsManageForm)
                     .then(function (response) {
 
