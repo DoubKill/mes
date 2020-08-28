@@ -283,7 +283,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'work_schedule__schedule_name')
+            data = queryset.values('id', 'work_schedule__schedule_name', 'day_time')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
