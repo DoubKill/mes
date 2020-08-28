@@ -12,12 +12,12 @@ import django
 
 from add_test_data import random_str
 from basics.models import Equip, PlanSchedule, WorkSchedulePlan
-from recipe.models import ProductBatching
+from recipe.models import ProductBatching, ProductBatchingDetail, Material
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from plan.models import ProductClassesPlan, ProductDayPlan
+from plan.models import ProductClassesPlan, ProductDayPlan, MaterialDemanded
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus
 from system.models import User
 from django.db.transaction import atomic
@@ -45,6 +45,15 @@ def random_status():
     return random.choice(status_list)
 
 
+def add_batching_detail():
+    pb_set = ProductBatching.objects.all()[:30]
+    m_set = Material.objects.all()[:3]
+    for pb_obj in pb_set:
+        for m_obj in m_set:
+            ProductBatchingDetail.objects.create(product_batching=pb_obj, sn=1, material=m_obj,actual_weight=100,
+                                                 standard_error=12.12,auto_flag=1)
+
+
 def add_product_plan():
     e_set = Equip.objects.all()[:3]
     p_set = ProductBatching.objects.all()[:3]
@@ -57,9 +66,15 @@ def add_product_plan():
             for ps_obj in ps_set:
                 pdp_obj = ProductDayPlan.objects.create(equip=e_obj, product_batching=p_obj, plan_schedule=ps_obj)
                 for ws_obj in ws_set:
-                    ProductClassesPlan.objects.create(product_day_plan=pdp_obj, sn=i, plan_trains=i, time=i,
-                                                      weight=i, unit='包', work_schedule_plan=ws_obj,
-                                                      plan_classes_uid=UUidTools.uuid1_hex(),note='备注')
+                    pcp_obj = ProductClassesPlan.objects.create(product_day_plan=pdp_obj, sn=i, plan_trains=i, time=i,
+                                                                weight=i, unit='包', work_schedule_plan=ws_obj,
+                                                                plan_classes_uid=UUidTools.uuid1_hex(), note='备注')
+                    details = pcp_obj.product_day_plan.product_batching.batching_details.all()
+                    for detail in details:
+                        MaterialDemanded.objects.create(product_classes_plan=pcp_obj,
+                                                        work_schedule_plan=pcp_obj.work_schedule_plan,
+                                                        material=detail.material, material_demanded=i,
+                                                        plan_classes_uid=pcp_obj.plan_classes_uid)
                     i += 1
 
 
@@ -92,7 +107,7 @@ def add_product():
                                                begin_time=datetime.datetime.now(),
                                                end_time=datetime.datetime.now(),
                                                operation_user=user_name,
-                                               begin_trains=i-1, end_trains=i,
+                                               begin_trains=i - 1, end_trains=i,
                                                pallet_no='托盘（虽然我也不知道是啥意思）',
                                                barcode=i * 100,
                                                classes=pcp_obj.work_schedule_plan.classes.global_name,
@@ -113,6 +128,7 @@ def add_product():
 
 
 if __name__ == '__main__':
+    add_batching_detail()
     add_product_plan()
     add_product()
     # add_work()

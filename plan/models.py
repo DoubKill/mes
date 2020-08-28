@@ -94,6 +94,8 @@ class ProductBatchingClassesPlan(AbstractEntity):
 
 class MaterialDemanded(AbstractEntity):
     """原材料需求量表"""
+    product_classes_plan = models.ForeignKey(ProductClassesPlan, on_delete=models.DO_NOTHING, help_text='胶料日班次计划表id',
+                                             verbose_name='胶料日班次计划表id')
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.DO_NOTHING, help_text='班次id',
                                            verbose_name='排班详情id')
     material = models.ForeignKey(Material, on_delete=models.DO_NOTHING, help_text='原材料id',
@@ -101,6 +103,7 @@ class MaterialDemanded(AbstractEntity):
                                  related_name='m_material_demanded')
     material_demanded = models.PositiveIntegerField(verbose_name='原材料需求重量', help_text='原材料需求重量')
     plan_classes_uid = models.CharField(max_length=128, verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
+
     # plan_schedule = models.ForeignKey(PlanSchedule, on_delete=models.DO_NOTHING, help_text='排班计划id',
     #                                   verbose_name='排班计划id',
     #                                   related_name='ps_material_demanded')
