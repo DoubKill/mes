@@ -209,8 +209,8 @@ class ProductDayPlanAPiView(APIView):
         except Exception:
             raise ValidationError('该计划不存在')
         interface = ProductDayPlanSyncInterface(instance=product_day)
-        # try:
-        interface.request()
-        # except Exception as e:
-            # raise ValidationError(e)
+        try:
+            interface.request()
+        except Exception as e:
+            raise ValidationError(e)
         return Response('发送成功', status=status.HTTP_200_OK)
