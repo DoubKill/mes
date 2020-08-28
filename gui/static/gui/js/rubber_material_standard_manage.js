@@ -689,6 +689,19 @@
                 }else {
                 }
             },
+            del_mod_raw_material_row: function(new_material_ele, index){
+                var app = this;
+                if(new_material_ele.hasOwnProperty("actual_weight")){
+                    app.PutProductRecipe.splice(index,1);
+                    var material_weight = 0;
+                    for(var i=0; i<app.PutProductRecipe.length; ++i){
+                        material_weight += app.PutProductRecipe[i]['actual_weight']
+                    }
+                    app.put_select_material_weight = material_weight;
+                    app.put_practicalWeightSum = material_weight;
+                }else {
+                }
+            },
 
             afterGetData: function () {
 
