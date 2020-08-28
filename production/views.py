@@ -486,7 +486,7 @@ class ProductInventory(GenericViewSet,
         return
 
     def list(self, request, *args, **kwargs):
-        ret = request.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
+        ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
         ret_json = json.loads(ret.text)
         for i in ret_json.get("datas"):
                 results = [{
