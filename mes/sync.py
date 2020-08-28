@@ -35,9 +35,9 @@ class BaseInterface(object):
         logger.info(kwargs)
         try:
             headers = {
-                       "Content-Type": "application/json; charset=UTF-8",
-                       }
-            res = requests.post(self.endpoint+self.Backend.path, headers=headers, json=kwargs)
+                "Content-Type": "application/json; charset=UTF-8",
+            }
+            res = requests.post(self.endpoint + self.Backend.path, headers=headers, json=kwargs)
         except Exception as err:
             logger.error(err)
             raise Exception('上辅机服务错误')
@@ -72,7 +72,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
 
     @staticmethod
     def get_used_time(obj):
-        return datetime.strftime(obj.used_time, '%Y-%m-%d %H:%M:%S')
+        return datetime.strftime(obj.used_time, '%Y-%m-%d %H:%M:%S') if obj.used_time else None
 
     class Backend:
         path = 'api/v1/recipe/recipe-receive/'
@@ -95,7 +95,7 @@ class ProductObsoleteInterface(serializers.ModelSerializer, BaseInterface):
 
     class Meta:
         model = ProductBatching
-        fields = ('stage_product_batch_no', )
+        fields = ('stage_product_batch_no',)
 
 
 class ProductClassesPlanSync(serializers.ModelSerializer):
@@ -107,7 +107,7 @@ class ProductClassesPlanSync(serializers.ModelSerializer):
         return datetime.strftime(obj.created_date, '%Y-%m-%d %H:%M:%S')
 
     class Meta:
-        model = ProductClassesPlan,
+        model = ProductClassesPlan
         fields = (
             'created_date', 'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan', 'plan_classes_uid',
             'note')
@@ -132,4 +132,3 @@ class ProductDayPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
     class Meta:
         model = ProductDayPlan
         fields = ('created_date', 'equip', 'product_batching', 'plan_schedule', 'pdp_product_classes_plan')
-
