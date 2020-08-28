@@ -303,9 +303,11 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
     """胶料日计划的复制序列化"""
     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
+    # is_delete = serializers.BooleanField(help_text='是否覆盖', write_only=True)
 
     class Meta:
         model = ProductDayPlan
+        # fields = ('src_date', 'dst_date', 'is_delete')
         fields = ('src_date', 'dst_date')
 
     def validate_src_date(self, value):
@@ -331,6 +333,10 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
         dst_date = attrs['dst_date']
         if dst_date < src_date:
             raise serializers.ValidationError('新建日期不能小于被复制日期')
+
+        instance = PlanSchedule.objects.filter(day_time=dst_date)
+        if not instance:
+            raise serializers.ValidationError('新建的日期没有计划时间')
         return attrs
 
     @atomic()
@@ -373,7 +379,7 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
                                                             plan_trains=pc_obj.plan_trains,
                                                             time=pc_obj.time,
                                                             weight=pc_obj.weight, unit=pc_obj.unit,
-                                                            classes_detail=pc_obj.classes_detail,
+                                                            work_schedule_plan=pc_obj.work_schedule_plan,
                                                             plan_classes_uid=UUidTools.uuid1_hex(),
                                                             created_user=self.context['request'].user)
                 for pbd_obj in instance.product_batching.batching_details.all():
@@ -478,28 +484,6 @@ class ProductBatchingDayPlanCopySerializer(BaseModelSerializer):
         return instance
 
 
-'''
-{
-    'created_date': '',
-    'equip': '',
-    'product_batching': '',
-    'plan_schedule': '',
-    'pdp_product_classes_plan': [
-        {
-            'created_date': '',
-            'sn': '',
-            'plan_trains': '',
-            'time': '',
-            'weight': '',
-            'unit': '',
-            'work_schedule_plan': '',
-            'plan_classes_uid': '',
-            'note': '',
-        }
-        ......
-    ],
-}
-'''
 # class MaterialRequisitionCopySerializer(BaseModelSerializer):
 #     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
 #     dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
