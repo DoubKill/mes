@@ -128,3 +128,8 @@ class MaterialRpertoryManageView(TitleMixin, LoginRequiredMixin, TemplateView):
 class RubberRepertoryManageView(TitleMixin, LoginRequiredMixin, TemplateView):
     template_name = 'gui/rubber_repertory_manage.html'
     name_path = ['库存管理', '胶料库存']
+
+# 原材料需求量
+class MaterialQuantityDemandedView(TitleMixin, LoginRequiredMixin, TemplateView):
+    template_name = 'gui/material_quantity_demanded.html'
+    name_path = ['库存管理', '原材料需求量']
