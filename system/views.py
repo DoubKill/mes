@@ -227,7 +227,6 @@ class ImportExcel(APIView):
                     cell_value = sheet.cell_value(rlow, clow)
                     # print('该单元格[%d,%d]属于合并单元格，值为[%s]' % (row_index, col_index, cell_value))
                     return cell_value
-                    break
         return None
 
     def get_merged_cells(self, sheet):
@@ -280,3 +279,9 @@ class LoginView(ObtainJSONWebToken):
                              "token": token})
         # 返回异常信息
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SyncDataPrepare(APIView):
+
+    def get(self, request, *args, **kwargs):
+        pass

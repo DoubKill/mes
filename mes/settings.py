@@ -61,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mes.middlewares.SyncMiddleware',
+    'mes.middlewares.JwtTokenUserMiddleware',
 ]
 
 ROOT_URLCONF = 'mes.urls'
