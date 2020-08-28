@@ -21,11 +21,33 @@
                 scheduleData: [],
                 classes: [],
                 fullscreenLoading: false,
-                classesByIndex: {}
+                classesByIndex: {},
+                selectDateArr: [],
+                calendarValue: '',
+                trueCalendar: false
             }
         },
         methods: {
-
+            setTimeStamp() {
+                var arr = []
+                arr = JSON.parse(JSON.stringify(this.selectDateArr))
+                this.selectDateArr.forEach((D, index) => {
+                    // const startD = D.split(' ')[0]
+                    if (D.hasOwnProperty('day_time') && D.day_time) {
+                        var startD = D.hasOwnProperty('day_time') ? D.day_time : ''
+                        arr[index].day_time = (new Date(startD.replace(/-/g, '/'))).getTime()
+                    } else {
+                        arr[index].day_time = ''
+                    }
+                })
+                return arr
+            },
+            _setDateModel(date, bool) {
+                const currentDate = setDate(date, bool)
+                const currentStamp = (new Date(currentDate.replace(/-/g, '/'))).getTime()
+                const boolVal = this.selectDateArr.findIndex(D => D.day_time === currentStamp)
+                return boolVal > -1
+            },
             dayOfWeek(day) {
 
                 switch (day) {
@@ -141,10 +163,31 @@
                     });
 
                 });
+            },
+            getFactoryScheduling() {
+                this.trueCalendar = true
+                var app = this
+                var obj = {}
+                Object.assign(obj, this.planSchedule)
+
+                axios.get(PlanScheduleUrl, {
+                    params: obj
+                }).then(function (response) {
+                    app.selectDateArr = response.data.results;
+                    app.selectDateArr = app.setTimeStamp(app.selectDateArr)
+                    this.trueCalendar = false
+                }).catch(function (error) {
+                    this.trueCalendar = false
+                });
             }
         },
         created: function () {
-
+            this.planSchedule = {
+                all: 1,
+                month: new Date().getMonth() + 1,
+                year: new Date().getFullYear()
+            }
+            this.getFactoryScheduling()
             var app = this;
             axios.get(GlobalCodesUrl, {
 
@@ -206,14 +249,50 @@
 
                             value: i,
                             label,
-                            schedule_name:  app.workSchedules[i].schedule_name
+                            schedule_name: app.workSchedules[i].schedule_name
                         });
                     }
                 }).catch(function (error) {
 
             })
+        },
+        watch: {
+            calendarValue(value) {
+                let dateValue = new Date(value)
+                let Year = dateValue.getFullYear()
+                let Month = dateValue.getMonth() + 1
+                if (this.planSchedule.month && this.planSchedule.month !== Month) {
+                    // 切换月份时
+                    this.planSchedule = {
+                        all: 1,
+                        month: Month,
+                        year: Year
+                    }
+                    this.getFactoryScheduling()
+                    return
+                }
+            }
         }
     };
     var Ctor = Vue.extend(Main);
     new Ctor().$mount("#app")
+
+    function setDate(_data, bool) {
+        const date = _data ? new Date(_data) : new Date()
+        const formatObj = {
+            y: date.getFullYear(),
+            m: date.getMonth() + 1,
+            d: date.getDate(),
+            h: date.getHours(),
+            i: date.getMinutes(),
+            s: date.getSeconds(),
+            a: date.getDay()
+        }
+        if (bool) {
+            return formatObj.y + '-' + formatObj.m + '-' + formatObj.d + ' ' +
+                formatObj.h + ':' + formatObj.i + ':' + formatObj.s
+        } else {
+            return formatObj.y + '-' + formatObj.m + '-' + formatObj.d
+        }
+    }
 })();
