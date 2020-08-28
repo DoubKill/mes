@@ -1,3 +1,4 @@
+import json
 import datetime
 import re
 
@@ -420,3 +421,85 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = PalletFeedbacksFilter
+
+
+class PlanRelease(APIView):
+    """计划下达"""
+
+    def _validate(self, data):
+        """校验请求体"""
+        return data
+
+    def post(self, request):
+        plan_data = request.data
+        plan_data = self._validate(plan_data)
+        token = request.get("Auth")
+        url = "http://xxxxx"
+        ret = requests.post(url, data=plan_data)
+        # TODO
+
+
+class MaterialInventory(GenericViewSet,
+                        mixins.ListModelMixin, ):
+
+    def get_queryset(self):
+        return
+
+    def list(self, request, *args, **kwargs):
+
+        results = [{"sn": 1,
+                    "id": 1,
+                    "material_id": 1,
+                    "material_no": "C9001",
+                    "material_name": "C9001",
+                    "material_type_id": 1,
+                    "material_type": "天然胶",
+                    "qty": 11,
+                    "unit": "吨",
+                    "unit_weight": 1,
+                    "total_weight": 1,
+                    "need_weight": 1,
+                    "site": "安吉仓库",
+                    "standard_flag": True,
+                    }, {"sn": 2,
+                        "id": 2,
+                        "material_id": 2,
+                        "material_no": "C9002",
+                        "material_name": "C9002",
+                        "material_type_id": 1,
+                        "material_type": "天然胶",
+                        "qty": 11,
+                        "unit": "吨",
+                        "unit_weight": 1,
+                        "total_weight": 1,
+                        "need_weight": 1,
+                        "site": "安吉仓库",
+                        "standard_flag": False,
+                        }]
+        return Response({'results': results})
+
+
+class ProductInventory(GenericViewSet,
+                       mixins.ListModelMixin, ):
+
+    def get_queryset(self):
+        return
+
+    def list(self, request, *args, **kwargs):
+        ret = request.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
+        ret_json = json.loads(ret.text)
+        for i in ret_json.get("datas"):
+                results = [{
+                    "sn": 1,
+                    "material_no": i.get('material_no'),
+                    "material_name": i.get('materialName'),
+                    "material_type": "1MB",
+                    "qty": 11,
+                    "unit": "吨",
+                    "unit_weight": 1,
+                    "total_weight": 1,
+                    "need_weight": 1,
+                    "standard_flag": True,
+                    "site": "立库",
+                }]
+        return Response({'results': results})
