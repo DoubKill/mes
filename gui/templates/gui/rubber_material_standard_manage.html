@@ -296,6 +296,7 @@
                         <template>
                           <el-radio v-model="new_material_ele.auto_flag_radio" :label="1">自动</el-radio>
                           <el-radio v-model="new_material_ele.auto_flag_radio" :label="2">手动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="0">其他</el-radio>
                         </template>
                     </td>
                     <td style="text-align: center">
@@ -370,6 +371,7 @@
                 <th style="text-align: center">自动与否</th>
                 <th style="text-align: center">原材料</th>
                 <td style="text-align: center">实际重量</td>
+                <td style="text-align: center">操作</td>
             </tr>
             </thead>
             {% verbatim vue %}
@@ -378,6 +380,7 @@
                 <tr style="background: rgba(189,198,210,0.73)">
                     <td colspan="4" style="text-align: center">配方结果</td>
                     <td style="text-align: center">{{ put_practicalWeightSum }}</td>
+                    <td></td>
                 </tr>
                 <tr v-for="(new_material_ele, index) in PutProductRecipe" :key="index">
                     <!--<td>{{ new_material_ele.sn }}</td>-->
@@ -388,6 +391,7 @@
                         <template>
                           <el-radio v-model="new_material_ele.auto_flag" :label="1">自动</el-radio>
                           <el-radio v-model="new_material_ele.auto_flag" :label="2">手动</el-radio>
+                          <el-radio v-model="new_material_ele.auto_flag" :label="0">其他</el-radio>
                         </template>
                     </td>
                     <td style="text-align: center">
@@ -399,6 +403,9 @@
                     </td>
                     <td style="text-align: center">
                         <el-input-number size="mini" controls-position="right" @change="PutNewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.actual_weight"></el-input-number>
+                    </td>
+                    <td style="text-align: center">
+                        <el-button size="mini" v-on:click="del_mod_raw_material_row(new_material_ele, index)">删除</el-button>
                     </td>
                 </tr>
 

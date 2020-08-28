@@ -13,6 +13,7 @@ const SITEGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=SITE";
 const StageGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=胶料段次";
 const DevTypeGlobalUrl = BasicsUrl + "global-codes/?all=1&class_name=炼胶机类型";
 const MaterialTypelUrl = BasicsUrl + "global-codes/?all=1&class_name=原材料类别";
+const ClassArrangelUrl = BasicsUrl + "global-codes/?all=1&class_name=班次";
 
 const EquipUrl = BasicsUrl + "equips/";
 
@@ -70,6 +71,10 @@ const PlanSchedulesUrl = "/api/v1/basics/plan-schedules/";
 const MaterialRepertoryUrl = '/api/v1/inventory/material-inventory/';
 //库存管理---胶料库存
 const RubberRepertoryUrl = '/api/v1/inventory/product-inventory/';
+//生成计划管理---原材料需求量
+const MaterialQuantityDemandedUrl = '/api/v1/plan/materia-quantity-demande/';
+
+const ProductDayPlanNoticeUrl = '/api/v1/plan/product-day-plan-notice/?product_day_id=';
 
 var BaseMixin = {
 

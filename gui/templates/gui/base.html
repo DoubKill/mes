@@ -69,8 +69,11 @@
                         <span slot="title">生产计划管理</span>
                     </template>
                     <el-menu-item index="4-1">排产胶料日计划</el-menu-item>
+                    <!--
                     <el-menu-item index="4-2">排产配料小料日计划</el-menu-item>
+                    -->
                     <el-menu-item index="4-3">排产领料计划</el-menu-item>
+                    <el-menu-item index="4-4">原材料需求量</el-menu-item>
 
                 </el-submenu>
                 <el-submenu index="5">
@@ -150,6 +153,7 @@
         "4-1": "{% url 'gui:rubber-schedule-daily-plan' %}",
         "4-2": "{% url 'gui:rubber-smallStuff-daily-plan' %}",
         "4-3": "{% url 'gui:material-requisitions-plan' %}",
+        "4-4": "{% url 'gui:material-quantity-demanded' %}",
         "5-1": "{% url 'gui:banburying-performance-manage' %}",
         "5-2": "{% url 'gui:banburying-plan-manage' %}",
         "5-3": "{% url 'gui:internal_mixer_production' %}",

@@ -154,6 +154,7 @@
                 materialType:null,
                 search_material_no:null,
                 search_material_name:null,
+                select_product_id:null,
             }
         },
         created: function () {
@@ -411,6 +412,14 @@
                       //       }
                       // }
 
+                      if(this.rubberMaterialForm['select_product_id'] == null){
+                          app.$message({
+                              message: "所选胶料编码不存在",
+                              type: 'error'
+                          });
+                          return
+                      }
+
                       //点击生成之前进行版本验证
                       var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + app.rubberMaterialForm['select_product_id'] + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
                       axios.get(v_validate_version_url, {}
@@ -466,6 +475,13 @@
                       //           break
                       //       }
                       // }
+                      if(this.rubberMaterialForm['select_product_id'] == null){
+                          app.$message({
+                              message: "所选胶料编码不存在",
+                              type: 'error'
+                          });
+                          return
+                      }
                       var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + app.rubberMaterialForm['select_product_id'] + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
                       axios.get(v_validate_version_url, {}
                         ).then(function (response) {
@@ -670,6 +686,19 @@
                     }
                     app.select_material_weight = material_weight;
                     app.practicalWeightSum = material_weight;
+                }else {
+                }
+            },
+            del_mod_raw_material_row: function(new_material_ele, index){
+                var app = this;
+                if(new_material_ele.hasOwnProperty("actual_weight")){
+                    app.PutProductRecipe.splice(index,1);
+                    var material_weight = 0;
+                    for(var i=0; i<app.PutProductRecipe.length; ++i){
+                        material_weight += app.PutProductRecipe[i]['actual_weight']
+                    }
+                    app.put_select_material_weight = material_weight;
+                    app.put_practicalWeightSum = material_weight;
                 }else {
                 }
             },
