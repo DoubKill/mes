@@ -4,6 +4,7 @@
         mixins: [BaseMixin],
         data: function () {
             return {
+                loadingInput: false,
                 tableDataUrl: ProductBatching,
                 machineList: [],
                 glueList: [],
@@ -59,8 +60,6 @@
             }
         },
         created() {
-            this.getMachineList()
-            this.getGlueList()
             this.getList()
 
             var _setDate = setDate()
@@ -113,8 +112,10 @@
                         // page_size: 100000
                     }
                 }).then(function (response) {
+                    _this.loadingInput = false
                     _this.machineList = response.data.results || [];
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             getGlueList(dev_type) {
@@ -137,7 +138,9 @@
                     _this.glueList = newArr
                     //新增里面的配料小料编码数据
                     _this.addGlueList = dev_type ? newArr : []
+                    _this.loadingInput = false
                 }).catch(function (error) {
+                    _this.loadingInput = false
                 });
             },
             getRubberList(bool, tableData) {
@@ -148,7 +151,6 @@
                 var _this = this
                 var params = bool ? {
                         all: 1
-                        // page_size: 100000000
                     } :
                     _this.rubberDialogParams
 
@@ -410,9 +412,7 @@
                 this.formEdit.bags_total_qty = allNumber
             },
             changeWorkRubberType(val) {
-                console.log(val, 'val')
                 this.getGlueList(val)
-                // this.getSmallMaterial(val)
             },
             handleCloseAdd(done) {
                 done()
@@ -434,6 +434,16 @@
                     return D.id === val
                 })
                 this.smallMaterialEdit = obj[0].batching_weight
+            },
+            equipVisibleChange(bool) {
+                if (!bool || this.machineList.length > 0) return
+                this.loadingInput = true
+                this.getMachineList()
+            },
+            glueVisibleChange(bool) {
+                if (!bool || this.glueList.length > 0) return
+                this.loadingInput = true
+                this.getGlueList()
             }
         },
         watch: {}
