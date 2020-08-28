@@ -37,4 +37,6 @@ urlpatterns = [
     path('material/repertory/manage/', views.MaterialRpertoryManageView.as_view(), name='material-repertory-manage'),
     # 胶料库存管理
     path('rubber/repertory/manage/', views.RubberRepertoryManageView.as_view(), name='rubber-repertory-manage'),
+    # 原材料需求量
+    path('material/quantity/demanded/', views.MaterialQuantityDemandedView.as_view(), name='material-quantity-demanded'),
 ]

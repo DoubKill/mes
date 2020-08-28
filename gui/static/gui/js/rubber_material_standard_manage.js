@@ -154,6 +154,7 @@
                 materialType:null,
                 search_material_no:null,
                 search_material_name:null,
+                select_product_id:null,
             }
         },
         created: function () {
@@ -411,6 +412,14 @@
                       //       }
                       // }
 
+                      if(this.rubberMaterialForm['select_product_id'] == null){
+                          app.$message({
+                              message: "所选胶料编码不存在",
+                              type: 'error'
+                          });
+                          return
+                      }
+
                       //点击生成之前进行版本验证
                       var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + app.rubberMaterialForm['select_product_id'] + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
                       axios.get(v_validate_version_url, {}
@@ -466,6 +475,13 @@
                       //           break
                       //       }
                       // }
+                      if(this.rubberMaterialForm['select_product_id'] == null){
+                          app.$message({
+                              message: "所选胶料编码不存在",
+                              type: 'error'
+                          });
+                          return
+                      }
                       var v_validate_version_url = ValidateVersionsUrl +'?factory=' + app.rubberMaterialForm['factory'] + '&site=' + app.rubberMaterialForm['SITE'] + '&product_info=' + app.rubberMaterialForm['select_product_id'] + '&versions=' + app.rubberMaterialForm['version'] + '&stage=' + app.rubberMaterialForm['stage'];
                       axios.get(v_validate_version_url, {}
                         ).then(function (response) {
