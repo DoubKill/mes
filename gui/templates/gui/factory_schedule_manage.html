@@ -6,21 +6,16 @@
         <el-col :span="14">
             <el-card shadow="never">
                 {% verbatim vue %}
-                    <el-calendar>
-                        <!--
+                    <el-calendar v-model="calendarValue" :v-loading="trueCalendar">
                         <template
-                                        slot="dateCell"
-                                        slot-scope="{date, data}"
-                                      >
-                                    <p
-                                          :class="[data.isSelected||_setDateModel(date,false) ? 'is-selected' : '']"
-                                          :style="{color:_setDateModel(date,false)?'#67C23A':data.isSelected?'#409EFF':''}"
-                                        >
-                                      {{data.day.split('-').slice(1).join('-') }} {{ _setDateModel(date,false) ? '✔️' : '' }}
-                                    </p>
-                                  
+                                slot="dateCell"
+                                slot-scope="{date, data}">
+                        <p class="[data.isSelected||_setDateModel(date,false)?'is-selected':'']"
+                            :style="{color:_setDateModel(date,false)?'#67C23A':data.isSelected?'#409EFF':''}"
+                        >
+                            {{ data.day.split('-').slice(1).join('-') }} {{ _setDateModel(date,false) ? '✔️' : ''}}
+                        </p>
                         </template>
-                        -->
                     </el-calendar>
                 {% endverbatim vue %}
             </el-card>
