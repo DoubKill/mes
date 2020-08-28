@@ -241,12 +241,13 @@ class MaterialDemandedSerializer(BaseModelSerializer):
     classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True, help_text='班次')
     material_type = serializers.CharField(source='material.material_type', read_only=True, help_text='原材料类别')
     material_no = serializers.CharField(source='material.material_no', read_only=True, help_text='原材料编码')
-
-
+    product_no = serializers.CharField(
+        source='product_classes_plan.product_day_plan.product_batching.stage_product_batch_no', read_only=True,
+        help_text='胶料编码')
 
     class Meta:
         model = MaterialDemanded
-        fields = ('sn', 'material_name', 'classes', 'material_type', 'material_no', 'material_demanded')
+        fields = ('sn', 'material_name', 'classes', 'material_type', 'material_no', 'material_demanded', 'product_no')
 
 
 class MaterialRequisitionClassesSerializer(BaseModelSerializer):
