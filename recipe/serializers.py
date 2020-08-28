@@ -145,10 +145,11 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         if batching_details:
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
+                auto_flag = detail.get('detail')
                 actual_weight = detail.get('actual_weight', 0)
-                if detail['auto_flag']:
+                if auto_flag == 1:
                     auto_material_weight += actual_weight
-                else:
+                elif auto_flag == 2:
                     manual_material_weight += actual_weight
                 batching_weight += actual_weight
                 detail['product_batching'] = instance
@@ -201,9 +202,10 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
                 actual_weight = detail.get('actual_weight', 0)
-                if detail['auto_flag']:
+                auto_flag = detail.get('detail')
+                if auto_flag == 1:
                     auto_material_weight += actual_weight
-                else:
+                elif auto_flag == 2:
                     manual_material_weight += actual_weight
                 batching_weight += actual_weight
                 detail['product_batching'] = instance

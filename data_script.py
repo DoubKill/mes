@@ -16,10 +16,10 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from basics.models import PlanSchedule
 from plan.models import ProductClassesPlan, ProductDayPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 
+pallet_count = 5
 
 class ProductDataEmulator():
 
@@ -82,10 +82,11 @@ def run():
                     "end_time": end_time,
                     "operation_user": "string-user",
                     "classes": class_name,
+                    "product_time": end_time,
                 }
                 start_time = end_time
                 TrainsFeedbacks.objects.create(**train_data)
-                if m % 5 == 0:
+                if m % pallet_count == 0:
                     end_time = start_time + datetime.timedelta(seconds=150*5)
                     pallet_data = {
                             "plan_classes_uid": class_plan.plan_classes_uid,
@@ -97,11 +98,12 @@ def run():
                             "begin_time": start_time,
                             "end_time": end_time,
                             "operation_user": "string-user",
-                            "begin_trains": 1,
+                            "begin_trains": m - (pallet_count-1),
                             "end_trains": m,
                             "pallet_no": f"{bath_no}|test",
                             "barcode": "KJDL:LKYDFJM<NLIIRD",
-                            "classes": class_name
+                            "classes": class_name,
+                            "product_time": end_time,
                         }
                     start_time = end_time
                     bath_no += 1
@@ -117,6 +119,7 @@ def run():
                         "pressure": random.randint(80,360),
                         "status": "running",
                         "current_trains": m,
+                        "product_time": end_time,
                     }
                     EquipStatus.objects.create(**equip_status_data)
                     t.sleep(1)
