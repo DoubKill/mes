@@ -11,7 +11,7 @@
 
             return {
                 tableDataUrl: ProductActualUrl,
-                performanceDate: dayjs("2020-08-01").format("YYYY-MM-DD"),
+                performanceDate: dayjs().format("YYYY-MM-DD"),
                 projectName: "",
                 equipNo: "",
                 equipNoOptions: [],
@@ -281,7 +281,10 @@
             })
             },
             beforeGetData() {
-                this.getParams["search_time"] = dayjs(this.performanceDate).format("YYYY-MM-DD");
+                this.getParams = {}
+                if(this.performanceDate){
+                    this.getParams["search_time"] = dayjs(this.performanceDate).format("YYYY-MM-DD");
+                }
                 this.getParams["equip_no"] = this.equipNo
             },
             detailsClick(row) {
