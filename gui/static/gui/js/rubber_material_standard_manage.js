@@ -431,13 +431,13 @@
 
                                 }).catch(function (error) {
                                     app.$message({
-                                        message: error.response.data['message'],
+                                        message: error.response.data,
                                         type: 'error'
                                     });
                                 });
                         }).catch(function (error) {
                             app.$message({
-                                message: error.response.data['message'],
+                                message: error.response.data,
                                 type: 'error'
                             });
                         });
@@ -478,7 +478,7 @@
                             app.NewRowMaterial = [];
                         }).catch(function (error) {
                             app.$message({
-                                message: error.response.data['message'],
+                                message: error.response.data,
                                 type: 'error'
                             });
                         });
