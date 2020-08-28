@@ -226,11 +226,11 @@ LOGGING = {
 #     }
 # }
 
-# oracle实例连接
+# oracle使用SID连接
 DATABASES = {
     'default': {
     'ENGINE': 'django.db.backends.oracle',
-    'NAME': 'zcaj1',
+    'NAME': 'zcaj1',  # 数据库SID
     'USER': 'zcajlj',
     'PASSWORD': 'zcajmes2020',
     'HOST':'10.4.10.17',
