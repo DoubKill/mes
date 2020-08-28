@@ -1,3 +1,5 @@
+import json
+
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
@@ -10,6 +12,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
 from datetime import datetime
+import requests
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -225,26 +228,25 @@ class ProductBatchingDayPlanSerializer(BaseModelSerializer):
         return pdp_obj
 
 
-class MaterialRequisitionSerializer(BaseModelSerializer):
-    class Meta:
-        model = MaterialRequisitionClasses
-        fields = '__all__'
+# class MaterialRequisitionSerializer(BaseModelSerializer):
+#     class Meta:
+#         model = MaterialRequisitionClasses
+#         fields = '__all__'
 
 
 class MaterialDemandedSerializer(BaseModelSerializer):
-    """原材料需求量序列化 暂时没用到"""
-    md_material_requisition_classes = MaterialRequisitionSerializer(read_only=True, many=True)
+    """原材料需求量序列化 暂时没用到，用到了"""
+    sn = serializers.IntegerField(source='product_classes_plan.sn', read_only=True, help_text='顺序')
     material_name = serializers.CharField(source='material.material_name', read_only=True, help_text='原材料名称')
-    classes_name = serializers.CharField(source='classes.classes_name', read_only=True)
-    material_type = serializers.CharField(source='material.material_type', read_only=True)
-    material_no = serializers.CharField(source='material.material_no', read_only=True)
+    classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True, help_text='班次')
+    material_type = serializers.CharField(source='material.material_type', read_only=True, help_text='原材料类别')
+    material_no = serializers.CharField(source='material.material_no', read_only=True, help_text='原材料编码')
 
-    # material_name = serializers.CharField(source='material.material_name', read_only=True)
+
 
     class Meta:
         model = MaterialDemanded
-        fields = ('id', 'material_name', 'classes_name', 'material_type', 'material_no',
-                  'classes', 'material', 'plan_schedule', 'material_demanded', 'md_material_requisition_classes')
+        fields = ('sn', 'material_name', 'classes', 'material_type', 'material_no', 'material_demanded')
 
 
 class MaterialRequisitionClassesSerializer(BaseModelSerializer):
@@ -303,6 +305,7 @@ class ProductDayPlanCopySerializer(BaseModelSerializer):
     """胶料日计划的复制序列化"""
     src_date = serializers.DateField(help_text="2020-07-31", write_only=True)
     dst_date = serializers.DateField(help_text="2020-08-01", write_only=True)
+
     # is_delete = serializers.BooleanField(help_text='是否覆盖', write_only=True)
 
     class Meta:

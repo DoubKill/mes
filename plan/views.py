@@ -1,10 +1,14 @@
+import json
+from collections import OrderedDict
+
+import requests
 from django.db.models import Sum
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
-from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView, GenericAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -13,7 +17,8 @@ from mes.derorators import api_recorder
 from mes.sync import ProductDayPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, ProductBatchingDayPlanFilter, MaterialDemandedFilter
 from plan.serializers import ProductDayPlanSerializer, ProductBatchingDayPlanSerializer, \
-    ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer, MaterialRequisitionClassesSerializer
+    ProductDayPlanCopySerializer, ProductBatchingDayPlanCopySerializer, MaterialRequisitionClassesSerializer, \
+    MaterialDemandedSerializer
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingDayPlan, \
     ProductBatchingClassesPlan, MaterialRequisitionClasses
 from rest_framework.views import APIView
@@ -214,3 +219,51 @@ class ProductDayPlanAPiView(APIView):
         except Exception as e:
             raise ValidationError(e)
         return Response('发送成功', status=status.HTTP_200_OK)
+
+
+class MaterialDemandedlist(GenericAPIView):
+    """计划原材料需求列表"""
+    queryset = MaterialDemanded.objects.filter(delete_flag=False)
+    serializer_class = MaterialDemandedSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filter_class = MaterialDemandedFilter
+
+    def add_inventory(self, serializer, material_inventory_dict):
+        own_data = serializer.data
+        for instance in own_data:
+            inventory_detail = material_inventory_dict.get(instance.get('material_no'))
+            if inventory_detail:
+                quantity = inventory_detail.get('quantity')
+                weightOfActual = inventory_detail.get('weightOfActual')
+                unit_weight = weightOfActual / quantity  # TODO 单位重量到底是总重量除以总数量还是计件数量 这个计件数量掉地是什么意思
+                instance['qty'] = quantity
+                instance['total_weight'] = weightOfActual
+                instance['unit_weight'] = unit_weight
+                instance['need_unit_weight'] = unit_weight
+                instance['need_qty'] = instance['material_demanded'] / unit_weight
+            else:
+                instance['qty'] = None
+                instance['total_weight'] = None
+                instance['unit_weight'] = None
+                instance['need_unit_weight'] = None
+                instance['need_qty'] = None
+        return own_data
+
+    def get(self, request, *args, **kwargs):
+        ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
+        ret_json = json.loads(ret.text)
+        material_inventory_dict = {}
+        for i in ret_json.get("datas"):
+            material_inventory_dict[i['materialCode']] = i
+
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            own_data = self.add_inventory(serializer, material_inventory_dict)
+            return self.get_paginated_response(own_data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        own_data = self.add_inventory(serializer, material_inventory_dict)
+        return Response(own_data)
