@@ -71,6 +71,8 @@ const MaterialRepertoryUrl = '/api/v1/inventory/material-inventory/';
 //库存管理---胶料库存
 const RubberRepertoryUrl = '/api/v1/inventory/product-inventory/';
 
+const ProductDayPlanNoticeUrl = '/api/v1/plan/product-day-plan-notice/?product_day_id=';
+
 var BaseMixin = {
 
     data: function () {

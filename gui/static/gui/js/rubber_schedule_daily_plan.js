@@ -80,10 +80,14 @@
                 planSchedules: [],
                 plan_date_for_create: dayjs().format("YYYY-MM-DD"),
                 workSchedules: [],
-                day_time: ""
+                day_time: "",
+                selectDateArr: []
             }
         },
         created: function () {
+
+            this.selectDateArr = ['2020-8-5 11:20:00', '2020-8-7 11:20:00', '2020-8-15  11:20:00']
+            this.selectDateArr = this.setTimeStamp(this.selectDateArr)
 
             var app = this;
             axios.get(EquipUrl, {
@@ -546,6 +550,15 @@
             },
             sendToAu(plan) {
 
+                var app = this;
+                axios.post(ProductDayPlanNoticeUrl + plan.id).then(function (response) {
+
+                    app.$message("发送成功");
+                }).catch(function (error) {
+
+                    app.$message("发送失败");
+                });
+
                 console.log(plan)
             },
             showAddPlansDialog() {
@@ -553,8 +566,41 @@
                 this.plansForAdd = []
                 this.addPlanVisible = true;
             },
+            setTimeStamp() {
+                const arr = []
+                this.selectDateArr.forEach((D, index) => {
+                    const startD = D.split(' ')[0]
+                    arr[index] = (new Date(startD.replace(/-/g, '/'))).getTime()
+                })
+                return arr
+            },
+            _setDateModel(date, bool) {
+                const currentDate = this.setDate(date, bool)
+                const currentStamp = (new Date(currentDate.replace(/-/g, '/'))).getTime()
+                const boolVal = this.selectDateArr.findIndex(D => D === currentStamp)
+                return boolVal > -1
+            },
+            setDate(_data, bool) {
+            const date = _data ? new Date(_data) : new Date()
+            const formatObj = {
+            y: date.getFullYear(),
+            m: date.getMonth() + 1,
+            d: date.getDate(),
+            h: date.getHours(),
+            i: date.getMinutes(),
+            s: date.getSeconds(),
+            a: date.getDay()
         }
-    };
+        if (bool) {
+            return formatObj.y + '-' + formatObj.m + '-' + formatObj.d + ' ' +
+                formatObj.h + ':' + formatObj.i + ':' + formatObj.s
+        } else {
+            return formatObj.y + '-' + formatObj.m + '-' + formatObj.d
+        }
+    }
+}
+}
+    ;
     var Ctor = Vue.extend(Main);
     new Ctor().$mount("#app")
 })();
