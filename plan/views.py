@@ -199,6 +199,7 @@ class ProductBatchingDayPlanCopyView(CreateAPIView):
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductDayPlanAPiView(APIView):
     """计划数据下发至上辅机"""
     permission_classes = ()
@@ -221,58 +222,62 @@ class ProductDayPlanAPiView(APIView):
         return Response('发送成功', status=status.HTTP_200_OK)
 
 
-# class MaterialDemandedlist(GenericAPIView):
-#     """计划原材料需求列表"""
-#     queryset = MaterialDemanded.objects.filter(delete_flag=False)
-#     serializer_class = MaterialDemandedSerializer
-#     permission_classes = (IsAuthenticatedOrReadOnly,)
-#     filter_backends = (DjangoFilterBackend, OrderingFilter)
-#     filter_class = MaterialDemandedFilter
-#
-#     def add_inventory(self, serializer, material_inventory_dict):
-#         own_data = serializer.data
-#         for instance in own_data:
-#             inventory_detail = material_inventory_dict.get(instance.get('material_no'))
-#             if inventory_detail:
-#                 quantity = inventory_detail.get('quantity')
-#                 weightOfActual = inventory_detail.get('weightOfActual')
-#                 unit_weight = weightOfActual / quantity  # TODO 单位重量到底是总重量除以总数量还是计件数量 这个计件数量掉地是什么意思
-#                 instance['qty'] = quantity
-#                 instance['total_weight'] = weightOfActual
-#                 instance['unit_weight'] = unit_weight
-#                 instance['need_unit_weight'] = unit_weight
-#                 instance['need_qty'] = instance['material_demanded'] / unit_weight
-#             else:
-#                 instance['qty'] = None
-#                 instance['total_weight'] = None
-#                 instance['unit_weight'] = None
-#                 instance['need_unit_weight'] = None
-#                 instance['need_qty'] = None
-#         return own_data
-#
-#     def get(self, request, *args, **kwargs):
-#         ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
-#         ret_json = json.loads(ret.text)
-#         material_inventory_dict = {}
-#         for i in ret_json.get("datas"):
-#             material_inventory_dict[i['materialCode']] = i
-#
-#         queryset = self.filter_queryset(self.get_queryset())
-#         page = self.paginate_queryset(queryset)
-#         if page is not None:
-#             serializer = self.get_serializer(page, many=True)
-#             own_data = self.add_inventory(serializer, material_inventory_dict)
-#             return self.get_paginated_response(own_data)
-#
-#         serializer = self.get_serializer(queryset, many=True)
-#         own_data = self.add_inventory(serializer, material_inventory_dict)
-#         return Response(own_data)
+'''
+class MaterialDemandedlist(GenericAPIView):
+    """计划原材料需求列表（已经用APIview重写该接口，这个没用了，先放着，之后再删）"""
+    queryset = MaterialDemanded.objects.filter(delete_flag=False)
+    serializer_class = MaterialDemandedSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = (DjangoFilterBackend, OrderingFilter)
+    filter_class = MaterialDemandedFilter
+
+    def add_inventory(self, serializer, material_inventory_dict):
+        own_data = serializer.data
+        for instance in own_data:
+            inventory_detail = material_inventory_dict.get(instance.get('material_no'))
+            if inventory_detail:
+                quantity = inventory_detail.get('quantity')
+                weightOfActual = inventory_detail.get('weightOfActual')
+                unit_weight = weightOfActual / quantity  # TODO 单位重量到底是总重量除以总数量还是计件数量 这个计件数量掉地是什么意思
+                instance['qty'] = quantity
+                instance['total_weight'] = weightOfActual
+                instance['unit_weight'] = unit_weight
+                instance['need_unit_weight'] = unit_weight
+                instance['need_qty'] = instance['material_demanded'] / unit_weight
+            else:
+                instance['qty'] = None
+                instance['total_weight'] = None
+                instance['unit_weight'] = None
+                instance['need_unit_weight'] = None
+                instance['need_qty'] = None
+        return own_data
+
+    def get(self, request, *args, **kwargs):
+        ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
+        ret_json = json.loads(ret.text)
+        material_inventory_dict = {}
+        for i in ret_json.get("datas"):
+            material_inventory_dict[i['materialCode']] = i
+
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            own_data = self.add_inventory(serializer, material_inventory_dict)
+            return self.get_paginated_response(own_data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        own_data = self.add_inventory(serializer, material_inventory_dict)
+        return Response(own_data)
+'''
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedlist(APIView):
+    """计划原材料需求列表"""
 
     def get(self, request):
-        # 条件
+        # 条件筛选
         params = request.query_params
         filter_dict = {}
         plan_date = params.get('plan_date')
@@ -285,6 +290,7 @@ class MaterialDemandedlist(APIView):
         if product_no:
             filter_dict[
                 'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no__icontains'] = product_no
+
         # 分页
         try:
             page = int(params.get("page", 1))
@@ -293,11 +299,14 @@ class MaterialDemandedlist(APIView):
             return Response("page和page_size必须是int", status=400)
 
         # 库存请求
-        ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
-        ret_json = json.loads(ret.text)
         material_inventory_dict = {}
-        for i in ret_json.get("datas"):
-            material_inventory_dict[i['materialCode']] = i
+        try:
+            ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
+            ret_json = json.loads(ret.text)
+            for i in ret_json.get("datas"):
+                material_inventory_dict[i['materialCode']] = i
+        except Exception as e:
+            return Response("请求库存失败", status=400)
 
         md_list = MaterialDemanded.objects.filter(**filter_dict).values_list(
             'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no',
@@ -306,14 +315,12 @@ class MaterialDemandedlist(APIView):
             'material__material_name',
             'material__material_type__global_name',
             'product_classes_plan__sn'
-        ).annotate(demanded=Sum('material_demanded'))
+            # 'id'
+        ).annotate(demanded=Sum('material_demanded')).order_by('product_classes_plan__sn')
+        print(md_list, md_list.count())
         # 分页和总计
-        count = md_list.count()
+        counts = md_list.count()
         md_list = md_list[(page - 1) * page_size:page_size * page]
-        if count % page_size:
-            counts = count // page_size + 1
-        else:
-            counts = count // page_size
         res = []
         for md_detail_list in md_list:
             md = {}
