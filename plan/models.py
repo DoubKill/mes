@@ -104,10 +104,6 @@ class MaterialDemanded(AbstractEntity):
     material_demanded = models.PositiveIntegerField(verbose_name='原材料需求重量', help_text='原材料需求重量')
     plan_classes_uid = models.CharField(max_length=128, verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
-    # plan_schedule = models.ForeignKey(PlanSchedule, on_delete=models.DO_NOTHING, help_text='排班计划id',
-    #                                   verbose_name='排班计划id',
-    #                                   related_name='ps_material_demanded')
-
     class Meta:
         db_table = 'material_demanded'
         verbose_name_plural = verbose_name = '原材料需求量'
