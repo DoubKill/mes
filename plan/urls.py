@@ -25,4 +25,5 @@ urlpatterns = [
     path('product-day-plan-manycreate/', ProductDayPlanManyCreate.as_view()),  # 群增胶料日计划
     path('product-day-plan-notice/', ProductDayPlanAPiView.as_view()),  # 计划下发至上辅机
     path('materia-quantity-demande/', MaterialDemandedlist.as_view()),  # 计划原材料需求列表
+    # path('xxxxx/', nix.as_view()),  # 计划原材料需求列表
 ]

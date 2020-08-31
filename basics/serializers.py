@@ -9,6 +9,7 @@ from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedul
     WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
+from plan.uuidfield import UUidTools
 
 
 class GlobalCodeTypeSerializer(BaseModelSerializer):
@@ -129,7 +130,7 @@ class WorkScheduleSerializer(BaseModelSerializer):
 class WorkScheduleUpdateSerializer(BaseModelSerializer):
     """日程修改序列化器"""
     classesdetail_set = ClassesDetailSerializer(many=True,
-                                                      help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,
+                                                help_text="""[{"id":1, "classes":班次id,"classes_name":班次名称,
                                                       "start_time":"12:12:12", "end_time":"12:12:12",
                                                       "classes_type_name":"正常"}]""")
 
@@ -160,7 +161,7 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
     equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
     category_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
-                                         queryset=EquipCategoryAttribute.objects.all(), message='该设备属性编号已存在')])
+        queryset=EquipCategoryAttribute.objects.all(), message='该设备属性编号已存在')])
 
     class Meta:
         model = EquipCategoryAttribute
@@ -211,7 +212,7 @@ class WorkSchedulePlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = WorkSchedulePlan
-        exclude = ('plan_schedule',)
+        exclude = ('plan_schedule','work_schedule_plan_no')
         read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
                             'delete_flag', 'created_user', 'last_updated_user',
                             'delete_user', 'start_time', 'end_time')
@@ -225,7 +226,8 @@ class PlanScheduleSerializer(BaseModelSerializer):
 
     class Meta:
         model = PlanSchedule
-        fields = '__all__'
+        # fields = '__all__'
+        exclude = ('plan_schedule_no',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def validate(self, attrs):
@@ -239,6 +241,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     def create(self, validated_data):
         day_time = validated_data['day_time']
         work_schedule_plan = validated_data.pop('work_schedule_plan', None)
+        validated_data['plan_schedule_no'] = UUidTools.uuid1_hex()
         instance = super().create(validated_data)
         work_schedule_plan_list = []
         morning_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
@@ -258,6 +261,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
             plan['start_time'] = str(day_time) + ' ' + str(class_detail.start_time)
             plan['end_time'] = str(day_time) + ' ' + str(class_detail.end_time)
             plan['plan_schedule'] = instance
+            plan['work_schedule_plan_no'] = UUidTools.uuid1_hex()
             work_schedule_plan_list.append(WorkSchedulePlan(**plan))
         WorkSchedulePlan.objects.bulk_create(work_schedule_plan_list)
         return instance
