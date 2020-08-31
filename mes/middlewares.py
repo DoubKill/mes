@@ -1,7 +1,11 @@
 import json
 
+from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
 from django.utils.deprecation import MiddlewareMixin
+from jwt import DecodeError
+from rest_framework_jwt.serializers import VerifyJSONWebTokenSerializer
+from rest_framework_jwt.utils import jwt_decode_handler
 
 from mes.conf import PROJECT_API_TREE, SYNC_SYSTEM_NAME
 from production.utils import OpreationLogRecorder
@@ -77,3 +81,28 @@ class SyncMiddleware(MiddlewareMixin):
                                                   dst_address=dst_address)
 
         return response
+
+
+class JwtTokenUserMiddleware(MiddlewareMixin):
+    # 根据jwt-token获取user并放入request中
+
+
+    def process_request(self, request):
+        jwt_token = request.META.get("HTTP_AUTHENTICATION", " ")
+        token = jwt_token.split(" ")[1]
+        token_dict = {"token": token}
+        try:
+            toke_user = jwt_decode_handler(token) # 获取用户基本数据
+        except DecodeError:
+            user = AnonymousUser() # token为空或者存在编码为空则为异常访问，默认成匿名用户
+        else:
+            token_dict.update(username=toke_user.get("username")) # 拼接下方序列化器所需入参
+            # 校验token并获取用户对象塞入request中
+            jwt_serializer = VerifyJSONWebTokenSerializer(token)
+            # 获得user_id
+            data = jwt_serializer.validate(token_dict)
+            user = data.get("user")
+            setattr(request, "user", user)
+
+
+

@@ -1,3 +1,4 @@
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -71,3 +72,4 @@ def menu(request, menu, temp, format):
 
     temp.data.update({"menu": data})
     return temp
+
