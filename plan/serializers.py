@@ -61,6 +61,8 @@ class ProductDayPlanSerializer(BaseModelSerializer):
         instance = super().create(validated_data)
         # 创建胶料日班次班次计划和原材料需求量
         for detail in details:
+            if not detail['plan_trains']:
+                continue
             classes = detail.pop('classes')
             work_schedule_plan = WorkSchedulePlan.objects.filter(classes=classes,
                                                                  plan_schedule=instance.plan_schedule).first()
@@ -77,10 +79,6 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                 material_demanded=pbd_obj.actual_weight * pcp_obj.plan_trains,
                                                 plan_classes_uid=pcp_obj.plan_classes_uid)
         return instance
-
-    @atomic()
-    def update(self, instance, validated_data):
-        pass
 
 
 class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
