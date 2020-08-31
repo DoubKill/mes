@@ -567,6 +567,13 @@
             NewsaveMaterialClicked: function () {
                 var app = this;
                 var batching_details_list = [];
+                if(app.select_dev_type == null){
+                    app.$message({
+                        message: "炼胶机类型不能为空",
+                        type: 'error'
+                    });
+                    return
+                }
 
                 for (var i = 0; i < this.NewRowMaterial.length; ++i) {
                     if(app.NewRowMaterial[i].material_name && app.NewRowMaterial[i].practical_weight){
@@ -582,7 +589,7 @@
                     }
                     else {
                         app.$message({
-                            message: "必填数据不能为空",
+                            message: "原材料与实际重量不能为空",
                             type: 'error'
                         });
                         return
@@ -597,6 +604,7 @@
                     stage_product_batch_no: app.rubberMaterialForm['generate_material_no'],
                     stage: app.rubberMaterialForm['stage'],
                     versions: app.rubberMaterialForm['version'],
+                    dev_type: app.select_dev_type,
                     batching_details: batching_details_list,
                 }).then(function (response) {
 
@@ -616,6 +624,13 @@
             PutNewsaveMaterialClicked: function () {
                 var app = this;
                 var batching_details_list = [];
+                if(app.put_select_dev_type == null){
+                    app.$message({
+                        message: "炼胶机类型不能为空",
+                        type: 'error'
+                    });
+                    return
+                }
                 //循环整个表格
                 for (var i = 0; i < this.PutProductRecipe.length; ++i) {
                     //只有原材料和实际重量两个必选项都填写时，才能往batching_details_list中push
@@ -634,7 +649,7 @@
                     }
                     else {
                         app.$message({
-                            message: "必填数据不能为空",
+                            message: "原材料与实际重量不能为空",
                             type: 'error'
                         });
                         return
