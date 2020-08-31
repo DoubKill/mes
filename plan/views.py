@@ -44,12 +44,9 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """"胶料计划删除 先删除胶料计划，随后删除胶料计划对应的班次日计划和原材料需求量表"""
         instance = self.get_object()
-        for pcp_obj in instance.pdp_product_classes_plan.all():
-            MaterialDemanded.objects.filter(
-                plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True,
-                                                                  delete_user=request.user)
+        MaterialDemanded.objects.filter(
+            product_classes_plan__product_day_plan=instance).delete()
         ProductClassesPlan.objects.filter(product_day_plan=instance).update(delete_flag=True, delete_user=request.user)
-
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
