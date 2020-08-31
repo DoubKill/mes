@@ -1,6 +1,5 @@
 migrations
 *venv*
-*ven*
 db.sqlite3
 logs
 .idea
