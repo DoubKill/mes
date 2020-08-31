@@ -99,7 +99,7 @@ class MaterialDemandedAPIView(ListAPIView):
                 materials.append(item['material__material_name'])
             else:
                 ret[item['material__material_name']
-                    ]['class_details'][item['work_schedule_plan__classes__global_name']] = item['num']
+                ]['class_details'][item['work_schedule_plan__classes__global_name']] = item['num']
         page = self.paginate_queryset(list(ret.values()))
         return self.get_paginated_response(page)
 
@@ -139,19 +139,12 @@ class MaterialDemandedView(APIView):
         classes = params.get('classes')
         product_no = params.get('product_no')
         if plan_date:
-            filter_dict['work_schedule_plan__plan_schedule__day_time'] = plan_date
+            filter_dict['work_schedule_plan__plan_schedule__day_time'] = plan_date  # TODO 前端必须一开始就穿一个日期
         if classes:
             filter_dict['work_schedule_plan__classes__global_name'] = classes
         if product_no:
             filter_dict[
                 'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no__icontains'] = product_no
-
-        # 分页
-        try:
-            page = int(params.get("page", 1))
-            page_size = int(params.get("page_size", 10))
-        except Exception as e:
-            return Response("page和page_size必须是int", status=400)
 
         # 库存请求
         material_inventory_dict = {}
@@ -163,29 +156,23 @@ class MaterialDemandedView(APIView):
         except Exception as e:
             return Response("请求库存失败", status=400)
 
-        md_list = MaterialDemanded.objects.filter(**filter_dict).values_list(
+        md_list = MaterialDemanded.objects.filter(**filter_dict).values(
             'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no',
             'work_schedule_plan__classes__global_name',
             'material__material_no',
             'material__material_name',
             'material__material_type__global_name',
-            'product_classes_plan__sn'
-            # 'id'
-        ).annotate(demanded=Sum('material_demanded')).order_by('product_classes_plan__sn')
-        # print(md_list, md_list.count())
-        # 分页和总计
-        counts = md_list.count()
-        md_list = md_list[(page - 1) * page_size:page_size * page]
+        ).annotate(demanded=Sum('material_demanded'))
         res = []
         for md_detail_list in md_list:
             md = {}
-            md['product_no'] = md_detail_list[0]
-            md['classes'] = md_detail_list[1]
-            md['material_no'] = md_detail_list[2]
-            md['material_name'] = md_detail_list[3]
-            md['material_type'] = md_detail_list[4]
-            md['sn'] = md_detail_list[5]
-            md['material_demanded'] = md_detail_list[6]
+            md['product_no'] = md_detail_list[
+                'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no']
+            md['classes'] = md_detail_list['work_schedule_plan__classes__global_name']
+            md['material_no'] = md_detail_list['material__material_no']
+            md['material_name'] = md_detail_list['material__material_name']
+            md['material_type'] = md_detail_list['material__material_type__global_name']
+            md['material_demanded'] = md_detail_list['demanded']
             # 库存
             inventory_detail = material_inventory_dict.get(md.get('material_no'))
             if inventory_detail:
@@ -204,4 +191,4 @@ class MaterialDemandedView(APIView):
                 md['need_unit_weight'] = None
                 md['need_qty'] = None
             res.append(md)
-        return Response({'count': counts, 'results': res})
+        return Response({'results': res})
