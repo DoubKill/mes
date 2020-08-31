@@ -61,7 +61,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mes.middlewares.SyncMiddleware',
-    'mes.middlewares.JwtTokenUserMiddleware',
+    'mes.middlewares.JwtTokenUserMiddleware', # jwt-token嵌套django权限组件
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -91,7 +91,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASS': ('rest_framework.permissions.IsAuthenticated',),  # 权限
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication', 功能被自定义中间件覆盖所以注去
     ),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
@@ -258,24 +258,13 @@ DATABASES = {
 #         }
 
 
-if DEBUG:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        }
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-            'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
-            'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mes@2020'),  # 密码
-            'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
-            'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
-        }
-    }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#     }
+# }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators

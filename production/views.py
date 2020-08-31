@@ -14,7 +14,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from basics.models import PlanSchedule
 from mes.paginations import SinglePageNumberPagination
-from plan.models import ProductClassesPlan
+from plan.models import ProductClassesPlan, ProductDayPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
@@ -290,7 +290,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                            GenericViewSet):
     """密炼实绩"""
 
-    def list(self, request, *args, **kwargs):
+    def list_bak(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
         return_data = {
             "data": []
@@ -372,7 +372,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             return_data["data"].append(instance)
         return Response(return_data)
 
-    def list_bak(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         params = request.query_params
         day_time = params.get("search_time", str(datetime.date.today() - datetime.timedelta(days=1)))
         if day_time:
@@ -380,37 +380,56 @@ class ProductActualViewSet(mixins.ListModelMixin,
                 return Response("bad search_time", status=400)
         equip_no = params.get('equip_no')
         if equip_no:
-            equip_no_str = f" and e.equip_no={equip_no}"
+            equip_no_str = f" and e.equip_no='{equip_no}'"
         else:
-            equip_no_str = ""
-        sql_str = f"""
-            select pdp.id,
-            pb.stage_product_batch_no as product_no,
-            tf.plan_trains,
-            tf.actual_trains,
-            e.equip_no,
-            gc.global_name,
-            SUM(pcp.plan_trains) as plan_trains_all,
-            sum(tf.actual_trains) as actual_trains_all,
-            sum(pcp.time) as plan_time_all,
-            sum(pcp.weight) as plan_weight_all,
-            SUM(tf.actual_trains) as actual_weight_all,
-            (sum(julianday(tf.end_time)- julianday(tf.begin_time)))*86400 as actual_time_all
-            --        timediff(tf.end_time, tf.begin_time) as ac_time
-            
-            from product_day_plan as pdp
-            left join plan_schedule ps on pdp.plan_schedule_id = ps.id
-            left join equip e on pdp.equip_id = e.id
-            left join product_classes_plan pcp on pdp.id = pcp.product_day_plan_id
-            left join trains_feedbacks tf on pcp.plan_classes_uid = tf.plan_classes_uid
-            left join product_batching pb on pb.id = pdp.product_batching_id
-            left join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
-            left join global_code gc on wsp.classes_id = gc.id
-            where ps.day_time = '{day_time}'{equip_no_str} 
-            group by e.equip_no, gc.global_name order by e.equip_no, tf.pro;
-        """
-        query_set = TrainsFeedbacks.objects.raw(sql_str)
-        return
+            equip_no_str = ''
+        sql_str = f"""select pdp.id,
+pb.stage_product_batch_no as product_no,
+tf.plan_trains as plan_trains,
+tf.actual_trains as actual_trains,
+tf.plan_weight as plan_weight,
+e.equip_no,
+gc.global_name as classes
+from product_day_plan as pdp
+left join plan_schedule ps on pdp.plan_schedule_id = ps.id
+left join equip e on pdp.equip_id = e.id
+left join product_classes_plan pcp on pdp.id = pcp.product_day_plan_id
+left join trains_feedbacks tf on pcp.plan_classes_uid = tf.plan_classes_uid
+            and tf.actual_trains=(select max(actual_trains)
+            from trains_feedbacks where trains_feedbacks.plan_classes_uid=plan_classes_uid)
+left join product_batching pb on pb.id = pdp.product_batching_id
+left join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
+left join global_code gc on wsp.classes_id = gc.id
+where ps.day_time='{day_time}'
+group by e.equip_no, gc.global_name order by e.equip_no"""
+        query_set = ProductDayPlan.objects.raw(sql_str)
+        # instance.update(classes_data=day_plan_actual, plan_weight=plan_weight_all,
+        #                 product_no=product_no, equip_no=equip_no,
+        #                 plan_trains=plan_trains_all, actual_trains=actual_trains)
+        data = {_.id: {"classes_data": []} for _ in query_set}
+        for x in query_set:
+            data[x.id]["classes_data"].append({
+                    "plan_trains": x.plan_trains if x.plan_trains else 0,
+                    "actual_trains": x.actual_trains if x.actual_trains else 0,
+                    "plan_weight": x.plan_weight if x.plan_weight else 0,
+                    "classes": x.classes
+                })
+            data[x.id].update(product_no=x.product_no, equip_no=x.equip_no)
+        rep = []
+        for k,v in data.items():
+            plan_trains_list = [t.get("plan_trains") for t in v.get("classes_data",[])]
+            actual_trains_list = [t.get("actual_trains") for t in v.get("classes_data",[])]
+            plan_weight_list = [t.get("plan_weight") for t in v.get("classes_data", [])]
+            plan_trains = sum(plan_trains_list)
+            actual_trains = sum(actual_trains_list)
+            plan_weight = sum(plan_weight_list)
+            v.update(plan_trains=plan_trains,
+                     actual_trains=actual_trains,
+                     plan_weight=plan_weight
+                     )
+            rep.append(v)
+
+        return Response({"data": rep})
 
 
 class ProductionRecordViewSet(mixins.ListModelMixin,
@@ -421,8 +440,6 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = PalletFeedbacksFilter
-
-
 
 
 class MaterialInventory(GenericViewSet,

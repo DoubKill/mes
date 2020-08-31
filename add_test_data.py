@@ -1371,28 +1371,27 @@ def add_material_day_classes_plan():
     # sn的规则?
     sn = 1
     init_ps_id = None
-    for day_plan in day_plan_set:
-        if init_ps_id == day_plan.plan_schedule:
+    for wsp in wsp_set:
+        if init_ps_id == wsp.plan_schedule:
             sn += 1
         else:
-            init_ps_id = day_plan.plan_schedule
-        for wsp in wsp_set:
-            mn_uid = None
-            an_uid = None
-            nt_uid = None
-            cs_name = wsp.classes.global_name
-            if cs_name == "早班":
-                uid = mn_uid if mn_uid else uuid.uuid1()
-            elif cs_name == "中班":
-                uid = an_uid if an_uid else uuid.uuid1()
-            elif cs_name == "晚班":
-                uid = nt_uid if nt_uid else uuid.uuid1()
-            else:
-                # 暂不做其他班次的处理
-                continue
-            ProductClassesPlan.objects.create(sn=sn, product_day_plan=day_plan, plan_classes_uid=uid,
-                                              work_schedule_plan=wsp, unit="kg", plan_trains=50, weight=250,
-                                              time=45)
+            init_ps_id = wsp.plan_schedule
+        mn_uid = None
+        an_uid = None
+        nt_uid = None
+        cs_name = wsp.classes.global_name
+        if cs_name == "早班":
+            uid = mn_uid if mn_uid else uuid.uuid1()
+        elif cs_name == "中班":
+            uid = an_uid if an_uid else uuid.uuid1()
+        elif cs_name == "晚班":
+            uid = nt_uid if nt_uid else uuid.uuid1()
+        else:
+            # 暂不做其他班次的处理
+            continue
+        ProductClassesPlan.objects.create(sn=sn, product_day_plan=day_plan, plan_classes_uid=uid,
+                                          work_schedule_plan=wsp, unit="kg", plan_trains=50, weight=250,
+                                          time=45)
 
 
 def add_product_demo_data():

@@ -37,9 +37,6 @@ router.register(r'plan-reality', PlanRealityViewSet, basename="plan-reality")
 # 密炼实绩
 router.register(r'product-actual', ProductActualViewSet, basename="product-actual")
 
-router.register(r'material-inventory', MaterialInventory, basename="material-inventory")
-router.register(r'product-inventory', ProductInventory, basename="product-inventory")
-
 urlpatterns = [
     path('', include(router.urls)),
 ]
