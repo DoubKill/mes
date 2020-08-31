@@ -6,7 +6,7 @@
 
             return {
                 tableDataUrl: MaterialQuantityDemandedUrl,
-                search_time:null,
+                search_time: new Date(),
                 classes_arrangeOptions:[],
                 rubber_recipe_no:null,
                 classes_arrange:null,
