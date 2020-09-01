@@ -91,7 +91,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASS': ('rest_framework.permissions.IsAuthenticated',),  # 权限
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        # 'rest_framework_jwt.authentication.JSONWebTokenAuthentication', 功能被自定义中间件覆盖所以注去
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
     ),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
@@ -256,14 +256,6 @@ DATABASES = {
 #             'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
 #             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
 #         }
-
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-#     }
-# }
 
 
 # Password validation
