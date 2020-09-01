@@ -13,7 +13,7 @@ class Material(AbstractEntity):
                                       on_delete=models.DO_NOTHING, related_name='mt_materials')
     package_unit = models.ForeignKey(GlobalCode, help_text='包装单位', verbose_name='包装单位',
                                      on_delete=models.DO_NOTHING, related_name='pu_materials', blank=True, null=True)
-    used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     def __str__(self):
         return self.material_name

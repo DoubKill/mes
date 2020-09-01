@@ -12,16 +12,16 @@ from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
-    EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer,\
+    EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer, \
     PlanScheduleSerializer, EquipCategoryAttributeSerializer, ClassesSimpleSerializer
-from mes.common_code import return_permission_params, CommonDeleteMixin
+from mes.common_code import return_permission_params, CommonDeleteMixin, CommonUsedFlagMixin
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
 from mes.paginations import SinglePageNumberPagination
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
+class GlobalCodeTypeViewSet(CommonUsedFlagMixin, ModelViewSet):
     """
     list:
         公共代码类型列表
@@ -39,15 +39,15 @@ class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
                           PermissionClass(return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     filter_class = GlobalCodeTypeFilter
+    # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+    # def destroy(self, request, *args, **kwargs):
+    #     instance = self.get_object()
+    #     instance.global_codes.filter().update(delete_flag=True, delete_user=request.user)
+    #     return super().destroy(request, *args, **kwargs)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.global_codes.filter().update(delete_flag=True, delete_user=request.user)
-        return super().destroy(request, *args, **kwargs)
 
-
-@method_decorator([api_recorder], name="dispatch")
-class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
+@method_decorator([api_recorder], name="dispatch")  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+class GlobalCodeViewSet(CommonUsedFlagMixin, ModelViewSet):
     """
     list:
         公共代码列表
@@ -76,7 +76,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.filter(used_flag=0).values('id', 'global_no', 'global_name', 'global_type__type_name')
+            data = queryset.filter(use_flag=0).values('id', 'global_no', 'global_name', 'global_type__type_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -193,7 +193,7 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.filter(used_flag=1).values('id', 'equip_no', 'equip_name', 'category')
+            data = queryset.filter(use_flag=1).values('id', 'equip_no', 'equip_name', 'category')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -270,7 +270,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
                                                                             'work_schedule_plan__group')
     serializer_class = PlanScheduleSerializer
     model_name = queryset.model.__name__.lower()
-    filter_fields = ('day_time', )
+    filter_fields = ('day_time',)
     filter_backends = (DjangoFilterBackend,)
     filter_class = PlanScheduleFilter
 

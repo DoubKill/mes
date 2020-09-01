@@ -90,7 +90,7 @@ def add_global_codes():
              'SITE']
     j = 1
     for i, name in enumerate(names):
-        instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, used_flag=1)
+        instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, use_flag=1)
         items = []
         if i == 1:
             items = ['安吉', '下沙', '杭州', '泰国']
@@ -967,7 +967,7 @@ def add_materials():
         data['material_no'] = x[2]
         data['material_name'] = x[4]
         data['material_type'] = GlobalCode.objects.filter(global_name=x[3]).first()
-        data['used_flag'] = 1
+        data['use_flag'] = 1
         try:
             Material.objects.create(**data)
         except Exception:
@@ -1223,7 +1223,7 @@ def add_equips():
                 category_id=random.choice(attr_ids),
                 equip_no=item[0],
                 equip_name=item[1],
-                used_flag=True,
+                use_flag=True,
                 count_flag=True,
                 equip_level_id=random.choice(equip_level_ids)
             )

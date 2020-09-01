@@ -8,7 +8,7 @@ class GlobalCodeType(AbstractEntity):
     type_no = models.CharField(max_length=64, help_text=_('类型编号'), verbose_name=_('类型编号'), unique=True)
     type_name = models.CharField(max_length=64, help_text='类型名称', verbose_name='类型名称')
     description = models.CharField(max_length=256, blank=True, null=True, help_text='说明', verbose_name='说明')
-    used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
 
     def __str__(self):
         return self.type_name
@@ -26,7 +26,7 @@ class GlobalCode(AbstractEntity):
     global_name = models.CharField(max_length=64, help_text='公用代码名称', verbose_name='公用代码名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
-    used_flag = models.IntegerField(help_text='是否启用', verbose_name='是否删除', default=0)
+    use_flag = models.IntegerField(help_text='是否启用', verbose_name='是否删除', default=0)
 
     def __str__(self):
         return self.global_name
@@ -104,7 +104,7 @@ class Equip(AbstractEntity):
                                related_name="equip_p")
     equip_no = models.CharField(max_length=64, help_text='设备编号', verbose_name='设备编号', unique=True)
     equip_name = models.CharField(max_length=64, help_text='设备名称', verbose_name='设备名称')
-    used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='设备说明', verbose_name='设备说明')
     count_flag = models.BooleanField(help_text='是否产量计数', verbose_name='是否产量计数')
