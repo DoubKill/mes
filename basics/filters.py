@@ -11,7 +11,6 @@ class EquipFilter(django_filters.rest_framework.FilterSet):
     equip_process = django_filters.CharFilter(field_name="category__process__global_name", lookup_expr='icontains',
                                               help_text='工序')
 
-
     class Meta:
         model = Equip
         fields = ('equip_level', 'equip_name', 'equip_process')
