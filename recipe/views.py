@@ -48,7 +48,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.filter(used_flag=1).values('id', 'material_no',
+            data = queryset.filter(use_flag=1).values('id', 'material_no',
                                                        'material_name', 'material_type__global_name')
             return Response({'results': data})
         else:
@@ -59,6 +59,15 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
         if ProductBatchingDetail.objects.filter(material=instance).exists():
             raise ValidationError('该原材料已关联配方，无法删除')
         else:
+            # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+            # instance = self.get_object()
+            # if instance.use_flag:
+            #     instance.use_flag = False
+            # else:
+            #     instance.use_flag = True
+            # instance.last_updated_user = request.user
+            # instance.save()
+            # return Response(status=status.HTTP_204_NO_CONTENT)
             return super().destroy(request, *args, **kwargs)
 
 
@@ -85,7 +94,7 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
 class ValidateProductVersionsView(APIView):
     """验证版本号，创建胶料工艺信息前调用，
     参数：xxx/?factory=产地id&site=SITEid&product_info=胶料代码id&versions=版本号&stage=段次id"""
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         factory = self.request.query_params.get('factory')

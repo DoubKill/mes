@@ -155,7 +155,7 @@ class MaterialTankStatus(AbstractEntity):
     masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
     masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
     masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
-    used_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=0)
+    use_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=0)
     low_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='慢称值', verbose_name='慢称值')
     advance_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='提前量', verbose_name='提前量')
     adjust_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='调整值', verbose_name='调整值')

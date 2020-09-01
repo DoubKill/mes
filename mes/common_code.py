@@ -16,6 +16,19 @@ class CommonDeleteMixin(object):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# 启用-》禁用    禁用-》启用
+class CommonUsedFlagMixin(object):
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.use_flag:
+            instance.use_flag = 0
+        else:
+            instance.use_flag = 1
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class SyncCreateMixin(mixins.CreateModelMixin):
     # 创建时需记录同步数据的接口请继承该创建插件
     def create(self, request, *args, **kwargs):
@@ -30,6 +43,7 @@ class SyncUpdateMixin(mixins.UpdateModelMixin):
         response = super().update(request, *args, **kwargs)
         setattr(response, "model_name", self.queryset.model.__name__)
         return response
+
 
 def return_permission_params(model_name):
     """
@@ -72,4 +86,3 @@ def menu(request, menu, temp, format):
 
     temp.data.update({"menu": data})
     return temp
-

@@ -20,11 +20,11 @@ class MaterialSerializer(BaseModelSerializer):
     material_no = serializers.CharField(max_length=64, help_text='编码',
                                         validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
                                                                     message='该原材料已存在')])
-    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
+    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=0,
                                                                                           delete_flag=False),
                                                        help_text='原材料类型id',
                                                        error_messages={'does_not_exist': 'object does not exist'})
-    package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
+    package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=0,
                                                                                          delete_flag=False),
                                                       help_text='包装单位id', required=False,
                                                       allow_null=True, allow_empty=True,
@@ -64,7 +64,7 @@ class ProductInfoSerializer(BaseModelSerializer):
 
 
 class ProductInfoCopySerializer(BaseModelSerializer):
-    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
+    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=0, delete_flag=False),
                                                  help_text='产地id')
 
     def validate(self, attrs):
@@ -95,7 +95,7 @@ class ProductInfoCopySerializer(BaseModelSerializer):
 
 
 class ProductBatchingDetailSerializer(BaseModelSerializer):
-    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=1))
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, use_flag=1))
     material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True)
 
@@ -119,7 +119,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
 
 
 class ProductBatchingCreateSerializer(BaseModelSerializer):
-    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
+    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=0, delete_flag=False),
                                                help_text='段次id')
     batching_details = ProductBatchingDetailSerializer(many=True, required=False,
                                                        help_text="""

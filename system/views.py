@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_code import menu
+from mes.common_code import menu, CommonUsedFlagMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from system.models import GroupExtension, User, Section
@@ -92,7 +92,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GroupExtensionViewSet(ModelViewSet):
+class GroupExtensionViewSet(CommonUsedFlagMixin,ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
     """
     list:
         角色列表,xxx?all=1查询所有
@@ -113,7 +113,7 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.request.query_params.get('all'):
             return ()
         else:
-            return (IsAuthenticated(), )
+            return (IsAuthenticated(),)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -262,12 +262,12 @@ class LoginView(ObtainJSONWebToken):
                     permission_list.append(p)
             # 生成菜单管理树
             permissions_set = set([_.split(".")[0] for _ in permission_list])
-            permissions_tree = {__:{} for __ in permissions_set}
+            permissions_tree = {__: {} for __ in permissions_set}
             for x in permission_list:
                 first_key = x.split(".")[0]
                 second_key = x.split(".")[-1].split("_")[-1]
                 op_value = x.split(".")[-1].split("_")[0]
-                op_list =  permissions_tree.get(first_key, {}).get(second_key)
+                op_list = permissions_tree.get(first_key, {}).get(second_key)
                 if op_list:
                     permissions_tree[first_key][second_key].append(op_value)
                 else:
