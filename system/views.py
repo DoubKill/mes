@@ -4,6 +4,7 @@ from django.utils.decorators import method_decorator
 from rest_framework import mixins, status
 from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
@@ -12,7 +13,7 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from mes.common_code import menu
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from system.models import GroupExtension, User, Section
+from system.models import GroupExtension, User, Section, ChildSystemInfo, SystemConfig
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -283,9 +284,3 @@ class LoginView(ObtainJSONWebToken):
                              "token": token})
         # 返回异常信息
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class SyncDataPrepare(APIView):
-
-    def get(self, request, *args, **kwargs):
-        pass

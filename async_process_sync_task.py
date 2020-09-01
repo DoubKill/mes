@@ -19,9 +19,7 @@ from django.db.models import Exists
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-
 from system.models import SystemConfig, ChildSystemInfo, AsyncUpdateContent
-
 
 logger = logging.getLogger("async_log")
 
@@ -30,10 +28,11 @@ def one_instance(func):
     '''
     如果已经有实例在跑则退出
     '''
+
     @functools.wraps(func)
-    def f(*args,**kwargs):
+    def f(*args, **kwargs):
         try:
-        # 全局属性，否则变量会在方法退出后被销毁
+            # 全局属性，否则变量会在方法退出后被销毁
             global s
             s = socket.socket()
             host = socket.gethostname()
@@ -41,12 +40,12 @@ def one_instance(func):
         except:
             print('already has an instance, this script will not be excuted')
             return
-        return func(*args,**kwargs)
+        return func(*args, **kwargs)
+
     return f
 
 
 class SystemSync(object):
-
 
     # 设置单例模式
     def __new__(cls, *args, **kwargs):
@@ -72,29 +71,29 @@ class SystemSync(object):
 
     # 进行同步
     def sync(self):
-        if self.if_system_online:
-
-            sync_set = AsyncUpdateContent.objects.filter(Exists(ChildSystemInfo.objects.filter(system_name=)), recv_flag=False)
-            for instance in sync_set:
-                id = instance.id
-                # 若dst_address是存入全量接口url 改参数冗余暂时不处理
-                model_name = instance.src_table_name
-                body_data = instance.content
-                address = instance.dst_address
-                method = instance.method
-                headers = {
-                    "Content-Type": "application/json; charset=UTF-8",
-                    "TAG": True
-                }
-                try:
-                    ret = requests.request(method, address, json=json.loads(body_data), headers=headers)
-                except Exception as e:
-                    logger.error(f"{address}|网络异常，详情：{e}")
-                    break
-                if ret.status_code < 300:
-                    self.sync_feedback(id)
-                else:
-                    logger.error(f"{address}|同步失败，详情：{ret.text}")
+        # if self.if_system_online:
+        sql = "select * from async_update_content where not recv_flag and exists(select id from child_system_info where system_name = 'MES' and status = '联网');"
+        sync_set = AsyncUpdateContent.objects.raw(sql)
+        for instance in sync_set:
+            id = instance.id
+            # 若dst_address是存入全量接口url 改参数冗余暂时不处理
+            model_name = instance.src_table_name
+            body_data = instance.content
+            address = instance.dst_address
+            method = instance.method
+            headers = {
+                "Content-Type": "application/json; charset=UTF-8",
+                "TAG": True
+            }
+            try:
+                ret = requests.request(method, address, json=json.loads(body_data), headers=headers)
+            except Exception as e:
+                logger.error(f"{address}|网络异常，详情：{e}")
+                break
+            if ret.status_code < 300:
+                self.sync_feedback(id)
+            else:
+                logger.error(f"{address}|同步失败，详情：{ret.text}")
         logger.warning("系统未联网，同步未执行")
 
     # 同步成功修改异步更新表状态
@@ -113,6 +112,7 @@ def run():
         runner = SystemSync()
         runner.sync()
         time.sleep(3)
+
 
 if __name__ == '__main__':
     run()
