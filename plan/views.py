@@ -136,7 +136,7 @@ class MaterialDemandedView(APIView):
         classes = params.get('classes')
         product_no = params.get('product_no')
         if plan_date:
-            filter_dict['work_schedule_plan__plan_schedule__day_time'] = plan_date  # TODO 前端必须一开始就穿一个日期
+            filter_dict['work_schedule_plan__plan_schedule__day_time'] = plan_date
         if classes:
             filter_dict['work_schedule_plan__classes__global_name'] = classes
         if product_no:
