@@ -22,7 +22,6 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.documentation import include_docs_urls
 
-
 # 修改后
 # 配置swgger
 schema_view = get_schema_view(
@@ -52,7 +51,7 @@ urlpatterns = [
 
 if settings.DEBUG:
     urlpatterns += [
-            path('docs/', include_docs_urls(title="Mes系统文档", description="Mes系统文档")),
-            path('api-auth/', include('rest_framework.urls')),
-            path('api/v1/docs/', include('docs.urls')),
-        ]
+        path('docs/', include_docs_urls(title="Mes系统文档", description="Mes系统文档")),
+        path('api-auth/', include('rest_framework.urls')),
+        path('api/v1/docs/', include('docs.urls')),
+    ]
