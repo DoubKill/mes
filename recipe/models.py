@@ -101,11 +101,11 @@ class ProductBatching(AbstractEntity):
     versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
     used_type = models.PositiveSmallIntegerField(help_text='使用状态', choices=USE_TYPE_CHOICE, default=1)
     batching_weight = models.DecimalField(verbose_name='配料重量', help_text='配料重量',
-                                          decimal_places=3, max_digits=8, default=0)
+                                          decimal_places=2, max_digits=8, default=0)
     manual_material_weight = models.DecimalField(verbose_name='手动小料重量', help_text='手动小料重量',
-                                                 decimal_places=3, max_digits=8, default=0)
+                                                 decimal_places=2, max_digits=8, default=0)
     auto_material_weight = models.DecimalField(verbose_name='自动小料重量', help_text='自动小料重量',
-                                               decimal_places=3, max_digits=8, default=0)
+                                               decimal_places=2, max_digits=8, default=0)
     volume = models.DecimalField(verbose_name='配料体积', help_text='配料体积', decimal_places=2, max_digits=8,
                                  blank=True, null=True)
     used_user = models.ForeignKey(User, help_text='启用人', blank=True, null=True,
@@ -136,8 +136,8 @@ class ProductBatchingDetail(AbstractEntity):
                                          related_name='batching_details')
     sn = models.PositiveIntegerField(verbose_name='序号', help_text='序号')
     material = models.ForeignKey(Material, verbose_name='原材料', help_text='原材料', on_delete=models.DO_NOTHING)
-    actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=3, max_digits=8)
-    standard_error = models.DecimalField(help_text='误差值范围', decimal_places=3, max_digits=8, default=0)
+    actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=2, max_digits=8)
+    standard_error = models.DecimalField(help_text='误差值范围', decimal_places=2, max_digits=8, default=0)
     auto_flag = models.PositiveSmallIntegerField(help_text='手动/自动', choices=AUTO_FLAG)
 
     class Meta:
