@@ -3,8 +3,7 @@ from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
 from rest_framework import mixins, status
 from rest_framework.generics import UpdateAPIView
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
@@ -13,7 +12,7 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from mes.common_code import menu
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from system.models import GroupExtension, User, Section, ChildSystemInfo, SystemConfig
+from system.models import GroupExtension, User, Section
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -34,7 +33,7 @@ class PermissionViewSet(ReadOnlyModelViewSet):
     """
     queryset = Permission.objects.filter()
     serializer_class = PermissionSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     pagination_class = SinglePageNumberPagination
     # filter_backends = (DjangoFilterBackend,)
 
@@ -53,7 +52,7 @@ class UserViewSet(ModelViewSet):
     """
     queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
     serializer_class = UserSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = UserFilter
 
@@ -80,12 +79,13 @@ class UserViewSet(ModelViewSet):
             return UserUpdateSerializer
 
 
+@method_decorator([api_recorder], name="dispatch")
 class UserGroupsViewSet(mixins.ListModelMixin,
                         GenericViewSet):
     queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
 
     serializer_class = UserSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     pagination_class = SinglePageNumberPagination
     filter_class = UserFilter
@@ -105,7 +105,7 @@ class GroupExtensionViewSet(ModelViewSet):
     """
     queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
     serializer_class = GroupExtensionSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = GroupExtensionFilter
 
@@ -113,7 +113,7 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.request.query_params.get('all'):
             return ()
         else:
-            return (IsAuthenticatedOrReadOnly(), )
+            return (IsAuthenticated(), )
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -155,7 +155,7 @@ class SectionViewSet(ModelViewSet):
     """
     queryset = Section.objects.filter(delete_flag=False)
     serializer_class = SectionSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
 
