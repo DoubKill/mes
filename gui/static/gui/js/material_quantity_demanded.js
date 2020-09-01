@@ -6,7 +6,7 @@
 
             return {
                 tableDataUrl: MaterialQuantityDemandedUrl,
-                search_time: new Date(),
+                search_time: dayjs().format("YYYY-MM-DD"),
                 classes_arrangeOptions:[],
                 rubber_recipe_no:null,
                 classes_arrange:null,
