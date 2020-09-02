@@ -5,7 +5,7 @@ from basics.models import AbstractEntity
 class TrainsFeedbacks(AbstractEntity):
     """车次产出反馈"""
     # id = models.BigIntegerField(primary_key=True, auto_created=True, unique=True)
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64)
     plan_trains = models.IntegerField(help_text='计划车次', verbose_name='计划车次')
     actual_trains = models.IntegerField(help_text='实际车次', verbose_name='实际车次')
     bath_no = models.IntegerField(help_text='批次', verbose_name='批次')
@@ -35,7 +35,7 @@ class TrainsFeedbacks(AbstractEntity):
 class PalletFeedbacks(AbstractEntity):
     """托盘产出反馈"""
     # id = models.BigIntegerField(primary_key=True, auto_created=True, unique=True)
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64)
     bath_no = models.IntegerField(help_text='批次', verbose_name='批次')
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
     product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
@@ -62,7 +62,7 @@ class PalletFeedbacks(AbstractEntity):
 
 class EquipStatus(AbstractEntity):
     """机台状况反馈"""
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64)
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
     temperature = models.DecimalField(decimal_places=2, max_digits=8, help_text='温度', verbose_name='温度')
     rpm = models.DecimalField(decimal_places=2, max_digits=8, help_text='转速', verbose_name='转速')
@@ -83,7 +83,7 @@ class EquipStatus(AbstractEntity):
 
 class PlanStatus(AbstractEntity):
     """计划状态变更"""
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64)
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
     product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
     status = models.CharField(max_length=64, help_text='状态', verbose_name='状态')
@@ -100,7 +100,7 @@ class PlanStatus(AbstractEntity):
 
 class ExpendMaterial(AbstractEntity):
     """原材料消耗表"""
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64)
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
     product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
     trains = models.IntegerField(help_text='车次', verbose_name='车次')

@@ -32,11 +32,12 @@ class BaseInterface(object):
         if not self.Backend.path:
             raise NotImplementedError("未设置path")
         kwargs = getattr(self, 'data')
+        # print(kwargs)
         logger.info(kwargs)
         try:
             headers = {
                 "Content-Type": "application/json; charset=UTF-8",
-                "Authorization": kwargs['context']
+                # "Authorization": kwargs['context']
 
             }
             res = requests.post(self.endpoint + self.Backend.path, headers=headers, json=kwargs)
@@ -123,10 +124,10 @@ class ProductDayPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
     product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
     plan_schedule = serializers.CharField(source='plan_schedule.plan_schedule_no')
     pdp_product_classes_plan = ProductClassesPlanSync(many=True)
-    context = serializers.SerializerMethodField()
+    # context = serializers.SerializerMethodField()
 
-    def get_context(self, object):
-        return self.context['request'].user.username
+    # def get_context(self, object):
+    #     return self.context['request'].user.username
 
     @staticmethod
     def get_created_date(obj):
