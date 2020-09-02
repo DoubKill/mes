@@ -1,4 +1,3 @@
-
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
@@ -68,7 +67,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                                  plan_schedule=instance.plan_schedule).first()
             if not work_schedule_plan:
                 raise serializers.ValidationError('暂无该班次排班数据')
-            detail['plan_classes_uid'] = UUidTools.uuid1_hex()
+            detail['plan_classes_uid'] = UUidTools.uuid1_hex(instance.equip.equip_no)
             detail['product_day_plan'] = instance
             detail['work_schedule_plan'] = work_schedule_plan
             pcp_obj = ProductClassesPlan.objects.create(**detail, created_user=self.context['request'].user)
