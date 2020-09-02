@@ -174,7 +174,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
-                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type')
+                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type', 'production_time_interval')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
