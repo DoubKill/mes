@@ -22,7 +22,7 @@
                 //     material_name: "",
                 //     for_short: "",
                 //     density: null,
-                //     used_flag: false,
+                //     use_flag: false,
                 //     material_type: null,
                 //     package_unit: null
                 // },

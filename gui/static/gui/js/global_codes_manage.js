@@ -17,7 +17,7 @@
                     type_no: '',
                     type_name: '',
                     description: '',
-                    used_flag: true
+                    use_flag: true
                 },
                 globalCodeTypeFormError: {},
 
@@ -30,7 +30,7 @@
                     global_name: '',
                     description: '',
                     used_flag_b: true,
-                    used_flag: 0, // 0用
+                    use_flag: 0, // 0用
                     global_type: null
                 },
                 globalCodeFormError: {}
@@ -56,7 +56,7 @@
                     type_no: '',
                     type_name: '',
                     description: '',
-                    used_flag: true
+                    use_flag: true
                 };
             },
             clearGlobalCodeTypeFormError: function() {
@@ -65,7 +65,7 @@
                     type_no: '',
                     type_name: '',
                     description: '',
-                    used_flag: ''
+                    use_flag: ''
                 };
             },
             showCreateGlobalCodeTypeDialog: function() {
@@ -159,7 +159,7 @@
                 }).then(function (response) {
 
                     app.globalCodes = response.data.results;
-                    app.globalCodes.used_flag_b = app.globalCodes.used_flag ? 0 : 1;
+                    app.globalCodes.used_flag_b = app.globalCodes.use_flag ? 0 : 1;
                     app.globalCodeForm.global_type = row.id;
                 }).catch(function (error) {
 
@@ -174,7 +174,7 @@
                     global_name: '',
                     description: '',
                     used_flag_b: true,
-                    used_flag: 0,
+                    use_flag: 0,
                     global_type: this.globalCodeForm.global_type
                 };
             },
@@ -185,7 +185,7 @@
                     global_no: '',
                     global_name: '',
                     description: '',
-                    used_flag: '',
+                    use_flag: '',
                 }
             },
             showCreateGlobalCodeDialog: function() {
@@ -199,7 +199,7 @@
             handleCreateGlobalCode: function() {
 
                 this.clearGlobalCodeFormError();
-                this.globalCodeForm.used_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
+                this.globalCodeForm.use_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
                 var app = this;
                 axios.post(GlobalCodesUrl, this.globalCodeForm)
                     .then(function (response) {
@@ -223,12 +223,12 @@
                 this.globalCodeForm.global_no = row.global_no;
                 this.globalCodeForm.global_name = row.global_name;
                 this.globalCodeForm.description = row.description;
-                this.globalCodeForm.used_flag_b = row.used_flag === 0;
+                this.globalCodeForm.used_flag_b = row.use_flag === 0;
                 this.dialogEditGlobalCodeVisible = true;
             },
             handleEditGlobalCode: function() {
 
-                this.globalCodeForm.used_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
+                this.globalCodeForm.use_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
                 const app = this;
                 axios.put(GlobalCodesUrl + this.globalCodeForm.id + '/', this.globalCodeForm)
                     .then(function (response) {
@@ -274,11 +274,11 @@
             },
             globalCodeTypeFormatter: function(row, column) {
 
-                return this.boolFormatter(row.used_flag);
+                return this.boolFormatter(row.use_flag);
             },
             globalCodeUsedFlagFormatter: function(row, column) {
 
-                return this.boolFormatter(row.used_flag === 0);
+                return this.boolFormatter(row.use_flag === 0);
             },
         }
     };

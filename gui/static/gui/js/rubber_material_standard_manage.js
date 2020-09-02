@@ -211,7 +211,7 @@
             get_raw_material(val=1){
                 var app=this;
                 this.getParams["page"] = val;
-                this.getParams["used_flag"] = true;
+                this.getParams["use_flag"] = true;
                 this.getParams["material_type_id"] = app.materialType?app.materialType:'';
                 this.getParams["material_no"] = app.search_material_no?app.search_material_no:'';
                 this.getParams["material_name"] = app.search_material_name?app.search_material_name:'';
