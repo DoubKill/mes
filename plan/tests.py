@@ -50,8 +50,8 @@ def add_batching_detail():
     m_set = Material.objects.all()[:3]
     for pb_obj in pb_set:
         for m_obj in m_set:
-            ProductBatchingDetail.objects.create(product_batching=pb_obj, sn=1, material=m_obj,actual_weight=100,
-                                                 standard_error=12.12,auto_flag=1)
+            ProductBatchingDetail.objects.create(product_batching=pb_obj, sn=1, material=m_obj, actual_weight=100,
+                                                 standard_error=12.12, auto_flag=1)
 
 
 def add_product_plan():
@@ -68,7 +68,8 @@ def add_product_plan():
                 for ws_obj in ws_set:
                     pcp_obj = ProductClassesPlan.objects.create(product_day_plan=pdp_obj, sn=i, plan_trains=i, time=i,
                                                                 weight=i, unit='包', work_schedule_plan=ws_obj,
-                                                                plan_classes_uid=UUidTools.uuid1_hex(), note='备注')
+                                                                plan_classes_uid=UUidTools.uuid1_hex(e_obj.equip_no),
+                                                                note='备注')
                     details = pcp_obj.product_day_plan.product_batching.batching_details.all()
                     for detail in details:
                         MaterialDemanded.objects.create(product_classes_plan=pcp_obj,
@@ -80,10 +81,8 @@ def add_product_plan():
 
 def add_product():
     pcp_set = ProductClassesPlan.objects.all()[:30]
-    # pcp_set = ProductClassesPlan.objects.all()
     for pcp_obj in pcp_set:
         num = pcp_obj.weight / pcp_obj.plan_trains
-        # for i in range(1, pcp_obj.plan_trains + 1):
         user_name = random_name()
         for i in range(1, 5):
             t = TrainsFeedbacks.objects.create(plan_classes_uid=pcp_obj.plan_classes_uid,
@@ -128,7 +127,8 @@ def add_product():
 
 
 if __name__ == '__main__':
+    print(123)
     add_batching_detail()
+    print(456)
     add_product_plan()
     add_product()
-    # add_work()
