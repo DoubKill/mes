@@ -280,11 +280,24 @@ class LoginView(ObtainJSONWebToken):
                 else:
                     permissions_tree["system"] = auth
 
-            # 先这么写 待会给李威看
+            # 先这么写 待会给李威看,
             # 并没有删除 只是给其他的模块新增
-            if permissions_tree['plan'] and permissions_tree['production'] and permissions_tree['plan'].get(
-                    'productdayplan'):
+            # 把plan里的productdayplan复制一份放在production里
+            if permissions_tree['plan'] and permissions_tree['plan'].get('productdayplan') and permissions_tree[
+                'production']:
                 permissions_tree['production']['productdayplan'] = permissions_tree['plan'].get('productdayplan')
+
+            # 把recipe里的material复制一份放在production里
+            if permissions_tree['recipe'] and permissions_tree['recipe'].get('material') and permissions_tree[
+                'production']:
+                permissions_tree['production']['material'] = permissions_tree['recipe'].get('material')
+
+            # 把system里的groupextension和user复制一份放在basics里
+            if permissions_tree['system'] and permissions_tree['system'].get('groupextension') and permissions_tree[
+                'system'].get('user') and permissions_tree['basics']:
+                permissions_tree['basics']['groupextension'] = permissions_tree['system'].get('groupextension')
+                permissions_tree['basics']['user'] = permissions_tree['system'].get('user')
+
             return Response({"results": permissions_tree,
                              "username": user.username,
                              "token": token})
