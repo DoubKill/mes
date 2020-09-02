@@ -92,7 +92,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GroupExtensionViewSet(CommonUsedFlagMixin,ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+class GroupExtensionViewSet(CommonUsedFlagMixin, ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
     """
     list:
         角色列表,xxx?all=1查询所有
@@ -279,6 +279,12 @@ class LoginView(ObtainJSONWebToken):
                     permissions_tree["system"].update(**auth)
                 else:
                     permissions_tree["system"] = auth
+
+            # 先这么写 待会给李威看
+            # 并没有删除 只是给其他的模块新增
+            if permissions_tree['plan'] and permissions_tree['production'] and permissions_tree['plan'].get(
+                    'productdayplan'):
+                permissions_tree['production']['productdayplan'] = permissions_tree['plan'].get('productdayplan')
             return Response({"results": permissions_tree,
                              "username": user.username,
                              "token": token})
