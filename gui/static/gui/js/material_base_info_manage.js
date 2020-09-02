@@ -18,7 +18,7 @@
                     material_name: "",
                     for_short: "",
                     // density: null,
-                    used_flag: false,
+                    use_flag: false,
                     material_type: null,
                     package_unit: null
                 },
@@ -28,7 +28,7 @@
                     material_name: "",
                     for_short: "",
                     // density: "",
-                    used_flag: "",
+                    use_flag: "",
                     material_type: "",
                     package_unit: ""
                 }
@@ -67,7 +67,7 @@
 
             formatter: function (row, column) {
 
-                return row.used_flag ? "Y" : "N"
+                return row.use_flag ? "Y" : "N"
             },
             beforeGetData() {
 
@@ -90,7 +90,7 @@
                     material_name: "",
                     for_short: "",
                     // density: null,
-                    used_flag: false,
+                    use_flag: false,
                     material_type: null,
                     package_unit: null
                 };
@@ -103,7 +103,7 @@
                     material_name: "",
                     for_short: "",
                     // density: "",
-                    used_flag: "",
+                    use_flag: "",
                     material_type: "",
                     package_unit: ""
                 }
