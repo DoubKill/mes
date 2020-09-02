@@ -90,7 +90,7 @@ class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
 
 
 class MaterialDemandedSerializer(BaseModelSerializer):
-    """原材料需求量序列化 暂时没用到，用到了"""
+    """原材料需求量序列化"""
     sn = serializers.IntegerField(source='product_classes_plan.sn', read_only=True, help_text='顺序')
     material_name = serializers.CharField(source='material.material_name', read_only=True, help_text='原材料名称')
     classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True, help_text='班次')

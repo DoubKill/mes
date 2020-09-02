@@ -111,7 +111,6 @@ class ProductDayPlanAPiView(APIView):
 
     def post(self, request):
         product_day_id = self.request.query_params.get('product_day_id')
-        print(product_day_id)
         if not product_day_id:
             raise ValidationError('缺失参数')
         try:
