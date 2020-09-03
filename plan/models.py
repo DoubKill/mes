@@ -29,7 +29,7 @@ class ProductClassesPlan(AbstractEntity):
                                          verbose_name='胶料日计划id',
                                          related_name='pdp_product_classes_plan')
     sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
-    plan_trains = models.PositiveIntegerField(verbose_name='车次', help_text='车次')
+    plan_trains = models.DecimalField(verbose_name='车次', help_text='车次', decimal_places=1, max_digits=8)
     time = models.DecimalField(help_text='时间（分钟）', blank=True, null=True, decimal_places=2, max_digits=8)
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=3, max_digits=8, blank=True, null=True)
