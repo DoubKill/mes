@@ -409,24 +409,25 @@ group by e.equip_no, gc.global_name order by e.equip_no"""
         data = {_.id: {"classes_data": []} for _ in query_set}
         for x in query_set:
             data[x.id]["classes_data"].append({
-                    "plan_trains": x.plan_trains if x.plan_trains else 0,
-                    "actual_trains": x.actual_trains if x.actual_trains else 0,
-                    "plan_weight": x.plan_weight if x.plan_weight else 0,
-                    "classes": x.classes
-                })
+                "plan_trains": x.plan_trains if x.plan_trains else 0,
+                "actual_trains": x.actual_trains if x.actual_trains else 0,
+                "plan_weight": x.plan_weight if x.plan_weight else 0,
+                "classes": x.classes
+            })
             data[x.id].update(product_no=x.product_no, equip_no=x.equip_no)
         rep = []
-        for k,v in data.items():
-            plan_trains_list = [t.get("plan_trains") for t in v.get("classes_data",[])]
-            actual_trains_list = [t.get("actual_trains") for t in v.get("classes_data",[])]
+        for k, v in data.items():
+
+            plan_trains_list = [t.get("plan_trains") for t in v.get("classes_data", [])]
+            actual_trains_list = [t.get("actual_trains") for t in v.get("classes_data", [])]
             plan_weight_list = [t.get("plan_weight") for t in v.get("classes_data", [])]
             plan_trains = sum(plan_trains_list)
             actual_trains = sum(actual_trains_list)
             plan_weight = sum(plan_weight_list)
             v.update(plan_trains=plan_trains,
                      actual_trains=actual_trains,
-                     plan_weight=plan_weight
-                     )
+                     plan_weight=plan_weight,
+                     id=k)
             rep.append(v)
 
         return Response({"data": rep})
@@ -467,7 +468,6 @@ class MaterialInventory(GenericViewSet,
                 "site": "立库",
             }]
         return Response({'results': results})
-
 
 
 class ProductInventory(GenericViewSet,
