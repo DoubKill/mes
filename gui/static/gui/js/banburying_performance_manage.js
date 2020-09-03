@@ -40,7 +40,7 @@
                 BATList: [],
                 dialogVisibleRubber: false,
                 tableDataRubber: [],
-                tableDataBAT:[],
+                tableDataBAT: [],
                 dialogVisibleBAT: false,
                 dialogVisibleGraph: false,
                 option1: {
@@ -173,7 +173,7 @@
                 this.getFirstPage();
             },
             equipNoVisibleChange(bool) {
-                if(bool){
+                if (bool) {
                     var app = this;
                     axios.get(EquipUrl, {
 
@@ -261,28 +261,28 @@
             },
             currentChange: function (page) {
 
-            this.beforeGetData();
-            // this.getParams["page"] = page;
-            this.tableData = [];
-            const app = this;
-            axios.get(this.tableDataUrl, {
+                this.beforeGetData();
+                // this.getParams["page"] = page;
+                this.tableData = [];
+                const app = this;
+                axios.get(this.tableDataUrl, {
 
-                params: this.getParams
-            }).then(function (response) {
+                    params: this.getParams
+                }).then(function (response) {
 
-                // if (app.tableDataTotal !== response.data.count) {
-                //     app.tableDataTotal = response.data.count;
-                // }
-                app.tableData = response.data.data;
-                app.afterGetData();
+                    // if (app.tableDataTotal !== response.data.count) {
+                    //     app.tableDataTotal = response.data.count;
+                    // }
+                    app.tableData = response.data.data;
+                    app.afterGetData();
 
-            }).catch(function (error) {
-                // this.$message.error(error);
-            })
+                }).catch(function (error) {
+                    // this.$message.error(error);
+                })
             },
             beforeGetData() {
                 this.getParams = {}
-                if(this.performanceDate){
+                if (this.performanceDate) {
                     this.getParams["search_time"] = dayjs(this.performanceDate).format("YYYY-MM-DD");
                 }
                 this.getParams["equip_no"] = this.equipNo
@@ -317,14 +317,25 @@
             //     });
             //     this.dialogVisibleBAT = true
             // },
-            opens () {
+            opens() {
                 this.$nextTick(() => {
                     this.pie1()
                 })
             },
-            pie1(){
+            pie1() {
                 echarts.init(this.$refs.main).setOption(this.option1)
             },
+            sendToAu(row) {
+
+                var app = this;
+                axios.post(ProductDayPlanNoticeUrl + row.id).then(function (response) {
+
+                    app.$message("发送成功");
+                }).catch(function (error) {
+
+                    app.$message("发送失败");
+                });
+            }
             // viewGraph() {
             //     this.dialogVisibleGraph = true;
             // }
