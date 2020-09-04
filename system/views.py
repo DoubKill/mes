@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_code import menu, CommonUsedFlagMixin
+from mes.common_code import menu, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from system.models import GroupExtension, User, Section
@@ -92,7 +92,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GroupExtensionViewSet(CommonUsedFlagMixin, ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
     """
     list:
         角色列表,xxx?all=1查询所有
