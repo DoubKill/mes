@@ -240,7 +240,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     def create(self, validated_data):
         day_time = validated_data['day_time']
         work_schedule_plan = validated_data.pop('work_schedule_plan', None)
-        validated_data['plan_schedule_no'] = UUidTools.uuid1_hex()
+        validated_data['plan_schedule_no'] = UUidTools.uuid1_hex(None)
         instance = super().create(validated_data)
         work_schedule_plan_list = []
         morning_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
@@ -260,7 +260,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
             plan['start_time'] = str(day_time) + ' ' + str(class_detail.start_time)
             plan['end_time'] = str(day_time) + ' ' + str(class_detail.end_time)
             plan['plan_schedule'] = instance
-            plan['work_schedule_plan_no'] = UUidTools.uuid1_hex()
+            plan['work_schedule_plan_no'] = UUidTools.uuid1_hex(None)
             work_schedule_plan_list.append(WorkSchedulePlan(**plan))
         WorkSchedulePlan.objects.bulk_create(work_schedule_plan_list)
         return instance

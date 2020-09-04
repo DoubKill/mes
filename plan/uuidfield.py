@@ -12,5 +12,8 @@ class UUidTools(object):
     def uuid1_hex(equip_no):
         global i
         i += 1
-        only_no = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(i).rjust(2, '0') + equip_no
+        if equip_no:
+            only_no = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(i).rjust(2, '0') + equip_no
+        else:
+            only_no = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(i).rjust(2, '0')
         return only_no
