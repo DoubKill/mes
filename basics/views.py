@@ -1,27 +1,26 @@
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
-from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, EquipCategoryFilter, \
-    ClassDetailFilter, PlanScheduleFilter
+from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, \
+    EquipCategoryFilter, ClassDetailFilter, PlanScheduleFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
     WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
     EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer, \
     PlanScheduleSerializer, EquipCategoryAttributeSerializer, ClassesSimpleSerializer
-from mes.common_code import return_permission_params, CommonDeleteMixin, CommonUsedFlagMixin
+from mes.common_code import return_permission_params, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
 from mes.paginations import SinglePageNumberPagination
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GlobalCodeTypeViewSet(CommonUsedFlagMixin, ModelViewSet):
+class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
         公共代码类型列表
@@ -39,15 +38,10 @@ class GlobalCodeTypeViewSet(CommonUsedFlagMixin, ModelViewSet):
                           PermissionClass(return_permission_params(model_name)))
     filter_backends = (DjangoFilterBackend,)
     filter_class = GlobalCodeTypeFilter
-    # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
-    # def destroy(self, request, *args, **kwargs):
-    #     instance = self.get_object()
-    #     instance.global_codes.filter().update(delete_flag=True, delete_user=request.user)
-    #     return super().destroy(request, *args, **kwargs)
 
 
 @method_decorator([api_recorder], name="dispatch")  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
-class GlobalCodeViewSet(CommonUsedFlagMixin, ModelViewSet):
+class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
         公共代码列表
@@ -76,7 +70,7 @@ class GlobalCodeViewSet(CommonUsedFlagMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.filter(use_flag=0).values('id', 'global_no', 'global_name', 'global_type__type_name')
+            data = queryset.filter(use_flag=1).values('id', 'global_no', 'global_name', 'global_type__type_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -116,12 +110,6 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': serializer.data})
         else:
             return super().list(request, *args, **kwargs)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if instance.plan_schedule.exists():
-            raise ValidationError('该倒班已管理排班计划，不可删除')
-        return super(WorkScheduleViewSet, self).destroy(request, *args, **kwargs)
 
     def get_serializer_class(self):
         if self.action in ['update', 'partial_update']:

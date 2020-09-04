@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from django.db.models import F
 from rest_framework import serializers
 from django.db.transaction import atomic
 
@@ -25,15 +24,15 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
                                                         message='该代码类型编号已存在'),
                                     ])
 
-    def update(self, instance, validated_data):
-        if 'use_flag' in validated_data:
-            if instance.use_flag != validated_data['use_flag']:
-                if validated_data['use_flag'] == 0:  # 弃用
-                    instance.global_codes.filter().update(use_flag=F('id'))
-                else:  # 启用
-                    instance.global_codes.filter().update(use_flag=0)
-        instance = super().update(instance, validated_data)
-        return instance
+    # def update(self, instance, validated_data):
+    #     if 'use_flag' in validated_data:
+    #         if instance.use_flag != validated_data['use_flag']:
+    #             if validated_data['use_flag'] == 0:  # 弃用
+    #                 instance.global_codes.filter().update(use_flag=F('id'))
+    #             else:  # 启用
+    #                 instance.global_codes.filter().update(use_flag=0)
+    #     instance = super().update(instance, validated_data)
+    #     return instance
 
     class Meta:
         model = GlobalCodeType
@@ -62,17 +61,17 @@ class GlobalCodeSerializer(BaseModelSerializer):
     def create(self, validated_data):
         validated_data.update(created_user=self.context["request"].user)
         instance = super().create(validated_data)
-        if 'use_flag' in validated_data:
-            if validated_data['use_flag'] != 0:  # 不是启用状态，修改其use_flag为id
-                instance.use_flag = instance.id
-                instance.save()
+        # if 'use_flag' in validated_data:
+        #     if validated_data['use_flag'] != 0:  # 不是启用状态，修改其use_flag为id
+        #         instance.use_flag = instance.id
+        #         instance.save()
         return instance
 
     def update(self, instance, validated_data):
-        if 'use_flag' in validated_data:
-            if instance.use_flag != validated_data['use_flag']:
-                if validated_data['use_flag'] != 0:  # 弃用
-                    validated_data['use_flag'] = instance.id
+        # if 'use_flag' in validated_data:
+        #     if instance.use_flag != validated_data['use_flag']:
+        #         if validated_data['use_flag'] != 0:  # 弃用
+        #             validated_data['use_flag'] = instance.id
         validated_data.update(last_updated_user=self.context["request"].user)
         return super(GlobalCodeSerializer, self).update(instance, validated_data)
 
