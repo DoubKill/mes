@@ -1,4 +1,3 @@
-
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator
@@ -17,7 +16,7 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        exclude = ('product_day_plan', 'work_schedule_plan')
+        exclude = ('product_day_plan', 'work_schedule_plan','plan_classes_uid')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -68,7 +67,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                                  plan_schedule=instance.plan_schedule).first()
             if not work_schedule_plan:
                 raise serializers.ValidationError('暂无该班次排班数据')
-            detail['plan_classes_uid'] = UUidTools.uuid1_hex()
+            detail['plan_classes_uid'] = UUidTools.uuid1_hex(instance.equip.equip_no)
             detail['product_day_plan'] = instance
             detail['work_schedule_plan'] = work_schedule_plan
             pcp_obj = ProductClassesPlan.objects.create(**detail, created_user=self.context['request'].user)
@@ -91,7 +90,7 @@ class ProductBatchingClassesPlanSerializer(BaseModelSerializer):
 
 
 class MaterialDemandedSerializer(BaseModelSerializer):
-    """原材料需求量序列化 暂时没用到，用到了"""
+    """原材料需求量序列化"""
     sn = serializers.IntegerField(source='product_classes_plan.sn', read_only=True, help_text='顺序')
     material_name = serializers.CharField(source='material.material_name', read_only=True, help_text='原材料名称')
     classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True, help_text='班次')

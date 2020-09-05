@@ -3,7 +3,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
@@ -43,13 +43,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
         if self.request.query_params.get('all'):
             return ()
         else:
-            return (IsAuthenticatedOrReadOnly(),)
+            return (IsAuthenticated(),)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.filter(used_flag=1).values('id', 'material_no',
-                                                       'material_name', 'material_type__global_name')
+            data = queryset.filter(use_flag=1).values('id', 'material_no',
+                                                      'material_name', 'material_type__global_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -76,7 +76,7 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = MaterialAttribute.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = MaterialAttributeSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialAttributeFilter
 
@@ -85,6 +85,7 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
 class ValidateProductVersionsView(APIView):
     """验证版本号，创建胶料工艺信息前调用，
     参数：xxx/?factory=产地id&site=SITEid&product_info=胶料代码id&versions=版本号&stage=段次id"""
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         factory = self.request.query_params.get('factory')
@@ -137,7 +138,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
         if self.request.query_params.get('all'):
             return ()
         else:
-            return (IsAuthenticatedOrReadOnly(),)
+            return (IsAuthenticated(),)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -165,7 +166,7 @@ class ProductBatchingViewSet(ModelViewSet):
     queryset = ProductBatching.objects.filter(delete_flag=False).select_related("factory", "site",
                                                                                 "dev_type", "stage", "product_info"
                                                                                 ).order_by('-created_date')
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
 
@@ -182,9 +183,9 @@ class ProductBatchingViewSet(ModelViewSet):
             return ()
         if self.action == 'partial_update':
             return (ProductBatchingPermissions(),
-                    IsAuthenticatedOrReadOnly())
+                    IsAuthenticated())
         else:
-            return (IsAuthenticatedOrReadOnly(),)
+            return (IsAuthenticated(),)
 
     def get_serializer_class(self):
         if self.action == 'list':

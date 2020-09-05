@@ -119,6 +119,14 @@
                 <el-button @click="downloadClick(scope.row)" type="text" size="small">下载</el-button>
             </template>
         </el-table-column>
+        <el-table-column label="发送到上辅机">
+            <template slot-scope="scope">
+                <el-button
+                        size="mini"
+                        @click="sendToAu(scope.row)">发送
+                </el-button>
+            </template>
+        </el-table-column>
     </el-table>
 
 {#    {% include 'gui/paginations.html' %}#}

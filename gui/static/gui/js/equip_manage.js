@@ -21,7 +21,7 @@
                     equip_no: "",
                     equip_name: "",
                     count_flag: true,
-                    used_flag: true,
+                    use_flag: true,
                     description:"",
                     equip_level:"",
                     category:"",
@@ -36,7 +36,7 @@
                     equip_no: "",
                     equip_name: "",
                     count_flag: "",
-                    used_flag: "",
+                    use_flag: "",
                     description:"",
                     equip_level:"",
                     category:"",
@@ -59,7 +59,7 @@
                     equip_no: "",
                     equip_name: "",
                     count_flag: true,
-                    used_flag: true,
+                    use_flag: true,
                     description:"",
                     equip_level:"",
                     category:""
@@ -71,7 +71,7 @@
                     equip_no: "",
                     equip_name: "",
                     count_flag: "",
-                    used_flag: "",
+                    use_flag: "",
                     description:"",
                     equip_level:"",
                     category:"",
@@ -176,7 +176,7 @@
             },
             EquipUsedFlagFormatter: function(row, column) {
 
-                return this.boolFormatter(row.used_flag);
+                return this.boolFormatter(row.use_flag);
             },
 
         },

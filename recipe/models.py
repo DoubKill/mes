@@ -13,7 +13,7 @@ class Material(AbstractEntity):
                                       on_delete=models.DO_NOTHING, related_name='mt_materials')
     package_unit = models.ForeignKey(GlobalCode, help_text='包装单位', verbose_name='包装单位',
                                      on_delete=models.DO_NOTHING, related_name='pu_materials', blank=True, null=True)
-    used_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     def __str__(self):
         return self.material_name
@@ -93,7 +93,7 @@ class ProductBatching(AbstractEntity):
                              on_delete=models.DO_NOTHING, related_name='s_batching')
     product_info = models.ForeignKey(ProductInfo, help_text='胶料工艺信息', on_delete=models.DO_NOTHING)
     precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案', blank=True, null=True)
-    stage_product_batch_no = models.CharField(max_length=63, help_text='胶料配方编码', unique=True)
+    stage_product_batch_no = models.CharField(max_length=63, help_text='胶料配方编码')
     dev_type = models.ForeignKey(EquipCategoryAttribute, help_text='机型', on_delete=models.DO_NOTHING, blank=True,
                                  null=True)
     stage = models.ForeignKey(GlobalCode, help_text='段次', verbose_name='段次',
@@ -101,11 +101,11 @@ class ProductBatching(AbstractEntity):
     versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
     used_type = models.PositiveSmallIntegerField(help_text='使用状态', choices=USE_TYPE_CHOICE, default=1)
     batching_weight = models.DecimalField(verbose_name='配料重量', help_text='配料重量',
-                                          decimal_places=3, max_digits=8, default=0)
+                                          decimal_places=2, max_digits=8, default=0)
     manual_material_weight = models.DecimalField(verbose_name='手动小料重量', help_text='手动小料重量',
-                                                 decimal_places=3, max_digits=8, default=0)
+                                                 decimal_places=2, max_digits=8, default=0)
     auto_material_weight = models.DecimalField(verbose_name='自动小料重量', help_text='自动小料重量',
-                                               decimal_places=3, max_digits=8, default=0)
+                                               decimal_places=2, max_digits=8, default=0)
     volume = models.DecimalField(verbose_name='配料体积', help_text='配料体积', decimal_places=2, max_digits=8,
                                  blank=True, null=True)
     used_user = models.ForeignKey(User, help_text='启用人', blank=True, null=True,
@@ -136,8 +136,8 @@ class ProductBatchingDetail(AbstractEntity):
                                          related_name='batching_details')
     sn = models.PositiveIntegerField(verbose_name='序号', help_text='序号')
     material = models.ForeignKey(Material, verbose_name='原材料', help_text='原材料', on_delete=models.DO_NOTHING)
-    actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=3, max_digits=8)
-    standard_error = models.DecimalField(help_text='误差值范围', decimal_places=3, max_digits=8, default=0)
+    actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=2, max_digits=8)
+    standard_error = models.DecimalField(help_text='误差值范围', decimal_places=2, max_digits=8, default=0)
     auto_flag = models.PositiveSmallIntegerField(help_text='手动/自动', choices=AUTO_FLAG)
 
     class Meta:
