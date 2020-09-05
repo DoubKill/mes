@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import xlrd
 from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
@@ -13,6 +15,8 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from mes.common_code import menu
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from plan.models import ProductClassesPlan
+from recipe.models import ProductBatching
 from system.models import GroupExtension, User, Section, ChildSystemInfo, SystemConfig
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
@@ -113,7 +117,7 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.request.query_params.get('all'):
             return ()
         else:
-            return (IsAuthenticatedOrReadOnly(), )
+            return (IsAuthenticatedOrReadOnly(),)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -262,12 +266,12 @@ class LoginView(ObtainJSONWebToken):
                     permission_list.append(p)
             # 生成菜单管理树
             permissions_set = set([_.split(".")[0] for _ in permission_list])
-            permissions_tree = {__:{} for __ in permissions_set}
+            permissions_tree = {__: {} for __ in permissions_set}
             for x in permission_list:
                 first_key = x.split(".")[0]
                 second_key = x.split(".")[-1].split("_")[-1]
                 op_value = x.split(".")[-1].split("_")[0]
-                op_list =  permissions_tree.get(first_key, {}).get(second_key)
+                op_list = permissions_tree.get(first_key, {}).get(second_key)
                 if op_list:
                     permissions_tree[first_key][second_key].append(op_value)
                 else:
@@ -284,3 +288,29 @@ class LoginView(ObtainJSONWebToken):
                              "token": token})
         # 返回异常信息
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class Synchronization(APIView):
+    def get(self, request, *args, **kwargs):
+        mes_dict = {'ProductClassesPlan': [], 'ProductBatching': []}
+        # 获取断网时间
+        params = request.query_params
+        lost_time = params.get("lost_time")
+        # lost_time = datetime.strptime(lost_time, '%Y-%m-%d %X')
+        mes_dict["lost_time"] = lost_time
+        if lost_time:
+            # 胶料日班次计划
+            pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
+            if pcp_set:
+                for pcp_obj in pcp_set:
+                    pcp_dict = pcp_obj.__dict__
+                    pcp_dict.pop("_state")
+                    mes_dict['ProductClassesPlan'].append(pcp_dict)
+            pbc_set = ProductBatching.objects.filter(last_updated_date__gte=lost_time)
+            if pbc_set:
+                for pbc_obj in pbc_set:
+                    pbc_dict = pbc_obj.__dict__
+                    pbc_dict.pop("_state")
+                    mes_dict['ProductBatching'].append(pbc_obj)
+
+        return Response({'MES系统': mes_dict}, status=200)
