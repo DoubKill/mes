@@ -165,7 +165,8 @@ class EquipViewSet(CommonDeleteMixin, ModelViewSet):
         删除设备
     """
     queryset = Equip.objects.filter(delete_flag=False).select_related('category__equip_type',
-                                                                      'category__process', 'equip_level')
+                                                                      'category__process',
+                                                                      'equip_level').order_by('equip_no')
     serializer_class = EquipSerializer
     model_name = queryset.model.__name__.lower()
     filter_backends = (DjangoFilterBackend,)
