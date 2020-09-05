@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from system.views import UserViewSet, UserGroupsViewSet, GroupExtensionViewSet, SectionViewSet, PermissionViewSet, \
-    GroupAddUserViewSet, LoginView
+    GroupAddUserViewSet, LoginView, Synchronization
 
 # app_name = 'system'
 router = DefaultRouter()
@@ -25,4 +25,6 @@ urlpatterns = [
     path('login/', LoginView.as_view()),
     path('api-token-auth/', obtain_jwt_token),
     path('api-token-refresh/', refresh_jwt_token),
+    path('synchronization/', Synchronization.as_view()),  # mes和上辅机同步接口
+
 ]

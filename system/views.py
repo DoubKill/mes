@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import xlrd
 from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
@@ -12,7 +14,10 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from mes.common_code import menu, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from system.models import GroupExtension, User, Section
+
+from plan.models import ProductClassesPlan
+from recipe.models import ProductBatching
+from system.models import GroupExtension, User, Section, ChildSystemInfo, SystemConfig
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
 from django_filters.rest_framework import DjangoFilterBackend
@@ -183,63 +188,6 @@ class MesLogin(ObtainJSONWebToken):
         return menu(request, self.menu, temp, format)
 
 
-class ImportExcel(APIView):
-
-    def post(self, request, *args, **kwargs):
-        excel_file = request.FILES.get('excel_file', '')
-        if excel_file.name.endswith(".xlsx"):
-            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())  # xlsx文件
-        elif excel_file.endswith(".xls"):
-            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read(), formatting_info=True)  # xls
-        else:
-            raise TypeError
-        all_list_1 = self.get_sheets_mg(data)
-        for x in all_list_1:
-            print(x)
-        return Response({"msg": "ok"})
-
-    def get_sheets_mg(self, data, num=0):  # data:Excel数据对象，num要读取的表
-        table = data.sheets()[num]  # 打开第一张表
-        nrows = table.nrows  # 获取表的行数
-        ncole = table.ncols  # 获取列数
-        all_list = []
-        for i in range(nrows):  # 循环逐行打印
-            one_list = []
-            for j in range(ncole):
-                cell_value = table.row_values(i)[j]
-                if (cell_value is None or cell_value == ''):
-                    cell_value = (self.get_merged_cells_value(table, i, j))
-                one_list.append(cell_value)
-            all_list.append(one_list)
-        del (all_list[0])  # 删除标题   如果Excel文件中第一行是标题可删除掉，如果没有就不需要这行代码
-        return all_list
-
-    def get_merged_cells_value(self, sheet, row_index, col_index):
-        """
-        先判断给定的单元格，是否属于合并单元格；
-        如果是合并单元格，就返回合并单元格的内容
-        :return:
-        """
-        merged = self.get_merged_cells(sheet)
-        # print(merged,"==hebing==")
-        for (rlow, rhigh, clow, chigh) in merged:
-            if (row_index >= rlow and row_index < rhigh):
-                if (col_index >= clow and col_index < chigh):
-                    cell_value = sheet.cell_value(rlow, clow)
-                    # print('该单元格[%d,%d]属于合并单元格，值为[%s]' % (row_index, col_index, cell_value))
-                    return cell_value
-        return None
-
-    def get_merged_cells(self, sheet):
-        """
-        获取所有的合并单元格，格式如下：
-        [(4, 5, 2, 4), (5, 6, 2, 4), (1, 4, 3, 4)]
-        (4, 5, 2, 4) 的含义为：行 从下标4开始，到下标5（不包含）  列 从下标2开始，到下标4（不包含），为合并单元格
-        :param sheet:
-        :return:
-        """
-        return sheet.merged_cells
-
 
 class LoginView(ObtainJSONWebToken):
     """
@@ -303,3 +251,29 @@ class LoginView(ObtainJSONWebToken):
                              "token": token})
         # 返回异常信息
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class Synchronization(APIView):
+    def get(self, request, *args, **kwargs):
+        mes_dict = {'ProductClassesPlan': [], 'ProductBatching': []}
+        # 获取断网时间
+        params = request.query_params
+        lost_time = params.get("lost_time")
+        # lost_time = datetime.strptime(lost_time, '%Y-%m-%d %X')
+        mes_dict["lost_time"] = lost_time
+        if lost_time:
+            # 胶料日班次计划
+            pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
+            if pcp_set:
+                for pcp_obj in pcp_set:
+                    pcp_dict = pcp_obj.__dict__
+                    pcp_dict.pop("_state")
+                    mes_dict['ProductClassesPlan'].append(pcp_dict)
+            pbc_set = ProductBatching.objects.filter(last_updated_date__gte=lost_time)
+            if pbc_set:
+                for pbc_obj in pbc_set:
+                    pbc_dict = pbc_obj.__dict__
+                    pbc_dict.pop("_state")
+                    mes_dict['ProductBatching'].append(pbc_obj)
+
+        return Response({'MES系统': mes_dict}, status=200)
