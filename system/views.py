@@ -188,7 +188,6 @@ class MesLogin(ObtainJSONWebToken):
         return menu(request, self.menu, temp, format)
 
 
-
 class LoginView(ObtainJSONWebToken):
     """
     post
@@ -255,25 +254,31 @@ class LoginView(ObtainJSONWebToken):
 
 class Synchronization(APIView):
     def get(self, request, *args, **kwargs):
-        mes_dict = {'ProductClassesPlan': [], 'ProductBatching': []}
+        mes_dict = {}
+        mes_dict['plan'] = {}
+        mes_dict['recipe'] = {}
+        # mes_dict = {'ProductClassesPlan': [], 'ProductBatching': []}
         # 获取断网时间
         params = request.query_params
-        lost_time = params.get("lost_time")
-        # lost_time = datetime.strptime(lost_time, '%Y-%m-%d %X')
+        lost_time1 = params.get("lost_time")
+        lost_time = datetime.strptime(lost_time1, '%Y-%m-%d %X')
+        print(lost_time, type(lost_time))
         mes_dict["lost_time"] = lost_time
         if lost_time:
             # 胶料日班次计划
             pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
             if pcp_set:
+                mes_dict['plan']['ProductClassesPlan'] = {}
                 for pcp_obj in pcp_set:
                     pcp_dict = pcp_obj.__dict__
                     pcp_dict.pop("_state")
-                    mes_dict['ProductClassesPlan'].append(pcp_dict)
+                    mes_dict['plan']['ProductClassesPlan'][pcp_obj.plan_classes_uid] = pcp_dict
             pbc_set = ProductBatching.objects.filter(last_updated_date__gte=lost_time)
             if pbc_set:
+                mes_dict['recipe']['ProductBatching'] = {}
                 for pbc_obj in pbc_set:
                     pbc_dict = pbc_obj.__dict__
                     pbc_dict.pop("_state")
-                    mes_dict['ProductBatching'].append(pbc_obj)
+                    mes_dict['recipe']['ProductBatching'][pbc_obj.stage_product_batch_no] = pbc_dict
 
         return Response({'MES系统': mes_dict}, status=200)
