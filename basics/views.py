@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -88,7 +89,10 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除工作日程
     """
-    queryset = WorkSchedule.objects.filter(delete_flag=False).prefetch_related('classesdetail_set__classes')
+    queryset = WorkSchedule.objects.filter(delete_flag=False
+                                           ).prefetch_related(
+        Prefetch('classesdetail_set', queryset=ClassesDetail.objects.filter(delete_flag=False))
+    )
     serializer_class = WorkScheduleSerializer
     model_name = queryset.model.__name__.lower()
     permission_classes = (IsAuthenticated,
