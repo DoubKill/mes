@@ -1,4 +1,5 @@
 # Create your views here.
+from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
@@ -163,9 +164,12 @@ class ProductBatchingViewSet(ModelViewSet):
         配料审批
     """
     # TODO 配方下载功能（只能下载应用状态的配方，并去除当前计划中的配方）
-    queryset = ProductBatching.objects.filter(delete_flag=False).select_related("factory", "site",
-                                                                                "dev_type", "stage", "product_info"
-                                                                                ).order_by('-created_date')
+    queryset = ProductBatching.objects.filter(
+        delete_flag=False).select_related(
+        "factory", "site", "dev_type", "stage", "product_info"
+    ).prefetch_related(
+        Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))
+    ).order_by('-created_date')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter

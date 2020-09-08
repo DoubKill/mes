@@ -139,7 +139,7 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
             raise serializers.ValidationError('该倒班已关联排班计划，不可修改')
         classesdetail_set = validated_data.pop('classesdetail_set', None)
         if classesdetail_set is not None:
-            instance.classesdetail_set.all().delete()
+            instance.classesdetail_set.filter().update(delete_flag=True)
             classes_details_list = []
             for plan in classesdetail_set:
                 plan['work_schedule'] = instance
