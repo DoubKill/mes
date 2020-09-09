@@ -87,6 +87,10 @@ class ProductBatching(AbstractEntity):
         (5, '驳回'),
         (6, '废弃')
     )
+    BATCHING_TYPE_CHOICE = (
+        (1, '机台'),
+        (2, '机型')
+    )
     factory = models.ForeignKey(GlobalCode, help_text='工厂', verbose_name='工厂',
                                 on_delete=models.DO_NOTHING, related_name='f_batching')
     site = models.ForeignKey(GlobalCode, help_text='SITE', verbose_name='SITE',
@@ -117,6 +121,8 @@ class ProductBatching(AbstractEntity):
     production_time_interval = models.DecimalField(help_text='炼胶时间(秒)', blank=True, null=True,
                                                    decimal_places=2, max_digits=8)
     equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.DO_NOTHING)
+    batching_type = models.PositiveIntegerField(verbose_name='配料类型', help_text='配料类型',
+                                                choices=BATCHING_TYPE_CHOICE, default=2)
 
     def __str__(self):
         return self.stage_product_batch_no
@@ -124,6 +130,11 @@ class ProductBatching(AbstractEntity):
     class Meta:
         db_table = 'product_batching'
         verbose_name_plural = verbose_name = '胶料配料标准'
+        permissions = (
+            ('submit_prod', '提交配方'),
+            ('using_prod', '启用配方'),
+            ('abandon_prod', '弃用配方')
+        )
 
 
 class ProductBatchingDetail(AbstractEntity):
