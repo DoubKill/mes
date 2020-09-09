@@ -3,7 +3,7 @@
     var Main = {
 
         mixins: [BaseMixin],
-        data: function() {
+        data: function () {
 
             return {
 
@@ -29,8 +29,7 @@
                     global_no: '',
                     global_name: '',
                     description: '',
-                    used_flag_b: true,
-                    use_flag: 0, // 0用
+                    use_flag: true,
                     global_type: null
                 },
                 globalCodeFormError: {}
@@ -38,19 +37,20 @@
         },
         methods: {
 
-            beforeGetData: function() {
+            beforeGetData: function () {
 
                 this.getParams['type_name'] = this.type_name;
             },
-            afterGetData: function() {
+            afterGetData: function () {
 
+                console.log(this.tableData, 'tableData')
                 this.globalCodeTypesCurrentRow = null;
             },
-            typeNameChanged: function() {  // 类型名搜索
+            typeNameChanged: function () {  // 类型名搜索
 
                 this.getFirstPage();
             },
-            clearGlobalCodeTypeForm: function() {
+            clearGlobalCodeTypeForm: function () {
 
                 this.globalCodeTypeForm = {
                     type_no: '',
@@ -59,7 +59,7 @@
                     use_flag: true
                 };
             },
-            clearGlobalCodeTypeFormError: function() {
+            clearGlobalCodeTypeFormError: function () {
 
                 this.globalCodeTypeFormError = {
                     type_no: '',
@@ -68,13 +68,13 @@
                     use_flag: ''
                 };
             },
-            showCreateGlobalCodeTypeDialog: function() {
+            showCreateGlobalCodeTypeDialog: function () {
 
                 this.clearGlobalCodeTypeForm();
                 this.clearGlobalCodeTypeFormError();
                 this.dialogCreateGlobalCodeTypeVisible = true;
             },
-            handleCreateGlobalCodeType: function() { // 创建全局代码类型
+            handleCreateGlobalCodeType: function () { // 创建全局代码类型
 
                 this.clearGlobalCodeTypeFormError();
                 const app = this;
@@ -92,14 +92,14 @@
                     }
                 });
             },
-            showEditGlobalCodeTypeDialog: function(row) {
+            showEditGlobalCodeTypeDialog: function (row) {
 
                 this.clearGlobalCodeTypeForm();
                 this.clearGlobalCodeTypeFormError();
                 this.globalCodeTypeForm = Object.assign({}, row);
                 this.dialogEditGlobalCodeTypeVisible = true;
             },
-            handleEditGlobalCodeType: function() {
+            handleEditGlobalCodeType: function () {
 
                 const app = this;
                 axios.put(GlobalTypesUrl + this.globalCodeTypeForm.id + '/', this.globalCodeTypeForm)
@@ -116,7 +116,7 @@
                     }
                 });
             },
-            handleGlobalCodeTypeDelete: function(row) {
+            handleGlobalCodeTypeDelete: function (row) {
 
                 var app = this;
                 this.$confirm('此操作将永久删除' + row.type_name + ', 是否继续?', '提示', {
@@ -146,7 +146,7 @@
                 });
             },
 
-            handleGlobalCodeTypesCurrentRowChange: function(row) {
+            handleGlobalCodeTypesCurrentRowChange: function (row) {
 
                 if (!row)
                     return;
@@ -159,26 +159,24 @@
                 }).then(function (response) {
 
                     app.globalCodes = response.data.results;
-                    app.globalCodes.used_flag_b = app.globalCodes.use_flag ? 0 : 1;
                     app.globalCodeForm.global_type = row.id;
                 }).catch(function (error) {
 
                     this.$message.error(error);
                 })
             },
-            clearGlobalCodeForm: function() {
+            clearGlobalCodeForm: function () {
 
                 this.globalCodeForm = {
 
                     global_no: '',
                     global_name: '',
                     description: '',
-                    used_flag_b: true,
-                    use_flag: 0,
+                    use_flag: true,
                     global_type: this.globalCodeForm.global_type
                 };
             },
-            clearGlobalCodeFormError: function() {
+            clearGlobalCodeFormError: function () {
 
                 this.globalCodeFormError = {
 
@@ -188,7 +186,7 @@
                     use_flag: '',
                 }
             },
-            showCreateGlobalCodeDialog: function() {
+            showCreateGlobalCodeDialog: function () {
 
                 if (!this.globalCodeForm.global_type)
                     return;
@@ -196,10 +194,10 @@
                 this.clearGlobalCodeFormError();
                 this.dialogCreateGlobalCodeVisible = true
             },
-            handleCreateGlobalCode: function() {
+            handleCreateGlobalCode: function () {
 
                 this.clearGlobalCodeFormError();
-                this.globalCodeForm.use_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
+                // this.globalCodeForm.use_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
                 var app = this;
                 axios.post(GlobalCodesUrl, this.globalCodeForm)
                     .then(function (response) {
@@ -215,20 +213,21 @@
                     }
                 });
             },
-            showEditGlobalCodeDialog: function(row) {
+            showEditGlobalCodeDialog: function (row) {
 
                 this.clearGlobalCodeForm();
                 this.clearGlobalCodeFormError();
-                this.globalCodeForm.id  = row.id;
+                this.globalCodeForm.id = row.id;
                 this.globalCodeForm.global_no = row.global_no;
                 this.globalCodeForm.global_name = row.global_name;
                 this.globalCodeForm.description = row.description;
-                this.globalCodeForm.used_flag_b = row.use_flag === 0;
+                this.globalCodeForm.use_flag = row.use_flag;
                 this.dialogEditGlobalCodeVisible = true;
             },
-            handleEditGlobalCode: function() {
+            handleEditGlobalCode: function () {
 
-                this.globalCodeForm.use_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
+                // this.globalCodeForm.use_flag = this.globalCodeForm.used_flag_b ? 0 : 1;
+                console.log(this.globalCodeForm, 'this.globalCodeForm')
                 const app = this;
                 axios.put(GlobalCodesUrl + this.globalCodeForm.id + '/', this.globalCodeForm)
                     .then(function (response) {
@@ -244,9 +243,10 @@
                                 app.globalCodeFormError[key] = error.response.data[key].join(",")
                         }
                     }
+                    app.$message.error(error.response.data['global_type'].join(","));
                 });
             },
-            handleGlobalCodesDelete: function(row) {
+            handleGlobalCodesDelete: function (row) {
 
                 var app = this;
                 this.$confirm('此操作将永久删除' + row.global_name + ', 是否继续?', '提示', {
@@ -272,13 +272,13 @@
 
                 });
             },
-            globalCodeTypeFormatter: function(row, column) {
+            globalCodeTypeFormatter: function (row, column) {
 
                 return this.boolFormatter(row.use_flag);
             },
-            globalCodeUsedFlagFormatter: function(row, column) {
+            globalCodeUsedFlagFormatter: function (row, column) {
 
-                return this.boolFormatter(row.use_flag === 0);
+                return this.boolFormatter(row.use_flag);
             },
         }
     };
