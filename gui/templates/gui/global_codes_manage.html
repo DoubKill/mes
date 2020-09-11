@@ -35,7 +35,7 @@
                             label="类型名称">
                     </el-table-column>
                     <el-table-column
-                            prop="used_flag"
+                            prop="use_flag"
                             label="使用"
                             width="50"
                             :formatter="globalCodeTypeFormatter">
@@ -94,7 +94,7 @@
                                 label="备注">
                         </el-table-column>
                         <el-table-column
-                                prop="used_flag"
+                                prop="use_flag"
                                 width="50"
                                 label="使用"
                                 :formatter="globalCodeUsedFlagFormatter">
@@ -185,7 +185,7 @@
                     <el-input v-model="globalCodeForm.description"></el-input>
                 </el-form-item>
                 <el-form-item :error="globalCodeFormError.use_flag" label="是否启用" :label-width="formLabelWidth">
-                    <el-switch v-model="globalCodeForm.used_flag_b"></el-switch>
+                    <el-switch v-model="globalCodeForm.use_flag"></el-switch>
                 </el-form-item>
             </el-form>
             <div slot="footer" class="dialog-footer">
@@ -207,7 +207,7 @@
                     <el-input v-model="globalCodeForm.description"></el-input>
                 </el-form-item>
                 <el-form-item :error="globalCodeFormError.use_flag" label="是否启用" :label-width="formLabelWidth">
-                    <el-switch v-model="globalCodeForm.used_flag_b"></el-switch>
+                    <el-switch v-model="globalCodeForm.use_flag"></el-switch>
                 </el-form-item>
             </el-form>
             <div slot="footer" class="dialog-footer">

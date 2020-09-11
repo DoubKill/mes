@@ -71,7 +71,7 @@ class ProductDayPlanSerializer(BaseModelSerializer):
             detail['product_day_plan'] = instance
             detail['work_schedule_plan'] = work_schedule_plan
             pcp_obj = ProductClassesPlan.objects.create(**detail, created_user=self.context['request'].user)
-            for pbd_obj in instance.product_batching.batching_details.all():
+            for pbd_obj in instance.product_batching.batching_details.filter(delete_flag=False):
                 MaterialDemanded.objects.create(product_classes_plan=pcp_obj,
                                                 work_schedule_plan=pcp_obj.work_schedule_plan,
                                                 material=pbd_obj.material,
