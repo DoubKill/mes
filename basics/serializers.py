@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-from django.db.models import F
 from rest_framework import serializers
 from django.db.transaction import atomic
 
@@ -25,15 +24,15 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
                                                         message='该代码类型编号已存在'),
                                     ])
 
-    def update(self, instance, validated_data):
-        if 'used_flag' in validated_data:
-            if instance.used_flag != validated_data['used_flag']:
-                if validated_data['used_flag'] == 0:  # 弃用
-                    instance.global_codes.filter().update(used_flag=F('id'))
-                else:  # 启用
-                    instance.global_codes.filter().update(used_flag=0)
-        instance = super().update(instance, validated_data)
-        return instance
+    # def update(self, instance, validated_data):
+    #     if 'use_flag' in validated_data:
+    #         if instance.use_flag != validated_data['use_flag']:
+    #             if validated_data['use_flag'] == 0:  # 弃用
+    #                 instance.global_codes.filter().update(use_flag=F('id'))
+    #             else:  # 启用
+    #                 instance.global_codes.filter().update(use_flag=0)
+    #     instance = super().update(instance, validated_data)
+    #     return instance
 
     class Meta:
         model = GlobalCodeType
@@ -42,7 +41,7 @@ class GlobalCodeTypeSerializer(BaseModelSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=model.objects.filter(delete_flag=False),
-                fields=('type_name', 'used_flag'),
+                fields=('type_name', 'use_flag'),
                 message="该代码类型名称已存在"
             )
         ]
@@ -55,24 +54,24 @@ class GlobalCodeSerializer(BaseModelSerializer):
 
     @staticmethod
     def validate_global_type(global_type):
-        if global_type.used_flag == 0:
+        if global_type.use_flag == 0:
             raise serializers.ValidationError('弃用状态的代码类型不可新建公共代码')
         return global_type
 
     def create(self, validated_data):
         validated_data.update(created_user=self.context["request"].user)
         instance = super().create(validated_data)
-        if 'used_flag' in validated_data:
-            if validated_data['used_flag'] != 0:  # 不是启用状态，修改其used_flag为id
-                instance.used_flag = instance.id
-                instance.save()
+        # if 'use_flag' in validated_data:
+        #     if validated_data['use_flag'] != 0:  # 不是启用状态，修改其use_flag为id
+        #         instance.use_flag = instance.id
+        #         instance.save()
         return instance
 
     def update(self, instance, validated_data):
-        if 'used_flag' in validated_data:
-            if instance.used_flag != validated_data['used_flag']:
-                if validated_data['used_flag'] != 0:  # 弃用
-                    validated_data['used_flag'] = instance.id
+        # if 'use_flag' in validated_data:
+        #     if instance.use_flag != validated_data['use_flag']:
+        #         if validated_data['use_flag'] != 0:  # 弃用
+        #             validated_data['use_flag'] = instance.id
         validated_data.update(last_updated_user=self.context["request"].user)
         return super(GlobalCodeSerializer, self).update(instance, validated_data)
 
@@ -140,7 +139,7 @@ class WorkScheduleUpdateSerializer(BaseModelSerializer):
             raise serializers.ValidationError('该倒班已关联排班计划，不可修改')
         classesdetail_set = validated_data.pop('classesdetail_set', None)
         if classesdetail_set is not None:
-            instance.classesdetail_set.all().delete()
+            instance.classesdetail_set.filter().update(delete_flag=True)
             classes_details_list = []
             for plan in classesdetail_set:
                 plan['work_schedule'] = instance
@@ -241,17 +240,17 @@ class PlanScheduleSerializer(BaseModelSerializer):
     def create(self, validated_data):
         day_time = validated_data['day_time']
         work_schedule_plan = validated_data.pop('work_schedule_plan', None)
-        validated_data['plan_schedule_no'] = UUidTools.uuid1_hex()
+        validated_data['plan_schedule_no'] = UUidTools.uuid1_hex(None)
         instance = super().create(validated_data)
         work_schedule_plan_list = []
         morning_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
-                                                     classes__global_name='早班').first()
+                                                     classes__global_name='早班', delete_flag=False).first()
         evening_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
-                                                     classes__global_name='晚班').first()
+                                                     classes__global_name='晚班', delete_flag=False).first()
         for plan in work_schedule_plan:
             classes = plan['classes']
             class_detail = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
-                                                        classes=plan['classes']).first()
+                                                        classes=plan['classes'], delete_flag=False).first()
             if not class_detail:
                 raise serializers.ValidationError('暂无此班次倒班数据')
             if classes.global_name == '晚班':  # 晚班的结束时间小于等于早班的开始时间，日期则加一天
@@ -261,7 +260,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
             plan['start_time'] = str(day_time) + ' ' + str(class_detail.start_time)
             plan['end_time'] = str(day_time) + ' ' + str(class_detail.end_time)
             plan['plan_schedule'] = instance
-            plan['work_schedule_plan_no'] = UUidTools.uuid1_hex()
+            plan['work_schedule_plan_no'] = UUidTools.uuid1_hex(None)
             work_schedule_plan_list.append(WorkSchedulePlan(**plan))
         WorkSchedulePlan.objects.bulk_create(work_schedule_plan_list)
         return instance

@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework import status
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from basics.views import CommonDeleteMixin
@@ -36,7 +36,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
         'equip__category', 'plan_schedule', 'product_batching').prefetch_related(
         'pdp_product_classes_plan__work_schedule_plan', 'pdp_product_batching_day_plan')
     serializer_class = ProductDayPlanSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
     filter_class = ProductDayPlanFilter
     ordering_fields = ['id', 'equip__category__equip_type__global_name']
@@ -44,12 +44,9 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         """"胶料计划删除 先删除胶料计划，随后删除胶料计划对应的班次日计划和原材料需求量表"""
         instance = self.get_object()
-        for pcp_obj in instance.pdp_product_classes_plan.all():
-            MaterialDemanded.objects.filter(
-                plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True,
-                                                                  delete_user=request.user)
+        MaterialDemanded.objects.filter(
+            product_classes_plan__product_day_plan=instance).delete()
         ProductClassesPlan.objects.filter(product_day_plan=instance).update(delete_flag=True, delete_user=request.user)
-
         instance.delete_flag = True
         instance.delete_user = request.user
         instance.save()
@@ -59,6 +56,7 @@ class ProductDayPlanViewSet(CommonDeleteMixin, ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class ProductDayPlanManyCreate(APIView):
     """胶料计划群增接口"""
+    permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
         if isinstance(request.data, dict):
@@ -80,6 +78,7 @@ class MaterialDemandedAPIView(ListAPIView):
     queryset = MaterialDemanded.objects.all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDemandedFilter
+    permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -112,7 +111,6 @@ class ProductDayPlanAPiView(APIView):
 
     def post(self, request):
         product_day_id = self.request.query_params.get('product_day_id')
-        print(product_day_id)
         if not product_day_id:
             raise ValidationError('缺失参数')
         try:
@@ -130,6 +128,7 @@ class ProductDayPlanAPiView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedView(APIView):
     """计划原材料需求列表"""
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         # 条件筛选
@@ -139,7 +138,7 @@ class MaterialDemandedView(APIView):
         classes = params.get('classes')
         product_no = params.get('product_no')
         if plan_date:
-            filter_dict['work_schedule_plan__plan_schedule__day_time'] = plan_date  # TODO 前端必须一开始就穿一个日期
+            filter_dict['work_schedule_plan__plan_schedule__day_time'] = plan_date
         if classes:
             filter_dict['work_schedule_plan__classes__global_name'] = classes
         if product_no:

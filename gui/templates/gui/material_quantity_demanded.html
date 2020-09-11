@@ -8,6 +8,7 @@
                     v-model="search_time"
                     @change="search_timeChange"
                     type="date"
+                    format="yyyy-MM-dd"
                     value-format="yyyy-MM-dd"
                     placeholder="选择日期">
             </el-date-picker>
@@ -73,6 +74,7 @@
 
 
 {% block scripts %}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
     <script src="{% static 'gui/js/material_quantity_demanded.js' %}"></script>
 {% endblock %}
 

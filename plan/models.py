@@ -29,15 +29,15 @@ class ProductClassesPlan(AbstractEntity):
                                          verbose_name='胶料日计划id',
                                          related_name='pdp_product_classes_plan')
     sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
-    plan_trains = models.PositiveIntegerField(verbose_name='车次', help_text='车次')
+    plan_trains = models.DecimalField(verbose_name='车次', help_text='车次', decimal_places=1, max_digits=8)
     time = models.DecimalField(help_text='时间（分钟）', blank=True, null=True, decimal_places=2, max_digits=8)
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=3, max_digits=8, blank=True, null=True)
     unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.DO_NOTHING, help_text='班次id',
                                            verbose_name='排班详情id', related_name='cd_product_classes_plan')
-    plan_classes_uid = models.UUIDField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',
-                                        null=True)
+    plan_classes_uid = models.CharField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',max_length=64)
+
     note = models.CharField(max_length=64, help_text='备注', blank=True, null=True)
 
     @property
@@ -85,7 +85,7 @@ class ProductBatchingClassesPlan(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_product_batching_classes_plan')
-    plan_classes_uid = models.UUIDField(default=uuid.uuid4(), verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
+    plan_classes_uid = models.CharField( verbose_name='班次计划唯一码', help_text='班次计划唯一码', max_length=64)
 
     class Meta:
         db_table = 'product_batching_classes_plan'
@@ -122,7 +122,7 @@ class MaterialRequisitionClasses(AbstractEntity):
     classes_detail = models.ForeignKey(ClassesDetail, on_delete=models.DO_NOTHING, help_text='班次id',
                                        verbose_name='班次id',
                                        related_name='cd_material_requisition_classes', null=True)
-    plan_classes_uid = models.UUIDField(default=uuid.uuid4(), verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
+    plan_classes_uid = models.CharField(max_length=64, verbose_name='班次计划唯一码', help_text='班次计划唯一码', null=True)
 
     class Meta:
         db_table = 'material_requisition_classes'

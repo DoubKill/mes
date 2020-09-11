@@ -20,15 +20,6 @@ class MaterialSerializer(BaseModelSerializer):
     material_no = serializers.CharField(max_length=64, help_text='编码',
                                         validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
                                                                     message='该原材料已存在')])
-    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
-                                                                                          delete_flag=False),
-                                                       help_text='原材料类型id',
-                                                       error_messages={'does_not_exist': 'object does not exist'})
-    package_unit = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0,
-                                                                                         delete_flag=False),
-                                                      help_text='包装单位id', required=False,
-                                                      allow_null=True, allow_empty=True,
-                                                      error_messages={'does_not_exist': 'object does not exist'})
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
@@ -64,8 +55,6 @@ class ProductInfoSerializer(BaseModelSerializer):
 
 
 class ProductInfoCopySerializer(BaseModelSerializer):
-    factory = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
-                                                 help_text='产地id')
 
     def validate(self, attrs):
         versions = attrs['versions']
@@ -95,7 +84,7 @@ class ProductInfoCopySerializer(BaseModelSerializer):
 
 
 class ProductBatchingDetailSerializer(BaseModelSerializer):
-    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, used_flag=1))
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False, use_flag=1))
     material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True)
 
@@ -119,8 +108,6 @@ class ProductBatchingListSerializer(BaseModelSerializer):
 
 
 class ProductBatchingCreateSerializer(BaseModelSerializer):
-    stage = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(used_flag=0, delete_flag=False),
-                                               help_text='段次id')
     batching_details = ProductBatchingDetailSerializer(many=True, required=False,
                                                        help_text="""
                                                            [{"sn": 序号, "material":原材料id, "auto_flag": true,
@@ -145,7 +132,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         if batching_details:
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
-                auto_flag = detail.get('detail')
+                auto_flag = detail.get('auto_flag')
                 actual_weight = detail.get('actual_weight', 0)
                 if auto_flag == 1:
                     auto_material_weight += actual_weight
@@ -174,7 +161,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
-                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type')
+                  'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type', 'production_time_interval')
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
@@ -198,11 +185,11 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
         instance = super().update(instance, validated_data)
         batching_weight = manual_material_weight = auto_material_weight = 0
         if batching_details is not None:
-            instance.batching_details.all().delete()
+            instance.batching_details.filter().update(delete_flag=True)
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
                 actual_weight = detail.get('actual_weight', 0)
-                auto_flag = detail.get('detail')
+                auto_flag = detail.get('auto_flag')
                 if auto_flag == 1:
                     auto_material_weight += actual_weight
                 elif auto_flag == 2:

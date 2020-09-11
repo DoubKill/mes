@@ -260,7 +260,19 @@
         胶料名称: <el-input size="mini" v-model="select_product_name" :disabled="true" style="width: 10%" ></el-input>
         状态: <el-input size="mini" v-model="select_status" :disabled="true" style="width: 10%" ></el-input>
         <br><br>
-        炼胶机类型: <el-input size="mini" v-model="RubberSite" :disabled="true" style="width: 10%" ></el-input>
+        炼胶机类型:
+            <el-select
+                    size="mini"
+                    clearable
+                    v-model="select_dev_type" placeholder="请选择">
+                <el-option
+                        v-for="item in DevTypeOptions"
+                        :key="item.id"
+                        :label="item.category_name"
+                        :value="item.id">
+                </el-option>
+            </el-select>
+
         配料重量: <el-input size="mini" v-model="select_material_weight" :disabled="true" style="width: 10%" ></el-input>
         炼胶时间: <el-time-picker size="mini" :disabled="true" v-model="select_rm_time_interval" value-format="HH:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
 
@@ -341,8 +353,7 @@
         胶料名称: <el-input size="mini" v-model="put_select_product_name" :disabled="true" style="width: 10%" ></el-input>
         状态: <el-input size="mini" v-model="put_select_status" :disabled="true" style="width: 10%" ></el-input>
         <br><br>
-        <el-form :inline="true">
-        <el-form-item label="炼胶机类型">
+        炼胶机类型:
             <el-select
                     size="mini"
                     clearable
@@ -354,11 +365,9 @@
                         :value="item.id">
                 </el-option>
             </el-select>
-        </el-form-item>
         配料重量: <el-input size="mini" v-model="put_select_material_weight" :disabled="true" style="width: 10%" ></el-input>
         炼胶时间: <el-input-number size="mini" controls-position="right"  v-model.number="put_select_rm_time_interval"></el-input-number>
 
-        </el-form>
         <br><br>
 
 
