@@ -1,0 +1,328 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+
+        <el-form-item label="工程名">
+            <el-input v-model="projectName" v-on:input="materialNameChanged" placeholder="密炼" :disabled="true"></el-input>
+        </el-form-item>
+        <el-form-item label="日期">
+            <el-date-picker
+                    v-model="performanceDate"
+                    @change="performanceDateChange"
+                    type="date"
+                    placeholder="选择日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="机台">
+            <el-select
+                    clearable
+                    @change="equipNoChange"
+                    @visible-change="equipNoVisibleChange"
+                    v-model="equipNo" placeholder="请选择">
+                <el-option
+                        v-for="item in equipNoOptions"
+                        :key="item.equip_no"
+                        :label="item.equip_no"
+                        :value="item.equip_no">
+                </el-option>
+            </el-select>
+        </el-form-item>
+
+        <el-form-item style="float: right">
+            <el-form-item>
+                <el-button>
+                    下载全部
+                </el-button>
+            </el-form-item>
+        </el-form-item>
+    </el-form>
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                label="处理"
+                width="40">
+        </el-table-column>
+        <el-table-column
+                prop="equip_no"
+                label="机型">
+        </el-table-column>
+        <el-table-column
+{#                prop="product_no"#}
+                width="140px"
+                label="胶料代码">
+            <template slot-scope="scope">
+                <span style="margin-left: 10px" v-text="scope.row.product_no"></span>
+                <el-button @click="clickProductNo(scope.row)" icon="el-icon-search" type="text" size="small" style="float: right; width: 30%">
+{#                    <i class="el-icon-search"></i>#}
+                </el-button>
+            </template>
+        </el-table-column>
+        <el-table-column
+                prop="plan_weight"
+                label="标准重量">
+        </el-table-column>
+        <el-table-column
+                prop="plan_trains"
+                label="日计划">
+        </el-table-column>
+        <el-table-column
+                prop="actual_trains"
+                label="日结果">
+        </el-table-column>
+        <el-table-column
+                align="center"
+{#                prop="mr_material_requisition_classes"#}
+                label="早班">
+            <el-table-column
+                prop="classes_data[0].plan_trains"
+                label="计划">
+            </el-table-column>
+            <el-table-column
+                prop="classes_data[0].actual_trains"
+                label="结果">
+            </el-table-column>
+        </el-table-column>
+        <el-table-column
+                align="center"
+{#                prop="mr_material_requisition_classes"#}
+                label="中班">
+            <el-table-column
+                prop="classes_data[1].plan_trains"
+                label="计划">
+            </el-table-column>
+            <el-table-column
+                prop="classes_data[1].actual_trains"
+                label="结果">
+            </el-table-column>
+        </el-table-column>
+        <el-table-column
+                align="center"
+{#                prop="mr_material_requisition_classes"#}
+                label="晚班">
+            <el-table-column
+                prop="classes_data[2].plan_trains"
+                label="计划">
+            </el-table-column>
+            <el-table-column
+                prop="classes_data[2].actual_trains"
+                label="结果">
+            </el-table-column>
+        </el-table-column>
+        <el-table-column
+            prop="download"
+            label="下载">
+            <template slot-scope="scope">
+                <el-button @click="downloadClick(scope.row)" type="text" size="small">下载</el-button>
+            </template>
+        </el-table-column>
+        <el-table-column label="发送到上辅机">
+            <template slot-scope="scope">
+                <el-button
+                        size="mini"
+                        @click="sendToAu(scope.row)">发送
+                </el-button>
+            </template>
+        </el-table-column>
+    </el-table>
+
+{#    {% include 'gui/paginations.html' %}#}
+{% endblock %}
+
+
+{% block dialogs %}
+    {% verbatim vue %}
+        <el-dialog
+                title="胶料产出反馈"
+                :visible.sync="dialogVisibleRubber">
+            <el-form :inline="true">
+                <el-form-item label="胶料区分: ">
+                    {{ palletFeedObj.hasOwnProperty("stage")?palletFeedObj.stage:'--'}}
+                </el-form-item>
+                <el-form-item label="胶料编码: ">
+                    {{ palletFeedObj.product_no }}
+                </el-form-item>
+                <el-form-item label="班次: ">
+                    {{ palletFeedObj.classes }}
+                </el-form-item>
+                <el-form-item label="机台: ">
+                    {{ palletFeedObj.equip_no }}
+                </el-form-item>
+
+            </el-form>
+            <el-table
+                    :data="palletFeedList"
+                    border
+                    style="width: 100%">
+                <el-table-column
+                        prop="lot_no"
+                        label="LOT">
+                    <template slot-scope="scope">
+                        {{ scope.row.LOT||'--' }}
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="product_no"
+                        label="胶料编码">
+                </el-table-column>
+                <el-table-column
+                        prop="equip_no"
+                        label="机台">
+                </el-table-column>
+
+                <el-table-column
+                        label="BAT">
+                    <template slot-scope="scope">
+                        <div style="color:#1989fa;cursor:pointer"
+                             @click="clickBAT(scope.row)">
+                            {{ scope.row.begin_trains }}--{{ scope.row.end_trains }}</div>
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="actual_weight"
+                        label="生产重量">
+                </el-table-column>
+                <el-table-column
+                        label="生产时间">
+                    <template slot-scope="scope">
+                        {{ scope.row.end_time.split(' ')[1]}}
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="classes"
+                        label="班次">
+                </el-table-column>
+                <el-table-column
+                        prop="operation_user"
+                        label="作业者">
+                </el-table-column>
+            </el-table>
+            <el-pagination
+                @current-change="getRubberCoding"
+                :current-page.sync="currentPage"
+                :page-size="pageSize"
+                :total="tableDataTotal"
+                layout="total, prev, pager, next">
+            </el-pagination>
+        </el-dialog>
+        <el-dialog
+                title="BAT查询"
+                :visible.sync="dialogVisibleBAT">
+            <div style="position: relative">
+                <el-form :inline="true" style="margin-right: 100px;">
+                    <el-form-item label="胶料区分: ">
+                        {{ BATObj.stage }}
+                    </el-form-item>
+                    <el-form-item label="胶料编码: ">
+                        {{ BATObj.product_no }}
+                    </el-form-item>
+                    <el-form-item label="班次: ">
+                        {{ BATObj.classes }}
+                    </el-form-item>
+                    <el-form-item label="机台: ">
+                        {{ BATObj.equip_no }}
+                    </el-form-item>
+                    <el-form-item label="车次: ">
+                        {{ BATObj.begin_trains }} -- {{ BATObj.end_trains }}
+                    </el-form-item>
+
+                </el-form>
+                <el-button @click="viewGraph" style="position: absolute;right:10px;top:0">
+                    图形
+                </el-button>
+            </div>
+            <el-table
+                    :data="BATList"
+                    style="width: 100%">
+                <el-table-column
+                        prop="equip_no"
+                        label="机台">
+                </el-table-column>
+                <el-table-column
+                        prop="name"
+                        label="日期">
+                    <template slot-scope="scope">
+                        {{ scope.row.end_time.split(' ')[0] }}
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="classes"
+                        label="班次">
+                </el-table-column>
+                <el-table-column
+                        prop="product_no"
+                        label="胶料编码">
+                </el-table-column>
+                <el-table-column
+                        prop="actual_trains"
+                        label="车次">
+                </el-table-column>
+                <el-table-column
+                        prop="actual_weight"
+                        label="胶">
+                </el-table-column>
+                <el-table-column
+                        prop="end_time-begin-time"
+                        label="时间">
+                    <template slot-scope="scope">
+                        {{ scope.row.begin_time }} -- {{ scope.row.end_time }}
+                    </template>
+                </el-table-column>
+                <el-table-column
+                        prop="equip_status.temperature"
+                        label="温度">
+                </el-table-column>
+                <el-table-column
+                        prop="equip_status.energy"
+                        label="电量">
+                </el-table-column>
+                <el-table-column
+                        prop="equip_status.rpm"
+                        label="RPM">
+                </el-table-column>
+            </el-table>
+        </el-dialog>
+
+        <el-dialog
+                title="分析图表"
+                :modal="true"
+                :close-on-click-modal="false"
+                :modal-append-to-body="false"
+                width="600px"
+                :visible.sync="dialogVisibleGraph"
+                @opened="opens"
+        >
+            <div style="margin: 0 0 20px 5px;">2020-12-12</div>
+            <div ref="main" style="width: 100%;height:400px;"></div>
+        </el-dialog>
+        {% endverbatim vue %}
+{% endblock %}
+
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'node_modules/bootstrap/dist/css/bootstrap.min.css' %}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'node_modules/echarts/dist/echarts.js' %}"></script>
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
+    <script src="{% static 'gui/js/banburying_performance_manage.js' %}"></script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

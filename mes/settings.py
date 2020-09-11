@@ -10,13 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
-import os, datetime
-
+import os
+import datetime
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 from django.utils.translation import ugettext_lazy
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
@@ -38,8 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # 'corsheaders',
     'rest_framework',
-    'drf_yasg',  # swgger文档插件    /api/v1/docs/swagger
+    'drf_yasg',  # swagger文档插件    /api/v1/docs/swagger
     'django_filters',
     'production.apps.ProductionConfig',
     'plan.apps.PlanConfig',
@@ -60,6 +60,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'mes.middlewares.SyncMiddleware',
+    'mes.middlewares.JwtTokenUserMiddleware', # jwt-token嵌套django权限组件
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -90,13 +92,14 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
-        ) if DEBUG else ('rest_framework_jwt.authentication.JSONWebTokenAuthentication',),  # 认证
+    ),  # 认证
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',),  # 过滤
     'DEFAULT_PAGINATION_CLASS': 'mes.paginations.DefaultPageNumberPagination',  # 分页
+    'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
 }
 
 JWT_AUTH = {
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(minutes=30),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
     'JWT_ALLOW_REFRESH': True,
 }
 
@@ -167,6 +170,22 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'standard',
         },
+        'syncFile': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'sync.log'),
+            'when': 'D',
+            'backupCount': 10,
+            'formatter': 'standard',
+        },
+        'asyncFile':{
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'async.log'),
+            'when': 'D',
+            'backupCount': 10,
+            'formatter': 'standard',
+        },
     },
     'loggers': {
         'django.db.backends': {
@@ -186,30 +205,65 @@ LOGGING = {
         'error_log': {
             'handlers': ['errorFile'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-        }
+        },
+        'sync_log': {
+            'handlers': ['syncFile'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+        },
+        'async_log':{
+            'handlers': ['asyncFile'],
+            'level': 'INFO',
+        },
     },
 }
 
+# oracle 实例链接
+# DATABASES = {
+#     'default': {
+#     'ENGINE': 'django.db.backends.oracle',
+#     'NAME': 'IP:端口号/service_name',
+#     'USER': '用户名',
+#     'PASSWORD': '密码',
+#     }
+# }
 
-# Database
-if DEBUG:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        }
+# oracle使用SID连接
+# DATABASES = {
+#     'default': {
+#     'ENGINE': 'django.db.backends.oracle',
+#     'NAME': 'zcaj1',  # 数据库SID
+#     'USER': 'zcajlj',
+#     'PASSWORD': 'zcajmes2020',
+#     'HOST':'10.4.10.17',
+#     'PORT':'1521'
+#     }
+# }
+
+# if DEBUG:
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.sqlite3',
+#             'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#         }
+#     }
+# else:
+#     DATABASES = {
+#         'default': {
+#             'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+#             'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
+#             'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
+#             'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mes@2020'),  # 密码
+#             'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
+#             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
+#         }
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-            'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
-            'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
-            'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mysql'),  # 密码
-            'HOST': os.getenv('DATABASE_HOSTNAME', '127.0.0.1'),  # HOST
-            'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
-        }
-    }
+}
 
 
 # Password validation
@@ -230,7 +284,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 
@@ -244,12 +297,12 @@ USE_L10N = True
 
 USE_TZ = False
 
-
 AUTH_USER_MODEL = 'system.User'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, "static/"))
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),
@@ -257,5 +310,47 @@ LANGUAGES = (
 )
 
 LOCALE_PATHS = (
-     os.path.join(BASE_DIR, 'locale'),
+    os.path.join(BASE_DIR, 'locale'),
 )
+
+LOGIN_URL = 'gui:login'
+LOGIN_REDIRECT_URL = 'gui:global-codes-manage'
+LOGOUT_REDIRECT_URL = 'gui:login'
+
+# 跨域允许的请求方式，可以使用默认值，默认的请求方式为:
+# from corsheaders.defaults import default_methods
+CORS_ALLOW_METHODS = (
+    'GET',
+    'POST',
+    'PUT',
+    'PATCH',
+    'DELETE',
+    'OPTIONS'
+)
+
+# 允许跨域的请求头，可以使用默认值，默认的请求头为:
+# from corsheaders.defaults import default_headers
+# CORS_ALLOW_HEADERS = default_headers
+
+CORS_ALLOW_HEADERS = (
+    'XMLHttpRequest',
+    'X_FILENAME',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'Pragma',
+)
+
+# 跨域请求时，是否运行携带cookie，默认为False
+CORS_ALLOW_CREDENTIALS = True
+# 允许所有主机执行跨站点请求，默认为False
+# 如果没设置该参数，则必须设置白名单，运行部分白名单的主机才能执行跨站点请求
+CORS_ORIGIN_ALLOW_ALL = True
+
+# 上辅机部署地址
+AUXILIARY_URL = os.environ.get('AUXILIARY_URL', 'http://127.0.0.1:9000/')

@@ -16,14 +16,14 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import RedirectView
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 from rest_framework.documentation import include_docs_urls
 
-
 # 修改后
-
+# 配置swgger
 schema_view = get_schema_view(
     openapi.Info(
         title="MES-API",
@@ -42,11 +42,16 @@ urlpatterns = [
     path('api/v1/basics/', include('basics.urls')),
     path('api/v1/system/', include('system.urls')),
     path('api/v1/recipe/', include('recipe.urls')),
+    path('api/v1/plan/', include('plan.urls')),
+    path('api/v1/production/', include('production.urls')),
+    path('api/v1/inventory/', include('inventory.urls')),
+    path('gui/', include('gui.urls')),
+    path('favicon.ico', RedirectView.as_view(url='static/m.ico'))
 ]
 
 if settings.DEBUG:
     urlpatterns += [
-            path('docs/', include_docs_urls(title="Mes系统文档", description="Mes系统文档")),
-            path('api-auth/', include('rest_framework.urls')),
-            path('api/v1/docs/', include('docs.urls')),
-        ]
+        path('docs/', include_docs_urls(title="Mes系统文档", description="Mes系统文档")),
+        path('api-auth/', include('rest_framework.urls')),
+        path('api/v1/docs/', include('docs.urls')),
+    ]

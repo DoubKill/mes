@@ -1,0 +1,184 @@
+{% extends 'gui/base.html' %}
+{% load static %}
+
+{% block main %}
+    <el-form :inline="true">
+        <el-form-item label="日期">
+            <el-date-picker
+                    v-model="planDate"
+                    @change="planDateChange"
+                    type="date"
+                    value-format="yyyy-MM-dd"
+                    placeholder="选择日期">
+            </el-date-picker>
+        </el-form-item>
+        <el-form-item label="原材料类别">
+            <el-select
+                    clearable
+                    @change="materialTypeChange"
+                    @visible-change="materialTypeVisibleChange"
+                    v-model="materialType" placeholder="请选择">
+                <el-option
+                        v-for="item in materialTypeOptions"
+                        :key="item.global_name"
+                        :label="item.global_name"
+                        :value="item.global_name">
+                </el-option>
+            </el-select>
+        </el-form-item>
+        <el-form-item label="原材料名称">
+            <el-input v-model="materialName" v-on:input="materialNameChanged"></el-input>
+        </el-form-item>
+    </el-form>
+
+    <el-table
+            :data="tableData"
+            border
+            style="width: 100%">
+        <el-table-column
+                label="S"
+                prop="unit"
+                width="30">
+        </el-table-column>
+        <el-table-column
+                type="index"
+                label="No"
+                width="30">
+        </el-table-column>
+        <el-table-column
+                prop="material_type"
+                label="原材料类别">
+        </el-table-column>
+        <el-table-column
+                prop="material_no"
+                label="原材料代码">
+        </el-table-column>
+        <el-table-column
+                prop="material_name"
+                label="原材料名称">
+        </el-table-column>
+        <el-table-column
+                prop="storage_weight"
+                label="原材料库存（Kg）">
+        </el-table-column>
+        <el-table-column
+                align="center"
+                label="原材料需要量（Kg）">
+            <el-table-column
+                prop="class_details.早班"
+                label="早班">
+            </el-table-column>
+            <el-table-column
+                prop="class_details.中班"
+                label="中班">
+            </el-table-column>
+            <el-table-column
+                prop="class_details.晚班"
+                label="晚班">
+            </el-table-column>
+            <el-table-column
+                label="总计">
+                <template slot-scope="scope">
+                    <span v-text="scope.row.class_details.早班 + scope.row.class_details.中班 + scope.row.class_details.晚班"></span>
+                </template>
+            </el-table-column>
+        </el-table-column>
+        <el-table-column
+                align="center"
+                label="领料计划（Kg）">
+            <el-table-column
+{#                prop="md_material_requisition_classes[0].早班"#}
+                label="早班">
+            </el-table-column>
+            <el-table-column
+{#                prop="md_material_requisition_classes[1].中班"#}
+                label="中班">
+            </el-table-column>
+            <el-table-column
+{#                prop="md_material_requisition_classes[2].晚班"#}
+                label="晚班">
+            </el-table-column>
+            <el-table-column
+                label="总计">
+{#                <template slot-scope="scope" v-if="scope.row.md_material_requisition_classes[0]">#}
+{#                    <span v-text="scope.row.md_material_requisition_classes[0].早班 + scope.row.md_material_requisition_classes[1].中班 + scope.row.md_material_requisition_classes[2].晚班"></span>#}
+{#                </template>#}
+            </el-table-column>
+        </el-table-column>
+{#        <el-table-column label="操作">#}
+{#            <template slot-scope="scope">#}
+{#                <el-button-group>#}
+{#                    <el-button type="primary"#}
+{#                            size="mini"#}
+{#                            @click="showEditDialog(scope.row)">编辑#}
+{#                    </el-button>#}
+{#                </el-button-group>#}
+{#            </template>#}
+{#        </el-table-column>#}
+
+
+    </el-table>
+    {% include 'gui/paginations.html' %}
+{% endblock %}
+
+
+{% block dialogs %}
+    <el-dialog title="编辑原材料领料计划" :visible.sync="dialogEditVisible" size="mini">
+        <el-form :model="editForm" ref="editForm" :label-width="formLabelWidth" >
+            <el-form-item label="日期：">
+                <span v-text="editForm.plan_date"></span>
+            </el-form-item>
+            <el-form-item label="原材料名称：">
+                <span v-text="editForm.material_name"></span>
+            </el-form-item>
+            <el-form-item label="早班领料计划：">
+                <el-input  v-model.number="editForm.weights[0]" style="float: left; width: 80%"></el-input>
+                <span style="float: right; width: 18%">Kg</span>
+            </el-form-item>
+            <el-form-item label="中班领料计划：">
+                <el-input  v-model.number="editForm.weights[1]" style="float: left; width: 80%"></el-input>
+                <span style="float: right; width: 18%">Kg</span>
+            </el-form-item>
+            <el-form-item label="晚班领料计划：">
+                <el-input  v-model.number="editForm.weights[2]" style="float: left; width: 80%"></el-input>
+                <span style="float: right; width: 18%">Kg</span>
+            </el-form-item>
+            <el-form-item label="领料计划合计：">
+                <template v-if="editForm.weights.length == 3">
+                    <span v-text="editForm.weights[0] + editForm.weights[1] + editForm.weights[2]"></span>
+                    <span>  Kg</span>
+                </template>
+            </el-form-item>
+        </el-form>
+        <div slot="footer" class="dialog-footer">
+            <el-button @click="dialogEditVisible = false">取 消</el-button>
+            <el-button type="primary" @click="saveRequisitionsPlan('editForm')">确 定</el-button>
+        </div>
+    </el-dialog>
+
+{% endblock %}
+
+
+{% block links %}
+    <link rel="stylesheet" href="{% static 'node_modules/bootstrap/dist/css/bootstrap.min.css' %}">
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'node_modules/dayjs/dayjs.min.js' %}"></script>
+    <script src="{% static 'gui/js/material_requisitions_plan.js' %}"></script>
+{% endblock %}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

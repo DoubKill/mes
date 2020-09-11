@@ -4,6 +4,7 @@ import logging
 import traceback
 
 from django.http.response import HttpResponseNotFound
+
 api_log = logging.getLogger('api_log')
 error_log = logging.getLogger('error_log')
 
@@ -42,4 +43,5 @@ def api_recorder(func):
             api_log.info(','.join(('SEND', 'http', '[%s,%s,%s,%s,%s]' % (request.method, request.user,
                                                                          request.path, round(finish - start, 3),
                                                                          value))))
+
     return inner

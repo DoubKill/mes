@@ -4,4 +4,6 @@ db.sqlite3
 logs
 .idea
 .svn
+*.DS_Store
 __pycache__
+static

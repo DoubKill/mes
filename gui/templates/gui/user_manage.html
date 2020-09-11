@@ -1,34 +1,31 @@
 {% extends 'gui/base.html' %}
 {% load static %}
 
-
 {% block main %}
-    <el-form :inline="true">
-        <el-form-item label="工号">
-            {#            <el-input v-model="type_name" v-on:input="typeNameChanged"></el-input>#}
-            <el-input></el-input>
-        </el-form-item>
-        <el-form-item label="用户名">
-            {#            <el-input v-model="type_name" v-on:input="typeNameChanged"></el-input>#}
-            <el-input></el-input>
-        </el-form-item>
-        <el-form-item>
-            {#            <el-button @click="showCreateGlobalCodeTypeDialog">新建</el-button>#}
-            <el-button @click="showCreateUserDialog">新建</el-button>
-        </el-form-item>
-        <el-form-item>
-            {#            <el-button @click="showCreateGlobalCodeTypeDialog">新建</el-button>#}
-            <el-button>导入</el-button>
-        </el-form-item>
-    </el-form>
-    <template>
+    {% if perms.system.view_user %}
+        <el-form :inline="true">
+            <el-form-item label="工号">
+                <el-input v-model.number="num" v-on:input="numChanged"></el-input>
+            </el-form-item>
+            <el-form-item label="用户名">
+                <el-input v-model="username" v-on:input="userNameChanged"></el-input>
+            </el-form-item>
+            {% if perms.system.add_user %}
+                <el-form-item style="float: right">
+                    <el-button @click="showCreateUserDialog">新建</el-button>
+                </el-form-item>
+                <el-form-item style="float: right">
+                    <el-button disabled="">导入</el-button>
+                </el-form-item>
+            {% endif %}
+        </el-form>
         <el-table
                 :data="tableData"
                 border
                 style="width: 100%">
             <el-table-column
                     prop="id"
-                    label="Id"
+                    label="序"
                     width="50">
             </el-table-column>
             <el-table-column
@@ -50,74 +47,95 @@
                     :formatter="formatter">
             </el-table-column>
             <el-table-column
-                    prop="created_user"
+                    prop="created_username"
                     label="创建人">
             </el-table-column>
             <el-table-column
-                    prop="type_name"
+                    prop="created_date"
                     label="创建日期">
             </el-table-column>
             <el-table-column label="操作">
                 <template slot-scope="scope">
                     <el-button-group>
-                        <el-button
-                                size="mini"
-                                @click="">编辑
-                        </el-button>
-                        <el-button
-                                size="mini"
-                                type="danger"
-                                @click="">删除
-                        </el-button>
+                        {% if perms.system.change_user %}
+                            <el-button
+                                    size="mini"
+                                    @click="showEditUserDialog(scope.row)">编辑
+                            </el-button>
+                        {% endif %}
+                        {% if perms.system.delete_user %}
+                            {% verbatim vue %}
+                                <el-button
+                                        size="mini"
+                                        type="danger"
+                                        @click="handleUserDelete(scope.row)">
+                                    {{ scope.row.is_active?'停用':'启用' }}
+                                </el-button>
+                            {% endverbatim vue %}
+                        {% endif %}
                     </el-button-group>
                 </template>
             </el-table-column>
         </el-table>
-        <el-pagination
-                @current-change="currentChange"
-                :current-page.sync="currentPage"
-                :page-size="pageSize"
-                :total="tableDataTotal"
-                layout="total, prev, pager, next">
-        </el-pagination>
-    </template>
+        {% include 'gui/paginations.html' %}
+    {% endif %}
 {% endblock %}
 
 {% block dialogs %}
-    <el-dialog title="添加用户" :visible.sync="dialogCreateUserVisible">
-        <el-form :model="userForm" ref="userForm" :rules="rules" :label-width="formLabelWidth">
-            <el-form-item label="用户名" >
-                <el-input v-model="userForm.username"></el-input>
-            </el-form-item>
-            <el-form-item label="密码" prop="password">
-                <el-input type="password" v-model="userForm.password" autocomplete="off"></el-input>
-            </el-form-item>
-            <el-form-item label="确认密码" prop="checkPass">
-                <el-input type="password" v-model="userForm.checkPass" autocomplete="off"></el-input>
-            </el-form-item>
-            <el-form-item label="工号">
-                <el-input v-model.number="userForm.num"></el-input>
-            </el-form-item>
-        </el-form>
-        {#        <el-form :model="globalCodeForm">#}
-        {#            <el-form-item :error="globalCodeFormError.global_no" label="公用代码编号" :label-width="formLabelWidth">#}
-        {#                <el-input v-model="globalCodeForm.global_no"></el-input>#}
-        {#            </el-form-item>#}
-        {#            <el-form-item :error="globalCodeFormError.global_name" label="公用代码名称" :label-width="formLabelWidth">#}
-        {#                <el-input v-model="globalCodeForm.global_name"></el-input>#}
-        {#            </el-form-item>#}
-        {#            <el-form-item :error="globalCodeFormError.description" label="说明" :label-width="formLabelWidth">#}
-        {#                <el-input v-model="globalCodeForm.description"></el-input>#}
-        {#            </el-form-item>#}
-        {#            <el-form-item :error="globalCodeFormError.used_flag" label="是否启用" :label-width="formLabelWidth">#}
-        {#                <el-switch v-model="globalCodeForm.used_flag_b"></el-switch>#}
-        {#            </el-form-item>#}
-        {#        </el-form>#}
-        <div slot="footer" class="dialog-footer">
-            <el-button @click="dialogCreateUserVisible = false">取 消</el-button>
-            <el-button type="primary" @click="submitForm('userForm')">确 定</el-button>
-        </div>
-    </el-dialog>
+    {% if perms.system.add_user %}
+        <el-dialog title="添加用户" :visible.sync="dialogCreateUserVisible">
+            <el-form :model="userForm" ref="userForm" :rules="rules" :label-width="formLabelWidth">
+                <el-form-item :error="userFormError.username" label="用户名">
+                    <el-input v-model="userForm.username"></el-input>
+                </el-form-item>
+                <el-form-item :error="userFormError.password" label="密码" prop="password">
+                    <el-input type="password" v-model="userForm.password" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item label="确认密码" prop="checkPass">
+                    <el-input type="password" v-model="userForm.checkPass" autocomplete="off"></el-input>
+                </el-form-item>
+                <el-form-item :error="userFormError.num" label="工号">
+                    <el-input v-model.number="userForm.num"></el-input>
+                </el-form-item>
+                <el-form-item label="角色" size="medium">
+                    <el-transfer :titles="['可用 角色', '选中的 角色']" :props="{key: 'id', label: 'name'}"
+                                 v-model="userForm.groups" :data="groups"></el-transfer>
+                </el-form-item>
+                <el-form-item label="权限" size="medium">
+                    <el-transfer :titles="['可用 用户权限', '选中的 用户权限']" :props="{key: 'id', label: 'name'}"
+                                 v-model="userForm.user_permissions" :data="permissions"></el-transfer>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogCreateUserVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleCreateUser('userForm')">确 定</el-button>
+            </div>
+        </el-dialog>
+    {% endif %}
+    {% if perms.system.change_user %}
+        <el-dialog title="编辑用户" :visible.sync="dialogEditUserVisible">
+            <el-form :model="userForm" ref="userForm" :rules="rules" :label-width="formLabelWidth">
+                <el-form-item :error="userFormError.username" label="用户名">
+                    <el-input disabled v-model="userForm.username"></el-input>
+                </el-form-item>
+                <el-form-item :error="userFormError.num" label="工号">
+                    <el-input disabled v-model.number="userForm.num"></el-input>
+                </el-form-item>
+                <el-form-item label="角色" size="medium">
+                    <el-transfer :titles="['可用 角色', '选中的 角色']" :props="{key: 'id', label: 'name'}"
+                                 v-model="userForm.groups" :data="groups"></el-transfer>
+                </el-form-item>
+                <el-form-item label="权限" size="medium">
+                    <el-transfer :titles="['可用 用户权限', '选中的 用户权限']" :props="{key: 'id', label: 'name'}"
+                                 v-model="userForm.user_permissions" :data="permissions"></el-transfer>
+                </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialogEditUserVisible = false">取 消</el-button>
+                <el-button type="primary" @click="handleEditUser('userForm')">确 定</el-button>
+            </div>
+        </el-dialog>
+    {% endif %}
 {% endblock %}
 
 {% block scripts %}

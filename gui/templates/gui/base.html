@@ -10,6 +10,7 @@
     <script src="{% static 'node_modules/element-ui/lib/index.js' %}"></script>
     <script src="{% static 'node_modules/axios/dist/axios.min.js' %}"></script>
     <script src="{% static 'gui/js/base.js' %}"></script>
+    <script src="{% static 'gui/js/permissions.js' %}"></script>
     <link rel="stylesheet" href="{% static 'node_modules/element-ui/lib/theme-chalk/index.css' %}">
     <link rel="stylesheet" href="{% static 'gui/css/base.css' %}">
     {% block links %}
@@ -21,6 +22,9 @@
     <el-container>
         <el-aside>
             <el-menu
+                    background-color="#545c64"
+                    text-color="#fff"
+                    active-text-color="#ffd04b"
                     :default-active="defaultActive"
                     :default-openeds="openeds"
                     @select="select">
@@ -39,27 +43,60 @@
                     <el-menu-item index="2-2">角色管理</el-menu-item>
                     <el-menu-item index="2-3">用户管理</el-menu-item>
                     <el-menu-item index="2-4">角色别用户管理</el-menu-item>
-                    <el-menu-item index="2-5">设备基础信息管理</el-menu-item>
+                    <el-menu-item index="2-6">倒班时间管理</el-menu-item>
+                    <el-menu-item index="2-7">工厂排班管理</el-menu-item>
+                    <el-menu-item index="2-9">工厂排班结果</el-menu-item>
+                    <el-submenu index="2-8">
+                        <template slot="title">设备管理</template>
+                        <el-menu-item index="2-8-1">设备种类</el-menu-item>
+                        <el-menu-item index="2-8-2">设备基础信息</el-menu-item>
+                    </el-submenu>
+
                 </el-submenu>
                 <el-submenu index="3">
                     <template slot="title">
                         <i class="el-icon-document"></i>
                         <span slot="title">配方管理</span>
                     </template>
+                    <el-menu-item index="3-1">原材料基本信息管理</el-menu-item>
+                    <el-menu-item index="3-2">胶料代码管理</el-menu-item>
+                    <el-menu-item index="3-3">胶料配料标准管理</el-menu-item>
+                    <el-menu-item index="3-4">小料配料标准管理</el-menu-item>
                 </el-submenu>
                 <el-submenu index="4">
                     <template slot="title">
                         <i class="el-icon-setting"></i>
                         <span slot="title">生产计划管理</span>
                     </template>
+                    <el-menu-item index="4-1">排产胶料日计划</el-menu-item>
+                    <!--
+                    <el-menu-item index="4-2">排产配料小料日计划</el-menu-item>
+                    -->
+                    <!--
+                    <el-menu-item index="4-3">排产领料计划</el-menu-item>
+                    -->
+                    <el-menu-item index="4-4">原材料需求量</el-menu-item>
+
                 </el-submenu>
                 <el-submenu index="5">
                     <template slot="title">
                         <i class="el-icon-setting"></i>
                         <span slot="title">生产管理</span>
                     </template>
+                    <el-menu-item index="5-1">密炼实绩</el-menu-item>
+                    <el-menu-item index="5-2">密炼机台别计划对比</el-menu-item>
+                    <el-menu-item index="5-3">密炼生产履历</el-menu-item>
+                    <el-menu-item index="5-4">日别胶料收皮管理</el-menu-item>
                 </el-submenu>
-                <el-menu-item index="6">
+                <el-submenu index="6">
+                    <template slot="title">
+                        <i class="el-icon-setting"></i>
+                        <span slot="title">库存管理</span>
+                    </template>
+                    <el-menu-item index="6-1">原料库存</el-menu-item>
+                    <el-menu-item index="6-2">胶料库存</el-menu-item>
+                </el-submenu>
+                <el-menu-item index="7">
                     <template slot="title">
                         <i class="el-icon-setting"></i>
                         <span slot="title">上辅机群控软件</span>
@@ -67,28 +104,25 @@
                 </el-menu-item>
             </el-menu>
         </el-aside>
-        <el-main>
+        <el-main style="padding:0">
             {% block breadcrumb %}
-                <el-row type="flex" justify="space-between">
-                    <el-breadcrumb separator="/">
+                <el-row type="flex" class="rowBreadTop" justify="space-between">
+                    <el-breadcrumb separator="/" class="breadcrumbTop">
                         {% for name in namePath %}
                             <el-breadcrumb-item>{{ name }}</el-breadcrumb-item>
                         {% endfor %}
                     </el-breadcrumb>
-                    <el-dropdown>
+                    <el-dropdown class="main-dropdown">
                           <span class="el-dropdown-link">
-                            用户<i class="el-icon-arrow-down el-icon--right"></i>
+                            用户：{{ user }}<i class="el-icon-arrow-down el-icon--right"></i>
                           </span>
                         <el-dropdown-menu slot="dropdown">
-                            <el-dropdown-item>测试1</el-dropdown-item>
-                            <el-dropdown-item>测试1</el-dropdown-item>
-                            <el-dropdown-item>测试1</el-dropdown-item>
-                            <el-dropdown-item disabled>测试1</el-dropdown-item>
-                            <el-dropdown-item divided>测试1</el-dropdown-item>
+                            <el-dropdown-item>
+                                <el-link href="{% url 'gui:logout' %}" :underline="false">注销</el-link>
+                            </el-dropdown-item>
                         </el-dropdown-menu>
                     </el-dropdown>
                 </el-row>
-
             {% endblock %}
             <el-card class="box-card">
                 <div slot="header">
@@ -104,9 +138,34 @@
 <script>
     const Routes = {
         "2-1": "{% url 'gui:global-codes-manage' %}",
-        "2-3": "{% url 'gui:user-manage' %}"
+        "2-2": "{% url 'gui:group-manage' %}",
+        "2-3": "{% url 'gui:user-manage' %}",
+        "2-4": "{% url 'gui:users-by-group-manage' %}",
+        "2-5": "{% url 'gui:equip-base-info-manage' %}",
+        "2-6": "{% url 'gui:change-shifts-manage' %}",
+        "2-7": "{% url 'gui:factory-schedule-manage' %}",
+        "2-8": "{% url 'gui:equip-category-manage' %}",
+        "2-8-1": "{% url 'gui:equip-category-manage' %}",
+        "2-8-2": "{% url 'gui:equip-manage' %}",
+        "2-9": "{% url 'gui:factory-schedule-result' %}",
+        "3-1": "{% url 'gui:material-base-info-manage' %}",
+        "3-2": "{% url 'gui:rb-recipe-std-manage' %}",
+        "3-3": "{% url 'gui:rb-material-std-manage' %}",
+        "3-4": "{% url 'gui:search-rubber-info' %}",
+        "4-1": "{% url 'gui:rubber-schedule-daily-plan' %}",
+        "4-2": "{% url 'gui:rubber-smallStuff-daily-plan' %}",
+        "4-3": "{% url 'gui:material-requisitions-plan' %}",
+        "4-4": "{% url 'gui:material-quantity-demanded' %}",
+        "5-1": "{% url 'gui:banburying-performance-manage' %}",
+        "5-2": "{% url 'gui:banburying-plan-manage' %}",
+        "5-3": "{% url 'gui:internal_mixer_production' %}",
+        "5-4": "{% url 'gui:collect-rub-daily-manage' %}",
+        "6-1": "{% url 'gui:material-repertory-manage' %}",
+        "6-2": "{% url 'gui:rubber-repertory-manage' %}",
     }
 </script>
 {% block scripts %}{% endblock %}
+{% block styles %}
+{% endblock %}
 </body>
 </html>

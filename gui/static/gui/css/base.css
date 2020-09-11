@@ -1,5 +1,51 @@
 
-.box-card {
+html, body, #app, .el-container, .el-aside, .el-menu {
+    height: 100%;
+}
 
-    margin-top: 20px;
+body {
+    margin: 0;
+}
+
+.box-card {
+    margin: 20px;
+}
+
+.rowBreadTop {
+    background: green;
+    padding: 0 20px;
+}
+
+.rowBreadTop .el-breadcrumb {
+    line-height: 45px;
+}
+
+.rowBreadTop .el-breadcrumb__inner {
+    color: #fff;
+}
+
+.rowBreadTop .el-breadcrumb__item:last-child .el-breadcrumb__inner {
+    color: #fff;
+}
+
+.main-dropdown {
+    line-height: 45px;
+    color: #fff;
+}
+
+.breadcrumbTop {
+    color: red;
+}
+
+.rowMainTop {
+    background: green;
+    color: #fff !important;
+}
+
+.el-transfer-panel {
+    width: 250px !important;
+}
+
+.el-main {
+
 }
