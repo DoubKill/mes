@@ -282,3 +282,5 @@ class Synchronization(APIView):
                     mes_dict['recipe']['ProductBatching'][pbc_obj.stage_product_batch_no] = pbc_dict
 
         return Response({'MES系统': mes_dict}, status=200)
+
+
