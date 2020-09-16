@@ -257,23 +257,23 @@ LOGGING = {
 #             'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
 #             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
 #         }
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-        'NAME': os.getenv('SFJ_DATABASE_NAME', 'MMM'),  # 数据库名称
-        'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
-        'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
-        'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
-        'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
-    }
-}
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#         'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+#         'NAME': os.getenv('SFJ_DATABASE_NAME', 'MMM'),  # 数据库名称
+#         'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
+#         'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
+#         'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
+#         'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
 
 
 # Password validation
