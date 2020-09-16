@@ -20,7 +20,7 @@ django.setup()
 from basics.models import GlobalCode, GlobalCodeType, WorkSchedule, ClassesDetail, EquipCategoryAttribute, PlanSchedule, \
     Equip, WorkSchedulePlan
 from recipe.models import Material, ProductInfo, ProductBatching
-from system.models import GroupExtension, User, Section
+from system.models import GroupExtension, User, Section, SystemConfig, ChildSystemInfo
 from plan.models import ProductDayPlan, ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
 
@@ -1389,7 +1389,7 @@ def add_material_day_classes_plan():
         else:
             # 暂不做其他班次的处理
             continue
-        ProductClassesPlan.objects.create(sn=sn, product_day_plan=day_plan, plan_classes_uid=uid,
+        ProductClassesPlan.objects.create(sn=sn, product_day_plan=1, plan_classes_uid=uid,
                                           work_schedule_plan=wsp, unit="kg", plan_trains=50, weight=250,
                                           time=45)
 
@@ -1481,6 +1481,13 @@ def add_product_demo_data():
                     }
                     EquipStatus.objects.create(**equip_status_data)
 
+def add_system_config():
+    SystemConfig.objects.create(category="gz", config_name="system_name", config_value="MES", )
+    ChildSystemInfo.objects.create(link_address="10.4.10.54", system_type="gz", system_name="MES", status="联网")
+    ChildSystemInfo.objects.create(link_address="10.4.10.55", system_type="gz", system_name="上辅机群控", status="联网")
+    ChildSystemInfo.objects.create(link_address="10.4.10.56", system_type="gz", system_name="上辅机工作站1", status="联网")
+
+
 
 def add_oil_material():
     """油料原材料"""
@@ -1492,6 +1499,7 @@ def add_oil_material():
 
 
 if __name__ == '__main__':
+    add_system_config()
     add_global_codes()
     print("global_codes is ok")
     add_materials()
