@@ -183,3 +183,24 @@ class ErrorType(AbstractEntity):
     class Meta:
         db_table = 'error_type'
         verbose_name_plural = verbose_name = '错误类型'
+
+
+class DataSynchronization(models.Model):
+    """记录已经同步过去的数据"""
+    TYPE_CHOICE = (
+        (1, '公共代码类型'),
+        (2, '公共代码'),
+        (3, '倒班管理'),
+        (4, '倒班条目'),
+        (5, '设备种类属性'),
+        (6, '设备'),
+        (7, '排班管理'),
+        (8, '排班详情'),
+        (9, '原材料'),
+    )
+    create_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    type = models.PositiveSmallIntegerField(help_text='模型类型', verbose_name='模型类型', choices=TYPE_CHOICE)
+    obj_id = models.IntegerField(help_text='对应数据库id', verbose_name='对应数据库id')
+
+    class Meta:
+        verbose_name = 'MES同步数据'
