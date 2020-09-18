@@ -14,7 +14,7 @@ logger = logging.getLogger('sync_log')
 from system.models import DataSynchronization
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, ClassesDetail, EquipCategoryAttribute, Equip, \
     PlanSchedule, WorkSchedulePlan
-from recipe.models import Material
+from recipe.models import Material, ProductInfo
 
 TYPE_CHOICE = (
     (1, '公共代码类型'),
@@ -140,10 +140,17 @@ class MaterialUploader(BaseUploader):
     model = Material
 
 
+class ProductInfoUploader(BaseUploader):
+    """原材料"""
+    path = "api/v1/datain/product_info_receive/"
+    type = 10
+    upload_fields = ('id', 'product_no', 'product_name')
+    model = ProductInfo
+
+
 if __name__ == '__main__':
 
     for uploader in (GlobalCodeTypeUploader, GlobalCodeUploader, WorkScheduleUploader,
                      ClassesDetailUploader, EquipCategoryAttributeUploader, EquipUploader, PlanScheduleUploader,
-                     WorkSchedulePlanUploader, MaterialUploader):
-        # time.sleep(1)
+                     WorkSchedulePlanUploader, MaterialUploader, ProductInfoUploader):
         uploader().upload()

@@ -197,6 +197,7 @@ class DataSynchronization(models.Model):
         (7, '排班管理'),
         (8, '排班详情'),
         (9, '原材料'),
+        (10, '胶料信息')
     )
     create_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     type = models.PositiveSmallIntegerField(help_text='模型类型', verbose_name='模型类型', choices=TYPE_CHOICE)
