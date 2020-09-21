@@ -56,9 +56,9 @@ class UserSerializer(BaseModelSerializer):
         return instance
 
     def create(self, validated_data):
-        partten = r"^(?![0-9]+$)(?![a-zA-Z]+$)[0-9A-Za-z]{6,16}$"
+        pattern = r"^(?![0-9]+$)(?![a-zA-Z]+$)[0-9A-Za-z]{6,16}$"
         password = validated_data.get('password')
-        if not re.search(partten, password):
+        if not re.search(pattern, password):
             raise serializers.ValidationError("请输入6~16位长度包含字母和数字的密码")
         user = super().create(validated_data)
         user.set_password(password)
@@ -67,8 +67,7 @@ class UserSerializer(BaseModelSerializer):
 
     class Meta:
         model = User
-        fields = '__all__'
-        # read_only_fields = COMMON_READ_ONLY_FIELDS
+        exclude = ('user_permissions', 'groups')
 
 
 class GroupUserSerializer(BaseModelSerializer):
@@ -89,7 +88,7 @@ class GroupUserSerializer(BaseModelSerializer):
 
 class GroupExtensionSerializer(BaseModelSerializer):
     """角色组扩展序列化器"""
-    user_set = UserUpdateSerializer(read_only=True, many=True)
+    group_users = UserUpdateSerializer(read_only=True, many=True)
 
     class Meta:
         model = GroupExtension

@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_code import menu, CommonDeleteMixin
+from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.common_code import UserFunctions
@@ -25,6 +25,8 @@ from system.filters import UserFilter, GroupExtensionFilter
 
 @method_decorator([api_recorder], name="dispatch")
 class PermissionView(APIView):
+    permission_classes = (IsAuthenticated,)
+
     def get(self, request):
         ret = {}
         parent_permissions = Permissions.objects.filter(parent__isnull=True)
@@ -45,7 +47,7 @@ class UserViewSet(ModelViewSet):
     destroy:
         账号停用和启用
     """
-    queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
+    queryset = User.objects.exclude(is_superuser=True).filter(delete_flag=False).prefetch_related('group_extensions')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -78,7 +80,6 @@ class UserViewSet(ModelViewSet):
 class UserGroupsViewSet(mixins.ListModelMixin,
                         GenericViewSet):
     queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
-
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -98,7 +99,8 @@ class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除
     destroy:
         删除角色
     """
-    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('permissions')
+    queryset = GroupExtension.objects.filter(
+        delete_flag=False).prefetch_related('permissions').order_by('-created_date')
     serializer_class = GroupExtensionSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -152,30 +154,6 @@ class SectionViewSet(ModelViewSet):
     serializer_class = SectionSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-
-
-class MesLogin(ObtainJSONWebToken):
-    menu = {
-        "basics": [
-            "globalcodetype",
-            "globalcode",
-            "workschedule",
-            "equip"
-        ],
-        "system": {
-            "user",
-        },
-        "auth": {
-        }
-
-    }
-
-    def post(self, request, *args, **kwargs):
-        temp = super().post(request, *args, **kwargs)
-        format = kwargs.get("format")
-        if temp.status_code != 200:
-            return temp
-        return menu(request, self.menu, temp, format)
 
 
 class LoginView(ObtainJSONWebToken):
