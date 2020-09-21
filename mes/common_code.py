@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
 from mes.permissions import PermissonsDispatch
-from system.models import User
+from system.models import User, Permissions
 
 
 # 启用-》禁用    禁用-》启用
@@ -76,3 +76,47 @@ def menu(request, menu, temp, format):
 
     temp.data.update({"menu": data})
     return temp
+
+
+class UserFunctions(object):
+    """
+    针对User类进行扩展
+    """
+
+    @property
+    def group_list(self):
+        """
+        获取用户现在所属角色列表
+        :return: list
+        """
+        return list(self.groups.values_list('name', flat=True))
+
+    @property
+    def permissions_list(self):
+        """
+        获取用户所有权限id
+        :return: 权限id列表
+        """
+        # ret = {}
+        # if self.is_superuser:
+        #     permissions = Permissions.objects.all()
+        # else:
+        #     permission_ids = []
+        #     for group in self.groups:
+        #         permission_ids += list(group.permissions.filter().values_list('id', flat=True))
+        #     permissions = Permissions.objects.filter(id__in=set(permission_ids))
+        # for permission in permissions:
+        #     if permission.name not in ret and permission.parent is None:
+        #         ret[permission.name] = []
+        #     else:
+        #         ret[permission.parent.name].append(permission.id)
+        if self.is_superuser:
+            return set(Permissions.objects.values_list('id', flat=True))
+        else:
+            permission_ids = []
+            for group in self.groups:
+                permission_ids += list(group.permissions.filter().values_list('id', flat=True))
+            return set(permission_ids)
+
+
+User.__bases__ += (UserFunctions, )

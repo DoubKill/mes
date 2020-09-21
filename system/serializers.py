@@ -13,7 +13,7 @@ from rest_framework.validators import UniqueValidator
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from system.models import GroupExtension, Group, User, Section
+from system.models import GroupExtension, User, Section
 
 
 class PermissionSerializer(BaseModelSerializer):
@@ -111,11 +111,11 @@ class GroupExtensionUpdateSerializer(BaseModelSerializer):
 
 class GroupUserUpdateSerializer(BaseModelSerializer):
     """更新角色组用户序列化器"""
-    user_set = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), write_only=True,
-                                                  help_text="""{"user_set":[<user_id>, ……]}""")
+    group_users = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), write_only=True,
+                                                     help_text="""{"group_users":[<user_id>, ……]}""")
 
     def update(self, instance, validated_data):
-        user_ids = validated_data['user_set']
+        user_ids = validated_data['group_users']
         instance.user_set.remove(*instance.user_set.all())
         instance.user_set.add(*user_ids)
         instance.save()
@@ -123,7 +123,7 @@ class GroupUserUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = GroupExtension
-        fields = ('id', 'user_set')
+        fields = ('id', 'group_users')
 
 
 class SectionSerializer(BaseModelSerializer):

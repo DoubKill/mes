@@ -1,12 +1,14 @@
 import os
-import time
+import sys
 
 import django
 import requests
 import logging
 
-from mes import settings
+from django.conf import settings
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 logger = logging.getLogger('sync_log')
