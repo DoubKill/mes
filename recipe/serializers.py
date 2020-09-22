@@ -113,16 +113,16 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                                                            [{"sn": 序号, "material":原材料id, "auto_flag": true,
                                                            "actual_weight":重量, "standard_error":误差值}]""")
 
-    def validate(self, attrs):
-        product_batching = ProductBatching.objects.filter(factory=attrs['factory'],
-                                                          site=attrs['site'],
-                                                          stage=attrs['stage'],
-                                                          product_info=attrs['product_info']
-                                                          ).order_by('-versions').first()
-        if product_batching:
-            if product_batching.versions >= attrs['versions']:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
-                raise serializers.ValidationError('该配方版本号不得小于现有版本号')
-        return attrs
+    # def validate(self, attrs):
+    #     product_batching = ProductBatching.objects.filter(factory=attrs['factory'],
+    #                                                       site=attrs['site'],
+    #                                                       stage=attrs['stage'],
+    #                                                       product_info=attrs['product_info']
+    #                                                       ).order_by('-versions').first()
+    #     if product_batching:
+    #         if product_batching.versions >= attrs['versions']:
+    #             raise serializers.ValidationError('该配方版本号不得小于现有版本号')
+    #     return attrs
 
     @atomic()
     def create(self, validated_data):
@@ -179,8 +179,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     @atomic()
     def update(self, instance, validated_data):
-        if instance.used_type != 1:
-            raise serializers.ValidationError('只有编辑状态的配方才可修改')
+        if instance.used_type not in (1, 4):
+            raise serializers.ValidationError('操作无效！')
         batching_details = validated_data.pop('batching_details', None)
         instance = super().update(instance, validated_data)
         batching_weight = manual_material_weight = auto_material_weight = 0
@@ -215,10 +215,14 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         pass_flag = validated_data['pass_flag']
         if pass_flag:
-            if instance.used_type == 1:  # 审核通过
+            if instance.used_type == 1:  # 提交
+                instance.submit_user = self.context['request'].user
+                instance.submit_time = datetime.now()
                 instance.used_type = 2
             elif instance.used_type == 2:  # 审核通过
                 instance.used_type = 3
+                instance.check_user = self.context['request'].user
+                instance.check_time = datetime.now()
             elif instance.used_type == 3:  # 启用
                 # 废弃旧版本
                 ProductBatching.objects.filter(used_type=4,
@@ -230,17 +234,22 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_type = 4
                 instance.used_user = self.context['request'].user
                 instance.used_time = datetime.now()
+            elif instance.used_type == 5:
+                instance.used_type = 1
         else:
-            if instance.used_type == 4:  # 弃用
+            if instance.used_type in (4, 5):  # 弃用
                 instance.obsolete_user = self.context['request'].user
                 instance.used_type = 6
                 instance.obsolete_time = datetime.now()
-                try:
-                    ProductObsoleteInterface(instance=instance).request()
-                except Exception as e:
-                    sync_logger.error(e)
+                if instance.used_type == 4:
+                    try:
+                        ProductObsoleteInterface(instance=instance).request()
+                    except Exception as e:
+                        sync_logger.error(e)
             else:  # 驳回
                 instance.used_type = 5
+                instance.reject_user = self.context['request'].user
+                instance.reject_time = datetime.now()
         instance.last_updated_user = self.context['request'].user
         instance.save()
         return instance
