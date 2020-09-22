@@ -92,17 +92,18 @@ class ProductBatching(AbstractEntity):
         (2, '机型')
     )
     factory = models.ForeignKey(GlobalCode, help_text='工厂', verbose_name='工厂',
-                                on_delete=models.CASCADE, related_name='f_batching')
+                                on_delete=models.CASCADE, related_name='f_batching', blank=True, null=True)
     site = models.ForeignKey(GlobalCode, help_text='SITE', verbose_name='SITE',
-                             on_delete=models.CASCADE, related_name='s_batching')
-    product_info = models.ForeignKey(ProductInfo, help_text='胶料工艺信息', on_delete=models.CASCADE)
+                             on_delete=models.CASCADE, related_name='s_batching', blank=True, null=True)
+    product_info = models.ForeignKey(ProductInfo, help_text='胶料工艺信息',
+                                     on_delete=models.CASCADE, blank=True, null=True)
     precept = models.CharField(max_length=64, help_text='方案', verbose_name='方案', blank=True, null=True)
     stage_product_batch_no = models.CharField(max_length=63, help_text='胶料配方编码')
     dev_type = models.ForeignKey(EquipCategoryAttribute, help_text='机型', on_delete=models.CASCADE, blank=True,
                                  null=True)
     stage = models.ForeignKey(GlobalCode, help_text='段次', verbose_name='段次',
-                              on_delete=models.CASCADE, related_name='stage_batches')
-    versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本')
+                              on_delete=models.CASCADE, related_name='stage_batches', blank=True, null=True)
+    versions = models.CharField(max_length=64, help_text='版本', verbose_name='版本', blank=True, null=True)
     used_type = models.PositiveSmallIntegerField(help_text='使用状态', choices=USE_TYPE_CHOICE, default=1)
     batching_weight = models.DecimalField(verbose_name='配料重量', help_text='配料重量',
                                           decimal_places=2, max_digits=8, default=0)
@@ -112,13 +113,22 @@ class ProductBatching(AbstractEntity):
                                                decimal_places=2, max_digits=8, default=0)
     volume = models.DecimalField(verbose_name='配料体积', help_text='配料体积', decimal_places=2, max_digits=8,
                                  blank=True, null=True)
+    submit_user = models.ForeignKey(User, help_text='提交人', blank=True, null=True,
+                                    on_delete=models.CASCADE, related_name='submit_batching')
+    submit_time = models.DateTimeField(help_text='提交时间', blank=True, null=True)
+    check_user = models.ForeignKey(User, help_text='提交人', blank=True, null=True,
+                                   on_delete=models.CASCADE, related_name='check_batching')
+    check_time = models.DateTimeField(help_text='提交时间', blank=True, null=True)
+    reject_user = models.ForeignKey(User, help_text='驳回人', blank=True, null=True,
+                                    on_delete=models.CASCADE, related_name='reject_batching')
+    reject_time = models.DateTimeField(help_text='驳回时间', blank=True, null=True)
     used_user = models.ForeignKey(User, help_text='启用人', blank=True, null=True,
                                   on_delete=models.CASCADE, related_name='used_batching')
     used_time = models.DateTimeField(help_text='启用时间', verbose_name='启用时间', blank=True, null=True)
     obsolete_user = models.ForeignKey(User, help_text='弃用人', blank=True, null=True,
                                       on_delete=models.CASCADE, related_name='obsolete_batching')
     obsolete_time = models.DateTimeField(help_text='弃用时间', verbose_name='弃用时间', blank=True, null=True)
-    production_time_interval = models.DecimalField(help_text='炼胶时间(秒)', blank=True, null=True,
+    production_time_interval = models.DecimalField(help_text='炼胶时间(分)', blank=True, null=True,
                                                    decimal_places=2, max_digits=8)
     equip = models.ForeignKey(Equip, help_text='设备', blank=True, null=True, on_delete=models.CASCADE)
     batching_type = models.PositiveIntegerField(verbose_name='配料类型', help_text='配料类型',
@@ -138,6 +148,11 @@ class ProductBatchingDetail(AbstractEntity):
         (1, '自动'),
         (2, '手动'),
     )
+    TYPE_CHOICE = (
+        (1, '胶料'),
+        (2, '炭黑'),
+        (3, '油料')
+    )
     product_batching = models.ForeignKey(ProductBatching, help_text='配料标准', on_delete=models.CASCADE,
                                          related_name='batching_details')
     sn = models.PositiveIntegerField(verbose_name='序号', help_text='序号')
@@ -145,6 +160,7 @@ class ProductBatchingDetail(AbstractEntity):
     actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=2, max_digits=8)
     standard_error = models.DecimalField(help_text='误差值范围', decimal_places=2, max_digits=8, default=0)
     auto_flag = models.PositiveSmallIntegerField(help_text='手动/自动', choices=AUTO_FLAG)
+    type = models.PositiveSmallIntegerField(help_text='类别', choices=TYPE_CHOICE, default=1)
 
     class Meta:
         db_table = 'product_batching_detail'

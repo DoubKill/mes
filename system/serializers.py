@@ -56,10 +56,7 @@ class UserSerializer(BaseModelSerializer):
         return instance
 
     def create(self, validated_data):
-        pattern = r"^(?![0-9]+$)(?![a-zA-Z]+$)[0-9A-Za-z]{6,16}$"
         password = validated_data.get('password')
-        if not re.search(pattern, password):
-            raise serializers.ValidationError("请输入6~16位长度包含字母和数字的密码")
         user = super().create(validated_data)
         user.set_password(password)
         user.save()
@@ -115,8 +112,8 @@ class GroupUserUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         user_ids = validated_data['group_users']
-        instance.user_set.remove(*instance.user_set.all())
-        instance.user_set.add(*user_ids)
+        instance.group_users.remove(*instance.group_users.all())
+        instance.group_users.add(*user_ids)
         instance.save()
         return super().update(instance, validated_data)
 

@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.utils.decorators import method_decorator
 from rest_framework import mixins, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -24,18 +25,6 @@ from system.filters import UserFilter, GroupExtensionFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
-class PermissionView(APIView):
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request):
-        ret = {}
-        parent_permissions = Permissions.objects.filter(parent__isnull=True)
-        for perm in parent_permissions:
-            ret[perm.name] = perm.children_list
-        return Response(data={'result': ret})
-
-
-@method_decorator([api_recorder], name="dispatch")
 class UserViewSet(ModelViewSet):
     """
     list:
@@ -47,7 +36,8 @@ class UserViewSet(ModelViewSet):
     destroy:
         账号停用和启用
     """
-    queryset = User.objects.exclude(is_superuser=True).filter(delete_flag=False).prefetch_related('group_extensions')
+    queryset = User.objects.exclude(
+        is_superuser=True).filter(delete_flag=False).order_by('num').prefetch_related('group_extensions')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -156,6 +146,7 @@ class SectionViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class LoginView(ObtainJSONWebToken):
     """
     post
@@ -174,6 +165,7 @@ class LoginView(ObtainJSONWebToken):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class Synchronization(APIView):
     def get(self, request, *args, **kwargs):
         mes_dict = {}
@@ -204,3 +196,34 @@ class Synchronization(APIView):
                     mes_dict['recipe']['ProductBatching'][pbc_obj.stage_product_batch_no] = pbc_dict
 
         return Response({'MES系统': mes_dict}, status=200)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class GroupPermissions(APIView):
+    """获取权限表格数据"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        group_id = self.request.query_params.get('group_id')
+        if group_id:
+            try:
+                group = GroupExtension.objects.get(id=self.request.query_params.get('group_id'))
+            except Exception:
+                raise ValidationError('参数错误')
+            group_permissions = list(group.permissions.values_list('id', flat=True))
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            for perm in parent_permissions:
+                children_list = perm.children_list
+                for child in children_list:
+                    if child['id'] in group_permissions:
+                        child['has_permission'] = True
+                    else:
+                        child['has_permission'] = False
+                ret.append({'name': perm.name, 'permissions': children_list})
+        else:
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            for perm in parent_permissions:
+                ret.append({'name': perm.name, 'permissions': perm.children_list})
+        return Response(data={'result': ret})

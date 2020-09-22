@@ -97,26 +97,18 @@ class UserFunctions(object):
         获取用户所有权限id
         :return: 权限id列表
         """
-        # ret = {}
-        # if self.is_superuser:
-        #     permissions = Permissions.objects.all()
-        # else:
-        #     permission_ids = []
-        #     for group in self.groups:
-        #         permission_ids += list(group.permissions.filter().values_list('id', flat=True))
-        #     permissions = Permissions.objects.filter(id__in=set(permission_ids))
-        # for permission in permissions:
-        #     if permission.name not in ret and permission.parent is None:
-        #         ret[permission.name] = []
-        #     else:
-        #         ret[permission.parent.name].append(permission.id)
-        if self.is_superuser:
-            return set(Permissions.objects.values_list('id', flat=True))
-        else:
-            permission_ids = []
-            for group in self.groups:
-                permission_ids += list(group.permissions.filter().values_list('id', flat=True))
-            return set(permission_ids)
+        permissions = {}
+        permission_ids = []
+        for group in self.group_extensions.all():
+            permission_ids += list(group.permissions.values_list('id', flat=True))
+        parent_permissions = Permissions.objects.filter(parent__isnull=True)
+        for perm in parent_permissions:
+            queryset = perm.children_permissions.all()
+            if not self.is_superuser:
+                queryset = queryset.filter(id__in=set(permission_ids))
+            codes = [item.split('_')[0] for item in queryset.values_list('code', flat=True)]
+            permissions[perm.code] = codes
+        return permissions
 
 
 User.__bases__ += (UserFunctions, )
