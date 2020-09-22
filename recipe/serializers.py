@@ -134,6 +134,11 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             for i, detail in enumerate(batching_details):
                 auto_flag = detail.get('auto_flag')
                 actual_weight = detail.get('actual_weight', 0)
+                material = detail.get('material')
+                if material.material_type.global_name == '碳黑':
+                    detail['type'] = 2
+                elif material.material_type.global_name == '油料':
+                    detail['type'] = 3
                 if auto_flag == 1:
                     auto_material_weight += actual_weight
                 elif auto_flag == 2:
@@ -190,6 +195,11 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             for i, detail in enumerate(batching_details):
                 actual_weight = detail.get('actual_weight', 0)
                 auto_flag = detail.get('auto_flag')
+                material = detail.get('material')
+                if material.material_type.global_name == '碳黑':
+                    detail['type'] = 2
+                elif material.material_type.global_name == '油料':
+                    detail['type'] = 3
                 if auto_flag == 1:
                     auto_material_weight += actual_weight
                 elif auto_flag == 2:
@@ -238,14 +248,15 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_type = 1
         else:
             if instance.used_type in (4, 5):  # 弃用
+                if instance.used_type == 4:
+                    if instance.dev_type:
+                        try:
+                            ProductObsoleteInterface(instance=instance).request()
+                        except Exception as e:
+                            sync_logger.error(e)
                 instance.obsolete_user = self.context['request'].user
                 instance.used_type = 6
                 instance.obsolete_time = datetime.now()
-                if instance.used_type == 4:
-                    try:
-                        ProductObsoleteInterface(instance=instance).request()
-                    except Exception as e:
-                        sync_logger.error(e)
             else:  # 驳回
                 instance.used_type = 5
                 instance.reject_user = self.context['request'].user
