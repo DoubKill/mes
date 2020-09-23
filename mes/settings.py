@@ -159,33 +159,37 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'api_log.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
         'errorFile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'error.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
         'syncFile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'sync.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
-        'asyncFile':{
+        'asyncFile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'async.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
     },
     'loggers': {
@@ -211,10 +215,10 @@ LOGGING = {
             'handlers': ['syncFile'],
             'level': 'DEBUG' if DEBUG else 'INFO',
         },
-        'async_log':{
+        'async_log': {
             'handlers': ['asyncFile'],
             'level': 'INFO',
-        },
+        }
     },
 }
 
