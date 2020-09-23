@@ -34,7 +34,7 @@ permission_data = [
 
         {'id': 16, 'code': 'group_user', 'name': '角色别用户管理', 'parent_id': None},
         {'id': 17, 'code': 'view_group_user', 'name': '查看', 'parent_id': 16},
-        {'id': 18, 'code': 'add_group_user', 'name': '修改', 'parent_id': 16},
+        {'id': 18, 'code': 'change_group_user', 'name': '修改', 'parent_id': 16},
 
         {'id': 19, 'code': 'workschedule', 'name': '倒班时间管理', 'parent_id': None},
         {'id': 20, 'code': 'view_workschedule', 'name': '查看', 'parent_id': 19},
