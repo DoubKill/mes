@@ -54,7 +54,7 @@ class ProductBatchingDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductBatchingDetail
-        fields = ('sn', 'material', 'actual_weight', 'standard_error', 'auto_flag')
+        fields = ('sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
 
 
 class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
@@ -78,7 +78,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
         return datetime.strftime(obj.used_time, '%Y-%m-%d %H:%M:%S') if obj.used_time else None
 
     class Backend:
-        path = 'api/v1/recipe/recipe-receive/'
+        path = 'api/v1/datain/recipe-receive/'
 
     class Meta:
         model = ProductBatching
@@ -92,13 +92,14 @@ class ProductObsoleteInterface(serializers.ModelSerializer, BaseInterface):
     """
     配方弃用
     """
+    dev_type = serializers.CharField(source='dev_type.category_no')
 
     class Backend:
         path = 'api/v1/recipe/recipe-obsolete/'
 
     class Meta:
         model = ProductBatching
-        fields = ('stage_product_batch_no',)
+        fields = ('stage_product_batch_no', 'dev_type')
 
 
 class ProductClassesPlanSync(serializers.ModelSerializer):
