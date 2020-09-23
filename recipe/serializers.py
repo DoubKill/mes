@@ -94,12 +94,12 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
 
 
 class ProductBatchingListSerializer(BaseModelSerializer):
-    product_no = serializers.CharField(source='product_info.product_no')
-    product_name = serializers.CharField(source='product_info.product_name')
+    product_no = serializers.CharField(source='product_info.product_no', read_only=True)
+    product_name = serializers.CharField(source='product_info.product_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.CharField(source='last_updated_user.username', read_only=True)
-    stage_name = serializers.CharField(source="stage.global_name")
-    site_name = serializers.CharField(source="site.global_name")
+    stage_name = serializers.CharField(source="stage.global_name", read_only=True)
+    site_name = serializers.CharField(source="site.global_name", read_only=True)
     dev_type_name = serializers.CharField(source='dev_type.category_name', default=None, read_only=True)
 
     class Meta:
