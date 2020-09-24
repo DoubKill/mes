@@ -132,7 +132,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
         plan_classes_uid = validated_data['plan_classes_uid']
         pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid, delete_flag=False).first()
         if not pcp_obj:
-            # validated_data['status'] = '等待'
+            validated_data['status'] = '已保存'
             instance = super().create(validated_data)
             # 创建计划状态
             PlanStatus.objects.create(plan_classes_uid=instance.plan_classes_uid, equip_no=instance.equip.equip_no,

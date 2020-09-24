@@ -165,7 +165,7 @@ class MaterialDemandedView(APIView):
             return Response("请求库存失败", status=400)
 
         md_list = MaterialDemanded.objects.filter(**filter_dict).values(
-            'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no',
+            'product_classes_plan__product_batching__stage_product_batch_no',
             'work_schedule_plan__classes__global_name',
             'material__material_no',
             'material__material_name',
@@ -175,7 +175,7 @@ class MaterialDemandedView(APIView):
         for md_detail_list in md_list:
             md = {}
             md['product_no'] = md_detail_list[
-                'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no']
+                'product_classes_plan__product_batching__stage_product_batch_no']
             md['classes'] = md_detail_list['work_schedule_plan__classes__global_name']
             md['material_no'] = md_detail_list['material__material_no']
             md['material_name'] = md_detail_list['material__material_name']
