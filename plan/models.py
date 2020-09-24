@@ -1,7 +1,8 @@
 from django.db import models
-from system.models import AbstractEntity
+
 from basics.models import Equip, PlanSchedule, ClassesDetail, WorkSchedulePlan
 from recipe.models import ProductBatching, Material
+from system.models import AbstractEntity
 
 
 # Create your models here.
@@ -44,7 +45,8 @@ class ProductClassesPlan(AbstractEntity):
                                          verbose_name='配料id',
                                          related_name='pb_product_classes_plan')
     status = models.CharField(max_length=64, help_text='状态:等待、已下达、运行中、完成', verbose_name='状态',
-                              choices=(('等待', '等待'), ('已下达', '已下达'), ('运行中', '运行中'), ('完成', '完成'), ('待停止', '待停止')))
+                              choices=(('已保存', '已保存'), ('等待', '等待'), ('已下达', '已下达'), ('运行中', '运行中'), ('完成', '完成'),
+                                       ('待停止', '待停止')))
 
     @property
     def total_time(self):

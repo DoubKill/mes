@@ -119,27 +119,49 @@ class ProductClassesPlanSync(serializers.ModelSerializer):
             'note', 'equip', 'product_batching', 'status')
 
 
-class ProductDayPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
+class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
+    material = serializers.CharField(source='material.material_no')
+
+    class Meta:
+        model = ProductBatchingDetail
+        fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
+
+
+class ProductBatchingSyncInterface(serializers.ModelSerializer):
+    batching_details = ProductBatchingDetailSyncInterface(many=True)
+
+    class Meta:
+        model = ProductBatching
+        fields = (
+            'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
+            'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
+            'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
+            'production_time_interval',
+            'equip', 'batching_type', 'batching_details')
+
+
+class ProductDayPlanSyncInterface(serializers.ModelSerializer):
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
+
+    class Meta:
+        model = ProductDayPlan
+        fields = ('equip', 'product_batching', 'plan_schedule')
+
+
+class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
     """计划同步序列化器"""
 
-    created_date = serializers.SerializerMethodField()
     equip = serializers.CharField(source='equip.equip_no')
-    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
-    plan_schedule = serializers.CharField(source='plan_schedule.plan_schedule_no')
-    pdp_product_classes_plan = ProductClassesPlanSync(many=True)
-
-    # context = serializers.SerializerMethodField()
-
-    # def get_context(self, object):
-    #     return self.context['request'].user.username
-
-    @staticmethod
-    def get_created_date(obj):
-        return datetime.strftime(obj.created_date, '%Y-%m-%d %H:%M:%S')
+    work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
+    product_batching = ProductBatchingSyncInterface(read_only=True)
+    product_day_plan = ProductDayPlanSyncInterface(read_only=True)
 
     class Backend:
         path = 'api/v1/plan/plan-receive/'
 
     class Meta:
-        model = ProductDayPlan
-        fields = ('created_date', 'equip', 'product_batching', 'plan_schedule', 'pdp_product_classes_plan')
+        model = ProductClassesPlan
+        fields = ('product_day_plan',
+                  'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
+                  'plan_classes_uid', 'note', 'equip',
+                  'product_batching')

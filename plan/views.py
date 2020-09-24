@@ -19,7 +19,7 @@ from basics.models import WorkSchedulePlan
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from mes.sync import ProductDayPlanSyncInterface
+from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
@@ -115,22 +115,27 @@ class ProductDayPlanAPiView(APIView):
     permission_classes = ()
     authentication_classes = ()
 
+    @atomic()
     def post(self, request):
-        # product_day_id = self.request.query_params.get('product_day_id')
-        equip = self.request.query_params.get('equip')
-        day_time = self.request.query_params.get('day_time')
-        if not equip or not day_time:
+        equip = request.data.get('equip', None)
+        work_schedule_plan = request.data.get('work_schedule_plan', None)
+        if not equip or not work_schedule_plan:
             raise ValidationError('缺失参数')
         try:
-            product_day_set = ProductDayPlan.objects.filter(equip_id=equip, plan_schedule__day_time=day_time)
+            product_classes_plan_set = ProductClassesPlan.objects.filter(equip_id=equip,
+                                                                         work_schedule_plan_id=work_schedule_plan,
+                                                                         delete_flag=False)
         except Exception:
             raise ValidationError('该计划不存在')
-        for product_day in product_day_set:
-            interface = ProductDayPlanSyncInterface(instance=product_day)
+        for product_classes_plan in product_classes_plan_set:
+            interface = ProductClassesPlanSyncInterface(instance=product_classes_plan)
             try:
                 interface.request()
             except Exception as e:
                 raise ValidationError(e)
+            product_classes_plan.status = '等待'
+            product_classes_plan.save()
+            PlanStatus.objects.filter(plan_classes_uid=product_classes_plan.plan_classes_uid).update(status='等待')
         return Response('发送成功', status=status.HTTP_200_OK)
 
 
@@ -227,22 +232,22 @@ class ProductClassesPlanManyCreate(APIView):
                 work_list.append(class_dict['work_schedule_plan'])
                 plan_list.append(class_dict['plan_classes_uid'])
                 equip_list.append(class_dict['equip'])
-                class_dict['status'] = '已下达'
+                class_dict['status'] = '已保存'
                 # 判断胶料日计划是否存在
                 wsp_obj = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first()
                 pdp_obj = ProductDayPlan.objects.filter(equip_id=class_dict['equip'],
                                                         product_batching_id=class_dict['product_batching'],
                                                         plan_schedule=wsp_obj.plan_schedule, delete_flag=False).first()
                 if pdp_obj:
-                    class_dict['product_day_plan'] = pdp_obj
+                    class_dict['product_day_plan'] = pdp_obj.id
+
                 else:
                     class_dict['product_day_plan'] = ProductDayPlan.objects.create(equip_id=class_dict['equip'],
                                                                                    product_batching_id=class_dict[
                                                                                        'product_batching'],
                                                                                    plan_schedule=wsp_obj.plan_schedule,
                                                                                    last_updated_date=datetime.datetime.now(),
-                                                                                   created_date=datetime.datetime.now())
-
+                                                                                   created_date=datetime.datetime.now()).id
             day_time = WorkSchedulePlan.objects.filter(
                 id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
             # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
@@ -255,7 +260,7 @@ class ProductClassesPlanManyCreate(APIView):
                                                         delete_flag=False).order_by(
                     'created_date').last()
                 if plan_status:
-                    if plan_status.status != '等待' or plan_status.status != '已保存':
+                    if plan_status.status not in ['等待', '已保存']:
                         raise ValidationError("只要等待中或者已保存的计划才可以删除")
                 else:
                     pass
@@ -265,8 +270,9 @@ class ProductClassesPlanManyCreate(APIView):
                 pcp_obj.save()
                 PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
                 MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
-
-            s = ProductClassesPlanManyCreateSerializer(data=request.data, many=many, context={'request': request})
+            print(class_dict_list)
+            s = ProductClassesPlanManyCreateSerializer(data=request.data, many=many,
+                                                       context={'request': request})
             s.is_valid(raise_exception=True)
             s.save()
             return Response('新建成功')
