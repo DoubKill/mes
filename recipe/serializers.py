@@ -183,6 +183,12 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
                   'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type', 'production_time_interval')
+        extra_kwargs = {
+            'stage_product_batch_no': {
+                'allow_blank': True,
+                'allow_null': True,
+                'required': False}
+        }
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
