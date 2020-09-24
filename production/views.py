@@ -3,6 +3,7 @@ import datetime
 import re
 
 import requests
+from django.db.transaction import atomic
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins
@@ -507,3 +508,53 @@ class ProductInventory(GenericViewSet,
                         "standard_flag": False,
                         }]
         return Response({'results': results})
+
+
+class TrainsFeedbacksBatch(APIView):
+    """批量同步车次生产数据接口"""
+    @atomic
+    def post(self, request):
+        serializer = TrainsFeedbacksSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)
+
+class PalletFeedbacksBatch(APIView):
+    """批量同步托次生产数据接口"""
+    @atomic
+    def post(self, request):
+        serializer = PalletFeedbacksSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)
+
+
+class EquipStatusBatch(APIView):
+    """批量同步设备生产数据接口"""
+    @atomic
+    def post(self, request):
+        serializer = EquipStatusSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)
+
+
+class PlanStatusBatch(APIView):
+    """批量同步计划状态数据接口"""
+
+    @atomic
+    def post(self, request):
+        serializer = PlanStatusSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)
+
+
+class ExpendMaterialBatch(APIView):
+    """批量同步原材料消耗数据接口"""
+    @atomic
+    def post(self, request):
+        serializer = ExpendMaterialSerializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)

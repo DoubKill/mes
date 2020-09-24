@@ -1,9 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from production.views import TrainsFeedbacksViewSet, PalletFeedbacksViewSet, EquipStatusViewSet, PlanStatusViewSet, \
-    ExpendMaterialViewSet, OperationLogViewSet, QualityControlViewSet, \
-    ProductionRecordViewSet, PlanRealityViewSet, ProductActualViewSet, MaterialInventory, ProductInventory
+from production.views import *
 
 router = DefaultRouter()
 
@@ -39,4 +37,9 @@ router.register(r'product-actual', ProductActualViewSet, basename="product-actua
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('trains-feedbacks-batch/', TrainsFeedbacksBatch.as_view()),
+    path('pallet-feedbacks-batch/', PalletFeedbacksBatch.as_view()),
+    path('equip-status-batch/', EquipStatusBatch.as_view()),
+    path('plan-status-batch/', PlanStatusBatch.as_view()),
+    path('expend-material-batch/', ExpendMaterialBatch.as_view())
 ]
