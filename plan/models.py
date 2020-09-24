@@ -24,7 +24,7 @@ class ProductDayPlan(AbstractEntity):
 
 class ProductClassesPlan(AbstractEntity):
     """胶料日班次计划表"""
-    product_day_plan = models.ForeignKey(ProductDayPlan, on_delete=models.DO_NOTHING, help_text='胶料日计划id',
+    product_day_plan = models.ForeignKey(ProductDayPlan, on_delete=models.CASCADE, help_text='胶料日计划id',
                                          verbose_name='胶料日计划id',
                                          related_name='pdp_product_classes_plan', null=True)
     sn = models.PositiveIntegerField(verbose_name='顺序', help_text='顺序')
@@ -33,14 +33,14 @@ class ProductClassesPlan(AbstractEntity):
     weight = models.DecimalField(verbose_name='重量', help_text='重量',
                                  decimal_places=3, max_digits=8, blank=True, null=True)
     unit = models.CharField(max_length=8, help_text='单位', verbose_name='单位')
-    work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.DO_NOTHING, help_text='班次id',
+    work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE, help_text='班次id',
                                            verbose_name='排班详情id', related_name='cd_product_classes_plan')
     plan_classes_uid = models.CharField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',
                                         max_length=64)
     note = models.CharField(max_length=64, help_text='备注', blank=True, null=True)
-    equip = models.ForeignKey(Equip, on_delete=models.DO_NOTHING, help_text='机台id', verbose_name='机台id',
+    equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台id', verbose_name='机台id',
                               related_name='equip_product_classes_plan')
-    product_batching = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='配料id',
+    product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配料id',
                                          verbose_name='配料id',
                                          related_name='pb_product_classes_plan')
     status = models.CharField(max_length=64, help_text='状态:等待、已下达、运行中、完成', verbose_name='状态',
