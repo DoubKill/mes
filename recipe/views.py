@@ -11,7 +11,6 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
-from mes.permissions import ProductBatchingPermissions
 from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
     MaterialAttributeFilter
@@ -85,7 +84,7 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class ValidateProductVersionsView(APIView):
     """验证版本号，创建胶料工艺信息前调用，
-    参数：xxx/?factory=产地id&site=SITEid&product_info=胶料代码id&versions=版本号&stage=段次id"""
+    参数：xxx/?factory=产地id&site=SITEid&product_info=胶料代码id&versions=版本号&stage=段次id&stage_product_batch_no=配方编码"""
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
@@ -94,6 +93,13 @@ class ValidateProductVersionsView(APIView):
         product_info = self.request.query_params.get('product_info')
         stage = self.request.query_params.get('stage')
         versions = self.request.query_params.get('versions')
+        stage_product_batch_no = self.request.query_params.get('stage_product_batch_no')
+        if stage_product_batch_no:
+            if ProductBatching.objects.exclude(
+                    used_type=6).filter(stage_product_batch_no=stage_product_batch_no,
+                                        factory__isnull=True).exists():
+                raise ValidationError('该配方已存在')
+            return Response('OK')
         if not all([versions, factory, site, product_info, stage]):
             raise ValidationError('参数不足')
         try:
@@ -107,7 +113,7 @@ class ValidateProductVersionsView(APIView):
                                                           product_info_id=product_info
                                                           ).order_by('-versions').first()
         if product_batching:
-            if product_batching.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+            if product_batching.versions >= versions:
                 raise ValidationError({'versions': '该配方版本号不得小于现有版本号'})
         return Response('OK')
 
@@ -163,7 +169,6 @@ class ProductBatchingViewSet(ModelViewSet):
     partial_update:
         配料审批
     """
-    # TODO 配方下载功能（只能下载应用状态的配方，并去除当前计划中的配方）
     queryset = ProductBatching.objects.filter(
         delete_flag=False).select_related(
         "factory", "site", "dev_type", "stage", "product_info"
@@ -185,9 +190,6 @@ class ProductBatchingViewSet(ModelViewSet):
     def get_permissions(self):
         if self.request.query_params.get('all'):
             return ()
-        if self.action == 'partial_update':
-            return (ProductBatchingPermissions(),
-                    IsAuthenticated())
         else:
             return (IsAuthenticated(),)
 
@@ -219,14 +221,18 @@ class RecipeNoticeAPiView(APIView):
 
     def post(self, request):
         product_batching_id = self.request.query_params.get('product_batching_id')
-        if not product_batching_id:
-            raise ValidationError('缺失参数')
         try:
-            product_batching = ProductBatching.objects.get(id=product_batching_id)
+            product_batching_id = int(product_batching_id)
         except Exception:
+            raise ValidationError('参数错误')
+        product_batching = ProductBatching.objects.filter(id=product_batching_id).prefetch_related(
+                Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))).first()
+        if not product_batching:
             raise ValidationError('该配方不存在')
         if not product_batching.used_type == 4:
             raise ValidationError('只有应用状态的配方才可下发至上辅机')
+        if not product_batching.dev_type:
+            raise ValidationError('请选择机型')
         interface = ProductBatchingSyncInterface(instance=product_batching)
         try:
             interface.request()

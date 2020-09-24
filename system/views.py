@@ -1,46 +1,27 @@
 from datetime import datetime
 
-import xlrd
-from django.contrib.auth.models import Permission
 from django.utils.decorators import method_decorator
 from rest_framework import mixins, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import UpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_code import menu, CommonDeleteMixin
+from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.common_code import UserFunctions
 
 from plan.models import ProductClassesPlan
 from recipe.models import ProductBatching
-from system.models import GroupExtension, User, Section, ChildSystemInfo, SystemConfig
+from system.models import GroupExtension, User, Section, Permissions
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
-    UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
+    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer
 from django_filters.rest_framework import DjangoFilterBackend
 from system.filters import UserFilter, GroupExtensionFilter
-
-
-@method_decorator([api_recorder], name="dispatch")
-class PermissionViewSet(ReadOnlyModelViewSet):
-    """
-    list:
-        权限列表
-    create:
-        创建权限
-    update:
-        修改权限
-    destroy:
-        删除权限
-    """
-    queryset = Permission.objects.filter()
-    serializer_class = PermissionSerializer
-    permission_classes = (IsAuthenticated,)
-    pagination_class = SinglePageNumberPagination
-    # filter_backends = (DjangoFilterBackend,)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -55,7 +36,8 @@ class UserViewSet(ModelViewSet):
     destroy:
         账号停用和启用
     """
-    queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
+    queryset = User.objects.exclude(
+        is_superuser=True).filter(delete_flag=False).order_by('num').prefetch_related('group_extensions')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -88,7 +70,6 @@ class UserViewSet(ModelViewSet):
 class UserGroupsViewSet(mixins.ListModelMixin,
                         GenericViewSet):
     queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
-
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -108,7 +89,8 @@ class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除
     destroy:
         删除角色
     """
-    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
+    queryset = GroupExtension.objects.filter(
+        delete_flag=False).prefetch_related('permissions').order_by('-created_date')
     serializer_class = GroupExtensionSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -142,7 +124,7 @@ class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除
 @method_decorator([api_recorder], name="dispatch")
 class GroupAddUserViewSet(UpdateAPIView):
     """控制角色中用户具体为哪些的视图"""
-    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
+    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('group_users', 'permissions')
     serializer_class = GroupUserUpdateSerializer
 
 
@@ -164,34 +146,11 @@ class SectionViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
 
 
-class MesLogin(ObtainJSONWebToken):
-    menu = {
-        "basics": [
-            "globalcodetype",
-            "globalcode",
-            "workschedule",
-            "equip"
-        ],
-        "system": {
-            "user",
-        },
-        "auth": {
-        }
-
-    }
-
-    def post(self, request, *args, **kwargs):
-        temp = super().post(request, *args, **kwargs)
-        format = kwargs.get("format")
-        if temp.status_code != 200:
-            return temp
-        return menu(request, self.menu, temp, format)
-
-
+@method_decorator([api_recorder], name="dispatch")
 class LoginView(ObtainJSONWebToken):
     """
     post
-        获取权限列表
+        登录并返回用户所有权限
     """
 
     def post(self, request, *args, **kwargs):
@@ -200,58 +159,13 @@ class LoginView(ObtainJSONWebToken):
         if serializer.is_valid():
             user = serializer.object.get('user') or request.user
             token = serializer.object.get('token')
-            # 获取该用户所有权限
-            permissions = list(user.get_all_permissions())
-            # 除去前端不涉及模块
-            permission_list = []
-            for p in permissions:
-                if p.split(".")[0] not in ["contenttypes", "sessions", "work_station", "admin"]:
-                    permission_list.append(p)
-            # 生成菜单管理树
-            permissions_set = set([_.split(".")[0] for _ in permission_list])
-            permissions_tree = {__: {} for __ in permissions_set}
-            for x in permission_list:
-                first_key = x.split(".")[0]
-                second_key = x.split(".")[-1].split("_")[-1]
-                op_value = x.split(".")[-1].split("_")[0]
-                op_list = permissions_tree.get(first_key, {}).get(second_key)
-                if op_list:
-                    permissions_tree[first_key][second_key].append(op_value)
-                else:
-                    permissions_tree[first_key][second_key] = [op_value]
-            if permissions_tree.get("auth"):
-                auth = permissions_tree.pop("auth")
-                # 合并auth与system
-                if permissions_tree.get("system"):
-                    permissions_tree["system"].update(**auth)
-                else:
-                    permissions_tree["system"] = auth
-
-            # 先这么写 待会给李威看,
-            # 并没有删除 只是给其他的模块新增
-            # 把plan里的productdayplan复制一份放在production里
-            if permissions_tree['plan'] and permissions_tree['plan'].get('productdayplan') and permissions_tree[
-                'production']:
-                permissions_tree['production']['productdayplan'] = permissions_tree['plan'].get('productdayplan')
-
-            # 把recipe里的material复制一份放在production里
-            if permissions_tree['recipe'] and permissions_tree['recipe'].get('material') and permissions_tree[
-                'production']:
-                permissions_tree['production']['material'] = permissions_tree['recipe'].get('material')
-
-            # 把system里的groupextension和user复制一份放在basics里
-            if permissions_tree['system'] and permissions_tree['system'].get('groupextension') and permissions_tree[
-                'system'].get('user') and permissions_tree['basics']:
-                permissions_tree['basics']['groupextension'] = permissions_tree['system'].get('groupextension')
-                permissions_tree['basics']['user'] = permissions_tree['system'].get('user')
-
-            return Response({"results": permissions_tree,
+            return Response({"permissions": user.permissions_list,
                              "username": user.username,
                              "token": token})
-        # 返回异常信息
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class Synchronization(APIView):
     def get(self, request, *args, **kwargs):
         mes_dict = {}
@@ -284,3 +198,32 @@ class Synchronization(APIView):
         return Response({'MES系统': mes_dict}, status=200)
 
 
+@method_decorator([api_recorder], name="dispatch")
+class GroupPermissions(APIView):
+    """获取权限表格数据"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        group_id = self.request.query_params.get('group_id')
+        if group_id:
+            try:
+                group = GroupExtension.objects.get(id=self.request.query_params.get('group_id'))
+            except Exception:
+                raise ValidationError('参数错误')
+            group_permissions = list(group.permissions.values_list('id', flat=True))
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            for perm in parent_permissions:
+                children_list = perm.children_list
+                for child in children_list:
+                    if child['id'] in group_permissions:
+                        child['has_permission'] = True
+                    else:
+                        child['has_permission'] = False
+                ret.append({'name': perm.name, 'permissions': children_list})
+        else:
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            for perm in parent_permissions:
+                ret.append({'name': perm.name, 'permissions': perm.children_list})
+        return Response(data={'result': ret})

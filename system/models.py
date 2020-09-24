@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser, Group
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 
@@ -7,22 +7,23 @@ class User(AbstractUser):
     num = models.CharField(max_length=20, help_text='工号', verbose_name='工号', unique=True)
     is_leave = models.BooleanField(help_text='是否离职', verbose_name='是否离职', default=False)
     section = models.ForeignKey("Section", blank=True, null=True, help_text='部门', verbose_name='部门',
-                                on_delete=models.DO_NOTHING)
+                                on_delete=models.CASCADE)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
     delete_date = models.DateTimeField(blank=True, null=True,
                                        help_text='删除日期', verbose_name='删除日期')
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
     created_user = models.ForeignKey('self', blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
-                                     help_text='创建人', verbose_name='创建人', on_delete=models.DO_NOTHING,
+                                     help_text='创建人', verbose_name='创建人', on_delete=models.CASCADE,
                                      related_query_name='c_%(app_label)s_%(class)ss')
     last_updated_user = models.ForeignKey('self', blank=True, null=True,
                                           related_name='u_%(app_label)s_%(class)s_related',
-                                          help_text='更新人', verbose_name='更新人', on_delete=models.DO_NOTHING,
+                                          help_text='更新人', verbose_name='更新人', on_delete=models.CASCADE,
                                           related_query_name='u_%(app_label)s_%(class)ss')
     delete_user = models.ForeignKey('self', blank=True, null=True, related_name='d_%(app_label)s_%(class)s_related',
-                                    help_text='删除人', verbose_name='删除人', on_delete=models.DO_NOTHING,
+                                    help_text='删除人', verbose_name='删除人', on_delete=models.CASCADE,
                                     related_query_name='d_%(app_label)s_%(class)ss')
+    group_extensions = models.ManyToManyField('GroupExtension', help_text='角色', related_name='group_users', blank=True)
 
     def __str__(self):
         return "{}".format(self.username)
@@ -30,7 +31,6 @@ class User(AbstractUser):
     class Meta:
         db_table = "user"
         verbose_name_plural = verbose_name = '用户'
-        permissions = ()
 
 
 class AbstractEntity(models.Model):
@@ -40,13 +40,13 @@ class AbstractEntity(models.Model):
                                        help_text='删除日期', verbose_name='删除日期')
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
     created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
-                                     help_text='创建人', verbose_name='创建人', on_delete=models.DO_NOTHING,
+                                     help_text='创建人', verbose_name='创建人', on_delete=models.CASCADE,
                                      related_query_name='c_%(app_label)s_%(class)ss')
     last_updated_user = models.ForeignKey(User, blank=True, null=True, related_name='u_%(app_label)s_%(class)s_related',
-                                          help_text='更新人', verbose_name='更新人', on_delete=models.DO_NOTHING,
+                                          help_text='更新人', verbose_name='更新人', on_delete=models.CASCADE,
                                           related_query_name='u_%(app_label)s_%(class)ss')
     delete_user = models.ForeignKey(User, blank=True, null=True, related_name='d_%(app_label)s_%(class)s_related',
-                                    help_text='删除人', verbose_name='删除人', on_delete=models.DO_NOTHING,
+                                    help_text='删除人', verbose_name='删除人', on_delete=models.CASCADE,
                                     related_query_name='d_%(app_label)s_%(class)ss')
 
     class Meta(object):
@@ -68,31 +68,34 @@ class Section(AbstractEntity):
         verbose_name_plural = verbose_name = '部门'
 
 
-class GroupExtension(Group):
-    """组织拓展信息表"""
+class Permissions(models.Model):
+    code = models.CharField(max_length=64, help_text='权限代码', unique=True)
+    name = models.CharField(max_length=64, help_text='权限名称')
+    parent = models.ForeignKey('self', help_text='父节点', related_name='children_permissions',
+                               blank=True, null=True, on_delete=models.CASCADE)
+
+    @property
+    def children_list(self):
+        return list(self.children_permissions.values('id', 'code', 'name'))
+
+    class Meta:
+        db_table = 'permissions'
+        verbose_name_plural = verbose_name = '权限'
+
+
+class GroupExtension(AbstractEntity):
+    """角色"""
     group_code = models.CharField(max_length=50, help_text='角色代码', verbose_name='角色代码', unique=True)
-    use_flag = models.BooleanField(help_text='是否使用', verbose_name='是否使用')
-    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
-    delete_date = models.DateTimeField(blank=True, null=True,
-                                       help_text='删除日期', verbose_name='删除日期')
-    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
-    created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
-                                     help_text='创建人', verbose_name='创建人', on_delete=models.DO_NOTHING,
-                                     related_query_name='c_%(app_label)s_%(class)ss')
-    last_updated_user = models.ForeignKey(User, blank=True, null=True, related_name='u_%(app_label)s_%(class)s_related',
-                                          help_text='更新人', verbose_name='更新人', on_delete=models.DO_NOTHING,
-                                          related_query_name='u_%(app_label)s_%(class)ss')
-    delete_user = models.ForeignKey(User, blank=True, null=True, related_name='d_%(app_label)s_%(class)s_related',
-                                    help_text='删除人', verbose_name='删除人', on_delete=models.DO_NOTHING,
-                                    related_query_name='d_%(app_label)s_%(class)ss')
+    name = models.CharField('角色名称', max_length=150, unique=True)
+    use_flag = models.BooleanField(help_text='是否使用', verbose_name='是否使用', default=True)
+    permissions = models.ManyToManyField(Permissions, help_text='角色权限', blank=True)
 
     def __str__(self):
         return "{}".format(self.name)
 
     class Meta:
-        db_table = 'group_extension'
-        verbose_name_plural = verbose_name = '组织拓展信息'
+        db_table = 'group_extensions'
+        verbose_name_plural = verbose_name = '角色'
 
 
 class ChildSystemInfo(AbstractEntity):
@@ -161,7 +164,7 @@ class ErrorCode(AbstractEntity):
     name = models.CharField(max_length=64, help_text='错误名称', verbose_name='错误名称')
     description = models.CharField(max_length=256, help_text='描述', verbose_name='描述')
     error_type = models.ForeignKey("ErrorType", help_text='错误类型', verbose_name='错误类型',
-                                on_delete=models.DO_NOTHING, related_name="error_code_set")
+                                   on_delete=models.CASCADE, related_name="error_code_set")
 
     def __str__(self):
         return f"{self.name}"
@@ -183,3 +186,26 @@ class ErrorType(AbstractEntity):
     class Meta:
         db_table = 'error_type'
         verbose_name_plural = verbose_name = '错误类型'
+
+
+class DataSynchronization(models.Model):
+    """记录已经同步过去的数据"""
+    TYPE_CHOICE = (
+        (1, '公共代码类型'),
+        (2, '公共代码'),
+        (3, '倒班管理'),
+        (4, '倒班条目'),
+        (5, '设备种类属性'),
+        (6, '设备'),
+        (7, '排班管理'),
+        (8, '排班详情'),
+        (9, '原材料'),
+        (10, '胶料信息')
+    )
+    create_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    type = models.PositiveSmallIntegerField(help_text='模型类型', verbose_name='模型类型', choices=TYPE_CHOICE)
+    obj_id = models.IntegerField(help_text='对应数据库id', verbose_name='对应数据库id')
+
+    class Meta:
+        db_table = 'data_sync'
+        verbose_name_plural = verbose_name = '自动同步数据'
