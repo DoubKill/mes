@@ -58,26 +58,26 @@ class BaseModelSerializer(serializers.ModelSerializer):
         """复用公共私有方法,扩展并继承原本to_representation方法"""
         return _common_to_representation(self, instance)
 
-    def create(self, validated_data):
-        """
-        可供所有继承该序列化器的子类自动补充created_user
-        :param validated_data:
-        :return:
-        """
-        if self.Meta.model.__name__ in ["Permission", "Group"]:
-            return super().create(validated_data)
-        validated_data.update(created_user=self.context["request"].user)
-        instance = super().create(validated_data)
-        return instance
-
-    def update(self, instance, validated_data):
-        """
-        可供所有继承该序列化器的子类自动补充updated_user
-        :param instance:
-        :param validated_data:
-        :return:
-        """
-        if self.Meta.model.__name__ in ["Permission", "Group"]:
-            return super().update(instance ,validated_data)
-        validated_data.update(last_updated_user=self.context["request"].user)
-        return super().update(instance ,validated_data)
+    # def create(self, validated_data):
+    #     """
+    #     可供所有继承该序列化器的子类自动补充created_user
+    #     :param validated_data:
+    #     :return:
+    #     """
+    #     if self.Meta.model.__name__ in ["Permission", "Group"]:
+    #         return super().create(validated_data)
+    #     validated_data.update(created_user=self.context["request"].user)
+    #     instance = super().create(validated_data)
+    #     return instance
+    #
+    # def update(self, instance, validated_data):
+    #     """
+    #     可供所有继承该序列化器的子类自动补充updated_user
+    #     :param instance:
+    #     :param validated_data:
+    #     :return:
+    #     """
+    #     if self.Meta.model.__name__ in ["Permission", "Group"]:
+    #         return super().update(instance ,validated_data)
+    #     validated_data.update(last_updated_user=self.context["request"].user)
+    #     return super().update(instance ,validated_data)
