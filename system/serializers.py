@@ -4,8 +4,6 @@ create_date:
 updater:
 update_time:
 """
-import re
-
 from django.contrib.auth.models import Permission
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
@@ -28,7 +26,7 @@ class UserUpdateSerializer(BaseModelSerializer):
     password = serializers.CharField(required=False)
     num = serializers.CharField(required=False, validators=[
         UniqueValidator(queryset=User.objects.all(),
-                        message='该用户工号已存在'),
+                        message='该员工工号已存在'),
     ])
 
     def to_representation(self, instance):
@@ -44,11 +42,11 @@ class UserUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = User
         fields = '__all__'
-        # read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class UserSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
+    num = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all(), message='该员工工号已存在')])
 
     def to_representation(self, instance):
         instance = super().to_representation(instance)
