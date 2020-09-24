@@ -124,7 +124,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        exclude = ('product_day_plan',)
+        fields='__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     @atomic()
@@ -133,6 +133,8 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
         pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid, delete_flag=False).first()
         if not pcp_obj:
             validated_data['status'] = '已保存'
+            print(self.context['pdp_obj'],'===============')
+            validated_data['product_day_plan'] = self.context['pdp_obj']
             instance = super().create(validated_data)
             # 创建计划状态
             PlanStatus.objects.create(plan_classes_uid=instance.plan_classes_uid, equip_no=instance.equip.equip_no,
