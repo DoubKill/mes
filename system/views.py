@@ -1,9 +1,11 @@
 from datetime import datetime
 
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import UpdateAPIView
+from rest_framework.generics import UpdateAPIView, CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,15 +15,13 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from mes.common_code import UserFunctions
-
-from plan.models import ProductClassesPlan
-from recipe.models import ProductBatching
+from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
+from production.models import PlanStatus
+from recipe.models import Material
+from system.filters import UserFilter, GroupExtensionFilter
 from system.models import GroupExtension, User, Section, Permissions
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
-    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer
-from django_filters.rest_framework import DjangoFilterBackend
-from system.filters import UserFilter, GroupExtensionFilter
+    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, MaterialReceiveSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -168,34 +168,18 @@ class LoginView(ObtainJSONWebToken):
 @method_decorator([api_recorder], name="dispatch")
 class Synchronization(APIView):
     def get(self, request, *args, **kwargs):
-        mes_dict = {}
-        mes_dict['plan'] = {}
-        mes_dict['recipe'] = {}
-        # mes_dict = {'ProductClassesPlan': [], 'ProductBatching': []}
         # 获取断网时间
         params = request.query_params
         lost_time1 = params.get("lost_time")
         lost_time = datetime.strptime(lost_time1, '%Y-%m-%d %X')
-        print(lost_time, type(lost_time))
-        mes_dict["lost_time"] = lost_time
-        if lost_time:
-            # 胶料日班次计划
-            pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
-            if pcp_set:
-                mes_dict['plan']['ProductClassesPlan'] = {}
-                for pcp_obj in pcp_set:
-                    pcp_dict = pcp_obj.__dict__
-                    pcp_dict.pop("_state")
-                    mes_dict['plan']['ProductClassesPlan'][pcp_obj.plan_classes_uid] = pcp_dict
-            pbc_set = ProductBatching.objects.filter(last_updated_date__gte=lost_time)
-            if pbc_set:
-                mes_dict['recipe']['ProductBatching'] = {}
-                for pbc_obj in pbc_set:
-                    pbc_dict = pbc_obj.__dict__
-                    pbc_dict.pop("_state")
-                    mes_dict['recipe']['ProductBatching'][pbc_obj.stage_product_batch_no] = pbc_dict
-
-        return Response({'MES系统': mes_dict}, status=200)
+        pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
+        ProductDayPlan.objects.filter(last_updated_date__gte=lost_time).update(delete_flag=True)
+        for pcp_obj in pcp_set:
+            PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
+            MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
+            pcp_obj.delete_flag = True
+            pcp_obj.save()
+        return Response('删除断网之后的计划成功', status=200)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -227,3 +211,41 @@ class GroupPermissions(APIView):
             for perm in parent_permissions:
                 ret.append({'name': perm.name, 'permissions': perm.children_list})
         return Response(data={'result': ret})
+
+
+class PlanReceive(CreateAPIView):
+    """接受上辅机计划数据接口"""
+    # permission_classes = ()
+    # authentication_classes = ()
+    # permission_classes = (IsAuthenticated,)
+    serializer_class = PlanReceiveSerializer
+    queryset = ProductClassesPlan.objects.all()
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class MaterialReceive(CreateAPIView):
+    """接受上辅机原材料数据接口"""
+    # permission_classes = ()
+    # authentication_classes = ()
+    # permission_classes = (IsAuthenticated,)
+    serializer_class = MaterialReceiveSerializer
+    queryset = Material.objects.all()
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        m_obj = Material.objects.filter(material_no=request.data['material_no']).first()
+        if not m_obj:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        else:
+            return Response('mes拥有当前原材料', status=status.HTTP_201_CREATED)

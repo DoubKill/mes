@@ -105,6 +105,8 @@ class ProductObsoleteInterface(serializers.ModelSerializer, BaseInterface):
 class ProductClassesPlanSync(serializers.ModelSerializer):
     created_date = serializers.SerializerMethodField()
     work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
+    equip = serializers.CharField(source='equip.equip_no')
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
 
     @staticmethod
     def get_created_date(obj):
@@ -114,7 +116,7 @@ class ProductClassesPlanSync(serializers.ModelSerializer):
         model = ProductClassesPlan
         fields = (
             'created_date', 'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan', 'plan_classes_uid',
-            'note')
+            'note', 'equip', 'product_batching', 'status')
 
 
 class ProductDayPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
@@ -125,6 +127,7 @@ class ProductDayPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
     product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
     plan_schedule = serializers.CharField(source='plan_schedule.plan_schedule_no')
     pdp_product_classes_plan = ProductClassesPlanSync(many=True)
+
     # context = serializers.SerializerMethodField()
 
     # def get_context(self, object):

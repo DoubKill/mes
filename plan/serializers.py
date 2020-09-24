@@ -1,12 +1,12 @@
 from django.db.transaction import atomic
 from rest_framework import serializers
-from rest_framework.validators import UniqueTogetherValidator
 
-from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan
 from basics.models import GlobalCode, WorkSchedulePlan
-from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
+from mes.conf import COMMON_READ_ONLY_FIELDS
+from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan
 from plan.uuidfield import UUidTools
+from production.models import PlanStatus
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -16,7 +16,7 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        exclude = ('product_day_plan', 'work_schedule_plan','plan_classes_uid')
+        exclude = ('product_day_plan', 'work_schedule_plan', 'plan_classes_uid')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -103,3 +103,58 @@ class MaterialDemandedSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialDemanded
         fields = ('sn', 'material_name', 'classes', 'material_type', 'material_no', 'material_demanded', 'product_no')
+
+
+class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
+    """胶料日班次计划序列化"""
+
+    classes_name = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True)
+    product_no = serializers.CharField(source='product_batching.stage_product_batch_no', read_only=True)
+    status = serializers.SerializerMethodField(read_only=True, help_text='计划状态')
+    start_time = serializers.DateTimeField(source='work_schedule_plan.start_time', read_only=True)
+    end_time = serializers.DateTimeField(source='work_schedule_plan.end_time', read_only=True)
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+
+    def get_status(self, obj):
+        plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
+        if plan_status:
+            return plan_status.status
+        else:
+            return None
+
+    class Meta:
+        model = ProductClassesPlan
+        exclude = ('product_day_plan',)
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    @atomic()
+    def create(self, validated_data):
+        plan_classes_uid = validated_data['plan_classes_uid']
+        pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid, delete_flag=False).first()
+        if not pcp_obj:
+            validated_data['status'] = '已保存'
+            instance = super().create(validated_data)
+            # 创建计划状态
+            PlanStatus.objects.create(plan_classes_uid=instance.plan_classes_uid, equip_no=instance.equip.equip_no,
+                                      product_no=instance.product_batching.stage_product_batch_no,
+                                      status='已保存', operation_user=self.context['request'].user.username)
+            # 创建原材料需求量
+            for pbd_obj in instance.product_batching.batching_details.filter(delete_flag=False):
+                MaterialDemanded.objects.create(product_classes_plan=instance,
+                                                work_schedule_plan=instance.work_schedule_plan,
+                                                material=pbd_obj.material,
+                                                material_demanded=pbd_obj.actual_weight * instance.plan_trains,
+                                                plan_classes_uid=instance.plan_classes_uid)
+        else:
+            instance = super().update(pcp_obj, validated_data)
+            PlanStatus.objects.filter(plan_classes_uid=instance.plan_classes_uid).update(
+                equip_no=instance.equip.equip_no,
+                product_no=instance.product_batching.stage_product_batch_no)
+            MaterialDemanded.objects.filter(product_classes_plan=instance).update(delete_flag=True)
+            for pbd_obj in instance.product_batching.batching_details.filter(delete_flag=False):
+                MaterialDemanded.objects.create(product_classes_plan=instance,
+                                                work_schedule_plan=instance.work_schedule_plan,
+                                                material=pbd_obj.material,
+                                                material_demanded=pbd_obj.actual_weight * instance.plan_trains,
+                                                plan_classes_uid=instance.plan_classes_uid)
+        return instance

@@ -1,23 +1,29 @@
+import datetime
 import json
 
 import requests
 from django.db.models import Sum
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
-from rest_framework import status
 from rest_framework.generics import ListAPIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
+
+from basics.models import WorkSchedulePlan
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
+from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductDayPlanSyncInterface
-from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter
-from plan.serializers import ProductDayPlanSerializer
+from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
-from rest_framework.views import APIView
+from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
+from production.models import PlanStatus
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -110,18 +116,21 @@ class ProductDayPlanAPiView(APIView):
     authentication_classes = ()
 
     def post(self, request):
-        product_day_id = self.request.query_params.get('product_day_id')
-        if not product_day_id:
+        # product_day_id = self.request.query_params.get('product_day_id')
+        equip = self.request.query_params.get('equip')
+        day_time = self.request.query_params.get('day_time')
+        if not equip or not day_time:
             raise ValidationError('缺失参数')
         try:
-            product_day = ProductDayPlan.objects.get(id=int(product_day_id))
+            product_day_set = ProductDayPlan.objects.filter(equip_id=equip, plan_schedule__day_time=day_time)
         except Exception:
             raise ValidationError('该计划不存在')
-        interface = ProductDayPlanSyncInterface(instance=product_day)
-        try:
-            interface.request()
-        except Exception as e:
-            raise ValidationError(e)
+        for product_day in product_day_set:
+            interface = ProductDayPlanSyncInterface(instance=product_day)
+            try:
+                interface.request()
+            except Exception as e:
+                raise ValidationError(e)
         return Response('发送成功', status=status.HTTP_200_OK)
 
 
@@ -156,7 +165,7 @@ class MaterialDemandedView(APIView):
             return Response("请求库存失败", status=400)
 
         md_list = MaterialDemanded.objects.filter(**filter_dict).values(
-            'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no',
+            'product_classes_plan__product_batching__stage_product_batch_no',
             'work_schedule_plan__classes__global_name',
             'material__material_no',
             'material__material_name',
@@ -166,7 +175,7 @@ class MaterialDemandedView(APIView):
         for md_detail_list in md_list:
             md = {}
             md['product_no'] = md_detail_list[
-                'product_classes_plan__product_day_plan__product_batching__stage_product_batch_no']
+                'product_classes_plan__product_batching__stage_product_batch_no']
             md['classes'] = md_detail_list['work_schedule_plan__classes__global_name']
             md['material_no'] = md_detail_list['material__material_no']
             md['material_name'] = md_detail_list['material__material_name']
@@ -191,3 +200,86 @@ class MaterialDemandedView(APIView):
                 md['need_qty'] = None
             res.append(md)
         return Response({'results': res})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductClassesPlanManyCreate(APIView):
+    """胶料日班次计划群增接口"""
+
+    permission_classes = (IsAuthenticated,)
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        if isinstance(request.data, dict):
+            many = False
+            print(request.data)
+            day_time = WorkSchedulePlan.objects.filter(
+                id=request.data['work_schedule_plan']).first().plan_schedule.day_time
+            ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
+                                              equip_id=request.data['equip']).update(delete_flag=True)
+            return Response('删除成功')
+        elif isinstance(request.data, list):
+            many = True
+            work_list = []
+            plan_list = []
+            equip_list = []
+            for class_dict in request.data:
+                work_list.append(class_dict['work_schedule_plan'])
+                plan_list.append(class_dict['plan_classes_uid'])
+                equip_list.append(class_dict['equip'])
+                class_dict['status'] = '已下达'
+                # 判断胶料日计划是否存在
+                wsp_obj = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first()
+                pdp_obj = ProductDayPlan.objects.filter(equip_id=class_dict['equip'],
+                                                        product_batching_id=class_dict['product_batching'],
+                                                        plan_schedule=wsp_obj.plan_schedule, delete_flag=False).first()
+                if pdp_obj:
+                    class_dict['product_day_plan'] = pdp_obj
+                else:
+                    class_dict['product_day_plan'] = ProductDayPlan.objects.create(equip_id=class_dict['equip'],
+                                                                                   product_batching_id=class_dict[
+                                                                                       'product_batching'],
+                                                                                   plan_schedule=wsp_obj.plan_schedule,
+                                                                                   last_updated_date=datetime.datetime.now(),
+                                                                                   created_date=datetime.datetime.now())
+
+            day_time = WorkSchedulePlan.objects.filter(
+                id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
+            # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
+            pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
+                                                        equip_id__in=equip_list, delete_flag=False).exclude(
+                plan_classes_uid__in=plan_list)
+            for pcp_obj in pcp_set:
+                # 删除前要先判断该数据的状态是不是非等待，只要等待中的加护才可以删除
+                plan_status = PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid,
+                                                        delete_flag=False).order_by(
+                    'created_date').last()
+                if plan_status:
+                    if plan_status.status != '等待' or plan_status.status != '已保存':
+                        raise ValidationError("只要等待中或者已保存的计划才可以删除")
+                else:
+                    pass
+
+                # 删除多余的数据已经以及向关联的计划状态变更表和原材料需求量表需求量表
+                pcp_obj.delete_flag = True
+                pcp_obj.save()
+                PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
+                MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
+
+            s = ProductClassesPlanManyCreateSerializer(data=request.data, many=many, context={'request': request})
+            s.is_valid(raise_exception=True)
+            s.save()
+            return Response('新建成功')
+        else:
+            return Response(data={'detail': '数据有误'}, status=400)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductClassesPlanList(mixins.ListModelMixin, GenericViewSet):
+    """计划新增展示数据"""
+    queryset = ProductClassesPlan.objects.filter(delete_flag=False).order_by('sn')
+    serializer_class = ProductClassesPlanManyCreateSerializer
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    pagination_class = SinglePageNumberPagination
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PalletFeedbacksFilter
