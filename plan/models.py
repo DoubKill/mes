@@ -43,8 +43,8 @@ class ProductClassesPlan(AbstractEntity):
     product_batching = models.ForeignKey(ProductBatching, on_delete=models.DO_NOTHING, help_text='配料id',
                                          verbose_name='配料id',
                                          related_name='pb_product_classes_plan')
-    # status = models.CharField(max_length=64, help_text='状态:等待、已下达、运行中、完成', verbose_name='状态',
-    #                           choices=(('等待', '等待'), ('已下达', '已下达'), ('运行中', '运行中'), ('完成', '完成'), ('待停止', '待停止')))
+    status = models.CharField(max_length=64, help_text='状态:等待、已下达、运行中、完成', verbose_name='状态',
+                              choices=(('等待', '等待'), ('已下达', '已下达'), ('运行中', '运行中'), ('完成', '完成'), ('待停止', '待停止')))
 
     @property
     def total_time(self):

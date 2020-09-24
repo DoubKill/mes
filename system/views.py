@@ -15,7 +15,7 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from plan.models import ProductClassesPlan, MaterialDemanded
+from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus
 from recipe.models import Material
 from system.filters import UserFilter, GroupExtensionFilter
@@ -173,9 +173,12 @@ class Synchronization(APIView):
         lost_time1 = params.get("lost_time")
         lost_time = datetime.strptime(lost_time1, '%Y-%m-%d %X')
         pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
+        ProductDayPlan.objects.filter(last_updated_date__gte=lost_time).update(delete_flag=True)
         for pcp_obj in pcp_set:
             PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
             MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
+            pcp_obj.delete_flag = True
+            pcp_obj.save()
         return Response('删除断网之后的计划成功', status=200)
 
 

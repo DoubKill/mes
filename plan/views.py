@@ -1,16 +1,18 @@
+import datetime
 import json
-from django.db.transaction import atomic
 
 import requests
 from django.db.models import Sum
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
-from rest_framework import status, mixins
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.models import WorkSchedulePlan
@@ -19,12 +21,8 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductDayPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter
-from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
-from rest_framework.views import APIView
-from itertools import groupby
-from operator import itemgetter
-
+from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
 from production.models import PlanStatus
 
 
@@ -118,18 +116,21 @@ class ProductDayPlanAPiView(APIView):
     authentication_classes = ()
 
     def post(self, request):
-        product_day_id = self.request.query_params.get('product_day_id')
-        if not product_day_id:
+        # product_day_id = self.request.query_params.get('product_day_id')
+        equip = self.request.query_params.get('equip')
+        day_time = self.request.query_params.get('day_time')
+        if not equip or not day_time:
             raise ValidationError('缺失参数')
         try:
-            product_day = ProductDayPlan.objects.get(id=int(product_day_id))
+            product_day_set = ProductDayPlan.objects.filter(equip_id=equip,plan_schedule__day_time=day_time)
         except Exception:
             raise ValidationError('该计划不存在')
-        interface = ProductDayPlanSyncInterface(instance=product_day)
-        try:
-            interface.request()
-        except Exception as e:
-            raise ValidationError(e)
+        for product_day in product_day_set:
+            interface = ProductDayPlanSyncInterface(instance=product_day)
+            try:
+                interface.request()
+            except Exception as e:
+                raise ValidationError(e)
         return Response('发送成功', status=status.HTTP_200_OK)
 
 
@@ -219,16 +220,27 @@ class ProductClassesPlanManyCreate(APIView):
         work_list = []
         plan_list = []
         equip_list = []
+        for class_dict in request.data:
+            work_list.append(class_dict['work_schedule_plan'])
+            plan_list.append(class_dict['plan_classes_uid'])
+            equip_list.append(class_dict['equip'])
+            class_dict['status'] = '已下达'
+            # 判断胶料日计划是否存在
+            wsp_obj = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first()
+            pdp_obj = ProductDayPlan.objects.filter(equip_id=class_dict['equip'],
+                                                    product_batching_id=class_dict['product_batching'],
+                                                    plan_schedule=wsp_obj.plan_schedule, delete_flag=False).first()
+            if pdp_obj:
+                class_dict['product_day_plan'] = pdp_obj
+            else:
+                class_dict['product_day_plan'] = ProductDayPlan.objects.create(equip_id=class_dict['equip'],
+                                                                               product_batching_id=class_dict[
+                                                                                   'product_batching'],
+                                                                               plan_schedule=wsp_obj.plan_schedule,
+                                                                               last_updated_date=datetime.datetime.now(),
+                                                                               created_date=datetime.datetime.now())
 
-        request.data.sort(key=itemgetter('equip', 'work_schedule_plan'))
-        for equip, items in groupby(request.data, key=itemgetter('equip', 'work_schedule_plan')):
-            for class_dict in items:
-                work_list.append(class_dict['work_schedule_plan'])
-                plan_list.append(class_dict['plan_classes_uid'])
-                equip_list.append(class_dict['equip'])
-            day_time = WorkSchedulePlan.objects.filter(
-                id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
-            # ProductClassesPlan.objects.filter(plan_classes_uid=class_dict['plan_classes_uid'])
+        day_time = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
         # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
         pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
                                                     equip_id__in=equip_list).exclude(
@@ -254,6 +266,7 @@ class ProductClassesPlanManyCreate(APIView):
         s.is_valid(raise_exception=True)
         s.save()
         return Response('新建成功')
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductClassesPlanList(mixins.ListModelMixin, GenericViewSet):

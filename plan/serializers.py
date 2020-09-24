@@ -1,11 +1,10 @@
 from django.db.transaction import atomic
 from rest_framework import serializers
-from rest_framework.validators import UniqueTogetherValidator
 
-from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan
 from basics.models import GlobalCode, WorkSchedulePlan
-from mes.conf import COMMON_READ_ONLY_FIELDS
 from mes.base_serializer import BaseModelSerializer
+from mes.conf import COMMON_READ_ONLY_FIELDS
+from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
 
@@ -17,7 +16,7 @@ class ProductClassesPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        exclude = ('product_day_plan', 'work_schedule_plan','plan_classes_uid')
+        exclude = ('product_day_plan', 'work_schedule_plan', 'plan_classes_uid')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -105,6 +104,7 @@ class MaterialDemandedSerializer(BaseModelSerializer):
         model = MaterialDemanded
         fields = ('sn', 'material_name', 'classes', 'material_type', 'material_no', 'material_demanded', 'product_no')
 
+
 class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     """胶料日班次计划序列化"""
 
@@ -137,7 +137,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
             # 创建计划状态
             PlanStatus.objects.create(plan_classes_uid=instance.plan_classes_uid, equip_no=instance.equip.equip_no,
                                       product_no=instance.product_batching.stage_product_batch_no,
-                                      status='等待', operation_user=self.context['request'].user.username)
+                                      status='已保存', operation_user=self.context['request'].user.username)
             # 创建原材料需求量
             for pbd_obj in instance.product_batching.batching_details.filter(delete_flag=False):
                 MaterialDemanded.objects.create(product_classes_plan=instance,

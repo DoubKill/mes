@@ -15,9 +15,9 @@ from rest_framework.validators import UniqueValidator
 from basics.models import Equip, WorkSchedulePlan, GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from plan.models import ProductClassesPlan, MaterialDemanded
+from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus
-from recipe.models import ProductBatching, Material
+from recipe.models import ProductBatching, Material, ProductBatchingDetail
 from system.models import GroupExtension, User, Section
 
 
@@ -134,7 +134,17 @@ class SectionSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
+    material = serializers.CharField(source='material.material_no')
+
+    class Meta:
+        model = ProductBatchingDetail
+        fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
+
+
 class ProductBatchingSyncInterface(serializers.ModelSerializer):
+    batching_details = ProductBatchingDetailSyncInterface(many=True)
+
     class Meta:
         model = ProductBatching
         fields = (
@@ -142,38 +152,70 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer):
             'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
             'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
             'production_time_interval',
-            'equip', 'batching_type')
+            'equip', 'batching_type', 'batching_details')
+
+
+class ProductDayPlanSyncInterface(serializers.ModelSerializer):
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
+
+    class Meta:
+        model = ProductDayPlan
+        fields = ('equip', 'product_batching', 'plan_schedule')
 
 
 class PlanReceiveSerializer(serializers.ModelSerializer):
     equip = serializers.CharField()
     work_schedule_plan = serializers.CharField()
     product_batching = ProductBatchingSyncInterface()
+    product_day_plan = ProductDayPlanSyncInterface()
 
     @atomic()
     def validate(self, attrs):
-        print('===============')
         print(attrs)
         work_schedule_plan = attrs.get('work_schedule_plan')
         product_batching = attrs.get('product_batching')
         equip = attrs.get('equip')
+        batching_details = attrs['product_batching']['batching_details']
         try:
-            equip = Equip.objects.get(equip_no=equip)
-            work_schedule_plan = WorkSchedulePlan.objects.get(work_schedule_plan_no=work_schedule_plan)
+            equip = Equip.objects.get(equip_no=equip, delete_flag=False)
+            work_schedule_plan = WorkSchedulePlan.objects.get(work_schedule_plan_no=work_schedule_plan,
+                                                              delete_flag=False)
         except Equip.DoesNotExist:
             raise serializers.ValidationError('MES机台{}不存在'.format(attrs.get('equip')))
         except WorkSchedulePlan.DoesNotExist:
             raise serializers.ValidationError('排班详情{}不存在'.format(attrs.get('work_schedule_plan')))
         except Exception as e:
             raise serializers.ValidationError('相关表没有数据')
+        # 判断胶料配方是否存在 不存在则创建
         product_batching_obj = ProductBatching.objects.filter(
-            stage_product_batch_no=product_batching['stage_product_batch_no']).first()
+            stage_product_batch_no=product_batching['stage_product_batch_no'], delete_flag=False).first()
         if not product_batching_obj:
             attrs['product_batching'] = ProductBatching.objects.create(**product_batching)
         else:
             attrs['product_batching'] = product_batching_obj
+        # 判断胶料日计划是否存在 不存在则创建
+        pdp_dict = attrs.get('product_day_plan')
+        pb_obj = ProductBatching.objects.filter(
+            stage_product_batch_no=pdp_dict['product_batching']['stage_product_batch_no']).first()
+        if not pb_obj:
+            raise serializers.ValidationError('配方未同步')
+        pdp_obj = ProductDayPlan.objects.filter(equip=pdp_dict['equip'], product_batching=pb_obj,
+                                                plan_schedule=pdp_dict['plan_schedule']).first()
+        if pdp_obj:
+            attrs['product_day_plan'] = pdp_obj
+        else:
+            attrs['product_day_plan'] = ProductDayPlan.objects.create(equip=pdp_dict['equip'], product_batching=pb_obj,
+                                                                      plan_schedule=pdp_dict['plan_schedule'])
         attrs['work_schedule_plan'] = work_schedule_plan
         attrs['equip'] = equip
+        for batching_details_dict in batching_details:
+            m_obj = Material.objects.filter(material_no=batching_details_dict['material']['material_no']).first()
+            ProductBatchingDetail.objects.create(product_batching=batching_details_dict['product_batching'],
+                                                 sn=batching_details_dict['sn'], material=m_obj,
+                                                 actual_weight=batching_details_dict['sn'],
+                                                 standard_error=batching_details_dict['standard_error'],
+                                                 auto_flag=batching_details_dict['auto_flag'],
+                                                 type=batching_details_dict['type'])
         return attrs
 
     @atomic()
@@ -194,10 +236,10 @@ class PlanReceiveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        fields = (
-            'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
-            'plan_classes_uid', 'note', 'equip',
-            'product_batching')
+        fields = ('product_day_plan',
+                  'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
+                  'plan_classes_uid', 'note', 'equip',
+                  'product_batching')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -232,7 +274,6 @@ class MaterialReceiveSerializer(serializers.ModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-        print(validated_data)
         instance = super().create(validated_data)
         return instance
 
