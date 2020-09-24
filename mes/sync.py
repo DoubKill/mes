@@ -60,11 +60,11 @@ class ProductBatchingDetailSerializer(serializers.ModelSerializer):
 class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
     """配方同步序列化器"""
     created_date = serializers.SerializerMethodField()
-    factory = serializers.CharField(source='factory.global_no')
-    site = serializers.CharField(source='site.global_no')
-    product_info = serializers.CharField(source='product_info.product_no')
+    factory = serializers.CharField(source='factory.global_no', default=None)
+    site = serializers.CharField(source='site.global_no', default=None)
+    product_info = serializers.CharField(source='product_info.product_no', default=None)
     dev_type = serializers.CharField(source='dev_type.category_no', default=None)
-    stage = serializers.CharField(source='stage.global_no')
+    stage = serializers.CharField(source='stage.global_no', default=None)
     equip = serializers.CharField(source='equip.equip_no', default=None)
     used_time = serializers.SerializerMethodField()
     batching_details = ProductBatchingDetailSerializer(many=True)
@@ -127,17 +127,17 @@ class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
         fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
 
 
-class ProductBatchingSyncInterface(serializers.ModelSerializer):
-    batching_details = ProductBatchingDetailSyncInterface(many=True)
-
-    class Meta:
-        model = ProductBatching
-        fields = (
-            'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
-            'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
-            'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
-            'production_time_interval',
-            'equip', 'batching_type', 'batching_details')
+# class ProductBatchingSyncInterface(serializers.ModelSerializer):
+#     batching_details = ProductBatchingDetailSyncInterface(many=True)
+#
+#     class Meta:
+#         model = ProductBatching
+#         fields = (
+#             'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
+#             'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
+#             'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
+#             'production_time_interval',
+#             'equip', 'batching_type', 'batching_details')
 
 
 class ProductDayPlanSyncInterface(serializers.ModelSerializer):
