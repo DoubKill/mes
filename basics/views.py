@@ -102,7 +102,7 @@ class WorkScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            serializer = self.get_serializer(queryset, many=True)
+            serializer = self.get_serializer(queryset.filter(use_flag=1), many=True)
             return Response({'results': serializer.data})
         else:
             return super().list(request, *args, **kwargs)
