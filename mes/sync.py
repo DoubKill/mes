@@ -127,7 +127,7 @@ class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
         fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
 
 
-class ProductBatchingSyncInterface(serializers.ModelSerializer):
+class ProductBatchingInterface(serializers.ModelSerializer):
     batching_details = ProductBatchingDetailSyncInterface(many=True)
 
     class Meta:
@@ -153,7 +153,7 @@ class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface
 
     equip = serializers.CharField(source='equip.equip_no')
     work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
-    product_batching = ProductBatchingSyncInterface(read_only=True)
+    product_batching = ProductBatchingInterface(read_only=True)
     product_day_plan = ProductDayPlanSyncInterface(read_only=True)
 
     class Backend:
