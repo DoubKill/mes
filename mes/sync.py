@@ -127,17 +127,17 @@ class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
         fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
 
 
-# class ProductBatchingSyncInterface(serializers.ModelSerializer):
-#     batching_details = ProductBatchingDetailSyncInterface(many=True)
-#
-#     class Meta:
-#         model = ProductBatching
-#         fields = (
-#             'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
-#             'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
-#             'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
-#             'production_time_interval',
-#             'equip', 'batching_type', 'batching_details')
+class ProductBatchingInterface(serializers.ModelSerializer):
+    batching_details = ProductBatchingDetailSyncInterface(many=True)
+
+    class Meta:
+        model = ProductBatching
+        fields = (
+            'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
+            'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
+            'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
+            'production_time_interval',
+            'equip', 'batching_type', 'batching_details')
 
 
 class ProductDayPlanSyncInterface(serializers.ModelSerializer):
@@ -153,7 +153,7 @@ class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface
 
     equip = serializers.CharField(source='equip.equip_no')
     work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
-    product_batching = ProductBatchingSyncInterface(read_only=True)
+    product_batching = ProductBatchingInterface(read_only=True)
     product_day_plan = ProductDayPlanSyncInterface(read_only=True)
 
     class Backend:
