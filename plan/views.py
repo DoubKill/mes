@@ -122,7 +122,7 @@ class ProductDayPlanAPiView(APIView):
         if not equip or not day_time:
             raise ValidationError('缺失参数')
         try:
-            product_day_set = ProductDayPlan.objects.filter(equip_id=equip,plan_schedule__day_time=day_time)
+            product_day_set = ProductDayPlan.objects.filter(equip_id=equip, plan_schedule__day_time=day_time)
         except Exception:
             raise ValidationError('该计划不存在')
         for product_day in product_day_set:
@@ -212,60 +212,66 @@ class ProductClassesPlanManyCreate(APIView):
     def post(self, request, *args, **kwargs):
         if isinstance(request.data, dict):
             many = False
+            print(request.data)
+            day_time = WorkSchedulePlan.objects.filter(
+                id=request.data['work_schedule_plan']).first().plan_schedule.day_time
+            ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
+                                              equip_id=request.data['equip']).update(delete_flag=True)
+            return Response('删除成功')
         elif isinstance(request.data, list):
             many = True
+            work_list = []
+            plan_list = []
+            equip_list = []
+            for class_dict in request.data:
+                work_list.append(class_dict['work_schedule_plan'])
+                plan_list.append(class_dict['plan_classes_uid'])
+                equip_list.append(class_dict['equip'])
+                class_dict['status'] = '已下达'
+                # 判断胶料日计划是否存在
+                wsp_obj = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first()
+                pdp_obj = ProductDayPlan.objects.filter(equip_id=class_dict['equip'],
+                                                        product_batching_id=class_dict['product_batching'],
+                                                        plan_schedule=wsp_obj.plan_schedule, delete_flag=False).first()
+                if pdp_obj:
+                    class_dict['product_day_plan'] = pdp_obj
+                else:
+                    class_dict['product_day_plan'] = ProductDayPlan.objects.create(equip_id=class_dict['equip'],
+                                                                                   product_batching_id=class_dict[
+                                                                                       'product_batching'],
+                                                                                   plan_schedule=wsp_obj.plan_schedule,
+                                                                                   last_updated_date=datetime.datetime.now(),
+                                                                                   created_date=datetime.datetime.now())
+
+            day_time = WorkSchedulePlan.objects.filter(
+                id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
+            # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
+            pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
+                                                        equip_id__in=equip_list, delete_flag=False).exclude(
+                plan_classes_uid__in=plan_list)
+            for pcp_obj in pcp_set:
+                # 删除前要先判断该数据的状态是不是非等待，只要等待中的加护才可以删除
+                plan_status = PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid,
+                                                        delete_flag=False).order_by(
+                    'created_date').last()
+                if plan_status:
+                    if plan_status.status != '等待' or plan_status.status != '已保存':
+                        raise ValidationError("只要等待中或者已保存的计划才可以删除")
+                else:
+                    pass
+
+                # 删除多余的数据已经以及向关联的计划状态变更表和原材料需求量表需求量表
+                pcp_obj.delete_flag = True
+                pcp_obj.save()
+                PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
+                MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
+
+            s = ProductClassesPlanManyCreateSerializer(data=request.data, many=many, context={'request': request})
+            s.is_valid(raise_exception=True)
+            s.save()
+            return Response('新建成功')
         else:
             return Response(data={'detail': '数据有误'}, status=400)
-
-        work_list = []
-        plan_list = []
-        equip_list = []
-        for class_dict in request.data:
-            work_list.append(class_dict['work_schedule_plan'])
-            plan_list.append(class_dict['plan_classes_uid'])
-            equip_list.append(class_dict['equip'])
-            class_dict['status'] = '已下达'
-            # 判断胶料日计划是否存在
-            wsp_obj = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first()
-            pdp_obj = ProductDayPlan.objects.filter(equip_id=class_dict['equip'],
-                                                    product_batching_id=class_dict['product_batching'],
-                                                    plan_schedule=wsp_obj.plan_schedule, delete_flag=False).first()
-            if pdp_obj:
-                class_dict['product_day_plan'] = pdp_obj
-            else:
-                class_dict['product_day_plan'] = ProductDayPlan.objects.create(equip_id=class_dict['equip'],
-                                                                               product_batching_id=class_dict[
-                                                                                   'product_batching'],
-                                                                               plan_schedule=wsp_obj.plan_schedule,
-                                                                               last_updated_date=datetime.datetime.now(),
-                                                                               created_date=datetime.datetime.now())
-
-        day_time = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
-        # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
-        pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                                    equip_id__in=equip_list).exclude(
-            plan_classes_uid__in=plan_list)
-        for pcp_obj in pcp_set:
-            # 删除前要先判断该数据的状态是不是非等待，只要等待中的加护才可以删除
-            plan_status = PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid,
-                                                    delete_flag=False).order_by(
-                'created_date').last()
-            if plan_status:
-                if plan_status.status != '等待':
-                    raise ValidationError("只要等待中的计划才可以删除")
-            else:
-                pass
-
-            # 删除多余的数据已经以及向关联的计划状态变更表和原材料需求量表需求量表
-            pcp_obj.delete_flag = True
-            pcp_obj.save()
-            PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
-            MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
-
-        s = ProductClassesPlanManyCreateSerializer(data=request.data, many=many, context={'request': request})
-        s.is_valid(raise_exception=True)
-        s.save()
-        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
