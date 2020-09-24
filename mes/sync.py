@@ -60,11 +60,11 @@ class ProductBatchingDetailSerializer(serializers.ModelSerializer):
 class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
     """配方同步序列化器"""
     created_date = serializers.SerializerMethodField()
-    factory = serializers.CharField(source='factory.global_no')
-    site = serializers.CharField(source='site.global_no')
-    product_info = serializers.CharField(source='product_info.product_no')
+    factory = serializers.CharField(source='factory.global_no', default=None)
+    site = serializers.CharField(source='site.global_no', default=None)
+    product_info = serializers.CharField(source='product_info.product_no', default=None)
     dev_type = serializers.CharField(source='dev_type.category_no', default=None)
-    stage = serializers.CharField(source='stage.global_no')
+    stage = serializers.CharField(source='stage.global_no', default=None)
     equip = serializers.CharField(source='equip.equip_no', default=None)
     used_time = serializers.SerializerMethodField()
     batching_details = ProductBatchingDetailSerializer(many=True)
