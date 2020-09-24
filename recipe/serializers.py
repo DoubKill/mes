@@ -127,6 +127,22 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     @atomic()
     def create(self, validated_data):
         batching_details = validated_data.pop('batching_details', None)
+        stage_product_batch_no = validated_data.get('stage_product_batch_no')
+        if stage_product_batch_no:
+            # 传胶料编码则代表是特殊配方
+            validated_data.pop('site', None)
+            validated_data.pop('stage', None)
+            validated_data.pop('versions', None)
+            validated_data.pop('product_info', None)
+        else:
+            site = validated_data.get('site')
+            stage = validated_data.get('stage')
+            product_info = validated_data.get('product_info')
+            versions = validated_data.get('versions')
+            if not all([site, stage, product_info, versions]):
+                raise serializers.ValidationError('参数不足')
+            validated_data['stage_product_batch_no'] = '{}-{}-{}-{}'.format(site.global_name, stage.global_name,
+                                                                            product_info.product_no, versions)
         instance = super().create(validated_data)
         batching_weight = manual_material_weight = auto_material_weight = 0
         if batching_details:
