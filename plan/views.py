@@ -216,8 +216,6 @@ class ProductClassesPlanManyCreate(APIView):
     @atomic()
     def post(self, request, *args, **kwargs):
         if isinstance(request.data, dict):
-            many = False
-            print(request.data)
             day_time = WorkSchedulePlan.objects.filter(
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
             ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
@@ -270,7 +268,6 @@ class ProductClassesPlanManyCreate(APIView):
                 pcp_obj.save()
                 PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
                 MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
-            print(class_dict_list)
             s = ProductClassesPlanManyCreateSerializer(data=request.data, many=many,
                                                        context={'request': request})
             s.is_valid(raise_exception=True)
