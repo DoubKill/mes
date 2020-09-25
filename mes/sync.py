@@ -119,29 +119,9 @@ class ProductClassesPlanSync(serializers.ModelSerializer):
             'note', 'equip', 'product_batching', 'status')
 
 
-class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
-    material = serializers.CharField(source='material.material_no')
-
-    class Meta:
-        model = ProductBatchingDetail
-        fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
-
-
-class ProductBatchingInterface(serializers.ModelSerializer):
-    batching_details = ProductBatchingDetailSyncInterface(many=True)
-
-    class Meta:
-        model = ProductBatching
-        fields = (
-            'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
-            'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
-            'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
-            'production_time_interval',
-            'equip', 'batching_type', 'batching_details')
-
-
 class ProductDayPlanSyncInterface(serializers.ModelSerializer):
     product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
+    plan_schedule = serializers.CharField(source='plan_schedule.plan_schedule_no')
 
     class Meta:
         model = ProductDayPlan
@@ -153,7 +133,7 @@ class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface
 
     equip = serializers.CharField(source='equip.equip_no')
     work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
-    product_batching = ProductBatchingInterface(read_only=True)
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
     product_day_plan = ProductDayPlanSyncInterface(read_only=True)
 
     class Backend:
@@ -164,4 +144,4 @@ class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface
         fields = ('product_day_plan',
                   'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
                   'plan_classes_uid', 'note', 'equip',
-                  'product_batching')
+                  'product_batching', )
