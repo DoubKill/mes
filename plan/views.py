@@ -2,7 +2,7 @@ import datetime
 import json
 
 import requests
-from django.db.models import Sum
+from django.db.models import Sum, Max
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -17,13 +17,14 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.models import WorkSchedulePlan
 from basics.views import CommonDeleteMixin
+from mes.common_code import days_cur_month_dates
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
-from production.models import PlanStatus
+from production.models import PlanStatus, TrainsFeedbacks
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -289,3 +290,41 @@ class ProductClassesPlanList(mixins.ListModelMixin, GenericViewSet):
     pagination_class = SinglePageNumberPagination
     filter_backends = (DjangoFilterBackend,)
     filter_class = PalletFeedbacksFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IndexView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        # 当前月份所有日期
+        dates = days_cur_month_dates()
+
+        # 计划数据
+        plan_data = ProductClassesPlan.objects.filter(
+            delete_flag=False).values(
+            'work_schedule_plan__plan_schedule__day_time').annotate(plan_trains=Sum('plan_trains'))
+        plan_data_dict = {str(item['work_schedule_plan__plan_schedule__day_time']): item for item in plan_data}
+
+        # 实际数据
+        max_actual_ids = TrainsFeedbacks.objects.filter(
+            created_date__date=datetime.datetime.now().date()
+        ).values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
+        actual_data = TrainsFeedbacks.objects.filter(
+            id__in=max_actual_ids).values('created_date__date').annotate(actual_trains=Sum('actual_trains'))
+        actual_data_dict = {str(item['created_date__date']): item for item in actual_data}
+
+        ret = {}
+        cur_month_plan = cur_month_actual = 0
+        for date in dates:
+            ret[date] = {'plan_trains': 0, 'actual_trains': 0}
+            if date in plan_data_dict:
+                ret[date]['plan_trains'] = plan_data_dict[date]['plan_trains']
+                cur_month_plan += plan_data_dict[date]['plan_trains']
+            if date in actual_data_dict:
+                ret[date]['actual_trains'] = actual_data_dict[date]['actual_trains']
+                cur_month_actual += actual_data_dict[date]['actual_trains']
+
+        return Response({'cur_month_plan': cur_month_plan,
+                         'cur_month_actual': cur_month_actual,
+                         'result': ret})

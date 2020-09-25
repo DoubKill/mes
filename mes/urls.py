@@ -24,6 +24,8 @@ from rest_framework.documentation import include_docs_urls
 
 # 修改后
 # 配置swgger
+from plan.views import IndexView
+
 schema_view = get_schema_view(
     openapi.Info(
         title="MES-API",
@@ -46,7 +48,8 @@ urlpatterns = [
     path('api/v1/production/', include('production.urls')),
     path('api/v1/inventory/', include('inventory.urls')),
     path('gui/', include('gui.urls')),
-    path('favicon.ico', RedirectView.as_view(url='static/m.ico'))
+    path('favicon.ico', RedirectView.as_view(url='static/m.ico')),
+    path('api/v1/index/', IndexView.as_view()),  # 首页展示
 ]
 
 if settings.DEBUG:
