@@ -80,13 +80,14 @@ permission_data = [
         {'id': 54, 'code': 'use_productbatching', 'name': '启用', 'parent_id': 47},
         {'id': 55, 'code': 'refuse_productbatching', 'name': '驳回', 'parent_id': 47},
         {'id': 56, 'code': 'abandon_productbatching', 'name': '弃用', 'parent_id': 47},
-        {'id': 57, 'code': 'send_productbatching', 'name': '发送至上辅机', 'parent_id': 47},
+        {'id': 57, 'code': 'send_productbatching', 'name': '配方下达', 'parent_id': 47},
 
         {'id': 58, 'code': 'productdayplan', 'name': '计划管理', 'parent_id': None},
         {'id': 59, 'code': 'view_productdayplan', 'name': '查看', 'parent_id': 58},
         {'id': 60, 'code': 'add_productdayplan', 'name': '增加', 'parent_id': 58},
         {'id': 61, 'code': 'change_productdayplan', 'name': '修改', 'parent_id': 58},
         {'id': 62, 'code': 'delete_productdayplan', 'name': '删除', 'parent_id': 58},
+        {'id': 77, 'code': 'send_productdayplan', 'name': '计划下达', 'parent_id': 58},
 
         {'id': 63, 'code': 'materialdemanded', 'name': '原材料需求量', 'parent_id': None},
         {'id': 64, 'code': 'view_materialdemanded', 'name': '查看', 'parent_id': 63},

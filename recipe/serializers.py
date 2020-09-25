@@ -151,7 +151,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 auto_flag = detail.get('auto_flag')
                 actual_weight = detail.get('actual_weight', 0)
                 material = detail.get('material')
-                if material.material_type.global_name == '碳黑':
+                if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
                 elif material.material_type.global_name == '油料':
                     detail['type'] = 3
@@ -218,7 +218,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                 actual_weight = detail.get('actual_weight', 0)
                 auto_flag = detail.get('auto_flag')
                 material = detail.get('material')
-                if material.material_type.global_name == '碳黑':
+                if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
                 elif material.material_type.global_name == '油料':
                     detail['type'] = 3
