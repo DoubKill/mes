@@ -101,6 +101,11 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     stage_name = serializers.CharField(source="stage.global_name", read_only=True)
     site_name = serializers.CharField(source="site.global_name", read_only=True)
     dev_type_name = serializers.CharField(source='dev_type.category_name', default=None, read_only=True)
+    submit_username = serializers.CharField(source="submit_user.username", read_only=True)
+    check_username = serializers.CharField(source="check_user.username", read_only=True)
+    reject_username = serializers.CharField(source="reject_user.username", read_only=True)
+    used_username = serializers.CharField(source="used_user.username", read_only=True)
+    obsolete_username = serializers.CharField(source="obsolete_user.username", read_only=True)
 
     class Meta:
         model = ProductBatching
