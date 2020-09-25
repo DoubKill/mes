@@ -130,6 +130,6 @@ def days_cur_month_dates():
 def get_weekdays(days):
     """获取当前日期往前n天的日期"""
     date_list = []
-    for i in range(1, days+1):
+    for i in range(days):
         date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
     return date_list[::-1]
