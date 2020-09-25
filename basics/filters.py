@@ -72,4 +72,4 @@ class PlanScheduleFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = PlanSchedule
-        fields = ('day_time', 'month', 'year')
+        fields = ('day_time', 'month', 'year', 'work_schedule__schedule_name')
