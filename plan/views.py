@@ -128,7 +128,7 @@ class ProductDayPlanAPiView(APIView):
         except Exception:
             raise ValidationError('该计划不存在')
         for product_classes_plan in product_classes_plan_set:
-            if product_classes_plan.status != "已保存":
+            if product_classes_plan.status not in ['已保存', '等待']:
                 continue
             else:
                 interface = ProductClassesPlanSyncInterface(instance=product_classes_plan)
