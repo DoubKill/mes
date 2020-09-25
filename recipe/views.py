@@ -156,6 +156,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
             return super().list(request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductBatchingViewSet(ModelViewSet):
     """
     list:
@@ -214,6 +215,7 @@ class ProductBatchingViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class RecipeNoticeAPiView(APIView):
     """配方数据下发至上辅机（只有应用状态的配方才可下发）"""
     permission_classes = ()
