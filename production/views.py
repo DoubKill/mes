@@ -291,7 +291,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                            GenericViewSet):
     """密炼实绩"""
 
-    def list_bak(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         # 获取url参数 search_time equip_no
         return_data = {
             "data": []
@@ -373,7 +373,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             return_data["data"].append(instance)
         return Response(return_data)
 
-    def list(self, request, *args, **kwargs):
+    def list_bak(self, request, *args, **kwargs):
         params = request.query_params
         day_time = params.get("search_time", str(datetime.date.today() - datetime.timedelta(days=1)))
         if day_time:
