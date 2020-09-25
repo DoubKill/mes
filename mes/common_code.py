@@ -125,3 +125,11 @@ def days_cur_month_dates():
     d2 = date(y, m, days)
     delta = d2 - d1
     return [(d1 + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(delta.days + 1)]
+
+
+def get_weekdays(days):
+    """获取当前日期往前n天的日期"""
+    date_list = []
+    for i in range(1, days+1):
+        date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
+    return date_list[::-1]

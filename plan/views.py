@@ -17,7 +17,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.models import WorkSchedulePlan
 from basics.views import CommonDeleteMixin
-from mes.common_code import days_cur_month_dates
+from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductClassesPlanSyncInterface
@@ -297,8 +297,8 @@ class IndexView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        # 当前月份所有日期
-        dates = days_cur_month_dates()
+        # 当前一周的日期
+        dates = get_weekdays(7)
 
         # 计划数据
         plan_data = ProductClassesPlan.objects.filter(
