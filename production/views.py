@@ -514,7 +514,7 @@ class TrainsFeedbacksBatch(APIView):
     """批量同步车次生产数据接口"""
     @atomic
     def post(self, request):
-        serializer = TrainsFeedbacksSerializer(data=request.data, many=True)
+        serializer = TrainsFeedbacksSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
@@ -523,7 +523,7 @@ class PalletFeedbacksBatch(APIView):
     """批量同步托次生产数据接口"""
     @atomic
     def post(self, request):
-        serializer = PalletFeedbacksSerializer(data=request.data, many=True)
+        serializer = PalletFeedbacksSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
@@ -533,7 +533,7 @@ class EquipStatusBatch(APIView):
     """批量同步设备生产数据接口"""
     @atomic
     def post(self, request):
-        serializer = EquipStatusSerializer(data=request.data, many=True)
+        serializer = EquipStatusSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
@@ -544,7 +544,7 @@ class PlanStatusBatch(APIView):
 
     @atomic
     def post(self, request):
-        serializer = PlanStatusSerializer(data=request.data, many=True)
+        serializer = PlanStatusSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
@@ -554,7 +554,7 @@ class ExpendMaterialBatch(APIView):
     """批量同步原材料消耗数据接口"""
     @atomic
     def post(self, request):
-        serializer = ExpendMaterialSerializer(data=request.data, many=True)
+        serializer = ExpendMaterialSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
