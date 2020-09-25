@@ -50,7 +50,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除公共代码
     """
-    queryset = GlobalCode.objects.filter(delete_flag=False)
+    queryset = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1)
     serializer_class = GlobalCodeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
