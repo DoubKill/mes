@@ -101,7 +101,7 @@ def run():
                             "begin_trains": m - (pallet_count-1),
                             "end_trains": m,
                             "pallet_no": f"{bath_no}|test",
-                            "barcode": "KJDL:LKYDFJM<NLIIRD",
+                            # "barcode": "KJDL:LKYDFJM<NLIIRD",
                             "classes": class_name,
                             "product_time": end_time,
                         }
@@ -119,10 +119,10 @@ def run():
                         "pressure": random.randint(80,360),
                         "status": "running",
                         "current_trains": m,
-                        "product_time": end_time,
+                        "product_time": end_time + datetime.timedelta(seconds=1),
                     }
                     EquipStatus.objects.create(**equip_status_data)
-                    t.sleep(1)
+                    # t.sleep(1)
 
 
 if __name__ == '__main__':
