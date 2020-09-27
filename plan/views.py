@@ -140,8 +140,7 @@ class ProductDayPlanAPiView(APIView):
                 product_classes_plan.status = '等待'
                 product_classes_plan.save()
                 PlanStatus.objects.filter(plan_classes_uid=product_classes_plan.plan_classes_uid).update(status='等待')
-        return Response('发送成功', status=status.HTTP_200_OK)
-
+        return Response('下达成功', status=status.HTTP_200_OK)
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialDemandedView(APIView):

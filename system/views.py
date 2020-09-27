@@ -167,9 +167,10 @@ class LoginView(ObtainJSONWebToken):
 
 @method_decorator([api_recorder], name="dispatch")
 class Synchronization(APIView):
-    def get(self, request, *args, **kwargs):
+    @atomic()
+    def post(self, request, *args, **kwargs):
         # 获取断网时间
-        params = request.query_params
+        params = request.data
         lost_time1 = params.get("lost_time")
         lost_time = datetime.strptime(lost_time1, '%Y-%m-%d %X')
         pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
