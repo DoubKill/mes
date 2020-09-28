@@ -211,6 +211,8 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         if search_time_str:
             if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 raise ValidationError("查询时间格式异常")
+        else:
+            search_time_str = str(datetime.date.today())
         if target_equip_no:
             pcp_set = ProductClassesPlan.objects.filter(product_day_plan__plan_schedule__day_time=search_time_str,
                                                         product_day_plan__equip__equip_no=target_equip_no,
@@ -371,6 +373,8 @@ class ProductActualViewSet(mixins.ListModelMixin,
         if search_time_str:
             if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 raise ValidationError("查询时间格式异常")
+        else:
+            search_time_str = str(datetime.date.today())
         if target_equip_no:
             pcp_set = ProductClassesPlan.objects.filter(product_day_plan__plan_schedule__day_time=search_time_str,
                                                         product_day_plan__equip__equip_no=target_equip_no,
