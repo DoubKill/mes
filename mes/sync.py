@@ -8,7 +8,6 @@
 """
     基础数据同步至上辅机
 """
-
 import logging
 from datetime import datetime
 
@@ -144,4 +143,4 @@ class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface
         fields = ('product_day_plan',
                   'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
                   'plan_classes_uid', 'note', 'equip',
-                  'product_batching', )
+                  'product_batching',)

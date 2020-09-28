@@ -141,7 +141,7 @@ class ProductDayPlanAPiView(APIView):
                 product_classes_plan.status = '等待'
                 product_classes_plan.save()
                 PlanStatus.objects.filter(plan_classes_uid=product_classes_plan.plan_classes_uid).update(status='等待')
-        return Response('发送成功', status=status.HTTP_200_OK)
+        return Response('下达成功', status=status.HTTP_200_OK)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -225,7 +225,7 @@ class ProductClassesPlanManyCreate(APIView):
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
             ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
                                               equip_id=request.data['equip']).update(delete_flag=True)
-            return Response('删除成功')
+            return Response('操作成功')
         elif isinstance(request.data, list):
             many = True
             work_list = []
@@ -277,7 +277,7 @@ class ProductClassesPlanManyCreate(APIView):
                                                        context={'request': request})
             s.is_valid(raise_exception=True)
             s.save()
-            return Response('新建成功')
+            return Response('保存成功')
         else:
             return Response(data={'detail': '数据有误'}, status=400)
 

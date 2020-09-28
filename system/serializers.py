@@ -171,7 +171,6 @@ class PlanReceiveSerializer(serializers.ModelSerializer):
 
     @atomic()
     def validate(self, attrs):
-        print(attrs)
         work_schedule_plan = attrs.get('work_schedule_plan')
         product_batching = attrs.get('product_batching')
         equip = attrs.get('equip')
