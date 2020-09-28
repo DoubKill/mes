@@ -393,7 +393,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Max('actual_weight'), classes=Max('classes'))
         tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x in tf_set}
-        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight":0 ,"class_data": [None, None, None]}
+        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight":0 ,"classes_data": [None, None, None]}
                          for x in day_plan_list}
         pcp_data = pcp_set.values("plan_classes_uid", "weight", "plan_trains", 'equip__equip_no',
                                   'product_batching__stage_product_batch_no',
@@ -410,19 +410,19 @@ class ProductActualViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["plan_trains"] += pcp.get('plan_trains', 0)
             if not tf_dict.get(plan_classes_uid):
                 if class_name == "早班":
-                    day_plan_dict[day_plan_id]["class_data"][0] = {
+                    day_plan_dict[day_plan_id]["classes_data"][0] = {
                         "plan_trains": pcp.get('plan_trains'),
                         "actual_trains": 0,
                         "classes": "早班"
                     }
                 if class_name == "中班":
-                    day_plan_dict[day_plan_id]["class_data"][1] = {
+                    day_plan_dict[day_plan_id]["classes_data"][1] = {
                         "plan_trains": pcp.get('plan_trains'),
                         "actual_trains": 0,
                         "classes": "中班"
                     }
                 if class_name == "晚班":
-                    day_plan_dict[day_plan_id]["class_data"][2] = {
+                    day_plan_dict[day_plan_id]["classes_data"][2] = {
                         "plan_trains": pcp.get('plan_trains'),
                         "actual_trains": 0,
                         "classes": "晚班"
@@ -431,19 +431,19 @@ class ProductActualViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += tf_dict[plan_classes_uid][1]
             if tf_dict[plan_classes_uid][2] == "早班":
-                day_plan_dict[day_plan_id]["class_data"][0] = {
+                day_plan_dict[day_plan_id]["classes_data"][0] = {
                     "plan_trains": pcp.get('plan_trains'),
                     "actual_trains": tf_dict[plan_classes_uid][0],
                     "classes": "早班"
                 }
             if tf_dict[plan_classes_uid][2] == "中班":
-                day_plan_dict[day_plan_id]["class_data"][1] = {
+                day_plan_dict[day_plan_id]["classes_data"][1] = {
                     "plan_trains": pcp.get('plan_trains'),
                     "actual_trains": tf_dict[pcp.plan_classes_uid][0],
                     "classes": "中班"
                 }
             if tf_dict[plan_classes_uid][2] == "晚班":
-                day_plan_dict[day_plan_id]["class_data"][2] = {
+                day_plan_dict[day_plan_id]["classes_data"][2] = {
                     "plan_trains": pcp.get('plan_trains'),
                     "actual_trains": tf_dict[plan_classes_uid][0],
                     "classes": "晚班"
