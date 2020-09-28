@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from plan.views import ProductDayPlanViewSet, \
     MaterialDemandedAPIView, ProductDayPlanManyCreate, \
-    ProductDayPlanAPiView, MaterialDemandedView, ProductClassesPlanManyCreate, ProductClassesPlanList
+    ProductDayPlanAPiView, MaterialDemandedView, ProductClassesPlanManyCreate, ProductClassesPlanList, PlanReceive
 
 router = DefaultRouter()
 
@@ -13,6 +13,7 @@ router.register(r'product-day-plans', ProductDayPlanViewSet)
 router.register(r'product-classes-plan-list', ProductClassesPlanList)
 urlpatterns = [
     path('', include(router.urls)),
+    path('plan-receive/', PlanReceive.as_view()),  # 上辅机群控中计划同步回mes
     path('material-demanded-apiview/', MaterialDemandedAPIView.as_view()),  # 原材料需求量展示
     path('product-day-plan-manycreate/', ProductDayPlanManyCreate.as_view()),  # 群增胶料日计划
     path('product-day-plan-notice/', ProductDayPlanAPiView.as_view()),  # 计划下发至上辅机

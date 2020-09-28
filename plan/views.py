@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,6 +25,7 @@ from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFee
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
 from production.models import PlanStatus, TrainsFeedbacks
+from system.serializers import PlanReceiveSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -328,3 +329,23 @@ class IndexView(APIView):
         return Response({'cur_month_plan': cur_month_plan,
                          'cur_month_actual': cur_month_actual,
                          'result': ret})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlanReceive(CreateAPIView):
+    """
+        接受上辅机计划数据接口
+        """
+    # permission_classes = ()
+    # authentication_classes = ()
+    permission_classes = (IsAuthenticated,)
+    serializer_class = PlanReceiveSerializer
+    queryset = ProductDayPlan.objects.all()
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
