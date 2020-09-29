@@ -46,7 +46,7 @@ class ProductClassesPlan(AbstractEntity):
                                          related_name='pb_product_classes_plan', null=True, blank=True)
     status = models.CharField(max_length=64, help_text='状态:等待、已下达、运行中、完成', verbose_name='状态',
                               choices=(('已保存', '已保存'), ('等待', '等待'), ('已下达', '已下达'), ('运行中', '运行中'), ('完成', '完成'),
-                                       ('待停止', '待停止')))
+                                       ('待停止', '待停止')), null=True, blank=True)
 
     @property
     def total_time(self):
