@@ -309,7 +309,7 @@ class IndexView(APIView):
 
         # 实际数据
         max_actual_ids = TrainsFeedbacks.objects.filter(
-            created_date__date=datetime.datetime.now().date()
+            end_time__date=datetime.datetime.now().date()
         ).values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
         actual_data = TrainsFeedbacks.objects.filter(
             id__in=max_actual_ids).values('created_date__date').annotate(actual_trains=Sum('actual_trains'))
