@@ -312,8 +312,8 @@ class IndexView(APIView):
             end_time__date=datetime.datetime.now().date()
         ).values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
         actual_data = TrainsFeedbacks.objects.filter(
-            id__in=max_actual_ids).values('created_date__date').annotate(actual_trains=Sum('actual_trains'))
-        actual_data_dict = {str(item['created_date__date']): item for item in actual_data}
+            id__in=max_actual_ids).values('end_time__date').annotate(actual_trains=Sum('actual_trains'))
+        actual_data_dict = {str(item['end_time__date']): item for item in actual_data}
 
         ret = {}
         cur_month_plan = cur_month_actual = 0
