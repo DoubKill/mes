@@ -306,6 +306,7 @@ class IndexView(APIView):
 
         # 计划数据
         plan_data = ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time__in=dates,
             delete_flag=False).values(
             'work_schedule_plan__plan_schedule__day_time').annotate(plan_trains=Sum('plan_trains'))
         plan_data_dict = {str(item['work_schedule_plan__plan_schedule__day_time']): item for item in plan_data}
