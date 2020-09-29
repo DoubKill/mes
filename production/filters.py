@@ -31,6 +31,8 @@ class EquipStatusFilter(django_filters.rest_framework.FilterSet):
     """机台状态反馈过滤器"""
     plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号')
+    st = django_filters.DateTimeFilter(field_name="product_time", help_text='生产时间', lookup_expr="gte")
+    et = django_filters.DateTimeFilter(field_name="product_time", help_text='生产时间', lookup_expr="lte")
     # product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
 
     class Meta:
