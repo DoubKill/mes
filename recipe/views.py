@@ -171,7 +171,7 @@ class ProductBatchingViewSet(ModelViewSet):
         配料审批
     """
     queryset = ProductBatching.objects.filter(
-        delete_flag=False).select_related(
+        delete_flag=False, batching_type=2).select_related(
         "factory", "site", "dev_type", "stage", "product_info"
     ).prefetch_related(
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))
