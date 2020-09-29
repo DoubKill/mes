@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+from django.contrib.auth.models import AnonymousUser
 from rest_framework import serializers
 from rest_framework.fields import SkipField
 from rest_framework.relations import PKOnlyObject
@@ -66,7 +67,10 @@ class BaseModelSerializer(serializers.ModelSerializer):
         """
         if self.Meta.model.__name__ in ["Permission", "Group"]:
             return super().create(validated_data)
-        validated_data.update(created_user=self.context["request"].user)
+        user = self.context["request"].user
+        if isinstance(user, AnonymousUser):
+            user = None
+        validated_data.update(created_user=user)
         instance = super().create(validated_data)
         return instance
 
@@ -79,5 +83,8 @@ class BaseModelSerializer(serializers.ModelSerializer):
         """
         if self.Meta.model.__name__ in ["Permission", "Group"]:
             return super().update(instance ,validated_data)
-        validated_data.update(last_updated_user=self.context["request"].user)
+        user = self.context["request"].user
+        if isinstance(user, AnonymousUser):
+            user = None
+        validated_data.update(last_updated_user=user)
         return super().update(instance ,validated_data)

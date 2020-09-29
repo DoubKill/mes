@@ -233,16 +233,16 @@ LOGGING = {
 # }
 
 # oracle使用SID连接
-# DATABASES = {
-#     'default': {
-#     'ENGINE': 'django.db.backends.oracle',
-#     'NAME': 'zcaj1',  # 数据库SID
-#     'USER': 'zcajlj',
-#     'PASSWORD': 'zcajmes2020',
-#     'HOST':'10.4.10.17',
-#     'PORT':'1521'
-#     }
-# }
+DATABASES = {
+    'default': {
+    'ENGINE': 'django.db.backends.oracle',
+    'NAME': 'zcaj1',  # 数据库SID
+    'USER': 'zcajlj',
+    'PASSWORD': 'zcajmes2020',
+    'HOST':'10.4.10.17',
+    'PORT':'1521'
+    }
+}
 
 # if DEBUG:
 #     DATABASES = {
@@ -272,12 +272,12 @@ LOGGING = {
 #     }
 # }
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#     }
+# }
 
 
 # Password validation

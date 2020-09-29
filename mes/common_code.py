@@ -2,6 +2,8 @@ from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
+from datetime import date, timedelta, datetime
+
 from mes.permissions import PermissonsDispatch
 from system.models import User, Permissions
 
@@ -112,3 +114,22 @@ class UserFunctions(object):
 
 
 User.__bases__ += (UserFunctions, )
+
+
+def days_cur_month_dates():
+    """获取当月所有日期列表"""
+    m = datetime.now().month
+    y = datetime.now().year
+    days = (date(y, m+1, 1) - date(y, m, 1)).days
+    d1 = date(y, m, 1)
+    d2 = date(y, m, days)
+    delta = d2 - d1
+    return [(d1 + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(delta.days + 1)]
+
+
+def get_weekdays(days):
+    """获取当前日期往前n天的日期"""
+    date_list = []
+    for i in range(days):
+        date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
+    return date_list[::-1]

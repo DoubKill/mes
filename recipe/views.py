@@ -156,6 +156,7 @@ class ProductInfoViewSet(mixins.CreateModelMixin,
             return super().list(request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductBatchingViewSet(ModelViewSet):
     """
     list:
@@ -170,7 +171,7 @@ class ProductBatchingViewSet(ModelViewSet):
         配料审批
     """
     queryset = ProductBatching.objects.filter(
-        delete_flag=False).select_related(
+        delete_flag=False, batching_type=2).select_related(
         "factory", "site", "dev_type", "stage", "product_info"
     ).prefetch_related(
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))
@@ -182,7 +183,10 @@ class ProductBatchingViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'stage_product_batch_no', 'batching_weight', 'production_time_interval')
+            data = queryset.values('id', 'stage_product_batch_no',
+                                   'batching_weight',
+                                   'production_time_interval',
+                                   'used_type')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -214,6 +218,7 @@ class ProductBatchingViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class RecipeNoticeAPiView(APIView):
     """配方数据下发至上辅机（只有应用状态的配方才可下发）"""
     permission_classes = ()

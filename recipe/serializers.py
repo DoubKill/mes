@@ -101,6 +101,11 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     stage_name = serializers.CharField(source="stage.global_name", read_only=True)
     site_name = serializers.CharField(source="site.global_name", read_only=True)
     dev_type_name = serializers.CharField(source='dev_type.category_name', default=None, read_only=True)
+    submit_username = serializers.CharField(source="submit_user.username", read_only=True)
+    check_username = serializers.CharField(source="check_user.username", read_only=True)
+    reject_username = serializers.CharField(source="reject_user.username", read_only=True)
+    used_username = serializers.CharField(source="used_user.username", read_only=True)
+    obsolete_username = serializers.CharField(source="obsolete_user.username", read_only=True)
 
     class Meta:
         model = ProductBatching
@@ -127,6 +132,22 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
     @atomic()
     def create(self, validated_data):
         batching_details = validated_data.pop('batching_details', None)
+        stage_product_batch_no = validated_data.get('stage_product_batch_no')
+        if stage_product_batch_no:
+            # 传胶料编码则代表是特殊配方
+            validated_data.pop('site', None)
+            validated_data.pop('stage', None)
+            validated_data.pop('versions', None)
+            validated_data.pop('product_info', None)
+        else:
+            site = validated_data.get('site')
+            stage = validated_data.get('stage')
+            product_info = validated_data.get('product_info')
+            versions = validated_data.get('versions')
+            if not all([site, stage, product_info, versions]):
+                raise serializers.ValidationError('参数不足')
+            validated_data['stage_product_batch_no'] = '{}-{}-{}-{}'.format(site.global_name, stage.global_name,
+                                                                            product_info.product_no, versions)
         instance = super().create(validated_data)
         batching_weight = manual_material_weight = auto_material_weight = 0
         if batching_details:
@@ -135,7 +156,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 auto_flag = detail.get('auto_flag')
                 actual_weight = detail.get('actual_weight', 0)
                 material = detail.get('material')
-                if material.material_type.global_name == '碳黑':
+                if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
                 elif material.material_type.global_name == '油料':
                     detail['type'] = 3
@@ -167,6 +188,12 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         model = ProductBatching
         fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no',
                   'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type', 'production_time_interval')
+        extra_kwargs = {
+            'stage_product_batch_no': {
+                'allow_blank': True,
+                'allow_null': True,
+                'required': False}
+        }
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
@@ -196,7 +223,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                 actual_weight = detail.get('actual_weight', 0)
                 auto_flag = detail.get('auto_flag')
                 material = detail.get('material')
-                if material.material_type.global_name == '碳黑':
+                if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
                 elif material.material_type.global_name == '油料':
                     detail['type'] = 3
