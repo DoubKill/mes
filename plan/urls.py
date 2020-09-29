@@ -3,7 +3,8 @@ from rest_framework.routers import DefaultRouter
 
 from plan.views import ProductDayPlanViewSet, \
     MaterialDemandedAPIView, ProductDayPlanManyCreate, \
-    ProductDayPlanAPiView, MaterialDemandedView, ProductClassesPlanManyCreate, ProductClassesPlanList, PlanReceive
+    ProductDayPlanAPiView, MaterialDemandedView, ProductClassesPlanManyCreate, ProductClassesPlanList, PlanReceive, \
+    ProductBatchingReceive, ProductBatchingDetailReceive, ProductDayPlanReceive, ProductClassesPlanReceive
 
 router = DefaultRouter()
 
@@ -19,4 +20,10 @@ urlpatterns = [
     path('product-day-plan-notice/', ProductDayPlanAPiView.as_view()),  # 计划下发至上辅机
     path('materia-quantity-demande/', MaterialDemandedView.as_view()),  # 计划原材料需求列表
     path('product-classes-plan-manycreate/', ProductClassesPlanManyCreate.as_view()),  # 群增胶料日班次计划
+
+    # 上辅机同步给mes的数据
+    path('product-batching-receive/', ProductBatchingReceive.as_view()),  # 胶料配料标准同步
+    path('product-batching-detail-receive/', ProductBatchingDetailReceive.as_view()),  # 胶料配料标准详情同步
+    path('product-day-plan-receive/', ProductDayPlanReceive.as_view()),  # 胶料日计划同步
+    path('product-classes-plan-receive/', ProductClassesPlanReceive.as_view()),  # 胶料日班次计划同步
 ]

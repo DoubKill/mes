@@ -40,13 +40,13 @@ class ProductClassesPlan(AbstractEntity):
                                         max_length=64)
     note = models.CharField(max_length=64, help_text='备注', blank=True, null=True)
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台id', verbose_name='机台id',
-                              related_name='equip_product_classes_plan')
+                              related_name='equip_product_classes_plan', null=True, blank=True)
     product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配料id',
                                          verbose_name='配料id',
-                                         related_name='pb_product_classes_plan')
+                                         related_name='pb_product_classes_plan', null=True, blank=True)
     status = models.CharField(max_length=64, help_text='状态:等待、已下达、运行中、完成', verbose_name='状态',
                               choices=(('已保存', '已保存'), ('等待', '等待'), ('已下达', '已下达'), ('运行中', '运行中'), ('完成', '完成'),
-                                       ('待停止', '待停止')))
+                                       ('待停止', '待停止')), null=True, blank=True)
 
     @property
     def total_time(self):
