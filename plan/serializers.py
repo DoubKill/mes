@@ -1,12 +1,13 @@
 from django.db.transaction import atomic
 from rest_framework import serializers
 
-from basics.models import GlobalCode, WorkSchedulePlan
+from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
+from recipe.models import ProductBatching, ProductInfo, ProductBatchingDetail, Material
 
 
 class ProductClassesPlanSerializer(BaseModelSerializer):
@@ -124,7 +125,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductClassesPlan
-        fields='__all__'
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     @atomic()
@@ -158,3 +159,206 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
                                                 material_demanded=pbd_obj.actual_weight * instance.plan_trains,
                                                 plan_classes_uid=instance.plan_classes_uid)
         return instance
+
+
+class ProductBatchingSerializer(BaseModelSerializer):
+    """胶料配料标准同步"""
+    factory__global_no = serializers.CharField(write_only=True)
+    site__global_no = serializers.CharField(write_only=True)
+    product_info__product_no = serializers.CharField(write_only=True)
+    dev_type__category_no = serializers.CharField(write_only=True)
+    stage__global_no = serializers.CharField(write_only=True)
+    equip__equip_no = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        factory1 = attrs.pop('factory__global_no')
+        site1 = attrs.pop('site__global_no')
+        product_info1 = attrs.pop('product_info__product_no')
+        dev_type1 = attrs.pop('dev_type__category_no')
+        stage1 = attrs.pop('stage__global_no')
+        equip1 = attrs.pop('equip__equip_no')
+        try:
+            factory = GlobalCode.objects.get(global_no=factory1)
+            site = GlobalCode.objects.get(global_no=site1)
+            product_info = ProductInfo.objects.get(product_no=product_info1)
+            dev_type = EquipCategoryAttribute.objects.get(category_no=dev_type1)
+            stage = GlobalCode.objects.get(global_no=stage1)
+            equip = Equip.objects.get(equip_no=equip1)
+        except GlobalCode.DoesNotExist:
+            raise serializers.ValidationError(
+                '工厂编号{0}或者SITE编号{1}或者段次{2}不存在'.format(factory1, site1, stage1))
+        except ProductInfo.DoesNotExist:
+            raise serializers.ValidationError('胶料工艺信息{}不存在'.format(product_info1))
+        except EquipCategoryAttribute.DoesNotExist:
+            raise serializers.ValidationError('设备种类属性{}不存在'.format(dev_type1))
+        except Equip.DoesNotExist:
+            raise serializers.ValidationError('设备{}不存在'.format(equip1))
+        attrs['factory'] = factory
+        attrs['site'] = site
+        attrs['product_info'] = product_info
+        attrs['dev_type'] = dev_type
+        attrs['stage'] = stage
+        attrs['equip'] = equip
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        stage_product_batch_no = validated_data['stage_product_batch_no']
+        equip = validated_data['equip']
+        instance = ProductBatching.objects.filter(stage_product_batch_no=stage_product_batch_no, equip=equip)
+        if instance:
+            instance.update(**validated_data)
+        else:
+            super().create(validated_data)
+        return validated_data
+
+    class Meta:
+        model = ProductBatching
+        fields = (
+            'factory__global_no', 'site__global_no', 'product_info__product_no', 'precept', 'stage_product_batch_no',
+            'dev_type__category_no', 'stage__global_no', 'versions', 'used_type', 'batching_weight',
+            'manual_material_weight', 'auto_material_weight', 'volume', 'production_time_interval', 'equip__equip_no',
+            'batching_type')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductBatchingDetailSerializer(BaseModelSerializer):
+    """胶料配料标准同步"""
+    product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+    material__material_no = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        product_batching1 = attrs.pop('product_batching__stage_product_batch_no')
+        material1 = attrs.pop('material__material_no')
+        try:
+            material = Material.objects.get(material_no=material1)
+        except Material.DoesNotExist:
+            raise serializers.ValidationError('原材料信息{}不存在'.format(material1))
+        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1).first()
+        if not pb_obj:
+            raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
+        attrs['product_batching'] = pb_obj
+        attrs['material'] = material
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        instance = ProductBatchingDetail.objects.filter(**validated_data)
+        if instance:
+            instance.update(**validated_data)
+        else:
+            super().create(validated_data)
+        return validated_data
+
+    class Meta:
+        model = ProductBatchingDetail
+        fields = (
+            'product_batching__stage_product_batch_no', 'sn', 'material__material_no', 'actual_weight',
+            'standard_error',
+            'auto_flag', 'type')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductDayPlansySerializer(BaseModelSerializer):
+    """胶料日计划表同步"""
+    equip__equip_no = serializers.CharField(write_only=True)
+    product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+    plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        equip1 = attrs.pop('equip__equip_no')
+        product_batching1 = attrs.pop('product_batching__stage_product_batch_no')
+        plan_schedule1 = attrs.pop('plan_schedule__plan_schedule_no')
+        try:
+            equip = Equip.objects.get(equip_no=equip1)
+            plan_schedule = PlanSchedule.objects.get(plan_schedule_no=plan_schedule1)
+        except Equip.DoesNotExist:
+            raise serializers.ValidationError('设备{}不存在'.format(equip1))
+        except PlanSchedule.DoesNotExist:
+            raise serializers.ValidationError('排班管理{}不存在'.format(plan_schedule1))
+        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1).first()
+        if not pb_obj:
+            raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
+        attrs['product_batching'] = pb_obj
+        attrs['equip'] = equip
+        attrs['plan_schedule'] = plan_schedule
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        instance = ProductDayPlan.objects.filter(**validated_data)
+        if instance:
+            instance.update(**validated_data)
+        else:
+            super().create(validated_data)
+        return validated_data
+
+    class Meta:
+        model = ProductDayPlan
+        fields = ('equip__equip_no', 'product_batching__stage_product_batch_no', 'plan_schedule__plan_schedule_no')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductClassesPlansySerializer(BaseModelSerializer):
+    """胶料日计划表同步"""
+    work_schedule_plan__work_schedule_plan_no = serializers.CharField(write_only=True)
+    equip__equip_no = serializers.CharField(write_only=True)
+    product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+    product_day_plan__equip__equip_no = serializers.CharField(write_only=True)
+    product_day_plan__plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
+    product_day_plan__product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        work_schedule_plan1 = attrs.pop('work_schedule_plan__work_schedule_plan_no')
+        equip1 = attrs.pop('equip__equip_no')
+        product_batching1 = attrs.pop('product_batching__stage_product_batch_no')
+        try:
+            equip = Equip.objects.get(equip_no=equip1)
+            work_schedule_plan = WorkSchedulePlan.objects.get(work_schedule_plan_no=work_schedule_plan1)
+        except Equip.DoesNotExist:
+            raise serializers.ValidationError('设备{}不存在'.format(equip1))
+        except WorkSchedulePlan.DoesNotExist:
+            raise serializers.ValidationError('排班详情{}不存在'.format(work_schedule_plan1))
+        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1).first()
+        if not pb_obj:
+            raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
+        attrs['product_batching'] = pb_obj
+        attrs['equip'] = equip
+        attrs['work_schedule_plan'] = work_schedule_plan
+
+        pcp_plan_schedule = attrs.pop('product_day_plan__plan_schedule__plan_schedule_no')
+        pcp_equip = attrs.pop('product_day_plan__equip__equip_no')
+        pcp_product_batching = attrs.pop('product_day_plan__product_batching__stage_product_batch_no')
+
+        try:
+            p_equip = Equip.objects.get(equip_no=pcp_equip)
+            p_plan_schedule = PlanSchedule.objects.get(plan_schedule_no=pcp_plan_schedule)
+        except Equip.DoesNotExist:
+            raise serializers.ValidationError('设备{}不存在'.format(pcp_equip))
+        except PlanSchedule.DoesNotExist:
+            raise serializers.ValidationError('排班管理{}不存在'.format(pcp_plan_schedule))
+        p_pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1).first()
+        if not pb_obj:
+            raise serializers.ValidationError('胶料配料标准{}不存在'.format(pcp_product_batching))
+        pdp_obj = ProductDayPlan.objects.filter(equip=p_equip, plan_schedule=p_plan_schedule,
+                                                product_batching=p_pb_obj).first()
+        attrs['product_day_plan'] = pdp_obj
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        plan_classes_uid = validated_data['plan_classes_uid']
+        instance = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid)
+        if instance:
+            instance.update(**validated_data)
+        else:
+            super().create(validated_data)
+        return validated_data
+
+    class Meta:
+        model = ProductClassesPlan
+        fields = ('sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan__work_schedule_plan_no',
+                  'plan_classes_uid', 'note', 'equip__equip_no', 'product_batching__stage_product_batch_no', 'status',
+                  'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
+                  'product_day_plan__plan_schedule__plan_schedule_no')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
