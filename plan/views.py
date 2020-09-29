@@ -23,8 +23,11 @@ from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
-from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer
+from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
+    ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
+    ProductClassesPlansySerializer
 from production.models import PlanStatus, TrainsFeedbacks
+from recipe.models import ProductBatching, ProductBatchingDetail
 from system.serializers import PlanReceiveSerializer
 
 
@@ -349,3 +352,31 @@ class PlanReceive(CreateAPIView):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductBatchingReceive(CreateAPIView):
+    """胶料配料标准同步"""
+    serializer_class = ProductBatchingSerializer
+    queryset = ProductBatching.objects.all()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductBatchingDetailReceive(CreateAPIView):
+    """胶料配料标准详情同步"""
+    serializer_class = ProductBatchingDetailSerializer
+    queryset = ProductBatchingDetail.objects.all()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductDayPlanReceive(CreateAPIView):
+    """胶料日计划表同步"""
+    serializer_class = ProductDayPlansySerializer
+    queryset = ProductDayPlan.objects.all()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductClassesPlanReceive(CreateAPIView):
+    """胶料日班次计划表同步"""
+    serializer_class = ProductClassesPlansySerializer
+    queryset = ProductClassesPlan.objects.all()
