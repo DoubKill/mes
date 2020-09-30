@@ -78,7 +78,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         create:
             托盘产出反馈反馈
     """
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False)
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = PalletFeedbacksSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -552,7 +552,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
 
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False)
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
