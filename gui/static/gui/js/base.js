@@ -68,7 +68,7 @@ const EchartsListUrl = "/api/v1/production/equip-status/"
 const PlanSchedulesUrl = "/api/v1/basics/plan-schedules/";
 
 //库存管理---原料库存
-const MaterialRepertoryUrl = '/api/v1/inventory/material-inventory/';
+const MaterialRepertoryUrl = '/api/v1/inventory/material-inventory-view/';
 //库存管理---胶料库存
 const RubberRepertoryUrl = '/api/v1/inventory/product-inventory/';
 //生成计划管理---原材料需求量

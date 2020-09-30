@@ -8,7 +8,6 @@
 """
     基础数据同步至上辅机
 """
-
 import logging
 from datetime import datetime
 
@@ -32,10 +31,13 @@ class BaseInterface(object):
         if not self.Backend.path:
             raise NotImplementedError("未设置path")
         kwargs = getattr(self, 'data')
+        # print(kwargs)
         logger.info(kwargs)
         try:
             headers = {
                 "Content-Type": "application/json; charset=UTF-8",
+                # "Authorization": kwargs['context']
+
             }
             res = requests.post(self.endpoint + self.Backend.path, headers=headers, json=kwargs)
         except Exception as err:
@@ -51,17 +53,17 @@ class ProductBatchingDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductBatchingDetail
-        fields = ('sn', 'material', 'actual_weight', 'standard_error', 'auto_flag')
+        fields = ('sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
 
 
 class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
     """配方同步序列化器"""
     created_date = serializers.SerializerMethodField()
-    factory = serializers.CharField(source='factory.global_no')
-    site = serializers.CharField(source='site.global_no')
-    product_info = serializers.CharField(source='product_info.product_no')
+    factory = serializers.CharField(source='factory.global_no', default=None)
+    site = serializers.CharField(source='site.global_no', default=None)
+    product_info = serializers.CharField(source='product_info.product_no', default=None)
     dev_type = serializers.CharField(source='dev_type.category_no', default=None)
-    stage = serializers.CharField(source='stage.global_no')
+    stage = serializers.CharField(source='stage.global_no', default=None)
     equip = serializers.CharField(source='equip.equip_no', default=None)
     used_time = serializers.SerializerMethodField()
     batching_details = ProductBatchingDetailSerializer(many=True)
@@ -75,7 +77,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
         return datetime.strftime(obj.used_time, '%Y-%m-%d %H:%M:%S') if obj.used_time else None
 
     class Backend:
-        path = 'api/v1/recipe/recipe-receive/'
+        path = 'api/v1/datain/recipe-receive/'
 
     class Meta:
         model = ProductBatching
@@ -89,18 +91,21 @@ class ProductObsoleteInterface(serializers.ModelSerializer, BaseInterface):
     """
     配方弃用
     """
+    dev_type = serializers.CharField(source='dev_type.category_no')
 
     class Backend:
         path = 'api/v1/recipe/recipe-obsolete/'
 
     class Meta:
         model = ProductBatching
-        fields = ('stage_product_batch_no',)
+        fields = ('stage_product_batch_no', 'dev_type')
 
 
 class ProductClassesPlanSync(serializers.ModelSerializer):
     created_date = serializers.SerializerMethodField()
     work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
+    equip = serializers.CharField(source='equip.equip_no')
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
 
     @staticmethod
     def get_created_date(obj):
@@ -110,25 +115,32 @@ class ProductClassesPlanSync(serializers.ModelSerializer):
         model = ProductClassesPlan
         fields = (
             'created_date', 'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan', 'plan_classes_uid',
-            'note')
+            'note', 'equip', 'product_batching', 'status')
 
 
-class ProductDayPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
-    """计划同步序列化器"""
-
-    created_date = serializers.SerializerMethodField()
-    equip = serializers.CharField(source='equip.equip_no')
+class ProductDayPlanSyncInterface(serializers.ModelSerializer):
     product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
     plan_schedule = serializers.CharField(source='plan_schedule.plan_schedule_no')
-    pdp_product_classes_plan = ProductClassesPlanSync(many=True)
 
-    @staticmethod
-    def get_created_date(obj):
-        return datetime.strftime(obj.created_date, '%Y-%m-%d %H:%M:%S')
+    class Meta:
+        model = ProductDayPlan
+        fields = ('equip', 'product_batching', 'plan_schedule')
+
+
+class ProductClassesPlanSyncInterface(serializers.ModelSerializer, BaseInterface):
+    """计划同步序列化器"""
+
+    equip = serializers.CharField(source='equip.equip_no')
+    work_schedule_plan = serializers.CharField(source='work_schedule_plan.work_schedule_plan_no')
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
+    product_day_plan = ProductDayPlanSyncInterface(read_only=True)
 
     class Backend:
         path = 'api/v1/plan/plan-receive/'
 
     class Meta:
-        model = ProductDayPlan
-        fields = ('created_date', 'equip', 'product_batching', 'plan_schedule', 'pdp_product_classes_plan')
+        model = ProductClassesPlan
+        fields = ('product_day_plan',
+                  'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
+                  'plan_classes_uid', 'note', 'equip',
+                  'product_batching',)

@@ -4,16 +4,21 @@ create_date:
 updater:
 update_time:
 """
-import re
+
+from django.contrib.auth.hashers import make_password
 
 from django.contrib.auth.models import Permission
+from django.db.transaction import atomic
 from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
 from rest_framework.validators import UniqueValidator
 
+from basics.models import Equip, WorkSchedulePlan, GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from system.models import GroupExtension, Group, User, Section
+from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
+from production.models import PlanStatus
+from recipe.models import ProductBatching, Material, ProductBatchingDetail
+from system.models import GroupExtension, User, Section
 
 
 class PermissionSerializer(BaseModelSerializer):
@@ -28,7 +33,7 @@ class UserUpdateSerializer(BaseModelSerializer):
     password = serializers.CharField(required=False)
     num = serializers.CharField(required=False, validators=[
         UniqueValidator(queryset=User.objects.all(),
-                        message='该用户工号已存在'),
+                        message='该员工工号已存在'),
     ])
 
     def to_representation(self, instance):
@@ -44,11 +49,11 @@ class UserUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = User
         fields = '__all__'
-        # read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class UserSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
+    num = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all(), message='该员工工号已存在')])
 
     def to_representation(self, instance):
         instance = super().to_representation(instance)
@@ -56,10 +61,7 @@ class UserSerializer(BaseModelSerializer):
         return instance
 
     def create(self, validated_data):
-        partten = r"^(?![0-9]+$)(?![a-zA-Z]+$)[0-9A-Za-z]{6,16}$"
         password = validated_data.get('password')
-        if not re.search(partten, password):
-            raise serializers.ValidationError("请输入6~16位长度包含字母和数字的密码")
         user = super().create(validated_data)
         user.set_password(password)
         user.save()
@@ -67,8 +69,7 @@ class UserSerializer(BaseModelSerializer):
 
     class Meta:
         model = User
-        fields = '__all__'
-        # read_only_fields = COMMON_READ_ONLY_FIELDS
+        exclude = ('user_permissions', 'groups')
 
 
 class GroupUserSerializer(BaseModelSerializer):
@@ -89,7 +90,7 @@ class GroupUserSerializer(BaseModelSerializer):
 
 class GroupExtensionSerializer(BaseModelSerializer):
     """角色组扩展序列化器"""
-    user_set = UserUpdateSerializer(read_only=True, many=True)
+    group_users = UserUpdateSerializer(read_only=True, many=True)
 
     class Meta:
         model = GroupExtension
@@ -111,23 +112,171 @@ class GroupExtensionUpdateSerializer(BaseModelSerializer):
 
 class GroupUserUpdateSerializer(BaseModelSerializer):
     """更新角色组用户序列化器"""
-    user_set = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), write_only=True,
-                                                  help_text="""{"user_set":[<user_id>, ……]}""")
+    group_users = serializers.PrimaryKeyRelatedField(many=True, queryset=User.objects.all(), write_only=True,
+                                                     help_text="""{"group_users":[<user_id>, ……]}""")
 
     def update(self, instance, validated_data):
-        user_ids = validated_data['user_set']
-        instance.user_set.remove(*instance.user_set.all())
-        instance.user_set.add(*user_ids)
+        user_ids = validated_data['group_users']
+        instance.group_users.remove(*instance.group_users.all())
+        instance.group_users.add(*user_ids)
         instance.save()
         return super().update(instance, validated_data)
 
     class Meta:
         model = GroupExtension
-        fields = ('id', 'user_set')
+        fields = ('id', 'group_users')
 
 
 class SectionSerializer(BaseModelSerializer):
     class Meta:
         model = Section
         fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductBatchingDetailSyncInterface(serializers.ModelSerializer):
+    material = serializers.CharField(source='material.material_no')
+
+    class Meta:
+        model = ProductBatchingDetail
+        fields = ('product_batching', 'sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
+
+
+class ProductBatchingSyncInterface(serializers.ModelSerializer):
+    batching_details = ProductBatchingDetailSyncInterface(many=True)
+
+    class Meta:
+        model = ProductBatching
+        fields = (
+            'factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'dev_type', 'stage', 'versions',
+            'used_type', 'batching_weight', 'manual_material_weight', 'auto_material_weight', 'volume', 'submit_user',
+            'submit_time', 'reject_user', 'reject_time', 'used_user', 'used_time', 'obsolete_user', 'obsolete_time',
+            'production_time_interval',
+            'equip', 'batching_type', 'batching_details')
+
+
+class ProductDayPlanSyncInterface(serializers.ModelSerializer):
+    product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
+
+    class Meta:
+        model = ProductDayPlan
+        fields = ('equip', 'product_batching', 'plan_schedule')
+
+
+class PlanReceiveSerializer(serializers.ModelSerializer):
+    equip = serializers.CharField()
+    work_schedule_plan = serializers.CharField()
+    product_batching = ProductBatchingSyncInterface()
+    product_day_plan = ProductDayPlanSyncInterface()
+
+    @atomic()
+    def validate(self, attrs):
+        work_schedule_plan = attrs.get('work_schedule_plan')
+        product_batching = attrs.get('product_batching')
+        equip = attrs.get('equip')
+        batching_details = attrs['product_batching']['batching_details']
+        try:
+            equip = Equip.objects.get(equip_no=equip, delete_flag=False)
+            work_schedule_plan = WorkSchedulePlan.objects.get(work_schedule_plan_no=work_schedule_plan,
+                                                              delete_flag=False)
+        except Equip.DoesNotExist:
+            raise serializers.ValidationError('MES机台{}不存在'.format(attrs.get('equip')))
+        except WorkSchedulePlan.DoesNotExist:
+            raise serializers.ValidationError('排班详情{}不存在'.format(attrs.get('work_schedule_plan')))
+        except Exception as e:
+            raise serializers.ValidationError('相关表没有数据')
+        # 判断胶料配方是否存在 不存在则创建
+        product_batching_obj = ProductBatching.objects.filter(
+            stage_product_batch_no=product_batching['stage_product_batch_no'], delete_flag=False).first()
+        if not product_batching_obj:
+            attrs['product_batching'] = ProductBatching.objects.create(**product_batching)
+        else:
+            attrs['product_batching'] = product_batching_obj
+        # 判断胶料日计划是否存在 不存在则创建
+        pdp_dict = attrs.get('product_day_plan')
+        pb_obj = ProductBatching.objects.filter(
+            stage_product_batch_no=pdp_dict['product_batching']['stage_product_batch_no']).first()
+        if not pb_obj:
+            raise serializers.ValidationError('配方未同步')
+        pdp_obj = ProductDayPlan.objects.filter(equip=pdp_dict['equip'], product_batching=pb_obj,
+                                                plan_schedule=pdp_dict['plan_schedule']).first()
+        if pdp_obj:
+            attrs['product_day_plan'] = pdp_obj
+        else:
+            attrs['product_day_plan'] = ProductDayPlan.objects.create(equip=pdp_dict['equip'], product_batching=pb_obj,
+                                                                      plan_schedule=pdp_dict['plan_schedule'])
+        attrs['work_schedule_plan'] = work_schedule_plan
+        attrs['equip'] = equip
+        for batching_details_dict in batching_details:
+            m_obj = Material.objects.filter(material_no=batching_details_dict['material']['material_no']).first()
+            ProductBatchingDetail.objects.create(product_batching=batching_details_dict['product_batching'],
+                                                 sn=batching_details_dict['sn'], material=m_obj,
+                                                 actual_weight=batching_details_dict['sn'],
+                                                 standard_error=batching_details_dict['standard_error'],
+                                                 auto_flag=batching_details_dict['auto_flag'],
+                                                 type=batching_details_dict['type'])
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        # 创建计划状态
+        PlanStatus.objects.create(plan_classes_uid=instance.plan_classes_uid, equip_no=instance.equip.equip_no,
+                                  product_no=instance.product_batching.stage_product_batch_no,
+                                  status='等待', operation_user=self.context['request'].user.username)
+        # 创建原材料需求量
+        for pbd_obj in instance.product_batching.batching_details.filter(delete_flag=False):
+            MaterialDemanded.objects.create(product_classes_plan=instance,
+                                            work_schedule_plan=instance.work_schedule_plan,
+                                            material=pbd_obj.material,
+                                            material_demanded=pbd_obj.actual_weight * instance.plan_trains,
+                                            plan_classes_uid=instance.plan_classes_uid)
+        return instance
+
+    class Meta:
+        model = ProductClassesPlan
+        fields = ('product_day_plan',
+                  'sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan',
+                  'plan_classes_uid', 'note', 'equip',
+                  'product_batching')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialReceiveSerializer(serializers.ModelSerializer):
+    material_type = serializers.CharField()
+    package_unit = serializers.CharField()
+
+    @atomic()
+    def validate(self, attrs):
+        material_type = attrs.get('material_type')
+        package_unit = attrs.get('package_unit')
+        try:
+            material_type = GlobalCode.objects.get(global_no=material_type)
+        except GlobalCode.DoesNotExist:
+            raise serializers.ValidationError(
+                'MES公共代码{0}不存在'.format(attrs.get('material_type')))
+        except Exception as e:
+            raise serializers.ValidationError('相关表没有数据')
+        if package_unit == '0':
+            package_unit = None
+        else:
+            try:
+                package_unit = GlobalCode.objects.get(global_no=package_unit)
+            except GlobalCode.DoesNotExist:
+                raise serializers.ValidationError(
+                    'MES公共代码{0}不存在'.format(attrs.get('package_unit')))
+            except Exception as e:
+                raise serializers.ValidationError('相关表没有数据')
+        attrs['material_type'] = material_type
+        attrs['package_unit'] = package_unit
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        instance = super().create(validated_data)
+        return instance
+
+    class Meta:
+        model = Material
+        fields = ('material_no', 'material_name', 'for_short', 'material_type', 'package_unit', 'use_flag')
         read_only_fields = COMMON_READ_ONLY_FIELDS

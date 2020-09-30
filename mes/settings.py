@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'corsheaders',
+    'corsheaders',
     'rest_framework',
     'drf_yasg',  # swagger文档插件    /api/v1/docs/swagger
     'django_filters',
@@ -54,6 +54,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'mes.middlewares.DisableCSRF',
     # 'django.middleware.csrf.CsrfViewMiddleware',
@@ -158,33 +159,37 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'api_log.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
         'errorFile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'error.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
         'syncFile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'sync.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
-        'asyncFile':{
+        'asyncFile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.TimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'async.log'),
-            'when': 'D',
+            'when': 'midnight',
             'backupCount': 10,
             'formatter': 'standard',
+            'interval': 1,
         },
     },
     'loggers': {
@@ -210,10 +215,10 @@ LOGGING = {
             'handlers': ['syncFile'],
             'level': 'DEBUG' if DEBUG else 'INFO',
         },
-        'async_log':{
+        'async_log': {
             'handlers': ['asyncFile'],
             'level': 'INFO',
-        },
+        }
     },
 }
 
@@ -256,14 +261,23 @@ DATABASES = {
 #             'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
 #             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
 #         }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+#         'NAME': os.getenv('SFJ_DATABASE_NAME', 'MMM'),  # 数据库名称
+#         'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
+#         'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
+#         'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
+#         'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
+#     }
+# }
 
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#     }
+# }
 
 
 # Password validation

@@ -1,17 +1,22 @@
-from django.contrib.auth.models import AnonymousUser
 from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
+from datetime import date, timedelta, datetime
+
 from mes.permissions import PermissonsDispatch
-from system.models import User
+from system.models import User, Permissions
 
 
+# 启用-》禁用    禁用-》启用
 class CommonDeleteMixin(object):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        instance.delete_flag = True
-        instance.delete_user = request.user
+        if instance.use_flag:
+            instance.use_flag = 0
+        else:
+            instance.use_flag = 1
+        instance.last_updated_user = request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -30,6 +35,7 @@ class SyncUpdateMixin(mixins.UpdateModelMixin):
         response = super().update(request, *args, **kwargs)
         setattr(response, "model_name", self.queryset.model.__name__)
         return response
+
 
 def return_permission_params(model_name):
     """
@@ -73,3 +79,57 @@ def menu(request, menu, temp, format):
     temp.data.update({"menu": data})
     return temp
 
+
+class UserFunctions(object):
+    """
+    针对User类进行扩展
+    """
+
+    @property
+    def group_list(self):
+        """
+        获取用户现在所属角色列表
+        :return: list
+        """
+        return list(self.groups.values_list('name', flat=True))
+
+    @property
+    def permissions_list(self):
+        """
+        获取用户所有权限id
+        :return: 权限id列表
+        """
+        permissions = {}
+        permission_ids = []
+        for group in self.group_extensions.all():
+            permission_ids += list(group.permissions.values_list('id', flat=True))
+        parent_permissions = Permissions.objects.filter(parent__isnull=True)
+        for perm in parent_permissions:
+            queryset = perm.children_permissions.all()
+            if not self.is_superuser:
+                queryset = queryset.filter(id__in=set(permission_ids))
+            codes = [item.split('_')[0] for item in queryset.values_list('code', flat=True)]
+            permissions[perm.code] = codes
+        return permissions
+
+
+User.__bases__ += (UserFunctions, )
+
+
+def days_cur_month_dates():
+    """获取当月所有日期列表"""
+    m = datetime.now().month
+    y = datetime.now().year
+    days = (date(y, m+1, 1) - date(y, m, 1)).days
+    d1 = date(y, m, 1)
+    d2 = date(y, m, days)
+    delta = d2 - d1
+    return [(d1 + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(delta.days + 1)]
+
+
+def get_weekdays(days):
+    """获取当前日期往前n天的日期"""
+    date_list = []
+    for i in range(days):
+        date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
+    return date_list[::-1]

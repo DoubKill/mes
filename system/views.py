@@ -1,41 +1,27 @@
-import xlrd
-from django.contrib.auth.models import Permission
+from datetime import datetime
+
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
-from rest_framework.generics import UpdateAPIView
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import UpdateAPIView, CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet, GenericViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_code import menu
+from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
-from system.models import GroupExtension, User, Section
-from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
-    UserUpdateSerializer, SectionSerializer, PermissionSerializer, GroupUserUpdateSerializer
-from django_filters.rest_framework import DjangoFilterBackend
+from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
+from production.models import PlanStatus
+from recipe.models import Material
 from system.filters import UserFilter, GroupExtensionFilter
-
-
-@method_decorator([api_recorder], name="dispatch")
-class PermissionViewSet(ReadOnlyModelViewSet):
-    """
-    list:
-        权限列表
-    create:
-        创建权限
-    update:
-        修改权限
-    destroy:
-        删除权限
-    """
-    queryset = Permission.objects.filter()
-    serializer_class = PermissionSerializer
-    permission_classes = (IsAuthenticated,)
-    pagination_class = SinglePageNumberPagination
-    # filter_backends = (DjangoFilterBackend,)
+from system.models import GroupExtension, User, Section, Permissions
+from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
+    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, MaterialReceiveSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -50,7 +36,8 @@ class UserViewSet(ModelViewSet):
     destroy:
         账号停用和启用
     """
-    queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
+    queryset = User.objects.exclude(
+        is_superuser=True).filter(delete_flag=False).order_by('num').prefetch_related('group_extensions')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -83,7 +70,6 @@ class UserViewSet(ModelViewSet):
 class UserGroupsViewSet(mixins.ListModelMixin,
                         GenericViewSet):
     queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
-
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -92,7 +78,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GroupExtensionViewSet(ModelViewSet):
+class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
     """
     list:
         角色列表,xxx?all=1查询所有
@@ -103,7 +89,8 @@ class GroupExtensionViewSet(ModelViewSet):
     destroy:
         删除角色
     """
-    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
+    queryset = GroupExtension.objects.filter(
+        delete_flag=False).prefetch_related('permissions').order_by('-created_date')
     serializer_class = GroupExtensionSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -113,7 +100,7 @@ class GroupExtensionViewSet(ModelViewSet):
         if self.request.query_params.get('all'):
             return ()
         else:
-            return (IsAuthenticated(), )
+            return (IsAuthenticated(),)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -137,7 +124,7 @@ class GroupExtensionViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class GroupAddUserViewSet(UpdateAPIView):
     """控制角色中用户具体为哪些的视图"""
-    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('user_set', 'permissions')
+    queryset = GroupExtension.objects.filter(delete_flag=False).prefetch_related('group_users', 'permissions')
     serializer_class = GroupUserUpdateSerializer
 
 
@@ -159,92 +146,11 @@ class SectionViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
 
 
-class MesLogin(ObtainJSONWebToken):
-    menu = {
-        "basics": [
-            "globalcodetype",
-            "globalcode",
-            "workschedule",
-            "equip"
-        ],
-        "system": {
-            "user",
-        },
-        "auth": {
-        }
-
-    }
-
-    def post(self, request, *args, **kwargs):
-        temp = super().post(request, *args, **kwargs)
-        format = kwargs.get("format")
-        if temp.status_code != 200:
-            return temp
-        return menu(request, self.menu, temp, format)
-
-
-class ImportExcel(APIView):
-
-    def post(self, request, *args, **kwargs):
-        excel_file = request.FILES.get('excel_file', '')
-        if excel_file.name.endswith(".xlsx"):
-            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())  # xlsx文件
-        elif excel_file.endswith(".xls"):
-            data = xlrd.open_workbook(filename=None, file_contents=excel_file.read(), formatting_info=True)  # xls
-        else:
-            raise TypeError
-        all_list_1 = self.get_sheets_mg(data)
-        for x in all_list_1:
-            print(x)
-        return Response({"msg": "ok"})
-
-    def get_sheets_mg(self, data, num=0):  # data:Excel数据对象，num要读取的表
-        table = data.sheets()[num]  # 打开第一张表
-        nrows = table.nrows  # 获取表的行数
-        ncole = table.ncols  # 获取列数
-        all_list = []
-        for i in range(nrows):  # 循环逐行打印
-            one_list = []
-            for j in range(ncole):
-                cell_value = table.row_values(i)[j]
-                if (cell_value is None or cell_value == ''):
-                    cell_value = (self.get_merged_cells_value(table, i, j))
-                one_list.append(cell_value)
-            all_list.append(one_list)
-        del (all_list[0])  # 删除标题   如果Excel文件中第一行是标题可删除掉，如果没有就不需要这行代码
-        return all_list
-
-    def get_merged_cells_value(self, sheet, row_index, col_index):
-        """
-        先判断给定的单元格，是否属于合并单元格；
-        如果是合并单元格，就返回合并单元格的内容
-        :return:
-        """
-        merged = self.get_merged_cells(sheet)
-        # print(merged,"==hebing==")
-        for (rlow, rhigh, clow, chigh) in merged:
-            if (row_index >= rlow and row_index < rhigh):
-                if (col_index >= clow and col_index < chigh):
-                    cell_value = sheet.cell_value(rlow, clow)
-                    # print('该单元格[%d,%d]属于合并单元格，值为[%s]' % (row_index, col_index, cell_value))
-                    return cell_value
-        return None
-
-    def get_merged_cells(self, sheet):
-        """
-        获取所有的合并单元格，格式如下：
-        [(4, 5, 2, 4), (5, 6, 2, 4), (1, 4, 3, 4)]
-        (4, 5, 2, 4) 的含义为：行 从下标4开始，到下标5（不包含）  列 从下标2开始，到下标4（不包含），为合并单元格
-        :param sheet:
-        :return:
-        """
-        return sheet.merged_cells
-
-
+@method_decorator([api_recorder], name="dispatch")
 class LoginView(ObtainJSONWebToken):
     """
     post
-        获取权限列表
+        登录并返回用户所有权限
     """
 
     def post(self, request, *args, **kwargs):
@@ -253,34 +159,94 @@ class LoginView(ObtainJSONWebToken):
         if serializer.is_valid():
             user = serializer.object.get('user') or request.user
             token = serializer.object.get('token')
-            # 获取该用户所有权限
-            permissions = list(user.get_all_permissions())
-            # 除去前端不涉及模块
-            permission_list = []
-            for p in permissions:
-                if p.split(".")[0] not in ["contenttypes", "sessions", "work_station", "admin"]:
-                    permission_list.append(p)
-            # 生成菜单管理树
-            permissions_set = set([_.split(".")[0] for _ in permission_list])
-            permissions_tree = {__:{} for __ in permissions_set}
-            for x in permission_list:
-                first_key = x.split(".")[0]
-                second_key = x.split(".")[-1].split("_")[-1]
-                op_value = x.split(".")[-1].split("_")[0]
-                op_list =  permissions_tree.get(first_key, {}).get(second_key)
-                if op_list:
-                    permissions_tree[first_key][second_key].append(op_value)
-                else:
-                    permissions_tree[first_key][second_key] = [op_value]
-            if permissions_tree.get("auth"):
-                auth = permissions_tree.pop("auth")
-                # 合并auth与system
-                if permissions_tree.get("system"):
-                    permissions_tree["system"].update(**auth)
-                else:
-                    permissions_tree["system"] = auth
-            return Response({"results": permissions_tree,
+            return Response({"permissions": user.permissions_list,
                              "username": user.username,
                              "token": token})
-        # 返回异常信息
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class Synchronization(APIView):
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        # 获取断网时间
+        params = request.data
+        lost_time1 = params.get("lost_time")
+        lost_time = datetime.strptime(lost_time1, '%Y-%m-%d %X')
+        pcp_set = ProductClassesPlan.objects.filter(last_updated_date__gte=lost_time)
+        ProductDayPlan.objects.filter(last_updated_date__gte=lost_time).update(delete_flag=True)
+        for pcp_obj in pcp_set:
+            PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
+            MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
+            pcp_obj.delete_flag = True
+            pcp_obj.save()
+        return Response('删除断网之后的计划成功', status=200)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class GroupPermissions(APIView):
+    """获取权限表格数据"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        group_id = self.request.query_params.get('group_id')
+        if group_id:
+            try:
+                group = GroupExtension.objects.get(id=self.request.query_params.get('group_id'))
+            except Exception:
+                raise ValidationError('参数错误')
+            group_permissions = list(group.permissions.values_list('id', flat=True))
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            for perm in parent_permissions:
+                children_list = perm.children_list
+                for child in children_list:
+                    if child['id'] in group_permissions:
+                        child['has_permission'] = True
+                    else:
+                        child['has_permission'] = False
+                ret.append({'name': perm.name, 'permissions': children_list})
+        else:
+            ret = []
+            parent_permissions = Permissions.objects.filter(parent__isnull=True)
+            for perm in parent_permissions:
+                ret.append({'name': perm.name, 'permissions': perm.children_list})
+        return Response(data={'result': ret})
+
+
+class PlanReceive(CreateAPIView):
+    """接受上辅机计划数据接口"""
+    # permission_classes = ()
+    # authentication_classes = ()
+    # permission_classes = (IsAuthenticated,)
+    serializer_class = PlanReceiveSerializer
+    queryset = ProductClassesPlan.objects.all()
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class MaterialReceive(CreateAPIView):
+    """接受上辅机原材料数据接口"""
+    # permission_classes = ()
+    # authentication_classes = ()
+    # permission_classes = (IsAuthenticated,)
+    serializer_class = MaterialReceiveSerializer
+    queryset = Material.objects.all()
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        m_obj = Material.objects.filter(material_no=request.data['material_no']).first()
+        if not m_obj:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        else:
+            return Response('mes拥有当前原材料', status=status.HTTP_201_CREATED)

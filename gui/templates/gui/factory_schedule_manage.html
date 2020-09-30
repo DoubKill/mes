@@ -135,10 +135,10 @@
                     <td>{{ schedule.day_of_the_week }}</td>
                     <template v-for="info in schedule.group_infos">
                         <td>
-                            {{ info.group_name }}
+                            {{ info ? info.group_name : '' }}
                         </td>
                         <td>
-                            <el-select v-model="info.is_rest">
+                            <el-select v-if="info" v-model="info.is_rest">
                                 <el-option
                                         v-for="item in [{label: '否', value: false}, {label: '是', value: true}]"
                                         :key="item.value"
@@ -148,10 +148,10 @@
                             </el-select>
                         </td>
                         <td>
-                            {{ info.start_time }}
+                            {{ info ? info.start_time : '' }}
                         </td>
                         <td>
-                            {{ info.end_time }}
+                            {{ info ? info.end_time : ''}}
                         </td>
                     </template>
                 </tr>

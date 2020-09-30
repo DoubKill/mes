@@ -5,18 +5,18 @@ from basics.models import AbstractEntity
 class TrainsFeedbacks(AbstractEntity):
     """车次产出反馈"""
     # id = models.BigIntegerField(primary_key=True, auto_created=True, unique=True)
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64, blank=True)
     plan_trains = models.IntegerField(help_text='计划车次', verbose_name='计划车次')
     actual_trains = models.IntegerField(help_text='实际车次', verbose_name='实际车次')
-    bath_no = models.IntegerField(help_text='批次', verbose_name='批次')
-    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
-    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
+    bath_no = models.IntegerField(help_text='批次', verbose_name='批次', blank=True)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料', blank=True)
     plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', verbose_name='计划重量')
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', verbose_name='实际重量')
     begin_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
     end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
-    operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员')
-    classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次')
+    operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员', blank=True)
+    classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间', verbose_name='工作站生产报表时间/存盘时间',null=True)
 
     @property
@@ -35,21 +35,21 @@ class TrainsFeedbacks(AbstractEntity):
 class PalletFeedbacks(AbstractEntity):
     """托盘产出反馈"""
     # id = models.BigIntegerField(primary_key=True, auto_created=True, unique=True)
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
-    bath_no = models.IntegerField(help_text='批次', verbose_name='批次')
-    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
-    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64, blank=True)
+    bath_no = models.IntegerField(help_text='批次', verbose_name='批次', blank=True)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料', blank=True)
     plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', verbose_name='计划重量')
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', verbose_name='实际重量')
     begin_time = models.DateTimeField(help_text='开始时间', verbose_name='开始时间')
     end_time = models.DateTimeField(help_text='结束时间', verbose_name='结束时间')
-    operation_user = models.CharField(max_length=74, help_text='操作员', verbose_name='操作员')
+    operation_user = models.CharField(max_length=74, help_text='操作员', verbose_name='操作员', blank=True)
     begin_trains = models.IntegerField(help_text='开始车次', verbose_name='开始车次')
     end_trains = models.IntegerField(help_text='结束车次', verbose_name='结束车次')
-    pallet_no = models.CharField(max_length=64, help_text='托盘', verbose_name='托盘')
-    barcode = models.CharField(max_length=64, help_text='收皮条码', verbose_name='收皮条码')
-    classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次')
-    lot_no = models.CharField(max_length=64, help_text='追踪号', verbose_name='追踪号')
+    pallet_no = models.CharField(max_length=64, help_text='托盘', verbose_name='托盘', blank=True)
+    # barcode = models.CharField(max_length=64, help_text='收皮条码', verbose_name='收皮条码')
+    classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次', blank=True)
+    lot_no = models.CharField(max_length=64, help_text='追踪号', verbose_name='追踪号', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间', verbose_name='工作站生产报表时间/存盘时间',null=True)
 
     def __str__(self):
@@ -62,8 +62,8 @@ class PalletFeedbacks(AbstractEntity):
 
 class EquipStatus(AbstractEntity):
     """机台状况反馈"""
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
-    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64, blank=True)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
     temperature = models.DecimalField(decimal_places=2, max_digits=8, help_text='温度', verbose_name='温度')
     rpm = models.DecimalField(decimal_places=2, max_digits=8, help_text='转速', verbose_name='转速')
     energy = models.DecimalField(decimal_places=2, max_digits=8, help_text='能量', verbose_name='能量')
@@ -83,11 +83,11 @@ class EquipStatus(AbstractEntity):
 
 class PlanStatus(AbstractEntity):
     """计划状态变更"""
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
-    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
-    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
-    status = models.CharField(max_length=64, help_text='状态', verbose_name='状态')
-    operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64, blank=True)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料', blank=True)
+    status = models.CharField(max_length=64, help_text='状态', verbose_name='状态', blank=True)
+    operation_user = models.CharField(max_length=64, help_text='操作员', verbose_name='操作员', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间', verbose_name='工作站生产报表时间/存盘时间',null=True)
 
     def __str__(self):
@@ -100,15 +100,15 @@ class PlanStatus(AbstractEntity):
 
 class ExpendMaterial(AbstractEntity):
     """原材料消耗表"""
-    plan_classes_uid = models.UUIDField(help_text='班次计划唯一码', verbose_name='班次计划唯一码')
-    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
-    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料')
+    plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码',max_length=64, blank=True)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料', blank=True)
     trains = models.IntegerField(help_text='车次', verbose_name='车次')
     plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', verbose_name='计划重量')
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际消耗重量', verbose_name='实际消耗重量')
-    masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
-    masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
-    masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
+    masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id', blank=True)
+    masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型', blank=True)
+    masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间', verbose_name='工作站生产报表时间/存盘时间',null=True)
 
     def __str__(self):
@@ -155,7 +155,7 @@ class MaterialTankStatus(AbstractEntity):
     masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
     masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
     masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
-    used_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=0)
+    use_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=0)
     low_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='慢称值', verbose_name='慢称值')
     advance_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='提前量', verbose_name='提前量')
     adjust_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='调整值', verbose_name='调整值')

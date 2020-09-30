@@ -18,3 +18,5 @@ PROJECT_API_TREE = {
 }
 
 SYNC_SYSTEM_NAME = "上辅机群控"
+
+EQUIP_LIST = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
