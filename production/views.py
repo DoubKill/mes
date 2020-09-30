@@ -78,7 +78,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         create:
             托盘产出反馈反馈
     """
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False)
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = PalletFeedbacksSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
