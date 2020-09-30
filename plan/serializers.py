@@ -302,22 +302,23 @@ class ProductDayPlansySerializer(BaseModelSerializer):
 class ProductClassesPlansySerializer(BaseModelSerializer):
     """胶料日计划表同步"""
     work_schedule_plan__work_schedule_plan_no = serializers.CharField(write_only=True)
-    equip__equip_no = serializers.CharField(write_only=True)
-    product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+    equip__equip_no = serializers.CharField(write_only=True, required=False)
+    product_batching__stage_product_batch_no = serializers.CharField(write_only=True, required=False)
     product_day_plan__equip__equip_no = serializers.CharField(write_only=True)
     product_day_plan__plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
     product_day_plan__product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+    status = serializers.CharField(write_only=True, required=False)
 
     def validate(self, attrs):
         work_schedule_plan1 = attrs.pop('work_schedule_plan__work_schedule_plan_no', None)
         equip1 = attrs.pop('equip__equip_no', None)
         product_batching1 = attrs.pop('product_batching__stage_product_batch_no', None)
         # 上辅机里work_schedule_plan1和equip1可能为空
-        if product_batching1 == '0':
+        if not product_batching1:
             attrs['product_batching'] = None
-        if equip1 == '0':
+        if not equip1:
             attrs['equip'] = None
-        if product_batching1 != '0' and equip1 != '0':
+        if product_batching1 and equip1:
             try:
                 equip = Equip.objects.get(equip_no=equip1)
             except Equip.DoesNotExist:
