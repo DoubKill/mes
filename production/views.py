@@ -52,7 +52,8 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
             train_list = actual_trains.split(",")
             try:
                 queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__gte=train_list[0],
-                                                                           actual_trains__lte=train_list[-1]))
+                                                                           actual_trains__lte=train_list[-1],
+                                                                            ))
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
@@ -83,6 +84,20 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
     filter_class = PalletFeedbacksFilter
+
+    def list(self, request, *args, **kwargs):
+        day_time = request.query_params.get("day_time",)
+        if day_time:
+            queryset = self.filter_queryset(self.get_queryset().filter(end_time__date=day_time))
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class EquipStatusViewSet(mixins.CreateModelMixin,
@@ -537,7 +552,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
 
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False)
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
