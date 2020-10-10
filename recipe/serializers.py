@@ -62,7 +62,7 @@ class ProductInfoCopySerializer(BaseModelSerializer):
         product_no = attrs['product_info_id'].product_no
         product_info = ProductInfo.objects.filter(factory=factory, product_no=product_no).order_by('-versions').first()
         if product_info:
-            if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+            if product_info.versions >= versions:
                 raise serializers.ValidationError('版本不得小于目前已有的版本')
         attrs['used_type'] = 1
         return attrs
@@ -178,7 +178,8 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             Material.objects.get_or_create(
                 material_no=instance.stage_product_batch_no,
                 material_name=instance.stage_product_batch_no,
-                material_type=material_type
+                material_type=material_type,
+                created_user=self.context['request'].user
             )
         except Exception as e:
             logger.error(e)
