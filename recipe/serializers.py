@@ -8,6 +8,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
+from plan.models import ProductClassesPlan
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -279,11 +280,8 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 if instance.used_type == 4:
                     if instance.dev_type:
                         # 如果该配方关联的计划不是全部完成（只要有计划是等待、已下达、运行中）都不能废弃的
-                        pcp_set = instance.pb_product_classes_plan.all().filter(delete_flag=False)
-                        for pcp_obj in pcp_set:
-                            if pcp_obj.status != "完成":
-                                raise serializers.ValidationError(
-                                    '该配方关联的计划{}还没有完成，该配方不能废弃'.format(pcp_obj.plan_classes_uid))
+                        if ProductClassesPlan.objects.exclude(status='完成').filter(product_batching=instance).exists():
+                            raise serializers.ValidationError('该配方有关联尚未完成的计划，无法废弃！')
                         try:
                             ProductObsoleteInterface(instance=instance).request()
                         except Exception as e:
