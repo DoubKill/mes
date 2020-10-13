@@ -8,6 +8,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
+from plan.models import ProductClassesPlan
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -62,7 +63,7 @@ class ProductInfoCopySerializer(BaseModelSerializer):
         product_no = attrs['product_info_id'].product_no
         product_info = ProductInfo.objects.filter(factory=factory, product_no=product_no).order_by('-versions').first()
         if product_info:
-            if product_info.versions >= versions:  # TODO 目前版本检测根据字符串做比较，后期搞清楚具体怎样填写版本号
+            if product_info.versions >= versions:
                 raise serializers.ValidationError('版本不得小于目前已有的版本')
         attrs['used_type'] = 1
         return attrs
@@ -178,7 +179,8 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             Material.objects.get_or_create(
                 material_no=instance.stage_product_batch_no,
                 material_name=instance.stage_product_batch_no,
-                material_type=material_type
+                material_type=material_type,
+                created_user=self.context['request'].user
             )
         except Exception as e:
             logger.error(e)
@@ -277,6 +279,9 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
             if instance.used_type in (4, 5):  # 弃用
                 if instance.used_type == 4:
                     if instance.dev_type:
+                        # 如果该配方关联的计划不是全部完成（只要有计划是等待、已下达、运行中）都不能废弃的
+                        if ProductClassesPlan.objects.exclude(status='完成').filter(product_batching=instance).exists():
+                            raise serializers.ValidationError('该配方有关联尚未完成的计划，无法废弃！')
                         try:
                             ProductObsoleteInterface(instance=instance).request()
                         except Exception as e:
