@@ -10,4 +10,4 @@ mysqlclient==2.0.1
 django-cors-headers==3.4.0
 cx-Oracle==8.0.0
 django-cors-headers==3.4.0
-pymssql==2.1.4
+pymssql==2.1.5
