@@ -78,7 +78,7 @@ class UserGroupsViewSet(mixins.ListModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
-class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+class GroupExtensionViewSet(ModelViewSet):
     """
     list:
         角色列表,xxx?all=1查询所有
@@ -105,7 +105,7 @@ class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name')
+            data = queryset.filter(use_flag=True).values('id', 'name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -119,6 +119,17 @@ class GroupExtensionViewSet(CommonDeleteMixin, ModelViewSet):  # 本来是删除
             return GroupExtensionUpdateSerializer
         if self.action == 'partial_update':
             return GroupExtensionUpdateSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.use_flag:
+            instance.use_flag = 0
+            instance.group_users.clear()
+        else:
+            instance.use_flag = 1
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
