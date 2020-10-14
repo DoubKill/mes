@@ -1,9 +1,11 @@
+import pymssql
 from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
 from datetime import date, timedelta, datetime
 
+from mes.conf import BZ_HOST, BZ_USR, BZ_PASSWORD
 from mes.permissions import PermissonsDispatch
 from system.models import User, Permissions
 
@@ -133,3 +135,27 @@ def get_weekdays(days):
     for i in range(days):
         date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
     return date_list[::-1]
+
+
+class SqlClient(object):
+    """默认是连接sqlserver的客户端"""
+    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="select * from v_ASRS_STORE_MESVIEW", db='dbo'):
+        conn = pymssql.connect(host, user, password, db)
+        cursor = conn.cursor()
+        cursor.execute(sql)
+        self.conn = conn
+        self.cursor = cursor
+
+    def all(self):
+        self.data = self.cursor.fetchall()
+        return self.data
+
+    def one(self):
+        if self.data:
+            return self.data[0]
+        else:
+            return tuple()
+
+    def close(self):
+        self.conn.close()
+        self.cursor.close()
