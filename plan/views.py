@@ -86,7 +86,7 @@ class ProductDayPlanManyCreate(APIView):
 class MaterialDemandedAPIView(ListAPIView):
     """原材料需求量展示，plan_date参数必填"""
 
-    queryset = MaterialDemanded.objects.all()
+    queryset = MaterialDemanded.objects.filter(delete_flag=False).all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDemandedFilter
     permission_classes = (IsAuthenticated,)
