@@ -1,4 +1,5 @@
 import pymssql
+from DBUtils.PooledDB import PooledDB
 from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -139,8 +140,13 @@ def get_weekdays(days):
 
 class SqlClient(object):
     """默认是连接sqlserver的客户端"""
-    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="select * from v_ASRS_STORE_MESVIEW", db='dbo'):
-        conn = pymssql.connect(host, user, password, db)
+    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="select * from v_ASRS_STORE_MESVIEW"):
+        pool = PooledDB(pymssql,
+                        mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
+                        maxusage=100, setsession=None, reset=True, host=host,
+                        user=user, password=password
+                        )
+        conn = pool.connection()
         cursor = conn.cursor()
         cursor.execute(sql)
         self.conn = conn
