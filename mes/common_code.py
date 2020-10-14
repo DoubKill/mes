@@ -140,7 +140,7 @@ def get_weekdays(days):
 
 class SqlClient(object):
     """默认是连接sqlserver的客户端"""
-    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="select * from v_ASRS_STORE_MESVIEW"):
+    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="SELECT *, Row_Number() OVER (order  by 库存索引) id FROM v_ASRS_STORE_MESVIEW"):
         pool = PooledDB(pymssql,
                         mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
                         maxusage=100, setsession=None, reset=True, host=host,
@@ -148,19 +148,25 @@ class SqlClient(object):
                         )
         conn = pool.connection()
         cursor = conn.cursor()
-        cursor.execute(sql)
+        self.sql = sql
         self.conn = conn
         self.cursor = cursor
 
     def all(self):
+        self.cursor.execute(self.sql)
         self.data = self.cursor.fetchall()
         return self.data
 
-    def one(self):
-        if self.data:
-            return self.data[0]
-        else:
-            return tuple()
+    def first(self):
+        self.cursor.execute("select top 1 * from v_ASRS_STORE_MESVIEW")
+        self.data = self.cursor.fetchone()
+        return self.data
+
+    def count(self, sql="select count(*) as count from v_ASRS_STORE_MESVIEW"):
+        self.cursor.execute(sql)
+        self.data = self.cursor.fetchone()
+        return self.data[0]
+
 
     def close(self):
         self.conn.close()
