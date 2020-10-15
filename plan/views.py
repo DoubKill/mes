@@ -185,7 +185,11 @@ class MaterialDemandedView(APIView):
                 material_inventory_dict[i['materialCode']] = i
         except Exception as e:
             return Response("请求库存失败", status=400)
-
+        try:
+            page = int(params.get("page", 1))
+            page_size = int(params.get("page_size", 10))
+        except Exception as e:
+            return Response("page和page_size必须是int", status=400)
         md_list = MaterialDemanded.objects.filter(**filter_dict).values(
             'product_classes_plan__product_batching__stage_product_batch_no',
             'work_schedule_plan__classes__global_name',
@@ -193,6 +197,8 @@ class MaterialDemandedView(APIView):
             'material__material_name',
             'material__material_type__global_name',
         ).annotate(demanded=Sum('material_demanded'))
+        counts = md_list.count()
+        md_list = md_list[(page - 1) * page_size:page_size * page]
         res = []
         for md_detail_list in md_list:
             md = {}
@@ -221,7 +227,7 @@ class MaterialDemandedView(APIView):
                 md['need_unit_weight'] = None
                 md['need_qty'] = None
             res.append(md)
-        return Response({'results': res})
+        return Response({'results': res, 'count': counts})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -236,7 +242,7 @@ class ProductClassesPlanManyCreate(APIView):
             day_time = WorkSchedulePlan.objects.filter(
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                                        equip_id=request.data['equip'],delete_flag=False).all()
+                                                        equip_id=request.data['equip'], delete_flag=False).all()
             for pcp_obj in pcp_set:
                 pcp_obj.delete_flag = True
                 pcp_obj.save()
