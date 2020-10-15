@@ -133,6 +133,15 @@ class ProductDayPlanAPiView(APIView):
         except Exception:
             raise ValidationError('该计划不存在')
         for product_classes_plan in product_classes_plan_set:
+
+            # 当前班次之前的计划不准现在下发
+            work_schedule_plan = product_classes_plan.work_schedule_plan
+            end_time = work_schedule_plan.end_time
+            now_time = datetime.datetime.now()
+            if now_time > end_time:
+                raise ValidationError(
+                    f'{end_time.strftime("%Y-%m-%d")}的{work_schedule_plan.classes.global_name}的计划不允许现在下发给上辅机')
+
             if product_classes_plan.status not in ['已保存', '等待']:
                 continue
             else:
@@ -155,7 +164,7 @@ class MaterialDemandedView(APIView):
     def get(self, request):
         # 条件筛选
         params = request.query_params
-        filter_dict = {}
+        filter_dict = {'delete_flag': False}
         plan_date = params.get('plan_date')
         classes = params.get('classes')
         product_no = params.get('product_no')
@@ -254,14 +263,14 @@ class ProductClassesPlanManyCreate(APIView):
                                                                                    plan_schedule=wsp_obj.plan_schedule,
                                                                                    last_updated_date=datetime.datetime.now(),
                                                                                    created_date=datetime.datetime.now()).id
+            # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
             day_time = WorkSchedulePlan.objects.filter(
                 id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
-            # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
                                                         equip_id__in=equip_list, delete_flag=False).exclude(
                 plan_classes_uid__in=plan_list)
             for pcp_obj in pcp_set:
-                # 删除前要先判断该数据的状态是不是非等待，只要等待中的加护才可以删除
+                # 删除前要先判断该数据的状态是不是非等待，只要等待中的计划才可以删除
                 plan_status = PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid,
                                                         delete_flag=False).order_by(
                     'created_date').last()
