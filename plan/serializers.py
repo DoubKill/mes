@@ -111,17 +111,17 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
 
     classes_name = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True)
     product_no = serializers.CharField(source='product_batching.stage_product_batch_no', read_only=True)
-    status = serializers.SerializerMethodField(read_only=True, help_text='计划状态')
+    # status = serializers.SerializerMethodField(read_only=True, help_text='计划状态')
     start_time = serializers.DateTimeField(source='work_schedule_plan.start_time', read_only=True)
     end_time = serializers.DateTimeField(source='work_schedule_plan.end_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
 
-    def get_status(self, obj):
-        plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
-        if plan_status:
-            return plan_status.status
-        else:
-            return None
+    # def get_status(self, obj):
+    #     plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
+    #     if plan_status:
+    #         return plan_status.status
+    #     else:
+    #         return None
 
     class Meta:
         model = ProductClassesPlan
