@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from basics.models import WorkSchedulePlan
+from basics.models import WorkSchedulePlan, GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
@@ -192,7 +192,7 @@ class MaterialDemandedView(APIView):
             return Response("page和page_size必须是int", status=400)
         md_list = MaterialDemanded.objects.filter(**filter_dict).values(
             'product_classes_plan__product_batching__stage_product_batch_no',
-            'work_schedule_plan__classes__global_name',
+            'work_schedule_plan',
             'material__material_no',
             'material__material_name',
             'material__material_type__global_name',
@@ -204,7 +204,7 @@ class MaterialDemandedView(APIView):
             md = {}
             md['product_no'] = md_detail_list[
                 'product_classes_plan__product_batching__stage_product_batch_no']
-            md['classes'] = md_detail_list['work_schedule_plan__classes__global_name']
+            md['classes'] = WorkSchedulePlan.objects.get(id=md_detail_list['work_schedule_plan']).classes.global_name
             md['material_no'] = md_detail_list['material__material_no']
             md['material_name'] = md_detail_list['material__material_name']
             md['material_type'] = md_detail_list['material__material_type__global_name']
