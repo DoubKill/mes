@@ -235,8 +235,13 @@ class ProductClassesPlanManyCreate(APIView):
         if isinstance(request.data, dict):
             day_time = WorkSchedulePlan.objects.filter(
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
-            ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                              equip_id=request.data['equip']).update(delete_flag=True)
+            pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
+                                                        equip_id=request.data['equip']).all()
+            for pcp_obj in pcp_set:
+                pcp_obj.delete_flag = True
+                pcp_obj.save()
+                PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
+                MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
             return Response('操作成功')
         elif isinstance(request.data, list):
             many = True
