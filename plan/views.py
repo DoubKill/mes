@@ -236,7 +236,7 @@ class ProductClassesPlanManyCreate(APIView):
             day_time = WorkSchedulePlan.objects.filter(
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                                        equip_id=request.data['equip']).all()
+                                                        equip_id=request.data['equip'],delete_flag=False).all()
             for pcp_obj in pcp_set:
                 pcp_obj.delete_flag = True
                 pcp_obj.save()
