@@ -12,7 +12,6 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
-from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
@@ -69,7 +68,7 @@ class UserViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class UserGroupsViewSet(mixins.ListModelMixin,
                         GenericViewSet):
-    queryset = User.objects.filter(delete_flag=False).prefetch_related('user_permissions', 'groups')
+    queryset = User.objects.filter(delete_flag=False, is_superuser=False).prefetch_related('user_permissions', 'groups')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -203,7 +202,7 @@ class GroupPermissions(APIView):
         group_id = self.request.query_params.get('group_id')
         if group_id:
             try:
-                group = GroupExtension.objects.get(id=self.request.query_params.get('group_id'))
+                group = GroupExtension.objects.get(id=group_id)
             except Exception:
                 raise ValidationError('参数错误')
             group_permissions = list(group.permissions.values_list('id', flat=True))
