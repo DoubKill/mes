@@ -147,6 +147,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
                                                 material_demanded=pbd_obj.actual_weight * instance.plan_trains,
                                                 plan_classes_uid=instance.plan_classes_uid)
         else:
+            validated_data.pop('status')
             instance = super().update(pcp_obj, validated_data)
             PlanStatus.objects.filter(plan_classes_uid=instance.plan_classes_uid).update(
                 equip_no=instance.equip.equip_no,
