@@ -258,7 +258,7 @@ class ProductClassesPlanManyCreate(APIView):
                 work_list.append(class_dict['work_schedule_plan'])
                 plan_list.append(class_dict['plan_classes_uid'])
                 equip_list.append(class_dict['equip'])
-                class_dict['status'] = '已保存'
+                # class_dict['status'] = '已保存'
                 # 判断胶料日计划是否存在
                 wsp_obj = WorkSchedulePlan.objects.filter(id=class_dict['work_schedule_plan']).first()
                 pdp_obj = ProductDayPlan.objects.filter(equip_id=class_dict['equip'],
