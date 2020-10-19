@@ -25,9 +25,9 @@ from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFee
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
-    ProductClassesPlansySerializer
+    ProductClassesPlansySerializer, MaterialsySerializer
 from production.models import PlanStatus, TrainsFeedbacks
-from recipe.models import ProductBatching, ProductBatchingDetail
+from recipe.models import ProductBatching, ProductBatchingDetail, Material
 from system.serializers import PlanReceiveSerializer
 
 
@@ -401,3 +401,9 @@ class ProductClassesPlanReceive(CreateAPIView):
     """胶料日班次计划表同步"""
     serializer_class = ProductClassesPlansySerializer
     queryset = ProductClassesPlan.objects.all()
+
+
+class MaterialReceive(CreateAPIView):
+    """原材料表同步"""
+    serializer_class = MaterialsySerializer
+    queryset = Material.objects.all()

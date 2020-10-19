@@ -375,3 +375,42 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
                   'product_day_plan__plan_schedule__plan_schedule_no')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialsySerializer(BaseModelSerializer):
+    """原材料表同步"""
+    material_type__global_no = serializers.CharField(write_only=True, required=False)
+    package_unit__global_no = serializers.CharField(write_only=True, required=False)
+    material_no = serializers.CharField(write_only=True, required=False)
+
+    def validate(self, attrs):
+        material_type1 = attrs.pop('material_type__global_no', None)
+        package_unit1 = attrs.pop('package_unit__global_no', None)
+        try:
+            material_type = GlobalCode.objects.get(global_no=material_type1)
+            if package_unit1:
+                package_unit = GlobalCode.objects.get(global_no=package_unit1)
+            else:
+                package_unit = None
+        except GlobalCode.DoesNotExist:
+            raise serializers.ValidationError('原材料类别{0}或者包装单位{1}不存在'.format(material_type1, package_unit1))
+        attrs['material_type'] = material_type
+        attrs['package_unit'] = package_unit
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        instance = Material.objects.filter(material_no=validated_data['material_no'])
+
+        if instance:
+            instance.update(**validated_data)
+        else:
+            super().create(validated_data)
+        return validated_data
+
+    class Meta:
+        model = Material
+        fields = (
+            'material_no', 'material_name', 'for_short', 'material_type__global_no', 'package_unit__global_no',
+            'use_flag')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
