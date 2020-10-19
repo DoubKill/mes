@@ -330,8 +330,8 @@ class IndexView(APIView):
             delete_flag=False).values(
             'work_schedule_plan__plan_schedule__day_time').annotate(plan_trains=Sum('plan_trains'))
         plan_data_dict = {str(item['work_schedule_plan__plan_schedule__day_time']): item for item in plan_data}
-
         # 实际数据
+        # 　TODO 实际计划数据是拿TrainsFeedbacks的结束时间做统计的，暂时这样做。
         max_actual_ids = TrainsFeedbacks.objects.filter(
             end_time__date__in=dates
         ).values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
