@@ -15,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from basics.models import WorkSchedulePlan
+from basics.models import WorkSchedulePlan, GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
@@ -86,7 +86,7 @@ class ProductDayPlanManyCreate(APIView):
 class MaterialDemandedAPIView(ListAPIView):
     """原材料需求量展示，plan_date参数必填"""
 
-    queryset = MaterialDemanded.objects.all()
+    queryset = MaterialDemanded.objects.filter(delete_flag=False).all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDemandedFilter
     permission_classes = (IsAuthenticated,)
@@ -133,6 +133,15 @@ class ProductDayPlanAPiView(APIView):
         except Exception:
             raise ValidationError('该计划不存在')
         for product_classes_plan in product_classes_plan_set:
+
+            # 当前班次之前的计划不准现在下发
+            work_schedule_plan = product_classes_plan.work_schedule_plan
+            end_time = work_schedule_plan.end_time
+            now_time = datetime.datetime.now()
+            if now_time > end_time:
+                raise ValidationError(
+                    f'{end_time.strftime("%Y-%m-%d")}的{work_schedule_plan.classes.global_name}的计划不允许现在下发给上辅机')
+
             if product_classes_plan.status not in ['已保存', '等待']:
                 continue
             else:
@@ -155,7 +164,7 @@ class MaterialDemandedView(APIView):
     def get(self, request):
         # 条件筛选
         params = request.query_params
-        filter_dict = {}
+        filter_dict = {'delete_flag': False}
         plan_date = params.get('plan_date')
         classes = params.get('classes')
         product_no = params.get('product_no')
@@ -176,20 +185,26 @@ class MaterialDemandedView(APIView):
                 material_inventory_dict[i['materialCode']] = i
         except Exception as e:
             return Response("请求库存失败", status=400)
-
+        try:
+            page = int(params.get("page", 1))
+            page_size = int(params.get("page_size", 10))
+        except Exception as e:
+            return Response("page和page_size必须是int", status=400)
         md_list = MaterialDemanded.objects.filter(**filter_dict).values(
             'product_classes_plan__product_batching__stage_product_batch_no',
-            'work_schedule_plan__classes__global_name',
+            'work_schedule_plan',
             'material__material_no',
             'material__material_name',
             'material__material_type__global_name',
         ).annotate(demanded=Sum('material_demanded'))
+        counts = md_list.count()
+        md_list = md_list[(page - 1) * page_size:page_size * page]
         res = []
         for md_detail_list in md_list:
             md = {}
             md['product_no'] = md_detail_list[
                 'product_classes_plan__product_batching__stage_product_batch_no']
-            md['classes'] = md_detail_list['work_schedule_plan__classes__global_name']
+            md['classes'] = WorkSchedulePlan.objects.get(id=md_detail_list['work_schedule_plan']).classes.global_name
             md['material_no'] = md_detail_list['material__material_no']
             md['material_name'] = md_detail_list['material__material_name']
             md['material_type'] = md_detail_list['material__material_type__global_name']
@@ -212,7 +227,7 @@ class MaterialDemandedView(APIView):
                 md['need_unit_weight'] = None
                 md['need_qty'] = None
             res.append(md)
-        return Response({'results': res})
+        return Response({'results': res, 'count': counts})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -226,8 +241,13 @@ class ProductClassesPlanManyCreate(APIView):
         if isinstance(request.data, dict):
             day_time = WorkSchedulePlan.objects.filter(
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
-            ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                              equip_id=request.data['equip']).update(delete_flag=True)
+            pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
+                                                        equip_id=request.data['equip'], delete_flag=False).all()
+            for pcp_obj in pcp_set:
+                pcp_obj.delete_flag = True
+                pcp_obj.save()
+                PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid).update(delete_flag=True)
+                MaterialDemanded.objects.filter(product_classes_plan=pcp_obj).update(delete_flag=True)
             return Response('操作成功')
         elif isinstance(request.data, list):
             many = True
@@ -254,14 +274,14 @@ class ProductClassesPlanManyCreate(APIView):
                                                                                    plan_schedule=wsp_obj.plan_schedule,
                                                                                    last_updated_date=datetime.datetime.now(),
                                                                                    created_date=datetime.datetime.now()).id
+            # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
             day_time = WorkSchedulePlan.objects.filter(
                 id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
-            # 举例说明：本来有四条 前端只传了三条 就会删掉多余的一条
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
                                                         equip_id__in=equip_list, delete_flag=False).exclude(
                 plan_classes_uid__in=plan_list)
             for pcp_obj in pcp_set:
-                # 删除前要先判断该数据的状态是不是非等待，只要等待中的加护才可以删除
+                # 删除前要先判断该数据的状态是不是非等待，只要等待中的计划才可以删除
                 plan_status = PlanStatus.objects.filter(plan_classes_uid=pcp_obj.plan_classes_uid,
                                                         delete_flag=False).order_by(
                     'created_date').last()

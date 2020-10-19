@@ -1,9 +1,12 @@
+import pymssql
+from DBUtils.PooledDB import PooledDB
 from rest_framework import status, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
 from datetime import date, timedelta, datetime
 
+from mes.conf import BZ_HOST, BZ_USR, BZ_PASSWORD
 from mes.permissions import PermissonsDispatch
 from system.models import User, Permissions
 
@@ -133,3 +136,38 @@ def get_weekdays(days):
     for i in range(days):
         date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
     return date_list[::-1]
+
+
+class SqlClient(object):
+    """默认是连接sqlserver的客户端"""
+    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="SELECT *, Row_Number() OVER (order  by 库存索引) id FROM v_ASRS_STORE_MESVIEW"):
+        pool = PooledDB(pymssql,
+                        mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
+                        maxusage=100, setsession=None, reset=True, host=host,
+                        user=user, password=password
+                        )
+        conn = pool.connection()
+        cursor = conn.cursor()
+        self.sql = sql
+        self.conn = conn
+        self.cursor = cursor
+
+    def all(self):
+        self.cursor.execute(self.sql)
+        self.data = self.cursor.fetchall()
+        return self.data
+
+    def first(self):
+        self.cursor.execute("select top 1 * from v_ASRS_STORE_MESVIEW")
+        self.data = self.cursor.fetchone()
+        return self.data
+
+    def count(self, sql="select count(*) as count from v_ASRS_STORE_MESVIEW"):
+        self.cursor.execute(sql)
+        self.data = self.cursor.fetchone()
+        return self.data[0]
+
+
+    def close(self):
+        self.conn.close()
+        self.cursor.close()
