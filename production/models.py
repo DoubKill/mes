@@ -53,7 +53,7 @@ class PalletFeedbacks(AbstractEntity):
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间', verbose_name='工作站生产报表时间/存盘时间',null=True)
 
     def __str__(self):
-        return f"{self.plan_classes_uid}|{self.barcode}|{self.equip_no}"
+        return f"{self.plan_classes_uid}|{self.lot_no}|{self.equip_no}"
 
     class Meta:
         db_table = 'pallet_feedbacks'

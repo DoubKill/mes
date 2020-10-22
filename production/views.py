@@ -78,7 +78,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         create:
             托盘产出反馈反馈
     """
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("product_time")
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-product_time")
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = PalletFeedbacksSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -241,7 +241,9 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                 'equip__equip_no',
                 'product_batching__stage_product_batch_no',
                 'product_day_plan_id', 'time', 'product_batching__stage__global_name')
+        # 班次计划号列表
         uid_list = pcp_set.values_list("plan_classes_uid", flat=True)
+        # 日计划号对比
         day_plan_list = pcp_set.values_list("product_day_plan__id", flat=True)
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Sum('actual_weight'), begin_time=Max('begin_time'),
