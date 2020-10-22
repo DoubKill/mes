@@ -26,3 +26,5 @@ BZ_USR = "GZ_MES"
 BZ_PASSWORD = "mes@_123"
 
 BZ_HOST = "10.4.23.101"
+
+WMS_CONF = dict(host='10.4.24.25', user='sa', database='zhada_wms_zhongc', password='Admin123$')
