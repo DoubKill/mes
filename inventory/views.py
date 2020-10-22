@@ -24,6 +24,8 @@ class MaterialInventory(GenericViewSet,
 
     def data_adapt(self, instance):
         data = {
+                "id": instance[8],
+                "sn": instance[8],
                 "material_no": instance[3],
                 "material_name": instance[1],
                 "material_type":instance[7],
@@ -45,7 +47,8 @@ class MaterialInventory(GenericViewSet,
             sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
                            sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
                            max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                           max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type
+                           max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
+                           Row_Number() OVER (order by tis.MaterialCode) sn
                                 from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
                             where tim.MaterialGroupName={material_type}
                             group by tis.MaterialCode;"""
@@ -53,7 +56,8 @@ class MaterialInventory(GenericViewSet,
             sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
                                        sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
                                        max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type
+                                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
+                                       Row_Number() OVER (order by tis.MaterialCode) sn
                                             from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
                                         group by tis.MaterialCode;"""
         try:
