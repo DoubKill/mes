@@ -82,7 +82,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = PalletFeedbacksSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
-    ordering_fields = ('id',)
+    ordering_fields = ('id', 'product_time')
     filter_class = PalletFeedbacksFilter
 
     def list(self, request, *args, **kwargs):
