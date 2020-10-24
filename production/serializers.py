@@ -20,6 +20,7 @@ class EquipStatusSerializer(BaseModelSerializer):
 class TrainsFeedbacksSerializer(BaseModelSerializer):
     """车次产出反馈"""
     equip_status = serializers.SerializerMethodField(read_only=True)
+    actual_weight = serializers.SerializerMethodField(read_only=True)
 
     def get_equip_status(self, object):
         equip_status = {}
@@ -36,6 +37,12 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
                             rpm=equip.rpm)
         return equip_status
 
+    def get_actual_weight(self, object):
+        actual = object.actual_trains
+        if actual:
+            if len(actual) >= 5:
+                return actual / 100
+        return actual
 
 
     class Meta:
