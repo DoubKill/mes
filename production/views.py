@@ -40,7 +40,8 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
         创建车次/批次产出反馈
     """
     queryset = TrainsFeedbacks.objects.filter(delete_flag=False)
-    permission_classes = (IsAuthenticatedOrReadOnly,)
+    permission_classes = ()#(IsAuthenticatedOrReadOnly,)
+    authentication_classes = ()
     serializer_class = TrainsFeedbacksSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id',)
