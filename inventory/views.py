@@ -34,7 +34,7 @@ class MaterialInventory(GenericViewSet,
                 "unit_weight": instance[5],
                 "total_weight": instance[2],
                 "site": instance[4],
-                "standard_flag": True,
+                "standard_flag": True if instance[9] else False,
             }
         return data
 
@@ -48,18 +48,18 @@ class MaterialInventory(GenericViewSet,
                            sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
                            max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
                            max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
-                           Row_Number() OVER (order by tis.MaterialCode) sn
+                           Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
                                 from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
                             where tim.MaterialGroupName={material_type}
-                            group by tis.MaterialCode;"""
+                            group by tis.MaterialCode, tis.StockDetailState;"""
         else:
             sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
                                        sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
                                        max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
                                        max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
-                                       Row_Number() OVER (order by tis.MaterialCode) sn
+                                       Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
                                             from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                                        group by tis.MaterialCode;"""
+                                        group by tis.MaterialCode, tis.StockDetailState;"""
         try:
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
