@@ -40,7 +40,7 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
     def get_actual_weight(self, object):
         actual = object.actual_trains
         if actual:
-            if len(actual) >= 5:
+            if len(str(actual)) >= 5:
                 return actual / 100
         return actual
 
