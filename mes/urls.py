@@ -47,6 +47,7 @@ urlpatterns = [
     path('api/v1/plan/', include('plan.urls')),
     path('api/v1/production/', include('production.urls')),
     path('api/v1/inventory/', include('inventory.urls')),
+    path('api/v1/quality/', include('quality.urls')),
     path('gui/', include('gui.urls')),
     path('favicon.ico', RedirectView.as_view(url='static/m.ico')),
     path('api/v1/index/', IndexView.as_view()),  # 首页展示
