@@ -81,8 +81,8 @@ class MaterialTestMethod(AbstractEntity):
 
 class MaterialDataPointIndicator(AbstractEntity):
     """数据点评判指标"""
-    material_test_data_point = models.ForeignKey(MaterialTestMethod, help_text='物料试验方法',
-                                                 on_delete=models.CASCADE, related_name='mat_indicators')
+    material_test_method = models.ForeignKey(MaterialTestMethod, help_text='物料试验方法',
+                                             on_delete=models.CASCADE, related_name='mat_indicators')
     data_point = models.ForeignKey(DataPoint, help_text='数据点', on_delete=models.CASCADE,
                                    related_name='point_indicators')
     level = models.PositiveIntegerField(help_text='等级')
@@ -91,7 +91,7 @@ class MaterialDataPointIndicator(AbstractEntity):
     lower_limit = models.DecimalField(help_text='下限', decimal_places=2, max_digits=8)
 
     def __str__(self):
-        return '{}-{}'.format(self.material_test_data_point, self.level)
+        return '{}-{}'.format(self.material_test_method, self.level)
 
     class Meta:
         db_table = 'material_data_indicator'
