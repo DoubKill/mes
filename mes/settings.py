@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'recipe.apps.RecipeConfig',
     'gui.apps.GuiConfig',
     'docs.apps.DocsConfig',
+    'quality.apps.QualityConfig'
 ]
 
 MIDDLEWARE = [
