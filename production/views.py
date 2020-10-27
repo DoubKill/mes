@@ -25,7 +25,7 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
     QualityControl
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
-    ProductionRecordSerializer
+    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer
 
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
@@ -632,7 +632,7 @@ class TrainsFeedbacksBatch(APIView):
     """批量同步车次生产数据接口"""
     @atomic
     def post(self, request):
-        serializer = TrainsFeedbacksSerializer(data=request.data, many=True, context={'request': request})
+        serializer = TrainsFeedbacksBatchSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
