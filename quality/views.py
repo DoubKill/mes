@@ -204,6 +204,7 @@ class MaterialDataPointIndicatorViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialDataPointIndicatorFilter
+    pagination_class = None
 
 
 class ProductBatchingMaterialListView(ListAPIView):

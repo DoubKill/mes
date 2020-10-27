@@ -22,7 +22,6 @@ class DataPointFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
-    """托盘产出反馈过滤器"""
     day_time = django_filters.DateTimeFilter(field_name="production_factory_date__date", help_text='生产时间', lookup_expr="lte")
     equip_no = django_filters.CharFilter(field_name='production_equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='产出胶料编号')
@@ -34,8 +33,7 @@ class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):
-    """托盘产出反馈过滤器"""
-    material_test_method_id = django_filters.CharFilter(field_name='material_test_data_point__material_test_method_id',
+    material_test_method_id = django_filters.CharFilter(field_name='material_test_method_id',
                                                         help_text='物料试验方法id')
 
     class Meta:
