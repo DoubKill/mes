@@ -129,13 +129,13 @@ class ExpendMaterial(AbstractEntity):
     trains = models.IntegerField(help_text='车次', verbose_name='车次')
     plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', verbose_name='计划重量')
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际消耗重量', verbose_name='实际消耗重量')
-    masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id', blank=True)
-    masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型', blank=True)
-    masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称', blank=True)
+    material_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id', blank=True)
+    material_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型', blank=True)
+    material_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间', verbose_name='工作站生产报表时间/存盘时间',null=True)
 
     def __str__(self):
-        return f"{self.plan_classes_uid}|{self.equip_no}|{self.product_no}|{self.masterial_no}"
+        return f"{self.plan_classes_uid}|{self.equip_no}|{self.product_no}|{self.material_no}"
 
     class Meta:
         db_table = 'expend_material'
@@ -180,9 +180,9 @@ class MaterialTankStatus(AbstractEntity):
     tank_type = models.CharField(max_length=64, help_text="储料罐类型", verbose_name='储料罐类型')
     tank_name = models.CharField(max_length=64, help_text="储料罐名称", verbose_name='储料罐名称')
     tank_no = models.CharField(max_length=64, help_text="储料罐编号", verbose_name='储料罐编号')
-    masterial_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
-    masterial_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
-    masterial_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
+    material_no = models.CharField(max_length=64, help_text='原材料id', verbose_name='原材料id')
+    material_type = models.CharField(max_length=64, help_text='原材料类型', verbose_name='原材料类型')
+    material_name = models.CharField(max_length=64, help_text='原材料名称', verbose_name='原材料名称')
     use_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=0)
     low_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='慢称值', verbose_name='慢称值')
     advance_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='提前量', verbose_name='提前量')
