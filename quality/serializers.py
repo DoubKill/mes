@@ -68,6 +68,7 @@ class DataPointSerializer(serializers.ModelSerializer):
 class MaterialDataPointIndicatorSerializer(serializers.ModelSerializer):
     # test_data_name = serializers.CharField(source='material_test_data.data_name')
     # test_data_id = serializers.CharField(source='material_test_data.id')
+    level = serializers.IntegerField(help_text='等级', min_value=0)
 
     class Meta:
         model = MaterialDataPointIndicator
@@ -86,6 +87,7 @@ class MaterialTestResultSerializer(serializers.ModelSerializer):
 
 class MaterialTestOrderSerializer(serializers.ModelSerializer):
     order_results = MaterialTestResultSerializer(many=True, required=True)
+    actual_trains = serializers.IntegerField(min_value=0)
 
     @atomic()
     def create(self, validated_data):
