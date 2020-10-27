@@ -1,3 +1,4 @@
+from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework.exceptions import ValidationError
@@ -6,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from mes.derorators import api_recorder
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
@@ -16,6 +18,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
 from recipe.models import Material, ProductBatching
 
 
+@method_decorator([api_recorder], name="dispatch")
 class TestIndicatorListView(ListAPIView):
     """试验指标列表"""
     queryset = TestIndicator.objects.all()
@@ -25,6 +28,7 @@ class TestIndicatorListView(ListAPIView):
         return Response(data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class TestTypeViewSet(ModelViewSet):
     """试验类型管理"""
     queryset = TestType.objects.filter(delete_flag=False)
@@ -40,6 +44,7 @@ class TestTypeViewSet(ModelViewSet):
         return super().list(self, request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DataPointViewSet(ModelViewSet):
     """试验类型数据点管理"""
     queryset = DataPoint.objects.filter(delete_flag=False)
@@ -56,6 +61,7 @@ class DataPointViewSet(ModelViewSet):
         return super().list(self, request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class TestMethodViewSet(ModelViewSet):
     """试验方法管理"""
     queryset = TestMethod.objects.filter(delete_flag=False)
@@ -71,6 +77,7 @@ class TestMethodViewSet(ModelViewSet):
         return super().list(self, request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class TestIndicatorDataPointListView(ListAPIView):
     """获取试验指标及其所有的试验方法数据点"""
     queryset = TestIndicator.objects.filter(delete_flag=False)
@@ -156,6 +163,7 @@ class TestIndicatorDataPointListView(ListAPIView):
 #         return Response(ret.values())
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                                mixins.ListModelMixin,
                                GenericViewSet):
@@ -189,6 +197,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         return Response('新建成功')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestMethodViewSet(ModelViewSet):
     """物料试验方法"""
     queryset = MaterialTestMethod.objects.filter(delete_flag=False)
@@ -198,6 +207,7 @@ class MaterialTestMethodViewSet(ModelViewSet):
     filter_class = MaterialTestMethodFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDataPointIndicatorViewSet(ModelViewSet):
     """物料数据点评判指标"""
     queryset = MaterialDataPointIndicator.objects.filter(delete_flag=False)
@@ -208,6 +218,7 @@ class MaterialDataPointIndicatorViewSet(ModelViewSet):
     pagination_class = None
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductBatchingMaterialListView(ListAPIView):
     """胶料原材料列表"""
     queryset = Material.objects.filter(delete_flag=False)
