@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
@@ -21,9 +22,18 @@ class TestMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestMethod
         fields = ('id', 'name', 'test_type', 'test_type_name', 'test_indicator_name')
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=('name', 'test_type'),
+                message="已存在相同试验方法，请修改后重试！"
+            )
+        ]
 
 
 class TestTypeSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(help_text='试验类型名称', validators=[UniqueValidator(queryset=TestType.objects.all(),
+                                                                                 message='该试验类型名称已存在！')])
     test_indicator_name = serializers.CharField(source='test_indicator.name', read_only=True)
 
     def create(self, validated_data):
@@ -46,6 +56,13 @@ class DataPointSerializer(serializers.ModelSerializer):
     class Meta:
         model = DataPoint
         fields = ('id', 'name', 'unit', 'test_type', 'test_type_name', 'test_indicator_name')
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=('name', 'test_type'),
+                message="已存在相同数据点，请修改后重试！"
+            )
+        ]
 
 
 class MaterialDataPointIndicatorSerializer(serializers.ModelSerializer):
@@ -140,3 +157,10 @@ class MaterialTestMethodSerializer(serializers.ModelSerializer):
         model = MaterialTestMethod
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=('material', 'test_method'),
+                message="该原材料已存在相同的试验方法，请修改后重试！"
+            )
+        ]
