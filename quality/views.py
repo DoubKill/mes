@@ -46,11 +46,12 @@ class DataPointViewSet(ModelViewSet):
     serializer_class = DataPointSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = DataPointFilter
+    pagination_class = None
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name')
+            data = queryset.values('id', 'name', 'unit')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
