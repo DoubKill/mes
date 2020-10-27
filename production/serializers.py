@@ -17,6 +17,14 @@ class EquipStatusSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class TrainsFeedbacksBatchSerializer(BaseModelSerializer):
+    """批量上传车次报表序列化器"""
+    class Meta:
+        model = TrainsFeedbacks
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class TrainsFeedbacksSerializer(BaseModelSerializer):
     """车次产出反馈"""
     equip_status = serializers.SerializerMethodField(read_only=True)

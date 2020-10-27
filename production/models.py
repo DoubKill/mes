@@ -30,6 +30,13 @@ class TrainsFeedbacks(AbstractEntity):
     class Meta:
         db_table = 'trains_feedbacks'
         verbose_name_plural = verbose_name = '胶料车次产出反馈'
+        indexes = [
+            models.Index(fields=['plan_classes_uid']),
+            models.Index(fields=['equip_no']),
+            models.Index(fields=['product_no']),
+            models.Index(fields=['operation_user']),
+            models.Index(fields=['begin_time']),
+            models.Index(fields=['end_time']), ]
 
 
 class PalletFeedbacks(AbstractEntity):
@@ -58,6 +65,13 @@ class PalletFeedbacks(AbstractEntity):
     class Meta:
         db_table = 'pallet_feedbacks'
         verbose_name_plural = verbose_name = '胶料托盘产出反馈'
+        indexes = [
+            models.Index(fields=['plan_classes_uid']),
+            models.Index(fields=['equip_no']),
+            models.Index(fields=['product_no']),
+            models.Index(fields=["classes"]),
+            models.Index(fields=["pallet_no"]),
+            models.Index(fields=["end_time"]), ]
 
 
 class EquipStatus(AbstractEntity):
@@ -79,6 +93,11 @@ class EquipStatus(AbstractEntity):
     class Meta:
         db_table = 'equip_status'
         verbose_name_plural = verbose_name = '机台状况反馈'
+        indexes = [
+            models.Index(fields=['equip_no']),
+            models.Index(fields=['plan_classes_uid']),
+            models.Index(fields=['product_time']),
+            models.Index(fields=['current_trains']), ]
 
 
 class PlanStatus(AbstractEntity):
@@ -96,6 +115,10 @@ class PlanStatus(AbstractEntity):
     class Meta:
         db_table = 'plan_status'
         verbose_name_plural = verbose_name = '计划状态变更'
+        indexes = [
+            models.Index(fields=['equip_no']),
+            models.Index(fields=['plan_classes_uid']),
+            models.Index(fields=['product_no']), ]
 
 
 class ExpendMaterial(AbstractEntity):
@@ -117,6 +140,11 @@ class ExpendMaterial(AbstractEntity):
     class Meta:
         db_table = 'expend_material'
         verbose_name_plural = verbose_name = '原材料消耗'
+        indexes = [
+            models.Index(fields=['equip_no']),
+            models.Index(fields=['product_no']),
+            models.Index(fields=['material_type']),
+            models.Index(fields=['product_time']), ]
 
 
 class OperationLog(AbstractEntity):
@@ -170,3 +198,4 @@ class MaterialTankStatus(AbstractEntity):
     class Meta:
         db_table = 'material_tank_status'
         verbose_name_plural = verbose_name = '储料罐状态'
+        indexes = [models.Index(fields=['equip_no']), ]
