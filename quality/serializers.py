@@ -7,7 +7,8 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from plan.uuidfield import UUidTools
 from quality.models import TestMethod, MaterialTestOrder, \
-    MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint
+    MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
+    MaterialDealResult
 
 
 class TestMethodSerializer(serializers.ModelSerializer):
@@ -139,4 +140,50 @@ class MaterialTestMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialTestMethod
         fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class DealSuggestionSerializer(serializers.ModelSerializer):
+    """处理意见序列化器"""
+
+    class Meta:
+        model = DealSuggestion
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class DealResultDealSerializer(serializers.ModelSerializer):
+    """胶料处理结果序列化器"""
+    product_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_product_info(self, object):
+        lot_no = object.lot_no
+        temp = MaterialTestOrder.objects.filter(lot_no=lot_no, delete_flag=False).first()
+        result = {}
+        if temp:
+            result.update(product_no=temp.product_no,
+                          production_class=temp.production_class,
+                          production_group=temp.production_group,
+                          production_equip_no=temp.production_equip_no,
+                          production_factory_date=temp.production_factory_date)
+        return result
+
+    def update(self, instance, validated_data):
+        if validated_data.get("status") == "待确认":
+            instance.deal_user = self.context['request'].user.username
+            instance.deal_time = datetime.now()
+        elif validated_data.get("status") == "已处理":
+            instance.confirm_user = self.context['request'].user.username
+            instance.confirm_time = datetime.now()
+        else:
+            pass
+        return super(DealResultDealSerializer, self).update(instance, validated_data)
+
+
+
+    class Meta:
+        model = MaterialDealResult
+        # fields = ("lot_no", "product_no", "production_class", "production_group",
+        #           "production_equip_no", "production_factory_date")
+        fields = "__all__"
         read_only_fields = COMMON_READ_ONLY_FIELDS

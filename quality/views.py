@@ -1,18 +1,25 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins
+from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.views import APIView
+from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 
+from basics.models import GlobalCode, GlobalCodeType
+from basics.serializers import GlobalCodeSerializer
+from mes.common_code import CommonDeleteMixin
+from mes.paginations import SinglePageNumberPagination
 from quality.filters import TestMethodFilter, DataPointFilter, \
-    MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter
+    MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
+    DealSuggestionFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
-    MaterialTestMethod, TestType, DataPoint
+    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
-    MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer
+    MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
+    DealSuggestionSerializer, DealResultDealSerializer
 from recipe.models import Material, ProductBatching
 
 
@@ -215,3 +222,51 @@ class ProductBatchingMaterialListView(ListAPIView):
         batching_no = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
         material_data = self.queryset.filter(material_no__in=batching_no).values('id', 'material_no')
         return Response(material_data)
+
+
+class DealSuggestionViewSet(CommonDeleteMixin, ModelViewSet):
+    """处理意见
+        list: 查询处理意见列表
+        retrive: 查询处理意见详情
+        post: 新增处理意见
+        put: 修改处理意见
+    """
+    queryset = DealSuggestion.objects.filter(delete_flag=False)
+    serializer_class = DealSuggestionSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = DealSuggestionFilter
+    pagination_class = SinglePageNumberPagination
+
+
+class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
+    """胶料处理结果
+    list: 查询胶料处理结果列表
+    post: 创建胶料处理结果
+    put: 创建胶料处理结果
+    """
+    queryset = MaterialDealResult.objects.filter(delete_flag=False)
+    serializer_class = DealResultDealSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class =  MaterialDealResulFilter
+
+
+class MaterialDealStatusListView(APIView):
+    """胶料状态列表"""
+
+    def get(self, request):
+        filter_set = MaterialDealResult.objects.filter(delete_flag=False).values("status").annotate()
+        return Response(filter_set)
+
+
+class DealTypeView(APIView):
+
+    def post(self, request):
+        data = request.data
+        gct = GlobalCodeType.objects.filter(type_name="处理类型").first()
+        if not gct:
+            raise ValidationError("请先在基础信息管理下的公用代码管理内启用/创建'处理类型'")
+        data.update(global_type=gct.id)
+        serializer = GlobalCodeSerializer(data=data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({"message": "ok"}, status=status.HTTP_201_CREATED)
