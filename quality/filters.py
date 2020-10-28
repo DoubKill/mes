@@ -1,7 +1,7 @@
 import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, \
-    TestMethod, DataPoint
+    TestMethod, DataPoint, DealSuggestion, MaterialTestResult, MaterialDealResult
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -52,3 +52,23 @@ class MaterialTestMethodFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MaterialTestMethod
         fields = ('material_no', 'test_indicator_id', 'test_type_id')
+
+
+class DealSuggestionFilter(django_filters.rest_framework.FilterSet):
+
+    deal_type = django_filters.NumberFilter(field_name='deal_type_id', help_text='处理类型id')
+    type_name = django_filters.CharFilter(field_name='deal_type__global_name', help_text="类型名称")
+
+    class Meta:
+        models = DealSuggestion
+        fields = ("deal_type", )
+
+
+class MaterialDealResulFilter(django_filters.rest_framework.FilterSet):
+
+    day = django_filters.CharFilter(field_name='production_factory_date', lookup_expr='icontains', help_text='生产日期筛选')
+    status = django_filters.CharFilter(field_name='status', help_text='状态筛选')
+
+    class Meta:
+        models = MaterialDealResult
+        fields = ("status", "day")

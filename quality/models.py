@@ -136,3 +136,43 @@ class MaterialTestResult(AbstractEntity):
     class Meta:
         db_table = 'material_test_result'
         verbose_name_plural = verbose_name = '检测结果'
+
+
+class DealSuggestion(AbstractEntity):
+    """处理意见"""
+    suggestion_desc = models.CharField(max_length=256, help_text="处理描述")
+    deal_type = models.ForeignKey(GlobalCode, help_text="处理类型id",
+                                     on_delete=models.CASCADE, related_name='deal_opinions')
+
+    class Meta:
+        db_table = 'deal_suggestion'
+        verbose_name_plural = verbose_name = '胶料处理结果'
+
+
+class MaterialDealResult(AbstractEntity):
+    """胶料处理结果"""
+    CHOICE = (
+        ("代处理", "代处理"),
+        ("代确认", "代确认"),
+        ("已处理", "已处理")
+    )
+    lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
+    level = models.IntegerField(help_text='综合等级')
+    deal_opinion = models.ForeignKey("DealSuggestion", help_text='综合处理意见id',
+                        on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
+    test_result = models.CharField(max_length=64, help_text="综合检测结果")
+    reason = models.CharField(max_length=64, help_text="不合格原因")
+    status = models.CharField(max_length=16, help_text="状态", choices=CHOICE)
+    deal_result = models.CharField(max_length=64, help_text="处理结果")
+    deal_user = models.CharField(max_length=8, help_text="处理人", blank=True, null=True)
+    confirm_user = models.CharField(max_length=8, help_text="确认人", blank=True, null=True)
+    be_warehouse_out = models.BooleanField(help_text="是否需要出库", default=False)
+    warehouse_out_time = models.DateTimeField(help_text="计划出库时间", blank=True, null=True)
+    deal_time = models.DateTimeField(help_text="处理时间", blank=True, null=True)
+    confirm_time = models.DateTimeField(help_text="确认时间", blank=True, null=True)
+    deal_suggestion = models.CharField(max_length=256, help_text="综合处理意见")
+    production_factory_date = models.DateTimeField(help_text='生产时间')
+
+    class Meta:
+        db_table = 'material_deal_result'
+        verbose_name_plural = verbose_name = '胶料处理结果'
