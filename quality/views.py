@@ -21,10 +21,10 @@ from recipe.models import Material, ProductBatching
 @method_decorator([api_recorder], name="dispatch")
 class TestIndicatorListView(ListAPIView):
     """试验指标列表"""
-    queryset = TestIndicator.objects.all()
+    queryset = TestIndicator.objects.filter(delete_flag=False)
 
     def list(self, request, *args, **kwargs):
-        data = TestIndicator.objects.values('id', 'name')
+        data = self.queryset.values('id', 'name')
         return Response(data)
 
 

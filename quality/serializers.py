@@ -106,6 +106,7 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
             instance = super().create(validated_data)
             created = True
 
+        material_no = validated_data['product_no']
         for item in order_results:
             item['material_test_order'] = instance
             item['test_factory_date'] = datetime.now()
@@ -120,6 +121,21 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
                     item['test_times'] = last_test_result.test_times + 1
                 else:
                     item['test_times'] = 1
+            material_test_method = MaterialTestMethod.objects.filter(
+                material__material_no=material_no,
+                test_method__name=item['test_method_name'],
+                test_method__test_type__test_indicator__name=item['test_indicator_name'],
+                data_point__name=item['data_point_name'],
+                data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+            if material_test_method:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    material_test_method=material_test_method,
+                    data_point__name=item['data_point_name'],
+                    data_point__test_type__test_indicator__name=item['test_indicator_name'],
+                    upper_limit__gte=item['value'],
+                    lower_limit__lte=item['value']).first()
+                if indicator:
+                    item['result'] = indicator.result
             MaterialTestResult.objects.create(**item)
         return instance
 
