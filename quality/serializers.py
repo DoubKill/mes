@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
@@ -22,9 +23,18 @@ class TestMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestMethod
         fields = ('id', 'name', 'test_type', 'test_type_name', 'test_indicator_name')
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=('name', 'test_type'),
+                message="已存在相同试验方法，请修改后重试！"
+            )
+        ]
 
 
 class TestTypeSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(help_text='试验类型名称', validators=[UniqueValidator(queryset=TestType.objects.all(),
+                                                                                 message='该试验类型名称已存在！')])
     test_indicator_name = serializers.CharField(source='test_indicator.name', read_only=True)
 
     def create(self, validated_data):
@@ -47,11 +57,19 @@ class DataPointSerializer(serializers.ModelSerializer):
     class Meta:
         model = DataPoint
         fields = ('id', 'name', 'unit', 'test_type', 'test_type_name', 'test_indicator_name')
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=('name', 'test_type'),
+                message="已存在相同数据点，请修改后重试！"
+            )
+        ]
 
 
 class MaterialDataPointIndicatorSerializer(serializers.ModelSerializer):
     # test_data_name = serializers.CharField(source='material_test_data.data_name')
     # test_data_id = serializers.CharField(source='material_test_data.id')
+    level = serializers.IntegerField(help_text='等级', min_value=0)
 
     class Meta:
         model = MaterialDataPointIndicator
@@ -70,6 +88,7 @@ class MaterialTestResultSerializer(serializers.ModelSerializer):
 
 class MaterialTestOrderSerializer(serializers.ModelSerializer):
     order_results = MaterialTestResultSerializer(many=True, required=True)
+    actual_trains = serializers.IntegerField(min_value=0)
 
     @atomic()
     def create(self, validated_data):
@@ -88,6 +107,7 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
             instance = super().create(validated_data)
             created = True
 
+        material_no = validated_data['product_no']
         for item in order_results:
             item['material_test_order'] = instance
             item['test_factory_date'] = datetime.now()
@@ -102,6 +122,21 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
                     item['test_times'] = last_test_result.test_times + 1
                 else:
                     item['test_times'] = 1
+            material_test_method = MaterialTestMethod.objects.filter(
+                material__material_no=material_no,
+                test_method__name=item['test_method_name'],
+                test_method__test_type__test_indicator__name=item['test_indicator_name'],
+                data_point__name=item['data_point_name'],
+                data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+            if material_test_method:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    material_test_method=material_test_method,
+                    data_point__name=item['data_point_name'],
+                    data_point__test_type__test_indicator__name=item['test_indicator_name'],
+                    upper_limit__gte=item['value'],
+                    lower_limit__lte=item['value']).first()
+                if indicator:
+                    item['result'] = indicator.result
             MaterialTestResult.objects.create(**item)
         return instance
 
@@ -141,6 +176,13 @@ class MaterialTestMethodSerializer(serializers.ModelSerializer):
         model = MaterialTestMethod
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [
+            UniqueTogetherValidator(
+                queryset=model.objects.all(),
+                fields=('material', 'test_method'),
+                message="该原材料已存在相同的试验方法，请修改后重试！"
+            )
+        ]
 
 
 class DealSuggestionSerializer(serializers.ModelSerializer):
