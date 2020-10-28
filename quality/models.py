@@ -152,8 +152,8 @@ class DealSuggestion(AbstractEntity):
 class MaterialDealResult(AbstractEntity):
     """胶料处理结果"""
     CHOICE = (
-        ("代处理", "代处理"),
-        ("代确认", "代确认"),
+        ("待处理", "待处理"),
+        ("待确认", "待确认"),
         ("已处理", "已处理")
     )
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
