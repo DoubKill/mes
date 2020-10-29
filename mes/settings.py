@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'recipe.apps.RecipeConfig',
     'gui.apps.GuiConfig',
     'docs.apps.DocsConfig',
-    'quality.apps.QualityConfig'
+    'quality.apps.QualityConfig',
+    'inventory.apps.InventoryConfig'
 ]
 
 MIDDLEWARE = [
@@ -63,7 +64,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mes.middlewares.SyncMiddleware',
-    'mes.middlewares.JwtTokenUserMiddleware', # jwt-token嵌套django权限组件
+    'mes.middlewares.JwtTokenUserMiddleware',  # jwt-token嵌套django权限组件
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -233,7 +234,6 @@ DATABASES = {
         'PORT': os.getenv('MES_MONOCLE_API_PORT', ''),  # 端口
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
