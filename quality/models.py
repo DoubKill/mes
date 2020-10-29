@@ -142,11 +142,11 @@ class DealSuggestion(AbstractEntity):
     """处理意见"""
     suggestion_desc = models.CharField(max_length=256, help_text="处理描述")
     deal_type = models.ForeignKey(GlobalCode, help_text="处理类型id",
-                                     on_delete=models.CASCADE, related_name='deal_opinions')
+                                  on_delete=models.CASCADE, related_name='deal_opinions')
 
     class Meta:
         db_table = 'deal_suggestion'
-        verbose_name_plural = verbose_name = '胶料处理结果'
+        verbose_name_plural = verbose_name = '处理意见'
 
 
 class MaterialDealResult(AbstractEntity):
@@ -159,7 +159,7 @@ class MaterialDealResult(AbstractEntity):
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
     level = models.IntegerField(help_text='综合等级')
     deal_opinion = models.ForeignKey("DealSuggestion", help_text='综合处理意见id',
-                        on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
+                                     on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
     test_result = models.CharField(max_length=64, help_text="综合检测结果")
     reason = models.CharField(max_length=64, help_text="不合格原因")
     status = models.CharField(max_length=16, help_text="状态", choices=CHOICE)
@@ -172,6 +172,8 @@ class MaterialDealResult(AbstractEntity):
     confirm_time = models.DateTimeField(help_text="确认时间", blank=True, null=True)
     deal_suggestion = models.CharField(max_length=256, help_text="综合处理意见")
     production_factory_date = models.DateTimeField(help_text='生产时间')
+    print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
+    valid_time = models.IntegerField(help_text='有效时间', null=True)
 
     class Meta:
         db_table = 'material_deal_result'
