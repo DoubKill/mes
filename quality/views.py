@@ -25,8 +25,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
-    DealSuggestionSerializer, DealResultDealSerializer, PalletFeedbacksTestOrderSerializer, \
-    MaterialDealResultListSerializer
+    DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer
 from recipe.models import Material, ProductBatching
 
 
