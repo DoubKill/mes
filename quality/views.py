@@ -6,9 +6,9 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import GlobalCode, GlobalCodeType
+from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
@@ -259,7 +259,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = MaterialDealResult.objects.filter(delete_flag=False)
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_class =  MaterialDealResulFilter
+    filter_class = MaterialDealResulFilter
 
 
 class MaterialDealStatusListView(APIView):

@@ -36,7 +36,7 @@ urlpatterns = [
     # path('material-test-indicators-tab/', MaterialTestIndicatorsTabView.as_view()),
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
     # path('mat-indicator-tab/', MatIndicatorsTabView.as_view()),
-    path('result-status/', MaterialDealStatusListView.as_view()), # 不合格状态筛选
+    path('result-status/', MaterialDealStatusListView.as_view()),  # 不合格状态筛选
     path('deal-type/', DealTypeView.as_view()),
     path('', include(router.urls)),
     ]
