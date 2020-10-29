@@ -236,7 +236,7 @@ class DealResultDealSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MaterialDealResultListSerializer(serializers.ModelSerializer):
+class MaterialDealResultListSerializer(BaseModelSerializer):
     day_time = serializers.SerializerMethodField(read_only=True, help_text='工厂时间')
     classes_group = serializers.SerializerMethodField(read_only=True, help_text='生产班次/班组')
     equip_no = serializers.SerializerMethodField(read_only=True, help_text='生产机台')
@@ -341,7 +341,6 @@ class MaterialDealResultListSerializer(serializers.ModelSerializer):
                                                        production_equip_no=pfb_obj.equip_no, actual_trains=i).last()
             if not mto_obj:
                 continue
-            # mtr = {'plan_train': i, 'mtr_list': []}
             mtr_list_return[i] = []
             # 先弄出表头
             table_head = mto_obj.order_results.all().values('test_indicator_name').annotate()
@@ -353,7 +352,7 @@ class MaterialDealResultListSerializer(serializers.ModelSerializer):
                                                      'result', 'test_times')
             for mtr_dict in mtr_list:
                 mtr_dict['status'] = f"{mtr_dict['test_times']}:{mtr_dict['result']}"
-            mtr_list_return[i].append(mtr_dict)
+                mtr_list_return[i].append(mtr_dict)
         table_head_set = list(set(table_head_count))
         mtr_list_return['table_head'] = table_head_set
         return mtr_list_return
