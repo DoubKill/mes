@@ -107,6 +107,53 @@ class TestIndicatorDataPointListView(ListAPIView):
         return Response(ret)
 
 
+class MaterialTestIndicatorMethods(APIView):
+    """获取原材料指标试验方法"""
+
+    def get(self, request):
+        material_no = self.request.query_params.get('material_no')
+        try:
+            material = Material.objects.get(material_no=material_no)
+        except Exception:
+            raise ValidationError('该胶料不存在')
+        ret = {}
+        test_indicator_names = TestIndicator.objects.values_list('name', flat=True)
+        test_methods = TestMethod.objects.all()
+        for test_method in test_methods:
+            indicator_name = test_method.test_type.test_indicator.name
+            allowed = True
+            data_points = None
+            mat_test_method = MaterialTestMethod.objects.filter(
+                material=material,
+                test_method=test_method).first()
+            if not mat_test_method:
+                allowed = False
+            else:
+                if not MaterialDataPointIndicator.objects.filter(material_test_method=mat_test_method).exists():
+                    allowed = False
+                else:
+                    data_points = mat_test_method.data_point.values('id', 'name', 'unit')
+            if indicator_name not in ret:
+                data = {
+                    'test_indicator': indicator_name,
+                    'methods': [
+                        {'id': 1,
+                         'name': test_method.name,
+                         'allowed': allowed,
+                         'data_points': data_points}
+                    ]
+                }
+                ret[indicator_name] = data
+            else:
+                ret[indicator_name]['methods'].append(
+                    {'id': 1, 'name': test_method.name, 'allowed': allowed, 'data_points': data_points})
+
+        for item in test_indicator_names:
+            if item not in ret:
+                ret[item] = {'test_indicator': item, 'methods': []}
+        return Response(ret.values())
+
+
 # class MaterialTestIndicatorsTabView(ListAPIView):
 #     """获取原材料及其试验类型表格数据，参数：?material_no=xxx"""
 #     permission_classes = (IsAuthenticated, )

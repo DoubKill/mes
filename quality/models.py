@@ -52,7 +52,7 @@ class DataPoint(AbstractEntity):
 class TestMethod(AbstractEntity):
     """试验方法"""
     no = models.CharField(max_length=64, help_text='试验方法编号', unique=True)
-    name = models.CharField(max_length=64, help_text='试验方法名称')
+    name = models.CharField(max_length=64, help_text='试验方法名称', unique=True)
     test_type = models.ForeignKey(TestType, help_text='试验类型', on_delete=models.CASCADE, related_name='type_methods')
 
     def __str__(self):
@@ -61,7 +61,6 @@ class TestMethod(AbstractEntity):
     class Meta:
         db_table = 'test_method'
         verbose_name_plural = verbose_name = '试验方法'
-        unique_together = ('name', 'test_type')
 
 
 class MaterialTestMethod(AbstractEntity):

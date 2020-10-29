@@ -18,6 +18,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
 
 
 class TestMethodSerializer(BaseModelSerializer):
+    name = serializers.CharField(help_text='试验方法名称', validators=[UniqueValidator(queryset=TestMethod.objects.all(),
+                                                                                 message='该试验方法名称已存在！')])
     test_type_name = serializers.CharField(source='test_type.name', read_only=True)
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
@@ -28,13 +30,6 @@ class TestMethodSerializer(BaseModelSerializer):
     class Meta:
         model = TestMethod
         fields = ('id', 'name', 'test_type', 'test_type_name', 'test_indicator_name')
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.all(),
-                fields=('name', 'test_type'),
-                message="已存在相同试验方法，请修改后重试！"
-            )
-        ]
 
 
 class TestTypeSerializer(BaseModelSerializer):
@@ -141,7 +136,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     upper_limit__gte=item['value'],
                     lower_limit__lte=item['value']).first()
                 if indicator:
-                    item['result'] = indicator.result
+                    item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
             MaterialTestResult.objects.create(**item)
         return instance
