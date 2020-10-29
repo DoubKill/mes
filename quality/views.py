@@ -311,21 +311,21 @@ class PalletFeedbacksTestListView(ListAPIView):
         equip_no = self.request.query_params.get('equip_no', None)
         product_no = self.request.query_params.get('product_no', None)
         day_time = self.request.query_params.get('day_time', None)
+        classes = self.request.query_params.get('classes', None)
         filter_dict = {'delete_flag': False}
+        pfb_filter = {}
         if day_time:
             pcp_uid_list = ProductClassesPlan.objects.filter(
-                work_schedule_plan__plan_schedule__day_time=day_time).values_list('plan_classes_uid')
-            filter_dict['plan_classes_uid__in'] = pcp_uid_list
-        if equip_no and product_no:
-            pfb_lot_list = PalletFeedbacks.objects.filter(equip_no=equip_no,
-                                                          product_no__icontains=product_no).values_list(
-                'lot_no')
-            filter_dict['lot_no__in'] = pfb_lot_list
-        elif equip_no:
-            pfb_lot_list = PalletFeedbacks.objects.filter(equip_no=equip_no).values_list('lot_no')
-            filter_dict['lot_no__in'] = pfb_lot_list
-        elif product_no:
-            pfb_product_list = PalletFeedbacks.objects.filter(product_no__icontains=product_no).values_list('lot_no')
-            filter_dict['lot_no__in'] = pfb_product_list
+                work_schedule_plan__plan_schedule__day_time=day_time).values_list('plan_classes_uid', flat=True)
+            pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
+        if equip_no:
+            pfb_filter['equip_no'] = equip_no
+        if product_no:
+            pfb_filter['product_no__icontains'] = product_no
+        if classes:
+            pfb_filter['classes'] = classes
+        if pfb_filter:
+            pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no',flat=True)
+            filter_dict['lot_no__in'] = list(pfb_product_list)
         pfb_queryset = MaterialDealResult.objects.filter(**filter_dict)
         return pfb_queryset
