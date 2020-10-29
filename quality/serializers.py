@@ -262,7 +262,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         if pcp_obj:
             return f"{pfb_obj.classes}/{pcp_obj.work_schedule_plan.group.global_name}"
         else:
-            return None
+            return f"{pfb_obj.classes}/None"
 
     def get_equip_no(self, obj):
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
