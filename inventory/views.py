@@ -7,9 +7,11 @@ from django.shortcuts import render
 from rest_framework import mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from basics.models import GlobalCode
+from inventory.models import OutOrderFeedBack
 from inventory.serializers import ProductInventorySerializer
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
@@ -171,3 +173,22 @@ class ProductInventory(GenericViewSet,
         result = result[st:et]
         sc.close()
         return Response({'results': result, "count": count})
+
+
+class OutWorkFeedBack(APIView):
+
+    # 出库反馈
+    def post(self, request):
+        """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
+        生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
+        # 任务编号
+        data = request.data
+        if data:
+            try:
+                OutOrderFeedBack.objects.create(**data)
+            except:
+                result = {"workId": data.get("task_id"), "msg": "FALSE"+data.get("material_no")+"物料在库内数量不足!", "flag": "99"}
+            else:
+                result = {"workId": data.get("task_id"), "msg": "TRUE"+data.get("material_no")+"下发成功!", "flag": "01"}
+
+            return Response(result)
