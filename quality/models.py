@@ -146,7 +146,7 @@ class DealSuggestion(AbstractEntity):
 
     class Meta:
         db_table = 'deal_suggestion'
-        verbose_name_plural = verbose_name = '胶料处理结果'
+        verbose_name_plural = verbose_name = '处理意见'
 
 
 class MaterialDealResult(AbstractEntity):
@@ -172,6 +172,8 @@ class MaterialDealResult(AbstractEntity):
     confirm_time = models.DateTimeField(help_text="确认时间", blank=True, null=True)
     deal_suggestion = models.CharField(max_length=256, help_text="综合处理意见")
     production_factory_date = models.DateTimeField(help_text='生产时间')
+    print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
+    valid_time = models.IntegerField(help_text='有效时间', null=True)
 
     class Meta:
         db_table = 'material_deal_result'
