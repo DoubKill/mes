@@ -10,7 +10,8 @@ from rest_framework.routers import DefaultRouter
 from quality.views import TestIndicatorListView, TestMethodViewSet, TestIndicatorDataPointListView, \
     MaterialTestOrderViewSet, TestTypeViewSet, DataPointViewSet, MaterialTestMethodViewSet, \
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
-    DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView
+    DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
+    MaterialDealResultUpdateValidTime
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -36,7 +37,9 @@ urlpatterns = [
     # path('material-test-indicators-tab/', MaterialTestIndicatorsTabView.as_view()),
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
     # path('mat-indicator-tab/', MatIndicatorsTabView.as_view()),
-    path('result-status/', MaterialDealStatusListView.as_view()), # 不合格状态筛选
+    path('result-status/', MaterialDealStatusListView.as_view()),  # 不合格状态筛选
     path('deal-type/', DealTypeView.as_view()),
+    path('pallet-feed-test/', PalletFeedbacksTestListView.as_view()),  # 快检信息综合管里
+    path('material_valid_time/', MaterialDealResultUpdateValidTime.as_view()),  # 快检信息综合管理修改有效时间
     path('', include(router.urls)),
-    ]
+]
