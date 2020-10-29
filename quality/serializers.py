@@ -4,7 +4,10 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
+from django.db.models import Sum, Max
+
 from mes.base_serializer import BaseModelSerializer
+
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from plan.uuidfield import UUidTools
@@ -80,7 +83,6 @@ class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultSerializer(BaseModelSerializer):
-
     class Meta:
         model = MaterialTestResult
         exclude = ('data_point_indicator', 'material_test_order', 'test_factory_date', 'test_class',
