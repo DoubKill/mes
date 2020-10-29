@@ -315,7 +315,6 @@ class PalletFeedbacksTestListView(ListAPIView):
         filter_dict = {'delete_flag': False}
         pfb_filter = {}
         if day_time:
-            print(day_time)
             pcp_uid_list = ProductClassesPlan.objects.filter(
                 work_schedule_plan__plan_schedule__day_time=day_time).values_list('plan_classes_uid', flat=True)
             pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
