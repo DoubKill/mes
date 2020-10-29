@@ -129,7 +129,7 @@ class MaterialTestResult(AbstractEntity):
     test_times = models.PositiveIntegerField(help_text='检验次数')
     data_point_name = models.CharField(max_length=64, help_text='数据点名称')
     test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
-    test_indicator_name = models.CharField(max_length=64, help_text='检测标准名称')
+    test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
     mes_result = models.CharField(max_length=64, help_text='mes评判结果', blank=True, null=True)
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
 
@@ -142,7 +142,7 @@ class DealSuggestion(AbstractEntity):
     """处理意见"""
     suggestion_desc = models.CharField(max_length=256, help_text="处理描述")
     deal_type = models.ForeignKey(GlobalCode, help_text="处理类型id",
-                                     on_delete=models.CASCADE, related_name='deal_opinions')
+                                  on_delete=models.CASCADE, related_name='deal_opinions')
 
     class Meta:
         db_table = 'deal_suggestion'
@@ -159,7 +159,7 @@ class MaterialDealResult(AbstractEntity):
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
     level = models.IntegerField(help_text='综合等级')
     deal_opinion = models.ForeignKey("DealSuggestion", help_text='综合处理意见id',
-                        on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
+                                     on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
     test_result = models.CharField(max_length=64, help_text="综合检测结果")
     reason = models.CharField(max_length=64, help_text="不合格原因")
     status = models.CharField(max_length=16, help_text="状态", choices=CHOICE)

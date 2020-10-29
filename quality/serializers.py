@@ -116,7 +116,8 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
             else:
                 last_test_result = MaterialTestResult.objects.filter(
                     material_test_order=instance,
-                    test_indicator_name=item['test_indicator_name']
+                    test_indicator_name=item['test_indicator_name'],
+                    data_point_name=item['data_point_name'],
                 ).order_by('-test_times').first()
                 if last_test_result:
                     item['test_times'] = last_test_result.test_times + 1
@@ -137,6 +138,7 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
                     lower_limit__lte=item['value']).first()
                 if indicator:
                     item['result'] = indicator.result
+                    item['data_point_indicator'] = indicator
             MaterialTestResult.objects.create(**item)
         return instance
 
