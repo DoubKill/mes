@@ -312,12 +312,18 @@ class PalletFeedbacksTestListView(ListAPIView):
         product_no = self.request.query_params.get('product_no', None)
         day_time = self.request.query_params.get('day_time', None)
         classes = self.request.query_params.get('classes', None)
+        schedule_name = self.request.query_params.get('schedule_name', None)
         filter_dict = {'delete_flag': False}
         pfb_filter = {}
+        pcp_filter = {}
         if day_time:
-            pcp_uid_list = ProductClassesPlan.objects.filter(
-                work_schedule_plan__plan_schedule__day_time=day_time).values_list('plan_classes_uid', flat=True)
+            pcp_filter['work_schedule_plan__plan_schedule__day_time'] = day_time
+        if schedule_name:
+            pcp_filter['work_schedule_plan__plan_schedule__work_schedule__schedule_name'] = schedule_name
+        if pcp_filter:
+            pcp_uid_list = ProductClassesPlan.objects.filter(**pcp_filter).values_list('plan_classes_uid', flat=True)
             pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
+
         if equip_no:
             pfb_filter['equip_no'] = equip_no
         if product_no:
@@ -325,7 +331,7 @@ class PalletFeedbacksTestListView(ListAPIView):
         if classes:
             pfb_filter['classes'] = classes
         if pfb_filter:
-            pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no',flat=True)
+            pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
         pfb_queryset = MaterialDealResult.objects.filter(**filter_dict)
         return pfb_queryset
