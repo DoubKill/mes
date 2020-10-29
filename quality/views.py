@@ -7,9 +7,9 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet, ViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import GlobalCode, GlobalCodeType
+from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination

@@ -3,7 +3,8 @@ from datetime import datetime
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
-from django.db.models import Sum, Max
+
+from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from plan.uuidfield import UUidTools
@@ -13,7 +14,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialDealResult
 
 
-class TestMethodSerializer(serializers.ModelSerializer):
+class TestMethodSerializer(BaseModelSerializer):
     test_type_name = serializers.CharField(source='test_type.name', read_only=True)
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
@@ -33,7 +34,7 @@ class TestMethodSerializer(serializers.ModelSerializer):
         ]
 
 
-class TestTypeSerializer(serializers.ModelSerializer):
+class TestTypeSerializer(BaseModelSerializer):
     name = serializers.CharField(help_text='试验类型名称', validators=[UniqueValidator(queryset=TestType.objects.all(),
                                                                                  message='该试验类型名称已存在！')])
     test_indicator_name = serializers.CharField(source='test_indicator.name', read_only=True)
@@ -47,7 +48,7 @@ class TestTypeSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'test_indicator', 'test_indicator_name')
 
 
-class DataPointSerializer(serializers.ModelSerializer):
+class DataPointSerializer(BaseModelSerializer):
     test_type_name = serializers.CharField(source='test_type.name', read_only=True)
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
@@ -67,7 +68,7 @@ class DataPointSerializer(serializers.ModelSerializer):
         ]
 
 
-class MaterialDataPointIndicatorSerializer(serializers.ModelSerializer):
+class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
     # test_data_name = serializers.CharField(source='material_test_data.data_name')
     # test_data_id = serializers.CharField(source='material_test_data.id')
     level = serializers.IntegerField(help_text='等级', min_value=0)
@@ -78,7 +79,8 @@ class MaterialDataPointIndicatorSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MaterialTestResultSerializer(serializers.ModelSerializer):
+class MaterialTestResultSerializer(BaseModelSerializer):
+
     class Meta:
         model = MaterialTestResult
         exclude = ('data_point_indicator', 'material_test_order', 'test_factory_date', 'test_class',
@@ -86,7 +88,7 @@ class MaterialTestResultSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MaterialTestOrderSerializer(serializers.ModelSerializer):
+class MaterialTestOrderSerializer(BaseModelSerializer):
     order_results = MaterialTestResultSerializer(many=True, required=True)
     actual_trains = serializers.IntegerField(min_value=0)
 
@@ -116,7 +118,8 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
             else:
                 last_test_result = MaterialTestResult.objects.filter(
                     material_test_order=instance,
-                    test_indicator_name=item['test_indicator_name']
+                    test_indicator_name=item['test_indicator_name'],
+                    data_point_name=item['data_point_name'],
                 ).order_by('-test_times').first()
                 if last_test_result:
                     item['test_times'] = last_test_result.test_times + 1
@@ -137,6 +140,7 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
                     lower_limit__lte=item['value']).first()
                 if indicator:
                     item['result'] = indicator.result
+                    item['data_point_indicator'] = indicator
             MaterialTestResult.objects.create(**item)
         return instance
 
@@ -146,13 +150,15 @@ class MaterialTestOrderSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class MaterialTestResultListSerializer(serializers.ModelSerializer):
+class MaterialTestResultListSerializer(BaseModelSerializer):
+    level = serializers.CharField(source='data_point_indicator.level', read_only=True, default=None)
+
     class Meta:
         model = MaterialTestResult
         fields = '__all__'
 
 
-class MaterialTestOrderListSerializer(serializers.ModelSerializer):
+class MaterialTestOrderListSerializer(BaseModelSerializer):
     order_results = MaterialTestResultListSerializer(many=True)
 
     class Meta:
@@ -160,7 +166,7 @@ class MaterialTestOrderListSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class MaterialTestMethodSerializer(serializers.ModelSerializer):
+class MaterialTestMethodSerializer(BaseModelSerializer):
     data_points = serializers.SerializerMethodField(read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
     test_method_name = serializers.CharField(source='test_method.name', read_only=True)
@@ -184,7 +190,7 @@ class MaterialTestMethodSerializer(serializers.ModelSerializer):
         ]
 
 
-class DealSuggestionSerializer(serializers.ModelSerializer):
+class DealSuggestionSerializer(BaseModelSerializer):
     """处理意见序列化器"""
 
     class Meta:
@@ -193,12 +199,12 @@ class DealSuggestionSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class DealResultDealSerializer(serializers.ModelSerializer):
+class DealResultDealSerializer(BaseModelSerializer):
     """胶料处理结果序列化器"""
     product_info = serializers.SerializerMethodField(read_only=True)
 
-    def get_product_info(self, object):
-        lot_no = object.lot_no
+    def get_product_info(self, obj):
+        lot_no = obj.lot_no
         temp = MaterialTestOrder.objects.filter(lot_no=lot_no, delete_flag=False).first()
         result = {}
         if temp:

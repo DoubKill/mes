@@ -129,7 +129,7 @@ class MaterialTestResult(AbstractEntity):
     test_times = models.PositiveIntegerField(help_text='检验次数')
     data_point_name = models.CharField(max_length=64, help_text='数据点名称')
     test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
-    test_indicator_name = models.CharField(max_length=64, help_text='检测标准名称')
+    test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
     mes_result = models.CharField(max_length=64, help_text='mes评判结果', blank=True, null=True)
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
 
@@ -152,8 +152,8 @@ class DealSuggestion(AbstractEntity):
 class MaterialDealResult(AbstractEntity):
     """胶料处理结果"""
     CHOICE = (
-        ("代处理", "代处理"),
-        ("代确认", "代确认"),
+        ("待处理", "待处理"),
+        ("待确认", "待确认"),
         ("已处理", "已处理")
     )
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')

@@ -233,7 +233,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
         day_time = attrs['day_time']
         work_schedule = attrs['work_schedule']
         if PlanSchedule.objects.filter(day_time=day_time, work_schedule=work_schedule).exists():
-            raise serializers.ValidationError('当前日期已存在此倒班')
+            raise serializers.ValidationError('日期:{}  已存在相同倒班'.format(day_time))
         return attrs
 
     @atomic()
