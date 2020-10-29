@@ -1,3 +1,4 @@
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
@@ -6,22 +7,25 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet, ViewSet
 
 from basics.models import GlobalCode, GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
+from plan.models import ProductClassesPlan
+from production.models import PalletFeedbacks
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
-    DealSuggestionFilter
+    DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
-    DealSuggestionSerializer, DealResultDealSerializer
+    DealSuggestionSerializer, DealResultDealSerializer, PalletFeedbacksTestOrderSerializer, \
+    MaterialDealResultListSerializer
 from recipe.models import Material, ProductBatching
 
 
@@ -41,7 +45,7 @@ class TestTypeViewSet(ModelViewSet):
     queryset = TestType.objects.filter(delete_flag=False)
     serializer_class = TestTypeSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('test_indicator', )
+    filter_fields = ('test_indicator',)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -183,7 +187,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     queryset = MaterialTestOrder.objects.filter(delete_flag=False)
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
 
     def get_serializer_class(self):
@@ -259,7 +263,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = MaterialDealResult.objects.filter(delete_flag=False)
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_class =  MaterialDealResulFilter
+    filter_class = MaterialDealResulFilter
 
 
 class MaterialDealStatusListView(APIView):
@@ -282,3 +286,46 @@ class DealTypeView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"message": "ok"}, status=status.HTTP_201_CREATED)
+
+
+class MaterialDealResultUpdateValidTime(APIView):
+    # 快检信息综合管理修改有效时间
+    @atomic()
+    def post(self, request):
+        id = self.request.data.get('id', None)
+        valid_time = self.request.data.get('valid_time', None)
+        if not id or not valid_time:
+            raise ValidationError('id或有效时间必传')
+        MaterialDealResult.objects.filter(id=id).update(valid_time=valid_time)
+        return Response('修改成功')
+
+
+class PalletFeedbacksTestListView(ListAPIView):
+    # 快检信息综合管里
+    queryset = MaterialDealResult.objects.filter(delete_flag=False)
+    serializer_class = MaterialDealResultListSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PalletFeedbacksTestFilter
+
+    def get_queryset(self):
+        equip_no = self.request.query_params.get('equip_no', None)
+        product_no = self.request.query_params.get('product_no', None)
+        day_time = self.request.query_params.get('day_time', None)
+        filter_dict = {'delete_flag': False}
+        if day_time:
+            pcp_uid_list = ProductClassesPlan.objects.filter(
+                work_schedule_plan__plan_schedule__day_time=day_time).values_list('plan_classes_uid')
+            filter_dict['plan_classes_uid__in'] = pcp_uid_list
+        if equip_no and product_no:
+            pfb_lot_list = PalletFeedbacks.objects.filter(equip_no=equip_no,
+                                                          product_no__icontains=product_no).values_list(
+                'lot_no')
+            filter_dict['lot_no__in'] = pfb_lot_list
+        elif equip_no:
+            pfb_lot_list = PalletFeedbacks.objects.filter(equip_no=equip_no).values_list('lot_no')
+            filter_dict['lot_no__in'] = pfb_lot_list
+        elif product_no:
+            pfb_product_list = PalletFeedbacks.objects.filter(product_no__icontains=product_no).values_list('lot_no')
+            filter_dict['lot_no__in'] = pfb_product_list
+        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict)
+        return pfb_queryset
