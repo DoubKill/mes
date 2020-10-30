@@ -228,28 +228,26 @@ class OutWork(APIView):
 
     def get_base_data(self, sender):
         data_json = {
-            "msgId": "1",
-            "KJTYPE": "物料快检",
-            "msgConut": "2",
-            "SENDUSER": self.request.user.username,
-            "items": [
-                {"WORKID": "11223",
-                 "MID": "C-HMB-F150-12",
-                 "PICI": "20200101",
-                 "NUM": "100",
-                 "KJJG": "合格",
-                 "SENDDATE":
-                     "20200513 09:22:22"
-                 },
-                {"WORKID": "11224",
-                 "MID": "C-HMB-F150-11",
-                 "PICI": "20200101",
-                 "NUM": "100",
-                 "KJJG": "不合格",
-                 "SENDDATE": "20200513 09:22:22"}
-            ]
-            }
-        return "1", "物料快检", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+        "msgId": "1",
+        "OUTTYPE": "生产出库",
+        "msgConut": "2",
+        "SENDUSER": "GJ_001",
+        "items": [
+             {"WORKID": "11223",
+              "MID": "C-HMB-F150-12",
+              "PICI": "20200101",
+              "NUM": "1",
+              "STATIONID": "二层后端",
+              "SENDDATE": "20200513 09:22:22"},
+             {"WORKID": "11224",
+              "MID": "C-HMB-F150-11",
+              "PICI": "20200101",
+              "NUM": "1",
+              "STATIONID": "二层前端",
+              "SENDDATE": "20200513 09:22:22"}
+         ]
+    }
+        return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
 
     # 出库
     def post(self, request):
@@ -294,27 +292,25 @@ class OutWorkGum(APIView):
     def get_base_data(self, sender):
         data_json = {
             "msgId": "1",
-            "KJTYPE": "物料快检",
+            "OUTTYPE": "生产出库",
             "msgConut": "2",
-            "SENDUSER": self.request.user.username,
+            "SENDUSER": "GJ_001",
             "items": [
-                {"WORKID": "11223",
-                 "MID": "C-HMB-F150-12",
-                 "PICI": "20200101",
-                 "NUM": "100",
-                 "KJJG": "合格",
-                 "SENDDATE":
-                     "20200513 09:22:22"
-                 },
-                {"WORKID": "11224",
-                 "MID": "C-HMB-F150-11",
-                 "PICI": "20200101",
-                 "NUM": "100",
-                 "KJJG": "不合格",
-                 "SENDDATE": "20200513 09:22:22"}
-            ]
+                 {"WORKID": "11223",
+                  "MID": "C-HMB-F150-12",
+                  "PICI": "20200101",
+                  "NUM": "1",
+                  "STATIONID": "二层后端",
+                  "SENDDATE": "20200513 09:22:22"},
+                 {"WORKID": "11224",
+                  "MID": "C-HMB-F150-11",
+                  "PICI": "20200101",
+                  "NUM": "1",
+                  "STATIONID": "二层前端",
+                  "SENDDATE": "20200513 09:22:22"}
+             ]
             }
-        return "1", "物料快检", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+        return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
 
     # 出库
     def post(self, request):
