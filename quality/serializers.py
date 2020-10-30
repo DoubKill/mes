@@ -343,10 +343,10 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                 table_head_count.append(table_head_dict['test_indicator_name'])
 
             mtr_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
-                test_times=Max('test_times')).values('test_indicator_name', 'value',
-                                                     'result', 'test_times')
+                max_test_times=Max('test_times')).values('test_indicator_name', 'value',
+                                                         'result', 'max_test_times')
             for mtr_dict in mtr_list:
-                mtr_dict['status'] = f"{mtr_dict['test_times']}:{mtr_dict['result']}"
+                mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[i].append(mtr_dict)
         table_head_set = list(set(table_head_count))
         mtr_list_return['table_head'] = table_head_set
