@@ -21,11 +21,11 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
-    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult
+    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
-    DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer
+    DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer
 from recipe.models import Material, ProductBatching
 
 
@@ -335,6 +335,7 @@ class DealTypeView(APIView):
         return Response({"message": "ok"}, status=status.HTTP_201_CREATED)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDealResultUpdateValidTime(APIView):
     # 快检信息综合管理修改有效时间
     @atomic()
@@ -347,6 +348,7 @@ class MaterialDealResultUpdateValidTime(APIView):
         return Response('修改成功')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PalletFeedbacksTestListView(ListAPIView):
     # 快检信息综合管里
     queryset = MaterialDealResult.objects.filter(delete_flag=False)
@@ -382,3 +384,29 @@ class PalletFeedbacksTestListView(ListAPIView):
             filter_dict['lot_no__in'] = list(pfb_product_list)
         pfb_queryset = MaterialDealResult.objects.filter(**filter_dict)
         return pfb_queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class LevelResultViewSet(ModelViewSet):
+    """等级和结果"""
+    queryset = LevelResult.objects.filter(delete_flag=False)
+    serializer_class = LevelResultSerializer
+    filter_backends = (DjangoFilterBackend,)
+    permission_classes = (IsAuthenticated,)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.delete_flag:
+            instance.delete_flag = False
+        else:
+            instance.delete_flag = True
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'deal_result', 'level')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)

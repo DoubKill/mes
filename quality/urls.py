@@ -11,7 +11,7 @@ from quality.views import TestIndicatorListView, TestMethodViewSet, TestIndicato
     MaterialTestOrderViewSet, TestTypeViewSet, DataPointViewSet, MaterialTestMethodViewSet, \
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
-    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods
+    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -30,6 +30,8 @@ router.register('mat-data-point-indicators', MaterialDataPointIndicatorViewSet)
 router.register('deal-suggestion', DealSuggestionViewSet)
 # 不合格处理意见管理
 router.register('material-deal-result', MaterialDealResultViewSet)
+# 等级和结果
+router.register('level-result', LevelResultViewSet)
 
 urlpatterns = [
     path('test-indicators/', TestIndicatorListView.as_view()),  # 试验指标列表
