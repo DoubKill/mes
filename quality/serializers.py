@@ -341,11 +341,21 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             table_head = mto_obj.order_results.all().values('test_indicator_name').annotate()
             for table_head_dict in table_head:
                 table_head_count.append(table_head_dict['test_indicator_name'])
-
+            # 根据test_indicator_name分组找到啊test_times最大的
             mtr_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
-                max_test_times=Max('test_times')).values('test_indicator_name', 'value',
-                                                         'result', 'max_test_times')
-            for mtr_dict in mtr_list:
+                max_test_times=Max('test_times')).values('test_indicator_name',
+                                                         'max_test_times',
+                                                         )
+            mtr_max_list = []
+            for mtr_max_obj in mtr_list:
+                # 根据分组找到数据
+                mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                            test_indicator_name=mtr_max_obj['test_indicator_name'],
+                                                            test_times=mtr_max_obj['max_test_times']).last()
+                mtr_max_list.append(
+                    {'test_indicator_name': mtr_obj.test_indicator_name, 'value': mtr_obj.value,
+                     'result': mtr_obj.result, 'max_test_times': mtr_obj.test_times})
+            for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[i].append(mtr_dict)
         table_head_set = list(set(table_head_count))
