@@ -177,3 +177,13 @@ class MaterialDealResult(AbstractEntity):
     class Meta:
         db_table = 'material_deal_result'
         verbose_name_plural = verbose_name = '胶料处理结果'
+
+
+class LevelResult(AbstractEntity):
+    """等级和结果"""
+    deal_result = models.CharField(max_length=64, help_text="检测结果")
+    level = models.IntegerField(help_text='等级')
+
+    class Meta:
+        db_table = 'level_result'
+        verbose_name_plural = verbose_name = '等级和结果'
