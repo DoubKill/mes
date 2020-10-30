@@ -14,7 +14,7 @@ from plan.uuidfield import UUidTools
 from production.models import TrainsFeedbacks, PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult
+    MaterialDealResult, LevelResult
 
 
 class TestMethodSerializer(BaseModelSerializer):
@@ -384,3 +384,12 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             'id', 'day_time', 'lot_no', 'classes_group', 'equip_no', 'product_no', 'actual_weight', 'residual_weight',
             'production_factory_date', 'valid_time', 'test', 'print_time', 'deal_user', 'deal_time', 'suggestion_desc',
             'mtr_list', 'actual_trains', 'operation_user')
+
+
+class LevelResultSerializer(BaseModelSerializer):
+    """等级和结果"""
+
+    class Meta:
+        model = LevelResult
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
