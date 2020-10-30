@@ -13,6 +13,7 @@ from rest_framework.viewsets import GenericViewSet
 from basics.models import GlobalCode
 from inventory.models import OutOrderFeedBack
 from inventory.serializers import ProductInventorySerializer
+from inventory.utils import BaseUploader
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
 from recipe.models import Material
@@ -187,8 +188,136 @@ class OutWorkFeedBack(APIView):
             try:
                 OutOrderFeedBack.objects.create(**data)
             except:
-                result = {"workId": data.get("task_id"), "msg": "FALSE"+data.get("material_no")+"物料在库内数量不足!", "flag": "99"}
+                result = {"work_id": data.get("task_id"), "msg": "FALSE"+data.get("material_no")+"物料在库内数量不足!", "flag": "99"}
             else:
-                result = {"workId": data.get("task_id"), "msg": "TRUE"+data.get("material_no")+"下发成功!", "flag": "01"}
+                result = {"work_id": data.get("task_id"), "msg": "TRUE"+data.get("material_no")+"下发成功!", "flag": "01"}
 
             return Response(result)
+
+
+class OutWork(APIView):
+    # 帘布库出库
+    class OUTWORKUploader(BaseUploader):
+        endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
+
+        def gen_payload(self, msg_id, r_type, msg_count, str_user, str_json):
+            xml_data = """
+            <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                <soap:Body><TRANS_MES_TO_WMS_OUTWORK xmlns="http://www.riamb.ac.cn/asrs/WebService/TA_SAP/">
+                    <MsgId>{}</MsgId>
+                    <OutType>{}</OutType>
+                    <MsgConut>{}</MsgConut>
+                    <strUser>{}</strUser>
+                    <strJson>{}</strJson>
+                </TRANS_MES_TO_WMS_OUTWORK>
+                </soap:Body>
+            </soap:Envelope>""".format(msg_id, r_type, msg_count, str_user, str_json)
+            return xml_data
+
+        def gen_result(self, data):
+            data = data.get('soap:Envelope').get('soap:Body').get('TRANS_MES_TO_WMS_OUTWORKResponse').get(
+                'TRANS_MES_TO_WMS_OUTWORKResult')
+            # items = json.loads(data).get('items')
+            items = json.loads(data)
+            print(items)
+            # ret = []
+            # for item in items:
+            #     if item['flag'] != '01':  # 01代表成功
+            #         ret.append(item['msg'])
+            return items
+
+    def get_base_data(self, sender):
+        data_json = {
+            "msgId": "1",
+            "KJTYPE": "物料快检",
+            "msgConut": "2",
+            "SENDUSER": self.request.user.username,
+            "items": [
+                {"WORKID": "11223",
+                 "MID": "C-HMB-F150-12",
+                 "PICI": "20200101",
+                 "NUM": "100",
+                 "KJJG": "合格",
+                 "SENDDATE":
+                     "20200513 09:22:22"
+                 },
+                {"WORKID": "11224",
+                 "MID": "C-HMB-F150-11",
+                 "PICI": "20200101",
+                 "NUM": "100",
+                 "KJJG": "不合格",
+                 "SENDDATE": "20200513 09:22:22"}
+            ]
+            }
+        return "1", "物料快检", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+
+    # 出库
+    def post(self, request):
+        sender = self.OUTWORKUploader()
+        ret = sender.request(*self.get_base_data(sender))
+        return Response(ret)
+
+
+class OutWorkGum(APIView):
+    # 混炼胶库出库
+    class KJJGUploader(BaseUploader):
+        endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"
+
+        def gen_payload(self, msg_id, r_type, msg_count, str_user, str_json):
+            xml_data = """<?xml version="1.0" encoding="utf-8"?>
+                    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+                      <soap:Body>
+                        <TRANS_MES_TO_WMS_KJJG xmlns="http://www.riamb.ac.cn/asrs/WebService/TA_SAP/">
+                          <MsgId>{}</MsgId>
+                          <KJTYPE>{}</KJTYPE>
+                          <MsgConut>{}</MsgConut>
+                          <strUser>{}</strUser>
+                          <strJson>{}</strJson>
+                        </TRANS_MES_TO_WMS_KJJG>
+                      </soap:Body>
+                    </soap:Envelope>""".format(msg_id, r_type, msg_count, str_user, str_json)
+            return xml_data
+
+        def gen_result(self, data):
+            data = data.get('soap:Envelope'
+                            ).get('soap:Body'
+                                  ).get('TRANS_MES_TO_WMS_KJJGResponse'
+                                        ).get('TRANS_MES_TO_WMS_KJJGResult')
+            items = json.loads(data).get('items')
+            print(items)
+            ret = []
+            for item in items:
+                if item['flag'] != '01':  # 01代表成功
+                    ret.append(item['msg'])
+            return ret
+
+    def get_base_data(self, sender):
+        data_json = {
+            "msgId": "1",
+            "KJTYPE": "物料快检",
+            "msgConut": "2",
+            "SENDUSER": self.request.user.username,
+            "items": [
+                {"WORKID": "11223",
+                 "MID": "C-HMB-F150-12",
+                 "PICI": "20200101",
+                 "NUM": "100",
+                 "KJJG": "合格",
+                 "SENDDATE":
+                     "20200513 09:22:22"
+                 },
+                {"WORKID": "11224",
+                 "MID": "C-HMB-F150-11",
+                 "PICI": "20200101",
+                 "NUM": "100",
+                 "KJJG": "不合格",
+                 "SENDDATE": "20200513 09:22:22"}
+            ]
+            }
+        return "1", "物料快检", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+
+    # 出库
+    def post(self, request):
+        sender = self.KJJGUploader()
+        ret = sender.request(*self.get_base_data(sender))
+        return Response(ret)
