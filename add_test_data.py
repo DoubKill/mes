@@ -5,6 +5,8 @@ import os
 import string
 import traceback
 
+from quality.models import DealSuggestion
+
 """
 只添加基础和系统模块数据
 """
@@ -117,7 +119,7 @@ def add_global_codes():
         elif i == 12:
             items = ['天然胶', '合成胶', '再生胶', 'CMB', 'FM', 'HMB', 'NF', 'RE', 'RFM', 'RMB', '1MB', '2MB', '3MB']
         elif i ==13:
-            items = ["通过", "驳回", "再检测"]
+            items = ["放行处理", "不合格处理"]
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
             j += 1
@@ -1390,6 +1392,15 @@ def add_system_config():
     ChildSystemInfo.objects.create(link_address="10.4.10.55", system_type="gz", system_name="上辅机群控", status="联网")
     ChildSystemInfo.objects.create(link_address="10.4.10.56", system_type="gz", system_name="上辅机工作站1", status="联网")
     ChildSystemInfo.objects.create(link_address="10.4.10.100", system_type="gz", system_name="收皮终端", status="联网")
+
+
+def add_suggestions():
+    ok_id = GlobalCode.objects.filter(global_name="放行处理").first().id
+    no_id = GlobalCode.objects.filter(global_name="不合格处理").first().id
+    DealSuggestion.objects.create(suggestion_desc="放行意见1", deal_type_id=ok_id)
+    DealSuggestion.objects.create(suggestion_desc="放行意见2", deal_type_id=ok_id)
+    DealSuggestion.objects.create(suggestion_desnoc="不合格意见1", deal_type_id=no_id)
+    DealSuggestion.objects.create(suggestion_desnoc="不合格意见2", deal_type_id=no_id)
 
 
 # 删除中间表权限
