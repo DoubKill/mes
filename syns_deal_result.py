@@ -36,11 +36,11 @@ def synthesize_to_material_deal_result():
         max_mtr = level_list[0]
         # 找到检测次数最多的几条 每一条的等级进行比较选出做大的
         reason = ''
-        exist_data_point_indicator=True
+        exist_data_point_indicator = True
         for mtr_obj in level_list:
             if not mtr_obj.data_point_indicator:
                 reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}数据错误！，\n'
-                exist_data_point_indicator=False
+                exist_data_point_indicator = False
             else:
                 if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
                     max_mtr = mtr_obj
