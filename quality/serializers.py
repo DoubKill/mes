@@ -345,7 +345,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                             test_times=mtr_max_obj['max_test_times']).last()
                 mtr_max_list.append(
                     {'data_point_name': mtr_obj.data_point_name, 'value': mtr_obj.value,
-                     'result': mtr_obj.result, 'max_test_times': mtr_obj.test_times})
+                     'result': mtr_obj.data_point_indicator.result,
+                     'max_test_times': mtr_obj.data_point_indicator.level})
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[mto_obj.actual_trains].append(mtr_dict)
