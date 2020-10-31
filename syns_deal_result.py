@@ -82,4 +82,4 @@ def run():
 
 
 if __name__ == '__main__':
-    synthesize_to_material_deal_result()
+    run()
