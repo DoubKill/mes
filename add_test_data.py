@@ -5,8 +5,6 @@ import os
 import string
 import traceback
 
-from quality.models import DealSuggestion
-
 """
 只添加基础和系统模块数据
 """
@@ -23,6 +21,7 @@ from recipe.models import Material, ProductInfo
 from system.models import GroupExtension, User, Section, SystemConfig, ChildSystemInfo
 from production.models import MaterialTankStatus
 from django.contrib.auth.models import Permission
+from quality.models import DealSuggestion
 
 last_names = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '尤', '许',
               '何', '吕', '施', '张', '孔', '曹', '严', '华', '金', '魏', '陶', '姜', '戚', '谢', '邹', '喻', '柏', '水', '窦', '章',
@@ -118,7 +117,7 @@ def add_global_codes():
             items = ['C', 'L', 'K']
         elif i == 12:
             items = ['天然胶', '合成胶', '再生胶', 'CMB', 'FM', 'HMB', 'NF', 'RE', 'RFM', 'RMB', '1MB', '2MB', '3MB']
-        elif i ==13:
+        elif i == 13:
             items = ["放行处理", "不合格处理"]
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
