@@ -36,21 +36,30 @@ def synthesize_to_material_deal_result():
         max_mtr = level_list[0]
         # 找到检测次数最多的几条 每一条的等级进行比较选出做大的
         reason = ''
+        exist_data_point_indicator=True
         for mtr_obj in level_list:
-            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
-                max_mtr = mtr_obj
-            # 判断value值与指标上下限
-            if mtr_obj.value < mtr_obj.data_point_indicator.lower_limit:
-                reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}低于下限{mtr_obj.data_point_indicator.lower_limit}，\n'
-            if mtr_obj.value > mtr_obj.data_point_indicator.upper_limit:
-                reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}高于上限{mtr_obj.data_point_indicator.upper_limit}，\n'
-            if mtr_obj.data_point_indicator.lower_limit <= mtr_obj.value <= mtr_obj.data_point_indicator.upper_limit:
-                reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}在{mtr_obj.data_point_indicator.lower_limit}至{mtr_obj.data_point_indicator.upper_limit}区间内，\n'
+            if not mtr_obj.data_point_indicator:
+                reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}数据错误！，\n'
+                exist_data_point_indicator=False
+            else:
+                if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+                    max_mtr = mtr_obj
+                # 判断value值与指标上下限
+                if mtr_obj.value < mtr_obj.data_point_indicator.lower_limit:
+                    reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}低于下限{mtr_obj.data_point_indicator.lower_limit}，\n'
+                if mtr_obj.value > mtr_obj.data_point_indicator.upper_limit:
+                    reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}高于上限{mtr_obj.data_point_indicator.upper_limit}，\n'
+                if mtr_obj.data_point_indicator.lower_limit <= mtr_obj.value <= mtr_obj.data_point_indicator.upper_limit:
+                    reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}在{mtr_obj.data_point_indicator.lower_limit}至{mtr_obj.data_point_indicator.upper_limit}区间内，\n'
 
         # 在生产模块里找开始生产时间
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).last()
-        mdr_dict['level'] = max_mtr.data_point_indicator.level
-        mdr_dict['deal_result'] = max_mtr.data_point_indicator.result
+        if exist_data_point_indicator:
+            mdr_dict['level'] = max_mtr.data_point_indicator.level
+            mdr_dict['deal_result'] = max_mtr.data_point_indicator.result
+        else:
+            # mdr_dict['level'] = None
+            mdr_dict['deal_result'] = '不合格！'
         mdr_dict['reason'] = reason
         mdr_dict['status'] = '待处理'
         mdr_dict['production_factory_date'] = pfb_obj.begin_time
@@ -73,4 +82,4 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    synthesize_to_material_deal_result()
