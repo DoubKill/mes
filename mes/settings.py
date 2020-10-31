@@ -224,24 +224,27 @@ LOGGING = {
     },
 }
 
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
-        'NAME': os.getenv('MES_DATABASE_NAME', ''),  # 数据库名称
-        'USER': os.getenv('MES_DATABASE_USERNAME', ''),  # 用户名
-        'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', ''),  # 密码
-        'HOST': os.getenv('MES_DATABASE_HOSTNAME', ''),  # HOST
-        'PORT': os.getenv('MES_MONOCLE_API_PORT', ''),  # 端口
-    }
-}
-
-
 # DATABASES = {
 #     'default': {
+#         'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
+#         'NAME': os.getenv('MES_DATABASE_NAME', ''),  # 数据库名称
+#         'USER': os.getenv('MES_DATABASE_USERNAME', ''),  # 用户名
+#         'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', ''),  # 密码
+#         'HOST': os.getenv('MES_DATABASE_HOSTNAME', ''),  # HOST
+#         'PORT': os.getenv('MES_MONOCLE_API_PORT', ''),  # 端口
+#     },
+#     'backup': {
 #         'ENGINE': 'django.db.backends.sqlite3',
 #         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
 #     }
 # }
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
+
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
 
