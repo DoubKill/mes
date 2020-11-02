@@ -1,9 +1,7 @@
 import django_filters
 
-from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
-    MaterialTestMethod, \
-    TestMethod, DataPoint, DealSuggestion, MaterialTestResult, MaterialDealResult
+    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -24,8 +22,7 @@ class DataPointFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
-    day_time = django_filters.DateTimeFilter(field_name="production_factory_date__date", help_text='生产时间',
-                                             lookup_expr="lte")
+    day_time = django_filters.DateTimeFilter(field_name="production_factory_date__date", help_text='生产时间')
     equip_no = django_filters.CharFilter(field_name='production_equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='产出胶料编号')
     classes = django_filters.CharFilter(field_name="production_class", help_text='班次')

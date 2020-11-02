@@ -1,6 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from production.summary_views import ClassesBanBurySummaryView
 from production.views import *
 
 router = DefaultRouter()
@@ -41,5 +42,6 @@ urlpatterns = [
     path('pallet-feedbacks-batch/', PalletFeedbacksBatch.as_view()),
     path('equip-status-batch/', EquipStatusBatch.as_view()),
     path('plan-status-batch/', PlanStatusBatch.as_view()),
+    path('classes-banbury-summary/', ClassesBanBurySummaryView.as_view()),
     path('expend-material-batch/', ExpendMaterialBatch.as_view())
 ]
