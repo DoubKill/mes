@@ -20,12 +20,13 @@ from mes.conf import EQUIP_LIST
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, ProductDayPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
-    PlanStatusFilter, ExpendMaterialFilter
+    PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
-    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer
+    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer
+from rest_framework.generics import ListAPIView
 
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
@@ -53,7 +54,7 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
             try:
                 queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__gte=train_list[0],
                                                                            actual_trains__lte=train_list[-1],
-                                                                            ))
+                                                                           ))
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
@@ -86,7 +87,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_class = PalletFeedbacksFilter
 
     def list(self, request, *args, **kwargs):
-        day_time = request.query_params.get("day_time",)
+        day_time = request.query_params.get("day_time", )
         if day_time:
             queryset = self.filter_queryset(self.get_queryset().filter(end_time__date=day_time))
         else:
@@ -395,22 +396,24 @@ class ProductActualViewSet(mixins.ListModelMixin,
         if target_equip_no:
             pcp_set = ProductClassesPlan.objects.filter(product_day_plan__plan_schedule__day_time=search_time_str,
                                                         product_day_plan__equip__equip_no=target_equip_no,
-                                                    delete_flag=False).select_related('equip__equip_no',
-                                                    'product_batching__stage_product_batch_no',
-                                                    'work_schedule_plan__classes__global_name',
-                                                    'product_day_plan_id')
+                                                        delete_flag=False).select_related('equip__equip_no',
+                                                                                          'product_batching__stage_product_batch_no',
+                                                                                          'work_schedule_plan__classes__global_name',
+                                                                                          'product_day_plan_id')
         else:
             pcp_set = ProductClassesPlan.objects.filter(product_day_plan__plan_schedule__day_time=search_time_str,
-                                                    delete_flag=False).select_related('equip__equip_no',
-                                                    'product_batching__stage_product_batch_no',
-                                                    'work_schedule_plan__classes__global_name',
-                                                    'product_day_plan_id')
+                                                        delete_flag=False).select_related('equip__equip_no',
+                                                                                          'product_batching__stage_product_batch_no',
+                                                                                          'work_schedule_plan__classes__global_name',
+                                                                                          'product_day_plan_id')
         uid_list = pcp_set.values_list("plan_classes_uid", flat=True)
         day_plan_list = pcp_set.values_list("product_day_plan__id", flat=True)
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Max('actual_weight'), classes=Max('classes'))
-        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x in tf_set}
-        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight":0 ,"classes_data": [None, None, None]}
+        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x
+                   in tf_set}
+        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0,
+                             "classes_data": [None, None, None]}
                          for x in day_plan_list}
         pcp_data = pcp_set.values("plan_classes_uid", "weight", "plan_trains", 'equip__equip_no',
                                   'product_batching__stage_product_batch_no',
@@ -465,7 +468,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                     "actual_trains": tf_dict[plan_classes_uid][0],
                     "classes": "晚班"
                 }
-        ret = {"data":[_ for _ in day_plan_dict.values()]}
+        ret = {"data": [_ for _ in day_plan_dict.values()]}
         return Response(ret)
 
     def list_bak(self, request, *args, **kwargs):
@@ -551,7 +554,6 @@ class ProductActualViewSet(mixins.ListModelMixin,
         return Response(return_data)
 
 
-
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
     queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
@@ -630,6 +632,7 @@ class ProductInventory(GenericViewSet,
 
 class TrainsFeedbacksBatch(APIView):
     """批量同步车次生产数据接口"""
+
     @atomic
     def post(self, request):
         serializer = TrainsFeedbacksBatchSerializer(data=request.data, many=True, context={'request': request})
@@ -637,8 +640,10 @@ class TrainsFeedbacksBatch(APIView):
         serializer.save()
         return Response("sync success", status=201)
 
+
 class PalletFeedbacksBatch(APIView):
     """批量同步托次生产数据接口"""
+
     @atomic
     def post(self, request):
         serializer = PalletFeedbacksSerializer(data=request.data, many=True, context={'request': request})
@@ -649,6 +654,7 @@ class PalletFeedbacksBatch(APIView):
 
 class EquipStatusBatch(APIView):
     """批量同步设备生产数据接口"""
+
     @atomic
     def post(self, request):
         serializer = EquipStatusSerializer(data=request.data, many=True, context={'request': request})
@@ -670,9 +676,110 @@ class PlanStatusBatch(APIView):
 
 class ExpendMaterialBatch(APIView):
     """批量同步原材料消耗数据接口"""
+
     @atomic
     def post(self, request):
         serializer = ExpendMaterialSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
+
+
+class CollectTrainsFeedbacksList(ListAPIView):
+    """胶料单车次时间汇总"""
+    queryset = TrainsFeedbacks.objects.filter(delete_flag=False)
+    serializer_class = CollectTrainsFeedbacksSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = CollectTrainsFeedbacksFilter
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
+                                          weeks=0)
+            max_time = serializer.data[0]['time_consuming']
+            min_time = serializer.data[0]['time_consuming']
+            for train_dict in serializer.data:
+                if train_dict['time_consuming'] > max_time:
+                    max_time = train_dict['time_consuming']
+                if train_dict['time_consuming'] < min_time:
+                    min_time = train_dict['time_consuming']
+                sum_time += train_dict['time_consuming']
+            avg_time = sum_time / len(serializer.data)
+            train_list = serializer.data
+            train_list.append({'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+            return self.get_paginated_response(train_list)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class CutTimeCollect(APIView):
+    """规格切换时间汇总"""
+
+    def get(self, request, *args, **kwargs):
+        # 筛选工厂
+        params = request.query_params
+        st = params.get("st", None)  # 开始时间
+        et = params.get("et", None)  # 结束时间
+        dimension = params.get("dimension", None)  # 时间跨度 1：班次  2：日 3：月
+        day_type = params.get("day_type", None)  # 日期类型 1：自然日  2：工厂日
+        equip_no = params.get("equip_no", None)  # 设备编号
+        product_no = params.get("product_no", None)  # 胶料编码
+        try:
+            page = int(params.get("page", 1))
+            page_size = int(params.get("page_size", 10))
+        except Exception as e:
+            return Response("page和page_size必须是int", status=400)
+        dict_filter = {}
+        if equip_no:  # 设备
+            dict_filter = {'equip_no': equip_no}
+        if st:
+            dict_filter['begin_time__date__gte'] = st
+        if et:
+            dict_filter['end_time__date__lte'] = et
+        # 统计过程
+        return_list = []
+        tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values('equip_no',
+                                                                                                     'plan_classes_uid').annotate().distinct()
+        if not tfb_equip_uid_list:
+            return Response({'results': return_list})
+        for tfb_equip_uid_dict in tfb_equip_uid_list:
+            tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict, **dict_filter).values(
+                'product_no').annotate().distinct()
+            if len(tfb_pn) <= 1:
+                continue
+            for i in range(len(tfb_pn) - 1):
+                tfb_last = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict, **tfb_pn[i]).last()
+                tfb_first = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict,
+                                                           **tfb_pn[i + 1]).first()
+                time_consuming = tfb_first.begin_time - tfb_last.end_time
+                return_dict = {'time': tfb_last.end_time,
+                               'plan_classes_uid': tfb_equip_uid_dict['plan_classes_uid'],
+                               'equip_no': tfb_equip_uid_dict['equip_no'],
+                               'cut_ago_product_no': tfb_last.product_no,
+                               'cut_later_product_no': tfb_first.product_no,
+                               'time_consuming': time_consuming}
+                return_list.append(return_dict)
+
+        # 分页
+        counts = len(return_list)
+        return_list = return_list[(page - 1) * page_size:page_size * page]
+
+        # 统计最大、最小、综合、平均时间
+        sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
+                                      weeks=0)
+        max_time = return_list[0]['time_consuming']
+        min_time = return_list[0]['time_consuming']
+        for train_dict in return_list:
+            if train_dict['time_consuming'] > max_time:
+                max_time = train_dict['time_consuming']
+            if train_dict['time_consuming'] < min_time:
+                min_time = train_dict['time_consuming']
+            sum_time += train_dict['time_consuming']
+        avg_time = sum_time / len(return_list)
+        return_list.append(
+            {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+        return Response({'count': counts, 'results': return_list})

@@ -43,5 +43,7 @@ urlpatterns = [
     path('equip-status-batch/', EquipStatusBatch.as_view()),
     path('plan-status-batch/', PlanStatusBatch.as_view()),
     path('classes-banbury-summary/', ClassesBanBurySummaryView.as_view()),
-    path('expend-material-batch/', ExpendMaterialBatch.as_view())
+    path('expend-material-batch/', ExpendMaterialBatch.as_view()),
+    path('collect-trains-feed/', CollectTrainsFeedbacksList.as_view()),  # 胶料单车次时间汇总
+    path('cut-time-collect/', CutTimeCollect.as_view())  # 规格切换时间汇总
 ]
