@@ -14,8 +14,31 @@ from production.models import PalletFeedbacks
 from django.db.transaction import atomic
 from django.db.models import Max
 import logging
+import socket
+import functools
 
 logger = logging.getLogger('send_log')
+
+
+def one_instance(func):
+    '''
+    如果已经有实例在跑则退出
+    '''
+
+    @functools.wraps(func)
+    def f(*args, **kwargs):
+        try:
+            # 全局属性，否则变量会在方法退出后被销毁
+            global s
+            s = socket.socket()
+            host = socket.gethostname()
+            s.bind((host, 60124))
+        except:
+            logger.info('already has an instance, this script will not be excuted')
+            return
+        return func(*args, **kwargs)
+
+    return f
 
 
 @atomic()
@@ -61,7 +84,7 @@ def synthesize_to_material_deal_result():
             mdr_dict['deal_result'] = max_mtr.data_point_indicator.result
             mdr_dict['production_factory_date'] = pfb_obj.begin_time
         else:  # 数据不在上下限范围内，这个得前端做好约束
-            mdr_dict['deal_result'] = '不合格！'
+            mdr_dict['deal_result'] = '不合格'
             mdr_dict['level'] = 0
             mdr_dict['production_factory_date'] = '1212-12-12'
 
@@ -75,6 +98,7 @@ def synthesize_to_material_deal_result():
             MaterialDealResult.objects.create(**mdr_dict)
 
 
+@one_instance
 def run():
     logger.info("统计和分析快检模块的数据，并将其存入MaterialDealResult（胶料处理结果）表中")
     while True:
