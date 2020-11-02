@@ -299,6 +299,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return None
         max_mtr = mtr_list[0]
         for mtr_obj in mtr_list:
+            if not mtr_obj.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
+                continue
             if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
                 max_mtr = mtr_obj
         if max_mtr.test_times == 1:
@@ -322,36 +324,51 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     def get_mtr_list(self, obj):
         mtr_list_return = {}
         # 找到每个车次检测次数最多的那一条
-        table_head_count = []
+        table_head_count = {}
         mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
         for mto_obj in mto_set:
             if not mto_obj:
                 continue
             mtr_list_return[mto_obj.actual_trains] = []
             # 先弄出表头
-            table_head = mto_obj.order_results.all().values('data_point_name').annotate()
+            table_head = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate()
             for table_head_dict in table_head:
-                table_head_count.append(table_head_dict['data_point_name'])
+                if table_head_dict['test_indicator_name'] not in table_head_count.keys():
+                    table_head_count[table_head_dict['test_indicator_name']] = []
+                table_head_count[table_head_dict['test_indicator_name']].append(table_head_dict['data_point_name'])
+                table_head_count[table_head_dict['test_indicator_name']] = list(
+                    set(table_head_count[table_head_dict['test_indicator_name']]))
             # 根据test_indicator_name分组找到啊test_times最大的
-            mtr_list = mto_obj.order_results.all().values('data_point_name').annotate(
-                max_test_times=Max('test_times')).values('data_point_name',
+            mtr_list = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate(
+                max_test_times=Max('test_times')).values('test_indicator_name', 'data_point_name',
                                                          'max_test_times',
                                                          )
             mtr_max_list = []
             for mtr_max_obj in mtr_list:
                 # 根据分组找到数据
                 mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                            test_indicator_name=mtr_max_obj['test_indicator_name'],
                                                             data_point_name=mtr_max_obj['data_point_name'],
                                                             test_times=mtr_max_obj['max_test_times']).last()
-                mtr_max_list.append(
-                    {'data_point_name': mtr_obj.data_point_name, 'value': mtr_obj.value,
-                     'result': mtr_obj.data_point_indicator.result,
-                     'max_test_times': mtr_obj.data_point_indicator.level})
+                if mtr_obj.data_point_indicator:
+                    mtr_max_list.append(
+                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                         'value': mtr_obj.value,
+                         'result': mtr_obj.data_point_indicator.result,
+                         'max_test_times': mtr_obj.data_point_indicator.level})
+                else:  # 数据不在上下限范围内，这个得前端做好约束
+                    mtr_max_list.append(
+                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                         'value': mtr_obj.value,
+                         'result': None,
+                         'max_test_times': None})
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[mto_obj.actual_trains].append(mtr_dict)
-        table_head_set = list(set(table_head_count))
-        mtr_list_return['table_head'] = table_head_set
+        table_head_top = {}
+        for i in sorted(table_head_count.items(), key=lambda x: len(x[1]), reverse=False):
+            table_head_top[i[0]] = i[-1]
+        mtr_list_return['table_head'] = table_head_top
         return mtr_list_return
 
     def get_actual_trains(self, obj):
