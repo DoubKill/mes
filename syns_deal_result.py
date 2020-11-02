@@ -45,6 +45,8 @@ def synthesize_to_material_deal_result():
                 if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
                     max_mtr = mtr_obj
                 # 判断value值与指标上下限
+                if mtr_obj.data_point_indicator.result == "合格":
+                    continue
                 if mtr_obj.value < mtr_obj.data_point_indicator.lower_limit:
                     reason = reason + f'第{mtr_obj.material_test_order.actual_trains}车次{mtr_obj.data_point_name}指标{mtr_obj.value}低于下限{mtr_obj.data_point_indicator.lower_limit}，\n'
                 if mtr_obj.value > mtr_obj.data_point_indicator.upper_limit:
@@ -57,12 +59,15 @@ def synthesize_to_material_deal_result():
         if exist_data_point_indicator:
             mdr_dict['level'] = max_mtr.data_point_indicator.level
             mdr_dict['deal_result'] = max_mtr.data_point_indicator.result
-        else:
-            # mdr_dict['level'] = None
+            mdr_dict['production_factory_date'] = pfb_obj.begin_time
+        else:  # 数据不在上下限范围内，这个得前端做好约束
             mdr_dict['deal_result'] = '不合格！'
+            mdr_dict['level'] = 0
+            mdr_dict['production_factory_date'] = '1212-12-12'
+
         mdr_dict['reason'] = reason
         mdr_dict['status'] = '待处理'
-        mdr_dict['production_factory_date'] = pfb_obj.begin_time
+
         iir_mdr_obj = MaterialDealResult.objects.filter(lot_no=mdr_lot_no).first()
         if iir_mdr_obj:
             MaterialDealResult.objects.filter(lot_no=mdr_lot_no).update(**mdr_dict)
