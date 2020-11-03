@@ -698,19 +698,24 @@ class CollectTrainsFeedbacksList(ListAPIView):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
-                                          weeks=0)
-            max_time = serializer.data[0]['time_consuming']
-            min_time = serializer.data[0]['time_consuming']
-            for train_dict in serializer.data:
-                if train_dict['time_consuming'] > max_time:
-                    max_time = train_dict['time_consuming']
-                if train_dict['time_consuming'] < min_time:
-                    min_time = train_dict['time_consuming']
-                sum_time += train_dict['time_consuming']
-            avg_time = sum_time / len(serializer.data)
-            train_list = serializer.data
-            train_list.append({'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+            if serializer.data:
+                sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
+                                              weeks=0)
+                max_time = serializer.data[0]['time_consuming']
+                min_time = serializer.data[0]['time_consuming']
+                for train_dict in serializer.data:
+                    if train_dict['time_consuming'] > max_time:
+                        max_time = train_dict['time_consuming']
+                    if train_dict['time_consuming'] < min_time:
+                        min_time = train_dict['time_consuming']
+                    sum_time += train_dict['time_consuming']
+                avg_time = sum_time / len(serializer.data)
+                train_list = serializer.data
+                train_list.append({'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+            else:
+                train_list = serializer.data
+                train_list.append(
+                    {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
             return self.get_paginated_response(train_list)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
@@ -747,22 +752,17 @@ class CutTimeCollect(APIView):
         if not tfb_equip_uid_list:
             return Response({'results': return_list})
         for tfb_equip_uid_dict in tfb_equip_uid_list:
-            tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict, **dict_filter).values(
-                'product_no').annotate().distinct()
-            if len(tfb_pn) <= 1:
-                continue
+            tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict, **dict_filter).values()
             for i in range(len(tfb_pn) - 1):
-                tfb_last = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict, **tfb_pn[i]).last()
-                tfb_first = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict,
-                                                           **tfb_pn[i + 1]).first()
-                time_consuming = tfb_first.begin_time - tfb_last.end_time
-                return_dict = {'time': tfb_last.end_time,
-                               'plan_classes_uid': tfb_equip_uid_dict['plan_classes_uid'],
-                               'equip_no': tfb_equip_uid_dict['equip_no'],
-                               'cut_ago_product_no': tfb_last.product_no,
-                               'cut_later_product_no': tfb_first.product_no,
-                               'time_consuming': time_consuming}
-                return_list.append(return_dict)
+                if tfb_pn[i]['product_no'] != tfb_pn[i + 1]['product_no']:
+                    time_consuming = tfb_pn[i + 1]['begin_time'] - tfb_pn[i]['end_time']
+                    return_dict = {'time': tfb_pn[i + 1]['end_time'],
+                                   'plan_classes_uid': tfb_equip_uid_dict['plan_classes_uid'],
+                                   'equip_no': tfb_equip_uid_dict['equip_no'],
+                                   'cut_ago_product_no': tfb_pn[i]['product_no'],
+                                   'cut_later_product_no': tfb_pn[i + 1]['product_no'],
+                                   'time_consuming': time_consuming}
+                    return_list.append(return_dict)
 
         # 分页
         counts = len(return_list)
