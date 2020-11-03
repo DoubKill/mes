@@ -1,3 +1,5 @@
+import copy
+
 from django.db.models import Sum, F, Min, Max, Avg
 from django.db.models.functions import TruncMonth
 from django_filters.rest_framework import DjangoFilterBackend
@@ -13,9 +15,9 @@ import datetime
 from rest_framework.response import Response
 
 DIMENSION_TYPE = {
-    '1': 'classes',
-    '2': 'end_time__date',
-    '3': 'month'
+    '1': ['classes', 'end_time__date'],
+    '2': ['end_time__date'],
+    '3': ['month']
 }
 
 
@@ -24,6 +26,7 @@ class ClassesBanBurySummaryView(ListAPIView):
     queryset = TrainsFeedbacks.objects.all()
 
     def list(self, request, *args, **kwargs):
+        dimension_type = copy.deepcopy(DIMENSION_TYPE)
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         dimension = self.request.query_params.get('dimension', '2')  # 维度 1：班次  2：日 3：月
@@ -40,17 +43,24 @@ class ClassesBanBurySummaryView(ListAPIView):
             kwargs['equip_no__icontains'] = equip_no
         if product_no:
             kwargs['product_no__icontains'] = product_no
-        if day_type:
-            if day_type == '2':  # 按照工厂日期
-                DIMENSION_TYPE['2'] = 'factory_data'
 
         # 默认需要分组的字段
         group_by_fields = ['plan_classes_uid', 'equip_no', 'product_no']
+        if day_type == '2':  # 按照工厂日期
+            dimension_type['2'] = ['factory_date']
+            dimension_type['1'][-1] = 'factory_date'
+            kwargs.pop('begin_time__date__gte', None)
+            kwargs.pop('end_time__date__lte', None)
+            if st:
+                kwargs['factory_date__gte'] = st
+            if et:
+                kwargs['factory_date__lte'] = et
+
         try:
-            query_group_by_field = DIMENSION_TYPE[dimension]  # 从前端获取的分组字段
+            query_group_by_field = dimension_type[dimension]  # 从前端获取的分组字段
         except Exception:
             raise ValidationError('参数错误')
-        group_by_fields.append(query_group_by_field)
+        group_by_fields.extend(query_group_by_field)
 
         if dimension == '3':
             # 按月的维度分组，查询写法不一样
@@ -72,7 +82,7 @@ class ClassesBanBurySummaryView(ListAPIView):
             )
         ret = {}
         for item in data:
-            item_key = str(item[query_group_by_field]) + item['equip_no'] + item['product_no']
+            item_key = ''.join([str(item[i]) for i in query_group_by_field]) + item['equip_no'] + item['product_no']
             if item_key not in ret:
                 ret[item_key] = item
             else:
@@ -88,12 +98,12 @@ class EquipBanBurySummaryView(ListAPIView):
     queryset = TrainsFeedbacks.objects.all()
 
     def list(self, request, *args, **kwargs):
+        dimension_type = copy.deepcopy(DIMENSION_TYPE)
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         dimension = self.request.query_params.get('dimension', '2')  # 维度 1：班次  2：日 3：月
         day_type = self.request.query_params.get('day_type', '2')  # 日期类型 1：自然日  2：工厂日
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
-        product_no = self.request.query_params.get('product_no')  # 胶料编码
 
         kwargs = {}
         if st:
@@ -102,20 +112,24 @@ class EquipBanBurySummaryView(ListAPIView):
             kwargs['end_time__date__lte'] = et
         if equip_no:
             kwargs['equip_no__icontains'] = equip_no
-        if product_no:
-            kwargs['product_no__icontains'] = product_no
-        if day_type:
-            if day_type:
-                if day_type == '2':  # 按照工厂日期
-                    DIMENSION_TYPE['2'] = 'factory_data'
 
         # 默认需要分组的字段
         group_by_fields = ['plan_classes_uid', 'equip_no']
+        if day_type == '2':  # 按照工厂日期
+            dimension_type['2'] = ['factory_date']
+            dimension_type['1'][-1] = 'factory_date'
+            kwargs.pop('begin_time__date__gte', None)
+            kwargs.pop('end_time__date__lte', None)
+            if st:
+                kwargs['factory_date__gte'] = st
+            if et:
+                kwargs['factory_date__lte'] = et
+
         try:
-            query_group_by_field = DIMENSION_TYPE[dimension]  # 从前端获取的分组字段
+            query_group_by_field = dimension_type[dimension]  # 从前端获取的分组字段
         except Exception:
             raise ValidationError('参数错误')
-        group_by_fields.append(query_group_by_field)
+        group_by_fields.extend(query_group_by_field)
 
         if dimension == '3':
             # 按月的维度分组，查询写法不一样
@@ -131,7 +145,7 @@ class EquipBanBurySummaryView(ListAPIView):
             )
         ret = {}
         for item in data:
-            item_key = str(item[query_group_by_field]) + item['equip_no']
+            item_key = ''.join([str(item[i]) for i in query_group_by_field]) + item['equip_no']
             if item_key not in ret:
                 ret[item_key] = item
             else:
@@ -199,7 +213,10 @@ class CutTimeCollect(APIView):
         dict_filter = {}
         if equip_no:  # 设备
             dict_filter['equip_no'] = equip_no
-
+        if st:
+            dict_filter['end_time__date__gte'] = st
+        if et:
+            dict_filter['end_time__date__lte'] = et
         # 统计过程
         return_list = []
         tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values('equip_no',
@@ -211,9 +228,9 @@ class CutTimeCollect(APIView):
         for tfb_equip_uid_dict in tfb_equip_uid_list:
             # 这里也要加筛选
             if st:
-                tfb_equip_uid_dict['end_time__data__gte'] = st
+                tfb_equip_uid_dict['end_time__date__gte'] = st
             if et:
-                tfb_equip_uid_dict['end_time__data__lte'] = et
+                tfb_equip_uid_dict['end_time__date__lte'] = et
 
             tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).values()
             for i in range(len(tfb_pn) - 1):
