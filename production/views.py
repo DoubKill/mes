@@ -711,7 +711,8 @@ class CollectTrainsFeedbacksList(ListAPIView):
                     sum_time += train_dict['time_consuming']
                 avg_time = sum_time / len(serializer.data)
                 train_list = serializer.data
-                train_list.append({'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+                train_list.append(
+                    {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
             else:
                 train_list = serializer.data
                 train_list.append(
@@ -729,10 +730,10 @@ class CutTimeCollect(APIView):
         params = request.query_params
         st = params.get("st", None)  # 开始时间
         et = params.get("et", None)  # 结束时间
-        dimension = params.get("dimension", None)  # 时间跨度 1：班次  2：日 3：月
-        day_type = params.get("day_type", None)  # 日期类型 1：自然日  2：工厂日
+        # dimension = params.get("dimension", None)  # 时间跨度 1：班次  2：日 3：月
+        # day_type = params.get("day_type", None)  # 日期类型 1：自然日  2：工厂日
         equip_no = params.get("equip_no", None)  # 设备编号
-        product_no = params.get("product_no", None)  # 胶料编码
+        # product_no = params.get("product_no", None)  # 胶料编码
         try:
             page = int(params.get("page", 1))
             page_size = int(params.get("page_size", 10))
@@ -740,28 +741,34 @@ class CutTimeCollect(APIView):
             return Response("page和page_size必须是int", status=400)
         dict_filter = {}
         if equip_no:  # 设备
-            dict_filter = {'equip_no': equip_no}
-        if st:
-            dict_filter['begin_time__date__gte'] = st
-        if et:
-            dict_filter['end_time__date__lte'] = et
+            dict_filter['equip_no'] = equip_no
+
         # 统计过程
         return_list = []
         tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values('equip_no',
                                                                                                      'plan_classes_uid').annotate().distinct()
         if not tfb_equip_uid_list:
+            return_list.append(
+                {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
             return Response({'results': return_list})
         for tfb_equip_uid_dict in tfb_equip_uid_list:
-            tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict, **dict_filter).values()
+            # 这里也要加筛选
+            if st:
+                tfb_equip_uid_dict['end_time_data__gte'] = st
+            if et:
+                tfb_equip_uid_dict['end_time_data__lte'] = et
+
+            tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).values()
             for i in range(len(tfb_pn) - 1):
                 if tfb_pn[i]['product_no'] != tfb_pn[i + 1]['product_no']:
                     time_consuming = tfb_pn[i + 1]['begin_time'] - tfb_pn[i]['end_time']
-                    return_dict = {'time': tfb_pn[i + 1]['end_time'],
-                                   'plan_classes_uid': tfb_equip_uid_dict['plan_classes_uid'],
-                                   'equip_no': tfb_equip_uid_dict['equip_no'],
-                                   'cut_ago_product_no': tfb_pn[i]['product_no'],
-                                   'cut_later_product_no': tfb_pn[i + 1]['product_no'],
-                                   'time_consuming': time_consuming}
+                    return_dict = {
+                        'time': tfb_pn[i]['end_time'],
+                        'plan_classes_uid': tfb_equip_uid_dict['plan_classes_uid'],
+                        'equip_no': tfb_equip_uid_dict['equip_no'],
+                        'cut_ago_product_no': tfb_pn[i]['product_no'],
+                        'cut_later_product_no': tfb_pn[i + 1]['product_no'],
+                        'time_consuming': time_consuming}
                     return_list.append(return_dict)
 
         # 分页
