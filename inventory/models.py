@@ -2,6 +2,7 @@ from django.db import models
 
 # Create your models here.
 from basics.models import GlobalCode
+from system.models import AbstractEntity
 
 
 class OutOrderFeedBack(models.Model):
