@@ -1,6 +1,8 @@
 from django.db import models
 
 # Create your models here.
+from basics.models import GlobalCode
+
 
 class OutOrderFeedBack(models.Model):
     """出库订单反馈"""
@@ -21,3 +23,17 @@ class OutOrderFeedBack(models.Model):
     class Meta:
         db_table = 'out_order_feedback'
         verbose_name_plural = verbose_name = '出库订单反馈'
+
+
+class WarehouseInfo(models.Model):
+    """仓库信息"""
+    no = models.CharField(max_length=64, verbose_name='仓库信息', help_text='仓库信息')
+    name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
+    ip = models.CharField(max_length=64, verbose_name='仓库ip', help_text='仓库ip')
+    address = models.CharField(max_length=64, verbose_name='仓库地址', help_text='仓库地址')
+
+
+class WarehouseMaterial_type(models.Model):
+    """仓库物料类型"""
+    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="warehouse_material_types")
+    material_type = models.OneToOneField(GlobalCode, on_delete=models.CASCADE)

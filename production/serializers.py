@@ -8,6 +8,7 @@ from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog
 
+
 class EquipStatusSerializer(BaseModelSerializer):
     """机台状况反馈"""
 
@@ -19,6 +20,7 @@ class EquipStatusSerializer(BaseModelSerializer):
 
 class TrainsFeedbacksBatchSerializer(BaseModelSerializer):
     """批量上传车次报表序列化器"""
+
     class Meta:
         model = TrainsFeedbacks
         fields = "__all__"
@@ -51,7 +53,6 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
             if len(str(actual)) >= 5:
                 return actual / 100
         return actual
-
 
     class Meta:
         model = TrainsFeedbacks
@@ -140,3 +141,17 @@ class ProductionRecordSerializer(BaseModelSerializer):
         model = PalletFeedbacks
         fields = "__all__"
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
+    """胶料单车次时间汇总"""
+    time_consuming = serializers.SerializerMethodField(read_only=True, help_text='耗时')
+
+    def get_time_consuming(self, obj):
+        if not obj.end_time or not obj.begin_time:
+            return None
+        return obj.end_time - obj.begin_time
+
+    class Meta:
+        model = TrainsFeedbacks
+        fields = ('id','equip_no', 'product_no', 'actual_trains','time_consuming')

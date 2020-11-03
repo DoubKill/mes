@@ -14,7 +14,7 @@ from plan.uuidfield import UUidTools
 from production.models import TrainsFeedbacks, PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult
+    MaterialDealResult, LevelResult
 
 
 class TestMethodSerializer(BaseModelSerializer):
@@ -288,15 +288,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     def get_test(self, obj):
         mtr_list = []
         # 找到每个车次检测次数最多的那一条
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        if not pfb_obj:
-            return None
-        for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
-            mto_obj = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no, product_no=pfb_obj.product_no,
-                                                       plan_classes_uid=pfb_obj.plan_classes_uid,
-                                                       production_equip_no=pfb_obj.equip_no, actual_trains=i).last()
-            if not mto_obj:
-                continue
+        mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
+        for mto_obj in mto_set:
             mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj).order_by('test_times').last()
             if not mtr_obj:
                 continue
@@ -306,6 +299,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return None
         max_mtr = mtr_list[0]
         for mtr_obj in mtr_list:
+            if not mtr_obj.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
+                continue
             if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
                 max_mtr = mtr_obj
         if max_mtr.test_times == 1:
@@ -316,7 +311,10 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             test_status = None  # 检测状态
         test_factory_date = max_mtr.test_factory_date  # 检测时间
         test_class = max_mtr.test_class  # 检测班次
-        test_user = max_mtr.created_user.username  # 检测员
+        try:
+            test_user = max_mtr.created_user.username  # 检测员
+        except:
+            test_user = None
         test_note = max_mtr.material_test_order.note  # 备注
         result = max_mtr.result  # 检测结果
         return {'test_status': test_status, 'test_factory_date': test_factory_date, 'test_class': test_class,
@@ -326,30 +324,51 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     def get_mtr_list(self, obj):
         mtr_list_return = {}
         # 找到每个车次检测次数最多的那一条
-        table_head_count = []
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        if not pfb_obj:
-            return None
-        for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
-            mto_obj = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no, product_no=pfb_obj.product_no,
-                                                       plan_classes_uid=pfb_obj.plan_classes_uid,
-                                                       production_equip_no=pfb_obj.equip_no, actual_trains=i).last()
+        table_head_count = {}
+        mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
+        for mto_obj in mto_set:
             if not mto_obj:
                 continue
-            mtr_list_return[i] = []
+            mtr_list_return[mto_obj.actual_trains] = []
             # 先弄出表头
-            table_head = mto_obj.order_results.all().values('test_indicator_name').annotate()
+            table_head = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate().distinct()
             for table_head_dict in table_head:
-                table_head_count.append(table_head_dict['test_indicator_name'])
-
-            mtr_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
-                max_test_times=Max('test_times')).values('test_indicator_name', 'value',
-                                                         'result', 'max_test_times')
-            for mtr_dict in mtr_list:
+                if table_head_dict['test_indicator_name'] not in table_head_count.keys():
+                    table_head_count[table_head_dict['test_indicator_name']] = []
+                table_head_count[table_head_dict['test_indicator_name']].append(table_head_dict['data_point_name'])
+                table_head_count[table_head_dict['test_indicator_name']] = list(
+                    set(table_head_count[table_head_dict['test_indicator_name']]))
+            # 根据test_indicator_name分组找到啊test_times最大的
+            mtr_list = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate(
+                max_test_times=Max('test_times')).values('test_indicator_name', 'data_point_name',
+                                                         'max_test_times',
+                                                         )
+            mtr_max_list = []
+            for mtr_max_obj in mtr_list:
+                # 根据分组找到数据
+                mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                            test_indicator_name=mtr_max_obj['test_indicator_name'],
+                                                            data_point_name=mtr_max_obj['data_point_name'],
+                                                            test_times=mtr_max_obj['max_test_times']).last()
+                if mtr_obj.data_point_indicator:
+                    mtr_max_list.append(
+                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                         'value': mtr_obj.value,
+                         'result': mtr_obj.data_point_indicator.result,
+                         'max_test_times': mtr_obj.data_point_indicator.level})
+                else:  # 数据不在上下限范围内，这个得前端做好约束
+                    mtr_max_list.append(
+                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                         'value': mtr_obj.value,
+                         'result': None,
+                         'max_test_times': None})
+            for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
-                mtr_list_return[i].append(mtr_dict)
-        table_head_set = list(set(table_head_count))
-        mtr_list_return['table_head'] = table_head_set
+                mtr_list_return[mto_obj.actual_trains].append(mtr_dict)
+        table_head_top = {}
+        for i in sorted(table_head_count.items(), key=lambda x: len(x[1]), reverse=False):
+            table_head_top[i[0]] = i[-1]
+        mtr_list_return['table_head'] = table_head_top
         return mtr_list_return
 
     def get_actual_trains(self, obj):
@@ -374,3 +393,12 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             'id', 'day_time', 'lot_no', 'classes_group', 'equip_no', 'product_no', 'actual_weight', 'residual_weight',
             'production_factory_date', 'valid_time', 'test', 'print_time', 'deal_user', 'deal_time', 'suggestion_desc',
             'mtr_list', 'actual_trains', 'operation_user')
+
+
+class LevelResultSerializer(BaseModelSerializer):
+    """等级和结果"""
+
+    class Meta:
+        model = LevelResult
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

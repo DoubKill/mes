@@ -20,12 +20,13 @@ from mes.conf import EQUIP_LIST
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, ProductDayPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
-    PlanStatusFilter, ExpendMaterialFilter
+    PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
-    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer
+    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer
+from rest_framework.generics import ListAPIView
 
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
@@ -53,7 +54,7 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
             try:
                 queryset = self.filter_queryset(self.get_queryset().filter(actual_trains__gte=train_list[0],
                                                                            actual_trains__lte=train_list[-1],
-                                                                            ))
+                                                                           ))
             except:
                 return Response({"actual_trains": "请输入: <开始车次>,<结束车次>。这类格式"})
         else:
@@ -86,7 +87,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_class = PalletFeedbacksFilter
 
     def list(self, request, *args, **kwargs):
-        day_time = request.query_params.get("day_time",)
+        day_time = request.query_params.get("day_time", )
         if day_time:
             queryset = self.filter_queryset(self.get_queryset().filter(end_time__date=day_time))
         else:
@@ -395,22 +396,24 @@ class ProductActualViewSet(mixins.ListModelMixin,
         if target_equip_no:
             pcp_set = ProductClassesPlan.objects.filter(product_day_plan__plan_schedule__day_time=search_time_str,
                                                         product_day_plan__equip__equip_no=target_equip_no,
-                                                    delete_flag=False).select_related('equip__equip_no',
-                                                    'product_batching__stage_product_batch_no',
-                                                    'work_schedule_plan__classes__global_name',
-                                                    'product_day_plan_id')
+                                                        delete_flag=False).select_related('equip__equip_no',
+                                                                                          'product_batching__stage_product_batch_no',
+                                                                                          'work_schedule_plan__classes__global_name',
+                                                                                          'product_day_plan_id')
         else:
             pcp_set = ProductClassesPlan.objects.filter(product_day_plan__plan_schedule__day_time=search_time_str,
-                                                    delete_flag=False).select_related('equip__equip_no',
-                                                    'product_batching__stage_product_batch_no',
-                                                    'work_schedule_plan__classes__global_name',
-                                                    'product_day_plan_id')
+                                                        delete_flag=False).select_related('equip__equip_no',
+                                                                                          'product_batching__stage_product_batch_no',
+                                                                                          'work_schedule_plan__classes__global_name',
+                                                                                          'product_day_plan_id')
         uid_list = pcp_set.values_list("plan_classes_uid", flat=True)
         day_plan_list = pcp_set.values_list("product_day_plan__id", flat=True)
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Max('actual_weight'), classes=Max('classes'))
-        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x in tf_set}
-        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight":0 ,"classes_data": [None, None, None]}
+        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x
+                   in tf_set}
+        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0,
+                             "classes_data": [None, None, None]}
                          for x in day_plan_list}
         pcp_data = pcp_set.values("plan_classes_uid", "weight", "plan_trains", 'equip__equip_no',
                                   'product_batching__stage_product_batch_no',
@@ -465,7 +468,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                     "actual_trains": tf_dict[plan_classes_uid][0],
                     "classes": "晚班"
                 }
-        ret = {"data":[_ for _ in day_plan_dict.values()]}
+        ret = {"data": [_ for _ in day_plan_dict.values()]}
         return Response(ret)
 
     def list_bak(self, request, *args, **kwargs):
@@ -551,7 +554,6 @@ class ProductActualViewSet(mixins.ListModelMixin,
         return Response(return_data)
 
 
-
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
     queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
@@ -630,6 +632,7 @@ class ProductInventory(GenericViewSet,
 
 class TrainsFeedbacksBatch(APIView):
     """批量同步车次生产数据接口"""
+
     @atomic
     def post(self, request):
         serializer = TrainsFeedbacksBatchSerializer(data=request.data, many=True, context={'request': request})
@@ -637,8 +640,10 @@ class TrainsFeedbacksBatch(APIView):
         serializer.save()
         return Response("sync success", status=201)
 
+
 class PalletFeedbacksBatch(APIView):
     """批量同步托次生产数据接口"""
+
     @atomic
     def post(self, request):
         serializer = PalletFeedbacksSerializer(data=request.data, many=True, context={'request': request})
@@ -649,6 +654,7 @@ class PalletFeedbacksBatch(APIView):
 
 class EquipStatusBatch(APIView):
     """批量同步设备生产数据接口"""
+
     @atomic
     def post(self, request):
         serializer = EquipStatusSerializer(data=request.data, many=True, context={'request': request})
@@ -670,9 +676,12 @@ class PlanStatusBatch(APIView):
 
 class ExpendMaterialBatch(APIView):
     """批量同步原材料消耗数据接口"""
+
     @atomic
     def post(self, request):
         serializer = ExpendMaterialSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response("sync success", status=201)
+
+

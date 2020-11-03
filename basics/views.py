@@ -142,6 +142,7 @@ class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
+            queryset = queryset.filter(use_flag=True)
             serializer = self.get_serializer(queryset, many=True)
             return Response({'results': serializer.data})
         else:
