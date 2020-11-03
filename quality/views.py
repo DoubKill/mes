@@ -393,7 +393,7 @@ class PalletFeedbacksTestListView(ListAPIView):
         if pfb_filter:
             pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
-        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict)
+        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
         return pfb_queryset
 
 
