@@ -2,6 +2,7 @@ from django.db import models
 
 # Create your models here.
 from basics.models import GlobalCode
+from recipe.models import Material
 from system.models import AbstractEntity
 
 
@@ -71,9 +72,9 @@ class InventoryLog(models.Model):
 
 class MaterialInventory(models.Model):
     """库存信息|线边库"""
-    material = models.ForeignKey(GlobalCode,verbose_name='物料id', help_text='物料id', on_delete=models.CASCADE)
+    material = models.ForeignKey(Material,verbose_name='物料id', help_text='物料id', on_delete=models.CASCADE, related_name="material_inventory_m")
     container_no = models.CharField(max_length=64 ,verbose_name='托盘号/容器号', help_text='托盘号/容器号')
-    site = models.ForeignKey(GlobalCode ,verbose_name='产地', help_text='产地', on_delete=models.CASCADE)
+    site = models.ForeignKey(GlobalCode ,verbose_name='产地', help_text='产地', on_delete=models.CASCADE, related_name="material_inventory_s")
     qty = models.IntegerField(verbose_name='库存数', help_text='库存数')
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
     unit_weight = models.DecimalField(verbose_name='单位重量', help_text='单位重量',decimal_places=2, max_digits=8, blank=True, null=True)
@@ -82,7 +83,7 @@ class MaterialInventory(models.Model):
     quality_status = models.CharField(max_length=8, verbose_name='品质状态',help_text='品质状态')
     lot_no = models.CharField(max_length=64, verbose_name='lot_no',help_text='lot_no')
     location = models.CharField(max_length=64, verbose_name='库位', help_text='库位')
-    warehouse_info = models.ForeignKey(WarehouseInfo, verbose_name='仓库id', help_text='仓库id', on_delete=models.CASCADE)
+    warehouse_info = models.ForeignKey(WarehouseInfo, verbose_name='仓库id', help_text='仓库id', on_delete=models.CASCADE, related_name="material_inventory_w")
 
     class Meta:
         db_table = 'material_inventory'
@@ -125,7 +126,7 @@ class DeliveryPlanStatus(models.Model):
         (4, '新建'),
         (5, '关闭')
     )
-    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plans")
+    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plan_status")
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
     status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE)
