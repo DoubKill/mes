@@ -153,7 +153,8 @@ class MaterialDealResult(AbstractEntity):
     CHOICE = (
         ("待处理", "待处理"),
         ("待确认", "待确认"),
-        ("已处理", "已处理")
+        ("已处理", "已处理"),
+        ("复测", "复测"),
     )
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
     level = models.IntegerField(help_text='综合等级')
@@ -182,8 +183,8 @@ class MaterialDealResult(AbstractEntity):
 
 class LevelResult(AbstractEntity):
     """等级和结果"""
-    deal_result = models.CharField(max_length=64, help_text="检测结果")
-    level = models.IntegerField(help_text='等级')
+    deal_result = models.CharField(max_length=64, help_text="检测结果", unique=True)
+    level = models.PositiveIntegerField(help_text='等级', unique=True)
 
     class Meta:
         db_table = 'level_result'
