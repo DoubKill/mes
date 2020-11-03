@@ -59,6 +59,7 @@ class InventoryLog(models.Model):
     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
     fin_tiem = models.DateField(verbose_name='完成时间', help_text='完成时间')
 
+
     class Meta:
         db_table = 'inventory_log'
         verbose_name_plural = verbose_name = '出入库履历'
