@@ -16,25 +16,25 @@ def add_permissions():
     pass
 
 
-def add_factory_data():
+def add_factory_date():
     """补充车次反馈和托盘反馈中的factory_date字段"""
     train_feed_backs = TrainsFeedbacks.objects.all()
     for train_feed_back in train_feed_backs:
         plan_classes_uid = train_feed_back.plan_classes_uid
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if classes_plan:
-            train_feed_back.factory_data = classes_plan.work_schedule_plan.plan_schedule.day_time
+            train_feed_back.factory_date = classes_plan.work_schedule_plan.plan_schedule.day_time
             train_feed_back.save()
 
-    # pallet_feed_backs = PalletFeedbacks.objects.all()
-    # for pallet_feed_back in pallet_feed_backs:
-    #     plan_classes_uid = pallet_feed_back.plan_classes_uid
-    #     classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
-    #     if classes_plan:
-    #         pallet_feed_back.factory_data = classes_plan.work_schedule_plan.plan_schedule.day_time
-    #         pallet_feed_back.save()
+    pallet_feed_backs = PalletFeedbacks.objects.all()
+    for pallet_feed_back in pallet_feed_backs:
+        plan_classes_uid = pallet_feed_back.plan_classes_uid
+        classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+        if classes_plan:
+            pallet_feed_back.factory_date = classes_plan.work_schedule_plan.plan_schedule.day_time
+            pallet_feed_back.save()
 
 
 if __name__ == '__main__':
     add_permissions()
-    add_factory_data()
+    add_factory_date()
