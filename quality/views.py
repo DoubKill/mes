@@ -318,7 +318,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     post: 创建胶料处理结果
     put: 创建胶料处理结果
     """
-    queryset = MaterialDealResult.objects.filter(delete_flag=False)
+    queryset = MaterialDealResult.objects.filter(delete_flag=False).exclude(status='复测')
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDealResulFilter

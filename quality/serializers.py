@@ -299,7 +299,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return None
         max_mtr = mtr_list[0]
         for mtr_obj in mtr_list:
-            if not mtr_obj.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
+            if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
                 continue
             if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
                 max_mtr = mtr_obj
