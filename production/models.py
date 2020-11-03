@@ -20,7 +20,7 @@ class TrainsFeedbacks(AbstractEntity):
     classes = models.CharField(max_length=64, help_text='班次', verbose_name='班次', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间',
                                         verbose_name='工作站生产报表时间/存盘时间', null=True)
-    factory_data = models.DateField(help_text='工厂日期', verbose_name='工厂日期', blank=True, null=True)
+    factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期', blank=True, null=True)
 
     @property
     def time(self):
@@ -62,7 +62,7 @@ class PalletFeedbacks(AbstractEntity):
     lot_no = models.CharField(max_length=64, help_text='追踪号', verbose_name='追踪号', blank=True)
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间',
                                         verbose_name='工作站生产报表时间/存盘时间', null=True)
-    factory_data = models.DateField(help_text='工厂日期', verbose_name='工厂日期', blank=True, null=True)
+    factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期', blank=True, null=True)
 
     def __str__(self):
         return f"{self.plan_classes_uid}|{self.lot_no}|{self.equip_no}"

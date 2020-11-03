@@ -47,8 +47,8 @@ class ClassesBanBurySummaryView(ListAPIView):
         # 默认需要分组的字段
         group_by_fields = ['plan_classes_uid', 'equip_no', 'product_no']
         if day_type == '2':  # 按照工厂日期
-            dimension_type['2'] = ['factory_data']
-            dimension_type['1'][-1] = 'factory_data'
+            dimension_type['2'] = ['factory_date']
+            dimension_type['1'][-1] = 'factory_date'
             kwargs.pop('begin_time__date__gte', None)
             kwargs.pop('end_time__date__lte', None)
             if st:
@@ -116,8 +116,8 @@ class EquipBanBurySummaryView(ListAPIView):
         # 默认需要分组的字段
         group_by_fields = ['plan_classes_uid', 'equip_no']
         if day_type == '2':  # 按照工厂日期
-            dimension_type['2'] = ['factory_data']
-            dimension_type['1'][-1] = 'factory_data'
+            dimension_type['2'] = ['factory_date']
+            dimension_type['1'][-1] = 'factory_date'
             kwargs.pop('begin_time__date__gte', None)
             kwargs.pop('end_time__date__lte', None)
             if st:
