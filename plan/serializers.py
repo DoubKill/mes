@@ -115,6 +115,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     start_time = serializers.DateTimeField(source='work_schedule_plan.start_time', read_only=True)
     end_time = serializers.DateTimeField(source='work_schedule_plan.end_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    batching_type = serializers.IntegerField(source='product_day_plan.product_batching.batching_type')
 
     def get_status(self, obj):
         plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
@@ -147,6 +148,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
                                                 material_demanded=pbd_obj.actual_weight * instance.plan_trains,
                                                 plan_classes_uid=instance.plan_classes_uid)
         else:
+            validated_data.pop('status', None)
             instance = super().update(pcp_obj, validated_data)
             PlanStatus.objects.filter(plan_classes_uid=instance.plan_classes_uid).update(
                 equip_no=instance.equip.equip_no,
@@ -163,27 +165,45 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
 
 class ProductBatchingSerializer(BaseModelSerializer):
     """胶料配料标准同步"""
-    factory__global_no = serializers.CharField(write_only=True)
-    site__global_no = serializers.CharField(write_only=True)
-    product_info__product_no = serializers.CharField(write_only=True)
-    dev_type__category_no = serializers.CharField(write_only=True)
-    stage__global_no = serializers.CharField(write_only=True)
-    equip__equip_no = serializers.CharField(write_only=True)
+    factory__global_no = serializers.CharField(write_only=True, required=False)
+    site__global_no = serializers.CharField(write_only=True, required=False)
+    product_info__product_no = serializers.CharField(write_only=True, required=False)
+    dev_type__category_no = serializers.CharField(write_only=True, required=False)
+    stage__global_no = serializers.CharField(write_only=True, required=False)
+    equip__equip_no = serializers.CharField(write_only=True, required=False)
 
     def validate(self, attrs):
-        factory1 = attrs.pop('factory__global_no')
-        site1 = attrs.pop('site__global_no')
-        product_info1 = attrs.pop('product_info__product_no')
-        dev_type1 = attrs.pop('dev_type__category_no')
-        stage1 = attrs.pop('stage__global_no')
-        equip1 = attrs.pop('equip__equip_no')
+        factory1 = attrs.pop('factory__global_no', None)
+        site1 = attrs.pop('site__global_no', None)
+        product_info1 = attrs.pop('product_info__product_no', None)
+        dev_type1 = attrs.pop('dev_type__category_no', None)
+        stage1 = attrs.pop('stage__global_no', None)
+        equip1 = attrs.pop('equip__equip_no', None)
         try:
-            factory = GlobalCode.objects.get(global_no=factory1)
-            site = GlobalCode.objects.get(global_no=site1)
-            product_info = ProductInfo.objects.get(product_no=product_info1)
-            dev_type = EquipCategoryAttribute.objects.get(category_no=dev_type1)
-            stage = GlobalCode.objects.get(global_no=stage1)
-            equip = Equip.objects.get(equip_no=equip1)
+            if factory1:
+                factory = GlobalCode.objects.get(global_no=factory1)
+            else:
+                factory = None
+            if site1:
+                site = GlobalCode.objects.get(global_no=site1)
+            else:
+                site = None
+            if product_info1:
+                product_info = ProductInfo.objects.get(product_no=product_info1)
+            else:
+                product_info = None
+            if dev_type1:
+                dev_type = EquipCategoryAttribute.objects.get(category_no=dev_type1)
+            else:
+                dev_type = None
+            if stage1:
+                stage = GlobalCode.objects.get(global_no=stage1)
+            else:
+                stage = None
+            if equip1:
+                equip = Equip.objects.get(equip_no=equip1)
+            else:
+                equip = None
         except GlobalCode.DoesNotExist:
             raise serializers.ValidationError(
                 '工厂编号{0}或者SITE编号{1}或者段次{2}不存在'.format(factory1, site1, stage1))
@@ -373,4 +393,43 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'status',
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
                   'product_day_plan__plan_schedule__plan_schedule_no')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialsySerializer(BaseModelSerializer):
+    """原材料表同步"""
+    material_type__global_no = serializers.CharField(write_only=True, required=False)
+    package_unit__global_no = serializers.CharField(write_only=True, required=False)
+    material_no = serializers.CharField(write_only=True, required=False)
+
+    def validate(self, attrs):
+        material_type1 = attrs.pop('material_type__global_no', None)
+        package_unit1 = attrs.pop('package_unit__global_no', None)
+        try:
+            material_type = GlobalCode.objects.get(global_no=material_type1)
+            if package_unit1:
+                package_unit = GlobalCode.objects.get(global_no=package_unit1)
+            else:
+                package_unit = None
+        except GlobalCode.DoesNotExist:
+            raise serializers.ValidationError('原材料类别{0}或者包装单位{1}不存在'.format(material_type1, package_unit1))
+        attrs['material_type'] = material_type
+        attrs['package_unit'] = package_unit
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        instance = Material.objects.filter(material_no=validated_data['material_no'])
+
+        if instance:
+            instance.update(**validated_data)
+        else:
+            super().create(validated_data)
+        return validated_data
+
+    class Meta:
+        model = Material
+        fields = (
+            'material_no', 'material_name', 'for_short', 'material_type__global_no', 'package_unit__global_no',
+            'use_flag')
         read_only_fields = COMMON_READ_ONLY_FIELDS

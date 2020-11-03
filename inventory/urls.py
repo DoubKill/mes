@@ -8,6 +8,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
+from .views import OutWork
 
 router = DefaultRouter()
 
@@ -17,5 +18,6 @@ router.register(r'material-inventory-view', views.MaterialInventory, basename="m
 router.register(r'product-inventory', views.ProductInventory, basename="product-inventory")
 
 urlpatterns = [
+    path('out-store/', OutWork.as_view()),
     path('', include(router.urls)),
     ]

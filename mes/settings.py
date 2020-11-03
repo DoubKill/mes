@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'recipe.apps.RecipeConfig',
     'gui.apps.GuiConfig',
     'docs.apps.DocsConfig',
+    'quality.apps.QualityConfig',
+    'inventory.apps.InventoryConfig'
 ]
 
 MIDDLEWARE = [
@@ -62,7 +64,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mes.middlewares.SyncMiddleware',
-    'mes.middlewares.JwtTokenUserMiddleware', # jwt-token嵌套django权限组件
+    'mes.middlewares.JwtTokenUserMiddleware',  # jwt-token嵌套django权限组件
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -222,55 +224,16 @@ LOGGING = {
     },
 }
 
-# oracle 实例链接
-# DATABASES = {
-#     'default': {
-#     'ENGINE': 'django.db.backends.oracle',
-#     'NAME': 'IP:端口号/service_name',
-#     'USER': '用户名',
-#     'PASSWORD': '密码',
-#     }
-# }
-
-# oracle使用SID连接
 DATABASES = {
     'default': {
-    'ENGINE': 'django.db.backends.oracle',
-    'NAME': 'zcaj1',  # 数据库SID
-    'USER': 'zcajlj',
-    'PASSWORD': 'zcajmes2020',
-    'HOST':'10.4.10.17',
-    'PORT':'1521'
+        'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
+        'NAME': os.getenv('MES_DATABASE_NAME', ''),  # 数据库名称
+        'USER': os.getenv('MES_DATABASE_USERNAME', ''),  # 用户名
+        'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', ''),  # 密码
+        'HOST': os.getenv('MES_DATABASE_HOSTNAME', ''),  # HOST
+        'PORT': os.getenv('MES_MONOCLE_API_PORT', ''),  # 端口
     }
 }
-
-# if DEBUG:
-#     DATABASES = {
-#         'default': {
-#             'ENGINE': 'django.db.backends.sqlite3',
-#             'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-#         }
-#     }
-# else:
-#     DATABASES = {
-#         'default': {
-#             'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-#             'NAME': os.getenv('DATABASE_NAME', 'mes'),  # 数据库名称
-#             'USER': os.getenv('DATABASE_USERNAME', 'root'),  # 用户名
-#             'PASSWORD': os.getenv('DATABASE_PASSWORD', 'mes@2020'),  # 密码
-#             'HOST': os.getenv('DATABASE_HOSTNAME', '10.10.120.14'),  # HOST
-#             'PORT': os.getenv('MONOCLE_API_PORT', '3306'),  # 端口
-#         }
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-#         'NAME': os.getenv('SFJ_DATABASE_NAME', 'MMM'),  # 数据库名称
-#         'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
-#         'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
-#         'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
-#         'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
-#     }
-# }
 
 # DATABASES = {
 #     'default': {

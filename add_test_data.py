@@ -21,6 +21,7 @@ from recipe.models import Material, ProductInfo
 from system.models import GroupExtension, User, Section, SystemConfig, ChildSystemInfo
 from production.models import MaterialTankStatus
 from django.contrib.auth.models import Permission
+from quality.models import DealSuggestion
 
 last_names = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '尤', '许',
               '何', '吕', '施', '张', '孔', '曹', '严', '华', '金', '魏', '陶', '姜', '戚', '谢', '邹', '喻', '柏', '水', '窦', '章',
@@ -85,7 +86,7 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
 
 def add_global_codes():
     names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
-             'SITE', '胶料']
+             'SITE', '胶料', '处理类型']
     j = 1
     for i, name in enumerate(names):
         instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, use_flag=1)
@@ -116,6 +117,8 @@ def add_global_codes():
             items = ['C', 'L', 'K']
         elif i == 12:
             items = ['天然胶', '合成胶', '再生胶', 'CMB', 'FM', 'HMB', 'NF', 'RE', 'RFM', 'RMB', '1MB', '2MB', '3MB']
+        elif i == 13:
+            items = ["放行处理", "不合格处理"]
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
             j += 1
@@ -1388,6 +1391,15 @@ def add_system_config():
     ChildSystemInfo.objects.create(link_address="10.4.10.55", system_type="gz", system_name="上辅机群控", status="联网")
     ChildSystemInfo.objects.create(link_address="10.4.10.56", system_type="gz", system_name="上辅机工作站1", status="联网")
     ChildSystemInfo.objects.create(link_address="10.4.10.100", system_type="gz", system_name="收皮终端", status="联网")
+
+
+def add_suggestions():
+    ok_id = GlobalCode.objects.filter(global_name="放行处理").first().id
+    no_id = GlobalCode.objects.filter(global_name="不合格处理").first().id
+    DealSuggestion.objects.create(suggestion_desc="放行意见1", deal_type_id=ok_id)
+    DealSuggestion.objects.create(suggestion_desc="放行意见2", deal_type_id=ok_id)
+    DealSuggestion.objects.create(suggestion_desnoc="不合格意见1", deal_type_id=no_id)
+    DealSuggestion.objects.create(suggestion_desnoc="不合格意见2", deal_type_id=no_id)
 
 
 # 删除中间表权限

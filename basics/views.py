@@ -2,6 +2,7 @@ from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -141,6 +142,7 @@ class EquipCategoryViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
+            queryset = queryset.filter(use_flag=True)
             serializer = self.get_serializer(queryset, many=True)
             return Response({'results': serializer.data})
         else:
@@ -274,13 +276,11 @@ class PlanScheduleManyCreate(APIView):
     permission_classes = (IsAuthenticated,)
 
     def post(self, request, *args, **kwargs):
-        if isinstance(request.data, dict):
-            many = False
-        elif isinstance(request.data, list):
-            many = True
-        else:
-            return Response(data={'detail': '数据有误'}, status=400)
-        s = PlanScheduleSerializer(data=request.data, many=many, context={'request': request})
-        s.is_valid(raise_exception=True)
-        s.save()
+        if not isinstance(request.data, list):
+            raise ValidationError('参数错误')
+        for item in request.data:
+            s = PlanScheduleSerializer(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
         return Response('新建成功')
