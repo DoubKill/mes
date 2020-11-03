@@ -331,7 +331,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                 continue
             mtr_list_return[mto_obj.actual_trains] = []
             # 先弄出表头
-            table_head = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate().distinct()
+            table_head = mto_obj.order_results.all().values('test_indicator_name',
+                                                            'data_point_name').annotate().distinct()
             for table_head_dict in table_head:
                 if table_head_dict['test_indicator_name'] not in table_head_count.keys():
                     table_head_count[table_head_dict['test_indicator_name']] = []
