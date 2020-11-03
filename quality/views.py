@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -259,7 +260,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
 
         # 等级综合判定
         # try:
-        synthesize_to_material_deal_result(s.data['lot_no'])
+        # synthesize_to_material_deal_result(s.data['lot_no'])
         # except Exception as e:
         #     logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
 
@@ -318,7 +319,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     post: 创建胶料处理结果
     put: 创建胶料处理结果
     """
-    queryset = MaterialDealResult.objects.filter(delete_flag=False).exclude(status='复测')
+    queryset = MaterialDealResult.objects.filter(~Q(deal_result="合格")).filter(~Q(status="复测")).filter(delete_flag=False)
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDealResulFilter
