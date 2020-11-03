@@ -258,10 +258,10 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             s.save()
 
         # 等级综合判定
-        try:
-            synthesize_to_material_deal_result(s.data['lot_no'])
-        except Exception as e:
-            logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
+        # try:
+        synthesize_to_material_deal_result(s.data['lot_no'])
+        # except Exception as e:
+        #     logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
 
         return Response('新建成功')
 
@@ -318,7 +318,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     post: 创建胶料处理结果
     put: 创建胶料处理结果
     """
-    queryset = MaterialDealResult.objects.filter(delete_flag=False)
+    queryset = MaterialDealResult.objects.filter(delete_flag=False).exclude(status='复测')
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDealResulFilter
@@ -393,7 +393,7 @@ class PalletFeedbacksTestListView(ListAPIView):
         if pfb_filter:
             pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
-        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict)
+        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
         return pfb_queryset
 
 

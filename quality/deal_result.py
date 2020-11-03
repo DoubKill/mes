@@ -1,4 +1,4 @@
-from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult
+from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult, LevelResult
 from production.models import PalletFeedbacks
 from django.db.transaction import atomic
 from django.db.models import Max
@@ -46,9 +46,13 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_dict['deal_result'] = max_mtr.data_point_indicator.result
         mdr_dict['production_factory_date'] = pfb_obj.begin_time
     else:  # 数据不在上下限范围内，这个得前端做好约束
-        mdr_dict['deal_result'] = '不合格'  # 要确定合格和不合格对应的等级 已经是否只有合格和不合格这两种情况
-        mdr_dict['level'] = 0
-        mdr_dict['production_factory_date'] = '1212-12-12'
+        lr_obj = LevelResult.objects.filter(delete_flag=False).all().order_by('level').last()
+        mdr_dict['deal_result'] = lr_obj.deal_result  # 要确定合格和不合格对应的等级 已经是否只有合格和不合格这两种情况
+        mdr_dict['level'] = lr_obj.level
+        if pfb_obj:
+            mdr_dict['production_factory_date'] = pfb_obj.begin_time
+        else:
+            mdr_dict['production_factory_date'] = '1212-12-12'
 
     mdr_dict['reason'] = reason
     mdr_dict['status'] = '待处理'
@@ -56,6 +60,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     iir_mdr_obj = MaterialDealResult.objects.filter(lot_no=mdr_lot_no).order_by('test_time').last()
     if iir_mdr_obj:
         mdr_dict['test_time'] = iir_mdr_obj.test_time + 1
+        MaterialDealResult.objects.filter(lot_no=mdr_lot_no).update(status='复测')
         MaterialDealResult.objects.create(**mdr_dict)
     else:
         mdr_dict['test_time'] = 1
