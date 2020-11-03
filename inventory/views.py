@@ -1,4 +1,5 @@
 import json
+import time
 
 import requests
 from django.shortcuts import render
@@ -215,6 +216,8 @@ class OutWork(APIView):
             return xml_data
 
         def gen_result(self, data):
+            print(data)
+            print('ssssssssssssssssssssssssssssssssssssssssss')
             data = data.get('soap:Envelope').get('soap:Body').get('TRANS_MES_TO_WMS_OUTWORKResponse').get(
                 'TRANS_MES_TO_WMS_OUTWORKResult')
             # items = json.loads(data).get('items')
@@ -226,33 +229,71 @@ class OutWork(APIView):
             #         ret.append(item['msg'])
             return items
 
-    def get_base_data(self, sender):
-        data_json = {
-        "msgId": "1",
-        "OUTTYPE": "生产出库",
-        "msgConut": "2",
-        "SENDUSER": "GJ_001",
-        "items": [
-             {"WORKID": "11223",
-              "MID": "C-HMB-F150-12",
-              "PICI": "20200101",
-              "NUM": "1",
-              "STATIONID": "二层后端",
-              "SENDDATE": "20200513 09:22:22"},
-             {"WORKID": "11224",
-              "MID": "C-HMB-F150-11",
-              "PICI": "20200101",
-              "NUM": "1",
-              "STATIONID": "二层前端",
-              "SENDDATE": "20200513 09:22:22"}
-         ]
-    }
-        return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+    def get_base_data(self, sender,request):
+        data_json ={}
+        items =[]
+        params = request.data
+        msgId = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        OUTTYPE = params.get('OUTTYPE','1')
+        msgConut = params.get('msgConut','1')
+        SENDUSER = request.user.username
+        items = params.get('items')
+        # for i in items:
+        #     i['WORKID']=i['MID']
+        data_json ={'msgId':msgId,"OUTTYPE":OUTTYPE,'msgConut':msgConut,'SENDUSER':SENDUSER,
+                    "items": [
+                        {"WORKID": "11223",
+                         "MID": "C-HMB-F150-12",
+                         "PICI": "20200101",
+                         "NUM": "1",
+                         "STATIONID": "二层后端",
+                         "SENDDATE": "20200513 09:22:22"},
+                        {"WORKID": "11227",
+                         "MID": "C-HMB-F150-11",
+                         "PICI": "20200101",
+                         "NUM": "1",
+                         "STATIONID": "二层前端",
+                         "SENDDATE": "20200513 09:22:22"}
+                    ]
+                    }
+        # data_json = {
+        # "msgId": "hzy11",
+        # "OUTTYPE": "生产出库123222",
+        # "msgConut": "2",
+        # "SENDUSER": "GJ_001hzy",
+        # "items": [
+        #      {"WORKID": "11223",
+        #       "MID": "C-HMB-F150-12",
+        #       "PICI": "20200101",
+        #       "NUM": "1",
+        #       "STATIONID": "二层后端",
+        #       "SENDDATE": "20200513 09:22:22"},
+        #      {"WORKID": "11227",
+        #       "MID": "C-HMB-F150-11",
+        #       "PICI": "20200101",
+        #       "NUM": "1",
+        #       "STATIONID": "二层前端",
+        #       "SENDDATE": "20200513 09:22:22"}
+        #  ]
+        # }
+        # ticks = time.strftime("%Y%m%d%H%M%S", time.localtime()) + data_json.get('msgId')
+        # items = data_json.get('items')
+        # for i in items:
+        #     i.get('WORKID')
+        #     ticks = time.strftime("%Y%m%d%H%M%S", time.localtime()) + i.get('WORKID')
+        # print(data_json.get('msgId'))
+        # print(ticks)
+        # msgId = ticks
+        # print(msgId)
+        return "1", "1", "1", "1", json.dumps(data_json, ensure_ascii=False)
 
     # 出库
     def post(self, request):
+        print(request.user.username)
+
         sender = self.OUTWORKUploader()
-        ret = sender.request(*self.get_base_data(sender))
+
+        ret = sender.request(*self.get_base_data(sender,request))
         return Response(ret)
 
 
