@@ -199,7 +199,10 @@ class CutTimeCollect(APIView):
         dict_filter = {}
         if equip_no:  # 设备
             dict_filter['equip_no'] = equip_no
-
+        if st:
+            dict_filter['end_time__date__gte'] = st
+        if et:
+            dict_filter['end_time__date__lte'] = et
         # 统计过程
         return_list = []
         tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values('equip_no',
@@ -211,9 +214,9 @@ class CutTimeCollect(APIView):
         for tfb_equip_uid_dict in tfb_equip_uid_list:
             # 这里也要加筛选
             if st:
-                tfb_equip_uid_dict['end_time__data__gte'] = st
+                tfb_equip_uid_dict['end_time__date__gte'] = st
             if et:
-                tfb_equip_uid_dict['end_time__data__lte'] = et
+                tfb_equip_uid_dict['end_time__date__lte'] = et
 
             tfb_pn = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).values()
             for i in range(len(tfb_pn) - 1):
