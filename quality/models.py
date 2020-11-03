@@ -173,6 +173,7 @@ class MaterialDealResult(AbstractEntity):
     production_factory_date = models.DateTimeField(help_text='生产时间')
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
+    test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
 
     class Meta:
         db_table = 'material_deal_result'

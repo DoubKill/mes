@@ -17,6 +17,7 @@ from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks
+from quality.deal_result import synthesize_to_material_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
@@ -27,6 +28,9 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer
 from recipe.models import Material, ProductBatching
+import logging
+
+logger = logging.getLogger('send_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -252,6 +256,13 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
+
+        # 等级综合判定
+        try:
+            synthesize_to_material_deal_result(s.data['lot_no'])
+        except Exception as e:
+            logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
+
         return Response('新建成功')
 
 
