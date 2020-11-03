@@ -1,7 +1,8 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from production.summary_views import ClassesBanBurySummaryView, EquipBanBurySummaryView
+from production.summary_views import ClassesBanBurySummaryView, EquipBanBurySummaryView, CollectTrainsFeedbacksList, \
+    CutTimeCollect
 from production.views import *
 
 router = DefaultRouter()
