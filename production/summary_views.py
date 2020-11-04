@@ -1,13 +1,16 @@
 import copy
 
-from django.db.models import Sum, F, Min, Max, Avg
+from django.db.models import Sum, F, Min, Max, Avg, Q
 from django.db.models.functions import TruncMonth
+from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.views import APIView
 
+from basics.models import WorkSchedulePlan
+from mes.derorators import api_recorder
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
@@ -21,9 +24,30 @@ DIMENSION_TYPE = {
 }
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ClassesBanBurySummaryView(ListAPIView):
     """班次密炼统计"""
     queryset = TrainsFeedbacks.objects.all()
+
+    @staticmethod
+    def get_class_dimension_page_data(page):
+        factory_dates = set([str(item['factory_date']) for item in page])
+        classes = set([item['classes'] for item in page])
+        schedule_plans = WorkSchedulePlan.objects.filter(
+            plan_schedule__work_schedule__schedule_name='三班两运转').filter(
+            Q(plan_schedule__day_time__in=factory_dates) | Q(classes__global_name__in=classes)).values(
+            'plan_schedule__day_time', 'classes__global_name', 'start_time', 'end_time'
+        )
+        schedule_plans_dict = {
+            str(schedule_plan['plan_schedule__day_time']) + schedule_plan['classes__global_name']:
+                schedule_plan for schedule_plan in schedule_plans}
+        """如果是按照工厂时间并且是按照班次分组则需要找出该班次的总时间"""
+        for value in page:
+            key = str(value['factory_date'])+value['classes']
+            if key in schedule_plans_dict:
+                value['classes_time'] = (schedule_plans_dict[key]['end_time']
+                                         - schedule_plans_dict[key]['start_time']).seconds
+        return page
 
     def list(self, request, *args, **kwargs):
         dimension_type = copy.deepcopy(DIMENSION_TYPE)
@@ -94,10 +118,14 @@ class ClassesBanBurySummaryView(ListAPIView):
                 ret[item_key]['total_time'] += item['total_time']
 
         page = self.paginate_queryset(list(ret.values()))
+        if day_type == '2' and dimension == '1':
+            page = self.get_class_dimension_page_data(page)
+
         return self.get_paginated_response(page)
 
 
-class EquipBanBurySummaryView(ListAPIView):
+@method_decorator([api_recorder], name="dispatch")
+class EquipBanBurySummaryView(ClassesBanBurySummaryView):
     """机台密炼统计"""
     queryset = TrainsFeedbacks.objects.all()
 
@@ -161,9 +189,13 @@ class EquipBanBurySummaryView(ListAPIView):
                 ret[item_key]['total_time'] += item['total_time']
 
         page = self.paginate_queryset(list(ret.values()))
+        if day_type == '2' and dimension == '1':
+            page = self.get_class_dimension_page_data(page)
+
         return self.get_paginated_response(page)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class CollectTrainsFeedbacksList(ListAPIView):
     """胶料单车次时间汇总"""
     queryset = TrainsFeedbacks.objects.filter(delete_flag=False)
@@ -215,6 +247,7 @@ class SumCollectTrains(APIView):
             return Response({'results': {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None}})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class CutTimeCollect(APIView):
     """规格切换时间汇总"""
 
