@@ -18,7 +18,7 @@ def add_permissions():
 
 def add_factory_date():
     """补充车次反馈和托盘反馈中的factory_date字段"""
-    train_feed_backs = TrainsFeedbacks.objects.all()
+    train_feed_backs = TrainsFeedbacks.objects.filter(factory_date__isnull=True)
     for train_feed_back in train_feed_backs:
         plan_classes_uid = train_feed_back.plan_classes_uid
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
@@ -26,7 +26,7 @@ def add_factory_date():
             train_feed_back.factory_date = classes_plan.work_schedule_plan.plan_schedule.day_time
             train_feed_back.save()
 
-    pallet_feed_backs = PalletFeedbacks.objects.all()
+    pallet_feed_backs = PalletFeedbacks.objects.filter(factory_date__isnull=True)
     for pallet_feed_back in pallet_feed_backs:
         plan_classes_uid = pallet_feed_back.plan_classes_uid
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()

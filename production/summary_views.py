@@ -64,7 +64,7 @@ class ClassesBanBurySummaryView(ListAPIView):
 
         if dimension == '3':
             # 按月的维度分组，查询写法不一样
-            data = TrainsFeedbacks.objects.annotate(
+            data = TrainsFeedbacks.objects.exclude(classes='').annotate(
                 month=TruncMonth('end_time')).filter(**kwargs).values(*group_by_fields).annotate(
                 total_trains=Max('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
@@ -73,7 +73,7 @@ class ClassesBanBurySummaryView(ListAPIView):
                 avg_train_time=Avg(F('end_time') - F('begin_time')) / 1000000
             )
         else:
-            data = TrainsFeedbacks.objects.filter(**kwargs).values(*group_by_fields).annotate(
+            data = TrainsFeedbacks.objects.exclude(classes='').filter(**kwargs).values(*group_by_fields).annotate(
                 total_trains=Max('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
                 min_train_time=Min(F('end_time') - F('begin_time')) / 1000000,
@@ -133,13 +133,13 @@ class EquipBanBurySummaryView(ListAPIView):
 
         if dimension == '3':
             # 按月的维度分组，查询写法不一样
-            data = TrainsFeedbacks.objects.annotate(
+            data = TrainsFeedbacks.objects.exclude(classes='').annotate(
                 month=TruncMonth('end_time')).filter(**kwargs).values(*group_by_fields).annotate(
                 total_trains=Max('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
             )
         else:
-            data = TrainsFeedbacks.objects.filter(**kwargs).values(*group_by_fields).annotate(
+            data = TrainsFeedbacks.objects.exclude(classes='').filter(**kwargs).values(*group_by_fields).annotate(
                 total_trains=Max('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
             )
