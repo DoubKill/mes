@@ -154,4 +154,4 @@ class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
 
     class Meta:
         model = TrainsFeedbacks
-        fields = ('id','equip_no', 'product_no', 'actual_trains','time_consuming')
+        fields = ('id', 'equip_no', 'product_no', 'actual_trains', 'time_consuming', 'classes')
