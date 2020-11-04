@@ -4,17 +4,30 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
-from django.db.models import Sum, Max
+from django.db.models import Max
 
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from plan.uuidfield import UUidTools
-from production.models import TrainsFeedbacks, PalletFeedbacks
+from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult
+    MaterialDealResult, LevelResult, TestIndicator
+
+
+class TestIndicatorSerializer(BaseModelSerializer):
+    name = serializers.CharField(help_text='指标名称', validators=[UniqueValidator(queryset=TestIndicator.objects.all(),
+                                                                               message='该指标名称已存在！')])
+
+    def create(self, validated_data):
+        validated_data['no'] = UUidTools.uuid1_hex('TD')
+        return super().create(validated_data)
+
+    class Meta:
+        model = TestIndicator
+        fields = ('name', )
 
 
 class TestMethodSerializer(BaseModelSerializer):
