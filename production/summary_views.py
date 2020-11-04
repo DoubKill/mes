@@ -209,10 +209,7 @@ class CutTimeCollect(APIView):
         params = request.query_params
         st = params.get("st", None)  # 开始时间
         et = params.get("et", None)  # 结束时间
-        # dimension = params.get("dimension", None)  # 时间跨度 1：班次  2：日 3：月
-        # day_type = params.get("day_type", None)  # 日期类型 1：自然日  2：工厂日
         equip_no = params.get("equip_no", None)  # 设备编号
-        # product_no = params.get("product_no", None)  # 胶料编码
         try:
             page = int(params.get("page", 1))
             page_size = int(params.get("page_size", 10))
@@ -252,7 +249,10 @@ class CutTimeCollect(APIView):
                         'cut_later_product_no': tfb_pn[i + 1]['product_no'],
                         'time_consuming': time_consuming}
                     return_list.append(return_dict)
-
+        if not return_list:
+            return_list.append(
+                {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
+            return Response({'results': return_list})
         # 分页
         counts = len(return_list)
         return_list = return_list[(page - 1) * page_size:page_size * page]

@@ -1,3 +1,5 @@
+import datetime
+
 from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -23,13 +25,14 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
-    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult
+    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer
 from recipe.models import Material, ProductBatching
 import logging
+from django.db.models import Sum, Max
 
 logger = logging.getLogger('send_log')
 
@@ -415,3 +418,126 @@ class LevelResultViewSet(ModelViewSet):
             data = queryset.values('id', 'deal_result', 'level')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
+
+
+class ProductDayStatistics(APIView):
+    """胶料日合格率统计"""
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        # month_time = params.get('ym_time', datetime.datetime.now().month)
+        # year_time = params.get('ym_time', datetime.datetime.now().year)
+        month_time = params.get('ym_time', datetime.datetime.now()).month
+        year_time = params.get('ym_time', datetime.datetime.now()).year
+        pass_type = params.get('pass_type', 1)  # 1:综合合格率  2：一次合格率  3：流变合格率
+        pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
+        test_indicator_name_dict = pass_dict[pass_type]
+        product_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
+                                                           production_factory_date__year=year_time,
+                                                           production_factory_date__month=month_time).values(
+            'product_no').annotate().distinct()
+        ruturn_pass = []
+        for product_no_dict in product_no_list:
+            return_dict = {}
+            return_dict['product_no'] = product_no_dict['product_no']
+            for day_time in range(1, int(datetime.datetime.now().day) + 1):
+                mto_set = MaterialTestOrder.objects.filter(delete_flag=False, production_factory_date__year=year_time,
+                                                           production_factory_date__month=month_time,
+                                                           production_factory_date__day=day_time,
+                                                           **product_no_dict).all()
+                if not mto_set:
+                    continue
+                mto_count = mto_set.count()
+                pass_count = 0
+                level_list = []
+
+                for mto_obj in mto_set:
+                    mrt_list = mto_obj.order_results.filter(
+                        test_indicator_name__in=test_indicator_name_dict).all().values(
+                        'data_point_name').annotate(max_test_time=Max('test_times'))
+                    for mrt_dict in mrt_list:
+                        mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                                         test_indicator_name__in=test_indicator_name_dict,
+                                                                         data_point_name=mrt_dict['data_point_name'],
+                                                                         test_times=mrt_dict['max_test_time']).last()
+                        level_list.append(mrt_dict_obj)
+                    if not level_list:
+                        continue
+                    max_mtr = level_list[0]
+                    for mtr_obj in level_list:
+                        if not mtr_obj.data_point_indicator:
+                            continue
+                        else:
+                            if not max_mtr.data_point_indicator:
+                                max_mtr = mtr_obj
+                                continue
+                            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+                                max_mtr = mtr_obj
+                    if not max_mtr.data_point_indicator:
+                        continue
+                    if max_mtr.data_point_indicator.result == '合格':
+                        pass_count += 1
+                percent_of_pass = str((pass_count / mto_count) * 100) + '%'
+                return_dict[f'{month_time}-{day_time}'] = percent_of_pass
+            ruturn_pass.append(return_dict)
+        return Response(ruturn_pass)
+
+
+class ProductDayListDetailed(APIView):
+    """胶料日合格率统计展示详细信息"""
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        product_no = params.get('product_no', None)
+        month_time = params.get('ym_time', datetime.datetime.now()).month
+        year_time = params.get('ym_time', datetime.datetime.now()).year
+        if not product_no:
+            raise ValidationError('胶料编码必传')
+        pass_list = [['门尼', '比重', '硬度', '流变'], ['门尼', '比重', '硬度'], ['流变']]
+        # test_indicator_name_dict =
+        ruturn_pass = []
+        return_dict = {}
+        return_dict['product_no'] = product_no
+        for day_time in range(1, int(datetime.datetime.now().day) + 1):
+            mto_set = MaterialTestOrder.objects.filter(delete_flag=False, production_factory_date__year=year_time,
+                                                       production_factory_date__month=month_time,
+                                                       production_factory_date__day=day_time,
+                                                       **return_dict).all()
+            if not mto_set:
+                continue
+            mto_count = mto_set.count()
+            pass_count = 0
+            level_list = []
+            for test_indicator_name_dict in pass_list:
+                for mto_obj in mto_set:
+                    mrt_list = mto_obj.order_results.filter(
+                        test_indicator_name__in=test_indicator_name_dict).all().values(
+                        'data_point_name').annotate(max_test_time=Max('test_times'))
+                    for mrt_dict in mrt_list:
+                        mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                                         test_indicator_name__in=test_indicator_name_dict,
+                                                                         data_point_name=mrt_dict['data_point_name'],
+                                                                         test_times=mrt_dict['max_test_time']).last()
+                        level_list.append(mrt_dict_obj)
+                    if not level_list:
+                        continue
+                    max_mtr = level_list[0]
+                    for mtr_obj in level_list:
+                        if not mtr_obj.data_point_indicator:
+                            continue
+                        else:
+                            if not max_mtr.data_point_indicator:
+                                max_mtr = mtr_obj
+                                continue
+                            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+                                max_mtr = mtr_obj
+                    if not max_mtr.data_point_indicator:
+                        print('123')
+                        continue
+                    if max_mtr.data_point_indicator.result == '合格':
+                        pass_count += 1
+                percent_of_pass = str((pass_count / mto_count) * 100) + '%'
+                return_dict[f'{test_indicator_name_dict}'] = percent_of_pass
+                print(return_dict)
+            ruturn_pass.append(return_dict)
+        return Response(ruturn_pass)
