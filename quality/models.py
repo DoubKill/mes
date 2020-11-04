@@ -161,7 +161,7 @@ class MaterialDealResult(AbstractEntity):
     deal_opinion = models.ForeignKey("DealSuggestion", help_text='综合处理意见id',
                                      on_delete=models.CASCADE, related_name='deal_opinions', blank=True, null=True)
     test_result = models.CharField(max_length=64, help_text="综合检测结果")
-    reason = models.CharField(max_length=64, help_text="不合格原因")
+    reason = models.TextField(help_text="不合格原因")
     status = models.CharField(max_length=16, help_text="状态", choices=CHOICE)
     deal_result = models.CharField(max_length=64, help_text="处理结果")
     deal_user = models.CharField(max_length=8, help_text="处理人", blank=True, null=True)
