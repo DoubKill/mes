@@ -94,10 +94,10 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
         order_results = validated_data.pop('order_results', None)
         test_order = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
                                                       actual_trains=validated_data['actual_trains']).first()
-        plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
-        if not plan:
-            raise serializers.ValidationError('该计划编号不存在')
-        validated_data['plan_classes_uid'] = plan.work_schedule_plan.group.global_name
+        # plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
+        # if not plan:
+        #     raise serializers.ValidationError('该计划编号不存在')
+        # validated_data['plan_classes_uid'] = plan.work_schedule_plan.group.global_name
         if test_order:
             instance = test_order
             created = False
