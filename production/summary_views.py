@@ -172,33 +172,47 @@ class CollectTrainsFeedbacksList(ListAPIView):
     filter_class = CollectTrainsFeedbacksFilter
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            if serializer.data:
-                sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
-                                              weeks=0)
-                max_time = serializer.data[0]['time_consuming']
-                min_time = serializer.data[0]['time_consuming']
-                for train_dict in serializer.data:
-                    if train_dict['time_consuming'] > max_time:
-                        max_time = train_dict['time_consuming']
-                    if train_dict['time_consuming'] < min_time:
-                        min_time = train_dict['time_consuming']
-                    sum_time += train_dict['time_consuming']
-                avg_time = sum_time / len(serializer.data)
-                train_list = serializer.data
-                train_list.append(
-                    {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+
+class SumCollectTrains(APIView):
+    """胶料单车次时间汇总最大最小平均时间"""
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        st = params.get("st", None)  # 开始时间
+        classes = params.get("classes", None)  # 班次
+        equip_no = params.get("equip_no", None)  # 设备编号
+        product_no = params.get("product_no", None)  # 胶料编码
+        dict_filter = {'delete_flag': False}
+        if st:
+            dict_filter['begin_time__date'] = st
+        if classes:
+            dict_filter['classes'] = classes
+        if equip_no:
+            dict_filter['equip_no'] = equip_no
+        if product_no:
+            dict_filter['product_no__icontains'] = product_no
+        tfb_set = TrainsFeedbacks.objects.filter(**dict_filter).values()
+        for tfb_obj in tfb_set:
+            if not tfb_obj['end_time'] or not tfb_obj['begin_time']:
+                tfb_obj['time_consuming'] = None
             else:
-                train_list = serializer.data
-                train_list.append(
-                    {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
-            return self.get_paginated_response(train_list)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+                tfb_obj['time_consuming'] = tfb_obj['end_time'] - tfb_obj['begin_time']
+        if tfb_set:
+            sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
+                                          weeks=0)
+            max_time = tfb_set[0]['time_consuming']
+            min_time = tfb_set[0]['time_consuming']
+            for tfb_obj in tfb_set:
+                if tfb_obj['time_consuming'] > max_time:
+                    max_time = tfb_obj['time_consuming']
+                if tfb_obj['time_consuming'] < min_time:
+                    min_time = tfb_obj['time_consuming']
+                sum_time += tfb_obj['time_consuming']
+            avg_time = sum_time / len(tfb_obj)
+            return Response(
+                {'results': {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time}})
+        else:
+            return Response({'results': {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None}})
 
 
 class CutTimeCollect(APIView):
@@ -253,11 +267,7 @@ class CutTimeCollect(APIView):
             return_list.append(
                 {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
             return Response({'results': return_list})
-        # 分页
-        counts = len(return_list)
-        return_list = return_list[(page - 1) * page_size:page_size * page]
-
-        # 统计最大、最小、综合、平均时间
+            # 统计最大、最小、综合、平均时间
         sum_time = datetime.timedelta(days=0, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0,
                                       weeks=0)
         max_time = return_list[0]['time_consuming']
@@ -271,4 +281,8 @@ class CutTimeCollect(APIView):
         avg_time = sum_time / len(return_list)
         return_list.append(
             {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+        # 分页
+        counts = len(return_list)
+        return_list = return_list[(page - 1) * page_size:page_size * page]
+
         return Response({'count': counts, 'results': return_list})
