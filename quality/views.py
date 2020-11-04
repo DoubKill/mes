@@ -353,6 +353,7 @@ class LevelResultViewSet(ModelViewSet):
         return super().list(self, request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductDayStatistics(APIView):
     """胶料日合格率统计"""
 
