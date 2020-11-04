@@ -257,13 +257,6 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
-
-        # 等级综合判定
-        # try:
-        # synthesize_to_material_deal_result(s.data['lot_no'])
-        # except Exception as e:
-        #     logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
-
         return Response('新建成功')
 
 
