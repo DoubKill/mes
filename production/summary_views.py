@@ -36,7 +36,7 @@ class ClassesBanBurySummaryView(ListAPIView):
 
         kwargs = {}
         if st:
-            kwargs['begin_time__date__gte'] = st
+            kwargs['end_time__date__gte'] = st
         if et:
             kwargs['end_time__date__lte'] = et
         if equip_no:
@@ -49,7 +49,7 @@ class ClassesBanBurySummaryView(ListAPIView):
         if day_type == '2':  # 按照工厂日期
             dimension_type['2'] = ['factory_date']
             dimension_type['1'][-1] = 'factory_date'
-            kwargs.pop('begin_time__date__gte', None)
+            kwargs.pop('end_time__date__gte', None)
             kwargs.pop('end_time__date__lte', None)
             if st:
                 kwargs['factory_date__gte'] = st
@@ -66,7 +66,8 @@ class ClassesBanBurySummaryView(ListAPIView):
             # 按月的维度分组，查询写法不一样
             data = TrainsFeedbacks.objects.exclude(classes='').annotate(
                 month=TruncMonth('end_time')).filter(**kwargs).values(*group_by_fields).annotate(
-                total_trains=Max('actual_trains'),
+                max_trains=Max('actual_trains'),
+                min_trains=Min('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
                 min_train_time=Min(F('end_time') - F('begin_time')) / 1000000,
                 max_train_time=Max(F('end_time') - F('begin_time')) / 1000000,
@@ -74,7 +75,8 @@ class ClassesBanBurySummaryView(ListAPIView):
             )
         else:
             data = TrainsFeedbacks.objects.exclude(classes='').filter(**kwargs).values(*group_by_fields).annotate(
-                total_trains=Max('actual_trains'),
+                max_trains=Max('actual_trains'),
+                min_trains=Min('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
                 min_train_time=Min(F('end_time') - F('begin_time')) / 1000000,
                 max_train_time=Max(F('end_time') - F('begin_time')) / 1000000,
@@ -82,11 +84,13 @@ class ClassesBanBurySummaryView(ListAPIView):
             )
         ret = {}
         for item in data:
+            diff_trains = item['max_trains'] - item['min_trains'] + 1
             item_key = ''.join([str(item[i]) for i in query_group_by_field]) + item['equip_no'] + item['product_no']
             if item_key not in ret:
+                item['total_trains'] = diff_trains
                 ret[item_key] = item
             else:
-                ret[item_key]['total_trains'] += item['total_trains']
+                ret[item_key]['total_trains'] += diff_trains
                 ret[item_key]['total_time'] += item['total_time']
 
         page = self.paginate_queryset(list(ret.values()))
@@ -107,7 +111,7 @@ class EquipBanBurySummaryView(ListAPIView):
 
         kwargs = {}
         if st:
-            kwargs['begin_time__date__gte'] = st
+            kwargs['end_time__date__gte'] = st
         if et:
             kwargs['end_time__date__lte'] = et
         if equip_no:
@@ -118,7 +122,7 @@ class EquipBanBurySummaryView(ListAPIView):
         if day_type == '2':  # 按照工厂日期
             dimension_type['2'] = ['factory_date']
             dimension_type['1'][-1] = 'factory_date'
-            kwargs.pop('begin_time__date__gte', None)
+            kwargs.pop('end_time__date__gte', None)
             kwargs.pop('end_time__date__lte', None)
             if st:
                 kwargs['factory_date__gte'] = st
@@ -135,21 +139,25 @@ class EquipBanBurySummaryView(ListAPIView):
             # 按月的维度分组，查询写法不一样
             data = TrainsFeedbacks.objects.exclude(classes='').annotate(
                 month=TruncMonth('end_time')).filter(**kwargs).values(*group_by_fields).annotate(
-                total_trains=Max('actual_trains'),
+                max_trains=Max('actual_trains'),
+                min_trains=Min('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
             )
         else:
             data = TrainsFeedbacks.objects.exclude(classes='').filter(**kwargs).values(*group_by_fields).annotate(
-                total_trains=Max('actual_trains'),
+                max_trains=Max('actual_trains'),
+                min_trains=Min('actual_trains'),
                 total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
             )
         ret = {}
         for item in data:
+            diff_trains = item['max_trains'] - item['min_trains'] + 1
             item_key = ''.join([str(item[i]) for i in query_group_by_field]) + item['equip_no']
             if item_key not in ret:
+                item['total_trains'] = diff_trains
                 ret[item_key] = item
             else:
-                ret[item_key]['total_trains'] += item['total_trains']
+                ret[item_key]['total_trains'] += diff_trains
                 ret[item_key]['total_time'] += item['total_time']
 
         page = self.paginate_queryset(list(ret.values()))
