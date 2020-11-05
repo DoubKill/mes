@@ -142,6 +142,21 @@ class WmsInventoryStock(models.Model):
         db_table = 't_inventory_stock'
         managed = False
 
+    @classmethod
+    def get_sql(cls, material_type = None, material_no = None):
+        material_type_filter = """AND material.MaterialGroupName = '{0}'""" \
+            .format(material_type) if material_type else ''
+        material_no_filter = """AND stock.MaterialCode LIKE '%%{material_no}%%'""" \
+            .format(material_no=material_no) if material_no else ''
+        sql = """
+                    SELECT *, material.MaterialGroupName AS material_type 
+                    FROM zhada_wms_zhongc.dbo.t_inventory_stock stock,
+                      zhada_wms_zhongc.dbo.t_inventory_material material
+                        WHERE stock.MaterialCode = material.MaterialCode
+                        {0} {1}
+                    """.format(material_type_filter, material_no_filter)
+        return sql
+
     def lot_no(self):
         pass
 

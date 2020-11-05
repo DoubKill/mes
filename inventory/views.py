@@ -387,18 +387,20 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             raise ValidationError('无次仓库名')
 
+    def get_query_param(self):
+        for query in 'material_type', 'container_no', 'material_no':
+            yield self.request.query_params.get(query, None)
+
     def get_queryset(self):
         model = self.divide_tool(self.MODEL)
         queryset = None
-        material_type = self.request.query_params.get('material_type', None)
-        container_no = self.request.query_params.get('container_no', None)
-        material_no = self.request.query_params.get('material_no', None)
+        material_type, container_no, material_no = self.get_query_param()
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             queryset = model.objects.using('bz').all()
         if queryset:
-            if material_type and not (model == BzFinalMixingRubberInventory):
+            if material_type and model != BzFinalMixingRubberInventory:
                 queryset = queryset.filter(material_type=material_type)
             if material_no:
                 queryset = queryset.filter(material_no__icontains=material_no)
@@ -406,18 +408,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(container_no__icontains=container_no)
             return queryset
         if model == WmsInventoryStock:
-            material_type_filter = """AND material.MaterialGroupName = '{0}'"""\
-                .format(material_type) if material_type else ''
-            material_no_filter = """AND stock.MaterialCode LIKE '%%{material_no}%%'"""\
-                .format(material_no=material_no) if material_no else ''
-            sql = """
-            SELECT *, material.MaterialGroupName AS material_type 
-            FROM zhada_wms_zhongc.dbo.t_inventory_stock stock,
-              zhada_wms_zhongc.dbo.t_inventory_material material
-                WHERE stock.MaterialCode = material.MaterialCode
-                {0} {1}
-            """.format(material_type_filter, material_no_filter)
-            queryset = model.objects.using('wms').raw(sql)
+            queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
         return queryset
 
     def get_serializer_class(self):
