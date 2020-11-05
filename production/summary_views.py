@@ -255,7 +255,6 @@ class CutTimeCollect(APIView):
         # 筛选工厂
         params = request.query_params
         st = params.get("st", None)  # 一天的
-        # et = params.get("et", None)  # 结束时间
         equip_no = params.get("equip_no", None)  # 设备编号
         try:
             page = int(params.get("page", 1))
@@ -294,6 +293,25 @@ class CutTimeCollect(APIView):
                 'cut_later_product_no': tfb_pn_later.product_no,
                 'time_consuming': tfb_pn_later.begin_time - tfb_pn_age.end_time}
             return_list.append(return_dict)
+        if st:  # 第二天的头一条
+            mst = datetime.datetime.strptime(st, "%Y-%m-%d") + datetime.timedelta(days=1)
+            m_tfb_obj = TrainsFeedbacks.objects.filter(delete_flag=False, equip_no=equip_no,
+                                                       end_time__date=mst).first()
+            if m_tfb_obj:
+                tfb_equip_uid_dict = tfb_equip_uid_list.last()
+                tfb_equip_uid_dict['end_time__date'] = st
+
+                tfb_pn_age = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).last()
+                if tfb_pn_age.plan_classes_uid != m_tfb_obj.plan_classes_uid:
+                    return_dict = {
+                        'time': tfb_pn_age.end_time.strftime("%Y-%m-%d"),
+                        'plan_classes_uid_age': tfb_pn_age.plan_classes_uid,
+                        'plan_classes_uid_later': m_tfb_obj.plan_classes_uid,
+                        'equip_no': tfb_pn_age.equip_no,
+                        'cut_ago_product_no': tfb_pn_age.product_no,
+                        'cut_later_product_no': m_tfb_obj.product_no,
+                        'time_consuming': m_tfb_obj.begin_time - tfb_pn_age.end_time}
+                    return_list.append(return_dict)
 
         if not return_list:
             return_list.append(
