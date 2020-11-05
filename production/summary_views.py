@@ -204,6 +204,17 @@ class CollectTrainsFeedbacksList(ListAPIView):
     filter_class = CollectTrainsFeedbacksFilter
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
 class SumCollectTrains(APIView):
     """胶料单车次时间汇总最大最小平均时间"""
@@ -240,7 +251,7 @@ class SumCollectTrains(APIView):
                 if tfb_obj['time_consuming'] < min_time:
                     min_time = tfb_obj['time_consuming']
                 sum_time += tfb_obj['time_consuming']
-            avg_time = sum_time / len(tfb_obj)
+            avg_time = sum_time / len(tfb_set)
             return Response(
                 {'results': {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time}})
         else:
