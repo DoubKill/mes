@@ -240,7 +240,7 @@ class SumCollectTrains(APIView):
                 if tfb_obj['time_consuming'] < min_time:
                     min_time = tfb_obj['time_consuming']
                 sum_time += tfb_obj['time_consuming']
-            avg_time = sum_time / len(tfb_obj)
+            avg_time = sum_time / len(tfb_set)
             return Response(
                 {'results': {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time}})
         else:
