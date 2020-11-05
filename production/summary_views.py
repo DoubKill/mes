@@ -311,10 +311,10 @@ class CutTimeCollect(APIView):
                 min_time = train_dict['time_consuming']
             sum_time += train_dict['time_consuming']
         avg_time = sum_time / len(return_list)
-        return_list.append(
-            {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
+
         # 分页
         counts = len(return_list)
         return_list = return_list[(page - 1) * page_size:page_size * page]
-
+        return_list.append(
+            {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
         return Response({'count': counts, 'results': return_list})
