@@ -12,7 +12,6 @@ class BaseUploader(object):
     endpoint = ""
 
     def request(self, msg_id, out_type, msg_count, str_user, json_data):
-        print(json_data)
         if not self.endpoint:
             raise NotImplementedError('未设置endpoint')
         pay_load = self.gen_payload(msg_id, out_type, msg_count, str_user, json_data)
@@ -25,8 +24,6 @@ class BaseUploader(object):
             raise Exception(resp.content)
         resp_xml = resp.text
         json_data = xmltodict.parse(resp_xml)
-        print(json_data)
-        print('json_data')
         return self.gen_result(json_data)
 
     def gen_result(self, data):
@@ -35,12 +32,6 @@ class BaseUploader(object):
     def gen_payload(self, msg_id, out_type, msg_count, str_user, json_data):
         raise NotImplementedError()
 
-    def gen_task_id(self):
-        #TODO
-        pass
-    def gen_order_id(self):
-        #TODO
-        pass
 
 
 
