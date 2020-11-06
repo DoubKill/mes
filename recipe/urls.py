@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ProductBatchingViewSet, MaterialAttributeViewSet, \
-    ValidateProductVersionsView, RecipeNoticeAPiView
+    ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet
 
 router = DefaultRouter()
 
@@ -18,6 +18,8 @@ router.register(r'product-infos', ProductInfoViewSet)
 
 # 胶料配料
 router.register(r'product-batching', ProductBatchingViewSet)
+
+router.register(r'materials-supplier', MaterialSupplierViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

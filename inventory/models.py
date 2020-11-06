@@ -110,16 +110,16 @@ class BzFinalMixingRubberInventory(models.Model):
     material_no = models.CharField(max_length=50, db_column='物料编码')
 
     def material_type(self):
-        pass
+        return "Unknown"
 
     def lot_no(self):
-        pass
+        return "Unknown"
 
     def unit(self):
-        pass
+        return "Unknown"
 
     def unit_weight(self):
-        pass
+        return "Unknown"
 
     class Meta:
         db_table = 'v_ASRS_STORE_MESVIEW'
@@ -137,14 +137,15 @@ class WmsInventoryStock(models.Model):
     unit = models.CharField(max_length=64, db_column='WeightUnit')
     quality_status = models.IntegerField(db_column='StockDetailState')
     material_type = models.CharField(max_length=64)
+    lot_no = models.CharField(max_length=64, db_column='BatchNo')
 
     class Meta:
         db_table = 't_inventory_stock'
         managed = False
 
     @classmethod
-    def get_sql(cls, material_type = None, material_no = None):
-        material_type_filter = """AND material.MaterialGroupName = '{0}'""" \
+    def get_sql(cls, material_type=None, material_no=None):
+        material_type_filter = """AND material.MaterialGroupName LIKE '%%{0}%%'""" \
             .format(material_type) if material_type else ''
         material_no_filter = """AND stock.MaterialCode LIKE '%%{material_no}%%'""" \
             .format(material_no=material_no) if material_no else ''
@@ -157,14 +158,11 @@ class WmsInventoryStock(models.Model):
                     """.format(material_type_filter, material_no_filter)
         return sql
 
-    def lot_no(self):
-        pass
-
     def container_no(self):
-        pass
+        return "Unknown"
 
     def unit_weight(self):
-        pass
+        return "Unknown"
 
 
 class WmsInventoryMaterial(models.Model):

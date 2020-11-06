@@ -385,23 +385,23 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         if warehouse_name and warehouse_name in self.INVENTORY_MODEL_BY_NAME:
             return self.INVENTORY_MODEL_BY_NAME[warehouse_name][index]
         else:
-            raise ValidationError('无次仓库名')
+            raise ValidationError('无此仓库名')
 
-    def get_query_param(self):
+    def get_query_params(self):
         for query in 'material_type', 'container_no', 'material_no':
             yield self.request.query_params.get(query, None)
 
     def get_queryset(self):
         model = self.divide_tool(self.MODEL)
         queryset = None
-        material_type, container_no, material_no = self.get_query_param()
+        material_type, container_no, material_no = self.get_query_params()
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             queryset = model.objects.using('bz').all()
         if queryset:
             if material_type and model != BzFinalMixingRubberInventory:
-                queryset = queryset.filter(material_type=material_type)
+                queryset = queryset.filter(material_type__icontains=material_type)
             if material_no:
                 queryset = queryset.filter(material_no__icontains=material_no)
             if container_no:
