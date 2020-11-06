@@ -31,17 +31,28 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         elif mtr_obj.mes_result != '合格':
             reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
             exist_data_point_indicator = False
+        if not max_mtr.data_point_indicator:
+            max_mtr = mtr_obj
+            continue
+        if not mtr_obj:
+            continue
+        if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+            max_mtr = mtr_obj
 
     mdr_dict['reason'] = reason
     mdr_dict['status'] = '待处理'
 
     if not exist_data_point_indicator:  # mes判断
-        mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
-        if mdp_obj:
-            mdr_dict['level'] = mdp_obj.level
+        if max_mtr.data_point_indicator:
+            mdr_dict['level'] = max_mtr.data_point_indicator.level
+            mdr_dict['deal_result'] = max_mtr.mes_result
         else:
-            mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
-        mdr_dict['deal_result'] = '不合格'
+            mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
+            if mdp_obj:
+                mdr_dict['level'] = mdp_obj.level
+            else:
+                mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
+            mdr_dict['deal_result'] = '不合格'
     else:
         for mtr_obj in level_list:  # 快检系统找到不合格数据
             reason = reason + '在快检系统中：'
