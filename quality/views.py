@@ -1,3 +1,6 @@
+import datetime
+
+from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -8,8 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet, ViewSet
-
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes.common_code import CommonDeleteMixin
@@ -17,26 +19,28 @@ from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks
-from quality.deal_result import synthesize_to_material_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
-    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult
+    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
-    DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer
+    DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
+    TestIndicatorSerializer
 from recipe.models import Material, ProductBatching
 import logging
+from django.db.models import Max
 
 logger = logging.getLogger('send_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
-class TestIndicatorListView(ListAPIView):
+class TestIndicatorViewSet(ModelViewSet):
     """试验指标列表"""
     queryset = TestIndicator.objects.filter(delete_flag=False)
+    serializer_class = TestIndicatorSerializer
 
     def list(self, request, *args, **kwargs):
         data = self.queryset.values('id', 'name')
@@ -158,73 +162,6 @@ class MaterialTestIndicatorMethods(APIView):
         return Response(ret.values())
 
 
-# class MaterialTestIndicatorsTabView(ListAPIView):
-#     """获取原材料及其试验类型表格数据，参数：?material_no=xxx"""
-#     permission_classes = (IsAuthenticated, )
-#     queryset = Material.objects.all()
-#
-#     def list(self, request, *args, **kwargs):
-#         material_no = self.request.query_params.get('material_no')
-#         material_data = MaterialTestMethod.objects.filter(delete_flag=False)
-#         if material_no:
-#             material_data = material_data.filter(material__material_no__icontains=material_no)
-#         material_ids = set(material_data.values_list('material_id', flat=True))
-#         materials = Material.objects.filter(id__in=material_ids)
-#         page_materials = self.paginate_queryset(materials)
-#         test_indicators = TestIndicator.objects.all()
-#         ret = []
-#         for material in page_materials:
-#             material_data = {'material_id': material.id,
-#                              'material_no': material.material_no,
-#                              'material_name': material.material_name,
-#                              'test_data_detail': {}
-#                              }
-#             for test_indicator in test_indicators:
-#                 if MaterialDataPointIndicator.objects.filter(
-#                         material_test_data_point__material_test_method__test_method__test_type__test_indicator=
-#                         test_indicator,
-#                         material_test_data_point__material_test_method__material=material).exists():
-#                     material_data['test_data_detail'][test_indicator.id] = {'test_type_name': test_indicator.name,
-#                                                                             'indicator_exists': True}
-#                 else:
-#                     material_data['test_data_detail'][test_indicator.id] = {'test_type_name': test_indicator.name,
-#                                                                             'indicator_exists': False}
-#             ret.append(material_data)
-#         return self.get_paginated_response(ret)
-
-
-# class MatIndicatorsTabView(APIView):
-#     """根据原材料编号和试验方法获取判断标准表格数据， 参数：material_no=胶料编号&test_method_id=试验方法id"""
-#     def get(self, request):
-#         material_no = self.request.query_params.get('material_no', 'BS1485')
-#         test_method_id = self.request.query_params.get('test_method_id', 7)
-#         if not all([material_no, test_method_id]):
-#             raise ValidationError('参数不足')
-#         test_data = MaterialTestMethodDataPoint.objects.filter(
-#             material_test_method__material__material_no=material_no,
-#             material_test_method__test_method_id=test_method_id)
-#         s = MaterialDataPointListSerializer(instance=test_data, many=True)
-#         ret = {}
-#         for item in s.data:
-#             mat_indicators = item['mat_indicators']
-#             for mat_indicator in mat_indicators:
-#                 if item['name'] not in ret:
-#                     ret[mat_indicator['result']] = {"level": mat_indicator['level'],
-#                                                     "result": mat_indicator['result'],
-#                                                     item['name']: {
-#                                                          'id': mat_indicator['id'],
-#                                                          "upper_limit": mat_indicator['upper_limit'],
-#                                                          "lower_limit": mat_indicator['lower_limit']}
-#                                                     }
-#                 else:
-#                     ret[mat_indicator['result']][item['name']] = {
-#                         'id': mat_indicator['id'],
-#                         "upper_limit": mat_indicator['upper_limit'],
-#                         "lower_limit": mat_indicator['lower_limit']
-#                         }
-#         return Response(ret.values())
-
-
 @method_decorator([api_recorder], name="dispatch")
 class MaterialTestOrderViewSet(mixins.CreateModelMixin,
                                mixins.ListModelMixin,
@@ -256,13 +193,6 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
-
-        # 等级综合判定
-        # try:
-        synthesize_to_material_deal_result(s.data['lot_no'])
-        # except Exception as e:
-        #     logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
-
         return Response('新建成功')
 
 
@@ -318,7 +248,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     post: 创建胶料处理结果
     put: 创建胶料处理结果
     """
-    queryset = MaterialDealResult.objects.filter(delete_flag=False).exclude(status='复测')
+    queryset = MaterialDealResult.objects.filter(~Q(deal_result="合格")).filter(~Q(status="复测")).filter(delete_flag=False)
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDealResulFilter
@@ -421,3 +351,67 @@ class LevelResultViewSet(ModelViewSet):
             data = queryset.values('id', 'deal_result', 'level')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductDayStatistics(APIView):
+    """胶料日合格率统计"""
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        # month_time = params.get('ym_time', datetime.datetime.now().month)
+        # year_time = params.get('ym_time', datetime.datetime.now().year)
+        month_time = params.get('ym_time', datetime.datetime.now()).month
+        year_time = params.get('ym_time', datetime.datetime.now()).year
+        pass_type = params.get('pass_type', 1)  # 1:综合合格率  2：一次合格率  3：流变合格率
+        pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
+        test_indicator_name_dict = pass_dict[pass_type]
+        product_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
+                                                           production_factory_date__year=year_time,
+                                                           production_factory_date__month=month_time).values(
+            'product_no').annotate().distinct()
+        ruturn_pass = []
+        for product_no_dict in product_no_list:
+            return_dict = {}
+            return_dict['product_no'] = product_no_dict['product_no']
+            for day_time in range(1, int(datetime.datetime.now().day) + 1):
+                mto_set = MaterialTestOrder.objects.filter(delete_flag=False, production_factory_date__year=year_time,
+                                                           production_factory_date__month=month_time,
+                                                           production_factory_date__day=day_time,
+                                                           **product_no_dict).all()
+                if not mto_set:
+                    continue
+                mto_count = mto_set.count()
+                pass_count = 0
+                level_list = []
+
+                for mto_obj in mto_set:
+                    mrt_list = mto_obj.order_results.filter(
+                        test_indicator_name__in=test_indicator_name_dict).all().values(
+                        'data_point_name').annotate(max_test_time=Max('test_times'))
+                    for mrt_dict in mrt_list:
+                        mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                                         test_indicator_name__in=test_indicator_name_dict,
+                                                                         data_point_name=mrt_dict['data_point_name'],
+                                                                         test_times=mrt_dict['max_test_time']).last()
+                        level_list.append(mrt_dict_obj)
+                    if not level_list:
+                        continue
+                    max_mtr = level_list[0]
+                    for mtr_obj in level_list:
+                        if not mtr_obj.data_point_indicator:
+                            continue
+                        else:
+                            if not max_mtr.data_point_indicator:
+                                max_mtr = mtr_obj
+                                continue
+                            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+                                max_mtr = mtr_obj
+                    if not max_mtr.data_point_indicator:
+                        continue
+                    if max_mtr.data_point_indicator.result == '合格':
+                        pass_count += 1
+                percent_of_pass = str((pass_count / mto_count) * 100) + '%'
+                return_dict[f'{month_time}-{day_time}'] = percent_of_pass
+            ruturn_pass.append(return_dict)
+        return Response(ruturn_pass)

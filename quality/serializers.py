@@ -4,17 +4,30 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
-from django.db.models import Sum, Max
+from django.db.models import Max
 
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from plan.uuidfield import UUidTools
-from production.models import TrainsFeedbacks, PalletFeedbacks
+from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult
+    MaterialDealResult, LevelResult, TestIndicator
+
+
+class TestIndicatorSerializer(BaseModelSerializer):
+    name = serializers.CharField(help_text='指标名称', validators=[UniqueValidator(queryset=TestIndicator.objects.all(),
+                                                                               message='该指标名称已存在！')])
+
+    def create(self, validated_data):
+        validated_data['no'] = UUidTools.uuid1_hex('TD')
+        return super().create(validated_data)
+
+    class Meta:
+        model = TestIndicator
+        fields = ('name',)
 
 
 class TestMethodSerializer(BaseModelSerializer):
@@ -94,10 +107,10 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
         order_results = validated_data.pop('order_results', None)
         test_order = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
                                                       actual_trains=validated_data['actual_trains']).first()
-        plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
-        if not plan:
-            raise serializers.ValidationError('该计划编号不存在')
-        validated_data['plan_classes_uid'] = plan.work_schedule_plan.group.global_name
+        # plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
+        # if not plan:
+        #     raise serializers.ValidationError('该计划编号不存在')
+        # validated_data['plan_classes_uid'] = plan.work_schedule_plan.group.global_name
         if test_order:
             instance = test_order
             created = False
@@ -138,6 +151,8 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 if indicator:
                     item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
+            item['created_user'] = self.context['request'].user  # 加一个create_user
+            item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
         return instance
 
@@ -316,7 +331,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         except:
             test_user = None
         test_note = max_mtr.material_test_order.note  # 备注
-        result = max_mtr.result  # 检测结果
+        result = max_mtr.result  # 检测结果,改了
         return {'test_status': test_status, 'test_factory_date': test_factory_date, 'test_class': test_class,
                 'test_user': test_user,
                 'test_note': test_note, 'result': result}
@@ -393,7 +408,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         fields = (
             'id', 'day_time', 'lot_no', 'classes_group', 'equip_no', 'product_no', 'actual_weight', 'residual_weight',
             'production_factory_date', 'valid_time', 'test', 'print_time', 'deal_user', 'deal_time', 'suggestion_desc',
-            'mtr_list', 'actual_trains', 'operation_user')
+            'mtr_list', 'actual_trains', 'operation_user', 'deal_result', 'deal_suggestion')
 
 
 class LevelResultSerializer(BaseModelSerializer):

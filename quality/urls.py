@@ -7,14 +7,15 @@ name:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from quality.views import TestIndicatorListView, TestMethodViewSet, TestIndicatorDataPointListView, \
+from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicatorDataPointListView, \
     MaterialTestOrderViewSet, TestTypeViewSet, DataPointViewSet, MaterialTestMethodViewSet, \
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
-    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet
+    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
+router.register('test-indicators', TestIndicatorViewSet)
 
 # 试验类型
 router.register('test-types', TestTypeViewSet)
@@ -34,15 +35,13 @@ router.register('material-deal-result', MaterialDealResultViewSet)
 router.register('level-result', LevelResultViewSet)
 
 urlpatterns = [
-    path('test-indicators/', TestIndicatorListView.as_view()),  # 试验指标列表
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
-    # path('material-test-indicators-tab/', MaterialTestIndicatorsTabView.as_view()),
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
-    # path('mat-indicator-tab/', MatIndicatorsTabView.as_view()),
     path('result-status/', MaterialDealStatusListView.as_view()),  # 不合格状态筛选
     path('deal-type/', DealTypeView.as_view()),
     path('pallet-feed-test/', PalletFeedbacksTestListView.as_view()),  # 快检信息综合管里
     path('material_valid_time/', MaterialDealResultUpdateValidTime.as_view()),  # 快检信息综合管理修改有效时间
     path('mat-test-indicator-methods/', MaterialTestIndicatorMethods.as_view()),
+    path('product_day_statistics/', ProductDayStatistics.as_view()),  # 胶料日合格率统计
     path('', include(router.urls)),
 ]
