@@ -352,6 +352,23 @@ class LevelResultViewSet(ModelViewSet):
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
+    def create(self, request, *args, **kwargs):
+        deal_result = self.request.data.get('deal_result', None)
+        level = self.request.data.get('level', None)
+        if not deal_result or not level:
+            raise ValidationError('等级和检测结果必传')
+        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level).first()
+        if lr_obj:
+            lr_obj.delete_flag = False
+            lr_obj.save()
+            return Response('新建成功')
+        else:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductDayStatistics(APIView):
