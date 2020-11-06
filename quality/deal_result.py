@@ -24,6 +24,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     reason = ''
     exist_data_point_indicator = True
     quality_point_indicator = True
+    is_hege = True
     for mtr_obj in level_list:
         if not mtr_obj.mes_result:  # mes找到不合格数据
             reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}没有判定区间，\n'
@@ -33,19 +34,24 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             exist_data_point_indicator = False
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
+            is_hege = False
             continue
         if not mtr_obj.data_point_indicator:
+            is_hege = False
             continue
         if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
             max_mtr = mtr_obj
 
     mdr_dict['reason'] = reason
     mdr_dict['status'] = '待处理'
-
     if not exist_data_point_indicator:  # mes判断
         if max_mtr.data_point_indicator:
-            mdr_dict['level'] = max_mtr.data_point_indicator.level
-            mdr_dict['deal_result'] = max_mtr.mes_result
+            if is_hege:
+                mdr_dict['level'] = max_mtr.data_point_indicator.level
+                mdr_dict['deal_result'] = max_mtr.mes_result
+            else:
+                mdr_dict['level'] = 0
+                mdr_dict['deal_result'] = '不合格'
         else:
             mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
             if mdp_obj:
