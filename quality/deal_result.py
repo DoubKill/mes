@@ -34,7 +34,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
             continue
-        if not mtr_obj:
+        if not mtr_obj.data_point_indicator:
             continue
         if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
             max_mtr = mtr_obj
