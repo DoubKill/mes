@@ -15,3 +15,5 @@ class PutPlanManagementFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = DeliveryPlan
         fields = ('st', 'et', 'status','material_no','name')
+from . import models
+

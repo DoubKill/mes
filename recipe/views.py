@@ -17,9 +17,9 @@ from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFil
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
-    ProductBatchingPartialUpdateSerializer
+    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail
+    ProductBatchingDetail, MaterialSupplier
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -79,6 +79,15 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialAttributeFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialSupplierViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = MaterialSupplier.objects.filter(use_flag=1).order_by('-created_date')
+    serializer_class = MaterialSupplierSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['material']
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -231,7 +240,7 @@ class RecipeNoticeAPiView(APIView):
         except Exception:
             raise ValidationError('参数错误')
         product_batching = ProductBatching.objects.filter(id=product_batching_id).prefetch_related(
-                Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))).first()
+            Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))).first()
         if not product_batching:
             raise ValidationError('该配方不存在')
         if not product_batching.used_type == 4:

@@ -25,6 +25,9 @@ router.register('overdue-material-management', OverdueMaterialManagement)
 
 router.register('out_work', OutWork)
 
+# 物料库存信息|线边库|终炼胶库|原材料库
+router.register(r'material-inventory-manage', views.MaterialInventoryManageViewSet, basename='material-inventory-manage')
+
 urlpatterns = [
     # path('out-store/', OutWork.as_view()),
     path('', include(router.urls)),
