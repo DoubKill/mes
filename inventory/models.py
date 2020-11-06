@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from basics.models import GlobalCode
 from recipe.models import Material
-from system.models import AbstractEntity
+from system.models import AbstractEntity, User
 
 
 class OutOrderFeedBack(models.Model):
@@ -109,8 +109,15 @@ class DeliveryPlan(models.Model):
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
     inventory_reason = models.CharField(max_length=128,verbose_name='出入库原因', help_text='出入库原因')
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
-    status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号',choices=ORDER_TYPE_CHOICE, default=1)
+    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=1)
     out_time = models.DateTimeField(verbose_name='出库时间', help_text='出库时间', auto_now_add=True)
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
+    created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
+                                     help_text='创建人', verbose_name='创建人', on_delete=models.CASCADE,
+                                     related_query_name='c_%(app_label)s_%(class)ss')
+
 
     class Meta:
         db_table = 'delivery_plan'
