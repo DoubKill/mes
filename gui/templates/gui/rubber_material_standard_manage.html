@@ -49,14 +49,15 @@
             </el-select>
         </el-form-item>
 
-        <el-form-item  label="胶料编码">
-            <el-input style="width: 200px" v-model="stage_product_batch_no" v-on:input="stage_product_batch_noChanged"></el-input>
+        <el-form-item label="胶料编码">
+            <el-input style="width: 200px" v-model="stage_product_batch_no"
+                      v-on:input="stage_product_batch_noChanged"></el-input>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button  @click="showAddRubberMaterialDialog">新建</el-button>
+            <el-button @click="showAddRubberMaterialDialog">新建</el-button>
         </el-form-item>
         <el-form-item style="float: right">
-            <el-button :disabled="currentRow.used_type != 1"  @click="showPutRubberMaterialDialog">配料</el-button>
+            <el-button :disabled="currentRow.used_type != 1" @click="showPutRubberMaterialDialog">配料</el-button>
         </el-form-item>
 
 
@@ -130,7 +131,8 @@
                     <el-button @click="status_true(scope.row)" size="mini" v-if="scope.row.used_type === 3">
                         启用
                     </el-button>
-                    <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 2 | scope.row.used_type === 3">
+                    <el-button @click="status_false(scope.row)" size="mini"
+                               v-if="scope.row.used_type === 2 | scope.row.used_type === 3">
                         驳回
                     </el-button>
                     <el-button @click="status_false(scope.row)" size="mini" v-if="scope.row.used_type === 4">
@@ -198,19 +200,6 @@
                     </el-option>
                 </el-select>
             </el-form-item>
-
-            <el-form-item label="胶料编码" prop="rubber_no">
-                <el-autocomplete
-                        style="width: 100%"
-                        size="mini"
-                        value-key = "product_no"
-                        v-model="rubberMaterialForm.rubber_no"
-                        :fetch-suggestions="rubber_no_querySearchAsync"
-                        placeholder="请输入内容"
-                        @select="RecipehandleSelect"
-                ></el-autocomplete>
-            </el-form-item>
-
             <el-form-item label="段次" prop="stage">
                 <el-select
                         style="width: 100%"
@@ -225,14 +214,28 @@
                     </el-option>
                 </el-select>
             </el-form-item>
+            <el-form-item label="胶料编码" prop="rubber_no">
+                <el-autocomplete
+                        style="width: 100%"
+                        size="mini"
+                        value-key="product_no"
+                        v-model="rubberMaterialForm.rubber_no"
+                        :fetch-suggestions="rubber_no_querySearchAsync"
+                        placeholder="请输入内容"
+                        @select="RecipehandleSelect"
+                ></el-autocomplete>
+            </el-form-item>
             <el-form-item label="版本" prop="version">
-                <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.version" placeholder="版本" v-on:input="GenerateRubberMaterialNOChanged"></el-input>
+                <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.version" placeholder="版本"
+                          v-on:input="GenerateRubberMaterialNOChanged"></el-input>
             </el-form-item>
             <el-form-item label="方案">
-            <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.scheme" placeholder="方案"></el-input>
+                <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.scheme"
+                          placeholder="方案"></el-input>
             </el-form-item>
             <el-form-item label="胶料配方编码">
-            <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.generate_material_no" :disabled="true" placeholder=""></el-input>
+                <el-input style="width: 100%" size="mini" v-model="rubberMaterialForm.generate_material_no"
+                          :disabled="true" placeholder=""></el-input>
             </el-form-item>
             <el-form-item>
                 <!--<el-button @click="dialogAddRubberMaterial = false">取 消</el-button>-->
@@ -256,25 +259,31 @@
             </el-form-item>
         </el-form>
 
-        胶料编码:&nbsp;&nbsp;&nbsp;&nbsp; <el-input size="mini" v-model="select_stage_product_batch_no" :disabled="true" style="width: 20%" ></el-input>
-        胶料名称: <el-input size="mini" v-model="select_product_name" :disabled="true" style="width: 10%" ></el-input>
-        状态: <el-input size="mini" v-model="select_status" :disabled="true" style="width: 10%" ></el-input>
+        胶料编码:&nbsp;&nbsp;&nbsp;&nbsp;
+        <el-input size="mini" v-model="select_stage_product_batch_no" :disabled="true" style="width: 20%"></el-input>
+        胶料名称:
+        <el-input size="mini" v-model="select_product_name" :disabled="true" style="width: 10%"></el-input>
+        状态:
+        <el-input size="mini" v-model="select_status" :disabled="true" style="width: 10%"></el-input>
         <br><br>
         炼胶机类型:
-            <el-select
-                    size="mini"
-                    clearable
-                    v-model="select_dev_type" placeholder="请选择">
-                <el-option
-                        v-for="item in DevTypeOptions"
-                        :key="item.id"
-                        :label="item.category_name"
-                        :value="item.id">
-                </el-option>
-            </el-select>
+        <el-select
+                size="mini"
+                clearable
+                v-model="select_dev_type" placeholder="请选择">
+            <el-option
+                    v-for="item in DevTypeOptions"
+                    :key="item.id"
+                    :label="item.category_name"
+                    :value="item.id">
+            </el-option>
+        </el-select>
 
-        配料重量: <el-input size="mini" v-model="select_material_weight" :disabled="true" style="width: 10%" ></el-input>
-        炼胶时间: <el-time-picker size="mini" :disabled="true" v-model="select_rm_time_interval" value-format="HH:mm:ss" :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
+        配料重量:
+        <el-input size="mini" v-model="select_material_weight" :disabled="true" style="width: 10%"></el-input>
+        炼胶时间:
+        <el-time-picker size="mini" :disabled="true" v-model="select_rm_time_interval" value-format="HH:mm:ss"
+                        :picker-options="{selectableRange: '00:00:00 - 23:59:59'}" placeholder="选择时间"></el-time-picker>
 
         <br><br>
 
@@ -306,21 +315,25 @@
                     <td style="text-align: center">{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
                         <template>
-                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="1">自动</el-radio>
-                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="2">手动</el-radio>
-                          <el-radio v-model="new_material_ele.auto_flag_radio" :label="0">其他</el-radio>
+                            <el-radio v-model="new_material_ele.auto_flag_radio" :label="1">自动</el-radio>
+                            <el-radio v-model="new_material_ele.auto_flag_radio" :label="2">手动</el-radio>
+                            <el-radio v-model="new_material_ele.auto_flag_radio" :label="0">其他</el-radio>
                         </template>
                     </td>
                     <td style="text-align: center">
                         <div style="margin-top: 12px;">
-                          <el-input v-model="new_material_ele.material_name" size="mini" style="width: 70%" class="input-with-select" :disabled="true">
-                            <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
-                          </el-input>
+                            <el-input v-model="new_material_ele.material_name" size="mini" style="width: 70%"
+                                      class="input-with-select" :disabled="true">
+                                <el-button slot="append" icon="el-icon-search"
+                                           v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
+                            </el-input>
                         </div>
 
                     </td>
                     <td style="text-align: center">
-                        <el-input-number size="mini" controls-position="right" @change="NewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.practical_weight"></el-input-number>
+                        <el-input-number size="mini" controls-position="right"
+                                         @change="NewPracticalWeightChanged(new_material_ele)"
+                                         v-model.number="new_material_ele.practical_weight"></el-input-number>
                     </td>
                     <td style="text-align: center">
                         <el-button size="mini" v-on:click="del_raw_material_row(new_material_ele, index)">删除</el-button>
@@ -332,7 +345,7 @@
         </table>
         <el-form>
             <el-form-item style="text-align: center">
-                <el-button  @click="insert_NewPracticalWeightChanged">插入一行</el-button>
+                <el-button @click="insert_NewPracticalWeightChanged">插入一行</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
@@ -349,24 +362,31 @@
             </el-form-item>
         </el-form>
 
-        胶料编码:&nbsp;&nbsp;&nbsp;&nbsp; <el-input size="mini" v-model="put_select_stage_product_batch_no" :disabled="true" style="width: 20%" ></el-input>
-        胶料名称: <el-input size="mini" v-model="put_select_product_name" :disabled="true" style="width: 10%" ></el-input>
-        状态: <el-input size="mini" v-model="put_select_status" :disabled="true" style="width: 10%" ></el-input>
+        胶料编码:&nbsp;&nbsp;&nbsp;&nbsp;
+        <el-input size="mini" v-model="put_select_stage_product_batch_no" :disabled="true"
+                  style="width: 20%"></el-input>
+        胶料名称:
+        <el-input size="mini" v-model="put_select_product_name" :disabled="true" style="width: 10%"></el-input>
+        状态:
+        <el-input size="mini" v-model="put_select_status" :disabled="true" style="width: 10%"></el-input>
         <br><br>
         炼胶机类型:
-            <el-select
-                    size="mini"
-                    clearable
-                    v-model="put_select_dev_type" placeholder="请选择">
-                <el-option
-                        v-for="item in DevTypeOptions"
-                        :key="item.id"
-                        :label="item.category_name"
-                        :value="item.id">
-                </el-option>
-            </el-select>
-        配料重量: <el-input size="mini" v-model="put_select_material_weight" :disabled="true" style="width: 10%" ></el-input>
-        炼胶时间: <el-input-number size="mini" controls-position="right"  v-model.number="put_select_rm_time_interval"></el-input-number>
+        <el-select
+                size="mini"
+                clearable
+                v-model="put_select_dev_type" placeholder="请选择">
+            <el-option
+                    v-for="item in DevTypeOptions"
+                    :key="item.id"
+                    :label="item.category_name"
+                    :value="item.id">
+            </el-option>
+        </el-select>
+        配料重量:
+        <el-input size="mini" v-model="put_select_material_weight" :disabled="true" style="width: 10%"></el-input>
+        炼胶时间:
+        <el-input-number size="mini" controls-position="right"
+                         v-model.number="put_select_rm_time_interval"></el-input-number>
 
         <br><br>
 
@@ -398,23 +418,28 @@
                     <td style="text-align: center">{{ new_material_ele.material_type }}</td>
                     <td style="text-align: center">
                         <template>
-                          <el-radio v-model="new_material_ele.auto_flag" :label="1">自动</el-radio>
-                          <el-radio v-model="new_material_ele.auto_flag" :label="2">手动</el-radio>
-                          <el-radio v-model="new_material_ele.auto_flag" :label="0">其他</el-radio>
+                            <el-radio v-model="new_material_ele.auto_flag" :label="1">自动</el-radio>
+                            <el-radio v-model="new_material_ele.auto_flag" :label="2">手动</el-radio>
+                            <el-radio v-model="new_material_ele.auto_flag" :label="0">其他</el-radio>
                         </template>
                     </td>
                     <td style="text-align: center">
                         <div style="margin-top: 12px;">
-                          <el-input v-model="new_material_ele.material_name" size="mini" style="width: 70%" class="input-with-select" :disabled="true">
-                            <el-button slot="append" icon="el-icon-search" v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
-                          </el-input>
+                            <el-input v-model="new_material_ele.material_name" size="mini" style="width: 70%"
+                                      class="input-with-select" :disabled="true">
+                                <el-button slot="append" icon="el-icon-search"
+                                           v-on:click="pop_up_raw_material(new_material_ele, index)"></el-button>
+                            </el-input>
                         </div>
                     </td>
                     <td style="text-align: center">
-                        <el-input-number size="mini" controls-position="right" @change="PutNewPracticalWeightChanged(new_material_ele)" v-model.number="new_material_ele.actual_weight"></el-input-number>
+                        <el-input-number size="mini" controls-position="right"
+                                         @change="PutNewPracticalWeightChanged(new_material_ele)"
+                                         v-model.number="new_material_ele.actual_weight"></el-input-number>
                     </td>
                     <td style="text-align: center">
-                        <el-button size="mini" v-on:click="del_mod_raw_material_row(new_material_ele, index)">删除</el-button>
+                        <el-button size="mini" v-on:click="del_mod_raw_material_row(new_material_ele, index)">删除
+                        </el-button>
                     </td>
                 </tr>
 
@@ -426,7 +451,7 @@
         </table>
         <el-form>
             <el-form-item style="text-align: center">
-                <el-button  @click="insert_PutNewPracticalWeightChanged">插入一行</el-button>
+                <el-button @click="insert_PutNewPracticalWeightChanged">插入一行</el-button>
             </el-form-item>
         </el-form>
     </el-dialog>
@@ -452,55 +477,58 @@
                     </el-option>
                 </el-select>
             </el-form-item>
-            原材料编号:<el-input  v-model="search_material_no" v-on:input="search_material_no_Change" style="width: 20%" ></el-input>
-            原材料名称:<el-input  v-model="search_material_name" v-on:input="search_material_name_Change" style="width: 20%" ></el-input>
+            原材料编号:
+            <el-input v-model="search_material_no" v-on:input="search_material_no_Change" style="width: 20%"></el-input>
+            原材料名称:
+            <el-input v-model="search_material_name" v-on:input="search_material_name_Change"
+                      style="width: 20%"></el-input>
         </el-form>
 
 
         <el-table
-            highlight-current-row
-            :data="tableRawMaterialData"
-            border
-            style="width: 100%">
-        <el-table-column
-                align="center"
-                label="S"
-                width="30">
-        </el-table-column>
-        <el-table-column
-                align="center"
-                prop="material_no"
-                label="原材料代码">
-        </el-table-column>
-        <el-table-column
-                align="center"
-                prop="material_name"
-                label="原材料名称">
-        </el-table-column>
-        <el-table-column
-                align="center"
-                prop="material_type_name"
-                label="原材料类别">
-        </el-table-column>
-        <el-table-column align="center" label="操作">
-            <template slot-scope="scope">
-                <el-button-group>
-                    <el-button
-                            size="mini"
-                            @click="handleMaterialSelect(scope.row)">选中
-                    </el-button>
-                </el-button-group>
-            </template>
-        </el-table-column>
-    </el-table>
+                highlight-current-row
+                :data="tableRawMaterialData"
+                border
+                style="width: 100%">
+            <el-table-column
+                    align="center"
+                    label="S"
+                    width="30">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    prop="material_no"
+                    label="原材料代码">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    prop="material_name"
+                    label="原材料名称">
+            </el-table-column>
+            <el-table-column
+                    align="center"
+                    prop="material_type_name"
+                    label="原材料类别">
+            </el-table-column>
+            <el-table-column align="center" label="操作">
+                <template slot-scope="scope">
+                    <el-button-group>
+                        <el-button
+                                size="mini"
+                                @click="handleMaterialSelect(scope.row)">选中
+                        </el-button>
+                    </el-button-group>
+                </template>
+            </el-table-column>
+        </el-table>
 
-    <el-pagination
-        @current-change="raw_material_handleCurrentChange"
-        :current-page.sync="currentPage"
-        :page-size="raw_material_pageSize"
-        :total="raw_material_tableDataTotal"
-        layout="total, prev, pager, next">
-    </el-pagination>
+        <el-pagination
+                @current-change="raw_material_handleCurrentChange"
+                :current-page.sync="currentPage"
+                :page-size="raw_material_pageSize"
+                :total="raw_material_tableDataTotal"
+                layout="total, prev, pager, next">
+        </el-pagination>
 
     </el-dialog>
 
