@@ -27,7 +27,7 @@ class TestIndicatorSerializer(BaseModelSerializer):
 
     class Meta:
         model = TestIndicator
-        fields = ('name', )
+        fields = ('name',)
 
 
 class TestMethodSerializer(BaseModelSerializer):
@@ -151,6 +151,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 if indicator:
                     item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
+            item['created_user'] = self.context['request'].user  # 加一个create_user
             MaterialTestResult.objects.create(**item)
         return instance
 
@@ -406,7 +407,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         fields = (
             'id', 'day_time', 'lot_no', 'classes_group', 'equip_no', 'product_no', 'actual_weight', 'residual_weight',
             'production_factory_date', 'valid_time', 'test', 'print_time', 'deal_user', 'deal_time', 'suggestion_desc',
-            'mtr_list', 'actual_trains', 'operation_user','deal_result','deal_suggestion')
+            'mtr_list', 'actual_trains', 'operation_user', 'deal_result', 'deal_suggestion')
 
 
 class LevelResultSerializer(BaseModelSerializer):
