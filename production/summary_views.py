@@ -60,8 +60,16 @@ class ClassesBanBurySummaryView(ListAPIView):
 
         kwargs = {}
         if st:
+            try:
+                datetime.datetime.strptime(st, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("开始日期格式错误")
             kwargs['end_time__date__gte'] = st
         if et:
+            try:
+                datetime.datetime.strptime(et, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("开始日期格式错误")
             kwargs['end_time__date__lte'] = et
         if equip_no:
             kwargs['equip_no__icontains'] = equip_no
@@ -139,8 +147,16 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
 
         kwargs = {}
         if st:
+            try:
+                datetime.datetime.strptime(st, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("开始日期格式错误")
             kwargs['end_time__date__gte'] = st
         if et:
+            try:
+                datetime.datetime.strptime(et, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("开始日期格式错误")
             kwargs['end_time__date__lte'] = et
         if equip_no:
             kwargs['equip_no__icontains'] = equip_no
