@@ -233,6 +233,14 @@ DATABASES = {
         'HOST':'10.4.10.17',
         'PORT':'1521'
     },
+    'pro': {
+        'ENGINE': 'django.db.backends.oracle',
+        'NAME': 'zcaj1',  # 数据库SID
+        'USER': 'zcajlj',
+        'PASSWORD': 'zcajmes2020',
+        'HOST':'10.4.10.17',
+        'PORT':'1521'
+        },
     'bz': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_2',

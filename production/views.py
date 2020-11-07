@@ -112,7 +112,7 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
     create:
         创建机台状况反馈
     """
-    queryset = EquipStatus.objects.filter(delete_flag=False).order_by("created_date")
+    queryset = EquipStatus.objects.using('pro').filter(delete_flag=False)
     pagination_class = SinglePageNumberPagination
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = EquipStatusSerializer
