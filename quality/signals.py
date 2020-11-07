@@ -9,6 +9,9 @@ from django.dispatch import receiver
 
 from quality.deal_result import synthesize_to_material_deal_result
 from quality.models import MaterialTestResult
+import logging
+
+logger = logging.getLogger('send_log')
 
 
 @receiver(post_save, sender=MaterialTestResult)

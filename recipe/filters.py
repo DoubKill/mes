@@ -41,8 +41,9 @@ class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialAttributeFilter(django_filters.rest_framework.FilterSet):
-    material_no = django_filters.NumberFilter(field_name='material__material_no', help_text='原材料编码')
+    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='原材料编码', lookup_expr='icontains')
+    material_type = django_filters.CharFilter(field_name='material__material_type__global_name', help_text='原材料类型')
 
     class Meta:
         model = MaterialAttribute
-        fields = ('material_no',)
+        fields = ('material_no', 'material_type')
