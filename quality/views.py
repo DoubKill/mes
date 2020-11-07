@@ -339,7 +339,6 @@ class LevelResultViewSet(ModelViewSet):
         instance = self.get_object()
         mdp_set = MaterialDataPointIndicator.objects.filter(level=instance.level, result=instance.deal_result,
                                                             delete_flag=False)
-        print(mdp_set,123)
         if mdp_set:
             raise ValidationError('该等级已被使用，不能删除')
         instance.delete_flag = True
