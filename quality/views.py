@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -433,3 +433,11 @@ class ProductDayStatistics(APIView):
                 return_dict[f'{month_time}-{day_time}'] = percent_of_pass
             ruturn_pass.append(return_dict)
         return Response(ruturn_pass)
+
+
+class DealSuggestionView(APIView):
+    """处理意见展示"""
+
+    def get(self, request, *args, **kwargs):
+        queryset = MaterialDealResult.objects.filter(delete_flag=False).values('deal_suggestion').annotate().distinct()
+        return Response(queryset.values_list('deal_suggestion', flat=True))
