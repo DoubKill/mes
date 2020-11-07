@@ -225,45 +225,38 @@ LOGGING = {
 }
 
 DATABASES = {
-     'bak':{
+     'default':{
         'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.mysql'),  # 数据库引擎
         'NAME': os.getenv('MES_DATABASE_NAME', 'MES'),  # 数据库名称
         'USER': os.getenv('MES_DATABASE_USERNAME', 'root'),  # 用户名
         'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
         'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
         'PORT': os.getenv('MES_MONOCLE_API_PORT', '33307'),  # 端口
-    },
-    # 'default': {
-    #     'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.mysql'),  # 数据库引擎
-    #     'NAME': os.getenv('MES_DATABASE_NAME', 'TEST2'),  # 数据库名称
-    #     'USER': os.getenv('MES_DATABASE_USERNAME', 'root'),  # 用户名
-    #     'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mysql'),  # 密码
-    #     'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
-    #     'PORT': os.getenv('MES_MONOCLE_API_PORT', '3306'),  # 端口
-    # },
-    # 'bz': {
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'ASRS_ZC_AJ_2',
-    #     'HOST': '10.4.23.101',
-    #     'PORT': '1433',
-    #     'USER': 'GZ_MES',
-    #     'PASSWORD': 'mes@_123',
-    #     'OPTIONS': {
-    #         'driver': 'SQL Server Native Client 11.0',
-    #         'MARS_Connection': True,
-    #     },
-    # },
-    # 'wms': {
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'zhada_wms_zhongc',
-    #     'HOST': '10.4.24.25',
-    #     'PORT': '1433',
-    #     'USER': 'sa',
-    #     'PASSWORD': 'Admin123$',
-    #     'OPTIONS': {
-    #         'driver': 'SQL Server Native Client 11.0',
-    #         'MARS_Connection': True,
-    #     },
+        },
+    'bz': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_2',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'SQL Server Native Client 11.0',
+            'MARS_Connection': True,
+            },
+        },
+    'wms': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'zhada_wms_zhongc',
+        'HOST': '10.4.24.25',
+        'PORT': '1433',
+        'USER': 'sa',
+        'PASSWORD': 'Admin123$',
+        'OPTIONS': {
+            'driver': 'SQL Server Native Client 11.0',
+            'MARS_Connection': True,
+            },
+    }
 }
 #
 # DATABASES = {

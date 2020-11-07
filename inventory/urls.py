@@ -31,7 +31,7 @@ router.register(r'material-inventory-manage', views.MaterialInventoryManageViewS
 # 混炼胶库
 
 urlpatterns = [
-    path('material_no/', MaterialCount.as_view()),
+    path('material_count/', MaterialCount.as_view()),
     path('', include(router.urls)),
 
     ]
