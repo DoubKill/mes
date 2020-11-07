@@ -84,7 +84,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     mdr_dict['production_factory_date'] = pfb_obj.begin_time
 
     iir_mdr_obj = MaterialDealResult.objects.filter(lot_no=mdr_lot_no).order_by('test_time').last()
-    print(mdr_dict)
     if iir_mdr_obj:
         mdr_dict['test_time'] = iir_mdr_obj.test_time + 1
         MaterialDealResult.objects.filter(lot_no=mdr_lot_no).update(status='复测')
