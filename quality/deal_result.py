@@ -50,7 +50,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 mdr_dict['level'] = max_mtr.data_point_indicator.level
                 mdr_dict['deal_result'] = max_mtr.mes_result
             else:
-                mdr_dict['level'] = 0
+                mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
                 mdr_dict['deal_result'] = '不合格'
         else:
             mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
