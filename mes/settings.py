@@ -226,12 +226,12 @@ LOGGING = {
 
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
-        'NAME': os.getenv('MES_DATABASE_NAME', ''),  # 数据库名称
-        'USER': os.getenv('MES_DATABASE_USERNAME', ''),  # 用户名
-        'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', ''),  # 密码
-        'HOST': os.getenv('MES_DATABASE_HOSTNAME', ''),  # HOST
-        'PORT': os.getenv('MES_MONOCLE_API_PORT', ''),  # 端口
+        'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.mysql'),  # 数据库引擎
+        'NAME': os.getenv('MES_DATABASE_NAME', 'TEST2'),  # 数据库名称
+        'USER': os.getenv('MES_DATABASE_USERNAME', 'root'),  # 用户名
+        'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mysql'),  # 密码
+        'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
+        'PORT': os.getenv('MES_MONOCLE_API_PORT', '3306'),  # 端口
     },
     'bz': {
         'ENGINE': 'sql_server.pyodbc',

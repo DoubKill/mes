@@ -42,7 +42,7 @@ class WarehouseInfo(models.Model):
 class WarehouseMaterialType(models.Model):
     """仓库物料类型"""
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="warehouse_material_types")
-    material_type = models.OneToOneField(GlobalCode, on_delete=models.CASCADE)
+    material_type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'ware_house_material_type'
