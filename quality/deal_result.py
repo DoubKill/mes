@@ -62,9 +62,10 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         for mtr_obj in level_list:  # 快检系统找到不合格数据
             reason = reason + '在快检系统中：'
-            if mtr_obj.result != '合格' or mtr_obj.result != None:
+            if mtr_obj.result not in ['合格', None]:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}{mtr_obj.result}\n'
                 quality_point_indicator = False
+
         if not quality_point_indicator:  # 快检判断
             mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
             if mdp_obj:
