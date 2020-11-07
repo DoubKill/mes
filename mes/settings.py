@@ -73,7 +73,7 @@ AUTH_USER_MODEL = 'system.User'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [os.path.join(BASE_DIR, 'dist')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -225,14 +225,14 @@ LOGGING = {
 }
 
 DATABASES = {
-     'default':{
-        'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.mysql'),  # 数据库引擎
-        'NAME': os.getenv('MES_DATABASE_NAME', 'MES'),  # 数据库名称
-        'USER': os.getenv('MES_DATABASE_USERNAME', 'root'),  # 用户名
-        'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
-        'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
-        'PORT': os.getenv('MES_MONOCLE_API_PORT', '33307'),  # 端口
-        },
+     'default': {
+        'ENGINE': 'django.db.backends.oracle',
+        'NAME': 'zcaj1',  # 数据库SID
+        'USER': 'MES',
+        'PASSWORD': 'mes2020',
+        'HOST':'10.4.10.17',
+        'PORT':'1521'
+    },
     'bz': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_2',
@@ -362,6 +362,11 @@ AUTH_USER_MODEL = 'system.User'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, "static/"))
+
+STATICFILES_DIRS = [
+    # os.path.join(BASE_DIR, 'static'),# 项目默认会有的路径，如果你部署的不仅是前端打包的静态文件，项目目录static文件下还有其他文件，最好不要删
+    os.path.join(BASE_DIR, "dist/static"),# 加上这条
+]
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),
