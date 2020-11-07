@@ -183,9 +183,10 @@ class MaterialDealResult(AbstractEntity):
 
 class LevelResult(AbstractEntity):
     """等级和结果"""
-    deal_result = models.CharField(max_length=64, help_text="检测结果", unique=True)
-    level = models.PositiveIntegerField(help_text='等级', unique=True)
+    deal_result = models.CharField(max_length=64, help_text="检测结果")
+    level = models.PositiveIntegerField(help_text='等级')
 
     class Meta:
+        unique_together = ('deal_result', 'level')
         db_table = 'level_result'
         verbose_name_plural = verbose_name = '等级和结果'

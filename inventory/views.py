@@ -2,6 +2,7 @@ import json
 import time
 
 import requests
+from django.db.models import Sum
 from django.shortcuts import render
 
 # Create your views here.
@@ -509,3 +510,20 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         return self.divide_tool(self.SERIALIZER)
+
+
+class MaterialCount(APIView):
+
+    def get(self, request):
+        param = request.query_params
+        material_no = param.get("material_no")
+        try:
+            temp = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no)
+        except:
+            raise ValidationError("北自胶片库连接失败")
+        if material_no:
+            ret = temp.filter(material_no=material_no).aggregate(all_qty=Sum('qty'))
+        else:
+            ret = temp.filter().aggregate(all_qty=Sum('qty'))
+        return Response(ret)
+

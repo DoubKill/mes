@@ -134,9 +134,9 @@ def main():
         ))
     os.system('python manage.py migrate')
 
-    print('创建超级管理员...')
-    User.objects.create_superuser('18888888888', '123456@qq.com', '123456')
-    init_permissions()
+    # print('创建超级管理员...')
+    # User.objects.create_superuser('18888888888', '123456@qq.com', '123456')
+    # init_permissions()
 
 
 if __name__ == '__main__':

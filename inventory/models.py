@@ -42,7 +42,7 @@ class WarehouseInfo(models.Model):
 class WarehouseMaterialType(models.Model):
     """仓库物料类型"""
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="warehouse_material_types")
-    material_type = models.OneToOneField(GlobalCode, on_delete=models.CASCADE)
+    material_type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE)
 
     class Meta:
         db_table = 'ware_house_material_type'
@@ -128,7 +128,7 @@ class BzFinalMixingRubberInventory(models.Model):
 
 class WmsInventoryStock(models.Model):
     """wms"""
-    sn = models.CharField(max_length=450, db_column='Sn', primary_key=True)
+    sn = models.CharField(max_length=255, db_column='Sn', primary_key=True)
     qty = models.DecimalField(max_digits=18, decimal_places=2, db_column='Quantity')
     material_name = models.CharField(max_length=64, db_column='MaterialName')
     total_weight = models.DecimalField(max_digits=18, decimal_places=2, db_column='WeightOfActual')
