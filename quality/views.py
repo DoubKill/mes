@@ -337,10 +337,11 @@ class LevelResultViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.delete_flag:
-            instance.delete_flag = False
-        else:
-            instance.delete_flag = True
+        mdp_set = MaterialDataPointIndicator.objects.filter(level=instance.level, result=instance.deal_result,
+                                                            delete_flag=False)
+        if mdp_set:
+            raise ValidationError('该等级已被使用，不能删除')
+        instance.delete_flag = True
         instance.last_updated_user = request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
