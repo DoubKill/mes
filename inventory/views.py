@@ -6,15 +6,17 @@ from django.shortcuts import render
 
 # Create your views here.
 from rest_framework import mixins, viewsets
+from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from basics.models import GlobalCode
-from inventory.models import OutOrderFeedBack, WmsInventoryStock
+from inventory.filters import InventoryLogFilter
+from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog
 from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
-    WmsInventoryStockSerializer
+    WmsInventoryStockSerializer, InventoryLogSerializer
 from inventory.utils import BaseUploader
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
@@ -416,3 +418,13 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         return self.divide_tool(self.SERIALIZER)
+
+
+class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = InventoryLog.objects.order_by('-start_time')
+    serializer_class = InventoryLogSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = InventoryLogFilter
+
+

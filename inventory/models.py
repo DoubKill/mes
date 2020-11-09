@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from basics.models import GlobalCode
 from recipe.models import Material
-from system.models import AbstractEntity
+from system.models import AbstractEntity, User
 
 
 class OutOrderFeedBack(models.Model):
@@ -57,13 +57,20 @@ class InventoryLog(models.Model):
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
     qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
-    wegit = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
+    weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
                                 max_digits=8)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
     quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
     order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
+    warehouse_type = models.CharField(max_length=64, verbose_name='仓库类型', help_text='仓库类型')
+    inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
+    inout_num_type= models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+    unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
+    initiator = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name='发起人', help_text='发起人')
+    start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
+    end_time = models.DateTimeField('完成时间', blank=True, null=True, help_text='完成时间')
 
     class Meta:
         db_table = 'inventory_log'

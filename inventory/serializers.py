@@ -5,7 +5,10 @@ datetime: 2020/10/14
 name: 
 """
 from rest_framework import serializers
-from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial
+from .models import MaterialInventory, \
+    BzFinalMixingRubberInventory, \
+    WmsInventoryStock, \
+    WmsInventoryMaterial, InventoryLog
 
 
 class ProductInventorySerializer(serializers.Serializer):
@@ -75,4 +78,22 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
                   'quality_status']
 
 
+class InventoryLogSerializer(serializers.ModelSerializer):
+    initiator = serializers.ReadOnlyField(source='initiator.username')
 
+    class Meta:
+        model = InventoryLog
+        fields = ['order_type',
+                  'order_no',
+                  'warehouse_type',
+                  'pallet_no',
+                  'material_no',
+                  'inout_reason',
+                  'inout_num_type',
+                  'qty',
+                  'unit',
+                  'weight',
+                  'initiator',
+                  'start_time',
+                  'end_time'
+                  ]
