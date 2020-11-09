@@ -108,11 +108,10 @@ class BzFinalMixingRubberInventory(models.Model):
     quality_status = models.CharField(max_length=20, db_column='品质状态')
     memo = models.CharField(max_length=250, db_column='车号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
+    lot_no = models.CharField(max_length=200, db_column='追溯号')
+    in_storage_time = models.DateTimeField(db_column='入库时间')
 
     def material_type(self):
-        return "Unknown"
-
-    def lot_no(self):
         return "Unknown"
 
     def unit(self):

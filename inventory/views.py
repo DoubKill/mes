@@ -399,6 +399,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             queryset = model.objects.using('bz').all()
+            quality_status = self.request.query_params.get('quality_status', None)
+            if quality_status:
+                queryset = queryset.filter(quality_status=quality_status)
         if queryset:
             if material_type and model != BzFinalMixingRubberInventory:
                 queryset = queryset.filter(material_type__icontains=material_type)

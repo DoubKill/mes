@@ -43,7 +43,9 @@ class XBKMaterialInventorySerializer(serializers.ModelSerializer):
 class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
     class Meta:
         model = BzFinalMixingRubberInventory
-        fields = ['material_type',
+        fields = [
+                  'id',
+                  'material_type',
                   'material_no',
                   'lot_no',
                   'container_no',
@@ -52,7 +54,9 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
                   'unit',
                   'unit_weight',
                   'total_weight',
-                  'quality_status']
+                  'quality_status',
+                  'memo'
+                  ]
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
