@@ -239,7 +239,7 @@ class DealResultDealSerializer(BaseModelSerializer):
         created_user = self.context['request'].user.username  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
         # 快检针对的是混炼胶/终炼胶库
-        warehouse_info_id = validated_data.get('warehouse_info') # 胶料库id
+        warehouse_info_id = validated_data.get('warehouse_info', 1) #  # TODO 混炼胶库暂时写死
         if not warehouse_info_id:
             warehouse_info_id = 1 # TODO 混炼胶库暂时写死
         if validated_data.get('be_warehouse_out') == True:
