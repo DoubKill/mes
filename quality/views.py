@@ -381,7 +381,7 @@ class ProductDayStatistics(APIView):
         # year_time = params.get('ym_time', datetime.datetime.now().year)
         month_time = params.get('ym_time', datetime.datetime.now()).month
         year_time = params.get('ym_time', datetime.datetime.now()).year
-        pass_type = params.get('pass_type', 1)  # 1:综合合格率  2：一次合格率  3：流变合格率
+        pass_type = params.get('pass_type', '1')  # 1:综合合格率  2：一次合格率  3：流变合格率
         pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
         test_indicator_name_dict = pass_dict[pass_type]
         product_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
