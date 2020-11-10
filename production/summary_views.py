@@ -1,7 +1,5 @@
-import copy
-
-from django.db.models import Sum, F, Min, Max, Avg, Q
-from django.db.models.functions import TruncMonth
+from django.db import connection
+from django.db.models import Q, Max
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
@@ -17,12 +15,6 @@ from production.serializers import CollectTrainsFeedbacksSerializer
 import datetime
 from rest_framework.response import Response
 
-DIMENSION_TYPE = {
-    '1': ['classes', 'end_time__date'],
-    '2': ['end_time__date'],
-    '3': ['month']
-}
-
 
 @method_decorator([api_recorder], name="dispatch")
 class ClassesBanBurySummaryView(ListAPIView):
@@ -31,7 +23,7 @@ class ClassesBanBurySummaryView(ListAPIView):
 
     @staticmethod
     def get_class_dimension_page_data(page):
-        factory_dates = set([str(item['factory_date']) for item in page])
+        factory_dates = set([str(item['date']) for item in page])
         classes = set([item['classes'] for item in page])
         schedule_plans = WorkSchedulePlan.objects.filter(
             plan_schedule__work_schedule__schedule_name='三班两运转').filter(
@@ -43,14 +35,13 @@ class ClassesBanBurySummaryView(ListAPIView):
                 schedule_plan for schedule_plan in schedule_plans}
         """如果是按照工厂时间并且是按照班次分组则需要找出该班次的总时间"""
         for value in page:
-            key = str(value['factory_date']) + value['classes']
+            key = str(value['date']) + value['classes']
             if key in schedule_plans_dict:
                 value['classes_time'] = (schedule_plans_dict[key]['end_time']
                                          - schedule_plans_dict[key]['start_time']).seconds
         return page
 
     def list(self, request, *args, **kwargs):
-        dimension_type = copy.deepcopy(DIMENSION_TYPE)
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         dimension = self.request.query_params.get('dimension', '2')  # 维度 1：班次  2：日 3：月
@@ -58,64 +49,106 @@ class ClassesBanBurySummaryView(ListAPIView):
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
         product_no = self.request.query_params.get('product_no')  # 胶料编码
 
-        kwargs = {}
-        if st:
-            kwargs['end_time__date__gte'] = st
-        if et:
-            kwargs['end_time__date__lte'] = et
-        if equip_no:
-            kwargs['equip_no__icontains'] = equip_no
-        if product_no:
-            kwargs['product_no__icontains'] = product_no
+        where_str = """not(CLASSES=' ') """
 
-        # 默认需要分组的字段
-        group_by_fields = ['plan_classes_uid', 'equip_no', 'product_no']
-        if day_type == '2':  # 按照工厂日期
-            dimension_type['2'] = ['factory_date']
-            dimension_type['1'][-1] = 'factory_date'
-            kwargs.pop('end_time__date__gte', None)
-            kwargs.pop('end_time__date__lte', None)
-            if st:
-                kwargs['factory_date__gte'] = st
-            if et:
-                kwargs['factory_date__lte'] = et
+        if day_type == '1':  # 按照自然日
+            group_date_field = 'end_time'
+        else:  # 按照工厂日期
+            group_date_field = 'factory_date'
+            where_str += 'and factory_date is not null '
 
-        try:
-            query_group_by_field = dimension_type[dimension]  # 从前端获取的分组字段
-        except Exception:
-            raise ValidationError('参数错误')
-        group_by_fields.extend(query_group_by_field)
-
-        if dimension == '3':
-            # 按月的维度分组，查询写法不一样
-            data = TrainsFeedbacks.objects.exclude(classes='').annotate(
-                month=TruncMonth('end_time')).filter(**kwargs).values(*group_by_fields).annotate(
-                max_trains=Max('actual_trains'),
-                min_trains=Min('actual_trains'),
-                total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
-                min_train_time=Min(F('end_time') - F('begin_time')) / 1000000,
-                max_train_time=Max(F('end_time') - F('begin_time')) / 1000000,
-                avg_train_time=Avg(F('end_time') - F('begin_time')) / 1000000
-            )
+        if dimension == '3':  # 按照月份分组
+            date_format = 'yyyy-mm'
         else:
-            data = TrainsFeedbacks.objects.exclude(classes='').filter(**kwargs).values(*group_by_fields).annotate(
-                max_trains=Max('actual_trains'),
-                min_trains=Min('actual_trains'),
-                total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
-                min_train_time=Min(F('end_time') - F('begin_time')) / 1000000,
-                max_train_time=Max(F('end_time') - F('begin_time')) / 1000000,
-                avg_train_time=Avg(F('end_time') - F('begin_time')) / 1000000
-            )
+            date_format = 'yyyy-mm-dd'
+
+        select_str = """plan_classes_uid,
+                    equip_no,
+                    product_no,
+                   to_char({}, '{}'),
+                   MAX(actual_trains) AS max_trains,
+                   MIN(actual_trains) AS min_trains,
+                   max(ceil(
+                    (To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                     - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                    ) * 24 * 60 * 60 )) as max_train_time,
+                    min(ceil(
+                    (To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                     - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                    ) * 24 * 60 * 60 )) as min_train_time,
+                   sum(ceil(
+                    (To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                     - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                    ) * 24 * 60 * 60 )) as total_time""".format(group_date_field, date_format)
+
+        group_by_str = """plan_classes_uid,
+                   equip_no,
+                   product_no,
+                   to_char({}, '{}')""".format(group_date_field, date_format)
+
+        if dimension == '1':
+            group_by_str += ' ,classes'
+            select_str += ' ,classes'
+
+        if equip_no:
+            where_str += """and equip_no like '%{}%' """.format(equip_no)
+        if product_no:
+            where_str += """and product_no like '%{}%' """.format(product_no)
+
+        if st:
+            try:
+                datetime.datetime.strptime(st, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("开始日期格式错误")
+            if day_type == '1':
+                where_str += """and to_char(end_time, 'yyyy-mm-dd') >= '{}' """.format(st)
+            else:
+                where_str += """and to_char(factory_date, 'yyyy-mm-dd') >= '{}' """.format(st)
+
+        if et:
+            try:
+                datetime.datetime.strptime(et, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("结束日期格式错误")
+            if day_type == '1':
+                where_str += """and to_char(end_time, 'yyyy-mm-dd') <= '{}' """.format(et)
+            else:
+                where_str += """and to_char(factory_date, 'yyyy-mm-dd') <= '{}' """.format(et)
+
+        sql = """
+            SELECT {}
+           FROM
+           trains_feedbacks
+           where {}
+           GROUP BY
+           {}""".format(select_str, where_str, group_by_str)
         ret = {}
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
         for item in data:
-            diff_trains = item['max_trains'] - item['min_trains'] + 1
-            item_key = ''.join([str(item[i]) for i in query_group_by_field]) + item['equip_no'] + item['product_no']
+            query_group_by_index = [3]
+            item_dict = {
+                'equip_no': item[1],
+                'product_no': item[2],
+                'max_trains': item[4],
+                'min_trains': item[5],
+                'max_train_time': item[6],
+                'min_train_time': item[7],
+                'total_time': item[8],
+                'date': item[3]
+            }
+            if dimension == '1':
+                query_group_by_index.append(-1)
+                item_dict['classes'] = item[-1]
+            diff_trains = item[4] - item[5] + 1
+            item_key = ''.join([str(item[i]) for i in query_group_by_index]) + item[1] + item[2]
             if item_key not in ret:
-                item['total_trains'] = diff_trains
-                ret[item_key] = item
+                item_dict['total_trains'] = diff_trains
+                ret[item_key] = item_dict
             else:
                 ret[item_key]['total_trains'] += diff_trains
-                ret[item_key]['total_time'] += item['total_time']
+                ret[item_key]['total_time'] += item_dict['total_time']
 
         page = self.paginate_queryset(list(ret.values()))
         if day_type == '2' and dimension == '1':
@@ -130,63 +163,97 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
     queryset = TrainsFeedbacks.objects.all()
 
     def list(self, request, *args, **kwargs):
-        dimension_type = copy.deepcopy(DIMENSION_TYPE)
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         dimension = self.request.query_params.get('dimension', '2')  # 维度 1：班次  2：日 3：月
         day_type = self.request.query_params.get('day_type', '2')  # 日期类型 1：自然日  2：工厂日
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
 
-        kwargs = {}
-        if st:
-            kwargs['end_time__date__gte'] = st
-        if et:
-            kwargs['end_time__date__lte'] = et
-        if equip_no:
-            kwargs['equip_no__icontains'] = equip_no
+        where_str = """not(CLASSES=' ') """
 
-        # 默认需要分组的字段
-        group_by_fields = ['plan_classes_uid', 'equip_no']
-        if day_type == '2':  # 按照工厂日期
-            dimension_type['2'] = ['factory_date']
-            dimension_type['1'][-1] = 'factory_date'
-            kwargs.pop('end_time__date__gte', None)
-            kwargs.pop('end_time__date__lte', None)
-            if st:
-                kwargs['factory_date__gte'] = st
-            if et:
-                kwargs['factory_date__lte'] = et
+        if day_type == '1':  # 按照自然日
+            group_date_field = 'end_time'
+        else:  # 按照工厂日期
+            group_date_field = 'factory_date'
+            where_str += 'and factory_date is not null '
 
-        try:
-            query_group_by_field = dimension_type[dimension]  # 从前端获取的分组字段
-        except Exception:
-            raise ValidationError('参数错误')
-        group_by_fields.extend(query_group_by_field)
-
-        if dimension == '3':
-            # 按月的维度分组，查询写法不一样
-            data = TrainsFeedbacks.objects.exclude(classes='').annotate(
-                month=TruncMonth('end_time')).filter(**kwargs).values(*group_by_fields).annotate(
-                max_trains=Max('actual_trains'),
-                min_trains=Min('actual_trains'),
-                total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
-            )
+        if dimension == '3':  # 按照月份分组
+            date_format = 'yyyy-mm'
         else:
-            data = TrainsFeedbacks.objects.exclude(classes='').filter(**kwargs).values(*group_by_fields).annotate(
-                max_trains=Max('actual_trains'),
-                min_trains=Min('actual_trains'),
-                total_time=Sum(F('end_time') - F('begin_time')) / 1000000,
-            )
+            date_format = 'yyyy-mm-dd'
+
+        select_str = """plan_classes_uid,
+                            equip_no,
+                           to_char({}, '{}'),
+                           MAX(actual_trains) AS max_trains,
+                           MIN(actual_trains) AS min_trains,
+                           sum(ceil(
+                            (To_date(to_char(END_TIME,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                             - To_date(to_char(BEGIN_TIME,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                            ) * 24 * 60 * 60 )) as total_time""".format(group_date_field, date_format)
+
+        group_by_str = """plan_classes_uid,
+                           equip_no,
+                           to_char({}, '{}')""".format(group_date_field, date_format)
+
+        if dimension == '1':
+            group_by_str += ' ,classes'
+            select_str += ' ,classes'
+
+        if equip_no:
+            where_str += """and equip_no like '%{}%' """.format(equip_no)
+
+        if st:
+            try:
+                datetime.datetime.strptime(st, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("开始日期格式错误")
+            if day_type == '1':
+                where_str += """and to_char(end_time, 'yyyy-mm-dd') >= '{}' """.format(st)
+            else:
+                where_str += """and to_char(factory_date, 'yyyy-mm-dd') >= '{}' """.format(st)
+
+        if et:
+            try:
+                datetime.datetime.strptime(et, "%Y-%m-%d")
+            except Exception:
+                raise ValidationError("结束日期格式错误")
+            if day_type == '1':
+                where_str += """and to_char(end_time, 'yyyy-mm-dd') <= '{}' """.format(et)
+            else:
+                where_str += """and to_char(factory_date, 'yyyy-mm-dd') <= '{}' """.format(et)
+
+        sql = """
+                    SELECT {}
+                   FROM
+                   trains_feedbacks
+                   where {}
+                   GROUP BY
+                   {}""".format(select_str, where_str, group_by_str)
         ret = {}
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
         for item in data:
-            diff_trains = item['max_trains'] - item['min_trains'] + 1
-            item_key = ''.join([str(item[i]) for i in query_group_by_field]) + item['equip_no']
+            query_group_by_index = [2]
+            item_dict = {
+                'equip_no': item[1],
+                'max_trains': item[3],
+                'min_trains': item[4],
+                'total_time': item[5],
+                'date': item[2]
+            }
+            if dimension == '1':
+                query_group_by_index.append(-1)
+                item_dict['classes'] = item[-1]
+            diff_trains = item[3] - item[4] + 1
+            item_key = ''.join([str(item[i]) for i in query_group_by_index]) + item[1] + item[2]
             if item_key not in ret:
-                item['total_trains'] = diff_trains
-                ret[item_key] = item
+                item_dict['total_trains'] = diff_trains
+                ret[item_key] = item_dict
             else:
                 ret[item_key]['total_trains'] += diff_trains
-                ret[item_key]['total_time'] += item['total_time']
+                ret[item_key]['total_time'] += item_dict['total_time']
 
         page = self.paginate_queryset(list(ret.values()))
         if day_type == '2' and dimension == '1':
