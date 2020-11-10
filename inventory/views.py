@@ -17,16 +17,13 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
-<<<<<<< HEAD
 from inventory.filters import InventoryLogFilter
 from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog
-=======
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import OutOrderFeedBack, DeliveryPlan, MaterialInventory
 from inventory.serializers import ProductInventorySerializer, PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer
 from inventory.models import OutOrderFeedBack, WmsInventoryStock
->>>>>>> 9f8df301f4dfab6f4be1d95eb93977bd74bbeee0
 from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from inventory.utils import BaseUploader
@@ -521,7 +518,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         return self.divide_tool(self.SERIALIZER)
 
 
-<<<<<<< HEAD
+
 class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InventoryLog.objects.order_by('-start_time')
     serializer_class = InventoryLogSerializer
@@ -529,7 +526,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = InventoryLogFilter
 
-=======
+
 class MaterialCount(APIView):
 
     def get(self, request):
@@ -544,5 +541,5 @@ class MaterialCount(APIView):
         else:
             ret = temp.filter().aggregate(all_qty=Sum('qty'))
         return Response(ret)
->>>>>>> 9f8df301f4dfab6f4be1d95eb93977bd74bbeee0
+
 
