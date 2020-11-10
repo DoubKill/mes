@@ -23,12 +23,13 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
-    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult
+    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
+    LabelPrint
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
-    TestIndicatorSerializer
+    TestIndicatorSerializer, LabelPrintSerializer
 from recipe.models import Material, ProductBatching
 import logging
 from django.db.models import Max
@@ -433,6 +434,28 @@ class ProductDayStatistics(APIView):
                 return_dict[f'{month_time}-{day_time}'] = percent_of_pass
             ruturn_pass.append(return_dict)
         return Response(ruturn_pass)
+
+
+class LabelPrintViewSet(mixins.CreateModelMixin,
+                           mixins.UpdateModelMixin,
+                           GenericViewSet):
+    """
+    list: 获取一条打印标签
+    create: 存储一条打印标签
+    """
+    queryset = LabelPrint.objects.all()
+    serializer_class = LabelPrintSerializer
+    permission_classes = ()
+    authentication_classes = ()
+
+    def list(self, request, *args, **kwargs):
+        instance = self.get_queryset().filter(label_type=2, status=0).first()
+        if instance:
+            serializer = self.get_serializer(instance)
+            data = serializer.data
+        else:
+            data = {}
+        return Response(data)
 
 
 class DealSuggestionView(APIView):

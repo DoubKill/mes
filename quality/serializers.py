@@ -14,7 +14,7 @@ from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult, TestIndicator
+    MaterialDealResult, LevelResult, TestIndicator, LabelPrint
 
 
 class TestIndicatorSerializer(BaseModelSerializer):
@@ -418,3 +418,11 @@ class LevelResultSerializer(BaseModelSerializer):
         model = LevelResult
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class LabelPrintSerializer(serializers.ModelSerializer):
+    """标签打印"""
+
+    class Meta:
+        model = LabelPrint
+        fields = '__all__'
