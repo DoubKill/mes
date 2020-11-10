@@ -238,9 +238,9 @@ class DealResultDealSerializer(BaseModelSerializer):
         created_user = self.context['request'].user.username  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
         # 快检针对的是混炼胶/终炼胶库
-        warehouse_info_id = validated_data.get('warehouse_info', 1) #  # TODO 混炼胶库暂时写死
+        warehouse_info_id = validated_data.get('warehouse_info', 1)  # # TODO 混炼胶库暂时写死
         if not warehouse_info_id:
-            warehouse_info_id = 1 # TODO 混炼胶库暂时写死
+            warehouse_info_id = 1  # TODO 混炼胶库暂时写死
         if validated_data.get('be_warehouse_out') == True:
             material_no = validated_data.get('material_no')  # 物料编码
             if not material_no:
@@ -293,6 +293,24 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     mtr_list = serializers.SerializerMethodField(read_only=True, )
     actual_trains = serializers.SerializerMethodField(read_only=True, )
     operation_user = serializers.SerializerMethodField(read_only=True, help_text='收皮员')
+    deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
+    deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
+    deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
+
+    def get_deal_suggestion(self, obj):
+        if obj.status == "已处理":
+            return obj.deal_suggestion
+        return None
+
+    def get_deal_user(self, obj):
+        if obj.status == "已处理":
+            return obj.deal_user
+        return None
+
+    def get_deal_time(self, obj):
+        if obj.status == "已处理":
+            return obj.deal_time
+        return None
 
     def get_day_time(self, obj):
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()

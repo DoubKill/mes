@@ -104,19 +104,19 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
-    try:
-        msg_ids = order_no()
-        item = []
-        item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1",
-                     "STATIONID": "二层后端",
-                     "SENDDATE": "20200513 09:22:22"}
-        item.append(item_dict)
-        jieguo = update_wms_kjjg(msg_id=msg_ids, items=item)
-    except:
-        pass
-    else:
-        mdr_obj.update_store_test_flag = True
-        mdr_obj.save()
+    # try:
+    #     msg_ids = order_no()
+    #     item = []
+    #     item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1",
+    #                  "STATIONID": "二层后端",
+    #                  "SENDDATE": "20200513 09:22:22"}
+    #     item.append(item_dict)
+    #     jieguo = update_wms_kjjg(msg_id=msg_ids, items=item)
+    # except:
+    #     pass
+    # else:
+    #     mdr_obj.update_store_test_flag = True
+    #     mdr_obj.save()
     print(time.time()-a)
 
 
