@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from django.db.transaction import atomic
@@ -6,6 +7,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from django.db.models import Max
 
+from inventory.models import DeliveryPlan, DeliveryPlanStatus
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -228,15 +230,46 @@ class DealResultDealSerializer(BaseModelSerializer):
         return result
 
     def update(self, instance, validated_data):
-        if validated_data.get("status") == "待确认":
-            instance.deal_user = self.context['request'].user.username
-            instance.deal_time = datetime.now()
-        elif validated_data.get("status") == "已处理":
-            instance.confirm_user = self.context['request'].user.username
-            instance.confirm_time = datetime.now()
+        lot_no = validated_data.get('lot_no')
+        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        material_no = validated_data['material_no']  # 物料编码
+        status = validated_data['status']  # 状态
+        inventory_type = validated_data['inventory_type']  # 出库类型
+        created_user = self.context['request'].user.username  # 发起人
+        inventory_reason = validated_data.get('reason')  # 出库原因
+        warehouse_info = validated_data['warehouse_info']  # 胶料库id
+
+        if validated_data.get('be_warehouse_out') == True:
+            pfb_obj = PalletFeedbacks.filter(lot_no = lot_no,delete_flag=False).first()
+            if pfb_obj:
+                DeliveryPlan.objects.create(order_no=order_no,
+                                                           inventory_type=inventory_type,
+                                                           material_no=material_no,
+                                                           warehouse_info=warehouse_info,
+                                                           status=status,
+                                                           pallet_no=pfb_obj.pallet_no,
+                                                           created_user=created_user,
+                                                           inventory_reason=inventory_reason
+                                                           )
+                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                                  order_no=order_no,
+                                                  order_type=inventory_type,
+                                                  status=status,
+                                                  created_user=created_user,
+                                                  )
+            else:
+                raise serializers.ValidationError('lot追踪号不存在')
+
         else:
-            pass
-        return super(DealResultDealSerializer, self).update(instance, validated_data)
+            if validated_data.get("status") == "待确认":
+                instance.deal_user = self.context['request'].user.username
+                instance.deal_time = datetime.now()
+            elif validated_data.get("status") == "已处理":
+                instance.confirm_user = self.context['request'].user.username
+                instance.confirm_time = datetime.now()
+            else:
+                pass
+            return super(DealResultDealSerializer, self).update(instance, validated_data)
 
     class Meta:
         model = MaterialDealResult
