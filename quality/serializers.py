@@ -242,7 +242,7 @@ class DealResultDealSerializer(BaseModelSerializer):
         if validated_data.get('be_warehouse_out') == True:
             pfb_obj = PalletFeedbacks.filter(lot_no = lot_no,delete_flag=False).first()
             if pfb_obj:
-                deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
+                DeliveryPlan.objects.create(order_no=order_no,
                                                            inventory_type=inventory_type,
                                                            material_no=material_no,
                                                            warehouse_info=warehouse_info,
@@ -257,7 +257,6 @@ class DealResultDealSerializer(BaseModelSerializer):
                                                   status=status,
                                                   created_user=created_user,
                                                   )
-                return deliveryplan
             else:
                 raise serializers.ValidationError('lot追踪号不存在')
 
