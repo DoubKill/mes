@@ -42,7 +42,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     def get_actual(self, object):
         order_no = object.order_no
         actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
-                                                                          actual_weight=Sum('wegit'))
+                                                                          actual_weight=Sum('weight'))
         actual_qty = actual['actual_qty']
         actual_wegit = actual['actual_weight']
         # 无法合计
@@ -57,7 +57,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         # if dp_obj:
         #     raise serializers.ValidationError('已经存在')
         # else:
-        order_no = validated_data['order_no']
+        # order_no = validated_data.get('order_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data['inventory_type']
         material_no = validated_data['material_no']
