@@ -216,8 +216,8 @@ class DealSuggestionSerializer(BaseModelSerializer):
 class DealResultDealSerializer(BaseModelSerializer):
     """胶料处理结果序列化器"""
     product_info = serializers.SerializerMethodField(read_only=True)
-    material_no = serializers.CharField(required=True)
-    warehouse_info = serializers.IntegerField(required=True)
+    material_no = serializers.CharField()
+    warehouse_info = serializers.IntegerField()
 
     def get_product_info(self, obj):
         lot_no = obj.lot_no
@@ -234,7 +234,9 @@ class DealResultDealSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         lot_no = validated_data.get('lot_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        material_no = validated_data['material_no']  # 物料编码
+        material_no = validated_data.get('material_no')  # 物料编码
+        if not material_no:
+            raise serializers.ValidationError("material_no为必传参数")
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
         created_user = self.context['request'].user.username  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
