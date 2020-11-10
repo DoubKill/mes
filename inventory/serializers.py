@@ -269,3 +269,24 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
                   'unit_weight',
                   'total_weight',
                   'quality_status']
+
+
+class InventoryLogSerializer(serializers.ModelSerializer):
+    initiator = serializers.ReadOnlyField(source='initiator.username')
+
+    class Meta:
+        model = InventoryLog
+        fields = ['order_type',
+                  'order_no',
+                  'warehouse_type',
+                  'pallet_no',
+                  'material_no',
+                  'inout_reason',
+                  'inout_num_type',
+                  'qty',
+                  'unit',
+                  'weight',
+                  'initiator',
+                  'start_time',
+                  'end_time'
+                  ]
