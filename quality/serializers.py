@@ -216,6 +216,8 @@ class DealSuggestionSerializer(BaseModelSerializer):
 class DealResultDealSerializer(BaseModelSerializer):
     """胶料处理结果序列化器"""
     product_info = serializers.SerializerMethodField(read_only=True)
+    material_no = serializers.CharField(required=True)
+    warehouse_info = serializers.IntegerField(required=True)
 
     def get_product_info(self, obj):
         lot_no = obj.lot_no
@@ -233,7 +235,6 @@ class DealResultDealSerializer(BaseModelSerializer):
         lot_no = validated_data.get('lot_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         material_no = validated_data['material_no']  # 物料编码
-        status = validated_data['status']  # 状态
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
         created_user = self.context['request'].user.username  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
@@ -248,7 +249,6 @@ class DealResultDealSerializer(BaseModelSerializer):
                                             inventory_type=inventory_type,
                                             material_no=material_no,
                                             warehouse_info_id=warehouse_info_id,
-                                            status=status,
                                             pallet_no=pfb_obj.pallet_no,
                                             created_user=created_user,
                                             inventory_reason=inventory_reason
@@ -256,22 +256,20 @@ class DealResultDealSerializer(BaseModelSerializer):
                 DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
                                                   order_no=order_no,
                                                   order_type=inventory_type,
-                                                  status=status,
+                                                  status=4,
                                                   created_user=created_user,
                                                   )
             else:
                 raise serializers.ValidationError('未找到胶料数据')
-
+        if validated_data.get("status") == "待确认":
+            instance.deal_user = self.context['request'].user.username
+            instance.deal_time = datetime.now()
+        elif validated_data.get("status") == "已处理":
+            instance.confirm_user = self.context['request'].user.username
+            instance.confirm_time = datetime.now()
         else:
-            if validated_data.get("status") == "待确认":
-                instance.deal_user = self.context['request'].user.username
-                instance.deal_time = datetime.now()
-            elif validated_data.get("status") == "已处理":
-                instance.confirm_user = self.context['request'].user.username
-                instance.confirm_time = datetime.now()
-            else:
-                pass
-            return super(DealResultDealSerializer, self).update(instance, validated_data)
+            pass
+        return super(DealResultDealSerializer, self).update(instance, validated_data)
 
     class Meta:
         model = MaterialDealResult
