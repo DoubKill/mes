@@ -216,8 +216,8 @@ class DealSuggestionSerializer(BaseModelSerializer):
 class DealResultDealSerializer(BaseModelSerializer):
     """胶料处理结果序列化器"""
     product_info = serializers.SerializerMethodField(read_only=True)
-    material_no = serializers.CharField()
-    warehouse_info = serializers.IntegerField()
+    material_no = serializers.CharField(max_length=64, write_only=True)
+    warehouse_info = serializers.IntegerField(write_only=True)
 
     def get_product_info(self, obj):
         lot_no = obj.lot_no
