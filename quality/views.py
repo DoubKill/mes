@@ -359,7 +359,10 @@ class LevelResultViewSet(ModelViewSet):
         level = self.request.data.get('level', None)
         if not deal_result or not level:
             raise ValidationError('等级和检测结果必传')
-        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level).first()
+        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level, delete_flag=False).first()
+        if lr_obj:
+            raise ValidationError('不可重复新建')
+        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level, delete_flag=True).first()
         if lr_obj:
             lr_obj.delete_flag = False
             lr_obj.save()
@@ -437,8 +440,8 @@ class ProductDayStatistics(APIView):
 
 
 class LabelPrintViewSet(mixins.CreateModelMixin,
-                           mixins.UpdateModelMixin,
-                           GenericViewSet):
+                        mixins.UpdateModelMixin,
+                        GenericViewSet):
     """
     list: 获取一条打印标签
     create: 存储一条打印标签
