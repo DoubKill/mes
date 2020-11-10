@@ -73,7 +73,7 @@ class MaterialDealResulFilter(django_filters.rest_framework.FilterSet):
 
 
 class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
-    suggestion_desc = django_filters.CharFilter(field_name='deal_opinion__suggestion_desc', help_text='机台筛选')
+    suggestion_desc = django_filters.CharFilter(field_name='deal_suggestion', help_text='处理意见筛选')
 
     class Meta:
         models = MaterialDealResult
