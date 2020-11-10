@@ -234,9 +234,6 @@ class DealResultDealSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         lot_no = validated_data.get('lot_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        material_no = validated_data.get('material_no')  # 物料编码
-        if not material_no:
-            raise serializers.ValidationError("material_no为必传参数")
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
         created_user = self.context['request'].user.username  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
@@ -245,6 +242,9 @@ class DealResultDealSerializer(BaseModelSerializer):
         if not warehouse_info_id:
             warehouse_info_id = 1 # TODO 混炼胶库暂时写死
         if validated_data.get('be_warehouse_out') == True:
+            material_no = validated_data.get('material_no')  # 物料编码
+            if not material_no:
+                raise serializers.ValidationError("material_no为必传参数")
             pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
