@@ -83,6 +83,7 @@ class ClassesBanBurySummaryView(ListAPIView):
             dimension_type['1'][-1] = 'factory_date'
             kwargs.pop('end_time__date__gte', None)
             kwargs.pop('end_time__date__lte', None)
+            kwargs['factory_date__isnull'] = False
             if st:
                 kwargs['factory_date__gte'] = st
             if et:
@@ -168,6 +169,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
             dimension_type['1'][-1] = 'factory_date'
             kwargs.pop('end_time__date__gte', None)
             kwargs.pop('end_time__date__lte', None)
+            kwargs['factory_date__isnull'] = False
             if st:
                 kwargs['factory_date__gte'] = st
             if et:
