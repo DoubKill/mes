@@ -80,12 +80,9 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                                    need_weight=need_weight,
                                                    created_user=created_user,
                                                    )
-        warehouse_info = validated_data['warehouse_info']
-        order_type = validated_data['inventory_type']
-        status = '1'
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
-                                          order_type=order_type,
+                                          order_type=inventory_type,
                                           status=status,
                                           created_user = created_user,
                                           )
