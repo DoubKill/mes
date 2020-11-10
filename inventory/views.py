@@ -10,19 +10,22 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import mixins, viewsets
+from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
+from inventory.filters import InventoryLogFilter
+from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import OutOrderFeedBack, DeliveryPlan, MaterialInventory
 from inventory.serializers import ProductInventorySerializer, PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer
 from inventory.models import OutOrderFeedBack, WmsInventoryStock
 from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
-    WmsInventoryStockSerializer
+    WmsInventoryStockSerializer, InventoryLogSerializer
 from inventory.utils import BaseUploader
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
@@ -36,7 +39,7 @@ from .serializers import XBKMaterialInventorySerializer
 
 
 class MaterialInventoryView(GenericViewSet,
-                        mixins.ListModelMixin, ):
+                            mixins.ListModelMixin, ):
 
     def get_queryset(self):
         return
@@ -216,6 +219,7 @@ class OutWorkFeedBack(APIView):
 class OutWork(ModelViewSet):
     queryset = DeliveryPlan.objects.filter()
     serializer_class = PutPlanManagementSerializer
+
     # 帘布库出库
     # class OUTWORKUploader(BaseUploader):
     #     endpointloa = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
@@ -249,7 +253,7 @@ class OutWork(ModelViewSet):
     #         #         ret.append(item['msg'])
     #         return items
 
-    def get_base_data(self, sender,request):
+    def get_base_data(self, sender, request):
         # data_json ={}
         # items =[]
         # params = request.data
@@ -300,6 +304,7 @@ class OutWork(ModelViewSet):
         }
 
         return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+
     def get_base_data(self, sender, request):
         data_json = {}
         items = []
@@ -362,7 +367,7 @@ class OutWork(ModelViewSet):
     def post(self, request):
         print(request.user.username)
         sender = self.OUTWORKUploader()
-        ret = sender.request(*self.get_base_data(sender,request))
+        ret = sender.request(*self.get_base_data(sender, request))
         print("eeesasdasdsada")
         print(ret)
         # items = ret['items']
@@ -435,6 +440,7 @@ class OutWorkGum(APIView):
         ret = sender.request(*self.get_base_data(sender))
         return Response(ret)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
     queryset = DeliveryPlan.objects.filter().order_by("-created_date")
@@ -442,17 +448,16 @@ class PutPlanManagement(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter
 
-
-    # def create(self, request, *args, **kwargs):
-    #     data = request.data
-    #     if not isinstance(data, list):
-    #         raise ValidationError('参数错误')
-    #     for item in data:
-    #         s = PutPlanManagementSerializer(data=item, context={'request': request})
-    #         if not s.is_valid():
-    #             raise ValidationError(s.errors)
-    #         s.save()
-    #     return Response('新建成功')
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            s = PutPlanManagementSerializer(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -460,8 +465,6 @@ class OverdueMaterialManagement(ModelViewSet):
     queryset = MaterialInventory.objects.filter()
     serializer_class = OverdueMaterialManagementSerializer
     filter_backends = [DjangoFilterBackend]
-
-
 
 
 class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -496,6 +499,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             queryset = model.objects.using('bz').all()
+            quality_status = self.request.query_params.get('quality_status', None)
+            if quality_status:
+                queryset = queryset.filter(quality_status=quality_status)
         if queryset:
             if material_type and model != BzFinalMixingRubberInventory:
                 queryset = queryset.filter(material_type__icontains=material_type)
@@ -512,18 +518,22 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         return self.divide_tool(self.SERIALIZER)
 
 
+class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = InventoryLog.objects.order_by('-start_time')
+    serializer_class = InventoryLogSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = InventoryLogFilter
+
+
 class MaterialCount(APIView):
 
     def get(self, request):
-        param = request.query_params
-        material_no = param.get("material_no")
+        params = request.query_params
+        store_name = params.get('store_name', None)
         try:
-            temp = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no)
+            ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                all_qty=Sum('qty')).values('material_no', 'all_qty')
         except:
             raise ValidationError("北自胶片库连接失败")
-        if material_no:
-            ret = temp.filter(material_no=material_no).aggregate(all_qty=Sum('qty'))
-        else:
-            ret = temp.filter().aggregate(all_qty=Sum('qty'))
         return Response(ret)
-

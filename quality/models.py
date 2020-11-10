@@ -175,6 +175,7 @@ class MaterialDealResult(AbstractEntity):
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
+    update_store_test_flag = models.BooleanField(help_text='更新立库检测结果标志', default=False)
 
     class Meta:
         db_table = 'material_deal_result'
@@ -190,3 +191,26 @@ class LevelResult(AbstractEntity):
         unique_together = ('deal_result', 'level')
         db_table = 'level_result'
         verbose_name_plural = verbose_name = '等级和结果'
+
+
+class LabelPrint(models.Model):
+    """标签打印对列表"""
+    TYPE_CHOICE = (
+        (1, "收皮"),
+        (2, "快检")
+    )
+    STATUS_CHOICE = (
+        (0, '未打印'),
+        (1, '已打印')
+    )
+    label_type = models.PositiveIntegerField(help_text="标签类型", choices=TYPE_CHOICE, verbose_name="标签类型")
+    lot_no = models.CharField(max_length=64, help_text="追踪条码", verbose_name="追踪条码")
+    status = models.IntegerField(help_text='打印状态', choices=STATUS_CHOICE, verbose_name='打印状态')
+    data = models.TextField(help_text="标签数据json集", verbose_name="标签数据json集")
+
+    def __str__(self):
+        return self.lot_no
+
+    class Meta:
+        db_table = 'label_print'
+        verbose_name_plural = verbose_name = '标签打印'

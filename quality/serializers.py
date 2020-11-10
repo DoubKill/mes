@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from django.db.transaction import atomic
@@ -6,6 +7,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from django.db.models import Max
 
+from inventory.models import DeliveryPlan, DeliveryPlanStatus
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -14,7 +16,7 @@ from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult, TestIndicator
+    MaterialDealResult, LevelResult, TestIndicator, LabelPrint
 
 
 class TestIndicatorSerializer(BaseModelSerializer):
@@ -214,6 +216,8 @@ class DealSuggestionSerializer(BaseModelSerializer):
 class DealResultDealSerializer(BaseModelSerializer):
     """胶料处理结果序列化器"""
     product_info = serializers.SerializerMethodField(read_only=True)
+    material_no = serializers.CharField(max_length=64, write_only=True)
+    warehouse_info = serializers.IntegerField(write_only=True)
 
     def get_product_info(self, obj):
         lot_no = obj.lot_no
@@ -228,6 +232,37 @@ class DealResultDealSerializer(BaseModelSerializer):
         return result
 
     def update(self, instance, validated_data):
+        lot_no = validated_data.get('lot_no')
+        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
+        created_user = self.context['request'].user.username  # 发起人
+        inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
+        # 快检针对的是混炼胶/终炼胶库
+        warehouse_info_id = validated_data.get('warehouse_info', 1) #  # TODO 混炼胶库暂时写死
+        if not warehouse_info_id:
+            warehouse_info_id = 1 # TODO 混炼胶库暂时写死
+        if validated_data.get('be_warehouse_out') == True:
+            material_no = validated_data.get('material_no')  # 物料编码
+            if not material_no:
+                raise serializers.ValidationError("material_no为必传参数")
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            if pfb_obj:
+                DeliveryPlan.objects.create(order_no=order_no,
+                                            inventory_type=inventory_type,
+                                            material_no=material_no,
+                                            warehouse_info_id=warehouse_info_id,
+                                            pallet_no=pfb_obj.pallet_no,
+                                            created_user=created_user,
+                                            inventory_reason=inventory_reason
+                                            )
+                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
+                                                  order_no=order_no,
+                                                  order_type=inventory_type,
+                                                  status=4,
+                                                  created_user=created_user,
+                                                  )
+            else:
+                raise serializers.ValidationError('未找到胶料数据')
         if validated_data.get("status") == "待确认":
             instance.deal_user = self.context['request'].user.username
             instance.deal_time = datetime.now()
@@ -324,7 +359,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             test_status = '复检'
         else:
             test_status = None  # 检测状态
-        test_factory_date = max_mtr.test_factory_date  # 检测时间
+        test_factory_date = max_mtr.test_factory_date.strftime('%Y-%m-%d %H:%M:%S')  # 检测时间
         test_class = max_mtr.test_class  # 检测班次
         try:
             test_user = max_mtr.created_user.username  # 检测员
@@ -418,3 +453,11 @@ class LevelResultSerializer(BaseModelSerializer):
         model = LevelResult
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class LabelPrintSerializer(serializers.ModelSerializer):
+    """标签打印"""
+
+    class Meta:
+        model = LabelPrint
+        fields = '__all__'

@@ -1,5 +1,5 @@
 from django.contrib import admin
 
-from .models import MaterialInventory, WarehouseInfo
+from .models import MaterialInventory, WarehouseInfo, InventoryLog
 
-admin.site.register([MaterialInventory, WarehouseInfo])
+admin.site.register([MaterialInventory, WarehouseInfo, InventoryLog])
