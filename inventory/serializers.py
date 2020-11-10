@@ -4,7 +4,6 @@ auther:
 datetime: 2020/10/14
 name: 
 """
-import datetime
 import json
 import time
 
@@ -14,6 +13,11 @@ from rest_framework import serializers
 
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial
+from .models import MaterialInventory, \
+    BzFinalMixingRubberInventory, \
+    WmsInventoryStock, \
+    WmsInventoryMaterial, InventoryLog
+
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader
@@ -36,18 +40,17 @@ class ProductInventorySerializer(serializers.Serializer):
 
 class PutPlanManagementSerializer(serializers.ModelSerializer):
     no = serializers.CharField(source="warehouse_info.no", read_only=True)
-    name = serializers.CharField(source="warehouse_info.name", read_only=True)
+    name = serializers.CharField(source="warehouse_info.name",read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
 
     def get_actual(self, object):
         order_no = object.order_no
-        actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
-                                                                          actual_weight=Sum('wegit'))
+        actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'), actual_weight=Sum('wegit'))
         actual_qty = actual['actual_qty']
         actual_wegit = actual['actual_weight']
         # 无法合计
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
-        items = {'actual_qty': actual_qty, 'actual_wegit': actual_wegit}
+        items = {'actual_qty':actual_qty,'actual_wegit':actual_wegit}
         return items
 
     @atomic()
@@ -63,67 +66,44 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         material_no = validated_data['material_no']
         need_qty = validated_data['need_qty']
         warehouse_info = validated_data['warehouse_info']
-        status = validated_data['status']
-        pallet_no = validated_data.get('pallet_no')
-        unit = validated_data.get('unit')
-        need_weight = validated_data.get('need_weight')
-        created_user = self.context['request'].user.username
+        status =  validated_data['status']
 
-        deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
-                                                   inventory_type=inventory_type,
-                                                   material_no=material_no,
-                                                   need_qty=need_qty,
-                                                   warehouse_info=warehouse_info,
-                                                   status=status,
-                                                   pallet_no=pallet_no,
-                                                   unit=unit,
-                                                   need_weight=need_weight,
-                                                   created_user=created_user,
+
+        deliveryplan = DeliveryPlan.objects.create(order_no = order_no,
+                                                   inventory_type = inventory_type,
+                                                   material_no = material_no,
+                                                   need_qty = need_qty,
+                                                   warehouse_info = warehouse_info,
+                                                   status = status
                                                    )
         warehouse_info = validated_data['warehouse_info']
         order_type = validated_data['inventory_type']
         status = '1'
-        DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
-                                          order_no=order_no,
-                                          order_type=order_type,
-                                          status=status,
-                                          created_user = created_user,
-                                          )
-        # dps_dict = {'warehouse_info': warehouse_info,
-        #             'order_no': order_no,
-        #             "order_type": order_type,
-        #             "status": status}
-        #
-        # self.create_dps(DeliveryPlan, dps_dict)
+        DeliveryPlanStatus.objects.create(warehouse_info = warehouse_info,
+                                                               order_no = order_no,
+                                                               order_type = order_type,
+                                                               status = status
+                                                               )
         return deliveryplan
 
-    # def create_dps(models_name, dps_dict):
-    #     models_name.objects.create(**dps_dict)
-
     def update(self, instance, validated_data):
-        out_type = validated_data.get('inventory_type')
-        status = validated_data.get('status')
-
-        if out_type == "正常出库" or out_type == "指定出库":
+        out_type = validated_data['inventory_type']
+        if out_type =="正常出库":
             msg_id = validated_data['order_no']
             str_user = self.context['request'].user.username
             material_no = validated_data['material_no']
-            pallet_no = validated_data.get('pallet_no')  # 托盘号
-            pici = 1  # 批次号
-            wegit = validated_data.get('wegit','1')
+            # wegit = validated_data['need_weight']
+            wegit = "1"
             msg_count = "1"
+            # location = validated_data['location']
             location = "二层后端"
-            # 发起时间
-            time = validated_data.get('created_date')
-            created_time = datetime.datetime.strftime(time, '%Y%m%d %H:%M:%S')
+            # created_date = validated_data['created_date']
+            created_date = "20200513 09:22:22"
             WORKID = time.strftime("%Y%m%d%H%M%S", time.localtime())
-            if out_type =="指定出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
-                         'STATIONID': location, 'SENDDATE': created_time}
-            elif out_type == "正常出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM ': wegit,
-                         'STATIONID': location, 'SENDDATE': created_time}
-            items = []
+            # 无批次号
+            dict1 = {'WORKID':WORKID,'MID':material_no,'PICI':1,'NUM':wegit,
+                     'STATIONID':location,'SENDDATE':created_date}
+            items =[]
             items.append(dict1)
             json_data = {
                 'msgId': msg_id,
@@ -132,56 +112,48 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 "SENDUSER": str_user,
                 "items": items
             }
-
             # msg_count = len(json_data["items"])
             # json_data["msgConut"] = msg_count
             json_data = json.dumps(json_data, ensure_ascii=False)
-            sender = OUTWORKUploader(end_type = out_type )
+            sender = OUTWORKUploader()
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
                 items = result['items']
                 msg = items[0]['msg']
                 msg = "TRUE"
-
-                warehouse_info = validated_data['warehouse_info']
-                order_no = validated_data['order_no']
-                order_type = validated_data['inventory_type']
-                created_user = self.context['request'].user.username
-                created_date = datetime.datetime.now()
                 if msg:
                     instance.status = 2
-                    instance.last_updated_date = datetime.datetime.now()
-                    instance.save()
+                    validated_data['status'] = instance.status
+                    instance = super().update(instance,validated_data)
+                    warehouse_info = validated_data['warehouse_info']
+                    order_no = validated_data['order_no']
+                    order_type = validated_data['inventory_type']
                     status = instance.status
                     DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                                       order_no=order_no,
                                                       order_type=order_type,
-                                                      status=status,
-                                                      created_user=created_user,
-                                                      created_date=created_date
+                                                      status=status
                                                       )
                     return instance
                 else:
                     instance.status = 3
+                    warehouse_info = validated_data['warehouse_info']
+                    order_no = validated_data['order_no']
+                    order_type = validated_data['inventory_type']
+                    status = instance.status
                     DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                                       order_no=order_no,
                                                       order_type=order_type,
-                                                      status=status,
-                                                      created_user=created_user,
-                                                      created_date=created_date
+                                                      status=status
                                                       )
                     instance.save()
                     raise serializers.ValidationError('出库失败')
         else:
-            if status == 5:
-                instance.status = status
-                instance.save()
-                return instance
-            else:
-                need_qty = validated_data['need_qty']
-                instance.need_qty = need_qty
-                instance.save()
-                return instance
+            need_qty = validated_data['need_qty']
+            # instance = super().update(need_qty)
+            instance.need_qty=need_qty
+            instance.save()
+            return instance
 
     # def update_planStatus(self):
 
@@ -190,12 +162,11 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         fields = '__all__'
         # read_only_fields = COMMON_READ_ONLY_FIELDS
 
-
 class OverdueMaterialManagementSerializer(serializers.ModelSerializer):
-    # quality_status 检测结果
-    material_no = serializers.CharField(source="material.material_no", read_only=True)  # 物料编码
-    pf_obj = serializers.SerializerMethodField(read_only=True)  # 班次 机台号 生产时间
-    material_obj = serializers.SerializerMethodField(read_only=True)  # 等级 保质期 超时时间
+
+    material_no = serializers.CharField(source="material.material_no", read_only=True) # 物料编码
+    pf_obj = serializers.SerializerMethodField(read_only=True) # 班次 机台号 生产时间
+    # material_obj = serializers.SerializerMethodField(read_only=True) # 物料属性
 
     def get_pf_obj(self, object):
         lot_no = object.lot_no
@@ -203,22 +174,16 @@ class OverdueMaterialManagementSerializer(serializers.ModelSerializer):
         if not pf_obj:
             return None
         else:
-            classes = pf_obj.classes  # 班次
-            equip_no = pf_obj.equip_no  # 机台号
-            product_time = pf_obj.product_time  # 生产日期
-            items = {'classes': classes, 'equip_no': equip_no, 'product_time': product_time}
+            classes =  pf_obj.classes
+            equip_no = pf_obj.equip_no
+            product_time = pf_obj.product_time
+            items = {'classes': classes, 'equip_no': equip_no,'product_time':product_time}
             return items
 
-    def get_material_obj(self, object):
-        material_no = object.material_no
-        mate_atr_obj = MaterialAttribute.objects.filter(material_no=material_no).first()
-        if not mate_atr_obj:
-            return None
-        else:
-            period_of_validity = mate_atr_obj.period_of_validity  # 保质期
-            safety_inventory = mate_atr_obj.safety_inventory  # 等级
-            items = {'period_of_validity':period_of_validity,'safety_inventory':safety_inventory}
-            return items
+    # def get_material_obj(self,object):
+    #     material_no = object.material_no
+    #
+    #     pass
 
 
     class Meta:
@@ -260,6 +225,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = WmsInventoryStock
         fields = ['material_type',
@@ -272,3 +238,24 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
                   'unit_weight',
                   'total_weight',
                   'quality_status']
+
+
+class InventoryLogSerializer(serializers.ModelSerializer):
+    initiator = serializers.ReadOnlyField(source='initiator.username')
+
+    class Meta:
+        model = InventoryLog
+        fields = ['order_type',
+                  'order_no',
+                  'warehouse_type',
+                  'pallet_no',
+                  'material_no',
+                  'inout_reason',
+                  'inout_num_type',
+                  'qty',
+                  'unit',
+                  'weight',
+                  'initiator',
+                  'start_time',
+                  'end_time'
+                  ]
