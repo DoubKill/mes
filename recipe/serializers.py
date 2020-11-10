@@ -3,6 +3,7 @@ import logging
 
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.generics import get_object_or_404
 from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
@@ -10,7 +11,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute
+    MaterialAttribute, MaterialSupplier
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 logger = logging.getLogger('api_log')
@@ -37,12 +38,27 @@ class MaterialSerializer(BaseModelSerializer):
 
 
 class MaterialAttributeSerializer(BaseModelSerializer):
-    material_no = serializers.CharField(source='Material.material_no', read_only=True)
-    material_name = serializers.CharField(source='Material.material_name', read_only=True)
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False))
+    material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
+    material_no = serializers.CharField(source='material.material_no', read_only=True)
+    material_name = serializers.CharField(source='material.material_name', read_only=True)
 
     class Meta:
         model = MaterialAttribute
-        fields = '__all__'
+        fields = ['id', 'material', 'material_type', 'material_no', 'material_name', 'period_of_validity', 'safety_inventory',
+                  'validity_unit']
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialSupplierSerializer(BaseModelSerializer):
+    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False))
+    material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
+    material_no = serializers.CharField(source='material.material_no', read_only=True)
+    material_name = serializers.CharField(source='material.material_name', read_only=True)
+
+    class Meta:
+        model = MaterialSupplier
+        fields = ['id', 'material', 'material_type', 'material_no', 'material_name', 'supplier_no', 'provenance']
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 

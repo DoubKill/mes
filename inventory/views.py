@@ -2,25 +2,40 @@ import json
 import time
 
 import requests
+from django.db.models import Sum
 from django.shortcuts import render
 
 # Create your views here.
+from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
+from rest_framework import mixins, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
-from inventory.models import OutOrderFeedBack
-from inventory.serializers import ProductInventorySerializer
+from inventory.filters import PutPlanManagementFilter
+from inventory.models import OutOrderFeedBack, DeliveryPlan, MaterialInventory
+from inventory.serializers import ProductInventorySerializer, PutPlanManagementSerializer, \
+    OverdueMaterialManagementSerializer
+from inventory.models import OutOrderFeedBack, WmsInventoryStock
+from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
+    WmsInventoryStockSerializer
 from inventory.utils import BaseUploader
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
+from mes.derorators import api_recorder
 from recipe.models import Material
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import permissions
+from .models import MaterialInventory as XBMaterialInventory
+from .models import BzFinalMixingRubberInventory
+from .serializers import XBKMaterialInventorySerializer
 
 
-class MaterialInventory(GenericViewSet,
+class MaterialInventoryView(GenericViewSet,
                         mixins.ListModelMixin, ):
 
     def get_queryset(self):
@@ -28,18 +43,18 @@ class MaterialInventory(GenericViewSet,
 
     def data_adapt(self, instance):
         data = {
-                "id": instance[8],
-                "sn": instance[8],
-                "material_no": instance[3],
-                "material_name": instance[1],
-                "material_type":instance[7],
-                "qty": instance[0],
-                "unit": instance[6],
-                "unit_weight": instance[5],
-                "total_weight": instance[2],
-                "site": instance[4],
-                "standard_flag": True if instance[9] else False,
-            }
+            "id": instance[8],
+            "sn": instance[8],
+            "material_no": instance[3],
+            "material_name": instance[1],
+            "material_type": instance[7],
+            "qty": instance[0],
+            "unit": instance[6],
+            "unit_weight": instance[5],
+            "total_weight": instance[2],
+            "site": instance[4],
+            "standard_flag": True if instance[9] else False,
+        }
         return data
 
     def list(self, request, *args, **kwargs):
@@ -189,73 +204,129 @@ class OutWorkFeedBack(APIView):
             try:
                 OutOrderFeedBack.objects.create(**data)
             except:
-                result = {"work_id": data.get("task_id"), "msg": "FALSE"+data.get("material_no")+"物料在库内数量不足!", "flag": "99"}
+                result = {"work_id": data.get("task_id"), "msg": "FALSE" + data.get("material_no") + "物料在库内数量不足!",
+                          "flag": "99"}
             else:
-                result = {"work_id": data.get("task_id"), "msg": "TRUE"+data.get("material_no")+"下发成功!", "flag": "01"}
+                result = {"work_id": data.get("task_id"), "msg": "TRUE" + data.get("material_no") + "下发成功!",
+                          "flag": "01"}
 
             return Response(result)
 
 
-class OutWork(APIView):
+class OutWork(ModelViewSet):
+    queryset = DeliveryPlan.objects.filter()
+    serializer_class = PutPlanManagementSerializer
     # 帘布库出库
-    class OUTWORKUploader(BaseUploader):
-        endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
-
-        def gen_payload(self, msg_id, r_type, msg_count, str_user, str_json):
-            xml_data = """
-            <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-                <soap:Body><TRANS_MES_TO_WMS_OUTWORK xmlns="http://www.riamb.ac.cn/asrs/WebService/TA_SAP/">
-                    <MsgId>{}</MsgId>
-                    <OutType>{}</OutType>
-                    <MsgConut>{}</MsgConut>
-                    <strUser>{}</strUser>
-                    <strJson>{}</strJson>
-                </TRANS_MES_TO_WMS_OUTWORK>
-                </soap:Body>
-            </soap:Envelope>""".format(msg_id, r_type, msg_count, str_user, str_json)
-            return xml_data
-
-        def gen_result(self, data):
-            print(data)
-            print('ssssssssssssssssssssssssssssssssssssssssss')
-            data = data.get('soap:Envelope').get('soap:Body').get('TRANS_MES_TO_WMS_OUTWORKResponse').get(
-                'TRANS_MES_TO_WMS_OUTWORKResult')
-            # items = json.loads(data).get('items')
-            items = json.loads(data)
-            print(items)
-            # ret = []
-            # for item in items:
-            #     if item['flag'] != '01':  # 01代表成功
-            #         ret.append(item['msg'])
-            return items
+    # class OUTWORKUploader(BaseUploader):
+    #     endpointloa = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
+    #
+    #     def gen_payd(self, msg_id, r_type, msg_count, str_user, str_json):
+    #         xml_data = """
+    #         <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+    #             <soap:Body><TRANS_MES_TO_WMS_OUTWORK xmlns="http://www.riamb.ac.cn/asrs/WebService/TA_SAP/">
+    #                 <MsgId>{}</MsgId>
+    #                 <OutType>{}</OutType>
+    #                 <MsgConut>{}</MsgConut>
+    #                 <strUser>{}</strUser>
+    #                 <strJson>{}</strJson>
+    #             </TRANS_MES_TO_WMS_OUTWORK>
+    #             </soap:Body>
+    #         </soap:Envelope>""".format(msg_id, r_type, msg_count, str_user, str_json)
+    #         return xml_data
+    #
+    #     def gen_result(self, data):
+    #         print(data)
+    #         print('ssssssssssssssssssssssssssssssssssssssssss')
+    #         data = data.get('soap:Envelope').get('soap:Body').get('TRANS_MES_TO_WMS_OUTWORKResponse').get(
+    #             'TRANS_MES_TO_WMS_OUTWORKResult')
+    #         # items = json.loads(data).get('items')
+    #         items = json.loads(data)
+    #         print("hhahahahahahahaha")
+    #         print(items)
+    #         # ret = []
+    #         # for item in items:
+    #         #     if item['flag'] != '01':  # 01代表成功
+    #         #         ret.append(item['msg'])
+    #         return items
 
     def get_base_data(self, sender,request):
-        data_json ={}
-        items =[]
+        # data_json ={}
+        # items =[]
+        # params = request.data
+        # msgId = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        # OUTTYPE = params.get('OUTTYPE','1')
+        # msgConut = params.get('msgConut','1')
+        # SENDUSER = request.user.username
+        # items = params.get('items')
+        # # for i in items:
+        # #     i['WORKID']=i['MID']
+        # data_json ={'msgId':msgId,"OUTTYPE":OUTTYPE,'msgConut':msgConut,'SENDUSER':SENDUSER,
+        #             "items": [
+        #                 {"WORKID": "11223",
+        #                  "MID": "C-HMB-F150-12",
+        #                  "PICI": "20200101",
+        #                  "NUM": "1",
+        #                  "STATIONID": "二层后端",
+        #                  "SENDDATE": "20200513 09:22:22"},
+        #                 {"WORKID": "11227",
+        #                  "MID": "C-HMB-F150-11",
+        #                  "PICI": "20200101",
+        #                  "NUM": "1",
+        #                  "STATIONID": "二层前端",
+        #                  "SENDDATE": "20200513 09:22:22"}
+        #             ]
+        #             }
+
+        # ................................
+        data_json = {
+            "msgId": "1",
+            "OUTTYPE": "生产出库",
+            "msgConut": "2",
+            "SENDUSER": "GJ_001",
+            "items": [
+                {"WORKID": "11223",
+                 "MID": "C-HMB-F150-12",
+                 "PICI": "20200101",
+                 "NUM": "1",
+                 "STATIONID": "二层后端",
+                 "SENDDATE": "20200513 09:22:22"},
+                {"WORKID": "11224",
+                 "MID": "C-HMB-F150-11",
+                 "PICI": "20200101",
+                 "NUM": "1",
+                 "STATIONID": "二层前端",
+                 "SENDDATE": "20200513 09:22:22"}
+            ]
+        }
+
+        return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+    def get_base_data(self, sender, request):
+        data_json = {}
+        items = []
         params = request.data
         msgId = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        OUTTYPE = params.get('OUTTYPE','1')
-        msgConut = params.get('msgConut','1')
+        OUTTYPE = params.get('OUTTYPE', '1')
+        msgConut = params.get('msgConut', '1')
         SENDUSER = request.user.username
         items = params.get('items')
         # for i in items:
         #     i['WORKID']=i['MID']
-        data_json ={'msgId':msgId,"OUTTYPE":OUTTYPE,'msgConut':msgConut,'SENDUSER':SENDUSER,
-                    "items": [
-                        {"WORKID": "11223",
-                         "MID": "C-HMB-F150-12",
-                         "PICI": "20200101",
-                         "NUM": "1",
-                         "STATIONID": "二层后端",
-                         "SENDDATE": "20200513 09:22:22"},
-                        {"WORKID": "11227",
-                         "MID": "C-HMB-F150-11",
-                         "PICI": "20200101",
-                         "NUM": "1",
-                         "STATIONID": "二层前端",
-                         "SENDDATE": "20200513 09:22:22"}
-                    ]
-                    }
+        data_json = {'msgId': msgId, "OUTTYPE": OUTTYPE, 'msgConut': msgConut, 'SENDUSER': SENDUSER,
+                     "items": [
+                         {"WORKID": "11223",
+                          "MID": "C-HMB-F150-12",
+                          "PICI": "20200101",
+                          "NUM": "1",
+                          "STATIONID": "二层后端",
+                          "SENDDATE": "20200513 09:22:22"},
+                         {"WORKID": "11227",
+                          "MID": "C-HMB-F150-11",
+                          "PICI": "20200101",
+                          "NUM": "1",
+                          "STATIONID": "二层前端",
+                          "SENDDATE": "20200513 09:22:22"}
+                     ]
+                     }
         # data_json = {
         # "msgId": "hzy11",
         # "OUTTYPE": "生产出库123222",
@@ -290,10 +361,15 @@ class OutWork(APIView):
     # 出库
     def post(self, request):
         print(request.user.username)
-
         sender = self.OUTWORKUploader()
-
         ret = sender.request(*self.get_base_data(sender,request))
+        print("eeesasdasdsada")
+        print(ret)
+        # items = ret['items']
+        # for i in items:
+        #     print(i['WORKID'])
+
+        ret = sender.request(*self.get_base_data(sender, request))
         return Response(ret)
 
 
@@ -337,20 +413,20 @@ class OutWorkGum(APIView):
             "msgConut": "2",
             "SENDUSER": "GJ_001",
             "items": [
-                 {"WORKID": "11223",
-                  "MID": "C-HMB-F150-12",
-                  "PICI": "20200101",
-                  "NUM": "1",
-                  "STATIONID": "二层后端",
-                  "SENDDATE": "20200513 09:22:22"},
-                 {"WORKID": "11224",
-                  "MID": "C-HMB-F150-11",
-                  "PICI": "20200101",
-                  "NUM": "1",
-                  "STATIONID": "二层前端",
-                  "SENDDATE": "20200513 09:22:22"}
-             ]
-            }
+                {"WORKID": "11223",
+                 "MID": "C-HMB-F150-12",
+                 "PICI": "20200101",
+                 "NUM": "1",
+                 "STATIONID": "二层后端",
+                 "SENDDATE": "20200513 09:22:22"},
+                {"WORKID": "11224",
+                 "MID": "C-HMB-F150-11",
+                 "PICI": "20200101",
+                 "NUM": "1",
+                 "STATIONID": "二层前端",
+                 "SENDDATE": "20200513 09:22:22"}
+            ]
+        }
         return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
 
     # 出库
@@ -358,3 +434,96 @@ class OutWorkGum(APIView):
         sender = self.KJJGUploader()
         ret = sender.request(*self.get_base_data(sender))
         return Response(ret)
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagement(ModelViewSet):
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFilter
+
+
+    # def create(self, request, *args, **kwargs):
+    #     data = request.data
+    #     if not isinstance(data, list):
+    #         raise ValidationError('参数错误')
+    #     for item in data:
+    #         s = PutPlanManagementSerializer(data=item, context={'request': request})
+    #         if not s.is_valid():
+    #             raise ValidationError(s.errors)
+    #         s.save()
+    #     return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OverdueMaterialManagement(ModelViewSet):
+    queryset = MaterialInventory.objects.filter()
+    serializer_class = OverdueMaterialManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+
+
+
+
+class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
+    """物料库存信息|线边库|终炼胶库|原材料库"""
+
+    MODEL, SERIALIZER = 0, 1
+    INVENTORY_MODEL_BY_NAME = {
+        '线边库': [XBMaterialInventory, XBKMaterialInventorySerializer],
+        '终炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
+        '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer]
+    }
+    permission_classes = (permissions.IsAuthenticated,)
+
+    # filter_backends = (DjangoFilterBackend,)
+
+    def divide_tool(self, index):
+        warehouse_name = self.request.query_params.get('warehouse_name', None)
+        if warehouse_name and warehouse_name in self.INVENTORY_MODEL_BY_NAME:
+            return self.INVENTORY_MODEL_BY_NAME[warehouse_name][index]
+        else:
+            raise ValidationError('无此仓库名')
+
+    def get_query_params(self):
+        for query in 'material_type', 'container_no', 'material_no':
+            yield self.request.query_params.get(query, None)
+
+    def get_queryset(self):
+        model = self.divide_tool(self.MODEL)
+        queryset = None
+        material_type, container_no, material_no = self.get_query_params()
+        if model == XBMaterialInventory:
+            queryset = model.objects.all()
+        elif model == BzFinalMixingRubberInventory:
+            queryset = model.objects.using('bz').all()
+        if queryset:
+            if material_type and model != BzFinalMixingRubberInventory:
+                queryset = queryset.filter(material_type__icontains=material_type)
+            if material_no:
+                queryset = queryset.filter(material_no__icontains=material_no)
+            if container_no:
+                queryset = queryset.filter(container_no__icontains=container_no)
+            return queryset
+        if model == WmsInventoryStock:
+            queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
+        return queryset
+
+    def get_serializer_class(self):
+        return self.divide_tool(self.SERIALIZER)
+
+
+class MaterialCount(APIView):
+
+    def get(self, request):
+        param = request.query_params
+        material_no = param.get("material_no")
+        try:
+            temp = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no)
+        except:
+            raise ValidationError("北自胶片库连接失败")
+        if material_no:
+            ret = temp.filter(material_no=material_no).aggregate(all_qty=Sum('qty'))
+        else:
+            ret = temp.filter().aggregate(all_qty=Sum('qty'))
+        return Response(ret)
+

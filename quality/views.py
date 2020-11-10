@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -337,10 +337,11 @@ class LevelResultViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.delete_flag:
-            instance.delete_flag = False
-        else:
-            instance.delete_flag = True
+        mdp_set = MaterialDataPointIndicator.objects.filter(level=instance.level, result=instance.deal_result,
+                                                            delete_flag=False)
+        if mdp_set:
+            raise ValidationError('该等级已被使用，不能删除')
+        instance.delete_flag = True
         instance.last_updated_user = request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -351,6 +352,23 @@ class LevelResultViewSet(ModelViewSet):
             data = queryset.values('id', 'deal_result', 'level')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        deal_result = self.request.data.get('deal_result', None)
+        level = self.request.data.get('level', None)
+        if not deal_result or not level:
+            raise ValidationError('等级和检测结果必传')
+        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level).first()
+        if lr_obj:
+            lr_obj.delete_flag = False
+            lr_obj.save()
+            return Response('新建成功')
+        else:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -415,3 +433,11 @@ class ProductDayStatistics(APIView):
                 return_dict[f'{month_time}-{day_time}'] = percent_of_pass
             ruturn_pass.append(return_dict)
         return Response(ruturn_pass)
+
+
+class DealSuggestionView(APIView):
+    """处理意见展示"""
+
+    def get(self, request, *args, **kwargs):
+        queryset = MaterialDealResult.objects.filter(delete_flag=False).values('deal_suggestion').annotate().distinct()
+        return Response(queryset.values_list('deal_suggestion', flat=True))
