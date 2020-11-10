@@ -234,31 +234,33 @@ class DealResultDealSerializer(BaseModelSerializer):
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         material_no = validated_data['material_no']  # 物料编码
         status = validated_data['status']  # 状态
-        inventory_type = validated_data['inventory_type']  # 出库类型
+        inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
         created_user = self.context['request'].user.username  # 发起人
-        inventory_reason = validated_data.get('reason')  # 出库原因
-        warehouse_info = validated_data['warehouse_info']  # 胶料库id
-
+        inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
+        # 快检针对的是混炼胶/终炼胶库
+        warehouse_info_id = validated_data.get('warehouse_info') # 胶料库id
+        if not warehouse_info_id:
+            warehouse_info_id = 1 # TODO 混炼胶库暂时写死
         if validated_data.get('be_warehouse_out') == True:
-            pfb_obj = PalletFeedbacks.filter(lot_no = lot_no,delete_flag=False).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no, delete_flag=False).first()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
-                                                           inventory_type=inventory_type,
-                                                           material_no=material_no,
-                                                           warehouse_info=warehouse_info,
-                                                           status=status,
-                                                           pallet_no=pfb_obj.pallet_no,
-                                                           created_user=created_user,
-                                                           inventory_reason=inventory_reason
-                                                           )
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                            inventory_type=inventory_type,
+                                            material_no=material_no,
+                                            warehouse_info_id=warehouse_info_id,
+                                            status=status,
+                                            pallet_no=pfb_obj.pallet_no,
+                                            created_user=created_user,
+                                            inventory_reason=inventory_reason
+                                            )
+                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
                                                   order_no=order_no,
                                                   order_type=inventory_type,
                                                   status=status,
                                                   created_user=created_user,
                                                   )
             else:
-                raise serializers.ValidationError('lot追踪号不存在')
+                raise serializers.ValidationError('未找到胶料数据')
 
         else:
             if validated_data.get("status") == "待确认":
