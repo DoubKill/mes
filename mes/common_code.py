@@ -183,4 +183,4 @@ class SqlClient(object):
 
 
 def order_no():
-    time.strftime("%Y%m%d%H%M%S")
+    return time.strftime("%Y%m%d%H%M%S")
