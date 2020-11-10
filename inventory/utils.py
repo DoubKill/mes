@@ -38,6 +38,13 @@ class BaseUploader(object):
 
 class OUTWORKUploader(BaseUploader):
     endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
+    dict_filter = {'正常出库': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK",
+                   '指定出库': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK_CJ"}
+    def __init__(self,end_type):
+        self.end_type=end_type
+        self.endpoint=self.dict_filter[self.end_type]
+
+    # endpoint = dict_filter['']
 
     def gen_payload(self, msg_id, r_type, msg_count, str_user, str_json):
         xml_data = """
