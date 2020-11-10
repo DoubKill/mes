@@ -242,7 +242,7 @@ class DealResultDealSerializer(BaseModelSerializer):
         if not warehouse_info_id:
             warehouse_info_id = 1 # TODO 混炼胶库暂时写死
         if validated_data.get('be_warehouse_out') == True:
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no, delete_flag=False).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
                                             inventory_type=inventory_type,

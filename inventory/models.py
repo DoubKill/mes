@@ -208,7 +208,7 @@ class DeliveryPlan(models.Model):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间')
     created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
 
 
