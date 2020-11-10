@@ -448,7 +448,6 @@ class PutPlanManagement(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter
 
-
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):
@@ -519,7 +518,6 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         return self.divide_tool(self.SERIALIZER)
 
 
-
 class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InventoryLog.objects.order_by('-start_time')
     serializer_class = InventoryLogSerializer
@@ -539,5 +537,3 @@ class MaterialCount(APIView):
             raise ValidationError("北自胶片库连接失败")
         ret = temp.values('material_no').annotate().aggregate(all_qty=Sum('qty'))
         return Response(ret)
-
-

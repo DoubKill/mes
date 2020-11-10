@@ -84,7 +84,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                           order_no=order_no,
                                           order_type=inventory_type,
                                           status=status,
-                                          created_user = created_user,
+                                          created_user=created_user,
                                           )
         # dps_dict = {'warehouse_info': warehouse_info,
         #             'order_no': order_no,
@@ -107,14 +107,14 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no')  # 托盘号
             pici = 1  # 批次号
-            wegit = validated_data.get('wegit','1')
+            wegit = validated_data.get('wegit', '1')
             msg_count = "1"
             location = "二层后端"
             # 发起时间
             time = validated_data.get('created_date')
             created_time = datetime.datetime.strftime(time, '%Y%m%d %H:%M:%S')
             WORKID = time.strftime("%Y%m%d%H%M%S", time.localtime())
-            if out_type =="指定出库":
+            if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
             elif out_type == "正常出库":
@@ -133,7 +133,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             # msg_count = len(json_data["items"])
             # json_data["msgConut"] = msg_count
             json_data = json.dumps(json_data, ensure_ascii=False)
-            sender = OUTWORKUploader(end_type = out_type )
+            sender = OUTWORKUploader(end_type=out_type)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
                 items = result['items']
@@ -214,9 +214,8 @@ class OverdueMaterialManagementSerializer(serializers.ModelSerializer):
         else:
             period_of_validity = mate_atr_obj.period_of_validity  # 保质期
             safety_inventory = mate_atr_obj.safety_inventory  # 等级
-            items = {'period_of_validity':period_of_validity,'safety_inventory':safety_inventory}
+            items = {'period_of_validity': period_of_validity, 'safety_inventory': safety_inventory}
             return items
-
 
     class Meta:
         model = MaterialInventory
@@ -269,3 +268,24 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
                   'unit_weight',
                   'total_weight',
                   'quality_status']
+
+
+class InventoryLogSerializer(serializers.ModelSerializer):
+    initiator = serializers.ReadOnlyField(source='initiator.username')
+
+    class Meta:
+        model = InventoryLog
+        fields = ['order_type',
+                  'order_no',
+                  'warehouse_type',
+                  'pallet_no',
+                  'material_no',
+                  'inout_reason',
+                  'inout_num_type',
+                  'qty',
+                  'unit',
+                  'weight',
+                  'initiator',
+                  'start_time',
+                  'end_time'
+                  ]
