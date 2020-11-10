@@ -34,7 +34,8 @@ class KJJGUploader(BaseUploader):
                         ).get('soap:Body'
                               ).get('TRANS_MES_TO_WMS_KJJGResponse'
                                     ).get('TRANS_MES_TO_WMS_KJJGResult')
-        items = json.loads(data).get('items')
+        # items = json.loads(data).get('items')
+        items = json.loads(data)
         ret = []
         for item in items:
             if item['flag'] != '01':  # 01代表成功
