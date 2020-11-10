@@ -57,13 +57,20 @@ class InventoryLog(models.Model):
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
     qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
-    wegit = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
+    weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
                                 max_digits=8)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
     quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
     order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
+    warehouse_type = models.CharField(max_length=64, verbose_name='仓库类型', help_text='仓库类型')
+    inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
+    inout_num_type= models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+    unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
+    initiator = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name='发起人', help_text='发起人')
+    start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
+    end_time = models.DateTimeField('完成时间', blank=True, null=True, help_text='完成时间')
 
     class Meta:
         db_table = 'inventory_log'
@@ -109,7 +116,8 @@ class BzFinalMixingRubberInventory(models.Model):
     memo = models.CharField(max_length=250, db_column='车号')
     lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
-    in_time = models.DateTimeField(db_column='入库时间')
+    in_storage_time = models.DateTimeField(db_column='入库时间')
+
 
     def material_type(self):
         try:
@@ -117,6 +125,7 @@ class BzFinalMixingRubberInventory(models.Model):
         except:
             mt = self.material_no
         return mt
+
 
     def unit(self):
         return "kg"
@@ -191,7 +200,7 @@ class DeliveryPlan(models.Model):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
     need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
-    need_weight = models.DecimalField(max_digits=8, decimal_places=2, verbose_name='需求重量', help_text='需求重量', blank=True, null=True)
+    need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True, null=True)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
     inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
@@ -200,9 +209,7 @@ class DeliveryPlan(models.Model):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
-    created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
-                                     help_text='创建人', verbose_name='创建人', on_delete=models.CASCADE,
-                                     related_query_name='c_%(app_label)s_%(class)ss')
+    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
 
 
     class Meta:
@@ -223,7 +230,8 @@ class DeliveryPlanStatus(models.Model):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
     status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE)
-
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
     class Meta:
         db_table = 'delivery_plan_status'
         verbose_name_plural = verbose_name = '出库计划状态变更表'

@@ -10,19 +10,22 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework import mixins, viewsets
+from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
+from inventory.filters import InventoryLogFilter
+from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import OutOrderFeedBack, DeliveryPlan, MaterialInventory
 from inventory.serializers import ProductInventorySerializer, PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer
 from inventory.models import OutOrderFeedBack, WmsInventoryStock
 from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
-    WmsInventoryStockSerializer
+    WmsInventoryStockSerializer, InventoryLogSerializer
 from inventory.utils import BaseUploader
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
@@ -446,16 +449,16 @@ class PutPlanManagement(ModelViewSet):
     filter_class = PutPlanManagementFilter
 
 
-    # def create(self, request, *args, **kwargs):
-    #     data = request.data
-    #     if not isinstance(data, list):
-    #         raise ValidationError('参数错误')
-    #     for item in data:
-    #         s = PutPlanManagementSerializer(data=item, context={'request': request})
-    #         if not s.is_valid():
-    #             raise ValidationError(s.errors)
-    #         s.save()
-    #     return Response('新建成功')
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            s = PutPlanManagementSerializer(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -497,6 +500,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             queryset = model.objects.using('bz').all()
+            quality_status = self.request.query_params.get('quality_status', None)
+            if quality_status:
+                queryset = queryset.filter(quality_status=quality_status)
         if queryset:
             if material_type and model != BzFinalMixingRubberInventory:
                 queryset = queryset.filter(material_type__icontains=material_type)
@@ -513,6 +519,15 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         return self.divide_tool(self.SERIALIZER)
 
 
+
+class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = InventoryLog.objects.order_by('-start_time')
+    serializer_class = InventoryLogSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = InventoryLogFilter
+
+
 class MaterialCount(APIView):
 
     def get(self, request):
@@ -524,3 +539,5 @@ class MaterialCount(APIView):
             raise ValidationError("北自胶片库连接失败")
         ret = temp.values('material_no').annotate().aggregate(all_qty=Sum('qty'))
         return Response(ret)
+
+
