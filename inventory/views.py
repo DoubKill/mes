@@ -465,11 +465,6 @@ class OverdueMaterialManagement(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
-<<<<<<< inventory/views.py
-=======
-
-
->>>>>>> inventory/views.py
 class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     """物料库存信息|线边库|终炼胶库|原材料库"""
 
