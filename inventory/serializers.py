@@ -8,6 +8,7 @@ import json
 import time
 
 from django.db.models import Sum
+from django.db.transaction import atomic
 from rest_framework import serializers
 from .models import MaterialInventory, \
     BzFinalMixingRubberInventory, \
@@ -49,84 +50,107 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         items = {'actual_qty':actual_qty,'actual_wegit':actual_wegit}
         return items
 
-
+    @atomic()
     def create(self, validated_data):
-
-
-        deliveryplan = DeliveryPlan.objects.create(**validated_data)
-        warehouse_info = validated_data['warehouse_info']
+        # pallet_no = validated_data['pallet_no']
+        # dp_obj = DeliveryPlan.objects.filter(pallet_no = pallet_no).first()
+        # if dp_obj:
+        #     raise serializers.ValidationError('已经存在')
+        # else:
         order_no = validated_data['order_no']
-        order_type = validated_data['order_type']
-        status = validated_data['status']
+        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        inventory_type = validated_data['inventory_type']
+        material_no = validated_data['material_no']
+        need_qty = validated_data['need_qty']
+        warehouse_info = validated_data['warehouse_info']
+        status =  validated_data['status']
+
+
+        deliveryplan = DeliveryPlan.objects.create(order_no = order_no,
+                                                   inventory_type = inventory_type,
+                                                   material_no = material_no,
+                                                   need_qty = need_qty,
+                                                   warehouse_info = warehouse_info,
+                                                   status = status
+                                                   )
+        warehouse_info = validated_data['warehouse_info']
+        order_type = validated_data['inventory_type']
+        status = '1'
         DeliveryPlanStatus.objects.create(warehouse_info = warehouse_info,
                                                                order_no = order_no,
                                                                order_type = order_type,
                                                                status = status
                                                                )
-
         return deliveryplan
 
     def update(self, instance, validated_data):
-        msg_id = validated_data['order_no']
         out_type = validated_data['inventory_type']
-        str_user = self.context['request'].user.username
-        material_no = validated_data['material_no']
-        # wegit = validated_data['need_weight']
-        wegit = "1"
-        msg_count = "1"
-        # location = validated_data['location']
-        location = "二层后端"
-        # created_date = validated_data['created_date']
-        created_date = "20200513 09:22:22"
-        WORKID = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        # 无批次号
-        dict1 = {'WORKID':WORKID,'MID':material_no,'PICI':1,'NUM':wegit,
-                 'STATIONID':location,'SENDDATE':created_date}
-        items =[]
-        items.append(dict1)
-        json_data = {
-            'msgId': msg_id,
-            'OUTTYPE': out_type,
-            "msgConut": msg_count,
-            "SENDUSER": str_user,
-            "items": items
-        }
-        # msg_count = len(json_data["items"])
-        # json_data["msgConut"] = msg_count
-        json_data = json.dumps(json_data, ensure_ascii=False)
-        sender = OUTWORKUploader()
-        result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
-        if result is not None:
-            items = result['items']
-            msg = items[0]['msg']
-            msg = "TRUE"
-            if msg:
-                instance.status = 2
-                validated_data['status'] = instance.status
-                instance = super().update(instance,validated_data)
-                warehouse_info = validated_data['warehouse_info']
-                order_no = validated_data['order_no']
-                order_type = validated_data['order_type']
-                status = instance.status
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
-                                                  order_no=order_no,
-                                                  order_type=order_type,
-                                                  status=status
-                                                  )
-                return instance
-            else:
-                instance.status = 3
-                warehouse_info = validated_data['warehouse_info']
-                order_no = validated_data['order_no']
-                order_type = validated_data['order_type']
-                status = instance.status
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
-                                                  order_no=order_no,
-                                                  order_type=order_type,
-                                                  status=status
-                                                  )
-                instance.save()
-                raise serializers.ValidationError('出库失败')
+        if out_type =="正常出库":
+            msg_id = validated_data['order_no']
+            str_user = self.context['request'].user.username
+            material_no = validated_data['material_no']
+            # wegit = validated_data['need_weight']
+            wegit = "1"
+            msg_count = "1"
+            # location = validated_data['location']
+            location = "二层后端"
+            # created_date = validated_data['created_date']
+            created_date = "20200513 09:22:22"
+            WORKID = time.strftime("%Y%m%d%H%M%S", time.localtime())
+            # 无批次号
+            dict1 = {'WORKID':WORKID,'MID':material_no,'PICI':1,'NUM':wegit,
+                     'STATIONID':location,'SENDDATE':created_date}
+            items =[]
+            items.append(dict1)
+            json_data = {
+                'msgId': msg_id,
+                'OUTTYPE': out_type,
+                "msgConut": msg_count,
+                "SENDUSER": str_user,
+                "items": items
+            }
+            # msg_count = len(json_data["items"])
+            # json_data["msgConut"] = msg_count
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            sender = OUTWORKUploader()
+            result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
+            if result is not None:
+                items = result['items']
+                msg = items[0]['msg']
+                msg = "TRUE"
+                if msg:
+                    instance.status = 2
+                    validated_data['status'] = instance.status
+                    instance = super().update(instance,validated_data)
+                    warehouse_info = validated_data['warehouse_info']
+                    order_no = validated_data['order_no']
+                    order_type = validated_data['inventory_type']
+                    status = instance.status
+                    DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                                      order_no=order_no,
+                                                      order_type=order_type,
+                                                      status=status
+                                                      )
+                    return instance
+                else:
+                    instance.status = 3
+                    warehouse_info = validated_data['warehouse_info']
+                    order_no = validated_data['order_no']
+                    order_type = validated_data['inventory_type']
+                    status = instance.status
+                    DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                                      order_no=order_no,
+                                                      order_type=order_type,
+                                                      status=status
+                                                      )
+                    instance.save()
+                    raise serializers.ValidationError('出库失败')
+        else:
+            need_qty = validated_data['need_qty']
+            # instance = super().update(need_qty)
+            instance.need_qty=need_qty
+            instance.save()
+            return instance
 
     # def update_planStatus(self):
 

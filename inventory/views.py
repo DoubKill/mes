@@ -443,10 +443,22 @@ class OutWorkGum(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
-    queryset = DeliveryPlan.objects.filter().order_by("-out_time")
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter
+
+
+    # def create(self, request, *args, **kwargs):
+    #     data = request.data
+    #     if not isinstance(data, list):
+    #         raise ValidationError('参数错误')
+    #     for item in data:
+    #         s = PutPlanManagementSerializer(data=item, context={'request': request})
+    #         if not s.is_valid():
+    #             raise ValidationError(s.errors)
+    #         s.save()
+    #     return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -454,7 +466,6 @@ class OverdueMaterialManagement(ModelViewSet):
     queryset = MaterialInventory.objects.filter()
     serializer_class = OverdueMaterialManagementSerializer
     filter_backends = [DjangoFilterBackend]
-
 
 
 
