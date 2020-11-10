@@ -107,19 +107,22 @@ class BzFinalMixingRubberInventory(models.Model):
     total_weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量')
     quality_status = models.CharField(max_length=20, db_column='品质状态')
     memo = models.CharField(max_length=250, db_column='车号')
+    lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
+    in_time = models.DateTimeField(db_column='入库时间')
 
     def material_type(self):
-        return "Unknown"
-
-    def lot_no(self):
-        return "Unknown"
+        try:
+            mt = self.material_no.split("-")[1]
+        except:
+            mt = self.material_no
+        return mt
 
     def unit(self):
-        return "Unknown"
+        return "kg"
 
     def unit_weight(self):
-        return "Unknown"
+        return str(round(self.total_weight / self.qty, 3))
 
     class Meta:
         db_table = 'v_ASRS_STORE_MESVIEW'
