@@ -324,7 +324,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             test_status = '复检'
         else:
             test_status = None  # 检测状态
-        test_factory_date = max_mtr.test_factory_date  # 检测时间
+        test_factory_date = max_mtr.test_factory_date.strftime('%Y-%m-%d %H:%M:%S')  # 检测时间
         test_class = max_mtr.test_class  # 检测班次
         try:
             test_user = max_mtr.created_user.username  # 检测员

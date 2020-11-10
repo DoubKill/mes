@@ -269,12 +269,16 @@ class CutTimeCollect(APIView):
         # 统计过程
         return_list = []
         tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values(
-            'plan_classes_uid').annotate().distinct()
+            'plan_classes_uid').annotate(et=Max("end_time")).distinct().values('plan_classes_uid', 'et')
+        tfb_equip_uid_list = list(tfb_equip_uid_list)
+        tfb_equip_uid_list.sort(key=lambda x: x["et"], reverse=False)
         if not tfb_equip_uid_list:
             return_list.append(
                 {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
             return Response({'results': return_list})
         for j in range(len(tfb_equip_uid_list) - 1):
+            tfb_equip_uid_list[j].pop('et', None)
+            tfb_equip_uid_list[j + 1].pop('et', None)
             tfb_equip_uid_dict_ago = tfb_equip_uid_list[j]
             tfb_equip_uid_dict_later = tfb_equip_uid_list[j + 1]
             # 这里也要加筛选
@@ -298,7 +302,7 @@ class CutTimeCollect(APIView):
             m_tfb_obj = TrainsFeedbacks.objects.filter(delete_flag=False, equip_no=equip_no,
                                                        end_time__date=mst).first()
             if m_tfb_obj:
-                tfb_equip_uid_dict = tfb_equip_uid_list.last()
+                tfb_equip_uid_dict = tfb_equip_uid_list[-1]
                 tfb_equip_uid_dict['end_time__date'] = st
 
                 tfb_pn_age = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).last()
