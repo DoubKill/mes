@@ -194,7 +194,7 @@ class DeliveryPlan(models.Model):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
     need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
-    need_weight = models.DecimalField(max_digits=8, decimal_places=2, verbose_name='需求重量', help_text='需求重量', blank=True, null=True)
+    need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True, null=True)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
     inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
@@ -203,9 +203,7 @@ class DeliveryPlan(models.Model):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
-    created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',
-                                     help_text='创建人', verbose_name='创建人', on_delete=models.CASCADE,
-                                     related_query_name='c_%(app_label)s_%(class)ss')
+    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
 
 
     class Meta:
@@ -226,7 +224,8 @@ class DeliveryPlanStatus(models.Model):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
     status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE)
-
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
     class Meta:
         db_table = 'delivery_plan_status'
         verbose_name_plural = verbose_name = '出库计划状态变更表'

@@ -10,6 +10,9 @@ import time
 from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
+
+from recipe.models import MaterialAttribute
+from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial
 from .models import MaterialInventory, \
     BzFinalMixingRubberInventory, \
     WmsInventoryStock, \
@@ -209,9 +212,7 @@ class XBKMaterialInventorySerializer(serializers.ModelSerializer):
 class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
     class Meta:
         model = BzFinalMixingRubberInventory
-        fields = [
-                  'id',
-                  'material_type',
+        fields = ['material_type',
                   'material_no',
                   'lot_no',
                   'container_no',
@@ -220,9 +221,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
                   'unit',
                   'unit_weight',
                   'total_weight',
-                  'quality_status',
-                  'memo'
-                  ]
+                  'quality_status']
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
