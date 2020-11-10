@@ -105,15 +105,13 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
 
-    # msg_id = order_no()
+    # msg_ids = order_no()
     # item = []
-    # item_dict = {"WORKID": str(int(msg_id) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1", "STATIONID": "二层后端",
+    # item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1",
+    #              "STATIONID": "二层后端",
     #              "SENDDATE": "20200513 09:22:22"}
     # item.append(item_dict)
-    # print(update_wms_kjjg(msg_id=msg_id,items=item))
-    # print(time.time() - a, '===')
-
-
+    # print(update_wms_kjjg(msg_id=msg_ids, items=item))
 
     # if not exist_data_point_indicator:  # mes判断
     #     if max_mtr.data_point_indicator:
