@@ -229,7 +229,7 @@ class DeliveryPlanStatus(models.Model):
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plan_status")
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
-    status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE)
+    status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
     class Meta:
