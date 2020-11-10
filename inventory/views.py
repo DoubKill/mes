@@ -440,10 +440,22 @@ class OutWorkGum(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
-    queryset = DeliveryPlan.objects.filter().order_by("-out_time")
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter
+
+
+    # def create(self, request, *args, **kwargs):
+    #     data = request.data
+    #     if not isinstance(data, list):
+    #         raise ValidationError('参数错误')
+    #     for item in data:
+    #         s = PutPlanManagementSerializer(data=item, context={'request': request})
+    #         if not s.is_valid():
+    #             raise ValidationError(s.errors)
+    #         s.save()
+    #     return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -453,6 +465,11 @@ class OverdueMaterialManagement(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
+<<<<<<< inventory/views.py
+=======
+
+
+>>>>>>> inventory/views.py
 class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     """物料库存信息|线边库|终炼胶库|原材料库"""
 
