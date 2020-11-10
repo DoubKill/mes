@@ -1,3 +1,5 @@
+import time
+
 import pymssql
 from DBUtils.PooledDB import PooledDB
 from rest_framework import status, mixins
@@ -178,3 +180,7 @@ class SqlClient(object):
     def close(self):
         self.conn.close()
         self.cursor.close()
+
+
+def order_no():
+    time.strftime("%Y%m%d%H%M%S")

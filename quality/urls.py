@@ -11,7 +11,8 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialTestOrderViewSet, TestTypeViewSet, DataPointViewSet, MaterialTestMethodViewSet, \
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
-    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics
+    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, \
+    LabelPrintViewSet
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -29,10 +30,12 @@ router.register('mat-test-methods', MaterialTestMethodViewSet)
 router.register('mat-data-point-indicators', MaterialDataPointIndicatorViewSet)
 # 不合格处理意见
 router.register('deal-suggestion', DealSuggestionViewSet)
-# 不合格处理意见管理
+# 不合格处理
 router.register('material-deal-result', MaterialDealResultViewSet)
 # 等级和结果
 router.register('level-result', LevelResultViewSet)
+# 快检标签打印
+router.register('label-print', LabelPrintViewSet)
 
 urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
