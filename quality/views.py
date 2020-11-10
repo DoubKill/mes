@@ -23,12 +23,13 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
-    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult
+    MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
+    LabelPrint
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
-    TestIndicatorSerializer
+    TestIndicatorSerializer, LabelPrintSerializer
 from recipe.models import Material, ProductBatching
 import logging
 from django.db.models import Max
@@ -381,7 +382,7 @@ class ProductDayStatistics(APIView):
         # year_time = params.get('ym_time', datetime.datetime.now().year)
         month_time = params.get('ym_time', datetime.datetime.now()).month
         year_time = params.get('ym_time', datetime.datetime.now()).year
-        pass_type = params.get('pass_type', 1)  # 1:综合合格率  2：一次合格率  3：流变合格率
+        pass_type = params.get('pass_type', '1')  # 1:综合合格率  2：一次合格率  3：流变合格率
         pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
         test_indicator_name_dict = pass_dict[pass_type]
         product_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
@@ -433,6 +434,28 @@ class ProductDayStatistics(APIView):
                 return_dict[f'{month_time}-{day_time}'] = percent_of_pass
             ruturn_pass.append(return_dict)
         return Response(ruturn_pass)
+
+
+class LabelPrintViewSet(mixins.CreateModelMixin,
+                           mixins.UpdateModelMixin,
+                           GenericViewSet):
+    """
+    list: 获取一条打印标签
+    create: 存储一条打印标签
+    """
+    queryset = LabelPrint.objects.all()
+    serializer_class = LabelPrintSerializer
+    permission_classes = ()
+    authentication_classes = ()
+
+    def list(self, request, *args, **kwargs):
+        instance = self.get_queryset().filter(label_type=2, status=0).first()
+        if instance:
+            serializer = self.get_serializer(instance)
+            data = serializer.data
+        else:
+            data = {}
+        return Response(data)
 
 
 class DealSuggestionView(APIView):

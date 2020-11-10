@@ -200,7 +200,7 @@ class DeliveryPlan(models.Model):
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
-    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=1)
+    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
     created_user = models.ForeignKey(User, blank=True, null=True, related_name='c_%(app_label)s_%(class)s_related',

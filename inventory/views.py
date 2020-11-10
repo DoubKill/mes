@@ -39,7 +39,7 @@ from .serializers import XBKMaterialInventorySerializer
 
 
 class MaterialInventoryView(GenericViewSet,
-                        mixins.ListModelMixin, ):
+                            mixins.ListModelMixin, ):
 
     def get_queryset(self):
         return
@@ -219,6 +219,7 @@ class OutWorkFeedBack(APIView):
 class OutWork(ModelViewSet):
     queryset = DeliveryPlan.objects.filter()
     serializer_class = PutPlanManagementSerializer
+
     # 帘布库出库
     # class OUTWORKUploader(BaseUploader):
     #     endpointloa = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
@@ -252,7 +253,7 @@ class OutWork(ModelViewSet):
     #         #         ret.append(item['msg'])
     #         return items
 
-    def get_base_data(self, sender,request):
+    def get_base_data(self, sender, request):
         # data_json ={}
         # items =[]
         # params = request.data
@@ -303,6 +304,7 @@ class OutWork(ModelViewSet):
         }
 
         return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
+
     def get_base_data(self, sender, request):
         data_json = {}
         items = []
@@ -365,7 +367,7 @@ class OutWork(ModelViewSet):
     def post(self, request):
         print(request.user.username)
         sender = self.OUTWORKUploader()
-        ret = sender.request(*self.get_base_data(sender,request))
+        ret = sender.request(*self.get_base_data(sender, request))
         print("eeesasdasdsada")
         print(ret)
         # items = ret['items']
@@ -438,6 +440,7 @@ class OutWorkGum(APIView):
         ret = sender.request(*self.get_base_data(sender))
         return Response(ret)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
     queryset = DeliveryPlan.objects.filter().order_by("-created_date")
@@ -463,8 +466,6 @@ class OverdueMaterialManagement(ModelViewSet):
     queryset = MaterialInventory.objects.filter()
     serializer_class = OverdueMaterialManagementSerializer
     filter_backends = [DjangoFilterBackend]
-
-
 
 
 class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -530,16 +531,13 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 class MaterialCount(APIView):
 
     def get(self, request):
-        param = request.query_params
-        material_no = param.get("material_no")
+        params = request.query_params
+        store_name = params.get('store_name', None)
         try:
-            temp = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no)
+            temp = BzFinalMixingRubberInventory.objects.using('bz')
         except:
             raise ValidationError("北自胶片库连接失败")
-        if material_no:
-            ret = temp.filter(material_no=material_no).aggregate(all_qty=Sum('qty'))
-        else:
-            ret = temp.filter().aggregate(all_qty=Sum('qty'))
+        ret = temp.values('material_no').annotate().aggregate(all_qty=Sum('qty'))
         return Response(ret)
 
 
