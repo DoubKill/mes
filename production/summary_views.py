@@ -268,8 +268,8 @@ class CutTimeCollect(APIView):
             dict_filter['end_time__date'] = st
         # 统计过程
         return_list = []
-        tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values('equip_no',
-                                                                                                     'plan_classes_uid').annotate().distinct()
+        tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values(
+            'plan_classes_uid').annotate().distinct()
         if not tfb_equip_uid_list:
             return_list.append(
                 {'sum_time': None, 'max_time': None, 'min_time': None, 'avg_time': None})
