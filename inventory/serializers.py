@@ -38,7 +38,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     no = serializers.CharField(source="warehouse_info.no", read_only=True)
     name = serializers.CharField(source="warehouse_info.name", read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
-    created_date = serializers.DateTimeField()
+    order_no = serializers.CharField(required=False)
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -107,12 +107,12 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             str_user = self.context['request'].user.username
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
-            pici = 1  # 批次号
+            pici = "1"  # 批次号
             num = validated_data.get('need_qty', '1')
             msg_count = "1"
             location = "二层后端"
             # 发起时间
-            time = validated_data.get('created_date')
+            time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
             WORKID = time.strftime("%Y%m%d%H%M%S")
             dict1 = {}
@@ -122,6 +122,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM ': num,
                          'STATIONID': location, 'SENDDATE': created_time}
+                out_type = "生产出库"
             items = []
             items.append(dict1)
             json_data = {
