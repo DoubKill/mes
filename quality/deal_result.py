@@ -12,7 +12,6 @@ from django.db.models import Max, Min
 @atomic()
 def synthesize_to_material_deal_result(mdr_lot_no):
     """等级综合判定"""
-    a=time.time()
     # 1、先找到这个胶料所有指标
     mto_set_all = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('product_no', flat=True)
     mto_product_no_list = list(mto_set_all)
@@ -24,16 +23,17 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 
     # 2、判断快检这边是不是所有的指标都有
     mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
-    test_indicator_name_list = []
+
     for mto_obj in mto_set:
+        test_indicator_name_list = []
         mtr_dpn_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
             max_test_time=Max('test_times'))
         for mtr_dpn_dict in mtr_dpn_list:
             test_indicator_name_list.append(mtr_dpn_dict['test_indicator_name'])
-    test_indicator_name_list = list(set(test_indicator_name_list))
-    for name in name_list:
-        if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
-            return
+        test_indicator_name_list = list(set(test_indicator_name_list))
+        for name in name_list:
+            if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
+                return
 
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
@@ -117,7 +117,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # else:
     #     mdr_obj.update_store_test_flag = True
     #     mdr_obj.save()
-    print(time.time()-a)
 
 
 
