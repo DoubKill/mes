@@ -132,6 +132,7 @@ class MaterialTestResult(AbstractEntity):
     mes_result = models.CharField(max_length=64, help_text='mes评判结果', blank=True, null=True)
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
     machine_name = models.CharField(max_length=64, help_text='试验机台名称', blank=True, null=True)
+    level = models.IntegerField(help_text='等级', blank=True, null=True)
 
     class Meta:
         db_table = 'material_test_result'

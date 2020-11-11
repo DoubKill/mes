@@ -167,7 +167,8 @@ def main():
                                     test_indicator_name=indicator_name,
                                     result=result,
                                     machine_name=machine_name,
-                                    test_class=test_class
+                                    test_class=test_class,
+                                    level=1 if result == '合格' else 3
                                 )
             conn.close()
             min_id += 1000
