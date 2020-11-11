@@ -18,22 +18,22 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     mtm_set = MaterialTestMethod.objects.filter(material__material_name__in=mto_product_no_list).all()
     name_list = []
     for mtm_obj in mtm_set:
-        name = mtm_obj.test_method.test_type.name
+        name = mtm_obj.test_method.test_type.test_indicator.name
         name_list.append(name)
 
     # 2、判断快检这边是不是所有的指标都有
     mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
-    test_indicator_name_list = []
+
     for mto_obj in mto_set:
+        test_indicator_name_list = []
         mtr_dpn_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
             max_test_time=Max('test_times'))
         for mtr_dpn_dict in mtr_dpn_list:
             test_indicator_name_list.append(mtr_dpn_dict['test_indicator_name'])
-    test_indicator_name_list = list(set(test_indicator_name_list))
-
-    for name in name_list:
-        if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
-            return
+        test_indicator_name_list = list(set(test_indicator_name_list))
+        for name in name_list:
+            if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
+                return
 
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
@@ -104,14 +104,41 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
+    # try:
+    #     msg_ids = order_no()
+    #     item = []
+    #     item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1",
+    #                  "STATIONID": "二层后端",
+    #                  "SENDDATE": "20200513 09:22:22"}
+    #     item.append(item_dict)
+    #     jieguo = update_wms_kjjg(msg_id=msg_ids, items=item)
+    # except:
+    #     pass
+    # else:
+    #     mdr_obj.update_store_test_flag = True
+    #     mdr_obj.save()
 
-    # msg_id = order_no()
-    # item = []
-    # item_dict = {"WORKID": str(int(msg_id) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1", "STATIONID": "二层后端",
-    #              "SENDDATE": "20200513 09:22:22"}
-    # item.append(item_dict)
-    # print(update_wms_kjjg(msg_id=msg_id,items=item))
-    # print(time.time() - a, '===')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

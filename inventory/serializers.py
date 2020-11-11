@@ -38,16 +38,17 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     no = serializers.CharField(source="warehouse_info.no", read_only=True)
     name = serializers.CharField(source="warehouse_info.name", read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
+    created_date = serializers.DateTimeField()
 
     def get_actual(self, object):
         order_no = object.order_no
         actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
                                                                           actual_weight=Sum('weight'))
         actual_qty = actual['actual_qty']
-        actual_wegit = actual['actual_weight']
+        actual_weight = actual['actual_weight']
         # 无法合计
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
-        items = {'actual_qty': actual_qty, 'actual_wegit': actual_wegit}
+        items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
 
     @atomic()

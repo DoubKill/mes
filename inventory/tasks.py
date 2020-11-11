@@ -43,7 +43,7 @@ class KJJGUploader(BaseUploader):
         return ret
 
 
-def update_wms_kjjg(items=[
+def update_wms_kjjg(msg_id, items=[
                 {"WORKID": "11223",
                  "MID": "C-HMB-F150-12",
                  "PICI": "20200101",
@@ -79,15 +79,13 @@ def update_wms_kjjg(items=[
         user = "Mes"
         out_type = "物料快检"
         data_json = {
-            "msgId": "1",
+            "msgId": msg_id,
             "OUTTYPE": out_type,
             "msgConut": "2",
             "SENDUSER": user,
             "items": items
         }
-        msg_id = order_no()
         msg_count = len(data_json["items"])
-        data_json["msgId"] = msg_id
         data_json["msgConut"] = msg_count
         return msg_id, out_type, msg_count, user, json.dumps(data_json, ensure_ascii=False)
     sender = KJJGUploader()
