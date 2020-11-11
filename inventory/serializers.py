@@ -38,16 +38,17 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     no = serializers.CharField(source="warehouse_info.no", read_only=True)
     name = serializers.CharField(source="warehouse_info.name", read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
+    created_date = serializers.DateTimeField()
 
     def get_actual(self, object):
         order_no = object.order_no
         actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
-                                                                          actual_weight=Sum('wegit'))
+                                                                          actual_weight=Sum('weight'))
         actual_qty = actual['actual_qty']
-        actual_wegit = actual['actual_weight']
+        actual_weight = actual['actual_weight']
         # 无法合计
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
-        items = {'actual_qty': actual_qty, 'actual_wegit': actual_wegit}
+        items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
 
     @atomic()
@@ -107,18 +108,18 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no')  # 托盘号
             pici = 1  # 批次号
-            wegit = validated_data.get('wegit','1')
+            weight = validated_data.get('weight','1')
             msg_count = "1"
             location = "二层后端"
             # 发起时间
-            time = validated_data.get('created_date')
-            created_time = datetime.datetime.strftime(time, '%Y%m%d %H:%M:%S')
+            created_time = validated_data.get('created_date')
+            created_time = datetime.datetime.strftime(created_time, '%Y%m%d %H:%M:%S')
             WORKID = time.strftime("%Y%m%d%H%M%S", time.localtime())
             if out_type =="指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
             elif out_type == "正常出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM ': wegit,
+                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM ': weight,
                          'STATIONID': location, 'SENDDATE': created_time}
             items = []
             items.append(dict1)
