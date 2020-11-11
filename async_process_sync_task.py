@@ -14,7 +14,6 @@ import django
 import logging
 
 import requests
-from django.db.models import Exists
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()

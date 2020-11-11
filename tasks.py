@@ -6,6 +6,12 @@ name: 触发任务，
 desc: 快检结果更新到mes，mes将触发该脚本将快检结果同步至wms
 """
 import json
+import os
+
+import django
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
+django.setup()
 
 from inventory.utils import BaseUploader
 from mes.common_code import order_no
@@ -34,8 +40,10 @@ class KJJGUploader(BaseUploader):
                         ).get('soap:Body'
                               ).get('TRANS_MES_TO_WMS_KJJGResponse'
                                     ).get('TRANS_MES_TO_WMS_KJJGResult')
-        # items = json.loads(data).get('items')
-        items = json.loads(data)
+        try:
+            items = json.loads(data).get('items')
+        except:
+            items = json.loads(data)
         ret = []
         for item in items:
             if item['flag'] != '01':  # 01代表成功
@@ -43,18 +51,18 @@ class KJJGUploader(BaseUploader):
         return ret
 
 
-def update_wms_kjjg(msg_id, items=[
-                {"WORKID": "11223",
+def update_wms_kjjg(items=[
+                {"WORKID": "202005130922221",
                  "MID": "C-HMB-F150-12",
                  "PICI": "20200101",
                  "NUM": "1",
-                 "STATIONID": "二层后端",
+                 "KJJG": "合格",
                  "SENDDATE": "20200513 09:22:22"},
-                {"WORKID": "11224",
+                {"WORKID": "202005130922222",
                  "MID": "C-HMB-F150-11",
                  "PICI": "20200101",
                  "NUM": "1",
-                 "STATIONID": "二层前端",
+                 "KJJG": "不合格",
                  "SENDDATE": "20200513 09:22:22"}
             ]):
     def get_base_data():
@@ -79,14 +87,35 @@ def update_wms_kjjg(msg_id, items=[
         user = "Mes"
         out_type = "物料快检"
         data_json = {
-            "msgId": msg_id,
-            "OUTTYPE": out_type,
+            "msgId": "1",
+            "KJTYPE": out_type,
             "msgConut": "2",
             "SENDUSER": user,
             "items": items
         }
-        msg_count = len(data_json["items"])
+        msg_id = order_no()
+        msg_count = str(len(data_json["items"]))
+        data_json["msgId"] = msg_id
         data_json["msgConut"] = msg_count
         return msg_id, out_type, msg_count, user, json.dumps(data_json, ensure_ascii=False)
+#         return "1", "物料快检", "1", "GJ_001", json.dumps({
+#         "msgId": "1",                       #  任务包号       string
+#         "KJTYPE": "物料快检",          #   质检类型       string
+#         "msgConut": "1",                 #  子任务数量    string
+#         "SENDUSER": "GJ_001",      #  质检操作人     string
+#         "items": [{
+#             "WORKID": "11223",                            #  任务id                string
+#             "MID": "C-HMB-F150-12",                  # 物料编号              string
+#             "PICI": "20200101",                             # 批次号/计划号       string
+#             "NUM": "100",                                     # 车数量                     string
+#             "KJJG": "合格",                                      # 品质状态               string
+#             "SENDDATE": "20200513 09:22:22"    # 下发时间               string
+#         }]
+#     }
+# , ensure_ascii=False)
     sender = KJJGUploader()
-    sender.request(*get_base_data())
+    ret = sender.request(*get_base_data())
+    print(ret)
+
+if __name__ == '__main__':
+    update_wms_kjjg()
