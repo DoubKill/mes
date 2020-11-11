@@ -68,8 +68,8 @@ class InventoryLog(models.Model):
     inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
     inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
-    initiator = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name='发起人',
-                                  help_text='发起人')
+    initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
+                                 help_text='发起人')
     start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
     end_time = models.DateTimeField('完成时间', blank=True, null=True, help_text='完成时间')
 
@@ -209,7 +209,7 @@ class DeliveryPlan(models.Model):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
-    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人', blank=True, null=True)
+    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
 
     class Meta:
         db_table = 'delivery_plan'

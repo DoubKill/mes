@@ -57,12 +57,6 @@ def update_wms_kjjg(items=[
                  "PICI": "20200101",
                  "NUM": "1",
                  "KJJG": "合格",
-                 "SENDDATE": "20200513 09:22:22"},
-                {"WORKID": "202005130922222",
-                 "MID": "C-HMB-F150-11",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "KJJG": "不合格",
                  "SENDDATE": "20200513 09:22:22"}
             ]):
     def get_base_data():
