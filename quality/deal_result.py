@@ -1,3 +1,4 @@
+import datetime
 import time
 
 from inventory.tasks import update_wms_kjjg
@@ -51,22 +52,22 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     exist_data_point_indicator = True  # 是否超出区间范围
     quality_point_indicator = True
     is_hege = True
-    quality_sign = True  # 快检判定何不合格
+    quality_sign = True  # 快检判定何三等品
     for mtr_obj in level_list:
         if not mtr_obj.mes_result:  # mes没有数据
             if not mtr_obj.result:  # 快检也没有数据
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}没有判定区间，\n'
                 exist_data_point_indicator = False
-            elif mtr_obj.result != '合格':
+            elif mtr_obj.result != '一等品':
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result == '合格':
-            if mtr_obj.result not in ['合格', None]:
+        elif mtr_obj.mes_result == '一等品':
+            if mtr_obj.result not in ['一等品', None]:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result != '合格':
+        elif mtr_obj.mes_result != '一等品':
             reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
 
         if not max_mtr.data_point_indicator:
@@ -88,10 +89,10 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             mdr_dict['deal_result'] = max_mtr.mes_result
         else:
             mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
-            mdr_dict['deal_result'] = '不合格'
+            mdr_dict['deal_result'] = '三等品'
     else:
         mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
-        mdr_dict['deal_result'] = '不合格'
+        mdr_dict['deal_result'] = '三等品'
 
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).last()
     mdr_dict['production_factory_date'] = pfb_obj.begin_time
@@ -106,10 +107,13 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
     # try:
     #     msg_ids = order_no()
+    #     mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
+    #     pfb_obj = PalletFeedbacks.objects.filter(pallet_no=mdr_obj.lot_no).first()
     #     item = []
-    #     item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": "C-HMB-F150-12", "PICI": "20200101", "NUM": "1",
-    #                  "STATIONID": "二层后端",
-    #                  "SENDDATE": "20200513 09:22:22"}
+    #     item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": mto_obj.product_no, "PICI": pfb_obj.bath_no,
+    #                  "NUM": mdr_obj.lot_no,
+    #                  "KJJG": mdr_obj.deal_result,
+    #                  "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
     #     item.append(item_dict)
     #     jieguo = update_wms_kjjg(msg_id=msg_ids, items=item)
     # except:
@@ -117,66 +121,3 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # else:
     #     mdr_obj.update_store_test_flag = True
     #     mdr_obj.save()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # if not exist_data_point_indicator:  # mes判断
-    #     if max_mtr.data_point_indicator:
-    #         if is_hege:
-    #             mdr_dict['level'] = max_mtr.data_point_indicator.level
-    #             mdr_dict['deal_result'] = max_mtr.mes_result
-    #         else:
-    #             mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
-    #             mdr_dict['deal_result'] = '不合格'
-    #     else:
-    #         mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
-    #         if mdp_obj:
-    #             mdr_dict['level'] = mdp_obj.level
-    #         else:
-    #             mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
-    #         mdr_dict['deal_result'] = '不合格'
-    # else:
-    #     for mtr_obj in level_list:  # 快检系统找到不合格数据
-    #         reason = reason + '在快检系统中：'
-    #         if mtr_obj.result not in ['合格', None]:
-    #             reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}{mtr_obj.result}\n'
-    #             quality_point_indicator = False
-    #
-    #     if not quality_point_indicator:  # 快检判断
-    #         mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='不合格').first()
-    #         if mdp_obj:
-    #             mdr_dict['level'] = mdp_obj.level
-    #         else:
-    #             mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
-    #         mdr_dict['deal_result'] = '不合格'
-    #     else:
-    #         mdp_obj = MaterialDataPointIndicator.objects.filter(delete_flag=False, result='合格').first()
-    #         if mdp_obj:
-    #             mdr_dict['level'] = mdp_obj.level
-    #         else:
-    #             mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Min('level'))['level__min']
-    #         mdr_dict['deal_result'] = '合格'
-    # pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).last()
-    # mdr_dict['production_factory_date'] = pfb_obj.begin_time
