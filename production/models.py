@@ -76,7 +76,8 @@ class PalletFeedbacks(AbstractEntity):
             models.Index(fields=['product_no']),
             models.Index(fields=["classes"]),
             models.Index(fields=["pallet_no"]),
-            models.Index(fields=["end_time"]), ]
+            models.Index(fields=["end_time"]),
+            models.Index(fields=["lot_no"]),]
 
 
 class EquipStatus(AbstractEntity):

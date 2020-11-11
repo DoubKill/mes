@@ -58,7 +58,7 @@ class InventoryLog(models.Model):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
     qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
     weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
-                                max_digits=8)
+                                 max_digits=8)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
     quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
@@ -66,9 +66,10 @@ class InventoryLog(models.Model):
     order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
     warehouse_type = models.CharField(max_length=64, verbose_name='仓库类型', help_text='仓库类型')
     inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
-    inout_num_type= models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+    inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
-    initiator = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name='发起人', help_text='发起人')
+    initiator = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name='发起人',
+                                  help_text='发起人')
     start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
     end_time = models.DateTimeField('完成时间', blank=True, null=True, help_text='完成时间')
 
@@ -114,18 +115,22 @@ class BzFinalMixingRubberInventory(models.Model):
     total_weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量')
     quality_status = models.CharField(max_length=20, db_column='品质状态')
     memo = models.CharField(max_length=250, db_column='车号')
-    material_no = models.CharField(max_length=50, db_column='物料编码')
     lot_no = models.CharField(max_length=200, db_column='追溯号')
+    material_no = models.CharField(max_length=50, db_column='物料编码')
     in_storage_time = models.DateTimeField(db_column='入库时间')
 
     def material_type(self):
-        return "Unknown"
+        try:
+            mt = self.material_no.split("-")[1]
+        except:
+            mt = self.material_no
+        return mt
 
     def unit(self):
-        return "Unknown"
+        return "kg"
 
     def unit_weight(self):
-        return "Unknown"
+        return str(round(self.total_weight / self.qty, 3))
 
     class Meta:
         db_table = 'v_ASRS_STORE_MESVIEW'
@@ -194,17 +199,17 @@ class DeliveryPlan(models.Model):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
     need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
-    need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True, null=True)
+    need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True,
+                                      null=True)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
     inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
-    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态',choices=ORDER_TYPE_CHOICE, default=4)
+    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
-    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
-
+    last_updated_date = models.DateTimeField(verbose_name='修改时间')
+    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
 
     class Meta:
         db_table = 'delivery_plan'
@@ -223,9 +228,25 @@ class DeliveryPlanStatus(models.Model):
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plan_status")
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
-    status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE)
+    status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE, default=4)
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    created_user = models.CharField(max_length=64,verbose_name='发起人',help_text='发起人',blank=True, null=True)
+    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
+
     class Meta:
         db_table = 'delivery_plan_status'
         verbose_name_plural = verbose_name = '出库计划状态变更表'
+
+
+class Station(models.Model):
+    """出入库站点信息表"""
+    no = models.CharField(max_length=64, verbose_name='站点编码', help_text='站点编码')
+    name = models.CharField(max_length=64, verbose_name='站点名称', help_text='站点名称')
+    desc = models.CharField(max_length=64, verbose_name='备注', help_text='备注')
+    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="station",
+                                       help_text='所属仓库')
+    type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE, help_text='站点类型')
+    used_flag = models.IntegerField(help_text='是否启用')
+
+    class Meta:
+        db_table = 'station'
+        verbose_name_plural = verbose_name = '出入库站点信息表'

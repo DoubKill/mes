@@ -58,7 +58,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         # if dp_obj:
         #     raise serializers.ValidationError('已经存在')
         # else:
-        order_no = validated_data['order_no']
+        # order_no = validated_data.get('order_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data['inventory_type']
         material_no = validated_data['material_no']
