@@ -37,7 +37,7 @@ def main():
     max_test_date = MaterialTestResult.objects.aggregate(
         max_test_date=Max('test_factory_date'))['max_test_date']
     if not max_test_date:
-        max_test_date = '2020-11-10 00:00:00'
+        max_test_date = '2020-11-12 00:00:00'
     else:
         max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
 
@@ -63,7 +63,8 @@ def main():
                    rf.TestDate,
                    rf.TestNo,
                    mt.MachineTypename,
-                   rf.CompoundCode
+                   rf.CompoundCode,
+                   tt.TypeName
                 from Result r
             inner join ResultInfo rf on r.RID=rf.RID
             inner join Compound c on c.id=rf.CompoundID
@@ -85,7 +86,11 @@ def main():
             for item in data:
                 value = item[0]
                 product_no = item[1].strip(' ')  # 胶料代码
-                group = item[2].strip(' ') + '班'  # 班组
+                production_class = item[2].strip(' ') + '班'  # 生产班次
+                if production_class == '夜班':
+                    classes = '晚班'
+                else:
+                    classes = production_class
                 data_point_name = item[4].strip(' ')  # 数据点
                 method_name = item[5].strip(' ')  # 试验方法名称
                 result = item[6].strip(' ')  # 结果
@@ -102,7 +107,8 @@ def main():
                     interval = int(item[13].strip(' '))
                 except Exception:
                     interval = 1
-                test_class = item[3].strip(' ')
+                test_group = item[3].strip(' ')  # 试验班组
+                test_type_name = item[14].strip(' ')
 
                 # 根据机器名称找到指标点
                 if machine_name == '流变仪':
@@ -111,28 +117,24 @@ def main():
                     indicator_name = '门尼'
                 else:
                     continue
+                # print('生产班次：{}, 试验班组：{}'.format(production_class, test_group))
 
                 # 根据班组找班次（找到的不一定对）
                 schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__schedule_name='三班两运转',
                     plan_schedule__day_time=product_date,
-                    group__global_name=group
+                    classes__global_name=classes
                 ).first()
                 if schedule_plan:
-                    classes = schedule_plan.classes.global_name
+                    group = schedule_plan.group.global_name
                 else:
                     continue
-
-                # print('生产日期：{}, 胶料：{}， 班组：{}， 班次：{}， 指标点：{}，'
-                #       '试验方法：{}，数据点：{}, 车次：{}， 值：{}， 结果：{}'.format(
-                #         product_date, product_no, group, classes, indicator_name,
-                #         method_name, data_point_name, trains, value, result))
 
                 # 根据机台编号、胶料代码、班次、日期找托盘lot_no
                 pallet = PalletFeedbacks.objects.filter(
                     equip_no=equip_no,
                     product_no__icontains=product_no,
-                    classes=classes,
+                    classes=production_class,
                     end_time__date=product_date,
                     begin_trains__lte=trains,
                     end_trains__gte=trains
@@ -152,7 +154,7 @@ def main():
                                     actual_trains=i,
                                     product_no=product_no,
                                     plan_classes_uid=pallet.plan_classes_uid,
-                                    production_class=classes,
+                                    production_class=production_class,
                                     production_group=group,
                                     production_equip_no=equip_no,
                                     production_factory_date=product_date,
@@ -166,9 +168,11 @@ def main():
                                     test_method_name=method_name,
                                     test_indicator_name=indicator_name,
                                     result=result,
+                                    mes_result=result,
                                     machine_name=machine_name,
-                                    test_class=test_class,
-                                    level=1 if result == '合格' else 3
+                                    test_group=test_group,
+                                    level=1 if result == '合格' else 3,
+                                    # test_type_name=test_type_name
                                 )
             conn.close()
             min_id += 1000

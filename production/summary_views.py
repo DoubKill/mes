@@ -149,6 +149,10 @@ class ClassesBanBurySummaryView(ListAPIView):
             else:
                 ret[item_key]['total_trains'] += diff_trains
                 ret[item_key]['total_time'] += item_dict['total_time']
+                if ret[item_key]['max_train_time'] < item[6]:
+                    ret[item_key]['max_train_time'] = item[6]
+                if ret[item_key]['min_train_time'] > item[7]:
+                    ret[item_key]['min_train_time'] = item[7]
 
         page = self.paginate_queryset(list(ret.values()))
         if day_type == '2' and dimension == '1':

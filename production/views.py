@@ -18,7 +18,7 @@ from rest_framework.viewsets import GenericViewSet
 from basics.models import PlanSchedule
 from mes.conf import EQUIP_LIST
 from mes.paginations import SinglePageNumberPagination
-from plan.models import ProductClassesPlan, ProductDayPlan
+from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
@@ -685,3 +685,36 @@ class ExpendMaterialBatch(APIView):
         return Response("sync success", status=201)
 
 
+class PalletTrainFeedback(APIView):
+    """获取托盘开始车次-结束车次的数据，过滤字段：equip_no=设备编码&factory_date=工厂日期&classes=班次&product_no=胶料编码"""
+
+    def get(self, request):
+        equip_no = self.request.query_params.get('equip_no')
+        factory_date = self.request.query_params.get('factory_date')
+        classes = self.request.query_params.get('classes')
+        product_no = self.request.query_params.get('product_no')
+        if not all([equip_no, factory_date, classes, product_no]):
+            raise ValidationError('缺少参数')
+        pallet_feed_backs = PalletFeedbacks.objects.filter(
+            equip_no=equip_no,
+            factory_date=factory_date,
+            classes=classes,
+            product_no=product_no
+        )
+        ret = []
+        for pallet_feed_back in pallet_feed_backs:
+            begin_trains = pallet_feed_back.begin_trains
+            end_trains = pallet_feed_back.end_trains
+            for i in range(begin_trains, end_trains+1):
+                data = {
+                    'product_no': pallet_feed_back.product_no,
+                    'lot_no': pallet_feed_back.lot_no,
+                    'classes': pallet_feed_back.classes,
+                    'equip_no': pallet_feed_back.equip_no,
+                    'actual_trains': i,
+                    'plan_classes_uid': pallet_feed_back.plan_classes_uid,
+                    'factory_date': pallet_feed_back.end_time
+                }
+                ret.append(data)
+        ret.sort(key=lambda x: x.get('actual_trains'), reverse=True)
+        return Response(ret)
