@@ -407,7 +407,7 @@ class ProductDayStatistics(APIView):
                 if mto_count == 0:
                     continue
                 pass_count = 0
-                level_list = []
+
                 for lot_no_dict in lot_no_list:
                     mto_set = MaterialTestOrder.objects.filter(delete_flag=False,
                                                                production_factory_date__year=year_time,
@@ -416,7 +416,7 @@ class ProductDayStatistics(APIView):
                                                                **product_no_dict, **lot_no_dict).all()
                     if not mto_set:
                         continue
-
+                    level_list = []
                     for mto_obj in mto_set:
                         mrt_list = mto_obj.order_results.filter(
                             test_indicator_name__in=test_indicator_name_dict).all().values('data_point_name').annotate(
