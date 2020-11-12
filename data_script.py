@@ -36,9 +36,9 @@ def gen_uuid():
 
 
 def run():
-    TrainsFeedbacks.objects.all().delete()
-    PalletFeedbacks.objects.all().delete()
-    EquipStatus.objects.all().delete()
+    # TrainsFeedbacks.objects.all().delete()
+    # PalletFeedbacks.objects.all().delete()
+    # EquipStatus.objects.all().delete()
 
     # plan_schedule_set = PlanSchedule.objects.filter(delete_flag=False)
     # for plan_schedule in plan_schedule_set:
@@ -104,6 +104,7 @@ def run():
                         "lot_no": str(random.randint(999999999, 99999999999999999)) + ''.join(random.sample(
                             'zyxwvutsrqponmlkjihgfedcba', 5)),  # 这个字段之前是没有的 但是表里有 快检那边会用的到 所以给他加上了 随机生成的 数字加字母随机生成字符串
                         "product_time": end_time,
+                        "factory_date":datetime.datetime.now().strftime('%Y-%m-%d')
                     }
                     start_time = end_time
                     bath_no += 1
