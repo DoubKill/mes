@@ -48,6 +48,8 @@ def main():
         name = data_base['name']
 
         min_id, max_id = get_min_max_id(server, user, password, name, max_test_date)
+        if not min_id:
+            continue
         while max_id >= min_id+1:
             sql = """select
                    r.DValue,
