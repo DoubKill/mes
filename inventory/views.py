@@ -223,10 +223,10 @@ class OutWorkFeedBack(APIView):
             try:
                 InventoryLog.objects.create(**data,**il_dict)
             except:
-                result = {"work_id": data.get("task_id"), "msg": "FALSE" + data.get("material_no") + "物料在库内数量不足!",
+                result = {"work_id": data.get("order_no"), "msg": "FALSE" + data.get("material_no") + "物料在库内数量不足!",
                           "flag": "99"}
             else:
-                result = {"work_id": data.get("task_id"), "msg": "TRUE" + data.get("material_no") + "下发成功!",
+                result = {"work_id": data.get("order_no"), "msg": "TRUE" + data.get("material_no") + "下发成功!",
                           "flag": "01"}
 
             return Response(result)
