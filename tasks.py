@@ -51,14 +51,14 @@ class KJJGUploader(BaseUploader):
         return ret
 
 
-def update_wms_kjjg(items=[
-                {"WORKID": "202005130922221",
-                 "MID": "C-HMB-F150-12",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "KJJG": "合格",
-                 "SENDDATE": "20200513 09:22:22"}
-            ]):
+def update_wms_kjjg(items=[{
+            "WORKID": "11223",                            #  任务id                  string
+            "MID": "C-HMB-F150-12",                  # 物料编号                string
+            "PICI": "20200101",                             # 批次号/计划号        string
+            "RFID": "20120001",                            # RFID托盘号            string
+            "DJJG": "一等品",                                  # 品质等级               string
+            "SENDDATE": "20200513 09:22:22"    # 下发时间                string
+        }]):
     def get_base_data():
         """
         items 按照业务要求填充
@@ -91,6 +91,7 @@ def update_wms_kjjg(items=[
         msg_count = str(len(data_json["items"]))
         data_json["msgId"] = msg_id
         data_json["msgConut"] = msg_count
+        print(data_json)
         return msg_id, out_type, msg_count, user, json.dumps(data_json, ensure_ascii=False)
 #         return "1", "物料快检", "1", "GJ_001", json.dumps({
 #         "msgId": "1",                       #  任务包号       string
