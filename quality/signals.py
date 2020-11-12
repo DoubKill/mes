@@ -19,6 +19,6 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
     # 等级综合判定
     try:
         synthesize_to_material_deal_result(instance.material_test_order.lot_no)
-    except Exception:
+    except Exception as e:
         pass
-    #     logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
+        logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")

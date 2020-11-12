@@ -106,17 +106,21 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
     # try:
-    #     msg_ids = order_no()
-    #     mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
-    #     pfb_obj = PalletFeedbacks.objects.filter(pallet_no=mdr_obj.lot_no).first()
-    #     item = []
-    #     item_dict = {"WORKID": str(int(msg_ids) + 1), "MID": mto_obj.product_no, "PICI": pfb_obj.bath_no,
-    #                  "NUM": mdr_obj.lot_no,
-    #                  "KJJG": mdr_obj.deal_result,
-    #                  "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
-    #     item.append(item_dict)
-    #     jieguo = update_wms_kjjg(msg_id=msg_ids, items=item)
-    # except:
+    # msg_ids = order_no()
+    # mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
+    # pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
+    # item = []
+    # item_dict = {"WORKID": str(int(msg_ids) + 1),
+    #              "MID": mto_obj.product_no,
+    #              "PICI": str(pfb_obj.plan_classes_uid),
+    #              "RFID": pfb_obj.pallet_no,
+    #              "DJJG": mdr_obj.deal_result,
+    #              "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
+    # item.append(item_dict)
+    # res = update_wms_kjjg(msg_id=msg_ids, items=item)
+    # print(res, type(res))
+    # except Exception as e:
+    #     print(e)
     #     pass
     # else:
     #     mdr_obj.update_store_test_flag = True
