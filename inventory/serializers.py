@@ -12,8 +12,10 @@ from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
 
+from basics.models import GlobalCode
 from recipe.models import MaterialAttribute
-from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial
+from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
+    WarehouseInfo, Station, WarehouseMaterialType
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader
@@ -296,3 +298,36 @@ class InventoryLogSerializer(serializers.ModelSerializer):
                   'start_time',
                   'end_time'
                   ]
+
+
+class WarehouseInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WarehouseInfo
+        fields = ['id', 'name', 'no', 'use_flag']
+        read_only_fields = ['use_flag']
+
+
+class StationSerializer(serializers.ModelSerializer):
+    warehouse_no = serializers.ReadOnlyField(source='warehouse_info.no', default='')
+    type_name = serializers.ReadOnlyField(source='type.global_name', default='')
+    type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=True,
+                                                                                global_type__type_name='站点类型'))
+    warehouse_info = serializers.PrimaryKeyRelatedField(queryset=WarehouseInfo.objects.all(), write_only=True)
+
+    class Meta:
+        model = Station
+        fields = ['id', 'warehouse_info', 'warehouse_no', 'name', 'no', 'type_name', 'use_flag', 'type']
+        read_only_fields = ['use_flag']
+
+
+class WarehouseMaterialTypeSerializer(serializers.ModelSerializer):
+    warehouse_no = serializers.ReadOnlyField(source='warehouse_info.no', default='')
+    material_type_name = serializers.ReadOnlyField(source='material_type.global_name', default='')
+    material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=True,
+                                                                                          global_type__type_name='物料类型'))
+    warehouse_info = serializers.PrimaryKeyRelatedField(queryset=WarehouseInfo.objects.all(), write_only=True)
+
+    class Meta:
+        model = WarehouseMaterialType
+        fields = ['id', 'warehouse_info', 'warehouse_no', 'material_type_name', 'use_flag', 'material_type']
+        read_only_fields = ['use_flag']

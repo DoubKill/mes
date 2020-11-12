@@ -13,16 +13,18 @@ from rest_framework import mixins, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
 from inventory.filters import InventoryLogFilter
-from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog
+from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog, WarehouseInfo, Station, \
+    WarehouseMaterialType
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import OutOrderFeedBack, DeliveryPlan, MaterialInventory
 from inventory.serializers import ProductInventorySerializer, PutPlanManagementSerializer, \
-    OverdueMaterialManagementSerializer
+    OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer
 from inventory.models import OutOrderFeedBack, WmsInventoryStock
 from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -537,3 +539,43 @@ class MaterialCount(APIView):
         except:
             raise ValidationError("北自胶片库连接失败")
         return Response(ret)
+
+
+class ReversalUseFlagMixin:
+
+    @action(detail=True, methods=['put'])
+    def reversal_use_flag(self, request, pk=None):
+        obj = self.get_object()
+        obj.use_flag = not obj.use_flag
+        obj.save()
+        serializer = self.serializer_class(obj)
+        return Response(serializer.data)
+
+
+class WarehouseInfoViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
+    queryset = WarehouseInfo.objects.all()
+    serializer_class = WarehouseInfoSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['name']
+
+    @action(detail=False)
+    def warehouse_names(self, request):
+        names = WarehouseInfo.objects.values_list('name', flat=True).distinct()
+        return Response(names)
+
+
+class StationInfoViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
+    queryset = Station.objects.all()
+    serializer_class = StationSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['warehouse_info']
+
+
+class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
+    queryset = WarehouseMaterialType.objects.all()
+    serializer_class = WarehouseMaterialTypeSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['warehouse_info']
