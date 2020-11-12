@@ -330,7 +330,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
 
     def get_deal_time(self, obj):
         if obj.status == "已处理":
-            return obj.deal_time
+            return obj.deal_time.strftime("%Y-%m-%d %H:%M:%S")
         return None
 
     def get_day_time(self, obj):
