@@ -205,12 +205,12 @@ class OutWorkFeedBack(APIView):
         生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
         # 任务编号
 
-        # data = request.data
-        data = {'order_no':'20201109193037',"pallet_no":'20102494',
-                'location':'二层前端','qty':'2','weight':'2.00',
-                'quality_status':'合格','lot_no':'122222',
-                'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
-                }
+        data = request.data
+        # data = {'order_no':'20201109193037',"pallet_no":'20102494',
+        #         'location':'二层前端','qty':'2','weight':'2.00',
+        #         'quality_status':'合格','lot_no':'122222',
+        #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
+        #         }
         if data:
             order_no = data.get('order_no')
             if order_no:
