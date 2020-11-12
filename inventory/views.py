@@ -206,8 +206,22 @@ class OutWorkFeedBack(APIView):
         # 任务编号
         data = request.data
         if data:
+            order_no = data.get('order_no')
+            if order_no:
+                dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
+                il_dict={}
+                il_dict['warehouse_no']=dp_obj.warehouse_info.no
+                il_dict['warehouse_name']=dp_obj.warehouse_info.name
+                il_dict['inout_reason']=dp_obj.inventory_reason
+                il_dict['unit']=dp_obj.unit
+                il_dict['initiator']=dp_obj.created_user
+                il_dict['material_no']=dp_obj.material_no
+                il_dict['start_time']=dp_obj.created_date
+                il_dict['order_type']=dp_obj.order_type
+            else:
+                raise ValidationError("订单号不能为空")
             try:
-                OutOrderFeedBack.objects.create(**data)
+                InventoryLog.objects.create(**data,**il_dict)
             except:
                 result = {"work_id": data.get("task_id"), "msg": "FALSE" + data.get("material_no") + "物料在库内数量不足!",
                           "flag": "99"}

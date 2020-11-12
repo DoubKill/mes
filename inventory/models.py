@@ -210,6 +210,8 @@ class DeliveryPlan(models.Model):
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
     created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+
 
     class Meta:
         db_table = 'delivery_plan'
