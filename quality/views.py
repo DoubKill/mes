@@ -249,7 +249,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     post: 创建胶料处理结果
     put: 创建胶料处理结果
     """
-    queryset = MaterialDealResult.objects.filter(~Q(deal_result="合格")).filter(~Q(status="复测")).filter(delete_flag=False)
+    queryset = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(delete_flag=False)
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDealResulFilter
@@ -431,7 +431,7 @@ class ProductDayStatistics(APIView):
                                 max_mtr = mtr_obj
                     if not max_mtr.data_point_indicator:
                         continue
-                    if max_mtr.data_point_indicator.result == '合格':
+                    if max_mtr.data_point_indicator.result == '一等品':
                         pass_count += 1
                 percent_of_pass = str((pass_count / mto_count) * 100) + '%'
                 return_dict[f'{month_time}-{day_time}'] = percent_of_pass

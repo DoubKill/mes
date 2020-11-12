@@ -44,17 +44,11 @@ class KJJGUploader(BaseUploader):
 
 
 def update_wms_kjjg(msg_id, items=[
-                {"WORKID": "11223",
+                {"WORKID": "202005130922221",
                  "MID": "C-HMB-F150-12",
                  "PICI": "20200101",
                  "NUM": "1",
-                 "STATIONID": "二层后端",
-                 "SENDDATE": "20200513 09:22:22"},
-                {"WORKID": "11224",
-                 "MID": "C-HMB-F150-11",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "STATIONID": "二层前端",
+                 "KJJG": "合格",
                  "SENDDATE": "20200513 09:22:22"}
             ]):
     def get_base_data():
