@@ -68,6 +68,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         pallet_no = validated_data.get('pallet_no')
         unit = validated_data.get('unit')
         need_weight = validated_data.get('need_weight')
+        location = validated_data.get('location')
         created_user = self.context['request'].user.username
 
         deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
@@ -80,6 +81,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                                    unit=unit,
                                                    need_weight=need_weight,
                                                    created_user=created_user,
+                                                   location=location
                                                    )
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
