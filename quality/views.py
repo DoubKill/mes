@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView, GenericAPIView
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -178,6 +178,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
+    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -467,3 +468,41 @@ class DealSuggestionView(APIView):
     def get(self, request, *args, **kwargs):
         queryset = MaterialDealResult.objects.filter(delete_flag=False).values('deal_suggestion').annotate().distinct()
         return Response(queryset.values_list('deal_suggestion', flat=True))
+
+
+class MaterialTestResultHistoryView(APIView):
+    """试验结果数据展开列表， 参数：?test_order_id=检测单id"""
+    def get(self, request):
+        test_order_id = self.request.query_params.get('test_order_id')
+        try:
+            test_order = MaterialTestOrder.objects.get(id=test_order_id)
+        except Exception:
+            raise ValidationError('参数错误')
+        data = MaterialTestResult.objects.filter(material_test_order=test_order).all()
+        max_test_times = MaterialTestResult.objects.filter(material_test_order=test_order
+                                                           ).aggregate(max_time=Max('test_times'))['max_time']
+        ret = {i: {} for i in range(1, max_test_times+1)}
+
+        for item in data:
+            indicator_name = item.test_indicator_name
+            data_point_name = item.data_point_name
+            test_times = item.test_times
+            value = item.value
+            result = item.result
+            mes_result = item.mes_result
+            level = item.level
+            machine_name = item.machine_name
+            test_result = {
+                'value': value,
+                'result': result,
+                'mes_result': mes_result,
+                'machine_name': machine_name,
+                'level': level,
+                'test_times': test_times
+            }
+            if test_times in ret:
+                if indicator_name not in ret[test_times]:
+                    ret[test_times] = {indicator_name: {data_point_name: test_result}}
+                else:
+                    ret[test_times][indicator_name][data_point_name] = test_result
+        return Response(ret)
