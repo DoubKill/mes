@@ -153,6 +153,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 if indicator:
                     item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
+                    item['level'] = indicator.level
             item['created_user'] = self.context['request'].user  # 加一个create_user
             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
@@ -165,7 +166,6 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultListSerializer(BaseModelSerializer):
-    level = serializers.CharField(source='data_point_indicator.level', read_only=True, default=None)
 
     class Meta:
         model = MaterialTestResult
@@ -216,6 +216,8 @@ class DealSuggestionSerializer(BaseModelSerializer):
 class DealResultDealSerializer(BaseModelSerializer):
     """胶料处理结果序列化器"""
     product_info = serializers.SerializerMethodField(read_only=True)
+    material_no = serializers.CharField(max_length=64, write_only=True)
+    warehouse_info = serializers.IntegerField(write_only=True)
 
     def get_product_info(self, obj):
         lot_no = obj.lot_no
@@ -232,44 +234,44 @@ class DealResultDealSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         lot_no = validated_data.get('lot_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        material_no = validated_data['material_no']  # 物料编码
-        status = validated_data['status']  # 状态
-        inventory_type = validated_data['inventory_type']  # 出库类型
+        inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
         created_user = self.context['request'].user.username  # 发起人
-        inventory_reason = validated_data.get('reason')  # 出库原因
-        warehouse_info = validated_data['warehouse_info']  # 胶料库id
-
+        inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
+        # 快检针对的是混炼胶/终炼胶库
+        warehouse_info_id = validated_data.get('warehouse_info', 1)  # # TODO 混炼胶库暂时写死
+        if not warehouse_info_id:
+            warehouse_info_id = 1  # TODO 混炼胶库暂时写死
         if validated_data.get('be_warehouse_out') == True:
-            pfb_obj = PalletFeedbacks.filter(lot_no = lot_no,delete_flag=False).first()
+            material_no = validated_data.get('material_no')  # 物料编码
+            if not material_no:
+                raise serializers.ValidationError("material_no为必传参数")
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
-                                                           inventory_type=inventory_type,
-                                                           material_no=material_no,
-                                                           warehouse_info=warehouse_info,
-                                                           status=status,
-                                                           pallet_no=pfb_obj.pallet_no,
-                                                           created_user=created_user,
-                                                           inventory_reason=inventory_reason
-                                                           )
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                            inventory_type=inventory_type,
+                                            material_no=material_no,
+                                            warehouse_info_id=warehouse_info_id,
+                                            pallet_no=pfb_obj.pallet_no,
+                                            created_user=created_user,
+                                            inventory_reason=inventory_reason
+                                            )
+                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
                                                   order_no=order_no,
                                                   order_type=inventory_type,
-                                                  status=status,
+                                                  status=4,
                                                   created_user=created_user,
                                                   )
             else:
-                raise serializers.ValidationError('lot追踪号不存在')
-
+                raise serializers.ValidationError('未找到胶料数据')
+        if validated_data.get("status") == "待确认":
+            instance.deal_user = self.context['request'].user.username
+            instance.deal_time = datetime.now()
+        elif validated_data.get("status") == "已处理":
+            instance.confirm_user = self.context['request'].user.username
+            instance.confirm_time = datetime.now()
         else:
-            if validated_data.get("status") == "待确认":
-                instance.deal_user = self.context['request'].user.username
-                instance.deal_time = datetime.now()
-            elif validated_data.get("status") == "已处理":
-                instance.confirm_user = self.context['request'].user.username
-                instance.confirm_time = datetime.now()
-            else:
-                pass
-            return super(DealResultDealSerializer, self).update(instance, validated_data)
+            pass
+        return super(DealResultDealSerializer, self).update(instance, validated_data)
 
     class Meta:
         model = MaterialDealResult
@@ -291,6 +293,24 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     mtr_list = serializers.SerializerMethodField(read_only=True, )
     actual_trains = serializers.SerializerMethodField(read_only=True, )
     operation_user = serializers.SerializerMethodField(read_only=True, help_text='收皮员')
+    deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
+    deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
+    deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
+
+    def get_deal_suggestion(self, obj):
+        if obj.status == "已处理":
+            return obj.deal_suggestion
+        return None
+
+    def get_deal_user(self, obj):
+        if obj.status == "已处理":
+            return obj.deal_user
+        return None
+
+    def get_deal_time(self, obj):
+        if obj.status == "已处理":
+            return obj.deal_time
+        return None
 
     def get_day_time(self, obj):
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()

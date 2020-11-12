@@ -131,6 +131,8 @@ class MaterialTestResult(AbstractEntity):
     test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
     mes_result = models.CharField(max_length=64, help_text='mes评判结果', blank=True, null=True)
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
+    machine_name = models.CharField(max_length=64, help_text='试验机台名称', blank=True, null=True)
+    level = models.IntegerField(help_text='等级', blank=True, null=True)
 
     class Meta:
         db_table = 'material_test_result'
@@ -175,6 +177,7 @@ class MaterialDealResult(AbstractEntity):
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
+    update_store_test_flag = models.BooleanField(help_text='更新立库检测结果标志', default=False)
 
     class Meta:
         db_table = 'material_deal_result'

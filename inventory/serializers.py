@@ -40,16 +40,17 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     no = serializers.CharField(source="warehouse_info.no", read_only=True)
     name = serializers.CharField(source="warehouse_info.name", read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
+    order_no = serializers.CharField(required=False)
 
     def get_actual(self, object):
         order_no = object.order_no
         actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
-                                                                          actual_weight=Sum('wegit'))
+                                                                          actual_weight=Sum('weight'))
         actual_qty = actual['actual_qty']
-        actual_wegit = actual['actual_weight']
+        actual_weight = actual['actual_weight']
         # 无法合计
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
-        items = {'actual_qty': actual_qty, 'actual_wegit': actual_wegit}
+        items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
 
     @atomic()
@@ -59,7 +60,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         # if dp_obj:
         #     raise serializers.ValidationError('已经存在')
         # else:
-        order_no = validated_data['order_no']
+        # order_no = validated_data.get('order_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data['inventory_type']
         material_no = validated_data['material_no']
@@ -107,21 +108,23 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             msg_id = validated_data['order_no']
             str_user = self.context['request'].user.username
             material_no = validated_data['material_no']
-            pallet_no = validated_data.get('pallet_no')  # 托盘号
-            pici = 1  # 批次号
-            wegit = validated_data.get('wegit', '1')
+            pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
+            pici = "1"  # 批次号
+            num = validated_data.get('need_qty', '1')
             msg_count = "1"
             location = "二层后端"
             # 发起时间
-            time = validated_data.get('created_date')
-            created_time = datetime.datetime.strftime(time, '%Y%m%d %H:%M:%S')
-            WORKID = time.strftime("%Y%m%d%H%M%S", time.localtime())
+            time = validated_data.get('created_date', datetime.datetime.now())
+            created_time = time.strftime('%Y%m%d %H:%M:%S')
+            WORKID = time.strftime("%Y%m%d%H%M%S")
+            dict1 = {}
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
             elif out_type == "正常出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM ': wegit,
+                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num,
                          'STATIONID': location, 'SENDDATE': created_time}
+                out_type = "生产出库"
             items = []
             items.append(dict1)
             json_data = {
@@ -138,16 +141,17 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             sender = OUTWORKUploader(end_type=out_type)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
-                items = result['items']
-                msg = items[0]['msg']
-                msg = "TRUE"
-
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
                 warehouse_info = validated_data['warehouse_info']
                 order_no = validated_data['order_no']
                 order_type = validated_data['inventory_type']
                 created_user = self.context['request'].user.username
                 created_date = datetime.datetime.now()
-                if msg:
+                if "TRUE" in msg:
                     instance.status = 2
                     instance.last_updated_date = datetime.datetime.now()
                     instance.save()
@@ -165,12 +169,15 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                     DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                                       order_no=order_no,
                                                       order_type=order_type,
-                                                      status=status,
+                                                      status=3,
                                                       created_user=created_user,
                                                       created_date=created_date
                                                       )
                     instance.save()
-                    raise serializers.ValidationError('出库失败')
+                    if "不足" in msg:
+                        raise serializers.ValidationError('库存不足, 出库失败')
+                    else:
+                        raise serializers.ValidationError(msg)
         else:
             if status == 5:
                 instance.status = status

@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'basics.apps.BasicsConfig',
     'system.apps.SystemConfig',
     'recipe.apps.RecipeConfig',
-    'gui.apps.GuiConfig',
     'docs.apps.DocsConfig',
     'quality.apps.QualityConfig',
     'inventory.apps.InventoryConfig'
@@ -241,7 +240,7 @@ DATABASES = {
         'USER': 'GZ_MES',
         'PASSWORD': 'mes@_123',
         'OPTIONS': {
-            'driver': 'SQL Server Native Client 11.0',
+            'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
             },
         },
@@ -253,7 +252,7 @@ DATABASES = {
         'USER': 'sa',
         'PASSWORD': 'Admin123$',
         'OPTIONS': {
-            'driver': 'SQL Server Native Client 11.0',
+            'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
             },
     }

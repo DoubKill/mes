@@ -534,10 +534,10 @@ class MaterialCount(APIView):
         params = request.query_params
         store_name = params.get('store_name', None)
         try:
-            temp = BzFinalMixingRubberInventory.objects.using('bz')
+            ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                all_qty=Sum('qty')).values('material_no', 'all_qty')
         except:
             raise ValidationError("北自胶片库连接失败")
-        ret = temp.values('material_no').annotate().aggregate(all_qty=Sum('qty'))
         return Response(ret)
 
 

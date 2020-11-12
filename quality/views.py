@@ -249,7 +249,8 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     post: 创建胶料处理结果
     put: 创建胶料处理结果
     """
-    queryset = MaterialDealResult.objects.filter(~Q(deal_result="合格")).filter(~Q(status="复测")).filter(delete_flag=False)
+    queryset = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(
+        delete_flag=False)
     serializer_class = DealResultDealSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialDealResulFilter
@@ -359,7 +360,10 @@ class LevelResultViewSet(ModelViewSet):
         level = self.request.data.get('level', None)
         if not deal_result or not level:
             raise ValidationError('等级和检测结果必传')
-        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level).first()
+        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level, delete_flag=False).first()
+        if lr_obj:
+            raise ValidationError('不可重复新建')
+        lr_obj = LevelResult.objects.filter(deal_result=deal_result, level=level, delete_flag=True).first()
         if lr_obj:
             lr_obj.delete_flag = False
             lr_obj.save()
@@ -378,8 +382,6 @@ class ProductDayStatistics(APIView):
 
     def get(self, request, *args, **kwargs):
         params = request.query_params
-        # month_time = params.get('ym_time', datetime.datetime.now().month)
-        # year_time = params.get('ym_time', datetime.datetime.now().year)
         month_time = params.get('ym_time', datetime.datetime.now()).month
         year_time = params.get('ym_time', datetime.datetime.now()).year
         pass_type = params.get('pass_type', '1')  # 1:综合合格率  2：一次合格率  3：流变合格率
@@ -394,41 +396,53 @@ class ProductDayStatistics(APIView):
             return_dict = {}
             return_dict['product_no'] = product_no_dict['product_no']
             for day_time in range(1, int(datetime.datetime.now().day) + 1):
-                mto_set = MaterialTestOrder.objects.filter(delete_flag=False, production_factory_date__year=year_time,
-                                                           production_factory_date__month=month_time,
-                                                           production_factory_date__day=day_time,
-                                                           **product_no_dict).all()
-                if not mto_set:
+                lot_no_list = MaterialTestOrder.objects.filter(delete_flag=False,
+                                                               production_factory_date__year=year_time,
+                                                               production_factory_date__month=month_time,
+                                                               production_factory_date__day=day_time,
+                                                               **product_no_dict).values('lot_no').annotate().distinct()
+
+                mto_count = lot_no_list.count()
+                if mto_count == 0:
                     continue
-                mto_count = mto_set.count()
                 pass_count = 0
                 level_list = []
+                for lot_no_dict in lot_no_list:
+                    mto_set = MaterialTestOrder.objects.filter(delete_flag=False,
+                                                               production_factory_date__year=year_time,
+                                                               production_factory_date__month=month_time,
+                                                               production_factory_date__day=day_time,
+                                                               **product_no_dict, **lot_no_dict).all()
+                    if not mto_set:
+                        continue
 
-                for mto_obj in mto_set:
-                    mrt_list = mto_obj.order_results.filter(
-                        test_indicator_name__in=test_indicator_name_dict).all().values(
-                        'data_point_name').annotate(max_test_time=Max('test_times'))
-                    for mrt_dict in mrt_list:
-                        mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                                         test_indicator_name__in=test_indicator_name_dict,
-                                                                         data_point_name=mrt_dict['data_point_name'],
-                                                                         test_times=mrt_dict['max_test_time']).last()
-                        level_list.append(mrt_dict_obj)
-                    if not level_list:
-                        continue
-                    max_mtr = level_list[0]
+                    for mto_obj in mto_set:
+                        mrt_list = mto_obj.order_results.filter(
+                            test_indicator_name__in=test_indicator_name_dict).all().values('data_point_name').annotate(
+                            max_test_time=Max('test_times'))
+                        for mrt_dict in mrt_list:
+                            mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                                             data_point_name=mrt_dict[
+                                                                                 'data_point_name'],
+                                                                             test_times=mrt_dict[
+                                                                                 'max_test_time']).last()
+                            level_list.append(mrt_dict_obj)
+                    quality_sign = True
                     for mtr_obj in level_list:
-                        if not mtr_obj.data_point_indicator:
-                            continue
-                        else:
-                            if not max_mtr.data_point_indicator:
-                                max_mtr = mtr_obj
-                                continue
-                            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
-                                max_mtr = mtr_obj
-                    if not max_mtr.data_point_indicator:
-                        continue
-                    if max_mtr.data_point_indicator.result == '合格':
+                        if not mtr_obj.mes_result:  # mes没有数据
+                            if not mtr_obj.result:  # 快检也没有数据
+                                quality_sign = False
+                            elif mtr_obj.result != '一等品':
+                                quality_sign = False
+
+                        elif mtr_obj.mes_result == '一等品':
+                            if mtr_obj.result not in ['一等品', None]:
+                                quality_sign = False
+
+                        elif mtr_obj.mes_result != '一等品':
+                            quality_sign = False
+
+                    if quality_sign:
                         pass_count += 1
                 percent_of_pass = str((pass_count / mto_count) * 100) + '%'
                 return_dict[f'{month_time}-{day_time}'] = percent_of_pass
@@ -437,8 +451,8 @@ class ProductDayStatistics(APIView):
 
 
 class LabelPrintViewSet(mixins.CreateModelMixin,
-                           mixins.UpdateModelMixin,
-                           GenericViewSet):
+                        mixins.UpdateModelMixin,
+                        GenericViewSet):
     """
     list: 获取一条打印标签
     create: 存储一条打印标签
