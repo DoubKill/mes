@@ -32,6 +32,14 @@ router.register(r'material-inventory-manage', views.MaterialInventoryManageViewS
 # 物料出入库履历
 router.register(r'inventory-log', views.InventoryLogViewSet)
 
+# 仓库信息
+router.register(r'warehouse-info', views.WarehouseInfoViewSet)
+
+# 站点信息
+router.register(r'station-info', views.StationInfoViewSet)
+
+# 仓库物料类型
+router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),

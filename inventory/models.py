@@ -29,10 +29,11 @@ class OutOrderFeedBack(models.Model):
 
 class WarehouseInfo(models.Model):
     """仓库信息"""
-    no = models.CharField(max_length=64, verbose_name='仓库信息', help_text='仓库信息')
+    no = models.CharField(max_length=64, verbose_name='仓库编码', help_text='仓库编码')
     name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
-    ip = models.CharField(max_length=64, verbose_name='仓库ip', help_text='仓库ip')
-    address = models.CharField(max_length=64, verbose_name='仓库地址', help_text='仓库地址')
+    ip = models.CharField(max_length=64, verbose_name='仓库ip', help_text='仓库ip', blank=True, default='')
+    address = models.CharField(max_length=64, verbose_name='仓库地址', help_text='仓库地址', blank=True, default='')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     class Meta:
         db_table = 'ware_house_info'
@@ -43,6 +44,7 @@ class WarehouseMaterialType(models.Model):
     """仓库物料类型"""
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="warehouse_material_types")
     material_type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     class Meta:
         db_table = 'ware_house_material_type'
@@ -238,15 +240,16 @@ class DeliveryPlanStatus(models.Model):
 
 
 class Station(models.Model):
-    """出入库站点信息表"""
-    no = models.CharField(max_length=64, verbose_name='站点编码', help_text='站点编码')
-    name = models.CharField(max_length=64, verbose_name='站点名称', help_text='站点名称')
-    desc = models.CharField(max_length=64, verbose_name='备注', help_text='备注')
-    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="station",
-                                       help_text='所属仓库')
-    type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE, help_text='站点类型')
-    used_flag = models.IntegerField(help_text='是否启用')
+    """站点信息"""
+    no = models.CharField('站点编码', max_length=64, help_text='站点编码')
+    name = models.CharField('站点名称', max_length=64, help_text='站点名称')
+    desc = models.CharField('备注', max_length=64, help_text='备注', blank=True, default='')
+    warehouse_info = models.ForeignKey(WarehouseInfo, verbose_name='所属仓库', help_text='所属仓库', on_delete=models.SET_NULL,
+                                       null=True, blank=True)
+    type = models.ForeignKey(GlobalCode, verbose_name='站点类型', help_text='站点类型', on_delete=models.SET_NULL, null=True,
+                             blank=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     class Meta:
         db_table = 'station'
-        verbose_name_plural = verbose_name = '出入库站点信息表'
+        verbose_name_plural = verbose_name = '站点信息'
