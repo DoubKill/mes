@@ -3,7 +3,6 @@ import logging
 
 from django.db.transaction import atomic
 from rest_framework import serializers
-from rest_framework.generics import get_object_or_404
 from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
@@ -45,8 +44,8 @@ class MaterialAttributeSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialAttribute
-        fields = ['id', 'material', 'material_type', 'material_no', 'material_name', 'period_of_validity', 'safety_inventory',
-                  'validity_unit']
+        fields = ['id', 'material', 'material_type', 'material_no', 'material_name',
+                  'period_of_validity', 'safety_inventory', 'validity_unit']
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 

@@ -85,6 +85,7 @@ class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
     # test_data_name = serializers.CharField(source='material_test_data.data_name')
     # test_data_id = serializers.CharField(source='material_test_data.id')
     level = serializers.IntegerField(help_text='等级', min_value=0)
+    last_updated_username = serializers.CharField(source='last_updated_user.username', read_only=True, default=None)
 
     class Meta:
         model = MaterialDataPointIndicator
@@ -169,11 +170,31 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestResult
-        fields = '__all__'
+        fields = ('test_times', 'value', 'data_point_name', 'test_method_name',
+                  'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level')
 
 
 class MaterialTestOrderListSerializer(BaseModelSerializer):
     order_results = MaterialTestResultListSerializer(many=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        order_results = data['order_results']
+        ret = {}
+        for item in order_results:
+            indicator = item['test_indicator_name']
+            data_point = item['data_point_name']
+            if indicator not in ret:
+                ret[indicator] = {}
+                ret[indicator][data_point] = [item]
+            else:
+                if data_point not in ret[indicator]:
+                    ret[indicator][data_point] = [item]
+                else:
+                    if ret[indicator][data_point][0]['test_times'] < item['test_times']:
+                        ret[indicator][data_point][0] = item
+        data['order_results'] = ret
+        return data
 
     class Meta:
         model = MaterialTestOrder

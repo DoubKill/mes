@@ -49,5 +49,6 @@ urlpatterns = [
     path('sum-collect-trains/', SumCollectTrains.as_view()),  # 胶料单车次时间汇总最大最小平均时间
     path('cut-time-collect/', CutTimeCollect.as_view()),  # 规格切换时间汇总
     path('equip-banbury-summary/', EquipBanBurySummaryView.as_view()),
-    path('expend-material-batch/', ExpendMaterialBatch.as_view())
+    path('expend-material-batch/', ExpendMaterialBatch.as_view()),
+    path('pallet-trains-feedbacks/', PalletTrainFeedback.as_view()),  # 托盘开始到结束车次列表
 ]
