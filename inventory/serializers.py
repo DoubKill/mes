@@ -120,7 +120,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
             elif out_type == "正常出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM ': num,
+                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num,
                          'STATIONID': location, 'SENDDATE': created_time}
                 out_type = "生产出库"
             items = []
@@ -172,7 +172,10 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                                       created_date=created_date
                                                       )
                     instance.save()
-                    raise serializers.ValidationError('出库失败')
+                    if "不足" in msg:
+                        raise serializers.ValidationError('库存不足, 出库失败')
+                    else:
+                        raise serializers.ValidationError(msg)
         else:
             if status == 5:
                 instance.status = status
