@@ -9,7 +9,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .views import OutWork, MaterialCount \
-    , PutPlanManagement, OverdueMaterialManagement
+    , PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack
 
 router = DefaultRouter()
 
@@ -43,6 +43,7 @@ router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),
+    path('outwork_feedback/', OutWorkFeedBack.as_view()),
     path('', include(router.urls)),
 
     ]

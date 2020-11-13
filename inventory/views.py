@@ -204,15 +204,37 @@ class OutWorkFeedBack(APIView):
         """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
         生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
         # 任务编号
+
         data = request.data
+        # data = {'order_no':'20201109193037',"pallet_no":'20102494',
+        #         'location':'二层前端','qty':'2','weight':'2.00',
+        #         'quality_status':'合格','lot_no':'122222',
+        #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
+        #         }
         if data:
+            order_no = data.get('order_no')
+            if order_no:
+                dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
+                il_dict={}
+                il_dict['warehouse_no']=dp_obj.warehouse_info.no
+                il_dict['warehouse_name']=dp_obj.warehouse_info.name
+                il_dict['inout_reason']=dp_obj.inventory_reason
+                il_dict['unit']=dp_obj.unit
+                il_dict['initiator']=dp_obj.created_user
+                il_dict['material_no']=dp_obj.material_no
+                il_dict['start_time']=dp_obj.created_date
+                il_dict['order_type']=dp_obj.order_type
+            else:
+                raise ValidationError("订单号不能为空")
             try:
-                OutOrderFeedBack.objects.create(**data)
-            except:
-                result = {"work_id": data.get("task_id"), "msg": "FALSE" + data.get("material_no") + "物料在库内数量不足!",
+                print(data,il_dict)
+                InventoryLog.objects.create(**data,**il_dict)
+            except Exception as e:
+                print(e,'===')
+                result = {"work_id": data.get("order_no"), "msg": "FALSE" + dp_obj.material_no + "物料在库内数量不足!",
                           "flag": "99"}
             else:
-                result = {"work_id": data.get("task_id"), "msg": "TRUE" + data.get("material_no") + "下发成功!",
+                result = {"work_id": data.get("order_no"), "msg": "TRUE" + dp_obj.material_no + "下发成功!",
                           "flag": "01"}
 
             return Response(result)
