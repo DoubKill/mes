@@ -286,7 +286,7 @@ class InventoryLogSerializer(serializers.ModelSerializer):
         model = InventoryLog
         fields = ['order_type',
                   'order_no',
-                  'warehouse_type',
+                  # 'warehouse_type',
                   'pallet_no',
                   'material_no',
                   'inout_reason',
@@ -296,7 +296,7 @@ class InventoryLogSerializer(serializers.ModelSerializer):
                   'weight',
                   'initiator',
                   'start_time',
-                  'end_time'
+                  'fin_time'
                   ]
 
 
@@ -331,3 +331,4 @@ class WarehouseMaterialTypeSerializer(serializers.ModelSerializer):
         model = WarehouseMaterialType
         fields = ['id', 'warehouse_info', 'warehouse_no', 'material_type_name', 'use_flag', 'material_type']
         read_only_fields = ['use_flag']
+

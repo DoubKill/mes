@@ -18,7 +18,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
-from inventory.filters import InventoryLogFilter
+from inventory.filters import InventoryLogFilter, StationFilter
 from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog, WarehouseInfo, Station, \
     WarehouseMaterialType
 from inventory.filters import PutPlanManagementFilter
@@ -552,7 +552,17 @@ class ReversalUseFlagMixin:
         return Response(serializer.data)
 
 
-class WarehouseInfoViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
+class AllMixin:
+
+    def list(self, request, *args, **kwargs):
+        if 'all' in self.request.query_params:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return super().list(request, *args, **kwargs)
+
+
+class WarehouseInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet):
     queryset = WarehouseInfo.objects.all()
     serializer_class = WarehouseInfoSerializer
     permission_classes = (permissions.IsAuthenticated,)
@@ -565,12 +575,12 @@ class WarehouseInfoViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
         return Response(names)
 
 
-class StationInfoViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
+class StationInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet):
     queryset = Station.objects.all()
     serializer_class = StationSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['warehouse_info']
+    filter_class = StationFilter
 
 
 class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
