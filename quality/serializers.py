@@ -189,7 +189,7 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
                 ret[indicator][data_point] = item
             else:
                 if data_point not in ret[indicator]:
-                    ret[indicator][data_point] = [item]
+                    ret[indicator][data_point] = item
                 else:
                     if ret[indicator][data_point]['test_times'] < item['test_times']:
                         ret[indicator][data_point] = item
