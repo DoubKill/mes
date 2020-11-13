@@ -22,9 +22,15 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         name = mtm_obj.test_method.test_type.test_indicator.name
         name_list.append(name)
 
+    # 1.1 判断是否所有车次都有
+    actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains')
+    pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
+    for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
+        if i not in actual_trains_list:
+            return
+
     # 2、判断快检这边是不是所有的指标都有
     mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
-
     for mto_obj in mto_set:
         test_indicator_name_list = []
         mtr_dpn_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
@@ -106,6 +112,10 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
     # try:
+    #     # 1、先判断库存
+    #     # 2、在去判断线边库
+    #     # 3、一个库里有就发给北自，没有就不发给北自
+    #     # 4、update_store_test_flag这个字段用choise 1对应成功 2对应失败 3对应库存线边库都没有
     #     msg_ids = order_no()
     #     mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
     #     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
