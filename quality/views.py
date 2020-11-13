@@ -174,7 +174,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         手工录入数据
     """
     queryset = MaterialTestOrder.objects.filter(delete_flag=False
-                                                ).prefetch_related('order_results').order_by('actual_trains')
+                                                ).prefetch_related('order_results')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)

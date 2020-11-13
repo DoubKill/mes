@@ -119,8 +119,8 @@ permission_data = [
     {'id': 83, 'code': 'view_test_type', 'name': '查看', 'parent_id': 82},
     {'id': 84, 'code': 'add_test_type', 'name': '新增', 'parent_id': 82},
     {'id': 85, 'code': 'change_test_type', 'name': '修改', 'parent_id': 82},
-    {'id': 86, 'code': 'add_data_point', 'name': '新增类型数据点', 'parent_id': 82},
-    {'id': 87, 'code': 'change_data_point', 'name': '修改类型数据点', 'parent_id': 82},
+    {'id': 86, 'code': 'point_add_test_type', 'name': '新增类型数据点', 'parent_id': 82},
+    {'id': 87, 'code': 'point_change_test_type', 'name': '修改类型数据点', 'parent_id': 82},
 
     {'id': 88, 'code': 'test_method', 'name': '试验方法管理', 'parent_id': None},
     {'id': 89, 'code': 'view_test_method', 'name': '查看', 'parent_id': 88},
@@ -192,7 +192,7 @@ permission_data = [
     {'id': 137, 'code': 'goods', 'name': '物料库存管理', 'parent_id': None},
     {'id': 138, 'code': 'view_goods', 'name': '查看', 'parent_id': 137},
 
-    {'id': 139, 'code': 'inventory_plan', 'name': '物料库存管理', 'parent_id': None},
+    {'id': 139, 'code': 'inventory_plan', 'name': '胶片库出库计划', 'parent_id': None},
     {'id': 140, 'code': 'view_inventory_plan', 'name': '查看', 'parent_id': 139},
     {'id': 141, 'code': 'norman_inventory_plan', 'name': '正常出库', 'parent_id': 139},
     {'id': 142, 'code': 'assign_inventory_plan', 'name': '制定出库', 'parent_id': 139},

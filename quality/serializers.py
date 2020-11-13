@@ -155,6 +155,9 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
                     item['level'] = indicator.level
+            else:
+                item['mes_result'] = '不合格'
+                item['level'] = 3
             item['created_user'] = self.context['request'].user  # 加一个create_user
             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
