@@ -30,7 +30,7 @@ class OutOrderFeedBack(models.Model):
 class WarehouseInfo(models.Model):
     """仓库信息"""
     no = models.CharField(max_length=64, verbose_name='仓库编码', help_text='仓库编码')
-    name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
+    name = models.CharField(max_length=64, unique=True, verbose_name='仓库名称', help_text='仓库名称')
     ip = models.CharField(max_length=64, verbose_name='仓库ip', help_text='仓库ip', blank=True, default='')
     address = models.CharField(max_length=64, verbose_name='仓库地址', help_text='仓库地址', blank=True, default='')
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)

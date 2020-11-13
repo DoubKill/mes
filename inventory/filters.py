@@ -1,5 +1,5 @@
 import django_filters
-from .models import InventoryLog
+from .models import InventoryLog, Station
 
 from inventory.models import DeliveryPlan
 
@@ -27,3 +27,12 @@ class InventoryLogFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = InventoryLog
         fields = ['start_time', 'end_time', 'type', 'location', 'material_no']
+
+
+class StationFilter(django_filters.rest_framework.FilterSet):
+    warehouse_info = django_filters.CharFilter(field_name='warehouse_info')
+    warehouse_name = django_filters.CharFilter(field_name='warehouse_info__name')
+
+    class Meta:
+        model = Station
+        fields = ['warehouse_info', 'warehouse_name']
