@@ -146,7 +146,7 @@ class MaterialTestIndicatorMethods(APIView):
                 data = {
                     'test_indicator': indicator_name,
                     'methods': [
-                        {'id': 1,
+                        {'id': test_method.id,
                          'name': test_method.name,
                          'allowed': allowed,
                          'data_points': data_points}
@@ -155,7 +155,7 @@ class MaterialTestIndicatorMethods(APIView):
                 ret[indicator_name] = data
             else:
                 ret[indicator_name]['methods'].append(
-                    {'id': 1, 'name': test_method.name, 'allowed': allowed, 'data_points': data_points})
+                    {'id': test_method.id, 'name': test_method.name, 'allowed': allowed, 'data_points': data_points})
 
         for item in test_indicator_names:
             if item not in ret:
@@ -173,7 +173,8 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     create:
         手工录入数据
     """
-    queryset = MaterialTestOrder.objects.filter(delete_flag=False)
+    queryset = MaterialTestOrder.objects.filter(delete_flag=False
+                                                ).prefetch_related('order_results')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
@@ -498,18 +499,13 @@ class MaterialTestResultHistoryView(APIView):
             indicator_name = item.test_indicator_name
             data_point_name = item.data_point_name
             test_times = item.test_times
-            value = item.value
-            result = item.result
-            mes_result = item.mes_result
-            level = item.level
-            machine_name = item.machine_name
             test_result = {
-                'value': value,
-                'result': result,
-                'mes_result': mes_result,
-                'machine_name': machine_name,
-                'level': level,
-                'test_times': test_times
+                'value': item.value,
+                'result': item.result,
+                'mes_result': item.mes_result,
+                'machine_name': item.machine_name,
+                'level': item.level,
+                'test_times': item.test_times
             }
             if test_times in ret:
                 if indicator_name not in ret[test_times]:

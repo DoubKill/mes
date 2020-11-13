@@ -269,7 +269,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
 @method_decorator([api_recorder], name="dispatch")
 class CollectTrainsFeedbacksList(ListAPIView):
     """胶料单车次时间汇总"""
-    queryset = TrainsFeedbacks.objects.filter(delete_flag=False)
+    queryset = TrainsFeedbacks.objects.filter(delete_flag=False).order_by('plan_classes_uid')
     serializer_class = CollectTrainsFeedbacksSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = CollectTrainsFeedbacksFilter
