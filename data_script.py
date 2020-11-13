@@ -11,15 +11,15 @@ import random
 import uuid
 import django
 
-
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from plan.models import ProductClassesPlan, ProductDayPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus
+import random
 
 pallet_count = 5
+
 
 class ProductDataEmulator():
 
@@ -31,16 +31,14 @@ class ProductDataEmulator():
         pass
 
 
-
-
 def gen_uuid():
     return str(uuid.uuid1())
 
 
 def run():
-    TrainsFeedbacks.objects.all().delete()
-    PalletFeedbacks.objects.all().delete()
-    EquipStatus.objects.all().delete()
+    # TrainsFeedbacks.objects.all().delete()
+    # PalletFeedbacks.objects.all().delete()
+    # EquipStatus.objects.all().delete()
 
     # plan_schedule_set = PlanSchedule.objects.filter(delete_flag=False)
     # for plan_schedule in plan_schedule_set:
@@ -55,7 +53,7 @@ def run():
         for class_plan in list(class_plan_set):
             plan_trains = class_plan.plan_trains
             start_time = class_plan.work_schedule_plan.start_time
-            for m in range(1, int(plan_trains)+1):
+            for m in range(1, int(plan_trains) + 1):
                 class_name = class_plan.work_schedule_plan.classes.global_name
                 equip_no = day_plan.equip.equip_no
                 product_no = day_plan.product_batching.stage_product_batch_no
@@ -77,7 +75,7 @@ def run():
                     "equip_no": equip_no,
                     "product_no": product_no,
                     "plan_weight": plan_weight,
-                    "actual_weight": m*5,
+                    "actual_weight": m * 5,
                     "begin_time": start_time,
                     "end_time": end_time,
                     "operation_user": "string-user",
@@ -87,24 +85,27 @@ def run():
                 start_time = end_time
                 TrainsFeedbacks.objects.create(**train_data)
                 if m % pallet_count == 0:
-                    end_time = start_time + datetime.timedelta(seconds=150*5)
+                    end_time = start_time + datetime.timedelta(seconds=150 * 5)
                     pallet_data = {
-                            "plan_classes_uid": class_plan.plan_classes_uid,
-                            "bath_no": bath_no,
-                            "equip_no": equip_no,
-                            "product_no": product_no,
-                            "plan_weight": plan_weight*5,
-                            "actual_weight": m*5*5,
-                            "begin_time": start_time,
-                            "end_time": end_time,
-                            "operation_user": "string-user",
-                            "begin_trains": m - (pallet_count-1),
-                            "end_trains": m,
-                            "pallet_no": f"{bath_no}|test",
-                            # "barcode": "KJDL:LKYDFJM<NLIIRD",
-                            "classes": class_name,
-                            "product_time": end_time,
-                        }
+                        "plan_classes_uid": class_plan.plan_classes_uid,
+                        "bath_no": bath_no,
+                        "equip_no": equip_no,
+                        "product_no": product_no,
+                        "plan_weight": plan_weight * 5,
+                        "actual_weight": m * 5 * 5,
+                        "begin_time": start_time,
+                        "end_time": end_time,
+                        "operation_user": "string-user",
+                        "begin_trains": m - (pallet_count - 1),
+                        "end_trains": m,
+                        "pallet_no": f"{bath_no}|test",
+                        # "barcode": "KJDL:LKYDFJM<NLIIRD",
+                        "classes": class_name,
+                        "lot_no": str(random.randint(999999999, 99999999999999999)) + ''.join(random.sample(
+                            'zyxwvutsrqponmlkjihgfedcba', 5)),  # 这个字段之前是没有的 但是表里有 快检那边会用的到 所以给他加上了 随机生成的 数字加字母随机生成字符串
+                        "product_time": end_time,
+                        "factory_date": datetime.datetime.now().strftime('%Y-%m-%d')
+                    }
                     start_time = end_time
                     bath_no += 1
                     PalletFeedbacks.objects.create(**pallet_data)
@@ -112,11 +113,11 @@ def run():
                     equip_status_data = {
                         "plan_classes_uid": class_plan.plan_classes_uid,
                         "equip_no": equip_no,
-                        "temperature": random.randint(300,700),
-                        "rpm": random.randint(500,2000),
-                        "energy": random.randint(50,500),
-                        "power": random.randint(50,500),
-                        "pressure": random.randint(80,360),
+                        "temperature": random.randint(300, 700),
+                        "rpm": random.randint(500, 2000),
+                        "energy": random.randint(50, 500),
+                        "power": random.randint(50, 500),
+                        "pressure": random.randint(80, 360),
                         "status": "running",
                         "current_trains": m,
                         "product_time": end_time + datetime.timedelta(seconds=1),

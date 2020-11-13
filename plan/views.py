@@ -2,6 +2,7 @@ import datetime
 import json
 
 import requests
+from django.db import connection
 from django.db.models import Sum, Max
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -330,15 +331,32 @@ class IndexView(APIView):
             delete_flag=False).values(
             'work_schedule_plan__plan_schedule__day_time').annotate(plan_trains=Sum('plan_trains'))
         plan_data_dict = {str(item['work_schedule_plan__plan_schedule__day_time']): item for item in plan_data}
-        # 实际数据
-        # 　TODO 实际计划数据是拿TrainsFeedbacks的结束时间做统计的，暂时这样做。
-        max_actual_ids = TrainsFeedbacks.objects.filter(
-            end_time__date__in=dates
-        ).values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
-        actual_data = TrainsFeedbacks.objects.filter(
-            id__in=max_actual_ids).values('end_time__date').annotate(actual_trains=Sum('actual_trains'))
-        actual_data_dict = {str(item['end_time__date']): item for item in actual_data}
 
+        # 计划uid列表
+        plan_uid_list = list(ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time__in=dates,
+            delete_flag=False).values_list('plan_classes_uid', flat=True))
+        max_actual_ids = TrainsFeedbacks.objects.filter(
+            plan_classes_uid__in=plan_uid_list
+        ).values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
+        if max_actual_ids:
+            sql = """select
+                       sum(actual_trains) as actual_trains,
+                       ps.day_time
+                from
+                    trains_feedbacks tf
+                inner join product_classes_plan pcp on pcp.plan_classes_uid=tf.plan_classes_uid
+                inner join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
+                inner join plan_schedule ps on wsp.plan_schedule_id = ps.id
+                where
+                      tf.id in ({}) 
+                group by ps.day_time;""".format(','.join([str(i) for i in max_actual_ids]))
+            cursor = connection.cursor()
+            cursor.execute(sql)
+            actual_data = cursor.fetchall()
+            actual_data_dict = {str(item[1])[:10]: int(item[0]) for item in actual_data}
+        else:
+            actual_data_dict = {}
         ret = {}
         cur_month_plan = cur_month_actual = 0
         for date in dates:
@@ -347,8 +365,8 @@ class IndexView(APIView):
                 ret[date]['plan_trains'] = plan_data_dict[date]['plan_trains']
                 cur_month_plan += plan_data_dict[date]['plan_trains']
             if date in actual_data_dict:
-                ret[date]['actual_trains'] = actual_data_dict[date]['actual_trains']
-                cur_month_actual += actual_data_dict[date]['actual_trains']
+                ret[date]['actual_trains'] = actual_data_dict[date]
+                cur_month_actual += actual_data_dict[date]
 
         return Response({'cur_month_plan': cur_month_plan,
                          'cur_month_actual': cur_month_actual,

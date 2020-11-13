@@ -46,8 +46,9 @@ INSTALLED_APPS = [
     'basics.apps.BasicsConfig',
     'system.apps.SystemConfig',
     'recipe.apps.RecipeConfig',
-    'gui.apps.GuiConfig',
     'docs.apps.DocsConfig',
+    'quality.apps.QualityConfig',
+    'inventory.apps.InventoryConfig'
 ]
 
 MIDDLEWARE = [
@@ -62,7 +63,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'mes.middlewares.SyncMiddleware',
-    'mes.middlewares.JwtTokenUserMiddleware', # jwt-token嵌套django权限组件
+    'mes.middlewares.JwtTokenUserMiddleware',  # jwt-token嵌套django权限组件
 ]
 
 ROOT_URLCONF = 'mes.urls'
@@ -71,7 +72,7 @@ AUTH_USER_MODEL = 'system.User'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': [os.path.join(BASE_DIR, 'dist')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -223,19 +224,39 @@ LOGGING = {
 }
 
 DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
-        'NAME': os.getenv('MES_DATABASE_NAME', ''),  # 数据库名称
-        'USER': os.getenv('MES_DATABASE_USERNAME', ''),  # 用户名
-        'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', ''),  # 密码
-        'HOST': os.getenv('MES_DATABASE_HOSTNAME', ''),  # HOST
-        'PORT': os.getenv('MES_MONOCLE_API_PORT', ''),  # 端口
+     'default': {
+        'ENGINE': 'django.db.backends.oracle',
+        'NAME': 'zcaj1',  # 数据库SID
+        'USER': 'MES',
+        'PASSWORD': 'mes2020',
+        'HOST':'10.4.10.17',
+        'PORT':'1521'
+    },
+    'bz': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_2',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+            },
+        },
+    'wms': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'zhada_wms_zhongc',
+        'HOST': '10.4.24.25',
+        'PORT': '1433',
+        'USER': 'sa',
+        'PASSWORD': 'Admin123$',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+            },
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -271,6 +292,11 @@ AUTH_USER_MODEL = 'system.User'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, "static/"))
+
+STATICFILES_DIRS = [
+    # os.path.join(BASE_DIR, 'static'),# 项目默认会有的路径，如果你部署的不仅是前端打包的静态文件，项目目录static文件下还有其他文件，最好不要删
+    os.path.join(BASE_DIR, "dist/static"),# 加上这条
+]
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),

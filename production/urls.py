@@ -1,6 +1,8 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from production.summary_views import ClassesBanBurySummaryView, EquipBanBurySummaryView, CollectTrainsFeedbacksList, \
+    CutTimeCollect, SumCollectTrains
 from production.views import *
 
 router = DefaultRouter()
@@ -41,5 +43,12 @@ urlpatterns = [
     path('pallet-feedbacks-batch/', PalletFeedbacksBatch.as_view()),
     path('equip-status-batch/', EquipStatusBatch.as_view()),
     path('plan-status-batch/', PlanStatusBatch.as_view()),
-    path('expend-material-batch/', ExpendMaterialBatch.as_view())
+    path('classes-banbury-summary/', ClassesBanBurySummaryView.as_view()),
+    path('expend-material-batch/', ExpendMaterialBatch.as_view()),
+    path('collect-trains-feed/', CollectTrainsFeedbacksList.as_view()),  # 胶料单车次时间汇总
+    path('sum-collect-trains/', SumCollectTrains.as_view()),  # 胶料单车次时间汇总最大最小平均时间
+    path('cut-time-collect/', CutTimeCollect.as_view()),  # 规格切换时间汇总
+    path('equip-banbury-summary/', EquipBanBurySummaryView.as_view()),
+    path('expend-material-batch/', ExpendMaterialBatch.as_view()),
+    path('pallet-trains-feedbacks/', PalletTrainFeedback.as_view()),  # 托盘开始到结束车次列表
 ]

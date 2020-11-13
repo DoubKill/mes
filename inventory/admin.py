@@ -1,3 +1,5 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import MaterialInventory, WarehouseInfo, InventoryLog, Station
+
+admin.site.register([MaterialInventory, WarehouseInfo, InventoryLog, Station])
