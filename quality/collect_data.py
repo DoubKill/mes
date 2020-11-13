@@ -67,8 +67,9 @@ def main():
                    mt.MachineTypename,
                    rf.CompoundCode,
                    tt.TypeName
-                from Result r
-            inner join ResultInfo rf on r.RID=rf.RID
+                from ResultInfo rf
+            inner join SubTest st on st.RID=rf.RID
+            inner join Result r on rf.RID=r.RID
             inner join Compound c on c.id=rf.CompoundID
             inner join MainTestMethod mtm on mtm.id=rf.MainMethodID
             inner join TestType tt on tt.ID=mtm.TestTypeID
@@ -114,9 +115,9 @@ def main():
 
                 # 根据机器名称找到指标点
                 if machine_name == '流变仪':
-                    indicator_name = '流变'
-                elif machine_name == '门尼粘度':
                     indicator_name = '门尼'
+                elif machine_name == '门尼粘度':
+                    indicator_name = '流变'
                 else:
                     continue
                 # print('生产班次：{}, 试验班组：{}'.format(production_class, test_group))
@@ -171,7 +172,7 @@ def main():
                                     test_indicator_name=indicator_name,
                                     result=result,
                                     mes_result=result,
-                                    machine_name=machine_name,
+                                    machine_name=indicator_name+'仪',
                                     test_group=test_group,
                                     level=1 if result == '合格' else 3,
                                     # test_type_name=test_type_name
