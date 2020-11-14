@@ -27,8 +27,8 @@ class MaterialAttribute(AbstractEntity):
     """原材料属性"""
     material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE)
     safety_inventory = models.PositiveIntegerField(help_text='安全库存标准', verbose_name='安全库存标准')
-    period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期', default="天")
-    validity_unit = models.CharField('有效期单位', help_text='有效期单位', max_length=8)
+    period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期')
+    validity_unit = models.CharField('有效期单位', help_text='有效期单位', max_length=8, default="天")
 
     class Meta:
         db_table = 'material_attribute'
