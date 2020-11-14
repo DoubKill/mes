@@ -115,7 +115,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # 1、先判断库存 # 2、在去判断线边库
     bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
     mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
-    mi_obj=1
+    # mi_obj=1
     # 3、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
         try:
