@@ -182,7 +182,7 @@ class MaterialDealResult(AbstractEntity):
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
-    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, null=True)
+    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, null=True) # 是否重新发起更新结果
 
     class Meta:
         db_table = 'material_deal_result'
