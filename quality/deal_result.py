@@ -60,8 +60,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # 找到检测次数最多的几条 每一条的等级进行比较选出做大的
     reason = ''
     exist_data_point_indicator = True  # 是否超出区间范围
-    quality_point_indicator = True
-    is_hege = True
     quality_sign = True  # 快检判定何三等品
     for mtr_obj in level_list:
         if not mtr_obj.mes_result:  # mes没有数据
@@ -82,10 +80,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
-            is_hege = False
             continue
         if not mtr_obj.data_point_indicator:
-            is_hege = False
             continue
         if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
             max_mtr = mtr_obj
@@ -119,6 +115,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # 1、先判断库存 # 2、在去判断线边库
     bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
     mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
+    mi_obj=1
     # 3、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
         try:
@@ -135,7 +132,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                          "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
             item.append(item_dict)
             res = update_wms_kjjg(msg_id=msg_ids, items=item)
-            print(res, '===')
+            # print(res, '===')
             if not res:  # res为空代表成功
                 mdr_obj.update_store_test_flag = 1
                 mdr_obj.save()
@@ -143,8 +140,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 mdr_obj.update_store_test_flag = 2
                 mdr_obj.save()
         except Exception as e:
-            print(e)
+            pass
     else:  # 两个库都没有
-        print('两个库都没有')
+        # print('两个库都没有')
         mdr_obj.update_store_test_flag = 3
         mdr_obj.save()
