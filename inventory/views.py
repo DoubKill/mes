@@ -348,7 +348,11 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
-            queryset = model.objects.using('bz').all()
+            # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
+            if self.request.query_params.get("location_status"):
+                queryset = model.objects.using('bz').filter(location_status="有货货位")
+            else:
+                queryset = model.objects.using('bz').all()
             quality_status = self.request.query_params.get('quality_status', None)
             if quality_status:
                 queryset = queryset.filter(quality_status=quality_status)
