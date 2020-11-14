@@ -135,26 +135,27 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
 
         # 北自接口类型区分
                 # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
-            if (inventory_reason =='一等品'):
-                out_type = "生产出库"
-            elif(inventory_reason =='三等品'):
-                out_type = "快检异常出库"
+            if inventory_reason =='一等品':
+                bz_out_type = "生产出库"
+            elif inventory_reason =='三等品':
+                bz_out_type = "快检异常出库"
+            else:
+                bz_out_type = "生产出库"
             items = []
             items.append(dict1)
             json_data = {
                 'msgId': msg_id,
-                'OUTTYPE': out_type,
+                'OUTTYPE': bz_out_type,
                 "msgConut": msg_count,
                 "SENDUSER": str_user,
                 "items": items
             }
-            print('***************************')
-            print(json_data)
-
             # msg_count = len(json_data["items"])
             # json_data["msgConut"] = msg_count
+            print(json_data)
             json_data = json.dumps(json_data, ensure_ascii=False)
             sender = OUTWORKUploader(end_type=out_type)
+            print(sender.endpoint)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
                 try:
@@ -192,6 +193,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                     instance.save()
                     if "不足" in msg:
                         raise serializers.ValidationError('库存不足, 出库失败')
+                    elif "json错误" in msg:
+                        raise serializers.ValidationError(f'出库接口调用失败,提示: {msg}')
                     else:
                         raise serializers.ValidationError(msg)
         else:

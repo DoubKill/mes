@@ -35,14 +35,15 @@ class BaseUploader(object):
         raise NotImplementedError()
 
 
-
 class OUTWORKUploader(BaseUploader):
     endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
     dict_filter = {'正常出库': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK",
-                   '快检异常出库': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK_CJ"}
-    def __init__(self,end_type):
-        self.end_type=end_type
-        self.endpoint=self.dict_filter[self.end_type]
+                   '指定出库': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK_CJ"}
+
+    def __init__(self, end_type):
+        self.end_type = end_type
+        self.endpoint = self.dict_filter[self.end_type]
+        print(self.endpoint)
 
     # endpoint = dict_filter['']
 
@@ -61,20 +62,12 @@ class OUTWORKUploader(BaseUploader):
         return xml_data
 
     def gen_result(self, data):
-        print(data)
-        print('ssssssssssssssssssssssssssssssssssssssssss')
         data = data.get('soap:Envelope').get('soap:Body').get('TRANS_MES_TO_WMS_OUTWORKResponse').get(
             'TRANS_MES_TO_WMS_OUTWORKResult')
         # items = json.loads(data).get('items')
         items = json.loads(data)
-        print("hhahahahahahahaha")
-        print(items)
         # ret = []
         # for item in items:
         #     if item['flag'] != '01':  # 01代表成功
         #         ret.append(item['msg'])
         return items
-
-
-
-
