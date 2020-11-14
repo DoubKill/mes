@@ -119,8 +119,8 @@ permission_data = [
     {'id': 83, 'code': 'view_test_type', 'name': '查看', 'parent_id': 82},
     {'id': 84, 'code': 'add_test_type', 'name': '新增', 'parent_id': 82},
     {'id': 85, 'code': 'change_test_type', 'name': '修改', 'parent_id': 82},
-    {'id': 86, 'code': 'point_add_test_type', 'name': '新增类型数据点', 'parent_id': 82},
-    {'id': 87, 'code': 'point_change_test_type', 'name': '修改类型数据点', 'parent_id': 82},
+    {'id': 86, 'code': 'pointAdd_test_type', 'name': '新增类型数据点', 'parent_id': 82},
+    {'id': 87, 'code': 'pointChange_test_type', 'name': '修改类型数据点', 'parent_id': 82},
 
     {'id': 88, 'code': 'test_method', 'name': '试验方法管理', 'parent_id': None},
     {'id': 89, 'code': 'view_test_method', 'name': '查看', 'parent_id': 88},
