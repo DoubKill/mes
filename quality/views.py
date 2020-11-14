@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Q, Max
+from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -116,6 +116,7 @@ class TestIndicatorDataPointListView(ListAPIView):
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestIndicatorMethods(APIView):
     """获取原材料指标试验方法"""
 
@@ -231,6 +232,7 @@ class ProductBatchingMaterialListView(ListAPIView):
         return Response(material_data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DealSuggestionViewSet(CommonDeleteMixin, ModelViewSet):
     """处理意见
         list: 查询处理意见列表
@@ -245,6 +247,7 @@ class DealSuggestionViewSet(CommonDeleteMixin, ModelViewSet):
     pagination_class = SinglePageNumberPagination
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     """胶料处理结果
     list: 查询胶料处理结果列表
@@ -258,6 +261,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     filter_class = MaterialDealResulFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDealStatusListView(APIView):
     """胶料状态列表"""
 
@@ -266,6 +270,7 @@ class MaterialDealStatusListView(APIView):
         return Response(filter_set)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DealTypeView(APIView):
 
     def post(self, request):
@@ -455,6 +460,7 @@ class ProductDayStatistics(APIView):
         return Response(ruturn_pass)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class LabelPrintViewSet(mixins.CreateModelMixin,
                         mixins.UpdateModelMixin,
                         GenericViewSet):
@@ -477,6 +483,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         return Response(data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DealSuggestionView(APIView):
     """处理意见展示"""
 
@@ -485,6 +492,7 @@ class DealSuggestionView(APIView):
         return Response(queryset.values_list('deal_suggestion', flat=True))
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestResultHistoryView(APIView):
     """试验结果数据展开列表， 参数：?test_order_id=检测单id"""
 
