@@ -119,6 +119,7 @@ class BzFinalMixingRubberInventory(models.Model):
     lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
     in_storage_time = models.DateTimeField(db_column='入库时间')
+    location_status = models.CharField(max_length=20, db_column='货位状态')
 
     def material_type(self):
         try:
