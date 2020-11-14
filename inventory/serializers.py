@@ -110,12 +110,13 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             djjg = "一等品"
         elif (inventory_reason == '三等品'):
             djjg = "三等品"
+        else:
+            djjg = "三等品"
         if out_type == "正常出库" or out_type == "指定出库":
             msg_id = validated_data['order_no']
             str_user = self.context['request'].user.username
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
-
             pici = "1"  # 批次号
             num = validated_data.get('need_qty', '1')
             msg_count = "1"
@@ -131,6 +132,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num,'DJJG':djjg,
                          'STATIONID': location, 'SENDDATE': created_time}
+
+        # 北自接口类型区分
                 # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
             if (inventory_reason =='一等品'):
                 out_type = "生产出库"

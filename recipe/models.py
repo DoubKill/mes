@@ -27,7 +27,7 @@ class MaterialAttribute(AbstractEntity):
     """原材料属性"""
     material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE)
     safety_inventory = models.PositiveIntegerField(help_text='安全库存标准', verbose_name='安全库存标准')
-    period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期')
+    period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期', default="天")
     validity_unit = models.CharField('有效期单位', help_text='有效期单位', max_length=8)
 
     class Meta:
@@ -39,7 +39,7 @@ class MaterialSupplier(AbstractEntity):
     """原材料供应商"""
     material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE)
     supplier_no = models.PositiveIntegerField(help_text='编码', verbose_name='编码', unique=True)
-    provenance = models.CharField('来源', max_length=8, blank=True, default='mes')
+    provenance = models.CharField('来源/产地', max_length=8, blank=True, default='mes')
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     class Meta:
