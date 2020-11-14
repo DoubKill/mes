@@ -74,7 +74,7 @@ class MaterialInventoryView(GenericViewSet,
                            max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
                            Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
                                 from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                            where tim.MaterialGroupName={material_type}
+                            where tim.MaterialGroupName='{material_type}'
                             group by tis.MaterialCode, tis.StockDetailState;"""
         else:
             sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
