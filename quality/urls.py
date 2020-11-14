@@ -12,7 +12,7 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
     MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, \
-    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView
+    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -46,6 +46,7 @@ urlpatterns = [
     path('material_valid_time/', MaterialDealResultUpdateValidTime.as_view()),  # 快检信息综合管理修改有效时间
     path('mat-test-indicator-methods/', MaterialTestIndicatorMethods.as_view()),
     path('product_day_statistics/', ProductDayStatistics.as_view()),  # 胶料日合格率统计
+    path('product_day_detail/', ProductDayDetail.as_view()),  # 胶料日合格率详情信息统计
     path('deal-suggestion-view/', DealSuggestionView.as_view()),  # 处理意见展示
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
     path('', include(router.urls)),

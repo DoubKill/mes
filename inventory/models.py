@@ -67,6 +67,7 @@ class InventoryLog(models.Model):
     order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
     inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
     inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+    inventory_type = models.CharField(max_length=64, verbose_name='BZ出入库类型', help_text='BZ出入库数类型') # 生产出库/快检异常出库
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
     initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
                                  help_text='发起人')
@@ -118,6 +119,7 @@ class BzFinalMixingRubberInventory(models.Model):
     lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
     in_storage_time = models.DateTimeField(db_column='入库时间')
+    location_status = models.CharField(max_length=20, db_column='货位状态')
 
     def material_type(self):
         try:

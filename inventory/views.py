@@ -1,38 +1,35 @@
+import datetime
 import json
 import time
 
 import requests
 from django.db.models import Sum
+from django.db.transaction import atomic
 from django.shortcuts import render
 
 # Create your views here.
 from django.utils.decorators import method_decorator
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins
 from rest_framework import mixins, viewsets
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
-from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
 from inventory.filters import InventoryLogFilter, StationFilter
-from inventory.models import OutOrderFeedBack, WmsInventoryStock, InventoryLog, WarehouseInfo, Station, \
-    WarehouseMaterialType
+from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus
 from inventory.filters import PutPlanManagementFilter
-from inventory.models import OutOrderFeedBack, DeliveryPlan, MaterialInventory
-from inventory.serializers import ProductInventorySerializer, PutPlanManagementSerializer, \
+from inventory.models import DeliveryPlan, MaterialInventory
+from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer
-from inventory.models import OutOrderFeedBack, WmsInventoryStock
-from inventory.serializers import ProductInventorySerializer, BzFinalMixingRubberInventorySerializer, \
+from inventory.models import WmsInventoryStock
+from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from inventory.utils import BaseUploader
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
 from mes.derorators import api_recorder
-from recipe.models import Material
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 from .models import MaterialInventory as XBMaterialInventory
@@ -74,7 +71,7 @@ class MaterialInventoryView(GenericViewSet,
                            max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
                            Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
                                 from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                            where tim.MaterialGroupName={material_type}
+                            where tim.MaterialGroupName='{material_type}'
                             group by tis.MaterialCode, tis.StockDetailState;"""
         else:
             sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
@@ -103,29 +100,6 @@ class MaterialInventoryView(GenericViewSet,
             result.append(self.data_adapt(instance))
         sc.close()
         return Response({'results': result, "count": count})
-
-        # ret = requests.get("http://49.235.45.128:8169/storageSpace/GetInventoryCount")
-        # ret_json = json.loads(ret.text)
-        # obj = Material.objects.get(material_no='L7125')
-        # results = []
-        # for i in ret_json.get("datas"):
-        #     results = [{
-        #         "sn": 1,
-        #         "id": 1,
-        #         "material_id": obj.id,
-        #         "material_no": i.get('materialCode'),
-        #         "material_name": i.get('materialName'),
-        #         "material_type_id": obj.material_type_id,
-        #         "material_type": obj.material_type.global_type.type_name,
-        #         "qty": i.get('quantity'),
-        #         "unit": "吨",
-        #         "unit_weight": 1,
-        #         "total_weight": 1,
-        #         "need_weight": 1,
-        #         "site": i.get('productionAddress'),
-        #         "standard_flag": True,
-        #     }]
-        # return Response({'results': results})
 
 
 class ProductInventory(GenericViewSet,
@@ -200,13 +174,14 @@ class ProductInventory(GenericViewSet,
 class OutWorkFeedBack(APIView):
 
     # 出库反馈
+    @atomic
     def post(self, request):
         """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
         生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
         # 任务编号
 
         data = request.data
-        # data = {'order_no':'20201109193037',"pallet_no":'20102494',
+        # data = {'order_no':'20201114131845',"pallet_no":'20102494',
         #         'location':'二层前端','qty':'2','weight':'2.00',
         #         'quality_status':'合格','lot_no':'122222',
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
@@ -214,7 +189,23 @@ class OutWorkFeedBack(APIView):
         if data:
             order_no = data.get('order_no')
             if order_no:
+                temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
+                all_qty = temp.get("all_qty")
+                if all_qty:
+                    all_qty += data.get("qty")
+                else:
+                    all_qty = data.get("qty")
                 dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
+                need_qty = dp_obj.need_qty if dp_obj else 2
+                if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
+                    dp_obj.status = 1
+                    dp_obj.save()
+                    DeliveryPlanStatus.objects.create(warehouse_info=dp_obj.warehouse_info,
+                                                      order_no=order_no,
+                                                      order_type=dp_obj.order_type,
+                                                      status=1,
+                                                      created_user=dp_obj.created_user,
+                                                      )
                 il_dict={}
                 il_dict['warehouse_no']=dp_obj.warehouse_info.no
                 il_dict['warehouse_name']=dp_obj.warehouse_info.name
@@ -227,179 +218,14 @@ class OutWorkFeedBack(APIView):
             else:
                 raise ValidationError("订单号不能为空")
             try:
-                print(data,il_dict)
                 InventoryLog.objects.create(**data,**il_dict)
-            except Exception as e:
-                print(e,'===')
-                result = {"work_id": data.get("order_no"), "msg": "FALSE" + dp_obj.material_no + "物料在库内数量不足!",
-                          "flag": "99"}
+            except:
+                result = {"message": "反馈失败", "flag": "99"}
             else:
-                result = {"work_id": data.get("order_no"), "msg": "TRUE" + dp_obj.material_no + "下发成功!",
-                          "flag": "01"}
+                result = {"message": "反馈成功", "flag": "01"}
 
             return Response(result)
 
-
-class OutWork(ModelViewSet):
-    queryset = DeliveryPlan.objects.filter()
-    serializer_class = PutPlanManagementSerializer
-
-    # 帘布库出库
-    # class OUTWORKUploader(BaseUploader):
-    #     endpointloa = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK"
-    #
-    #     def gen_payd(self, msg_id, r_type, msg_count, str_user, str_json):
-    #         xml_data = """
-    #         <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-    #             <soap:Body><TRANS_MES_TO_WMS_OUTWORK xmlns="http://www.riamb.ac.cn/asrs/WebService/TA_SAP/">
-    #                 <MsgId>{}</MsgId>
-    #                 <OutType>{}</OutType>
-    #                 <MsgConut>{}</MsgConut>
-    #                 <strUser>{}</strUser>
-    #                 <strJson>{}</strJson>
-    #             </TRANS_MES_TO_WMS_OUTWORK>
-    #             </soap:Body>
-    #         </soap:Envelope>""".format(msg_id, r_type, msg_count, str_user, str_json)
-    #         return xml_data
-    #
-    #     def gen_result(self, data):
-    #         print(data)
-    #         print('ssssssssssssssssssssssssssssssssssssssssss')
-    #         data = data.get('soap:Envelope').get('soap:Body').get('TRANS_MES_TO_WMS_OUTWORKResponse').get(
-    #             'TRANS_MES_TO_WMS_OUTWORKResult')
-    #         # items = json.loads(data).get('items')
-    #         items = json.loads(data)
-    #         print("hhahahahahahahaha")
-    #         print(items)
-    #         # ret = []
-    #         # for item in items:
-    #         #     if item['flag'] != '01':  # 01代表成功
-    #         #         ret.append(item['msg'])
-    #         return items
-
-    def get_base_data(self, sender, request):
-        # data_json ={}
-        # items =[]
-        # params = request.data
-        # msgId = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        # OUTTYPE = params.get('OUTTYPE','1')
-        # msgConut = params.get('msgConut','1')
-        # SENDUSER = request.user.username
-        # items = params.get('items')
-        # # for i in items:
-        # #     i['WORKID']=i['MID']
-        # data_json ={'msgId':msgId,"OUTTYPE":OUTTYPE,'msgConut':msgConut,'SENDUSER':SENDUSER,
-        #             "items": [
-        #                 {"WORKID": "11223",
-        #                  "MID": "C-HMB-F150-12",
-        #                  "PICI": "20200101",
-        #                  "NUM": "1",
-        #                  "STATIONID": "二层后端",
-        #                  "SENDDATE": "20200513 09:22:22"},
-        #                 {"WORKID": "11227",
-        #                  "MID": "C-HMB-F150-11",
-        #                  "PICI": "20200101",
-        #                  "NUM": "1",
-        #                  "STATIONID": "二层前端",
-        #                  "SENDDATE": "20200513 09:22:22"}
-        #             ]
-        #             }
-
-        # ................................
-        data_json = {
-            "msgId": "1",
-            "OUTTYPE": "生产出库",
-            "msgConut": "2",
-            "SENDUSER": "GJ_001",
-            "items": [
-                {"WORKID": "11223",
-                 "MID": "C-HMB-F150-12",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "STATIONID": "二层后端",
-                 "SENDDATE": "20200513 09:22:22"},
-                {"WORKID": "11224",
-                 "MID": "C-HMB-F150-11",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "STATIONID": "二层前端",
-                 "SENDDATE": "20200513 09:22:22"}
-            ]
-        }
-
-        return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
-
-    def get_base_data(self, sender, request):
-        data_json = {}
-        items = []
-        params = request.data
-        msgId = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        OUTTYPE = params.get('OUTTYPE', '1')
-        msgConut = params.get('msgConut', '1')
-        SENDUSER = request.user.username
-        items = params.get('items')
-        # for i in items:
-        #     i['WORKID']=i['MID']
-        data_json = {'msgId': msgId, "OUTTYPE": OUTTYPE, 'msgConut': msgConut, 'SENDUSER': SENDUSER,
-                     "items": [
-                         {"WORKID": "11223",
-                          "MID": "C-HMB-F150-12",
-                          "PICI": "20200101",
-                          "NUM": "1",
-                          "STATIONID": "二层后端",
-                          "SENDDATE": "20200513 09:22:22"},
-                         {"WORKID": "11227",
-                          "MID": "C-HMB-F150-11",
-                          "PICI": "20200101",
-                          "NUM": "1",
-                          "STATIONID": "二层前端",
-                          "SENDDATE": "20200513 09:22:22"}
-                     ]
-                     }
-        # data_json = {
-        # "msgId": "hzy11",
-        # "OUTTYPE": "生产出库123222",
-        # "msgConut": "2",
-        # "SENDUSER": "GJ_001hzy",
-        # "items": [
-        #      {"WORKID": "11223",
-        #       "MID": "C-HMB-F150-12",
-        #       "PICI": "20200101",
-        #       "NUM": "1",
-        #       "STATIONID": "二层后端",
-        #       "SENDDATE": "20200513 09:22:22"},
-        #      {"WORKID": "11227",
-        #       "MID": "C-HMB-F150-11",
-        #       "PICI": "20200101",
-        #       "NUM": "1",
-        #       "STATIONID": "二层前端",
-        #       "SENDDATE": "20200513 09:22:22"}
-        #  ]
-        # }
-        # ticks = time.strftime("%Y%m%d%H%M%S", time.localtime()) + data_json.get('msgId')
-        # items = data_json.get('items')
-        # for i in items:
-        #     i.get('WORKID')
-        #     ticks = time.strftime("%Y%m%d%H%M%S", time.localtime()) + i.get('WORKID')
-        # print(data_json.get('msgId'))
-        # print(ticks)
-        # msgId = ticks
-        # print(msgId)
-        return "1", "1", "1", "1", json.dumps(data_json, ensure_ascii=False)
-
-    # 出库
-    def post(self, request):
-        print(request.user.username)
-        sender = self.OUTWORKUploader()
-        ret = sender.request(*self.get_base_data(sender, request))
-        print("eeesasdasdsada")
-        print(ret)
-        # items = ret['items']
-        # for i in items:
-        #     print(i['WORKID'])
-
-        ret = sender.request(*self.get_base_data(sender, request))
-        return Response(ret)
 
 
 class OutWorkGum(APIView):
@@ -522,7 +348,11 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
-            queryset = model.objects.using('bz').all()
+            # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
+            if self.request.query_params.get("location_status"):
+                queryset = model.objects.using('bz').filter(location_status="有货货位")
+            else:
+                queryset = model.objects.using('bz').all()
             quality_status = self.request.query_params.get('quality_status', None)
             if quality_status:
                 queryset = queryset.filter(quality_status=quality_status)

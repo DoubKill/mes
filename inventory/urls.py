@@ -8,8 +8,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .views import OutWork, MaterialCount \
-    , PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack
+from .views import MaterialCount , PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack
 
 router = DefaultRouter()
 
@@ -23,11 +22,8 @@ router.register('put-plan-management', PutPlanManagement)
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
 
-router.register('out_work', OutWork)
-
 # 物料库存信息|线边库|终炼胶库|原材料库
 router.register(r'material-inventory-manage', views.MaterialInventoryManageViewSet, basename='material-inventory-manage'),
-
 
 # 物料出入库履历
 router.register(r'inventory-log', views.InventoryLogViewSet)
