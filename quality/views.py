@@ -536,7 +536,7 @@ class ProductDayDetail(APIView):
         params = request.query_params
         month_time = params.get('ym_time', datetime.datetime.now()).month
         year_time = params.get('ym_time', datetime.datetime.now()).year
-        product_no = params.get('product_no', 'C-FM-UC109-01')
+        product_no = params.get('product_no', 'C-FM-UC109-001')
         pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
         name_dict = {'1': '综合合格率', '2': '一次合格率', '3': '流变合格率'}
 
@@ -640,6 +640,8 @@ class ProductDayDetail(APIView):
                                                                         'data_point_name'],
                                                                     test_times=mrt_dict[
                                                                         'max_test_time']).last()
+                        if not mtr_obj.data_point_indicator:
+                            continue
                         if mrt_dict['data_point_name'] not in point_count.keys():
                             point_count[mrt_dict['data_point_name']] = 0
                         point_count[mrt_dict['data_point_name']] += 1
