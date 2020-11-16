@@ -10,7 +10,9 @@ from production.models import PalletFeedbacks
 from django.db.transaction import atomic
 from django.db.models import Max, Min
 import logging
+
 logger = logging.getLogger('send_log')
+
 
 @atomic()
 def synthesize_to_material_deal_result(mdr_lot_no):
@@ -47,6 +49,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
                 return
 
+    # 4、分析流程
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
     level_list = []
@@ -112,10 +115,12 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
-    # 1、先判断库存 # 2、在去判断线边库
+
+    # 5、向北自接口发送数据
+    # 5.1、先判断库存和线边库里有没有数据
     bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
     mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
-    # 3、一个库里有就发给北自，没有就不发给北自
+    # 5.2、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
         try:
             # 4、update_store_test_flag这个字段用choise 1对应成功 2对应失败 3对应库存线边库都没有
