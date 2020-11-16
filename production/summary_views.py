@@ -276,6 +276,7 @@ class CollectTrainsFeedbacksList(ListAPIView):
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SumCollectTrains(APIView):
     """胶料单车次时间汇总最大最小平均时间"""
 

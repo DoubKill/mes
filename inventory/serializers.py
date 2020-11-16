@@ -41,6 +41,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="warehouse_info.name", read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
     order_no = serializers.CharField(required=False)
+    quality_status = serializers.CharField(required=False)
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -55,14 +56,9 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-        # pallet_no = validated_data['pallet_no']
-        # dp_obj = DeliveryPlan.objects.filter(pallet_no = pallet_no).first()
-        # if dp_obj:
-        #     raise serializers.ValidationError('已经存在')
-        # else:
-        # order_no = validated_data.get('order_no')
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        inventory_type = validated_data['inventory_type']
+        inventory_type = validated_data.get('inventory_type') #  出入库类型
+
         material_no = validated_data['material_no']
         need_qty = validated_data['need_qty']
         warehouse_info = validated_data['warehouse_info']
@@ -72,6 +68,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         need_weight = validated_data.get('need_weight')
         location = validated_data.get('location')
         created_user = self.context['request'].user.username
+        order_type = validated_data.get('order_type','出库')  # 订单类型
+        inventory_reason = validated_data.get('quality_status')      # 出入库原因
 
         deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
                                                    inventory_type=inventory_type,
@@ -79,15 +77,17 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                                    need_qty=need_qty,
                                                    warehouse_info=warehouse_info,
                                                    status=status,
+                                                   order_type=order_type,
                                                    pallet_no=pallet_no,
                                                    unit=unit,
                                                    need_weight=need_weight,
                                                    created_user=created_user,
-                                                   location=location
+                                                   location=location,
+                                                   inventory_reason=inventory_reason #出库原因
                                                    )
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
-                                          order_type=inventory_type,
+                                          order_type=order_type,
                                           status=status,
                                           created_user=created_user,
                                           )
@@ -105,7 +105,13 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
         status = validated_data.get('status')
-
+        inventory_reason = validated_data.get('inventory_reason')
+        if (inventory_reason == '一等品'):
+            djjg = "一等品"
+        elif (inventory_reason == '三等品'):
+            djjg = "三等品"
+        else:
+            djjg = "三等品"
         if out_type == "正常出库" or out_type == "指定出库":
             msg_id = validated_data['order_no']
             str_user = self.context['request'].user.username
@@ -124,23 +130,32 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
             elif out_type == "正常出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num,
+                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num,'DJJG':djjg,
                          'STATIONID': location, 'SENDDATE': created_time}
-                out_type = "生产出库"
+
+        # 北自接口类型区分
+                # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
+            if inventory_reason =='一等品':
+                bz_out_type = "生产出库"
+            elif inventory_reason =='三等品':
+                bz_out_type = "快检异常出库"
+            else:
+                bz_out_type = "生产出库"
             items = []
             items.append(dict1)
             json_data = {
                 'msgId': msg_id,
-                'OUTTYPE': out_type,
+                'OUTTYPE': bz_out_type,
                 "msgConut": msg_count,
                 "SENDUSER": str_user,
                 "items": items
             }
-
             # msg_count = len(json_data["items"])
             # json_data["msgConut"] = msg_count
+            print(json_data)
             json_data = json.dumps(json_data, ensure_ascii=False)
             sender = OUTWORKUploader(end_type=out_type)
+            print(sender.endpoint)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
                 try:
@@ -178,6 +193,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                     instance.save()
                     if "不足" in msg:
                         raise serializers.ValidationError('库存不足, 出库失败')
+                    elif "json错误" in msg:
+                        raise serializers.ValidationError(f'出库接口调用失败,提示: {msg}')
                     else:
                         raise serializers.ValidationError(msg)
         else:

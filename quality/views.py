@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Q, Max
+from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -116,6 +116,7 @@ class TestIndicatorDataPointListView(ListAPIView):
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestIndicatorMethods(APIView):
     """获取原材料指标试验方法"""
 
@@ -179,7 +180,6 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
-    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -231,6 +231,7 @@ class ProductBatchingMaterialListView(ListAPIView):
         return Response(material_data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DealSuggestionViewSet(CommonDeleteMixin, ModelViewSet):
     """处理意见
         list: 查询处理意见列表
@@ -245,6 +246,7 @@ class DealSuggestionViewSet(CommonDeleteMixin, ModelViewSet):
     pagination_class = SinglePageNumberPagination
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     """胶料处理结果
     list: 查询胶料处理结果列表
@@ -258,6 +260,7 @@ class MaterialDealResultViewSet(CommonDeleteMixin, ModelViewSet):
     filter_class = MaterialDealResulFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialDealStatusListView(APIView):
     """胶料状态列表"""
 
@@ -266,6 +269,7 @@ class MaterialDealStatusListView(APIView):
         return Response(filter_set)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DealTypeView(APIView):
 
     def post(self, request):
@@ -455,6 +459,7 @@ class ProductDayStatistics(APIView):
         return Response(ruturn_pass)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class LabelPrintViewSet(mixins.CreateModelMixin,
                         mixins.UpdateModelMixin,
                         GenericViewSet):
@@ -477,6 +482,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         return Response(data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DealSuggestionView(APIView):
     """处理意见展示"""
 
@@ -485,6 +491,7 @@ class DealSuggestionView(APIView):
         return Response(queryset.values_list('deal_suggestion', flat=True))
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTestResultHistoryView(APIView):
     """试验结果数据展开列表， 参数：?test_order_id=检测单id"""
 
@@ -528,7 +535,7 @@ class ProductDayDetail(APIView):
         params = request.query_params
         month_time = params.get('ym_time', datetime.datetime.now()).month
         year_time = params.get('ym_time', datetime.datetime.now()).year
-        product_no = params.get('product_no', 'C-FM-UC109-01')
+        product_no = params.get('product_no', 'C-FM-UC109-001')
         pass_dict = {'1': ['门尼', '比重', '硬度', '流变'], '2': ['门尼', '比重', '硬度'], '3': ['流变']}
         name_dict = {'1': '综合合格率', '2': '一次合格率', '3': '流变合格率'}
 
@@ -632,6 +639,8 @@ class ProductDayDetail(APIView):
                                                                         'data_point_name'],
                                                                     test_times=mrt_dict[
                                                                         'max_test_time']).last()
+                        if not mtr_obj.data_point_indicator:
+                            continue
                         if mrt_dict['data_point_name'] not in point_count.keys():
                             point_count[mrt_dict['data_point_name']] = 0
                         point_count[mrt_dict['data_point_name']] += 1

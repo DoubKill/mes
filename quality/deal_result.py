@@ -1,6 +1,7 @@
 import datetime
 import time
 
+from inventory.models import BzFinalMixingRubberInventory, MaterialInventory
 from inventory.tasks import update_wms_kjjg
 from mes.common_code import order_no
 from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult, LevelResult, \
@@ -8,7 +9,8 @@ from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestRe
 from production.models import PalletFeedbacks
 from django.db.transaction import atomic
 from django.db.models import Max, Min
-
+import logging
+logger = logging.getLogger('send_log')
 
 @atomic()
 def synthesize_to_material_deal_result(mdr_lot_no):
@@ -22,9 +24,18 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         name = mtm_obj.test_method.test_type.test_indicator.name
         name_list.append(name)
 
-    # 2、判断快检这边是不是所有的指标都有
-    mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
+    # 2、 判断是否所有车次都有
+    actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains')
+    train_liat = []
+    for i in list(actual_trains_list):
+        train_liat.append(i[0])
+    pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
+    for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
+        if i not in train_liat:
+            return
 
+    # 3、判断快检这边是不是所有的指标都有
+    mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
     for mto_obj in mto_set:
         test_indicator_name_list = []
         mtr_dpn_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
@@ -50,8 +61,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # 找到检测次数最多的几条 每一条的等级进行比较选出做大的
     reason = ''
     exist_data_point_indicator = True  # 是否超出区间范围
-    quality_point_indicator = True
-    is_hege = True
     quality_sign = True  # 快检判定何三等品
     for mtr_obj in level_list:
         if not mtr_obj.mes_result:  # mes没有数据
@@ -72,10 +81,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
-            is_hege = False
             continue
         if not mtr_obj.data_point_indicator:
-            is_hege = False
             continue
         if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
             max_mtr = mtr_obj
@@ -105,22 +112,37 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
-    # try:
-    #     msg_ids = order_no()
-    #     mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
-    #     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
-    #     item = []
-    #     item_dict = {"WORKID": str(int(msg_ids) + 1),
-    #                  "MID": mto_obj.product_no,
-    #                  "PICI": str(pfb_obj.plan_classes_uid),
-    #                  "RFID": pfb_obj.pallet_no,
-    #                  "DJJG": mdr_obj.deal_result,
-    #                  "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
-    #     item.append(item_dict)
-    #     res = update_wms_kjjg(msg_id=msg_ids, items=item)
-    #     print(res, '===')
-    #     if not res:
-    #         mdr_obj.update_store_test_flag = True
-    #         mdr_obj.save()
-    # except Exception as e:
-    #     print(e)
+    # 1、先判断库存 # 2、在去判断线边库
+    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
+    mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
+    # 3、一个库里有就发给北自，没有就不发给北自
+    if bz_obj or mi_obj:
+        try:
+            # 4、update_store_test_flag这个字段用choise 1对应成功 2对应失败 3对应库存线边库都没有
+            msg_ids = order_no()
+            mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
+            item = []
+            item_dict = {"WORKID": str(int(msg_ids) + 1),
+                         "MID": mto_obj.product_no,
+                         "PICI": str(pfb_obj.plan_classes_uid),
+                         "RFID": pfb_obj.pallet_no,
+                         "DJJG": mdr_obj.deal_result,
+                         "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
+            item.append(item_dict)
+            # 向北自发送数据
+            res = update_wms_kjjg(msg_id=msg_ids, items=item)
+            if not res:  # res为空代表成功
+                mdr_obj.update_store_test_flag = 1
+                mdr_obj.save()
+
+            else:
+                mdr_obj.update_store_test_flag = 2
+                mdr_obj.save()
+                logger.error(f"发送失败{res}")
+        except Exception as e:
+            pass
+    else:  # 两个库都没有
+        mdr_obj.update_store_test_flag = 3
+        mdr_obj.save()
+        logger.error("没有发送，两个库存和线边库里都没有")
