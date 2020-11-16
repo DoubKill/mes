@@ -34,7 +34,9 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除原材料
     """
-    queryset = Material.objects.filter(delete_flag=False).select_related('material_type').order_by('-created_date')
+    queryset = Material.objects.filter(delete_flag=False
+                                       ).select_related('material_type'
+                                                        ).prefetch_related('material_attr').order_by('-created_date')
     serializer_class = MaterialSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialFilter
@@ -83,11 +85,11 @@ class MaterialAttributeViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialSupplierViewSet(CommonDeleteMixin, ModelViewSet):
-    queryset = MaterialSupplier.objects.filter(use_flag=1).order_by('-created_date')
+    queryset = MaterialSupplier.objects.all().order_by('-created_date')
     serializer_class = MaterialSupplierSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ['material']
+    filter_fields = ['material']
 
 
 @method_decorator([api_recorder], name="dispatch")
