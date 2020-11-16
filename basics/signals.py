@@ -86,21 +86,21 @@ def material_post_save(sender, instance=None, created=False, update_fields=None,
 
 
 @receiver(post_save, sender=ProductInfo)
-def material_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
+def product_info_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
     if not created:
         """更新了数据则需要从同步表中删除此记录"""
         DataSynchronization.objects.filter(type=10, obj_id=instance.id).delete()
 
 
 @receiver(post_save, sender=MaterialAttribute)
-def material_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
+def material_attribute_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
     if not created:
         """更新了数据则需要从同步表中删除此记录"""
         DataSynchronization.objects.filter(type=11, obj_id=instance.id).delete()
 
 
 @receiver(post_save, sender=MaterialSupplier)
-def material_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
+def material_supplier_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
     if not created:
         """更新了数据则需要从同步表中删除此记录"""
         DataSynchronization.objects.filter(type=12, obj_id=instance.id).delete()
