@@ -16,7 +16,7 @@ logger = logging.getLogger('sync_log')
 from system.models import DataSynchronization
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, ClassesDetail, EquipCategoryAttribute, Equip, \
     PlanSchedule, WorkSchedulePlan
-from recipe.models import Material, ProductInfo
+from recipe.models import Material, ProductInfo, MaterialAttribute, MaterialSupplier
 
 TYPE_CHOICE = (
     (1, '公共代码类型'),
@@ -27,7 +27,10 @@ TYPE_CHOICE = (
     (6, '设备'),
     (7, '排班管理'),
     (8, '排班详情'),
-    (9, '原材料')
+    (9, '原材料'),
+    (10, '胶料代码'),
+    (11, '原材料属性'),
+    (12, '原材料产地')
 )
 
 
@@ -150,9 +153,26 @@ class ProductInfoUploader(BaseUploader):
     model = ProductInfo
 
 
+class MaterialAttributeUploader(BaseUploader):
+    """原材料属性"""
+    path = "api/v1/datain/material_attr_receive/"
+    type = 11
+    upload_fields = ('id', 'material__material_no', 'safety_inventory', 'period_of_validity', 'validity_unit')
+    model = MaterialAttribute
+
+
+class MaterialSupplierUploader(BaseUploader):
+    """原材料产地"""
+    path = "api/v1/datain/material_supplier_receive/"
+    type = 12
+    upload_fields = ('id', 'material__material_no', 'supplier_no', 'provenance', 'use_flag')
+    model = MaterialSupplier
+
+
 if __name__ == '__main__':
 
     for uploader in (GlobalCodeTypeUploader, GlobalCodeUploader, WorkScheduleUploader,
                      ClassesDetailUploader, EquipCategoryAttributeUploader, EquipUploader, PlanScheduleUploader,
-                     WorkSchedulePlanUploader, MaterialUploader, ProductInfoUploader):
+                     WorkSchedulePlanUploader, MaterialUploader, ProductInfoUploader,
+                     MaterialAttributeUploader, MaterialSupplierUploader):
         uploader().upload()

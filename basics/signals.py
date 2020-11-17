@@ -3,7 +3,7 @@ from django.dispatch import receiver
 
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedulePlan, PlanSchedule, Equip, ClassesDetail, \
     WorkSchedule, EquipCategoryAttribute
-from recipe.models import Material
+from recipe.models import Material, ProductInfo, MaterialAttribute, MaterialSupplier
 from system.models import DataSynchronization
 
 
@@ -16,8 +16,10 @@ TYPE_CHOICE = (
         (6, '设备'),
         (7, '排班管理'),
         (8, '排班详情'),
-        (9, '原材料')
-    )
+        (9, '原材料'),
+        (10, '胶料代码'),
+        (11, '原材料属性'),
+        (12, '原材料产地'))
 
 
 @receiver(post_save, sender=GlobalCodeType)
@@ -81,3 +83,24 @@ def material_post_save(sender, instance=None, created=False, update_fields=None,
     if not created:
         """更新了数据则需要从同步表中删除此记录"""
         DataSynchronization.objects.filter(type=9, obj_id=instance.id).delete()
+
+
+@receiver(post_save, sender=ProductInfo)
+def product_info_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
+    if not created:
+        """更新了数据则需要从同步表中删除此记录"""
+        DataSynchronization.objects.filter(type=10, obj_id=instance.id).delete()
+
+
+@receiver(post_save, sender=MaterialAttribute)
+def material_attribute_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
+    if not created:
+        """更新了数据则需要从同步表中删除此记录"""
+        DataSynchronization.objects.filter(type=11, obj_id=instance.id).delete()
+
+
+@receiver(post_save, sender=MaterialSupplier)
+def material_supplier_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
+    if not created:
+        """更新了数据则需要从同步表中删除此记录"""
+        DataSynchronization.objects.filter(type=12, obj_id=instance.id).delete()
