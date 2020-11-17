@@ -255,7 +255,19 @@ DATABASES = {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
             },
-    }
+    },
+    "LB": {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_4',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+            },
+        }
 }
 
 AUTH_PASSWORD_VALIDATORS = [

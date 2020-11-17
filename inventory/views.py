@@ -22,7 +22,8 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
-    OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer
+    OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
+    PutPlanManagementSerializerLB
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -441,3 +442,22 @@ class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['warehouse_info']
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementLB(ModelViewSet):
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerLB
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFilter
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            s = PutPlanManagementSerializerLB(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功')

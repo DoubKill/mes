@@ -139,6 +139,41 @@ class BzFinalMixingRubberInventory(models.Model):
         managed = False
 
 
+class BzFinalMixingRubberInventoryLB(models.Model):
+    """bz终炼胶库"""
+    id = models.PositiveIntegerField(db_column='库存索引', primary_key=True)
+    store_id = models.CharField(max_length=20, db_column='库房编号')
+    store_name = models.CharField(max_length=20, db_column='库房名称')
+    bill_id = models.CharField(max_length=50, db_column='订单号')
+    container_no = models.CharField(max_length=50, db_column='托盘号')
+    location = models.CharField(max_length=20, db_column='货位地址')
+    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='数量')
+    total_weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量')
+    quality_status = models.CharField(max_length=20, db_column='品质状态')
+    memo = models.CharField(max_length=250, db_column='车号')
+    lot_no = models.CharField(max_length=200, db_column='追溯号')
+    material_no = models.CharField(max_length=50, db_column='物料编码')
+    in_storage_time = models.DateTimeField(db_column='入库时间')
+    location_status = models.CharField(max_length=20, db_column='货位状态')
+
+    def material_type(self):
+        try:
+            mt = self.material_no.split("-")[1]
+        except:
+            mt = self.material_no
+        return mt
+
+    def unit(self):
+        return "kg"
+
+    def unit_weight(self):
+        return str(round(self.total_weight / self.qty, 3))
+
+    class Meta:
+        db_table = 'v_ASRS_STORE_MESVIEW'
+        managed = False
+
+
 class WmsInventoryStock(models.Model):
     """wms"""
     sn = models.CharField(max_length=255, db_column='Sn', primary_key=True)
