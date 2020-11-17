@@ -117,6 +117,11 @@ class MaterialTestOrder(AbstractEntity):
 
 class MaterialTestResult(AbstractEntity):
     """检测结果"""
+    ORIGIN_CHOICE = (
+        (0, '手工录入'),
+        (1, '10.4.23.140'),
+        (2, '10.4.23.141'),
+    )
     data_point_indicator = models.ForeignKey(MaterialDataPointIndicator, help_text='数据评判指标id', on_delete=models.CASCADE,
                                              blank=True, null=True)
     material_test_order = models.ForeignKey(MaterialTestOrder, help_text='物料检测单', on_delete=models.CASCADE,
@@ -133,6 +138,7 @@ class MaterialTestResult(AbstractEntity):
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
     machine_name = models.CharField(max_length=64, help_text='试验机台名称', blank=True, null=True)
     level = models.IntegerField(help_text='等级', blank=True, null=True)
+    origin = models.IntegerField(help_text='数据来源', default=0)
 
     class Meta:
         db_table = 'material_test_result'
