@@ -256,7 +256,7 @@ DATABASES = {
             'MARS_Connection': True,
             },
     },
-    "LB": {
+    "lb": {  # 帘布库|终炼胶库缩写
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_4',
         'HOST': '10.4.23.101',

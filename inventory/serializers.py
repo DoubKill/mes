@@ -136,7 +136,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             if inventory_reason =='一等品':
                 bz_out_type = "生产出库"
             elif inventory_reason =='三等品':
-                bz_out_type = "快检异常出库"
+                bz_out_type = "快检出库"
             else:
                 bz_out_type = "生产出库"
             items = []
@@ -307,7 +307,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             if inventory_reason =='一等品':
                 bz_out_type = "生产出库"
             elif inventory_reason =='三等品':
-                bz_out_type = "快检异常出库"
+                bz_out_type = "快检出库"
             else:
                 bz_out_type = "生产出库"
             items = []
