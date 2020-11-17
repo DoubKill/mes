@@ -182,7 +182,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
-    pagination_class = SinglePageNumberPagination
+    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
