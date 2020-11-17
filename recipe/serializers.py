@@ -30,6 +30,7 @@ class MaterialSerializer(BaseModelSerializer):
     period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True, default=None)
     validity_unit = serializers.CharField(source='material_attr.validity_unit', read_only=True, default=None)
 
+
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
         return super().update(instance, validated_data)
