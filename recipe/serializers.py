@@ -47,7 +47,8 @@ class MaterialAttributeSerializer(BaseModelSerializer):
         if not hasattr(material, 'material_attr'):
             MaterialAttribute.objects.create(**validated_data)
         else:
-            MaterialAttribute.objects.filter(material=material).update(**validated_data)
+            instance = material.material_attr
+            return super().update(instance, validated_data)
         return validated_data
 
     class Meta:
