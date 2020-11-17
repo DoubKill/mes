@@ -49,6 +49,6 @@ urlpatterns = [
     path('product_day_detail/', ProductDayDetail.as_view()),  # 胶料日合格率详情信息统计
     path('deal-suggestion-view/', DealSuggestionView.as_view()),  # 处理意见展示
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
-    path('print-material-deal-result/', PrintMaterialDealResult.as_view()),
+    path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
     path('', include(router.urls)),
 ]
