@@ -164,22 +164,22 @@ def main():
                                     production_equip_no=equip_no,
                                     production_factory_date=product_date,
                                 )
-                                MaterialTestResult.objects.get_or_create(
-                                    material_test_order=test_order,
-                                    test_factory_date=test_date,
-                                    value=value,
-                                    test_times=test_times,
-                                    data_point_name=data_point_name,
-                                    test_method_name=method_name,
-                                    test_indicator_name=indicator_name,
-                                    result=result,
-                                    mes_result=result,
-                                    machine_name=indicator_name+'仪',
-                                    test_group=test_group,
-                                    level=1 if result == '合格' else 3,
-                                    origin=idx+1
-                                    # test_type_name=test_type_name
-                                )
+                            MaterialTestResult.objects.get_or_create(
+                                material_test_order=test_order,
+                                test_factory_date=test_date,
+                                value=value,
+                                test_times=test_times,
+                                data_point_name=data_point_name,
+                                test_method_name=method_name,
+                                test_indicator_name=indicator_name,
+                                result=result,
+                                mes_result=result,
+                                machine_name=indicator_name+'仪',
+                                test_group=test_group,
+                                level=1 if result == '合格' else 3,
+                                origin=idx+1
+                                # test_type_name=test_type_name
+                            )
             conn.close()
             min_id += 1000
 
