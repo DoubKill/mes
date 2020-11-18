@@ -60,7 +60,7 @@ class DealSuggestionFilter(django_filters.rest_framework.FilterSet):
     type_name = django_filters.CharFilter(field_name='deal_type__global_name', help_text="类型名称")
 
     class Meta:
-        models = DealSuggestion
+        model = DealSuggestion
         fields = ("deal_type",)
 
 
@@ -69,7 +69,7 @@ class MaterialDealResulFilter(django_filters.rest_framework.FilterSet):
     status = django_filters.CharFilter(field_name='status', help_text='状态筛选')
 
     class Meta:
-        models = MaterialDealResult
+        model = MaterialDealResult
         fields = ("status", "day")
 
 
@@ -77,5 +77,5 @@ class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
     suggestion_desc = django_filters.CharFilter(field_name='deal_suggestion', help_text='处理意见筛选')
 
     class Meta:
-        models = MaterialDealResult
+        model = MaterialDealResult
         fields = ('suggestion_desc',)
