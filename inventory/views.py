@@ -17,10 +17,9 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
-from inventory.filters import InventoryLogFilter, StationFilter
+from inventory.filters import InventoryLogFilter, StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB
-from inventory.filters import PutPlanManagementFilter
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -461,7 +460,7 @@ class PutPlanManagementLB(ModelViewSet):
     queryset = DeliveryPlanLB.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializerLB
     filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementFilter
+    filter_class = PutPlanManagementLBFilter
 
     def create(self, request, *args, **kwargs):
         data = request.data
