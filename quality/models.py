@@ -168,6 +168,7 @@ class MaterialDealResult(AbstractEntity):
         (1, "成功"),
         (2, "失败"),
         (3, "库存、线边库都没有"),
+        (4, "创建"),
     )
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
     level = models.IntegerField(help_text='综合等级')
@@ -188,7 +189,7 @@ class MaterialDealResult(AbstractEntity):
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
-    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, null=True) # 是否重新发起更新结果
+    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, default=4)  # 是否重新发起更新结果
 
     class Meta:
         db_table = 'material_deal_result'
