@@ -1,18 +1,21 @@
 import datetime
 
+from django.utils import timezone
+from datetime import timedelta
 import requests
 from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes.common_code import CommonDeleteMixin
@@ -25,12 +28,16 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
-    LabelPrint
+    LabelPrint, Batch, TestDataPoint, BatchMonth, BatchDay
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
-    TestIndicatorSerializer, LabelPrintSerializer
+    TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
+    BatchCommonSerializer
+from django.db.models import Q
+from django.db.models import Count
+from django.db.models import FloatField
 from quality.utils import print_mdr
 from recipe.models import Material, ProductBatching
 import logging
@@ -521,11 +528,10 @@ class MaterialTestResultHistoryView(APIView):
                 'level': item.level,
                 'test_times': item.test_times
             }
-            if test_times in ret:
-                if indicator_name not in ret[test_times]:
-                    ret[test_times] = {indicator_name: {data_point_name: test_result}}
-                else:
-                    ret[test_times][indicator_name][data_point_name] = test_result
+            if indicator_name not in ret[test_times]:
+                ret[test_times][indicator_name] = {data_point_name: test_result}
+            else:
+                ret[test_times][indicator_name][data_point_name] = test_result
         return Response(ret)
 
 
@@ -689,3 +695,30 @@ class PrintMaterialDealResult(APIView):
                                                                                                           delete_flag=False)
         return print_mdr("results", mdr_set)
 
+
+
+
+class BatchCommonStatisticsView(ReadOnlyModelViewSet):
+
+    def get_queryset(self):
+        params = self.request.query_params
+        start_time = params.get('start_time',
+                                timezone.now() - timedelta(days=365))
+        end_time = params.get('end_time', timezone.now())
+        batches = super().get_queryset().filter(date__gte=start_time,
+                                                date__lte=end_time)
+        if batches:
+            batches = BatchCommonSerializer.batch_annotate(batches)
+            batches = batches.order_by('-date')
+
+        return batches
+
+
+class BatchMonthStatisticsView(BatchCommonStatisticsView):
+    queryset = BatchMonth.objects.all()
+    serializer_class = BatchMonthSerializer
+
+
+class BatchDayStatisticsView(BatchCommonStatisticsView):
+    queryset = BatchDay.objects.all()
+    serializer_class = BatchDaySerializer

@@ -514,7 +514,7 @@ class WarehouseMaterialTypeSerializer(serializers.ModelSerializer):
     warehouse_no = serializers.ReadOnlyField(source='warehouse_info.no', default='')
     material_type_name = serializers.ReadOnlyField(source='material_type.global_name', default='')
     material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=True,
-                                                                                          global_type__type_name='物料类型'))
+                                                                                          global_type__type_name='原材料类别'))
     warehouse_info = serializers.PrimaryKeyRelatedField(queryset=WarehouseInfo.objects.all(), write_only=True)
 
     class Meta:

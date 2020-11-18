@@ -1,6 +1,8 @@
 import time
 from datetime import datetime, timedelta
-
+from django.db.models import Q, F
+from django.db.models import Count
+from django.db.models import FloatField
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
@@ -16,7 +18,8 @@ from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult, TestIndicator, LabelPrint
+    MaterialDealResult, LevelResult, TestIndicator, LabelPrint, Batch, TestDataPoint, BatchMonth, BatchDay, BatchEquip, \
+    BatchClass, BatchProductNo, MaterialDealResult, LevelResult, TestIndicator, LabelPrint
 from recipe.models import MaterialAttribute
 
 
@@ -530,3 +533,219 @@ class LabelPrintSerializer(serializers.ModelSerializer):
     class Meta:
         model = LabelPrint
         fields = '__all__'
+
+
+class TestDataPointSerializer(serializers.ModelSerializer):
+    upper_limit_count = serializers.SerializerMethodField()
+    upper_limit_percent = serializers.SerializerMethodField()
+    lower_limit_count = serializers.SerializerMethodField()
+    lower_limit_percent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TestDataPoint
+        fields = ['name',
+                  'upper_limit_count',
+                  'upper_limit_percent',
+                  'lower_limit_count',
+                  'lower_limit_percent']
+
+    def get_upper_limit_count(self, obj):
+        return obj.upper_limit_count
+
+    def get_upper_limit_percent(self, obj):
+        return obj.upper_limit_count / obj.train_count
+
+    def get_lower_limit_count(self, obj):
+        return obj.lower_limit_count
+
+    def get_lower_limit_percent(self, obj):
+        return obj.lower_limit_count / obj.train_count
+
+    @classmethod
+    def points_annotate(cls, points):
+        points = points.annotate(train_count=Count('testresult__train'))
+        points = points.annotate(upper_limit_count=
+                                 Count('testresult__train',
+                                       filter=Q(testresult__qualified=False,
+                                                testresult__value__gt=F('data_point_indicator__upper_limit'))))
+        points = points.annotate(lower_limit_count=
+                                 Count('testresult__train',
+                                       filter=Q(testresult__qualified=False,
+                                                testresult__value__lt=F('data_point_indicator__lower_limit'))))
+        return points
+
+
+class PercentOfPassSerializer(serializers.Serializer):
+    yc_percent_of_pass = serializers.SerializerMethodField()
+    lb_percent_of_pass = serializers.SerializerMethodField()
+    zh_percent_of_pass = serializers.SerializerMethodField()
+
+    def get_yc_percent_of_pass(self, obj):
+        return obj.yc_test_pass_count / obj.yc_train_count
+
+    def get_lb_percent_of_pass(self, obj):
+        return obj.lb_test_pass_count / obj.lb_train_count
+
+    def get_zh_percent_of_pass(self, obj):
+        return obj.zh_test_pass_count / obj.zh_train_count
+
+    @classmethod
+    def batch_annotate(cls, batches):
+        yc_train_count = Count('batch__lot__train',
+                               filter=~Q(batch__lot__train__testresult__point__indicator__name='流变'),
+                               output_field=FloatField())
+        yc_test_pass_count = Count('batch__lot__train',
+                                   filter=
+                                   Q(~Q(batch__lot__train__testresult__point__indicator__name='流变') &
+                                     Q(batch__lot__train__testresult__qualified=True)),
+                                   output_field=FloatField())
+        batches = batches.annotate(yc_train_count=yc_train_count) \
+            .annotate(yc_test_pass_count=yc_test_pass_count)
+
+        # 流变
+        lb_train_count = Count('batch__lot__train',
+                               filter=Q(batch__lot__train__testresult__point__indicator__name='流变'),
+                               output_field=FloatField())
+        lb_test_pass_count = Count('batch__lot__train',
+                                   filter=Q(batch__lot__train__testresult__point__indicator__name='流变',
+                                            batch__lot__train__testresult__qualified=True),
+                                   output_field=FloatField())
+        batches = batches.annotate(lb_train_count=lb_train_count) \
+            .annotate(lb_test_pass_count=lb_test_pass_count)
+
+        # 综合
+        zh_train_count = Count('batch__lot__train', output_field=FloatField())
+        zh_test_pass_count = Count('batch__lot__train',
+                                   filter=Q(batch__lot__train__testresult__qualified=True),
+                                   output_field=FloatField())
+        batches = batches.annotate(zh_train_count=zh_train_count) \
+            .annotate(zh_test_pass_count=zh_test_pass_count)
+
+        return batches
+
+
+class BatchEquipSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+    class Meta:
+        model = BatchEquip
+        fields = [
+            'production_equip_no',
+            'yc_percent_of_pass',
+            'lb_percent_of_pass',
+            'zh_percent_of_pass']
+
+
+class BatchProductNoSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+    points = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BatchProductNo
+        fields = [
+            'product_no',
+            'yc_percent_of_pass',
+            'lb_percent_of_pass',
+            'zh_percent_of_pass',
+            'points']
+
+    def get_points(self, obj):
+        points = TestDataPoint.objects.filter(testresult__train__lot__batch__batch_product_no=obj)  # TestDataPoint
+        points = TestDataPointSerializer.points_annotate(points)
+        serializer = TestDataPointSerializer(points, many=True)
+        return serializer.data
+
+
+class BatchClassSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+    class Meta:
+        model = BatchClass
+        fields = [
+            'production_class',
+            'yc_percent_of_pass',
+            'lb_percent_of_pass',
+            'zh_percent_of_pass']
+
+
+class BatchCommonSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+    points = serializers.SerializerMethodField()
+    equips = serializers.SerializerMethodField()
+    classes = serializers.SerializerMethodField()
+    product_no = serializers.SerializerMethodField()
+
+    class Meta:
+        fields = ['id',
+                  'date',
+                  'yc_percent_of_pass',
+                  'lb_percent_of_pass',
+                  'zh_percent_of_pass',
+                  'points',
+                  'equips',
+                  'classes',
+                  'product_no']
+
+    def query_points(self, obj):
+        pass
+
+    def get_points(self, obj):
+        points = self.query_points(obj)  # TestDataPoint
+        points = TestDataPointSerializer.points_annotate(points)
+        serializer = TestDataPointSerializer(points, many=True)
+        return serializer.data
+
+    def query_equips(self, obj):
+        pass
+
+    def get_equips(self, obj):
+        return self.percent_of_pass_serialize(
+            self.query_equips(obj), BatchEquipSerializer)
+
+    def query_classes(self, obj):
+        pass
+
+    def get_classes(self, obj):
+        return self.percent_of_pass_serialize(
+            self.query_classes(obj), BatchClassSerializer)
+
+    def query_product_no(self, obj):
+        pass
+
+    def get_product_no(self, obj):
+        return self.percent_of_pass_serialize(
+            self.query_product_no(obj), BatchProductNoSerializer)
+
+    @staticmethod
+    def percent_of_pass_serialize(objects, serializer_class):
+        objects = serializer_class.batch_annotate(objects)
+        serializer = serializer_class(objects, many=True)
+        return serializer.data
+
+
+class BatchMonthSerializer(BatchCommonSerializer):
+    class Meta(BatchCommonSerializer.Meta):
+        model = BatchMonth
+
+    def query_points(self, obj):
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj)
+
+    def query_equips(self, obj):
+        return BatchEquip.objects.filter(batch__batch_month=obj)
+
+    def query_classes(self, obj):
+        return BatchClass.objects.filter(batch__batch_month=obj)
+
+    def query_product_no(self, obj):
+        return BatchProductNo.objects.filter(batch__batch_month=obj)
+
+
+class BatchDaySerializer(BatchCommonSerializer):
+    class Meta(BatchCommonSerializer.Meta):
+        model = BatchDay
+
+    def query_points(self, obj):
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj)
+
+    def query_equips(self, obj):
+        return BatchEquip.objects.filter(batch__batch_day=obj)
+
+    def query_classes(self, obj):
+        return BatchClass.objects.filter(batch__batch_day=obj)
+
+    def query_product_no(self, obj):
+        return BatchProductNo.objects.filter(batch__batch_day=obj)
