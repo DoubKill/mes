@@ -30,6 +30,7 @@ class MaterialSerializer(BaseModelSerializer):
     period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True, default=None)
     validity_unit = serializers.CharField(source='material_attr.validity_unit', read_only=True, default=None)
 
+
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
         return super().update(instance, validated_data)
@@ -47,7 +48,8 @@ class MaterialAttributeSerializer(BaseModelSerializer):
         if not hasattr(material, 'material_attr'):
             MaterialAttribute.objects.create(**validated_data)
         else:
-            MaterialAttribute.objects.filter(material=material).update(**validated_data)
+            instance = material.material_attr
+            return super().update(instance, validated_data)
         return validated_data
 
     class Meta:
