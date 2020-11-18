@@ -37,9 +37,11 @@ router.register(r'station-info', views.StationInfoViewSet)
 # 仓库物料类型
 router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 
+# 帘布库出库管理
+router.register(r'lb-plan-management', views.PutPlanManagementLB)
+
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),
     path('outwork_feedback/', OutWorkFeedBack.as_view()),
     path('', include(router.urls)),
-
-    ]
+]

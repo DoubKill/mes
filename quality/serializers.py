@@ -1,5 +1,5 @@
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db.transaction import atomic
 from rest_framework import serializers
@@ -17,6 +17,7 @@ from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     MaterialDealResult, LevelResult, TestIndicator, LabelPrint
+from recipe.models import MaterialAttribute
 
 
 class TestIndicatorSerializer(BaseModelSerializer):
@@ -320,6 +321,24 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
     deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
     deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
+    valid_time = serializers.SerializerMethodField(read_only=True, help_text="有效时间")
+
+    def get_valid_time(self, obj):
+        product_no = self.product_no
+        product_time = obj.production_factory_date
+        material_detail = MaterialAttribute.objects.filter(material__material_no=product_no).first()
+        if not material_detail:
+            return None
+        unit = material_detail.validity_unit
+        if unit in ["天", "days", "day"]:
+            param = {"days": material_detail.period_of_validity}
+        elif unit in ["小时", "hours", "hour"]:
+            param = {"hours": material_detail.period_of_validity}
+        else:
+            param = {"days": material_detail.period_of_validity}
+        expire_time = product_time + timedelta(**param)
+        return expire_time
+
 
     def get_deal_suggestion(self, obj):
         if obj.status == "已处理":
@@ -338,6 +357,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
 
     def get_day_time(self, obj):
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        self.__setattr__("pfb_obj", pfb_obj)
         if not pfb_obj:
             return None
         pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
@@ -347,7 +367,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return None
 
     def get_classes_group(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
         pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
@@ -357,19 +378,23 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return f"{pfb_obj.classes}/None"
 
     def get_equip_no(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
         return pfb_obj.equip_no
 
     def get_product_no(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
+        self.__setattr__("product_no", pfb_obj.product_no)
         return pfb_obj.product_no
 
     def get_actual_weight(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
         return pfb_obj.actual_weight
@@ -466,7 +491,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
 
     def get_actual_trains(self, obj):
         at_list = []
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
         for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
@@ -475,7 +501,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         return at_str
 
     def get_operation_user(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
         return pfb_obj.operation_user
