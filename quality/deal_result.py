@@ -7,10 +7,13 @@ from mes.common_code import order_no
 from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult, LevelResult, \
     MaterialDataPointIndicator, MaterialTestMethod
 from production.models import PalletFeedbacks
+from quality.serializers import MaterialDealResultListSerializer
 from django.db.transaction import atomic
 from django.db.models import Max, Min
 import logging
+
 logger = logging.getLogger('send_log')
+
 
 @atomic()
 def synthesize_to_material_deal_result(mdr_lot_no):
@@ -25,10 +28,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         name_list.append(name)
 
     # 2、 判断是否所有车次都有
-    actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains')
-    train_liat = []
-    for i in list(actual_trains_list):
-        train_liat.append(i[0])
+    actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains', flat=True)
+    train_liat = list(actual_trains_list)
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
     for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
         if i not in train_liat:
@@ -47,6 +48,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
                 return
 
+    # 4、分析流程
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
     level_list = []
@@ -112,10 +114,12 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
-    # 1、先判断库存 # 2、在去判断线边库
+
+    # 5、向北自接口发送数据
+    # 5.1、先判断库存和线边库里有没有数据
     bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
     mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
-    # 3、一个库里有就发给北自，没有就不发给北自
+    # 5.2、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
         try:
             # 4、update_store_test_flag这个字段用choise 1对应成功 2对应失败 3对应库存线边库都没有
@@ -141,8 +145,55 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 mdr_obj.save()
                 logger.error(f"发送失败{res}")
         except Exception as e:
+            logger.error(f"调北自接口发生异常：{e}")
             pass
     else:  # 两个库都没有
         mdr_obj.update_store_test_flag = 3
         mdr_obj.save()
         logger.error("没有发送，两个库存和线边库里都没有")
+
+
+def get_deal_result(lot_no):
+    """将快检信息综合管理接口(就是打印的卡片信息)封装成一个类，需要的时候就调用一下"""
+    mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
+    mdrls = MaterialDealResultListSerializer()
+    results = {}
+    # id
+    results['id'] = mdr_obj.id
+    # day_time
+    results['day_time'] = mdrls.get_day_time(mdr_obj)
+    # lot_no
+    results['lot_no'] = mdr_obj.lot_no
+    # classes_group
+    results['classes_group'] = mdrls.get_classes_group(mdr_obj)
+    # equip_no
+    results['equip_no'] = mdrls.get_equip_no(mdr_obj)
+    # product_no
+    results['product_no'] = mdrls.get_product_no(mdr_obj)
+    # actual_weight
+    results['actual_weight'] = mdrls.get_actual_weight(mdr_obj)
+    # residual_weight
+    results['residual_weight'] = mdrls.get_residual_weight(mdr_obj)
+    # production_factory_date
+    results['production_factory_date'] = mdr_obj.production_factory_date
+    # valid_time
+    results['valid_time'] = mdr_obj.valid_time
+    # test
+    results['test'] = mdrls.get_test(mdr_obj)
+    # print_time
+    results['print_time'] = mdr_obj.print_time
+    # deal_user
+    results['deal_user'] = mdrls.get_deal_user(mdr_obj)
+    # deal_time
+    results['deal_time'] = mdrls.get_deal_time(mdr_obj)
+    # mtr_list
+    results['mtr_list'] = mdrls.get_mtr_list(mdr_obj)
+    # actual_trains
+    results['actual_trains'] = mdrls.get_actual_trains(mdr_obj)
+    # operation_user
+    results['operation_user'] = mdrls.get_operation_user(mdr_obj)
+    # deal_result
+    results['deal_result'] = mdr_obj.deal_result
+    # deal_suggestion
+    results['deal_suggestion'] = mdrls.get_deal_suggestion(mdr_obj)
+    return results
