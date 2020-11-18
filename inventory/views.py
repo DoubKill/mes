@@ -18,11 +18,13 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
 from inventory.filters import InventoryLogFilter, StationFilter
-from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus
+from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
+    BzFinalMixingRubberInventoryLB
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
-    OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer
+    OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
+    PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -324,7 +326,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     INVENTORY_MODEL_BY_NAME = {
         '线边库': [XBMaterialInventory, XBKMaterialInventorySerializer],
         '终炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
-        '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer]
+        '帘布库': [BzFinalMixingRubberInventoryLB, BzFinalMixingRubberLBInventorySerializer],
+        '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer],
+        '混炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
     }
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -353,6 +357,15 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = model.objects.using('bz').filter(location_status="有货货位")
             else:
                 queryset = model.objects.using('bz').all()
+            quality_status = self.request.query_params.get('quality_status', None)
+            if quality_status:
+                queryset = queryset.filter(quality_status=quality_status)
+        elif model == BzFinalMixingRubberInventoryLB:
+            # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
+            if self.request.query_params.get("location_status"):
+                queryset = model.objects.using('lb').filter(location_status="有货货位")
+            else:
+                queryset = model.objects.using('lb').all()
             quality_status = self.request.query_params.get('quality_status', None)
             if quality_status:
                 queryset = queryset.filter(quality_status=quality_status)
@@ -441,3 +454,22 @@ class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['warehouse_info']
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementLB(ModelViewSet):
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerLB
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFilter
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            s = PutPlanManagementSerializerLB(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功')

@@ -2,6 +2,7 @@ import datetime
 
 from django.utils import timezone
 from datetime import timedelta
+import requests
 from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -37,6 +38,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
 from django.db.models import Q
 from django.db.models import Count
 from django.db.models import FloatField
+from quality.utils import print_mdr
 from recipe.models import Material, ProductBatching
 import logging
 from django.db.models import Max, Sum
@@ -187,6 +189,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
+    pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -675,6 +678,24 @@ class ProductDayDetail(APIView):
                     return_dict[point]['-%'] = str((point_lower[point] / point_count[point]) * 100) + '%'
             ruturn_pass.append(return_dict)
         return Response(ruturn_pass)
+
+
+class PrintMaterialDealResult(APIView):
+    """不合格品打印功能"""
+
+    def get(self, request, *args, **kwargs):
+        day = self.request.query_params.get('day', None)
+        status = self.request.query_params.get('status', None)
+        filter_dict = {}
+        if day:
+            filter_dict['production_factory_date__icontains'] = day
+        if status:
+            filter_dict['status'] = status
+        MaterialDealResult.objects.filter()
+        mdr_set = MaterialDealResult.objects.filter(~Q(deal_result="一等品")).filter(~Q(status="复测")).filter(**filter_dict,
+                                                                                                          delete_flag=False)
+        return print_mdr("results", mdr_set)
+
 
 
 

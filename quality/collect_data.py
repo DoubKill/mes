@@ -34,20 +34,22 @@ def get_min_max_id(server, user, password, database, test_date):
 
 
 def main():
-    max_test_date = MaterialTestResult.objects.aggregate(
-        max_test_date=Max('test_factory_date'))['max_test_date']
-    if not max_test_date:
-        max_test_date = '2020-11-12 00:00:00'
-    else:
-        max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
+    for idx, data_base in enumerate(data_bases):
+        max_test_date = MaterialTestResult.objects.filter(origin=idx+1).aggregate(
+            max_test_date=Max('test_factory_date'))['max_test_date']
+        if not max_test_date:
+            max_test_date = '2020-11-12 00:00:00'
+        else:
+            max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
 
-    for data_base in data_bases:
         server = data_base['server']
         user = data_base['user']
         password = data_base['password']
         name = data_base['name']
-
-        min_id, max_id = get_min_max_id(server, user, password, name, max_test_date)
+        try:
+            min_id, max_id = get_min_max_id(server, user, password, name, max_test_date)
+        except Exception:
+            continue
         if not min_id:
             continue
         while max_id >= min_id+1:
@@ -162,21 +164,22 @@ def main():
                                     production_equip_no=equip_no,
                                     production_factory_date=product_date,
                                 )
-                                MaterialTestResult.objects.get_or_create(
-                                    material_test_order=test_order,
-                                    test_factory_date=test_date,
-                                    value=value,
-                                    test_times=test_times,
-                                    data_point_name=data_point_name,
-                                    test_method_name=method_name,
-                                    test_indicator_name=indicator_name,
-                                    result=result,
-                                    mes_result=result,
-                                    machine_name=indicator_name+'仪',
-                                    test_group=test_group,
-                                    level=1 if result == '合格' else 3,
-                                    # test_type_name=test_type_name
-                                )
+                            MaterialTestResult.objects.get_or_create(
+                                material_test_order=test_order,
+                                test_factory_date=test_date,
+                                value=value,
+                                test_times=test_times,
+                                data_point_name=data_point_name,
+                                test_method_name=method_name,
+                                test_indicator_name=indicator_name,
+                                result=result,
+                                mes_result=result,
+                                machine_name=indicator_name+'仪',
+                                test_group=test_group,
+                                level=1 if result == '合格' else 3,
+                                origin=idx+1
+                                # test_type_name=test_type_name
+                            )
             conn.close()
             min_id += 1000
 

@@ -9,6 +9,7 @@ from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
+from plan.uuidfield import UUidTools
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -25,6 +26,10 @@ class MaterialSerializer(BaseModelSerializer):
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.CharField(source='last_updated_user.username', default=None, read_only=True)
+    safety_inventory = serializers.IntegerField(source='material_attr.safety_inventory', read_only=True, default=None)
+    period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True, default=None)
+    validity_unit = serializers.CharField(source='material_attr.validity_unit', read_only=True, default=None)
+
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
@@ -37,16 +42,21 @@ class MaterialSerializer(BaseModelSerializer):
 
 
 class MaterialAttributeSerializer(BaseModelSerializer):
-    material = serializers.PrimaryKeyRelatedField(queryset=Material.objects.filter(delete_flag=False))
-    material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
-    material_no = serializers.CharField(source='material.material_no', read_only=True)
-    material_name = serializers.CharField(source='material.material_name', read_only=True)
+
+    def create(self, validated_data):
+        material = validated_data['material']
+        if not hasattr(material, 'material_attr'):
+            MaterialAttribute.objects.create(**validated_data)
+        else:
+            instance = material.material_attr
+            return super().update(instance, validated_data)
+        return validated_data
 
     class Meta:
         model = MaterialAttribute
-        fields = ['id', 'material', 'material_type', 'material_no', 'material_name',
-                  'period_of_validity', 'safety_inventory', 'validity_unit']
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'material': {'validators': []}}
 
 
 class MaterialSupplierSerializer(BaseModelSerializer):
@@ -54,10 +64,14 @@ class MaterialSupplierSerializer(BaseModelSerializer):
     material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True)
-
+    
+    def create(self, validated_data):
+        validated_data['supplier_no'] = UUidTools.uuid1_hex('CD')
+        return super(MaterialSupplierSerializer, self).create(validated_data)
+    
     class Meta:
         model = MaterialSupplier
-        fields = ['id', 'material', 'material_type', 'material_no', 'material_name', 'supplier_no', 'provenance']
+        exclude = ('supplier_no', )
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 

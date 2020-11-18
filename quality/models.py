@@ -171,9 +171,9 @@ class TestResult(models.Model):
 
 class MaterialTestOrder(AbstractEntity):
     """物料检测单"""
-    lot_no = models.CharField(max_length=64, help_text='收皮条码')  # 一托 一托有好几车
+    lot_no = models.CharField(max_length=64, help_text='收皮条码')
     material_test_order_uid = models.CharField(max_length=64, help_text='唯一码', unique=True)
-    actual_trains = models.PositiveIntegerField(help_text='车次')  # 第几车
+    actual_trains = models.PositiveIntegerField(help_text='车次')
     product_no = models.CharField(max_length=64, help_text='胶料编码')
     plan_classes_uid = models.CharField(max_length=64, help_text='班次计划唯一码')
     production_class = models.CharField(max_length=64, help_text='生产班次名')
@@ -189,6 +189,11 @@ class MaterialTestOrder(AbstractEntity):
 
 class MaterialTestResult(AbstractEntity):
     """检测结果"""
+    ORIGIN_CHOICE = (
+        (0, '手工录入'),
+        (1, '10.4.23.140'),
+        (2, '10.4.23.141'),
+    )
     data_point_indicator = models.ForeignKey(MaterialDataPointIndicator, help_text='数据评判指标id', on_delete=models.CASCADE,
                                              blank=True, null=True)
     material_test_order = models.ForeignKey(MaterialTestOrder, help_text='物料检测单', on_delete=models.CASCADE,
@@ -202,11 +207,10 @@ class MaterialTestResult(AbstractEntity):
     test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
     test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
     mes_result = models.CharField(max_length=64, help_text='mes评判结果', blank=True, null=True)
-    # 一等品合格 三等品不合格
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
-    # 一等品合格 三等品不合格
     machine_name = models.CharField(max_length=64, help_text='试验机台名称', blank=True, null=True)
     level = models.IntegerField(help_text='等级', blank=True, null=True)
+    origin = models.IntegerField(help_text='数据来源', default=0)
 
     class Meta:
         db_table = 'material_test_result'
@@ -236,6 +240,7 @@ class MaterialDealResult(AbstractEntity):
         (1, "成功"),
         (2, "失败"),
         (3, "库存、线边库都没有"),
+        (4, "创建"),
     )
     lot_no = models.CharField(max_length=64, help_text='托盘追踪号')
     level = models.IntegerField(help_text='综合等级')
@@ -256,7 +261,7 @@ class MaterialDealResult(AbstractEntity):
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
-    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, null=True)  # 是否重新发起更新结果
+    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, default=4)  # 是否重新发起更新结果
 
     class Meta:
         db_table = 'material_deal_result'
