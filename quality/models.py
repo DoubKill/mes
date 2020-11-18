@@ -97,11 +97,83 @@ class MaterialDataPointIndicator(AbstractEntity):
         verbose_name_plural = verbose_name = '数据点评判指标'
 
 
+# 统计用中间表 BatchMonth BatchDay Batch Lot Train Indicator TestDataPoint TestResult
+
+class BatchMonth(models.Model):
+    """统计用中间表 add by fq   月批次"""
+    date = models.DateField()  # 只有年月 日为当月第一天
+
+
+class BatchDay(models.Model):
+    """统计用中间表 add by fq   日批次"""
+    date = models.DateField()
+
+
+class BatchEquip(models.Model):
+    production_equip_no = models.CharField(max_length=64, help_text='机台')
+
+
+class BatchClass(models.Model):
+    production_class = models.CharField(max_length=64, help_text='生产班次名')
+
+
+class BatchProductNo(models.Model):
+    product_no = models.CharField(max_length=64, help_text='胶料编码')
+
+
+class Batch(models.Model):
+    """统计用中间表 add by fq   一批次"""
+    production_factory_date = models.DateTimeField(help_text='生产时间')
+    batch_month = models.ForeignKey(BatchMonth, on_delete=models.SET_NULL, null=True, blank=True)
+    batch_day = models.ForeignKey(BatchDay, on_delete=models.SET_NULL, null=True, blank=True)
+    batch_equip = models.ForeignKey(BatchEquip, on_delete=models.SET_NULL, null=True, blank=True)
+    batch_class = models.ForeignKey(BatchClass, on_delete=models.SET_NULL, null=True, blank=True)
+    batch_product_no = models.ForeignKey(BatchProductNo, on_delete=models.SET_NULL, null=True, blank=True)
+
+
+
+class Lot(models.Model):
+    """统计用中间表 add by fq   一拖胶"""
+    lot_no = models.CharField('收皮条码', max_length=64, help_text='收皮条码')
+    batch = models.ForeignKey(Batch, on_delete=models.SET_NULL, null=True, blank=True)
+
+
+class Train(models.Model):
+    """统计用中间表 add by fq   一车胶"""
+    lot = models.ForeignKey(Lot, on_delete=models.SET_NULL, null=True, blank=True)
+    actual_trains = models.PositiveIntegerField('车次')
+
+
+class Indicator(models.Model):
+    """统计用中间表 add by fq"""
+    name = models.CharField('检测指标名称', max_length=64)
+
+
+class TestDataPoint(models.Model):
+    """统计用中间表 add by fq"""
+    name = models.CharField('数据点名称', max_length=64)
+    indicator = models.ForeignKey(Indicator, on_delete=models.SET_NULL, null=True, blank=True)
+    data_point_indicator = models.ForeignKey(MaterialDataPointIndicator, help_text='数据评判指标id', on_delete=models.CASCADE,
+                                             blank=True, null=True)
+
+
+class TestResult(models.Model):
+    """统计用中间表 add by fq   测试结果"""
+    train = models.ForeignKey(Train, on_delete=models.CASCADE)
+    max_times = models.PositiveIntegerField(help_text='检验次数', default=0)
+    point = models.ForeignKey(TestDataPoint, on_delete=models.SET_NULL, null=True, blank=True)
+    qualified = models.NullBooleanField(max_length=64, default=None)
+    value = models.DecimalField(help_text='检测值', decimal_places=2, max_digits=8, null=True, blank=True)
+
+
+# 统计用中间表结束
+
+
 class MaterialTestOrder(AbstractEntity):
     """物料检测单"""
-    lot_no = models.CharField(max_length=64, help_text='收皮条码')
+    lot_no = models.CharField(max_length=64, help_text='收皮条码')  # 一托 一托有好几车
     material_test_order_uid = models.CharField(max_length=64, help_text='唯一码', unique=True)
-    actual_trains = models.PositiveIntegerField(help_text='车次')
+    actual_trains = models.PositiveIntegerField(help_text='车次')  # 第几车
     product_no = models.CharField(max_length=64, help_text='胶料编码')
     plan_classes_uid = models.CharField(max_length=64, help_text='班次计划唯一码')
     production_class = models.CharField(max_length=64, help_text='生产班次名')
@@ -130,7 +202,9 @@ class MaterialTestResult(AbstractEntity):
     test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
     test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
     mes_result = models.CharField(max_length=64, help_text='mes评判结果', blank=True, null=True)
+    # 一等品合格 三等品不合格
     result = models.CharField(max_length=64, help_text='快检系统评判结果', blank=True, null=True)
+    # 一等品合格 三等品不合格
     machine_name = models.CharField(max_length=64, help_text='试验机台名称', blank=True, null=True)
     level = models.IntegerField(help_text='等级', blank=True, null=True)
 
@@ -182,7 +256,7 @@ class MaterialDealResult(AbstractEntity):
     print_time = models.DateTimeField(help_text='第一次打印时间', null=True)
     valid_time = models.IntegerField(help_text='有效时间', null=True)
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
-    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, null=True) # 是否重新发起更新结果
+    update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, null=True)  # 是否重新发起更新结果
 
     class Meta:
         db_table = 'material_deal_result'

@@ -12,7 +12,7 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
     MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, \
-    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail
+    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, BatchDayStatisticsView
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -36,6 +36,13 @@ router.register('material-deal-result', MaterialDealResultViewSet)
 router.register('level-result', LevelResultViewSet)
 # 快检标签打印
 router.register('label-print', LabelPrintViewSet)
+
+# 月批次快检合格率统计
+router.register('batch-month-statistics', BatchMonthStatisticsView)
+
+# 日批次快检合格率统计
+router.register('batch-day-statistics', BatchDayStatisticsView)
+
 
 urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
