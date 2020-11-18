@@ -26,7 +26,7 @@ class Material(AbstractEntity):
 class MaterialAttribute(AbstractEntity):
     """原材料属性"""
     material = models.OneToOneField(Material, help_text='原材料', verbose_name='原材料',
-                                    on_delete=models.CASCADE, related_name='material_attr')
+                                    on_delete=models.CASCADE, related_name='material_attr', null=True, blank=True)
     safety_inventory = models.PositiveIntegerField(help_text='安全库存标准', verbose_name='安全库存标准')
     period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期')
     validity_unit = models.CharField('有效期单位', help_text='有效期单位', max_length=8, default="天")
