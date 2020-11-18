@@ -24,7 +24,7 @@ from inventory.filters import PutPlanManagementFilter
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
-    PutPlanManagementSerializerLB
+    PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -326,8 +326,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     INVENTORY_MODEL_BY_NAME = {
         '线边库': [XBMaterialInventory, XBKMaterialInventorySerializer],
         '终炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
-        '帘布库': [BzFinalMixingRubberInventoryLB, BzFinalMixingRubberInventorySerializer],
-        '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer]
+        '帘布库': [BzFinalMixingRubberInventoryLB, BzFinalMixingRubberLBInventorySerializer],
+        '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer],
+        '混炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
     }
     permission_classes = (permissions.IsAuthenticated,)
 

@@ -446,6 +446,14 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
                   'quality_status']
 
 
+class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
+
+    """终炼胶|帘布库共用序列化器"""
+    class Meta:
+        model = BzFinalMixingRubberInventory
+        fields = "__all__"
+
+
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = WmsInventoryStock
