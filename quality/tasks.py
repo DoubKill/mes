@@ -59,7 +59,6 @@ for order in MaterialTestOrder.objects.all():
                 (test_result.mes_result == '一等品' or not test_result.mes_result) and test_result.result == '一等品'
             result.qualified = qualified
             result.value = test_result.value
-            result.data_point_indicator = test_result.data_point_indicator
             result.save()
 #
 # lb_train_count = Count('lot__train', filter=Q(lot__train__testresult__point__indicator__name='流变'),
