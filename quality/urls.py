@@ -12,8 +12,8 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
     MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, \
-    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, BatchDayStatisticsView
-
+    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, \
+    BatchDayStatisticsView, PrintMaterialDealResult
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
