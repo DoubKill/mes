@@ -19,7 +19,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import GlobalCode
 from inventory.filters import InventoryLogFilter, StationFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
-    BzFinalMixingRubberInventoryLB
+    BzFinalMixingRubberInventoryLB, DeliveryPlanLB
 from inventory.filters import PutPlanManagementFilter
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
@@ -458,7 +458,7 @@ class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagementLB(ModelViewSet):
-    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
+    queryset = DeliveryPlanLB.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializerLB
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter

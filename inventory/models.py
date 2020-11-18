@@ -224,7 +224,7 @@ class WmsInventoryMaterial(models.Model):
 
 
 class DeliveryPlan(models.Model):
-    """出库计划"""
+    """出库计划 | 混炼胶"""
     ORDER_TYPE_CHOICE = (
         (1, '完成'),
         (2, '执行中'),
@@ -253,6 +253,70 @@ class DeliveryPlan(models.Model):
     class Meta:
         db_table = 'delivery_plan'
         verbose_name_plural = verbose_name = '出库计划'
+
+
+class DeliveryPlanLB(models.Model):
+    """出库计划 | 帘布"""
+    ORDER_TYPE_CHOICE = (
+        (1, '完成'),
+        (2, '执行中'),
+        (3, '失败'),
+        (4, '新建'),
+        (5, '关闭')
+    )
+    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plans")
+    order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
+    pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
+    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
+    need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True,
+                                      null=True)
+    material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
+    inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
+    order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
+    inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
+    unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
+    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
+    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+
+
+    class Meta:
+        db_table = 'delivery_plan_lb'
+        verbose_name_plural = verbose_name = '帘布库出库计划'
+
+
+class DeliveryPlanFinal(models.Model):
+    """出库计划 | 终炼"""
+    ORDER_TYPE_CHOICE = (
+        (1, '完成'),
+        (2, '执行中'),
+        (3, '失败'),
+        (4, '新建'),
+        (5, '关闭')
+    )
+    warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plans")
+    order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
+    pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
+    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
+    need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True,
+                                      null=True)
+    material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
+    inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
+    order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
+    inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
+    unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
+    status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
+    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+
+
+    class Meta:
+        db_table = 'delivery_plan_final'
+        verbose_name_plural = verbose_name = '终炼胶库出库计划'
 
 
 class DeliveryPlanStatus(models.Model):
