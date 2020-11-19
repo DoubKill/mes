@@ -197,6 +197,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):

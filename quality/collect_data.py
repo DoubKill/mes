@@ -19,8 +19,8 @@ from basics.models import WorkSchedulePlan
 import pymssql
 
 data_bases = [
-    {"server": "10.4.23.140", "user": "sa", "password": "123456", "name": "NIDAS3"},
-    {"server": "10.4.23.141", "user": "sa", "password": "123456", "name": "NIDAS3"}
+    {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.141", "user": "gz", "password": "mes2020", "name": "NIDAS3"}
 ]
 
 
