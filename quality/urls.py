@@ -12,8 +12,8 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
     MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, \
-    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, BatchDayStatisticsView
-
+    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, \
+    BatchDayStatisticsView, BatchProductNoDayStatisticsView, BatchProductNoMonthStatisticsView
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -44,6 +44,11 @@ router.register('batch-month-statistics', BatchMonthStatisticsView)
 # 日批次快检合格率统计
 router.register('batch-day-statistics', BatchDayStatisticsView)
 
+# 胶料日合格率统计
+router.register('batch-product-no-day-statistics', BatchProductNoDayStatisticsView, basename='dayStatistics')
+
+# 胶料月合格率统计
+router.register('batch-product-no-month-statistics', BatchProductNoMonthStatisticsView)
 
 urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
@@ -57,6 +62,6 @@ urlpatterns = [
     path('product_day_detail/', ProductDayDetail.as_view()),  # 胶料日合格率详情信息统计
     path('deal-suggestion-view/', DealSuggestionView.as_view()),  # 处理意见展示
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
-    path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
+    # path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
     path('', include(router.urls)),
 ]
