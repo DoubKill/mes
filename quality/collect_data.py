@@ -149,6 +149,8 @@ def main():
                 if pallet:
                     if indicator_name:
                         for i in range(trains, trains+interval):
+                            if i > pallet.end_trains:
+                                continue
                             lot_no = pallet.lot_no
                             test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
                                                                           actual_trains=i).first()
