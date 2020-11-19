@@ -40,8 +40,8 @@ for order in MaterialTestOrder.objects.all():
                                            batch_day=batch_day,
                                            batch_equip=batch_equip,
                                            batch_class=batch_class,
-                                           batch_product_no=batch_product_no
-                                           )
+                                           batch_product_no=batch_product_no)
+
     lot, _ = Lot.objects.get_or_create(lot_no=order.lot_no, batch=batch)
     train, _ = Train.objects.get_or_create(lot=lot, actual_trains=order.actual_trains)
     for test_result in order.order_results.all():
@@ -80,3 +80,12 @@ for order in MaterialTestOrder.objects.all():
 # TestDataPoint.objects.annotate(upper_limit_count=Count('testresult__train', filter=
 #                                      Q(testresult__qualified=False,
 #                                        testresult__value__gt=F('data_point_indicator__upper_limit'))))
+#
+# for batch_product_no in BatchProductNo.objects.all():
+#     # BatchDay.objects.filter(batch__batch_product_no=batch_product_no)
+#     BatchDay.objects.annotate(Count('batch__lot__train',
+#                 filter=Q(batch__batch_product_no=batch_product_no)))\
+#         .annotate(Count('batch__lot__train',
+#                 filter=Q(batch__batch_product_no=batch_product_no,
+#                          batch__lot__train__testresult__qualified=True)))\
+#         .filter(batch__batch_product_no=batch_product_no)

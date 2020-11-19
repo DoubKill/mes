@@ -174,7 +174,6 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultListSerializer(BaseModelSerializer):
-
     class Meta:
         model = MaterialTestResult
         fields = ('test_times', 'value', 'data_point_name', 'test_method_name',
@@ -341,7 +340,6 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             param = {"days": material_detail.period_of_validity}
         expire_time = product_time + timedelta(**param)
         return expire_time
-
 
     def get_deal_suggestion(self, obj):
         if obj.status == "已处理":
@@ -563,15 +561,19 @@ class TestDataPointSerializer(serializers.ModelSerializer):
 
     @classmethod
     def points_annotate(cls, points):
-        points = points.annotate(train_count=Count('testresult__train'))
-        points = points.annotate(upper_limit_count=
-                                 Count('testresult__train',
-                                       filter=Q(testresult__qualified=False,
-                                                testresult__value__gt=F('data_point_indicator__upper_limit'))))
-        points = points.annotate(lower_limit_count=
-                                 Count('testresult__train',
-                                       filter=Q(testresult__qualified=False,
-                                                testresult__value__lt=F('data_point_indicator__lower_limit'))))
+        points = points.annotate(
+            train_count=
+            Count('testresult__train'))
+        points = points.annotate(
+            upper_limit_count=
+            Count('testresult__train',
+                  filter=Q(testresult__qualified=False,
+                           testresult__value__gt=F('data_point_indicator__upper_limit'))))
+        points = points.annotate(
+            lower_limit_count=
+            Count('testresult__train',
+                  filter=Q(testresult__qualified=False,
+                           testresult__value__lt=F('data_point_indicator__lower_limit'))))
         return points
 
 
@@ -581,13 +583,13 @@ class PercentOfPassSerializer(serializers.Serializer):
     zh_percent_of_pass = serializers.SerializerMethodField()
 
     def get_yc_percent_of_pass(self, obj):
-        return obj.yc_test_pass_count / obj.yc_train_count
+        return (obj.yc_test_pass_count / obj.yc_train_count) if obj.yc_train_count else 0.0
 
     def get_lb_percent_of_pass(self, obj):
-        return obj.lb_test_pass_count / obj.lb_train_count
+        return (obj.lb_test_pass_count / obj.lb_train_count) if obj.lb_train_count else 0.0
 
     def get_zh_percent_of_pass(self, obj):
-        return obj.zh_test_pass_count / obj.zh_train_count
+        return (obj.zh_test_pass_count / obj.zh_train_count) if obj.zh_train_count else 0.0
 
     @classmethod
     def batch_annotate(cls, batches):
@@ -607,8 +609,9 @@ class PercentOfPassSerializer(serializers.Serializer):
                                filter=Q(batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
         lb_test_pass_count = Count('batch__lot__train',
-                                   filter=Q(batch__lot__train__testresult__point__indicator__name='流变',
-                                            batch__lot__train__testresult__qualified=True),
+                                   filter=
+                                   Q(batch__lot__train__testresult__point__indicator__name='流变',
+                                     batch__lot__train__testresult__qualified=True),
                                    output_field=FloatField())
         batches = batches.annotate(lb_train_count=lb_train_count) \
             .annotate(lb_test_pass_count=lb_test_pass_count)
@@ -749,3 +752,103 @@ class BatchDaySerializer(BatchCommonSerializer):
 
     def query_product_no(self, obj):
         return BatchProductNo.objects.filter(batch__batch_day=obj)
+
+
+class BatchDateProductNoSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+    points = serializers.SerializerMethodField()
+
+    class Meta:
+        fields = ['date',
+                  'yc_percent_of_pass',
+                  'lb_percent_of_pass',
+                  'zh_percent_of_pass',
+                  'points']
+
+    def query_points(self, obj):
+        pass
+
+    def get_points(self, obj):
+        points = self.query_points(obj)
+        points = TestDataPointSerializer.points_annotate(points)
+        serializer = TestDataPointSerializer(points, many=True)
+        return serializer.data
+
+
+class BatchDayProductNoSerializer(BatchDateProductNoSerializer):
+    class Meta(BatchDateProductNoSerializer.Meta):
+        model = BatchDay
+
+    def query_points(self, obj):
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj)
+
+
+class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
+    class Meta(BatchDateProductNoSerializer.Meta):
+        model = BatchMonth
+
+    def query_points(self, obj):
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj)
+
+
+class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
+    dates = serializers.SerializerMethodField()
+    batch_date_model = None
+    batch_date_product_no_serializer = None
+
+    class Meta:
+        model = BatchProductNo
+        fields = ['product_no', 'dates']
+
+    def get_dates(self, batch_product_no_obj):
+        batches = self.batch_date_model.objects.filter(batch__batch_product_no=batch_product_no_obj)
+        yc_train_count = Count('batch__lot__train',
+                               filter=~Q(batch__batch_product_no=batch_product_no_obj,
+                                         batch__lot__train__testresult__point__indicator__name='流变'),
+                               output_field=FloatField())
+        yc_test_pass_count = Count('batch__lot__train',
+                                   filter=
+                                   Q(~Q(batch__lot__train__testresult__point__indicator__name='流变') &
+                                     Q(batch__batch_product_no=batch_product_no_obj) &
+                                     Q(batch__lot__train__testresult__qualified=True)),
+                                   output_field=FloatField())
+        batches = batches \
+            .annotate(yc_train_count=yc_train_count) \
+            .annotate(yc_test_pass_count=yc_test_pass_count)
+        # 流变
+        lb_train_count = Count('batch__lot__train',
+                               filter=Q(batch__batch_product_no=batch_product_no_obj,
+                                        batch__lot__train__testresult__point__indicator__name='流变'),
+                               output_field=FloatField())
+        lb_test_pass_count = Count('batch__lot__train',
+                                   filter=Q(batch__batch_product_no=batch_product_no_obj,
+                                            batch__lot__train__testresult__point__indicator__name='流变',
+                                            batch__lot__train__testresult__qualified=True),
+                                   output_field=FloatField())
+        batches = batches \
+            .annotate(lb_train_count=lb_train_count) \
+            .annotate(lb_test_pass_count=lb_test_pass_count)
+
+        # 综合
+        zh_train_count = Count('batch__lot__train',
+                               filter == Q(batch__batch_product_no=batch_product_no_obj),
+                               output_field=FloatField())
+        zh_test_pass_count = Count('batch__lot__train',
+                                   filter=Q(batch__batch_product_no=batch_product_no_obj,
+                                            batch__lot__train__testresult__qualified=True),
+                                   output_field=FloatField())
+
+        batches = batches \
+            .annotate(zh_train_count=zh_train_count) \
+            .annotate(zh_test_pass_count=zh_test_pass_count)
+
+        return self.batch_date_product_no_serializer(batches, many=True).data
+
+
+class BatchProductNoDaySerializer(BatchProductNoDateCommonSerializer):
+    batch_date_model = BatchDay
+    batch_date_product_no_serializer = BatchDayProductNoSerializer
+
+
+class BatchProductNoMonthSerializer(BatchProductNoDateCommonSerializer):
+    batch_date_model = BatchMonth
+    batch_date_product_no_serializer = BatchMonthProductNoSerializer
