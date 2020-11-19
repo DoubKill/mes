@@ -15,7 +15,7 @@ import logging
 logger = logging.getLogger('send_log')
 
 
-@atomic()
+
 def synthesize_to_material_deal_result(mdr_lot_no):
     """等级综合判定"""
     # 1、先找到这个胶料所有指标
@@ -151,7 +151,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_obj.update_store_test_flag = 3
         mdr_obj.save()
         logger.error("没有发送，两个库存和线边库里都没有")
-
 
 def get_deal_result(lot_no):
     """将快检信息综合管理接口(就是打印的卡片信息)封装成一个类，需要的时候就调用一下"""

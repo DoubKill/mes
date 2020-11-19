@@ -528,11 +528,10 @@ class MaterialTestResultHistoryView(APIView):
                 'level': item.level,
                 'test_times': item.test_times
             }
-            if test_times in ret:
-                if indicator_name not in ret[test_times]:
-                    ret[test_times] = {indicator_name: {data_point_name: test_result}}
-                else:
-                    ret[test_times][indicator_name][data_point_name] = test_result
+            if indicator_name not in ret[test_times]:
+                ret[test_times][indicator_name] = {data_point_name: test_result}
+            else:
+                ret[test_times][indicator_name][data_point_name] = test_result
         return Response(ret)
 
 
