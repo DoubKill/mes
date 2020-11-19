@@ -102,6 +102,7 @@ class MaterialTestResultSerializer(BaseModelSerializer):
         model = MaterialTestResult
         exclude = ('data_point_indicator', 'material_test_order', 'test_factory_date', 'test_class',
                    'test_group', 'test_times', 'mes_result', 'result')
+        extra_kwargs = {'value': {'required': False, 'allow_null': True}}
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -128,6 +129,8 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
         material_no = validated_data['product_no']
         for item in order_results:
+            if not item.get('value'):
+                continue
             item['material_test_order'] = instance
             item['test_factory_date'] = datetime.now()
             if created:
@@ -159,6 +162,9 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
                     item['level'] = indicator.level
+                else:
+                    item['mes_result'] = '不合格'
+                    item['level'] = 3
             else:
                 item['mes_result'] = '不合格'
                 item['level'] = 3
