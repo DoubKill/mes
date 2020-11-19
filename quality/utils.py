@@ -52,7 +52,7 @@ def print_mdr(filename: str, queryset):
             w.write(excel_row, 7, obj.reason)
             w.write(excel_row, 8, obj.status)
             w.write(excel_row, 9, 'Y'if obj.be_warehouse_out else 'N')
-            w.write(excel_row, 10, obj.warehouse_out_time)
+            w.write(excel_row, 10, obj.warehouse_out_time.strftime("%Y-%m-%d %H:%M:%S"))
             w.write(excel_row, 11, obj.deal_suggestion)
             w.write(excel_row, 12, obj.deal_result)
             w.write(excel_row, 13, obj.deal_user)

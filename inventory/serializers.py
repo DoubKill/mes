@@ -15,7 +15,7 @@ from rest_framework import serializers
 from basics.models import GlobalCode
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
-    WarehouseInfo, Station, WarehouseMaterialType
+    WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -374,7 +374,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
                 return instance
 
     class Meta:
-        model = DeliveryPlan
+        model = DeliveryPlanLB
         fields = '__all__'
         # read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -514,7 +514,7 @@ class WarehouseMaterialTypeSerializer(serializers.ModelSerializer):
     warehouse_no = serializers.ReadOnlyField(source='warehouse_info.no', default='')
     material_type_name = serializers.ReadOnlyField(source='material_type.global_name', default='')
     material_type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=True,
-                                                                                          global_type__type_name='物料类型'))
+                                                                                          global_type__type_name='原材料类别'))
     warehouse_info = serializers.PrimaryKeyRelatedField(queryset=WarehouseInfo.objects.all(), write_only=True)
 
     class Meta:

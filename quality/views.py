@@ -1,18 +1,21 @@
 import datetime
 
+from django.utils import timezone
+from datetime import timedelta
 import requests
 from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes.common_code import CommonDeleteMixin
@@ -25,12 +28,16 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
-    LabelPrint
+    LabelPrint, Batch, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
-    TestIndicatorSerializer, LabelPrintSerializer
+    TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
+    BatchCommonSerializer, BatchProductNoSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer
+from django.db.models import Q
+from django.db.models import Count
+from django.db.models import FloatField
 from quality.utils import print_mdr
 from recipe.models import Material, ProductBatching
 import logging
@@ -190,6 +197,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):
@@ -521,11 +529,10 @@ class MaterialTestResultHistoryView(APIView):
                 'level': item.level,
                 'test_times': item.test_times
             }
-            if test_times in ret:
-                if indicator_name not in ret[test_times]:
-                    ret[test_times] = {indicator_name: {data_point_name: test_result}}
-                else:
-                    ret[test_times][indicator_name][data_point_name] = test_result
+            if indicator_name not in ret[test_times]:
+                ret[test_times][indicator_name] = {data_point_name: test_result}
+            else:
+                ret[test_times][indicator_name][data_point_name] = test_result
         return Response(ret)
 
 
@@ -689,3 +696,84 @@ class PrintMaterialDealResult(APIView):
                                                                                                           delete_flag=False)
         return print_mdr("results", mdr_set)
 
+
+def get_statics_query_times(query_params):
+    start_time = query_params.get('start_time')
+    end_time = query_params.get('end_time')
+    try:
+        start_time = datetime.datetime.strptime(start_time, '%Y-%m') \
+            if start_time else timezone.now() - timedelta(days=365)
+        end_time = datetime.datetime.strptime(end_time, '%Y-%m') \
+            if end_time else timezone.now()
+    except ValueError:
+        raise ValidationError('日期格式:yyyy-mm')
+    return start_time, end_time
+
+
+class BatchMonthStatisticsView(ReadOnlyModelViewSet):
+    queryset = BatchMonth.objects.all()
+    serializer_class = BatchMonthSerializer
+
+    @action(detail=False)
+    def statistic_headers(self, request):
+        result = {
+            'points': TestDataPoint.objects.values_list('name', flat=True).distinct(),
+            'equips': BatchEquip.objects.values_list('production_equip_no', flat=True).distinct(),
+            'classes': BatchClass.objects.values_list('production_class', flat=True).distinct()
+        }
+        return Response(result)
+
+    def get_queryset(self):
+        start_time, end_time = get_statics_query_times(self.request.query_params)
+        batches = BatchMonth.objects.filter(date__gte=start_time,
+                                            date__lte=end_time)
+        if batches:
+            batches = BatchCommonSerializer.batch_annotate(batches)
+            batches = batches.order_by('-date')
+        return batches
+
+
+def get_statics_query_date(query_params):
+    date = query_params.get('date')
+    try:
+        date = datetime.datetime.strptime(date, '%Y-%m') if date else timezone.now()
+    except ValueError:
+        raise ValidationError('日期格式:yyyy-mm')
+    return date
+
+
+class BatchDayStatisticsView(ReadOnlyModelViewSet):
+    queryset = BatchDay.objects.all()
+    serializer_class = BatchDaySerializer
+
+    def get_queryset(self):
+        date = get_statics_query_date(self.request.query_params)
+        batches = BatchDay.objects.filter(date__year=date.year,
+                                          date__month=date.month)
+        if batches:
+            batches = BatchCommonSerializer.batch_annotate(batches)
+            batches = batches.order_by('-date')
+
+        return batches
+
+
+class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
+    queryset = BatchProductNo.objects.all()
+    serializer_class = BatchProductNoDaySerializer
+
+    def get_queryset(self):
+        date = get_statics_query_date(self.request.query_params)
+        return BatchProductNo.objects.filter(
+            batch__batch_month__date__year=date.year,
+            batch__batch_month__date__month=date.month).distinct()
+
+
+class BatchProductNoMonthStatisticsView(ReadOnlyModelViewSet):
+    queryset = BatchProductNo.objects.all()
+    serializer_class = BatchProductNoMonthSerializer
+
+    def get_queryset(self):
+        start_time, end_time = get_statics_query_times(self.request.query_params)
+        return BatchProductNo.objects.filter(
+            batch__batch_month__date__gte=start_time,
+            batch__batch_month__date__lte=end_time).distinct()
