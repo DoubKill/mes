@@ -345,7 +345,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         else:
             param = {"days": material_detail.period_of_validity}
         expire_time = product_time + timedelta(**param)
-        return expire_time
+        return expire_time.strftime("%Y-%m-%d %H:%M:%S")
 
     def get_deal_suggestion(self, obj):
         if obj.status == "已处理":
@@ -475,18 +475,16 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                             test_indicator_name=mtr_max_obj['test_indicator_name'],
                                                             data_point_name=mtr_max_obj['data_point_name'],
                                                             test_times=mtr_max_obj['max_test_times']).last()
-                if mtr_obj.data_point_indicator:
-                    mtr_max_list.append(
-                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
-                         'value': mtr_obj.value,
-                         'result': mtr_obj.data_point_indicator.result,
-                         'max_test_times': mtr_obj.data_point_indicator.level})
-                else:  # 数据不在上下限范围内，这个得前端做好约束
-                    mtr_max_list.append(
-                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
-                         'value': mtr_obj.value,
-                         'result': None,
-                         'max_test_times': None})
+                if mtr_obj.level==1:
+                    result='一等品'
+                else:
+                    result = '三等品'
+                mtr_max_list.append(
+                    {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                     'value': mtr_obj.value,
+                     'result':  result,
+                     'max_test_times': mtr_obj.level})
+
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[mto_obj.actual_trains].append(mtr_dict)

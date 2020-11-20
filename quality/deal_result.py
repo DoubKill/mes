@@ -18,7 +18,9 @@ logger = logging.getLogger('send_log')
 
 def synthesize_to_material_deal_result(mdr_lot_no):
     """等级综合判定"""
+
     # 1、先找到这个胶料所有指标
+    logger.error("1、先找到这个胶料所有指标")
     mto_set_all = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('product_no', flat=True)
     mto_product_no_list = list(mto_set_all)
     mtm_set = MaterialTestMethod.objects.filter(material__material_name__in=mto_product_no_list).all()
@@ -28,6 +30,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         name_list.append(name)
 
     # 2、 判断是否所有车次都有
+    logger.error("2、 判断是否所有车次都有")
     actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains', flat=True)
     train_liat = list(actual_trains_list)
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
@@ -36,6 +39,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             return
 
     # 3、判断快检这边是不是所有的指标都有
+    logger.error("3、判断快检这边是不是所有的指标都有")
     mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
     for mto_obj in mto_set:
         test_indicator_name_list = []
@@ -49,6 +53,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 return
 
     # 4、分析流程
+    logger.error("4、分析流程")
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
     level_list = []
@@ -67,22 +72,22 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     for mtr_obj in level_list:
         if not mtr_obj.mes_result:  # mes没有数据
             if not mtr_obj.result:  # 快检也没有数据
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}没有判定区间，\n'
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判定区间，\n'
                 exist_data_point_indicator = False
-            elif mtr_obj.result != '一等品':
+            elif mtr_obj.result not in ['一等品', '合格', None, '']:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result == '一等品':
-            if mtr_obj.result not in ['一等品', None]:
+        elif mtr_obj.mes_result in ['一等品', '合格']:
+            if mtr_obj.result not in ['一等品', '合格', None, '']:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result != '一等品':
+        elif mtr_obj.mes_result not in ['一等品', '合格']:
             if mtr_obj.data_point_indicator:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
             else:
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判断指标内'
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判断区间内，\n'
                 exist_data_point_indicator = False
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
@@ -120,7 +125,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 
     # 5、向北自接口发送数据
     # 5.1、先判断库存和线边库里有没有数据
-    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
+    pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
+    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(container_no=pfb_obj.pallet_no).last()
     mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
     # 5.2、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
@@ -138,6 +144,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                          "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
             item.append(item_dict)
             # 向北自发送数据
+            logger.error("向北自发送数据")
             res = update_wms_kjjg(msg_id=msg_ids, items=item)
             if not res:  # res为空代表成功
                 mdr_obj.update_store_test_flag = 1
