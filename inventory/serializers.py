@@ -67,7 +67,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         unit = validated_data.get('unit')
         need_weight = validated_data.get('need_weight')
         location = validated_data.get('location')
-        created_user = self.context['request'].user.username
+        created_user = self.context['request'].user
         order_type = validated_data.get('order_type','出库')  # 订单类型
         inventory_reason = validated_data.get('quality_status')      # 出入库原因
 
@@ -112,13 +112,15 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             djjg = "三等品"
         if out_type == "正常出库" or out_type == "指定出库":
             msg_id = validated_data['order_no']
-            str_user = self.context['request'].user.username
+            user = self.context['request'].user
+            str_user = user.username
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
-            pici = "1"  # 批次号
+            pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
+            pici = pallet.bath_no if pallet else "1"  # 批次号
             num = validated_data.get('need_qty', '1')
             msg_count = "1"
-            location = "二层后端"
+            location = instance.location if instance.location else ""
             # 发起时间
             time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
@@ -160,7 +162,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 warehouse_info = validated_data['warehouse_info']
                 order_no = validated_data['order_no']
                 order_type = validated_data['inventory_type']
-                created_user = self.context['request'].user.username
+                created_user = self.context['request'].user
                 created_date = datetime.datetime.now()
                 if "TRUE" in msg:
                     instance.status = 2
@@ -202,6 +204,11 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 instance.save()
                 return instance
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["created_user"] = instance.created_user.username
+        return ret
+
 
     class Meta:
         model = DeliveryPlan
@@ -240,7 +247,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         unit = validated_data.get('unit')
         need_weight = validated_data.get('need_weight')
         location = validated_data.get('location')
-        created_user = self.context['request'].user.username
+        created_user = self.context['request'].user
         order_type = validated_data.get('order_type','出库')  # 订单类型
         inventory_reason = validated_data.get('quality_status')      # 出入库原因
 
@@ -286,10 +293,11 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             str_user = self.context['request'].user.username
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
-            pici = "1"  # 批次号
+            pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
+            pici = pallet.bath_no if pallet else "1"  # 批次号
             num = validated_data.get('need_qty', '1')
             msg_count = "1"
-            location = "二层后端"
+            location = instance.location if instance.location else ""
             # 发起时间
             time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
@@ -331,7 +339,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
                 warehouse_info = validated_data['warehouse_info']
                 order_no = validated_data['order_no']
                 order_type = validated_data['inventory_type']
-                created_user = self.context['request'].user.username
+                created_user = self.context['request'].user
                 created_date = datetime.datetime.now()
                 if "TRUE" in msg:
                     instance.status = 2
@@ -372,6 +380,11 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
                 instance.need_qty = need_qty
                 instance.save()
                 return instance
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["created_user"] = instance.created_user.username
+        return ret
 
     class Meta:
         model = DeliveryPlanLB

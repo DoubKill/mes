@@ -265,7 +265,7 @@ class DealResultDealSerializer(BaseModelSerializer):
         return result
 
     def update(self, instance, validated_data):
-        lot_no = validated_data.get('lot_no')
+        lot_no = validated_data.get('lot_no', instance.lot_no)
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
         created_user = self.context['request'].user.username  # 发起人

@@ -1,3 +1,5 @@
+import decimal
+import json
 import time
 
 import pymssql
@@ -118,14 +120,14 @@ class UserFunctions(object):
         return permissions
 
 
-User.__bases__ += (UserFunctions, )
+User.__bases__ += (UserFunctions,)
 
 
 def days_cur_month_dates():
     """获取当月所有日期列表"""
     m = datetime.now().month
     y = datetime.now().year
-    days = (date(y, m+1, 1) - date(y, m, 1)).days
+    days = (date(y, m + 1, 1) - date(y, m, 1)).days
     d1 = date(y, m, 1)
     d2 = date(y, m, days)
     delta = d2 - d1
@@ -142,7 +144,9 @@ def get_weekdays(days):
 
 class SqlClient(object):
     """默认是连接sqlserver的客户端"""
-    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD, sql="SELECT *, Row_Number() OVER (order  by 库存索引) id FROM v_ASRS_STORE_MESVIEW", database=None):
+
+    def __init__(self, host=BZ_HOST, user=BZ_USR, password=BZ_PASSWORD,
+                 sql="SELECT *, Row_Number() OVER (order  by 库存索引) id FROM v_ASRS_STORE_MESVIEW", database=None):
         if database:
             pool = PooledDB(pymssql, database=database,
                             mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
@@ -151,10 +155,10 @@ class SqlClient(object):
                             )
         else:
             pool = PooledDB(pymssql,
-                        mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
-                        maxusage=100, setsession=None, reset=True, host=host,
-                        user=user, password=password
-                        )
+                            mincached=5, maxcached=10, maxshared=5, maxconnections=10, blocking=True,
+                            maxusage=100, setsession=None, reset=True, host=host,
+                            user=user, password=password
+                            )
         conn = pool.connection()
         cursor = conn.cursor()
         self.sql = sql
@@ -176,7 +180,6 @@ class SqlClient(object):
         self.data = self.cursor.fetchone()
         return self.data[0]
 
-
     def close(self):
         self.conn.close()
         self.cursor.close()
@@ -184,3 +187,13 @@ class SqlClient(object):
 
 def order_no():
     return time.strftime("%Y%m%d%H%M%S")
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """将Decimal类型转成float类型"""
+
+    def default(self, o):
+        if isinstance(o, decimal.Decimal):
+            return float(o)
+
+        super(DecimalEncoder, self).default(o)
