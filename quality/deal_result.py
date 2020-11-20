@@ -1,9 +1,10 @@
 import datetime
+import json
 import time
 
 from inventory.models import BzFinalMixingRubberInventory, MaterialInventory
 from inventory.tasks import update_wms_kjjg
-from mes.common_code import order_no
+from mes.common_code import order_no, DecimalEncoder
 from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult, LevelResult, \
     MaterialDataPointIndicator, MaterialTestMethod
 from production.models import PalletFeedbacks
@@ -13,7 +14,6 @@ from django.db.models import Max, Min
 import logging
 
 logger = logging.getLogger('send_log')
-
 
 
 def synthesize_to_material_deal_result(mdr_lot_no):
@@ -79,8 +79,11 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 quality_sign = False
 
         elif mtr_obj.mes_result != '一等品':
-            reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
-
+            if mtr_obj.data_point_indicator:
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
+            else:
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判断指标内'
+                exist_data_point_indicator = False
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
             continue
@@ -152,7 +155,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_obj.save()
         logger.error("没有发送，两个库存和线边库里都没有")
 
-def get_deal_result(lot_no):
+
+def receive_deal_result(lot_no):
     """将快检信息综合管理接口(就是打印的卡片信息)封装成一个类，需要的时候就调用一下"""
     mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
     mdrls = MaterialDealResultListSerializer()
@@ -160,7 +164,7 @@ def get_deal_result(lot_no):
     # id
     results['id'] = mdr_obj.id
     # day_time
-    results['day_time'] = mdrls.get_day_time(mdr_obj)
+    results['day_time'] = str(mdrls.get_day_time(mdr_obj))
     # lot_no
     results['lot_no'] = mdr_obj.lot_no
     # classes_group
@@ -174,13 +178,13 @@ def get_deal_result(lot_no):
     # residual_weight
     results['residual_weight'] = mdrls.get_residual_weight(mdr_obj)
     # production_factory_date
-    results['production_factory_date'] = mdr_obj.production_factory_date
+    results['production_factory_date'] = str(mdr_obj.production_factory_date)
     # valid_time
-    results['valid_time'] = mdr_obj.valid_time
+    results['valid_time'] = mdrls.get_valid_time(mdr_obj)
     # test
     results['test'] = mdrls.get_test(mdr_obj)
     # print_time
-    results['print_time'] = mdr_obj.print_time
+    results['print_time'] = mdr_obj.print_time.strftime("%Y-%m-%d %H:%M:%S") if mdr_obj.print_time else None
     # deal_user
     results['deal_user'] = mdrls.get_deal_user(mdr_obj)
     # deal_time
@@ -195,4 +199,5 @@ def get_deal_result(lot_no):
     results['deal_result'] = mdr_obj.deal_result
     # deal_suggestion
     results['deal_suggestion'] = mdrls.get_deal_suggestion(mdr_obj)
+    results = json.dumps(results, cls=DecimalEncoder)
     return results
