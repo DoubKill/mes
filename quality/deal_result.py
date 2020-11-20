@@ -149,7 +149,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             if not res:  # res为空代表成功
                 mdr_obj.update_store_test_flag = 1
                 mdr_obj.save()
-
+                logger.error("向北自发送数据,发送成功")
             else:
                 mdr_obj.update_store_test_flag = 2
                 mdr_obj.save()
