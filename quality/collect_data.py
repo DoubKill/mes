@@ -19,8 +19,8 @@ from basics.models import WorkSchedulePlan
 import pymssql
 
 data_bases = [
-    {"server": "10.4.23.140", "user": "sa", "password": "123456", "name": "NIDAS3"},
-    {"server": "10.4.23.141", "user": "sa", "password": "123456", "name": "NIDAS3"}
+    {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.141", "user": "gz", "password": "mes2020", "name": "NIDAS3"}
 ]
 
 
@@ -135,51 +135,49 @@ def main():
                 else:
                     continue
 
-                # 根据机台编号、胶料代码、班次、日期找托盘lot_no
-                pallet = PalletFeedbacks.objects.filter(
-                    equip_no=equip_no,
-                    product_no__icontains=product_no,
-                    classes=production_class,
-                    end_time__date=product_date,
-                    begin_trains__lte=trains,
-                    end_trains__gte=trains
-                ).first()
-
                 # 关键看能不能找到托盘反馈数据
-                if pallet:
-                    if indicator_name:
-                        for i in range(trains, trains+interval):
-                            lot_no = pallet.lot_no
-                            test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                          actual_trains=i).first()
-                            if not test_order:
-                                test_order = MaterialTestOrder.objects.create(
-                                    lot_no=lot_no,
-                                    material_test_order_uid=UUidTools.uuid1_hex('KJ'),
-                                    actual_trains=i,
-                                    product_no=product_no,
-                                    plan_classes_uid=pallet.plan_classes_uid,
-                                    production_class=production_class,
-                                    production_group=group,
-                                    production_equip_no=equip_no,
-                                    production_factory_date=product_date,
-                                )
-                            MaterialTestResult.objects.get_or_create(
-                                material_test_order=test_order,
-                                test_factory_date=test_date,
-                                value=value,
-                                test_times=test_times,
-                                data_point_name=data_point_name,
-                                test_method_name=method_name,
-                                test_indicator_name=indicator_name,
-                                result=result,
-                                mes_result=result,
-                                machine_name=indicator_name+'仪',
-                                test_group=test_group,
-                                level=1 if result == '合格' else 3,
-                                origin=idx+1
-                                # test_type_name=test_type_name
-                            )
+                for i in range(trains, trains+interval):
+                    # 根据机台编号、胶料代码、班次、日期找托盘lot_no
+                    pallet = PalletFeedbacks.objects.filter(
+                        equip_no=equip_no,
+                        product_no__icontains=product_no,
+                        classes=production_class,
+                        end_time__date=product_date,
+                        begin_trains__lte=i,
+                        end_trains__gte=i
+                    ).first()
+                    if not pallet:
+                        continue
+                    lot_no = pallet.lot_no
+                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                  actual_trains=i).first()
+                    if not test_order:
+                        test_order = MaterialTestOrder.objects.create(
+                            lot_no=lot_no,
+                            material_test_order_uid=UUidTools.uuid1_hex('KJ'),
+                            actual_trains=i,
+                            product_no=product_no,
+                            plan_classes_uid=pallet.plan_classes_uid,
+                            production_class=production_class,
+                            production_group=group,
+                            production_equip_no=equip_no,
+                            production_factory_date=product_date,
+                        )
+                    MaterialTestResult.objects.get_or_create(
+                        material_test_order=test_order,
+                        test_factory_date=test_date,
+                        value=value,
+                        test_times=test_times,
+                        data_point_name=data_point_name,
+                        test_method_name=method_name,
+                        test_indicator_name=indicator_name,
+                        result=result,
+                        mes_result=result,
+                        machine_name=indicator_name+'仪',
+                        test_group=test_group,
+                        level=1 if result == '合格' else 3,
+                        origin=idx+1
+                    )
             conn.close()
             min_id += 1000
 

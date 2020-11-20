@@ -161,9 +161,11 @@ permission_data = [
 
     {'id': 116, 'code': 'result_info', 'name': '快检结果详细信息', 'parent_id': None},
     {'id': 117, 'code': 'view_result_info', 'name': '查看', 'parent_id': 116},
+    {'id': 163, 'code': 'export_result_info', 'name': '导出', 'parent_id': 116},
 
     {'id': 118, 'code': 'deal_result', 'name': '快检信息综合管理', 'parent_id': None},
     {'id': 119, 'code': 'view_deal_result', 'name': '查看', 'parent_id': 118},
+    {'id': 162, 'code': 'print_deal_result', 'name': '打印', 'parent_id': 118},
 
     {'id': 120, 'code': 'class_production_summary', 'name': '班次密炼时间汇总', 'parent_id': None},
     {'id': 121, 'code': 'view_class_production_summary', 'name': '查看', 'parent_id': 120},
@@ -195,7 +197,7 @@ permission_data = [
     {'id': 139, 'code': 'inventory_plan', 'name': '胶片库出库计划', 'parent_id': None},
     {'id': 140, 'code': 'view_inventory_plan', 'name': '查看', 'parent_id': 139},
     {'id': 141, 'code': 'norman_inventory_plan', 'name': '正常出库', 'parent_id': 139},
-    {'id': 142, 'code': 'assign_inventory_plan', 'name': '制定出库', 'parent_id': 139},
+    {'id': 142, 'code': 'assign_inventory_plan', 'name': '指定出库', 'parent_id': 139},
     {'id': 143, 'code': 'manual_inventory_plan', 'name': '人工出库', 'parent_id': 139},
     {'id': 144, 'code': 'close_inventory_plan', 'name': '关闭', 'parent_id': 139},
     {'id': 145, 'code': 'change_inventory_plan', 'name': '编辑', 'parent_id': 139},
@@ -210,6 +212,14 @@ permission_data = [
     {'id': 152, 'code': 'add_material_attr', 'name': '新增', 'parent_id': 150},
     {'id': 153, 'code': 'change_material_attr', 'name': '修改', 'parent_id': 150},
     {'id': 154, 'code': 'delete_material_attr', 'name': '删除', 'parent_id': 150},
+
+    {'id': 155, 'code': 'LB_inventory_plan', 'name': '帘布库出库计划', 'parent_id': None},
+    {'id': 156, 'code': 'view_LB_inventory_plan', 'name': '查看', 'parent_id': 155},
+    {'id': 157, 'code': 'norman_LB_inventory_plan', 'name': '正常出库', 'parent_id': 155},
+    {'id': 158, 'code': 'assign_LB_inventory_plan', 'name': '指定出库', 'parent_id': 155},
+    {'id': 159, 'code': 'manual_LB_inventory_plan', 'name': '人工出库', 'parent_id': 155},
+    {'id': 160, 'code': 'close_LB_inventory_plan', 'name': '关闭', 'parent_id': 155},
+    {'id': 161, 'code': 'change_LB_inventory_plan', 'name': '编辑', 'parent_id': 155},
 ]
 
 
