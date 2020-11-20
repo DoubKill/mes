@@ -224,10 +224,8 @@ class DeliveryPlan(AbstractEntity):
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
-    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
-    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+    finish_time = models.DateTimeField(verbose_name='完成时间',  blank=True, null=True)
 
 
     class Meta:
@@ -256,10 +254,8 @@ class DeliveryPlanLB(AbstractEntity):
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
-    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
-    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+    finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
 
 
     class Meta:
@@ -288,10 +284,8 @@ class DeliveryPlanFinal(AbstractEntity):
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
-    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    last_updated_date = models.DateTimeField(verbose_name='修改时间', blank=True, null=True)
-    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
-    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
 
 
     class Meta:
@@ -312,8 +306,6 @@ class DeliveryPlanStatus(AbstractEntity):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型')
     status = models.PositiveIntegerField(verbose_name='订单号', help_text='订单号', choices=ORDER_TYPE_CHOICE, default=4)
-    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
-    created_user = models.CharField(max_length=64, verbose_name='发起人', help_text='发起人', blank=True, null=True)
 
     class Meta:
         db_table = 'delivery_plan_status'
