@@ -203,6 +203,7 @@ class OutWorkFeedBack(APIView):
                 need_qty = dp_obj.need_qty if dp_obj else 2
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
                     dp_obj.status = 1
+                    dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
                     DeliveryPlanStatus.objects.create(warehouse_info=dp_obj.warehouse_info,
                                                       order_no=order_no,
@@ -338,12 +339,31 @@ class MaterialCount(APIView):
 
     def get(self, request):
         params = request.query_params
-        store_name = params.get('store_name', None)
-        try:
-            ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
-                all_qty=Sum('qty')).values('material_no', 'all_qty')
-        except:
-            raise ValidationError("北自胶片库连接失败")
+        store_name = params.get('store_name')
+        if not store_name:
+            raise ValidationError("缺少立库名参数，请检查后重试")
+        if store_name == "终炼胶库":
+            try:
+                ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+            except:
+                raise ValidationError("终炼胶库连接失败")
+        elif store_name == "混炼胶库":
+            #TODO 暂时这么写
+            try:
+                ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+            except:
+                raise ValidationError("混炼胶库连接失败")
+        elif store_name == "帘布库":
+            try:
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').values('material_no').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+            except:
+                raise ValidationError("帘布库库连接失败")
+        # elif store_name == "原材料库":
+        else:
+            ret = []
         return Response(ret)
 
 
