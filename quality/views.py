@@ -117,7 +117,7 @@ class TestIndicatorDataPointListView(ListAPIView):
         test_indicators = TestIndicator.objects.all()
         for test_indicator in test_indicators:
             data_names = set(DataPoint.objects.filter(
-                test_type__test_indicator=test_indicator).values_list('name', flat=True))
+                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True))
             data = {'test_type_id': test_indicator.id,
                     'test_type_name': test_indicator.name,
                     'data_indicator_detail': [data_name for data_name in data_names]
@@ -184,8 +184,8 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     create:
         手工录入数据
     """
-    queryset = MaterialTestOrder.objects.filter(delete_flag=False
-                                                ).prefetch_related('order_results')
+    queryset = MaterialTestOrder.objects.filter(
+        delete_flag=False).prefetch_related('order_results').order_by('lot_no', 'product_no', 'actual_trains')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
