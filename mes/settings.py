@@ -192,6 +192,15 @@ LOGGING = {
             'formatter': 'standard',
             'interval': 1,
         },
+        'sendFile': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'send.log'),
+            'when': 'midnight',
+            'backupCount': 10,
+            'formatter': 'standard',
+            'interval': 1,
+        },
     },
     'loggers': {
         'django.db.backends': {
@@ -219,19 +228,24 @@ LOGGING = {
         'async_log': {
             'handlers': ['asyncFile'],
             'level': 'INFO',
-        }
+        },
+        'send_log': {
+            'handlers': ['sendFile'],
+            'level': 'INFO',
+        },
     },
 }
 
 DATABASES = {
-     'default': {
+    'default': {
         'ENGINE': 'django.db.backends.oracle',
         'NAME': 'zcaj1',  # 数据库SID
-        'USER': 'MES',
-        'PASSWORD': 'mes2020',
-        'HOST':'10.4.10.17',
-        'PORT':'1521'
+        'USER': 'zcajlj',
+        'PASSWORD': 'zcajmes2020',
+        'HOST': '10.4.10.17',
+        'PORT': '1521'
     },
+
     'bz': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_2',
@@ -242,8 +256,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
-            },
         },
+    },
     'wms': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'zhada_wms_zhongc',
@@ -254,7 +268,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
-            },
+        },
     },
     "lb": {  # 帘布库|终炼胶库缩写
         'ENGINE': 'sql_server.pyodbc',
@@ -266,8 +280,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
-            },
-        }
+        },
+    }
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -307,7 +321,7 @@ STATIC_ROOT = os.environ.get('STATIC_ROOT', os.path.join(BASE_DIR, "static/"))
 
 STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, 'static'),# 项目默认会有的路径，如果你部署的不仅是前端打包的静态文件，项目目录static文件下还有其他文件，最好不要删
-    os.path.join(BASE_DIR, "dist/static"),# 加上这条
+    os.path.join(BASE_DIR, "dist/static"),  # 加上这条
 ]
 
 LANGUAGES = (
