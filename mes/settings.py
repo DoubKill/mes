@@ -237,15 +237,14 @@ LOGGING = {
 }
 
 DATABASES = {
-    'default': {
+     'default': {
         'ENGINE': 'django.db.backends.oracle',
         'NAME': 'zcaj1',  # 数据库SID
-        'USER': 'zcajlj',
-        'PASSWORD': 'zcajmes2020',
-        'HOST': '10.4.10.17',
-        'PORT': '1521'
+        'USER': 'MES',
+        'PASSWORD': 'mes2020',
+        'HOST':'10.4.10.17',
+        'PORT':'1521'
     },
-
     'bz': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_2',
@@ -256,8 +255,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
+            },
         },
-    },
     'wms': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'zhada_wms_zhongc',
@@ -268,7 +267,7 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
-        },
+            },
     },
     "lb": {  # 帘布库|终炼胶库缩写
         'ENGINE': 'sql_server.pyodbc',
@@ -280,8 +279,8 @@ DATABASES = {
         'OPTIONS': {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
-        },
-    }
+            },
+        }
 }
 
 AUTH_PASSWORD_VALIDATORS = [
