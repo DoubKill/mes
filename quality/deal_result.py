@@ -18,7 +18,9 @@ logger = logging.getLogger('send_log')
 
 def synthesize_to_material_deal_result(mdr_lot_no):
     """等级综合判定"""
+
     # 1、先找到这个胶料所有指标
+    logger.error("1、先找到这个胶料所有指标")
     mto_set_all = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('product_no', flat=True)
     mto_product_no_list = list(mto_set_all)
     mtm_set = MaterialTestMethod.objects.filter(material__material_name__in=mto_product_no_list).all()
@@ -28,6 +30,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         name_list.append(name)
 
     # 2、 判断是否所有车次都有
+    logger.error("2、 判断是否所有车次都有")
     actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains', flat=True)
     train_liat = list(actual_trains_list)
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
@@ -36,6 +39,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             return
 
     # 3、判断快检这边是不是所有的指标都有
+    logger.error("3、判断快检这边是不是所有的指标都有")
     mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
     for mto_obj in mto_set:
         test_indicator_name_list = []
@@ -49,6 +53,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 return
 
     # 4、分析流程
+    logger.error("4、分析流程")
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
     level_list = []
@@ -139,7 +144,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                          "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
             item.append(item_dict)
             # 向北自发送数据
-            logger.error(f"向北自发送数据")
+            logger.error("向北自发送数据")
             res = update_wms_kjjg(msg_id=msg_ids, items=item)
             if not res:  # res为空代表成功
                 mdr_obj.update_store_test_flag = 1
