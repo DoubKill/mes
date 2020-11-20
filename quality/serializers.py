@@ -475,11 +475,14 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                             test_indicator_name=mtr_max_obj['test_indicator_name'],
                                                             data_point_name=mtr_max_obj['data_point_name'],
                                                             test_times=mtr_max_obj['max_test_times']).last()
-
+                if mtr_obj.level==1:
+                    result='一等品'
+                else:
+                    result = '三等品'
                 mtr_max_list.append(
                     {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
                      'value': mtr_obj.value,
-                     'result': mtr_obj.mes_result,
+                     'result':  result,
                      'max_test_times': mtr_obj.level})
 
             for mtr_dict in mtr_max_list:
