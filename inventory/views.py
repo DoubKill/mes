@@ -38,6 +38,7 @@ from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialInventoryView(GenericViewSet,
                             mixins.ListModelMixin, ):
 
@@ -103,6 +104,7 @@ class MaterialInventoryView(GenericViewSet,
         return Response({'results': result, "count": count})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductInventory(GenericViewSet,
                        mixins.ListModelMixin, ):
 
@@ -172,6 +174,7 @@ class ProductInventory(GenericViewSet,
         return Response({'results': result, "count": count})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class OutWorkFeedBack(APIView):
 
     # 出库反馈
@@ -207,89 +210,25 @@ class OutWorkFeedBack(APIView):
                                                       status=1,
                                                       created_user=dp_obj.created_user,
                                                       )
-                il_dict={}
-                il_dict['warehouse_no']=dp_obj.warehouse_info.no
-                il_dict['warehouse_name']=dp_obj.warehouse_info.name
-                il_dict['inout_reason']=dp_obj.inventory_reason
-                il_dict['unit']=dp_obj.unit
-                il_dict['initiator']=dp_obj.created_user
-                il_dict['material_no']=dp_obj.material_no
-                il_dict['start_time']=dp_obj.created_date
-                il_dict['order_type']=dp_obj.order_type
+                il_dict = {}
+                il_dict['warehouse_no'] = dp_obj.warehouse_info.no
+                il_dict['warehouse_name'] = dp_obj.warehouse_info.name
+                il_dict['inout_reason'] = dp_obj.inventory_reason
+                il_dict['unit'] = dp_obj.unit
+                il_dict['initiator'] = dp_obj.created_user
+                il_dict['material_no'] = dp_obj.material_no
+                il_dict['start_time'] = dp_obj.created_date
+                il_dict['order_type'] = dp_obj.order_type
             else:
                 raise ValidationError("订单号不能为空")
             try:
-                InventoryLog.objects.create(**data,**il_dict)
+                InventoryLog.objects.create(**data, **il_dict)
             except:
                 result = {"message": "反馈失败", "flag": "99"}
             else:
                 result = {"message": "反馈成功", "flag": "01"}
 
             return Response(result)
-
-
-
-class OutWorkGum(APIView):
-    # 混炼胶库出库
-    class KJJGUploader(BaseUploader):
-        endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"
-
-        def gen_payload(self, msg_id, r_type, msg_count, str_user, str_json):
-            xml_data = """<?xml version="1.0" encoding="utf-8"?>
-                    <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-                      <soap:Body>
-                        <TRANS_MES_TO_WMS_KJJG xmlns="http://www.riamb.ac.cn/asrs/WebService/TA_SAP/">
-                          <MsgId>{}</MsgId>
-                          <KJTYPE>{}</KJTYPE>
-                          <MsgConut>{}</MsgConut>
-                          <strUser>{}</strUser>
-                          <strJson>{}</strJson>
-                        </TRANS_MES_TO_WMS_KJJG>
-                      </soap:Body>
-                    </soap:Envelope>""".format(msg_id, r_type, msg_count, str_user, str_json)
-            return xml_data
-
-        def gen_result(self, data):
-            data = data.get('soap:Envelope'
-                            ).get('soap:Body'
-                                  ).get('TRANS_MES_TO_WMS_KJJGResponse'
-                                        ).get('TRANS_MES_TO_WMS_KJJGResult')
-            items = json.loads(data).get('items')
-            print(items)
-            ret = []
-            for item in items:
-                if item['flag'] != '01':  # 01代表成功
-                    ret.append(item['msg'])
-            return ret
-
-    def get_base_data(self, sender):
-        data_json = {
-            "msgId": "1",
-            "OUTTYPE": "生产出库",
-            "msgConut": "2",
-            "SENDUSER": "GJ_001",
-            "items": [
-                {"WORKID": "11223",
-                 "MID": "C-HMB-F150-12",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "STATIONID": "二层后端",
-                 "SENDDATE": "20200513 09:22:22"},
-                {"WORKID": "11224",
-                 "MID": "C-HMB-F150-11",
-                 "PICI": "20200101",
-                 "NUM": "1",
-                 "STATIONID": "二层前端",
-                 "SENDDATE": "20200513 09:22:22"}
-            ]
-        }
-        return "1", "生产出库", "2", "GJ_001", json.dumps(data_json, ensure_ascii=False)
-
-    # 出库
-    def post(self, request):
-        sender = self.KJJGUploader()
-        ret = sender.request(*self.get_base_data(sender))
-        return Response(ret)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -318,6 +257,7 @@ class OverdueMaterialManagement(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     """物料库存信息|线边库|终炼胶库|原材料库"""
 
@@ -384,6 +324,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         return self.divide_tool(self.SERIALIZER)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InventoryLog.objects.order_by('-start_time')
     serializer_class = InventoryLogSerializer
@@ -392,6 +333,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     filter_class = InventoryLogFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialCount(APIView):
 
     def get(self, request):
@@ -426,6 +368,7 @@ class AllMixin:
         return super().list(request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WarehouseInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet):
     queryset = WarehouseInfo.objects.all()
     serializer_class = WarehouseInfoSerializer
@@ -439,6 +382,7 @@ class WarehouseInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet
         return Response(names)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class StationInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet):
     queryset = Station.objects.all()
     serializer_class = StationSerializer
@@ -447,6 +391,7 @@ class StationInfoViewSet(ReversalUseFlagMixin, AllMixin, viewsets.ModelViewSet):
     filter_class = StationFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
     queryset = WarehouseMaterialType.objects.all()
     serializer_class = WarehouseMaterialTypeSerializer
