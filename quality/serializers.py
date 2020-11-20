@@ -345,7 +345,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         else:
             param = {"days": material_detail.period_of_validity}
         expire_time = product_time + timedelta(**param)
-        return expire_time
+        return expire_time.strftime("%Y-%m-%d %H:%M:%S")
 
     def get_deal_suggestion(self, obj):
         if obj.status == "已处理":
