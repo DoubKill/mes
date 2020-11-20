@@ -6,28 +6,8 @@ from recipe.models import Material
 from system.models import AbstractEntity, User
 
 
-class OutOrderFeedBack(models.Model):
-    """出库订单反馈"""
-    task_id = models.CharField(max_length=64, verbose_name='任务编号', help_text='任务编号', blank=True)
-    material_no = models.CharField(max_length=64, verbose_name='物料信息ID', help_text='物料信息ID', blank=True)
-    pdm_no = models.CharField(max_length=64, verbose_name='PDM号', help_text='PDM号', blank=True)
-    batch_no = models.CharField(max_length=64, verbose_name='批号', help_text='批号', blank=True, null=True)
-    lot_no = models.CharField(max_length=64, verbose_name='条码', help_text='条码', blank=True)
-    weight = models.DecimalField(max_digits=5, decimal_places=2, verbose_name='重量', help_text='重量', blank=True)
-    unit = models.CharField(max_length=64, verbose_name='重量单位', help_text='重量单位', blank=True)
-    product_time = models.DateTimeField(verbose_name='生产日期', help_text='生产日期', blank=True)
-    expire_time = models.DateTimeField(verbose_name='生产期限', help_text='生产期限', blank=True)
-    rfid = models.CharField(max_length=64, verbose_name='托盘RFID', help_text='托盘RFID', blank=True)
-    station = models.CharField(max_length=64, verbose_name='工位', help_text='工位', blank=True)
-    out_user = models.CharField(max_length=64, verbose_name='出库人', help_text='出库人', blank=True)
-    out_type = models.CharField(max_length=64, verbose_name='出库类型', help_text='出库类型', blank=True)
 
-    class Meta:
-        db_table = 'out_order_feedback'
-        verbose_name_plural = verbose_name = '出库订单反馈'
-
-
-class WarehouseInfo(models.Model):
+class WarehouseInfo(AbstractEntity):
     """仓库信息"""
     no = models.CharField(max_length=64, verbose_name='仓库编码', help_text='仓库编码')
     name = models.CharField(max_length=64, unique=True, verbose_name='仓库名称', help_text='仓库名称')
@@ -40,7 +20,7 @@ class WarehouseInfo(models.Model):
         verbose_name_plural = verbose_name = '仓库信息'
 
 
-class WarehouseMaterialType(models.Model):
+class WarehouseMaterialType(AbstractEntity):
     """仓库物料类型"""
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="warehouse_material_types")
     material_type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE)
@@ -51,7 +31,7 @@ class WarehouseMaterialType(models.Model):
         verbose_name_plural = verbose_name = '仓库物料类型'
 
 
-class InventoryLog(models.Model):
+class InventoryLog(AbstractEntity):
     """出入库履历"""
     warehouse_no = models.CharField(max_length=64, verbose_name='仓库编号', help_text='仓库编号')
     warehouse_name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
@@ -79,7 +59,7 @@ class InventoryLog(models.Model):
         verbose_name_plural = verbose_name = '出入库履历'
 
 
-class MaterialInventory(models.Model):
+class MaterialInventory(AbstractEntity):
     """库存信息|线边库"""
     material = models.ForeignKey(Material, verbose_name='物料id', help_text='物料id', on_delete=models.CASCADE,
                                  related_name="material_inventory_m")
@@ -223,7 +203,7 @@ class WmsInventoryMaterial(models.Model):
         managed = False
 
 
-class DeliveryPlan(models.Model):
+class DeliveryPlan(AbstractEntity):
     """出库计划 | 混炼胶"""
     ORDER_TYPE_CHOICE = (
         (1, '完成'),
@@ -255,7 +235,7 @@ class DeliveryPlan(models.Model):
         verbose_name_plural = verbose_name = '出库计划'
 
 
-class DeliveryPlanLB(models.Model):
+class DeliveryPlanLB(AbstractEntity):
     """出库计划 | 帘布"""
     ORDER_TYPE_CHOICE = (
         (1, '完成'),
@@ -287,7 +267,7 @@ class DeliveryPlanLB(models.Model):
         verbose_name_plural = verbose_name = '帘布库出库计划'
 
 
-class DeliveryPlanFinal(models.Model):
+class DeliveryPlanFinal(AbstractEntity):
     """出库计划 | 终炼"""
     ORDER_TYPE_CHOICE = (
         (1, '完成'),
@@ -319,7 +299,7 @@ class DeliveryPlanFinal(models.Model):
         verbose_name_plural = verbose_name = '终炼胶库出库计划'
 
 
-class DeliveryPlanStatus(models.Model):
+class DeliveryPlanStatus(AbstractEntity):
     """出库计划状态变更记录"""
     ORDER_TYPE_CHOICE = (
         (1, '完成'),
@@ -340,7 +320,7 @@ class DeliveryPlanStatus(models.Model):
         verbose_name_plural = verbose_name = '出库计划状态变更表'
 
 
-class Station(models.Model):
+class Station(AbstractEntity):
     """站点信息"""
     no = models.CharField('站点编码', max_length=64, help_text='站点编码')
     name = models.CharField('站点名称', max_length=64, help_text='站点名称')
