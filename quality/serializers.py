@@ -102,6 +102,7 @@ class MaterialTestResultSerializer(BaseModelSerializer):
         model = MaterialTestResult
         exclude = ('data_point_indicator', 'material_test_order', 'test_factory_date', 'test_class',
                    'test_group', 'test_times', 'mes_result', 'result')
+        extra_kwargs = {'value': {'required': False, 'allow_null': True}}
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -128,6 +129,8 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
         material_no = validated_data['product_no']
         for item in order_results:
+            if not item.get('value'):
+                continue
             item['material_test_order'] = instance
             item['test_factory_date'] = datetime.now()
             if created:
@@ -159,6 +162,9 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['mes_result'] = indicator.result
                     item['data_point_indicator'] = indicator
                     item['level'] = indicator.level
+                else:
+                    item['mes_result'] = '不合格'
+                    item['level'] = 3
             else:
                 item['mes_result'] = '不合格'
                 item['level'] = 3
@@ -259,20 +265,22 @@ class DealResultDealSerializer(BaseModelSerializer):
         return result
 
     def update(self, instance, validated_data):
-        lot_no = validated_data.get('lot_no')
+        lot_no = validated_data.get('lot_no', instance.lot_no)
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
-        created_user = self.context['request'].user.username  # 发起人
+        created_user = self.context['request'].user  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
         # 快检针对的是混炼胶/终炼胶库
         warehouse_info_id = validated_data.get('warehouse_info', 1)  # # TODO 混炼胶库暂时写死
         if not warehouse_info_id:
             warehouse_info_id = 1  # TODO 混炼胶库暂时写死
+        # TODO 根据胶料编号去判断在终炼胶库还是混炼胶库
+        product_info = self.get_product_info(instance)
         if validated_data.get('be_warehouse_out') == True:
             material_no = validated_data.get('material_no')  # 物料编码
             if not material_no:
                 raise serializers.ValidationError("material_no为必传参数")
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
                                             inventory_type=inventory_type,
@@ -282,7 +290,7 @@ class DealResultDealSerializer(BaseModelSerializer):
                                             created_user=created_user,
                                             inventory_reason=inventory_reason
                                             )
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
+                DeliveryPlanStatus.objects.create(warehouse_info_id=warehouse_info_id,
                                                   order_no=order_no,
                                                   order_type=inventory_type,
                                                   status=4,
@@ -339,7 +347,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         else:
             param = {"days": material_detail.period_of_validity}
         expire_time = product_time + timedelta(**param)
-        return expire_time
+        return expire_time.strftime("%Y-%m-%d %H:%M:%S")
 
     def get_deal_suggestion(self, obj):
         if obj.status == "已处理":
@@ -469,18 +477,16 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                             test_indicator_name=mtr_max_obj['test_indicator_name'],
                                                             data_point_name=mtr_max_obj['data_point_name'],
                                                             test_times=mtr_max_obj['max_test_times']).last()
-                if mtr_obj.data_point_indicator:
-                    mtr_max_list.append(
-                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
-                         'value': mtr_obj.value,
-                         'result': mtr_obj.data_point_indicator.result,
-                         'max_test_times': mtr_obj.data_point_indicator.level})
-                else:  # 数据不在上下限范围内，这个得前端做好约束
-                    mtr_max_list.append(
-                        {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
-                         'value': mtr_obj.value,
-                         'result': None,
-                         'max_test_times': None})
+                if mtr_obj.level==1:
+                    result='一等品'
+                else:
+                    result = '三等品'
+                mtr_max_list.append(
+                    {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                     'value': mtr_obj.value,
+                     'result':  result,
+                     'max_test_times': mtr_obj.level})
+
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[mto_obj.actual_trains].append(mtr_dict)

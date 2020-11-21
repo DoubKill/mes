@@ -23,6 +23,7 @@ from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
+from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter
@@ -116,7 +117,7 @@ class TestIndicatorDataPointListView(ListAPIView):
         test_indicators = TestIndicator.objects.all()
         for test_indicator in test_indicators:
             data_names = set(DataPoint.objects.filter(
-                test_type__test_indicator=test_indicator).values_list('name', flat=True))
+                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True))
             data = {'test_type_id': test_indicator.id,
                     'test_type_name': test_indicator.name,
                     'data_indicator_detail': [data_name for data_name in data_names]
@@ -183,8 +184,8 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     create:
         手工录入数据
     """
-    queryset = MaterialTestOrder.objects.filter(delete_flag=False
-                                                ).prefetch_related('order_results')
+    queryset = MaterialTestOrder.objects.filter(
+        delete_flag=False).prefetch_related('order_results').order_by('lot_no', 'product_no', 'actual_trains')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
@@ -197,6 +198,7 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):
@@ -481,6 +483,15 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
     serializer_class = LabelPrintSerializer
     permission_classes = ()
     authentication_classes = ()
+
+    def create(self, request, *args, **kwargs):
+        lot_no_list = request.data.get('lot_no')
+        if not isinstance(lot_no_list, list):
+            raise ValidationError('数据格式错误！')
+        for lot_no in lot_no_list:
+            data = receive_deal_result(lot_no)
+            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=data)
+        return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
         instance = self.get_queryset().filter(label_type=2, status=0).first()

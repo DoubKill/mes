@@ -1,9 +1,10 @@
 import datetime
+import json
 import time
 
 from inventory.models import BzFinalMixingRubberInventory, MaterialInventory
 from inventory.tasks import update_wms_kjjg
-from mes.common_code import order_no
+from mes.common_code import order_no, DecimalEncoder
 from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult, LevelResult, \
     MaterialDataPointIndicator, MaterialTestMethod
 from production.models import PalletFeedbacks
@@ -15,10 +16,11 @@ import logging
 logger = logging.getLogger('send_log')
 
 
-
 def synthesize_to_material_deal_result(mdr_lot_no):
     """等级综合判定"""
+
     # 1、先找到这个胶料所有指标
+    logger.error("1、先找到这个胶料所有指标")
     mto_set_all = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('product_no', flat=True)
     mto_product_no_list = list(mto_set_all)
     mtm_set = MaterialTestMethod.objects.filter(material__material_name__in=mto_product_no_list).all()
@@ -28,6 +30,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         name_list.append(name)
 
     # 2、 判断是否所有车次都有
+    logger.error("2、 判断是否所有车次都有")
     actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains', flat=True)
     train_liat = list(actual_trains_list)
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
@@ -36,6 +39,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             return
 
     # 3、判断快检这边是不是所有的指标都有
+    logger.error("3、判断快检这边是不是所有的指标都有")
     mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
     for mto_obj in mto_set:
         test_indicator_name_list = []
@@ -49,6 +53,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                 return
 
     # 4、分析流程
+    logger.error("4、分析流程")
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
     level_list = []
@@ -67,20 +72,23 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     for mtr_obj in level_list:
         if not mtr_obj.mes_result:  # mes没有数据
             if not mtr_obj.result:  # 快检也没有数据
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}没有判定区间，\n'
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判定区间，\n'
                 exist_data_point_indicator = False
-            elif mtr_obj.result != '一等品':
+            elif mtr_obj.result not in ['一等品', '合格', None, '']:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result == '一等品':
-            if mtr_obj.result not in ['一等品', None]:
+        elif mtr_obj.mes_result in ['一等品', '合格']:
+            if mtr_obj.result not in ['一等品', '合格', None, '']:
                 reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result != '一等品':
-            reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
-
+        elif mtr_obj.mes_result not in ['一等品', '合格']:
+            if mtr_obj.data_point_indicator:
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
+            else:
+                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判断区间内，\n'
+                exist_data_point_indicator = False
         if not max_mtr.data_point_indicator:
             max_mtr = mtr_obj
             continue
@@ -117,7 +125,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 
     # 5、向北自接口发送数据
     # 5.1、先判断库存和线边库里有没有数据
-    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(lot_no=mdr_obj.lot_no).first()
+    pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
+    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(container_no=pfb_obj.pallet_no).last()
     mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
     # 5.2、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
@@ -135,11 +144,12 @@ def synthesize_to_material_deal_result(mdr_lot_no):
                          "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
             item.append(item_dict)
             # 向北自发送数据
+            logger.error("向北自发送数据")
             res = update_wms_kjjg(msg_id=msg_ids, items=item)
             if not res:  # res为空代表成功
                 mdr_obj.update_store_test_flag = 1
                 mdr_obj.save()
-
+                logger.error("向北自发送数据,发送成功")
             else:
                 mdr_obj.update_store_test_flag = 2
                 mdr_obj.save()
@@ -152,7 +162,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_obj.save()
         logger.error("没有发送，两个库存和线边库里都没有")
 
-def get_deal_result(lot_no):
+
+def receive_deal_result(lot_no):
     """将快检信息综合管理接口(就是打印的卡片信息)封装成一个类，需要的时候就调用一下"""
     mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
     mdrls = MaterialDealResultListSerializer()
@@ -160,7 +171,7 @@ def get_deal_result(lot_no):
     # id
     results['id'] = mdr_obj.id
     # day_time
-    results['day_time'] = mdrls.get_day_time(mdr_obj)
+    results['day_time'] = str(mdrls.get_day_time(mdr_obj))
     # lot_no
     results['lot_no'] = mdr_obj.lot_no
     # classes_group
@@ -174,13 +185,13 @@ def get_deal_result(lot_no):
     # residual_weight
     results['residual_weight'] = mdrls.get_residual_weight(mdr_obj)
     # production_factory_date
-    results['production_factory_date'] = mdr_obj.production_factory_date
+    results['production_factory_date'] = str(mdr_obj.production_factory_date)
     # valid_time
-    results['valid_time'] = mdr_obj.valid_time
+    results['valid_time'] = mdrls.get_valid_time(mdr_obj)
     # test
     results['test'] = mdrls.get_test(mdr_obj)
     # print_time
-    results['print_time'] = mdr_obj.print_time
+    results['print_time'] = mdr_obj.print_time.strftime("%Y-%m-%d %H:%M:%S") if mdr_obj.print_time else None
     # deal_user
     results['deal_user'] = mdrls.get_deal_user(mdr_obj)
     # deal_time
@@ -195,4 +206,5 @@ def get_deal_result(lot_no):
     results['deal_result'] = mdr_obj.deal_result
     # deal_suggestion
     results['deal_suggestion'] = mdrls.get_deal_suggestion(mdr_obj)
+    results = json.dumps(results, cls=DecimalEncoder)
     return results
