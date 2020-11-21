@@ -268,7 +268,7 @@ class DealResultDealSerializer(BaseModelSerializer):
         lot_no = validated_data.get('lot_no', instance.lot_no)
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
-        created_user = self.context['request'].user.username  # 发起人
+        created_user = self.context['request'].user  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
         # 快检针对的是混炼胶/终炼胶库
         warehouse_info_id = validated_data.get('warehouse_info', 1)  # # TODO 混炼胶库暂时写死
