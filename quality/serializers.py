@@ -274,11 +274,13 @@ class DealResultDealSerializer(BaseModelSerializer):
         warehouse_info_id = validated_data.get('warehouse_info', 1)  # # TODO 混炼胶库暂时写死
         if not warehouse_info_id:
             warehouse_info_id = 1  # TODO 混炼胶库暂时写死
+        # TODO 根据胶料编号去判断在终炼胶库还是混炼胶库
+        product_info = self.get_product_info(instance)
         if validated_data.get('be_warehouse_out') == True:
             material_no = validated_data.get('material_no')  # 物料编码
             if not material_no:
                 raise serializers.ValidationError("material_no为必传参数")
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
                                             inventory_type=inventory_type,
