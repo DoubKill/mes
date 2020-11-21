@@ -268,17 +268,19 @@ class DealResultDealSerializer(BaseModelSerializer):
         lot_no = validated_data.get('lot_no', instance.lot_no)
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         inventory_type = validated_data.get('inventory_type', "指定出库")  # 出库类型
-        created_user = self.context['request'].user.username  # 发起人
+        created_user = self.context['request'].user  # 发起人
         inventory_reason = validated_data.get('reason', "处理意见出库")  # 出库原因
         # 快检针对的是混炼胶/终炼胶库
         warehouse_info_id = validated_data.get('warehouse_info', 1)  # # TODO 混炼胶库暂时写死
         if not warehouse_info_id:
             warehouse_info_id = 1  # TODO 混炼胶库暂时写死
+        # TODO 根据胶料编号去判断在终炼胶库还是混炼胶库
+        product_info = self.get_product_info(instance)
         if validated_data.get('be_warehouse_out') == True:
             material_no = validated_data.get('material_no')  # 物料编码
             if not material_no:
                 raise serializers.ValidationError("material_no为必传参数")
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
             if pfb_obj:
                 DeliveryPlan.objects.create(order_no=order_no,
                                             inventory_type=inventory_type,
@@ -288,7 +290,7 @@ class DealResultDealSerializer(BaseModelSerializer):
                                             created_user=created_user,
                                             inventory_reason=inventory_reason
                                             )
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
+                DeliveryPlanStatus.objects.create(warehouse_info_id=warehouse_info_id,
                                                   order_no=order_no,
                                                   order_type=inventory_type,
                                                   status=4,
