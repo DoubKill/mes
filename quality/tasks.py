@@ -14,6 +14,9 @@ from django.db.models import Q, F
 from django.db.models import Count
 from django.db.models import FloatField
 
+for model in BatchMonth, BatchDay, BatchEquip, BatchClass, \
+BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
+    model.objects.all().delete()
 
 # 中间表分发数据
 for order in MaterialTestOrder.objects.all():
@@ -55,8 +58,12 @@ for order in MaterialTestOrder.objects.all():
                                                      point=test_data_point)
         if result.max_times < test_result.test_times:
             result.max_times = test_result.test_times
+            # qualified = None if (not test_result.mes_result and not test_result.result) else \
+            #     (test_result.mes_result == '一等品' or not test_result.mes_result) and test_result.result == '一等品'
+
             qualified = None if (not test_result.mes_result and not test_result.result) else \
-                (test_result.mes_result == '一等品' or not test_result.mes_result) and test_result.result == '一等品'
+                (test_result.mes_result == '合格' or test_result.mes_result == '一等品'
+                 or not test_result.mes_result) and (test_result.result == '合格' or test_result.result == '一等品')
             result.qualified = qualified
             result.value = test_result.value
             result.save()
