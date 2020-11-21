@@ -716,5 +716,5 @@ class PalletTrainFeedback(APIView):
                     'factory_date': pallet_feed_back.end_time
                 }
                 ret.append(data)
-        ret.sort(key=lambda x: x.get('actual_trains'), reverse=True)
+        ret.sort(key=lambda x: x.get('actual_trains'))
         return Response(ret)
