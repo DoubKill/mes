@@ -220,16 +220,31 @@ class OutWorkFeedBack(APIView):
                 il_dict['material_no'] = dp_obj.material_no
                 il_dict['start_time'] = dp_obj.created_date
                 il_dict['order_type'] = dp_obj.order_type
+                material_inventory_dict = {
+                    "material": 1,
+                    "container_no": data.get("pallet_no"),
+                    "site": 15,
+                    "qty": data.get("qty"),
+                    "unit": dp_obj.unit,
+                    "unit_weight": data.get("weight") / data.get("qty"),
+                    "total_weight": data.get("weight"),
+                    "quality_status": data.get("quality_status"),
+                    "lot_no": data.get("lot_no"),
+                    "location": "预留",
+                    "warehouse_info": dp_obj.warehouse_info
+                }
             else:
                 raise ValidationError("订单号不能为空")
             try:
                 InventoryLog.objects.create(**data, **il_dict)
+                MaterialInventory.objects.create(**material_inventory_dict)
             except:
                 result = {"message": "反馈失败", "flag": "99"}
             else:
                 result = {"message": "反馈成功", "flag": "01"}
 
             return Response(result)
+        return Response({"message": "反馈失败", "flag": "99"})
 
 
 @method_decorator([api_recorder], name="dispatch")
