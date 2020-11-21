@@ -288,7 +288,7 @@ class DealResultDealSerializer(BaseModelSerializer):
                                             created_user=created_user,
                                             inventory_reason=inventory_reason
                                             )
-                DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info_id,
+                DeliveryPlanStatus.objects.create(warehouse_info_id=warehouse_info_id,
                                                   order_no=order_no,
                                                   order_type=inventory_type,
                                                   status=4,
