@@ -707,7 +707,7 @@ class PrintMaterialDealResult(APIView):
         return print_mdr("results", mdr_set)
 
 
-def get_statics_query_times(query_params):
+def get_statics_query_dates(query_params):
     start_time = query_params.get('start_time')
     end_time = query_params.get('end_time')
     try:
@@ -734,12 +734,12 @@ class BatchMonthStatisticsView(ReadOnlyModelViewSet):
         return Response(result)
 
     def get_queryset(self):
-        start_time, end_time = get_statics_query_times(self.request.query_params)
+        start_time, end_time = get_statics_query_dates(self.request.query_params)
         batches = BatchMonth.objects.filter(date__gte=start_time,
                                             date__lte=end_time)
         if batches:
             batches = BatchCommonSerializer.batch_annotate(batches)
-            batches = batches.order_by('-date')
+            batches = batches.order_by('date')
         return batches
 
 
@@ -762,7 +762,7 @@ class BatchDayStatisticsView(ReadOnlyModelViewSet):
                                           date__month=date.month)
         if batches:
             batches = BatchCommonSerializer.batch_annotate(batches)
-            batches = batches.order_by('-date')
+            batches = batches.order_by('date')
 
         return batches
 
@@ -770,6 +770,8 @@ class BatchDayStatisticsView(ReadOnlyModelViewSet):
 class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoDaySerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['product_no']
 
     def get_queryset(self):
         date = get_statics_query_date(self.request.query_params)
@@ -781,9 +783,11 @@ class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
 class BatchProductNoMonthStatisticsView(ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoMonthSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ['product_no']
 
     def get_queryset(self):
-        start_time, end_time = get_statics_query_times(self.request.query_params)
+        start_time, end_time = get_statics_query_dates(self.request.query_params)
         return BatchProductNo.objects.filter(
             batch__batch_month__date__gte=start_time,
             batch__batch_month__date__lte=end_time).distinct()
