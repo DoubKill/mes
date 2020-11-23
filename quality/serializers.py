@@ -425,9 +425,9 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return None
         max_mtr = mtr_list[0]
         for mtr_obj in mtr_list:
-            if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
-                continue
-            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+            # if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
+            #     continue
+            if mtr_obj.level > max_mtr.level:
                 max_mtr = mtr_obj
         if max_mtr.test_times == 1:
             test_status = '正常'
@@ -477,14 +477,14 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                             test_indicator_name=mtr_max_obj['test_indicator_name'],
                                                             data_point_name=mtr_max_obj['data_point_name'],
                                                             test_times=mtr_max_obj['max_test_times']).last()
-                if mtr_obj.level==1:
-                    result='一等品'
+                if mtr_obj.level == 1:
+                    result = '一等品'
                 else:
                     result = '三等品'
                 mtr_max_list.append(
                     {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
                      'value': mtr_obj.value,
-                     'result':  result,
+                     'result': result,
                      'max_test_times': mtr_obj.level})
 
             for mtr_dict in mtr_max_list:
