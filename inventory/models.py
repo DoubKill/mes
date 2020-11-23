@@ -354,23 +354,20 @@ class DispatchLog(AbstractEntity):
 
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
-    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
-    need_weight = models.DecimalField(verbose_name='需求重量', help_text='需求重量', blank=True, null=True, decimal_places=2,
-                                 max_digits=8)
+    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量')
+    need_weight = models.DecimalField(verbose_name='需求重量', help_text='需求重量', blank=True, null=True,
+                                      decimal_places=2, max_digits=8)
     dispatch_type = models.CharField(max_length=64, verbose_name='发货类型', help_text='发货类型')
-
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
     quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
     order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
     status = models.PositiveIntegerField(verbose_name="发货状态", help_text="发货状态", choices=STATUS_CHOICES)
-    qty = models.PositiveIntegerField(verbose_name='单托数量', help_text='单托数量', blank=True, null=True)
-    weight = models.DecimalField(verbose_name='单托重量', help_text='单托重量', blank=True, null=True, decimal_places=2,
-                                      max_digits=8)
+    qty = models.PositiveIntegerField(verbose_name='单托数量', help_text='单托数量', default=2)
+    weight = models.DecimalField(verbose_name='单托重量', help_text='单托重量', decimal_places=2, max_digits=8)
     dispatch_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
-    dispatch_user = models.CharField(max_length=16, blank=True, null=True, verbose_name='发货人',
-                                     help_text='发货人')
-    order_created_time = models.DateTimeField(verbose_name="订单创建时间", help_text="订单创建时间", auto_now_add=True)
+    dispatch_user = models.CharField(max_length=16, verbose_name='发货人', help_text='发货人')
+    order_created_time = models.DateTimeField(verbose_name="订单创建时间", help_text="订单创建时间", auto_created=True)
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', null=True, blank=True)
 
     class Meta:
@@ -389,22 +386,19 @@ class DispatchPlan(AbstractEntity):
     )
 
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
-    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
+    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量')
     need_weight = models.DecimalField(verbose_name='需求重量', help_text='需求重量', blank=True, null=True, decimal_places=2,
                                       max_digits=8)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
     dispatch_type = models.CharField(max_length=64, verbose_name='发货类型', help_text='发货类型')
     order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型')
-    actual_qty = models.PositiveIntegerField(verbose_name='已发数量', help_text='已发数量', blank=True, null=True)
-    actual_weight = models.DecimalField(verbose_name='已发重量', help_text='已发重量', blank=True, null=True, decimal_places=2,
-                                 max_digits=8)
-    quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
+    actual_qty = models.PositiveIntegerField(verbose_name='已发数量', help_text='已发数量', default=0)
+    actual_weight = models.DecimalField(verbose_name='已发重量', help_text='已发重量', decimal_places=2,
+                                 max_digits=8, default=0)
     status = models.PositiveIntegerField(verbose_name="状态", help_text="状态", choices=STATUS_CHOICES)
     qty = models.PositiveIntegerField(verbose_name='单托数量', help_text='单托数量', blank=True, null=True)
-
     dispatch_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
-    dispatch_user = models.CharField(max_length=16, blank=True, null=True, verbose_name='发货人',
-                                     help_text='发货人')
+    dispatch_user = models.CharField(max_length=16, verbose_name='发货人', help_text='发货人')
     start_time = models.DateTimeField(verbose_name="发起时间", help_text="发起时间", auto_created=True)
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', null=True, blank=True)
 
