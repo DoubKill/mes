@@ -57,7 +57,7 @@ for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timez
         test_data_point, _ = TestDataPoint.objects.get_or_create(
             name=test_result.data_point_name,
             indicator=indicator)
-        if test_result.data_point_indicator:
+        if test_result.data_point_indicator and not test_data_point.data_point_indicator:
             test_data_point.data_point_indicator = test_result.data_point_indicator
             test_data_point.save()
         result, _ = TestResult.objects.get_or_create(train=train,
@@ -67,11 +67,14 @@ for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timez
             # qualified = None if (not test_result.mes_result and not test_result.result) else \
             #     (test_result.mes_result == '一等品' or not test_result.mes_result) and test_result.result == '一等品'
 
-            qualified = None if (not test_result.mes_result and not test_result.result) else \
-                (test_result.mes_result == '合格' or test_result.mes_result == '一等品'
-                 or not test_result.mes_result) and (test_result.result == '合格'
-                                                     or test_result.result == '一等品'
-                                                     or not test_result.result)
-            result.qualified = qualified
+            # qualified = None if (not test_result.mes_result and not test_result.result) else \
+            #     (test_result.mes_result == '合格' or test_result.mes_result == '一等品'
+            #      or not test_result.mes_result) and (test_result.result == '合格'
+            #                                          or test_result.result == '一等品'
+            #                                          or not test_result.result)
+
+            result.qualified = (test_result.level == 1)
             result.value = test_result.value
             result.save()
+# level 为一是合格
+
