@@ -94,7 +94,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             continue
         if not mtr_obj.data_point_indicator:
             continue
-        if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+        if mtr_obj.level > max_mtr.level:
             max_mtr = mtr_obj
 
     mdr_dict['reason'] = reason
@@ -102,8 +102,11 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 
     if exist_data_point_indicator:
         if quality_sign:
-            mdr_dict['level'] = max_mtr.data_point_indicator.level
-            mdr_dict['deal_result'] = max_mtr.mes_result
+            mdr_dict['level'] = max_mtr.level
+            if max_mtr.mes_result in ['合格', '一等品']:
+                mdr_dict['deal_result'] = '一等品'
+            else:
+                mdr_dict['deal_result'] = '三等品'
         else:
             mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
             mdr_dict['deal_result'] = '三等品'
