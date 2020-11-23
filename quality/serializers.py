@@ -591,6 +591,10 @@ class PercentOfPassSerializer(serializers.Serializer):
     yc_percent_of_pass = serializers.SerializerMethodField()
     lb_percent_of_pass = serializers.SerializerMethodField()
     zh_percent_of_pass = serializers.SerializerMethodField()
+    train_count = serializers.SerializerMethodField()
+
+    def get_train_count(self, obj):
+        return obj.zh_train_count
 
     def get_yc_percent_of_pass(self, obj):
         return to_bfb(obj.yc_test_pass_count / obj.yc_train_count) if obj.yc_train_count else None
@@ -685,6 +689,7 @@ class BatchCommonSerializer(PercentOfPassSerializer, serializers.ModelSerializer
     class Meta:
         fields = ['id',
                   'date',
+                  'train_count',
                   'yc_percent_of_pass',
                   'lb_percent_of_pass',
                   'zh_percent_of_pass',
@@ -769,6 +774,7 @@ class BatchDateProductNoSerializer(PercentOfPassSerializer, serializers.ModelSer
 
     class Meta:
         fields = ['date',
+                  'train_count',
                   'yc_percent_of_pass',
                   'lb_percent_of_pass',
                   'zh_percent_of_pass',

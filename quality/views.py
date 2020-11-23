@@ -722,6 +722,16 @@ class PrintMaterialDealResult(APIView):
         return print_mdr("results", mdr_set)
 
 
+class AllMixin:
+
+    def list(self, request, *args, **kwargs):
+        if 'all' in self.request.query_params:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return super().list(request, *args, **kwargs)
+
+
 def get_statics_query_dates(query_params):
     start_time = query_params.get('start_time')
     end_time = query_params.get('end_time')
@@ -735,7 +745,7 @@ def get_statics_query_dates(query_params):
     return start_time, end_time
 
 
-class BatchMonthStatisticsView(ReadOnlyModelViewSet):
+class BatchMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchMonth.objects.all()
     serializer_class = BatchMonthSerializer
 
@@ -767,7 +777,7 @@ def get_statics_query_date(query_params):
     return date
 
 
-class BatchDayStatisticsView(ReadOnlyModelViewSet):
+class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchDay.objects.all()
     serializer_class = BatchDaySerializer
 
@@ -782,7 +792,7 @@ class BatchDayStatisticsView(ReadOnlyModelViewSet):
         return batches
 
 
-class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
+class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoDaySerializer
     filter_backends = (DjangoFilterBackend,)
@@ -795,7 +805,7 @@ class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
             batch__batch_month__date__month=date.month).distinct()
 
 
-class BatchProductNoMonthStatisticsView(ReadOnlyModelViewSet):
+class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoMonthSerializer
     filter_backends = (DjangoFilterBackend,)
