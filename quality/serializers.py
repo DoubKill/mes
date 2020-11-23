@@ -573,15 +573,15 @@ class TestDataPointSerializer(serializers.ModelSerializer):
     def points_annotate(cls, points):
         points = points.annotate(
             train_count=
-            Count('testresult__train', distinct=True))
+            Count('testresult__train'))
         points = points.annotate(
             upper_limit_count=
-            Count('testresult__train', distinct=True,
+            Count('testresult__train',
                   filter=Q(testresult__qualified=False,
                            testresult__value__gt=F('data_point_indicator__upper_limit'))))
         points = points.annotate(
             lower_limit_count=
-            Count('testresult__train', distinct=True,
+            Count('testresult__train',
                   filter=Q(testresult__qualified=False,
                            testresult__value__lt=F('data_point_indicator__lower_limit'))))
         return points
@@ -603,10 +603,10 @@ class PercentOfPassSerializer(serializers.Serializer):
 
     @classmethod
     def batch_annotate(cls, batches):
-        yc_train_count = Count('batch__lot__train', distinct=True,
+        yc_train_count = Count('batch__lot__train',
                                filter=~Q(batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        yc_test_pass_count = Count('batch__lot__train', distinct=True,
+        yc_test_pass_count = Count('batch__lot__train',
                                    filter=
                                    Q(~Q(batch__lot__train__testresult__point__indicator__name='流变') &
                                      Q(batch__lot__train__testresult__qualified=True)),
@@ -615,10 +615,10 @@ class PercentOfPassSerializer(serializers.Serializer):
             .annotate(yc_test_pass_count=yc_test_pass_count)
 
         # 流变
-        lb_train_count = Count('batch__lot__train', distinct=True,
+        lb_train_count = Count('batch__lot__train',
                                filter=Q(batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        lb_test_pass_count = Count('batch__lot__train', distinct=True,
+        lb_test_pass_count = Count('batch__lot__train',
                                    filter=
                                    Q(batch__lot__train__testresult__point__indicator__name='流变',
                                      batch__lot__train__testresult__qualified=True),
@@ -627,8 +627,8 @@ class PercentOfPassSerializer(serializers.Serializer):
             .annotate(lb_test_pass_count=lb_test_pass_count)
 
         # 综合
-        zh_train_count = Count('batch__lot__train', distinct=True, output_field=FloatField())
-        zh_test_pass_count = Count('batch__lot__train', distinct=True,
+        zh_train_count = Count('batch__lot__train',  output_field=FloatField())
+        zh_test_pass_count = Count('batch__lot__train',
                                    filter=Q(batch__lot__train__testresult__qualified=True),
                                    output_field=FloatField())
         batches = batches.annotate(zh_train_count=zh_train_count) \
@@ -811,11 +811,11 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
 
     def get_dates(self, batch_product_no_obj):
         batches = self.batch_date_model.objects.filter(batch__batch_product_no=batch_product_no_obj)
-        yc_train_count = Count('batch__lot__train', distinct=True,
+        yc_train_count = Count('batch__lot__train',
                                filter=~Q(batch__batch_product_no=batch_product_no_obj,
                                          batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        yc_test_pass_count = Count('batch__lot__train', distinct=True,
+        yc_test_pass_count = Count('batch__lot__train',
                                    filter=
                                    Q(~Q(batch__lot__train__testresult__point__indicator__name='流变') &
                                      Q(batch__batch_product_no=batch_product_no_obj) &
@@ -825,11 +825,11 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
             .annotate(yc_train_count=yc_train_count) \
             .annotate(yc_test_pass_count=yc_test_pass_count)
         # 流变
-        lb_train_count = Count('batch__lot__train', distinct=True,
+        lb_train_count = Count('batch__lot__train',
                                filter=Q(batch__batch_product_no=batch_product_no_obj,
                                         batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        lb_test_pass_count = Count('batch__lot__train', distinct=True,
+        lb_test_pass_count = Count('batch__lot__train',
                                    filter=Q(batch__batch_product_no=batch_product_no_obj,
                                             batch__lot__train__testresult__point__indicator__name='流变',
                                             batch__lot__train__testresult__qualified=True),
@@ -839,10 +839,10 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
             .annotate(lb_test_pass_count=lb_test_pass_count)
 
         # 综合
-        zh_train_count = Count('batch__lot__train', distinct=True,
+        zh_train_count = Count('batch__lot__train',
                                filter=Q(batch__batch_product_no=batch_product_no_obj),
                                output_field=FloatField())
-        zh_test_pass_count = Count('batch__lot__train', distinct=True,
+        zh_test_pass_count = Count('batch__lot__train',
                                    filter=Q(batch__batch_product_no=batch_product_no_obj,
                                             batch__lot__train__testresult__qualified=True),
                                    output_field=FloatField())
