@@ -19,12 +19,12 @@ from django.db.models import Q, F
 from django.db.models import Count
 from django.db.models import FloatField
 
-for model in BatchMonth, BatchDay, BatchEquip, BatchClass, \
-BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
-    model.objects.all().delete()
+# for model in BatchMonth, BatchDay, BatchEquip, BatchClass, \
+# BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
+#     model.objects.all().delete()
 
 # 中间表分发数据
-for order in MaterialTestOrder.objects.all():
+for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timezone.now()-timedelta(days=30)):
     production_factory_date = order.production_factory_date
     batch_month, _ = BatchMonth.objects.get_or_create(date=
                                                       datetime(year=production_factory_date.year,
@@ -56,9 +56,10 @@ for order in MaterialTestOrder.objects.all():
         indicator, _ = Indicator.objects.get_or_create(name=test_result.test_indicator_name)
         test_data_point, _ = TestDataPoint.objects.get_or_create(
             name=test_result.data_point_name,
-            indicator=indicator,
-            data_point_indicator=test_result.data_point_indicator
-        )
+            indicator=indicator)
+        if test_result.data_point_indicator:
+            test_data_point.data_point_indicator = test_result.data_point_indicator
+            test_data_point.save()
         result, _ = TestResult.objects.get_or_create(train=train,
                                                      point=test_data_point)
         if result.max_times < test_result.test_times:
@@ -68,36 +69,9 @@ for order in MaterialTestOrder.objects.all():
 
             qualified = None if (not test_result.mes_result and not test_result.result) else \
                 (test_result.mes_result == '合格' or test_result.mes_result == '一等品'
-                 or not test_result.mes_result) and (test_result.result == '合格' or test_result.result == '一等品')
+                 or not test_result.mes_result) and (test_result.result == '合格'
+                                                     or test_result.result == '一等品'
+                                                     or not test_result.result)
             result.qualified = qualified
             result.value = test_result.value
             result.save()
-#
-# lb_train_count = Count('lot__train', filter=Q(lot__train__testresult__point__indicator__name='流变'),
-#                        output_field=FloatField())
-#
-# lb_test_pass_count = Count('lot__train', filter=Q(lot__train__testresult__point__indicator__name='流变',
-#                                                   lot__train__testresult__qualified=True),
-#                            output_field=FloatField())
-#
-#
-# batches = Batch.objects.annotate(lb_train_count=lb_train_count)\
-#     .annotate(lb_test_pass_count=lb_test_pass_count)\
-#
-# for batch in batches:
-#     print(batch.id, batch.lb_test_pass_count / batch.lb_train_count)
-
-# for point in TestDataPoint.objects.all():
-#     point.testresult_set
-# TestDataPoint.objects.annotate(upper_limit_count=Count('testresult__train', filter=
-#                                      Q(testresult__qualified=False,
-#                                        testresult__value__gt=F('data_point_indicator__upper_limit'))))
-#
-# for batch_product_no in BatchProductNo.objects.all():
-#     # BatchDay.objects.filter(batch__batch_product_no=batch_product_no)
-#     BatchDay.objects.annotate(Count('batch__lot__train',
-#                 filter=Q(batch__batch_product_no=batch_product_no)))\
-#         .annotate(Count('batch__lot__train',
-#                 filter=Q(batch__batch_product_no=batch_product_no,
-#                          batch__lot__train__testresult__qualified=True)))\
-#         .filter(batch__batch_product_no=batch_product_no)
