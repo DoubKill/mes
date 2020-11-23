@@ -405,7 +405,7 @@ class DispatchPlan(AbstractEntity):
     dispatch_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
     dispatch_user = models.CharField(max_length=16, blank=True, null=True, verbose_name='发货人',
                                      help_text='发货人')
-    start_time = models.DateTimeField(verbose_name="发起时间", help_text="发起时间", auto_now_add=True)
+    start_time = models.DateTimeField(verbose_name="发起时间", help_text="发起时间", auto_created=True)
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', null=True, blank=True)
 
     class Meta:
