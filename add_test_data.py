@@ -86,7 +86,7 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
 
 def add_global_codes():
     names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
-             'SITE', '胶料', '处理类型']
+             'SITE', '胶料', '处理类型', '发货类型']
     j = 1
     for i, name in enumerate(names):
         instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, use_flag=1)
@@ -119,6 +119,8 @@ def add_global_codes():
             items = ['天然胶', '合成胶', '再生胶', 'CMB', 'FM', 'HMB', 'NF', 'RE', 'RFM', 'RMB', '1MB', '2MB', '3MB']
         elif i == 13:
             items = ["放行处理", "不合格处理"]
+        elif i == 14:
+            items = ['正常发货', '配送发货', '返退发货']
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
             j += 1

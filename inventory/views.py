@@ -1,5 +1,6 @@
 import datetime
 import json
+import random
 import time
 
 import requests
@@ -9,7 +10,7 @@ from django.shortcuts import render
 
 # Create your views here.
 from django.utils.decorators import method_decorator
-from rest_framework import mixins, viewsets
+from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -17,22 +18,26 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
-from inventory.filters import InventoryLogFilter, StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter
+from inventory.filters import InventoryLogFilter, StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
+    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
-    BzFinalMixingRubberInventoryLB, DeliveryPlanLB
+    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
-    PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer
+    PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
+    DispatchLogSerializer, DispatchLocationSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from inventory.utils import BaseUploader
-from mes.common_code import SqlClient
+from mes.common_code import SqlClient, CommonDeleteMixin
 from mes.conf import WMS_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
+
+from recipe.models import ProductBatching
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -364,7 +369,7 @@ class MaterialCount(APIView):
             except:
                 raise ValidationError("终炼胶库连接失败")
         elif store_name == "混炼胶库":
-            #TODO 暂时这么写
+            # TODO 暂时这么写
             try:
                 ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
@@ -452,3 +457,116 @@ class PutPlanManagementLB(ModelViewSet):
                 raise ValidationError(s.errors)
             s.save()
         return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DispatchPlanViewSet(ModelViewSet):
+    """发货计划管理"""
+    """
+    发货终端设计67调用的接口在这
+    6、发货页面：点击关闭调用改发货计划接口				
+    7、发货页面：点击完成调用改发货计划接口				
+    """
+    queryset = DispatchPlan.objects.filter(delete_flag=False)
+    serializer_class = DispatchPlanSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DispatchPlanFilter
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        data['dispatch_user'] = request.user.username
+        data['order_no'] = 'FH' + datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(
+            random.randint(1, 99))
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.status in [2, 4]:
+            instance.status = 5
+            instance.last_updated_user = request.user
+            instance.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        else:
+            raise ValidationError('只有执行中和新建才可以关闭！')
+
+
+class DispatchLocationViewSet(ModelViewSet):
+    """目的地"""
+    queryset = DispatchLocation.objects.filter(delete_flag=False)
+    serializer_class = DispatchLocationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DispatchLocationFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'name')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.use_flag:
+            instance.use_flag = False
+        else:
+            instance.use_flag = True
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class DispatchLogViewSet(ModelViewSet):
+    """发货履历管理"""
+    """
+        发货终端设计123调用的接口在这
+        1、详情页： 调用 查询发货履历接口					
+        2、撤销页查询：调用查询发货履历接口 参数为lotno					
+        3、撤销页确认：调用新增发货履历接口					
+    """
+    queryset = DispatchLog.objects.filter(delete_flag=False)
+    serializer_class = DispatchLogSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DispatchLogFilter
+
+
+class DispatchPlanList(APIView):
+    """发货终端设计4"""
+    """	4、发货页面：调用获取未完成单号接口获取单号列表					
+    """
+
+    # 伪代码
+    def get(self, request):
+        order_no_list = DispatchPlan.objects.filter(delete_flag=False).exclude(status=1).values_list('order_no',
+                                                                                                     flat=True)
+        return Response(order_no_list)
+
+
+class DispatchPlanUpdate(APIView):
+    """发货终端设计5"""
+    """5、发货页面：每次扫码成功，更新已发数量和重量,后端需要写发货履历	
+    """
+
+    # 伪代码
+    def get(self, request):
+        dp_obj = DispatchPlan.objects.get(id=1)
+        dl_dict = {'order_no': dp_obj.order_no,
+                   'pallet_no': '这个字段不知道咋取',
+                   'need_qty': dp_obj.need_qty,
+                   'need_weight': dp_obj.need_weight,
+                   'dispatch_type': dp_obj.dispatch_type,
+                   'material_no': dp_obj.material_no,
+                   'quality_status': '这个字段不知道咋取',
+                   'lot_no': '这个字段不知道咋取',
+                   'order_type': dp_obj.order_type,
+                   'status': dp_obj.status,
+                   'qty': dp_obj.qty,
+                   'weight': dp_obj.qty * ProductBatching.objects.filter(
+                       stage_product_batch_no=dp_obj.material_no).first().batching_weight,
+                   'dispatch_location': dp_obj.dispatch_location,
+                   'dispatch_user': dp_obj.dispatch_user,
+                   'fin_time': dp_obj.fin_time
+                   }
+        DispatchLog.objects.create(**dl_dict)
+        return Response('OK')

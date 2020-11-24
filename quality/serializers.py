@@ -481,11 +481,36 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                     result = '一等品'
                 else:
                     result = '三等品'
+                # 判断加减
+                data_point_name = mtr_obj.data_point_name  # 数据点名称
+                test_method_name = mtr_obj.test_method_name  # 试验方法名称
+                test_indicator_name = mtr_obj.test_indicator_name  # 检测指标名称
+                product_no = mtr_obj.material_test_order.product_no  # 胶料编码
+                # 根据material-test-orders接口逻辑找到data_point_indicator
+                material_test_method = MaterialTestMethod.objects.filter(
+                    material__material_no=product_no,
+                    test_method__name=test_method_name,
+                    test_method__test_type__test_indicator__name=test_indicator_name,
+                    data_point__name=data_point_name,
+                    data_point__test_type__test_indicator__name=test_indicator_name).first()
+                add_subtract = None  # 页面的加减
+                if material_test_method:
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        material_test_method=material_test_method,
+                        data_point__name=data_point_name,
+                        data_point__test_type__test_indicator__name=test_indicator_name, level=1).first()
+                    if indicator:  # 判断value与上下限的比较
+                        if mtr_obj.value > indicator.upper_limit:
+                            add_subtract = '+'
+                        elif mtr_obj.value < indicator.lower_limit:
+                            add_subtract = '-'
+
                 mtr_max_list.append(
                     {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
                      'value': mtr_obj.value,
                      'result': result,
-                     'max_test_times': mtr_obj.level})
+                     'max_test_times': mtr_obj.level,
+                     'add_subtract': add_subtract})
 
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
