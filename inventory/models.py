@@ -328,7 +328,7 @@ class DispatchLocation(AbstractEntity):
     """发货地"""
 
     no = models.CharField('发货地编码', max_length=64, help_text='发货地编码')
-    name = models.CharField('发货地名称', max_length=64, help_text='发货地名称')
+    name = models.CharField('发货地名称', max_length=64, help_text='发货地名称', unique=True)
     desc = models.CharField('备注', max_length=64, help_text='备注', blank=True, default='')
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
