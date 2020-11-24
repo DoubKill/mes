@@ -467,7 +467,7 @@ class DispatchPlanViewSet(ModelViewSet):
     6、发货页面：点击关闭调用改发货计划接口				
     7、发货页面：点击完成调用改发货计划接口				
     """
-    queryset = DispatchPlan.objects.filter(delete_flag=False)
+    queryset = DispatchPlan.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = DispatchPlanSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DispatchPlanFilter
@@ -504,7 +504,7 @@ class DispatchLocationViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name')
+            data = queryset.values('id', 'name', 'use_flag')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
@@ -556,14 +556,13 @@ class DispatchPlanUpdate(APIView):
                    'need_qty': dp_obj.need_qty,
                    'need_weight': dp_obj.need_weight,
                    'dispatch_type': dp_obj.dispatch_type,
-                   'material_no': dp_obj.material_no,
-                   'quality_status': '这个字段不知道咋取',
+                   'material_no': dp_obj.material.material_no,
+                   'quality_status': '',#这个字段不知道咋取
                    'lot_no': '这个字段不知道咋取',
                    'order_type': dp_obj.order_type,
                    'status': dp_obj.status,
                    'qty': dp_obj.qty,
-                   'weight': dp_obj.qty * ProductBatching.objects.filter(
-                       stage_product_batch_no=dp_obj.material_no).first().batching_weight,
+                   'weight': 1,  # 这个字段不知道咋取 先默认写个1
                    'dispatch_location': dp_obj.dispatch_location,
                    'dispatch_user': dp_obj.dispatch_user,
                    'fin_time': dp_obj.fin_time
