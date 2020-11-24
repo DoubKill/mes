@@ -803,7 +803,7 @@ class BatchDateProductNoSerializer(PercentOfPassSerializer, serializers.ModelSer
 
     def __init__(self, *args, **kwargs):
         self.batch_product_no_obj = kwargs.pop('batch_product_no_obj', None)
-        super().__init__(args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     points = serializers.SerializerMethodField()
 
@@ -830,7 +830,6 @@ class BatchDayProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchDay
 
     def query_points(self, obj):
-        print(self.batch_product_no_obj)
         return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj,
                                             testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
@@ -840,7 +839,6 @@ class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchMonth
 
     def query_points(self, obj):
-        print(self.batch_product_no_obj)
         return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj,
                                             testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
