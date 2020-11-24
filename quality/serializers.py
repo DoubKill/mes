@@ -609,6 +609,7 @@ class TestDataPointSerializer(serializers.ModelSerializer):
             Count('testresult__train', distinct=True,
                   filter=Q(testresult__qualified=False,
                            testresult__value__lt=F('data_point_indicator__lower_limit'))))
+
         return points
 
 
@@ -799,6 +800,11 @@ class BatchDaySerializer(BatchCommonSerializer):
 
 
 class BatchDateProductNoSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+
+    def __init__(self, *args, **kwargs):
+        self.batch_product_no_obj = kwargs.pop('batch_product_no_obj', None)
+        super().__init__(args, **kwargs)
+
     points = serializers.SerializerMethodField()
 
     class Meta:
@@ -824,7 +830,9 @@ class BatchDayProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchDay
 
     def query_points(self, obj):
-        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj)
+        print(self.batch_product_no_obj)
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj,
+                                            testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
 
 class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
@@ -832,7 +840,9 @@ class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchMonth
 
     def query_points(self, obj):
-        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj)
+        print(self.batch_product_no_obj)
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj,
+                                            testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
 
 class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
@@ -890,7 +900,8 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
         batches = batches.annotate(train_count=train_count)
 
         batches = batches.order_by('date')
-        return self.batch_date_product_no_serializer(batches, many=True).data
+        batch_date_product_no_serializer = self.batch_date_product_no_serializer(batches, many=True, batch_product_no_obj=batch_product_no_obj)
+        return batch_date_product_no_serializer.data
 
 
 class BatchProductNoDaySerializer(BatchProductNoDateCommonSerializer):
