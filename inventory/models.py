@@ -2,9 +2,8 @@ from django.db import models
 
 # Create your models here.
 from basics.models import GlobalCode
-from recipe.models import Material
+from recipe.models import Material, ProductBatching
 from system.models import AbstractEntity, User
-
 
 
 class WarehouseInfo(AbstractEntity):
@@ -47,7 +46,7 @@ class InventoryLog(AbstractEntity):
     order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
     inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
     inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
-    inventory_type = models.CharField(max_length=64, verbose_name='BZ出入库类型', help_text='BZ出入库数类型') # 生产出库/快检异常出库
+    inventory_type = models.CharField(max_length=64, verbose_name='BZ出入库类型', help_text='BZ出入库数类型')  # 生产出库/快检异常出库
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
     initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
                                  help_text='发起人')
@@ -155,7 +154,7 @@ class BzFinalMixingRubberInventoryLB(models.Model):
 
 
 class WmsInventoryStock(models.Model):
-    """wms"""
+    """wms原材料库"""
     sn = models.CharField(max_length=255, db_column='Sn', primary_key=True)
     qty = models.DecimalField(max_digits=18, decimal_places=2, db_column='Quantity')
     material_name = models.CharField(max_length=64, db_column='MaterialName')
@@ -224,9 +223,8 @@ class DeliveryPlan(AbstractEntity):
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
-    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
-    finish_time = models.DateTimeField(verbose_name='完成时间',  blank=True, null=True)
-
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
 
     class Meta:
         db_table = 'delivery_plan'
@@ -254,9 +252,8 @@ class DeliveryPlanLB(AbstractEntity):
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
-    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址',blank=True, null=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-
 
     class Meta:
         db_table = 'delivery_plan_lb'
@@ -286,7 +283,6 @@ class DeliveryPlanFinal(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-
 
     class Meta:
         db_table = 'delivery_plan_final'
@@ -328,7 +324,6 @@ class Station(AbstractEntity):
         verbose_name_plural = verbose_name = '站点信息'
 
 
-
 class DispatchLocation(AbstractEntity):
     """发货地"""
 
@@ -367,7 +362,7 @@ class DispatchLog(AbstractEntity):
     weight = models.DecimalField(verbose_name='单托重量', help_text='单托重量', decimal_places=2, max_digits=8)
     dispatch_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
     dispatch_user = models.CharField(max_length=16, verbose_name='发货人', help_text='发货人')
-    order_created_time = models.DateTimeField(verbose_name="订单创建时间", help_text="订单创建时间", auto_created=True)
+    order_created_time = models.DateTimeField(verbose_name="订单创建时间", help_text="订单创建时间", auto_now_add=True)
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', null=True, blank=True)
 
     class Meta:
@@ -389,19 +384,23 @@ class DispatchPlan(AbstractEntity):
     need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量')
     need_weight = models.DecimalField(verbose_name='需求重量', help_text='需求重量', blank=True, null=True, decimal_places=2,
                                       max_digits=8)
-    material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
-    dispatch_type = models.CharField(max_length=64, verbose_name='发货类型', help_text='发货类型')
+    material = models.ForeignKey(Material, verbose_name='物料编码', help_text='物料编码', on_delete=models.SET_NULL,
+                                 blank=True, null=True)
+    dispatch_type = models.ForeignKey(GlobalCode, verbose_name='发货类型', help_text='发货类型', on_delete=models.SET_NULL,
+                                      blank=True, null=True)
     order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型')
     actual_qty = models.PositiveIntegerField(verbose_name='已发数量', help_text='已发数量', default=0)
     actual_weight = models.DecimalField(verbose_name='已发重量', help_text='已发重量', decimal_places=2,
-                                 max_digits=8, default=0)
-    status = models.PositiveIntegerField(verbose_name="状态", help_text="状态", choices=STATUS_CHOICES)
+                                        max_digits=8, default=0)
+    status = models.PositiveIntegerField(verbose_name="状态", help_text="状态", choices=STATUS_CHOICES, default=4)
     qty = models.PositiveIntegerField(verbose_name='单托数量', help_text='单托数量', blank=True, null=True)
-    dispatch_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
-    dispatch_user = models.CharField(max_length=16, verbose_name='发货人', help_text='发货人')
-    start_time = models.DateTimeField(verbose_name="发起时间", help_text="发起时间", auto_created=True)
+    dispatch_location = models.ForeignKey(DispatchLocation, verbose_name='目的地', help_text='目的地',
+                                          on_delete=models.SET_NULL,
+                                          blank=True, null=True)
+    dispatch_user = models.CharField(max_length=16, verbose_name='发货人', help_text='发货人', null=True, blank=True)
+    start_time = models.DateTimeField(verbose_name="发起时间", help_text="发起时间", auto_now_add=True)
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', null=True, blank=True)
 
     class Meta:
-        db_table = 'dispatch_log'
-        verbose_name_plural = verbose_name = '发货履历'
+        db_table = 'dispatch_plan'
+        verbose_name_plural = verbose_name = '发货计划'
