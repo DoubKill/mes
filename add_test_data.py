@@ -5,7 +5,6 @@ import os
 import string
 import traceback
 
-from inventory.models import DispatchLocation
 
 """
 只添加基础和系统模块数据
@@ -24,6 +23,7 @@ from system.models import GroupExtension, User, Section, SystemConfig, ChildSyst
 from production.models import MaterialTankStatus
 from django.contrib.auth.models import Permission
 from quality.models import DealSuggestion
+from inventory.models import DispatchLocation
 
 last_names = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '尤', '许',
               '何', '吕', '施', '张', '孔', '曹', '严', '华', '金', '魏', '陶', '姜', '戚', '谢', '邹', '喻', '柏', '水', '窦', '章',
