@@ -5,6 +5,8 @@ import os
 import string
 import traceback
 
+from inventory.models import DispatchLocation
+
 """
 只添加基础和系统模块数据
 """
@@ -1409,6 +1411,17 @@ def delete_permission():
     Permission.objects.filter(name__contains='if').delete()
 
 
+# 新增发货地
+def add_dispatch_location():
+    create_list = [
+        {'no': '123', 'name': '安吉', 'desc': '测试专用', 'use_flag': True},
+        {'no': '456', 'name': '下沙', 'desc': '测试专用', 'use_flag': True},
+        {'no': '789', 'name': '富阳', 'desc': '测试专用', 'use_flag': True}
+    ]
+    for create_dict in create_list:
+        DispatchLocation.objects.create(**create_dict)
+
+
 if __name__ == '__main__':
     delete_permission()  # 删除中间表的权限
     add_global_codes()
@@ -1433,3 +1446,5 @@ if __name__ == '__main__':
     print("product is ok")
     add_system_config()
     add_oil_material()
+    add_dispatch_location()
+    print('add dispatch_location ok')
