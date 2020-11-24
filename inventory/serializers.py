@@ -6,6 +6,7 @@ name:
 """
 import datetime
 import json
+import random
 import time
 
 from django.db.models import Sum
@@ -13,9 +14,10 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 
 from basics.models import GlobalCode
+from mes.base_serializer import BaseModelSerializer
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
-    WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB
+    WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -57,7 +59,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     @atomic()
     def create(self, validated_data):
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        inventory_type = validated_data.get('inventory_type') #  出入库类型
+        inventory_type = validated_data.get('inventory_type')  # 出入库类型
 
         material_no = validated_data['material_no']
         need_qty = validated_data['need_qty']
@@ -68,8 +70,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         need_weight = validated_data.get('need_weight')
         location = validated_data.get('location')
         created_user = self.context['request'].user
-        order_type = validated_data.get('order_type','出库')  # 订单类型
-        inventory_reason = validated_data.get('quality_status')      # 出入库原因
+        order_type = validated_data.get('order_type', '出库')  # 订单类型
+        inventory_reason = validated_data.get('quality_status')  # 出入库原因
 
         deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
                                                    inventory_type=inventory_type,
@@ -83,7 +85,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                                    need_weight=need_weight,
                                                    created_user=created_user,
                                                    location=location,
-                                                   inventory_reason=inventory_reason #出库原因
+                                                   inventory_reason=inventory_reason  # 出库原因
                                                    )
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
@@ -98,7 +100,6 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         #
         # self.create_dps(DeliveryPlan, dps_dict)
         return deliveryplan
-
 
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
@@ -130,14 +131,14 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
             elif out_type == "正常出库":
-                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num,'DJJG':djjg,
+                dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num, 'DJJG': djjg,
                          'STATIONID': location, 'SENDDATE': created_time}
 
-        # 北自接口类型区分
-                # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
-            if inventory_reason =='一等品':
+            # 北自接口类型区分
+            # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
+            if inventory_reason == '一等品':
                 bz_out_type = "生产出库"
-            elif inventory_reason =='三等品':
+            elif inventory_reason == '三等品':
                 bz_out_type = "快检出库"
             else:
                 bz_out_type = "生产出库"
@@ -209,7 +210,6 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         ret["created_user"] = instance.created_user.username
         return ret
 
-
     class Meta:
         model = DeliveryPlan
         fields = '__all__'
@@ -237,7 +237,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
     @atomic()
     def create(self, validated_data):
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
-        inventory_type = validated_data.get('inventory_type') #  出入库类型
+        inventory_type = validated_data.get('inventory_type')  # 出入库类型
 
         material_no = validated_data['material_no']
         need_qty = validated_data['need_qty']
@@ -248,8 +248,8 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         need_weight = validated_data.get('need_weight')
         location = validated_data.get('location')
         created_user = self.context['request'].user
-        order_type = validated_data.get('order_type','出库')  # 订单类型
-        inventory_reason = validated_data.get('quality_status')      # 出入库原因
+        order_type = validated_data.get('order_type', '出库')  # 订单类型
+        inventory_reason = validated_data.get('quality_status')  # 出入库原因
 
         deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
                                                    inventory_type=inventory_type,
@@ -263,7 +263,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
                                                    need_weight=need_weight,
                                                    created_user=created_user,
                                                    location=location,
-                                                   inventory_reason=inventory_reason #出库原因
+                                                   inventory_reason=inventory_reason  # 出库原因
                                                    )
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
@@ -278,7 +278,6 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         #
         # self.create_dps(DeliveryPlan, dps_dict)
         return deliveryplan
-
 
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
@@ -312,9 +311,9 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
 
             # 北自接口类型区分
             # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
-            if inventory_reason =='一等品':
+            if inventory_reason == '一等品':
                 bz_out_type = "生产出库"
-            elif inventory_reason =='三等品':
+            elif inventory_reason == '三等品':
                 bz_out_type = "快检出库"
             else:
                 bz_out_type = "生产出库"
@@ -460,8 +459,8 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
-
     """终炼胶|帘布库共用序列化器"""
+
     class Meta:
         model = BzFinalMixingRubberInventory
         fields = "__all__"
@@ -514,7 +513,7 @@ class StationSerializer(serializers.ModelSerializer):
     warehouse_no = serializers.ReadOnlyField(source='warehouse_info.no', default='')
     type_name = serializers.ReadOnlyField(source='type.global_name', default='')
     type = serializers.PrimaryKeyRelatedField(queryset=GlobalCode.objects.filter(use_flag=True,
-                                                                                global_type__type_name='站点类型'))
+                                                                                 global_type__type_name='站点类型'))
     warehouse_info = serializers.PrimaryKeyRelatedField(queryset=WarehouseInfo.objects.all(), write_only=True)
 
     class Meta:
@@ -534,3 +533,37 @@ class WarehouseMaterialTypeSerializer(serializers.ModelSerializer):
         model = WarehouseMaterialType
         fields = ['id', 'warehouse_info', 'warehouse_no', 'material_type_name', 'use_flag', 'material_type']
         read_only_fields = ['use_flag']
+
+
+class DispatchPlanSerializer(BaseModelSerializer):
+    """发货计划管理"""
+    '''发货日期前端页面删除'''
+    dispatch_type_name = serializers.ReadOnlyField(source='dispatch_type.global_name', help_text='发货类型', )
+    dispatch_location_name = serializers.ReadOnlyField(source='dispatch_location.name', help_text='目的地', )
+    material_name = serializers.ReadOnlyField(source='material.material_no', help_text='物料编码', )
+    status_name = serializers.ReadOnlyField(source='get_status_display', help_text="状态")
+
+    class Meta:
+        model = DispatchPlan
+        fields = (
+            'id', 'dispatch_location', 'order_no', 'dispatch_type', 'material', 'need_qty', 'actual_qty',
+            'need_weight', 'actual_weight', 'status', 'dispatch_user', 'start_time', 'fin_time', 'dispatch_type_name',
+            'dispatch_location_name', 'material_name', 'status_name', 'created_date')
+
+
+class DispatchLocationSerializer(BaseModelSerializer):
+    """目的地"""
+    create_user_name = serializers.ReadOnlyField(source='created_user.username')
+    update_user_name = serializers.ReadOnlyField(source='last_updated_user.username')
+
+    class Meta:
+        model = DispatchLocation
+        fields = '__all__'
+
+
+class DispatchLogSerializer(BaseModelSerializer):
+    """发货履历"""
+
+    class Meta:
+        model = DispatchLog
+        fields = '__all__'
