@@ -462,6 +462,11 @@ class PutPlanManagementLB(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class DispatchPlanViewSet(ModelViewSet):
     """发货计划管理"""
+    """
+    发货终端设计67调用的接口在这
+    6、发货页面：点击关闭调用改发货计划接口				
+    7、发货页面：点击完成调用改发货计划接口				
+    """
     queryset = DispatchPlan.objects.filter(delete_flag=False)
     serializer_class = DispatchPlanSerializer
     filter_backends = [DjangoFilterBackend]
@@ -513,7 +518,13 @@ class DispatchLocationViewSet(ModelViewSet):
 
 
 class DispatchLogViewSet(ModelViewSet):
-    """发货履历管理(发货终端设计)123"""
+    """发货履历管理"""
+    """
+        发货终端设计123调用的接口在这
+        1、详情页： 调用 查询发货履历接口					
+        2、撤销页查询：调用查询发货履历接口 参数为lotno					
+        3、撤销页确认：调用新增发货履历接口					
+    """
     queryset = DispatchLog.objects.filter(delete_flag=False)
     serializer_class = DispatchLogSerializer
     filter_backends = [DjangoFilterBackend]
@@ -522,7 +533,10 @@ class DispatchLogViewSet(ModelViewSet):
 
 class DispatchPlanList(APIView):
     """发货终端设计4"""
+    """	4、发货页面：调用获取未完成单号接口获取单号列表					
+    """
 
+    # 伪代码
     def get(self, request):
         order_no_list = DispatchPlan.objects.filter(delete_flag=False).exclude(status=1).values_list('order_no',
                                                                                                      flat=True)
@@ -531,7 +545,10 @@ class DispatchPlanList(APIView):
 
 class DispatchPlanUpdate(APIView):
     """发货终端设计5"""
+    """5、发货页面：每次扫码成功，更新已发数量和重量,后端需要写发货履历	
+    """
 
+    # 伪代码
     def get(self, request):
         dp_obj = DispatchPlan.objects.get(id=1)
         dl_dict = {'order_no': dp_obj.order_no,
