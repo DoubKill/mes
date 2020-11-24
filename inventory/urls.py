@@ -42,13 +42,14 @@ router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 # 帘布库出库管理
 router.register(r'lb-plan-management', views.PutPlanManagementLB)
 
+'''在后面加发货终端设计的url表示发货终端设计所需要的接口和mes页面所需要的接口耦合了，在此提示说明一下，防止重复开发'''
 # 发货计划管理
 router.register(r'dispatch-plan', views.DispatchPlanViewSet)  # 发货终端设计67
 
 # 目的地
 router.register(r'dispatch-location', views.DispatchLocationViewSet)
 
-# 发货履历管理(发货终端设计)
+# 发货履历管理
 router.register(r'dispatch-log', views.DispatchLogViewSet)  # 发货终端设计123
 
 urlpatterns = [
