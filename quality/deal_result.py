@@ -10,7 +10,7 @@ from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestRe
 from production.models import PalletFeedbacks
 from quality.serializers import MaterialDealResultListSerializer
 from django.db.transaction import atomic
-from django.db.models import Max, Min
+from django.db.models import Max, Min, Q
 import logging
 
 logger = logging.getLogger('send_log')
@@ -129,8 +129,10 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     # 5、向北自接口发送数据
     # 5.1、先判断库存和线边库里有没有数据
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
-    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(container_no=pfb_obj.pallet_no).last()
-    mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
+
+    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(
+        Q(container_no=pfb_obj.pallet_no) | Q(lot_no=mdr_obj.lot_no)).last()
+    mi_obj = MaterialInventory.objects.filter(Q(container_no=pfb_obj.pallet_no) | Q(lot_no=mdr_obj.lot_no)).last()
     # 5.2、一个库里有就发给北自，没有就不发给北自
     if bz_obj or mi_obj:
         try:
