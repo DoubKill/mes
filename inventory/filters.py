@@ -75,8 +75,8 @@ class DispatchLogFilter(django_filters.rest_framework.FilterSet):
 
 
 class DispatchLocationFilter(django_filters.rest_framework.FilterSet):
-    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
     '''目的地'''
+    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
 
     class Meta:
         model = DispatchLocation

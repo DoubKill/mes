@@ -516,6 +516,7 @@ class DispatchLocationViewSet(ModelViewSet):
             instance.use_flag = False
         else:
             instance.use_flag = True
+        instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
