@@ -465,7 +465,9 @@ class DispatchPlanViewSet(ModelViewSet):
     """
     发货终端设计67调用的接口在这
     6、发货页面：点击关闭调用改发货计划接口				
-    7、发货页面：点击完成调用改发货计划接口				
+    7、发货页面：点击完成调用改发货计划接口		
+    个人理解：
+        67两点应该是调用PATCH方法对status字段进行修改
     """
     queryset = DispatchPlan.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = DispatchPlanSerializer
@@ -520,10 +522,14 @@ class DispatchLocationViewSet(ModelViewSet):
 class DispatchLogViewSet(ModelViewSet):
     """发货履历管理"""
     """
-        发货终端设计123调用的接口在这
-        1、详情页： 调用 查询发货履历接口					
-        2、撤销页查询：调用查询发货履历接口 参数为lotno					
-        3、撤销页确认：调用新增发货履历接口					
+    发货终端设计123调用的接口在这
+    1、详情页： 调用 查询发货履历接口					
+    2、撤销页查询：调用查询发货履历接口 参数为lotno					
+    3、撤销页确认：调用新增发货履历接口
+    个人理解：
+           详情页应该就是list展示
+           撤销页查询应该就是通过lotno筛选，但是不明白撤销是什么意思，现有的表里是没有那个字段表示撤销的含义的
+           撤销页确认应该就是新增一条发货履历表数据
     """
     queryset = DispatchLog.objects.filter(delete_flag=False)
     serializer_class = DispatchLogSerializer
@@ -546,6 +552,10 @@ class DispatchPlanList(APIView):
 class DispatchPlanUpdate(APIView):
     """发货终端设计5"""
     """5、发货页面：每次扫码成功，更新已发数量和重量,后端需要写发货履历	
+    个人理解：
+        这里的逻辑应该是每次扫码之后 通过某个值去找到发货计划的一条具体数据A
+        然后更新A的已发数量和重量（这两个值也应该是扫码传过来的）
+        再然后根据A的数据在发货履历表里新增一条数据
     """
 
     # 伪代码
@@ -557,7 +567,7 @@ class DispatchPlanUpdate(APIView):
                    'need_weight': dp_obj.need_weight,
                    'dispatch_type': dp_obj.dispatch_type,
                    'material_no': dp_obj.material.material_no,
-                   'quality_status': '',#这个字段不知道咋取
+                   'quality_status': '',  # 这个字段不知道咋取
                    'lot_no': '这个字段不知道咋取',
                    'order_type': dp_obj.order_type,
                    'status': dp_obj.status,
