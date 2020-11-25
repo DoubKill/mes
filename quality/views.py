@@ -923,9 +923,9 @@ class UnqualifiedOrderTrains(APIView):
                     'classes': item[1],
                     'equip_no': item[2],
                     'product_no': item[3],
-                    'actual_trains': set([item[4]]),
+                    'actual_trains': {item[4]},
                     'indicator_data': {data_point_key: [item[7]]},
-                    'order_ids': set([item[8]])
+                    'order_ids': {item[8]}
                 }
             else:
                 ret[item_key]['actual_trains'].add(item[4])
@@ -1034,7 +1034,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
                     'classes': item[1],
                     'equip_no': item[2],
                     'product_no': item[3],
-                    'actual_trains': set([item[4]]),
+                    'actual_trains': {item[4]},
                     'indicator_data': {data_point_key: [item[7]]},
                 }
             else:
