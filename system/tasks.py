@@ -87,7 +87,7 @@ class WorkScheduleUploader(BaseUploader):
     """倒班管理"""
     path = "api/v1/datain/work_schedule-receive/"
     type = 3
-    upload_fields = ('id', 'schedule_no', 'schedule_name', 'period', 'description', 'use_flag')
+    upload_fields = ('id', 'schedule_no', 'schedule_name', 'period', 'description', 'use_flag', 'work_procedure__global_no')
     model = WorkSchedule
 
 
