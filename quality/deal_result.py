@@ -163,7 +163,7 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:  # 两个库都没有
         mdr_obj.update_store_test_flag = 3
         mdr_obj.save()
-        logger.error("没有发送，两个库存和线边库里都没有")
+        logger.error("没有发送，库存和线边库里都没有")
 
 
 def receive_deal_result(lot_no):
