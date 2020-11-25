@@ -130,18 +130,16 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
+                bz_out_type = "快检出库"
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num, 'DJJG': djjg,
                          'STATIONID': location, 'SENDDATE': created_time}
-
+                bz_out_type = "生产出库"
+            else:
+                dict1 = {}
+                bz_out_type = "生产出库"
             # 北自接口类型区分
             # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
-            if inventory_reason == '一等品':
-                bz_out_type = "生产出库"
-            elif inventory_reason == '三等品':
-                bz_out_type = "快检出库"
-            else:
-                bz_out_type = "生产出库"
             items = []
             items.append(dict1)
             json_data = {
@@ -251,7 +249,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         order_type = validated_data.get('order_type', '出库')  # 订单类型
         inventory_reason = validated_data.get('quality_status')  # 出入库原因
 
-        deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
+        deliveryplan = DeliveryPlanLB.objects.create(order_no=order_no,
                                                    inventory_type=inventory_type,
                                                    material_no=material_no,
                                                    need_qty=need_qty,
@@ -301,22 +299,20 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
             WORKID = time.strftime("%Y%m%d%H%M%S")
-            dict1 = {}
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
+                bz_out_type = "快检出库"
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num, 'DJJG': djjg,
                          'STATIONID': location, 'SENDDATE': created_time}
 
+                bz_out_type = "生产出库"
+            else:
+                dict1 = {}
+                bz_out_type = "生产出库"
             # 北自接口类型区分
             # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
-            if inventory_reason == '一等品':
-                bz_out_type = "生产出库"
-            elif inventory_reason == '三等品':
-                bz_out_type = "快检出库"
-            else:
-                bz_out_type = "生产出库"
             items = []
             items.append(dict1)
             json_data = {
