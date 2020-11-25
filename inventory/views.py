@@ -562,13 +562,13 @@ class DispatchPlanUpdate(APIView):
     def get(self, request):
         dp_obj = DispatchPlan.objects.get(id=1)
         dl_dict = {'order_no': dp_obj.order_no,
-                   'pallet_no': '这个字段不知道咋取',
+                   'pallet_no': '托盘号不知道咋取',
                    'need_qty': dp_obj.need_qty,
                    'need_weight': dp_obj.need_weight,
                    'dispatch_type': dp_obj.dispatch_type,
                    'material_no': dp_obj.material.material_no,
                    'quality_status': '',  # 这个字段不知道咋取
-                   'lot_no': '这个字段不知道咋取',
+                   'lot_no': 'lot_no不知道咋取',
                    'order_type': dp_obj.order_type,
                    'status': dp_obj.status,
                    'qty': dp_obj.qty,
