@@ -887,7 +887,7 @@ class UnqualifiedOrderTrains(APIView):
                    mtr.TEST_INDICATOR_NAME,
                    mtr.DATA_POINT_NAME,
                    mtr.VALUE,
-                   mtr."LEVEL",
+                   mtr.MATERIAL_TEST_ORDER_ID,
                    udod.ID
             from MATERIAL_TEST_RESULT mtr
             inner join (
@@ -1017,8 +1017,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
                              and tmp.TEST_INDICATOR_NAME=mtr.TEST_INDICATOR_NAME
                              and tmp.max_times=mtr.TEST_TIMES
             inner join MATERIAL_TEST_ORDER mto on mtr.MATERIAL_TEST_ORDER_ID = mto.ID
-            where mtr."LEVEL">1 and mto.ID in ({});
-              """.format(create_data, ','.join([str(i) for i in order_ids]))
+            where mtr."LEVEL">1 and mto.ID in ({});""".format(create_data, ','.join([str(i) for i in order_ids]))
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
