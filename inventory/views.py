@@ -578,7 +578,7 @@ class DispatchPlanUpdate(APIView):
                    'lot_no': 'lot_no不知道咋取',
                    'order_type': dp_obj.order_type,
                    'status': dp_obj.status,
-                   'qty': dp_obj.qty,
+                   'qty': dp_obj.qty if dp_obj.qty else 1,  # 因为出库计划表里的一些字段目前没法存值，导致在新建出库履历时也为空，所以先写个1放着
                    'weight': 1,  # 这个字段不知道咋取 先默认写个1
                    'dispatch_location': dp_obj.dispatch_location,
                    'dispatch_user': dp_obj.dispatch_user,
