@@ -171,11 +171,11 @@ def main():
                         data_point_name=data_point_name,
                         test_method_name=method_name,
                         test_indicator_name=indicator_name,
-                        result=result,
+                        result='一等品' if result == '合格' else '三等品',
                         mes_result=result,
                         machine_name=indicator_name+'仪',
                         test_group=test_group,
-                        level=1 if result == '合格' else 3,
+                        level=1 if result == '合格' else 2,
                         origin=idx+1
                     )
             conn.close()
