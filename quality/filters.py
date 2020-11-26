@@ -84,10 +84,7 @@ class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
 class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
     st = django_filters.DateFilter(field_name='created_date__date', lookup_expr='gte', help_text='开始时间')
     et = django_filters.DateFilter(field_name='created_date__date', lookup_expr='lte', help_text='结束时间')
-    reason = django_filters.BooleanFilter(field_name='reason', lookup_expr='isnull', help_text='原因编辑')
-    t_deal_suggestion = django_filters.BooleanFilter(field_name='t_deal_user', lookup_expr='isnull', help_text='技术处理')
-    c_deal_suggestion = django_filters.BooleanFilter(field_name='c_deal_user', lookup_expr='isnull', help_text='检查处理')
 
     class Meta:
         model = UnqualifiedDealOrder
-        fields = ('st', 'et', 'reason', 't_deal_suggestion', 'c_deal_suggestion')
+        fields = ('st', 'et')

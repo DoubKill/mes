@@ -944,6 +944,25 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = UnqualifiedDealOrderFilter
 
+    def get_queryset(self):
+        queryset = self.queryset
+        reason = self.request.query_params.get('reason')
+        t_deal_suggestion = self.request.query_params.get('t_deal_suggestion')
+        c_deal_suggestion = self.request.query_params.get('c_deal_suggestion')
+        if reason == 'true':  # 未处理
+            queryset = queryset.filter(reason__isnull=True)
+        elif reason == 'false':  # 已处理
+            queryset = queryset.filter(reason__isnull=False)
+        if t_deal_suggestion == 'true':  # 未处理
+            queryset = queryset.filter(t_deal_suggestion__isnull=True)
+        elif t_deal_suggestion == 'false':  # 已处理
+            queryset = queryset.filter(t_deal_suggestion__isnull=False)
+        if c_deal_suggestion == 'true':  # 未处理
+            queryset = queryset.filter(c_deal_suggestion__isnull=True)
+        elif c_deal_suggestion == 'false':  # 已处理
+            queryset = queryset.filter(c_deal_suggestion__isnull=False)
+        return queryset
+
     def get_serializer_class(self):
         if self.action == 'create':
             return UnqualifiedDealOrderCreateSerializer
