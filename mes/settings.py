@@ -332,9 +332,9 @@ LOCALE_PATHS = (
     os.path.join(BASE_DIR, 'locale'),
 )
 
-LOGIN_URL = 'gui:login'
-LOGIN_REDIRECT_URL = 'gui:global-codes-manage'
-LOGOUT_REDIRECT_URL = 'gui:login'
+# LOGIN_URL = 'gui:login'
+# LOGIN_REDIRECT_URL = 'gui:global-codes-manage'
+# LOGOUT_REDIRECT_URL = 'gui:login'
 
 # 跨域允许的请求方式，可以使用默认值，默认的请求方式为:
 # from corsheaders.defaults import default_methods
