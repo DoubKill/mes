@@ -65,8 +65,7 @@ def send_bz():
 
 
 if __name__ == '__main__':
-    while True:
-        try:
-            send_bz()
-        except Exception as e:
-            logger.error(e)
+    try:
+        send_bz()
+    except Exception as e:
+        logger.error(e)
