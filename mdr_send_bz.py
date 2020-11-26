@@ -5,7 +5,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 from tasks import update_wms_kjjg
 import datetime
-from django.db.models import Q
+from django.db.models import Q, Max
 from inventory.models import BzFinalMixingRubberInventory, MaterialInventory
 from mes.common_code import order_no
 from production.models import PalletFeedbacks
@@ -20,10 +20,12 @@ logger = logging.getLogger('send_log')
 def send_bz():
     # 5、向北自接口发送数据
     # 5.1、先判断库存和线边库里有没有数据
-    mdr_set = MaterialDealResult.objects.exclude(update_store_test_flag=1).all()
-    for mdr_obj in mdr_set:
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
+    max_list = MaterialDealResult.objects.values('lot_no').annotate(max_test=Max('test_time'))
+    for max_dict in max_list:
+        mdr_obj = MaterialDealResult.objects.filter(lot_no=max_dict['lot_no'], test_time=max_dict['max_test']).exclude(
+            update_store_test_flag=1).first()
 
+        pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
         bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(
             Q(container_no=pfb_obj.pallet_no) | Q(lot_no=mdr_obj.lot_no)).last()
         mi_obj = MaterialInventory.objects.filter(Q(container_no=pfb_obj.pallet_no) | Q(lot_no=mdr_obj.lot_no)).last()
