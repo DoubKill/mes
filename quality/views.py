@@ -115,11 +115,15 @@ class TestIndicatorDataPointListView(ListAPIView):
         ret = []
         test_indicators = TestIndicator.objects.all()
         for test_indicator in test_indicators:
-            data_names = set(DataPoint.objects.filter(
-                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True))
+            data_indicator_detail = []
+            data_names = DataPoint.objects.filter(
+                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True)
+            for name in data_names:
+                if name not in data_indicator_detail:
+                    data_indicator_detail.append(name)
             data = {'test_type_id': test_indicator.id,
                     'test_type_name': test_indicator.name,
-                    'data_indicator_detail': [data_name for data_name in data_names]
+                    'data_indicator_detail': data_indicator_detail
                     }
             ret.append(data)
         return Response(ret)
@@ -943,6 +947,25 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
     queryset = UnqualifiedDealOrder.objects.all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = UnqualifiedDealOrderFilter
+
+    def get_queryset(self):
+        queryset = self.queryset
+        reason = self.request.query_params.get('reason')
+        t_deal_suggestion = self.request.query_params.get('t_deal_suggestion')
+        c_deal_suggestion = self.request.query_params.get('c_deal_suggestion')
+        if reason == 'true':  # 未处理
+            queryset = queryset.filter(reason__isnull=True)
+        elif reason == 'false':  # 已处理
+            queryset = queryset.filter(reason__isnull=False)
+        if t_deal_suggestion == 'true':  # 未处理
+            queryset = queryset.filter(t_deal_suggestion__isnull=True)
+        elif t_deal_suggestion == 'false':  # 已处理
+            queryset = queryset.filter(t_deal_suggestion__isnull=False)
+        if c_deal_suggestion == 'true':  # 未处理
+            queryset = queryset.filter(c_deal_suggestion__isnull=True)
+        elif c_deal_suggestion == 'false':  # 已处理
+            queryset = queryset.filter(c_deal_suggestion__isnull=False)
+        return queryset
 
     def get_serializer_class(self):
         if self.action == 'create':
