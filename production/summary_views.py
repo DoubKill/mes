@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from basics.models import WorkSchedulePlan
 from mes.derorators import api_recorder
+from mes.paginations import DefaultPageNumberPagination
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
@@ -20,6 +21,7 @@ from rest_framework.response import Response
 class ClassesBanBurySummaryView(ListAPIView):
     """班次密炼统计"""
     queryset = TrainsFeedbacks.objects.all()
+    pagination_class = None
 
     @staticmethod
     def get_class_dimension_page_data(page):
@@ -154,17 +156,18 @@ class ClassesBanBurySummaryView(ListAPIView):
                 if ret[item_key]['min_train_time'] > item[7]:
                     ret[item_key]['min_train_time'] = item[7]
 
-        page = self.paginate_queryset(list(ret.values()))
+        data = ret.values()
         if day_type == '2' and dimension == '1':
-            page = self.get_class_dimension_page_data(page)
+            data = self.get_class_dimension_page_data(ret.values())
 
-        return self.get_paginated_response(page)
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipBanBurySummaryView(ClassesBanBurySummaryView):
     """机台密炼统计"""
     queryset = TrainsFeedbacks.objects.all()
+    pagination_class = DefaultPageNumberPagination
 
     def list(self, request, *args, **kwargs):
         st = self.request.query_params.get('st')  # 开始时间
