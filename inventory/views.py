@@ -37,7 +37,7 @@ from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
-from recipe.models import ProductBatching
+from recipe.models import ProductBatching, Material
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -199,11 +199,11 @@ class OutWorkFeedBack(APIView):
             order_no = data.get('order_no')
             if order_no:
                 temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
-                all_qty = temp.get("all_qty")
+                all_qty = int(temp.get("all_qty"))
                 if all_qty:
-                    all_qty += data.get("qty")
+                    all_qty += int(data.get("qty"))
                 else:
-                    all_qty = data.get("qty")
+                    all_qty = int(data.get("qty"))
                 dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
                 need_qty = dp_obj.need_qty if dp_obj else 2
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
@@ -225,13 +225,14 @@ class OutWorkFeedBack(APIView):
                 il_dict['material_no'] = dp_obj.material_no
                 il_dict['start_time'] = dp_obj.created_date
                 il_dict['order_type'] = dp_obj.order_type
+                material = Material.objects.filter(material_no=dp_obj.material_no).first()
                 material_inventory_dict = {
-                    "material": 1,
+                    "material": material,
                     "container_no": data.get("pallet_no"),
-                    "site": 15,
+                    "site_id": 15,
                     "qty": data.get("qty"),
                     "unit": dp_obj.unit,
-                    "unit_weight": data.get("weight") / data.get("qty"),
+                    "unit_weight": float(data.get("weight")) / float(data.get("qty")),
                     "total_weight": data.get("weight"),
                     "quality_status": data.get("quality_status"),
                     "lot_no": data.get("lot_no"),
@@ -243,7 +244,7 @@ class OutWorkFeedBack(APIView):
             try:
                 InventoryLog.objects.create(**data, **il_dict)
                 MaterialInventory.objects.create(**material_inventory_dict)
-            except:
+            except Exception as e:
                 result = {"message": "反馈失败", "flag": "99"}
             else:
                 result = {"message": "反馈成功", "flag": "01"}
