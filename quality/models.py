@@ -309,14 +309,14 @@ class UnqualifiedDealOrder(AbstractEntity):
     status = models.CharField(max_length=64, help_text='状态', blank=True, null=True)
     deal_user = models.CharField(max_length=64, help_text='经办人', blank=True, null=True)
     deal_date = models.DateField(max_length=64, help_text='经办日期', blank=True, null=True)
-    reason = models.TextField(max_length=64, help_text='原因', blank=True, null=True)
-    t_deal_suggestion = models.TextField(max_length=64, help_text='技术部门处理意见', blank=True, null=True)
-    c_deal_suggestion = models.TextField(max_length=64, help_text='检查部门处理意见', blank=True, null=True)
+    reason = models.TextField(help_text='原因', blank=True, null=True)
+    t_deal_suggestion = models.TextField(help_text='技术部门处理意见', blank=True, null=True)
+    c_deal_suggestion = models.TextField(help_text='检查部门处理意见', blank=True, null=True)
     t_deal_user = models.CharField(max_length=64, help_text='技术部门处理人', blank=True, null=True)
     t_deal_date = models.DateField(help_text='技术日期', blank=True, null=True)
     c_deal_user = models.CharField(max_length=64, help_text='检查部门处理人', blank=True, null=True)
     c_deal_date = models.DateField(help_text='检查日期', blank=True, null=True)
-    desc = models.TextField(max_length=64, help_text='描述', blank=True, null=True)
+    desc = models.TextField(help_text='描述', blank=True, null=True)
 
     class Meta:
         db_table = 'unqualified_deal_order'
