@@ -167,7 +167,6 @@ class ClassesBanBurySummaryView(ListAPIView):
 class EquipBanBurySummaryView(ClassesBanBurySummaryView):
     """机台密炼统计"""
     queryset = TrainsFeedbacks.objects.all()
-    pagination_class = DefaultPageNumberPagination
 
     def list(self, request, *args, **kwargs):
         st = self.request.query_params.get('st')  # 开始时间
@@ -262,11 +261,11 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                 ret[item_key]['total_trains'] += diff_trains
                 ret[item_key]['total_time'] += item_dict['total_time']
 
-        page = self.paginate_queryset(list(ret.values()))
+        data = ret.values()
         if day_type == '2' and dimension == '1':
-            page = self.get_class_dimension_page_data(page)
+            data = self.get_class_dimension_page_data(ret.values())
 
-        return self.get_paginated_response(page)
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
