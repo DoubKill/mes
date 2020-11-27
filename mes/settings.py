@@ -244,7 +244,7 @@ LOGGING = {
         },
         'quality_log': {
             'handlers': ['qualityFile'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': 'INFO',
         },
     },
 }

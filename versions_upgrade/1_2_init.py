@@ -27,7 +27,7 @@ def add_permissions():
         {'id': 163, 'code': 'export_result_info', 'name': '导出', 'parent_id': 116},
          ]
     for item in permission_data:
-        Permissions.objects.create(**item)
+        Permissions.objects.get_or_create(**item)
 
 
 if __name__ == '__main__':
