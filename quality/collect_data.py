@@ -18,7 +18,7 @@ from basics.models import WorkSchedulePlan
 
 import pymssql
 import logging
-logger = logging.getLogger('sync_log')
+logger = logging.getLogger('quality_log')
 
 data_bases = [
     {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
@@ -40,10 +40,10 @@ def main():
         max_test_date = MaterialTestResult.objects.filter(origin=idx+1).aggregate(
             max_test_date=Max('test_factory_date'))['max_test_date']
         if not max_test_date:
-            max_test_date = '2020-11-12 00:00:00'
+            max_test_date = '2020-11-22 00:00:00'
         else:
             max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
-        logger.info('max_test_date: {}'.format(max_test_date))
+        logger.error('max_test_date: {}'.format(max_test_date))
         server = data_base['server']
         user = data_base['user']
         password = data_base['password']
@@ -136,7 +136,7 @@ def main():
                 if schedule_plan:
                     group = schedule_plan.group.global_name
                 else:
-                    continue
+                    group = 'a'
 
                 # 关键看能不能找到托盘反馈数据
                 for i in range(trains, trains+interval):
