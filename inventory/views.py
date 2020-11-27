@@ -199,7 +199,7 @@ class OutWorkFeedBack(APIView):
             order_no = data.get('order_no')
             if order_no:
                 temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
-                all_qty = int(temp.get("all_qty"))
+                all_qty = temp.get("all_qty")
                 if all_qty:
                     all_qty += int(data.get("qty"))
                 else:
