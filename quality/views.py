@@ -113,19 +113,21 @@ class TestIndicatorDataPointListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = []
-        test_indicators = TestIndicator.objects.all()
-        for test_indicator in test_indicators:
-            data_indicator_detail = []
-            data_names = DataPoint.objects.filter(
-                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True)
-            for name in data_names:
-                if name not in data_indicator_detail:
-                    data_indicator_detail.append(name)
-            data = {'test_type_id': test_indicator.id,
-                    'test_type_name': test_indicator.name,
-                    'data_indicator_detail': data_indicator_detail
-                    }
-            ret.append(data)
+        test_indicators_names = ['门尼', '比重', '硬度', '流变', '钢拔']
+        for name in test_indicators_names:
+            test_indicator = TestIndicator.objects.filter(name__icontains=name).first()
+            if test_indicator:
+                data_indicator_detail = []
+                data_names = DataPoint.objects.filter(
+                    test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True)
+                for name in data_names:
+                    if name not in data_indicator_detail:
+                        data_indicator_detail.append(name)
+                data = {'test_type_id': test_indicator.id,
+                        'test_type_name': test_indicator.name,
+                        'data_indicator_detail': data_indicator_detail
+                        }
+                ret.append(data)
         return Response(ret)
 
 
