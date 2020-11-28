@@ -125,8 +125,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             # 发起时间
             time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
-            WORKID = time.strftime("%Y%m%d%H%M%S")
-            dict1 = {}
+            WORKID = msg_id
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}
@@ -298,7 +297,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             # 发起时间
             time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
-            WORKID = time.strftime("%Y%m%d%H%M%S")
+            WORKID = msg_id
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
                          'STATIONID': location, 'SENDDATE': created_time}

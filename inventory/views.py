@@ -1,5 +1,6 @@
 import datetime
 import json
+import logging
 import random
 import time
 
@@ -21,7 +22,8 @@ from basics.models import GlobalCode
 from inventory.filters import InventoryLogFilter, StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
-    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation
+    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, MixGumOutInventoryLog, \
+    MixGumInInventoryLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -41,6 +43,8 @@ from recipe.models import ProductBatching, Material
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
+
+logger = logging.getLogger('send.log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -196,10 +200,11 @@ class OutWorkFeedBack(APIView):
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
         #         }
         if data:
+            data.pop("status", None)
             order_no = data.get('order_no')
             if order_no:
                 temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
-                all_qty = int(temp.get("all_qty"))
+                all_qty = temp.get("all_qty")
                 if all_qty:
                     all_qty += int(data.get("qty"))
                 else:
@@ -245,12 +250,13 @@ class OutWorkFeedBack(APIView):
                 InventoryLog.objects.create(**data, **il_dict)
                 MaterialInventory.objects.create(**material_inventory_dict)
             except Exception as e:
-                result = {"message": "反馈失败", "flag": "99"}
+                logger.error(e)
+                result = {"99": "FALSE", f"message":"反馈失败，原因: {e}"}
             else:
-                result = {"message": "反馈成功", "flag": "01"}
+                result = {"01":"TRUES", "message":"反馈成功，OK"}
 
             return Response(result)
-        return Response({"message": "反馈失败", "flag": "99"})
+        return Response({"99": "FALSE", "message":"反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -352,7 +358,20 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InventoryLogSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_class = InventoryLogFilter
+    # filter_class = InventoryLogFilter
+
+    def get_queryset(self):
+        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        store_type = self.request.query_params.get("store_type", "out")
+        if store_name == "混炼胶库":
+            if store_type == "out":
+                return MixGumOutInventoryLog.objects.using('bz').all()
+            else:
+                return MixGumInInventoryLog.objects.using('bz').all()
+        else:
+            return InventoryLog.objects.order_by('-start_time')
+
+
 
 
 @method_decorator([api_recorder], name="dispatch")
