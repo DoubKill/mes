@@ -404,3 +404,77 @@ class DispatchPlan(AbstractEntity):
     class Meta:
         db_table = 'dispatch_plan'
         verbose_name_plural = verbose_name = '发货计划'
+
+
+class MixGumOutInventoryLog(models.Model):
+    """混炼胶库出库履历视图"""
+    order_no = models.CharField(max_length=100, db_column='BILLID', primary_key=True)
+    pallet_no = models.CharField(max_length=50, db_column='PALLETID')
+    location = models.CharField(max_length=50, db_column='CID')
+    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='CarNum')
+    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='Weight')
+    quality_status = models.CharField(db_column='MStatus', max_length=6)
+    lot_no = models.CharField(max_length=100, db_column='Lot_no', null=True, blank=True)
+    inout_num_type = models.CharField(max_length=50, db_column='OutType')
+    initiator = models.CharField(max_length=50, db_column='OutUser')
+    material_no = models.CharField(max_length=100, db_column='MID')
+    fin_time = models.DateTimeField(db_column='DEALTIME')
+
+    def warehouse_no(self):
+        return "混炼胶库"
+
+    def warehouse_name(self):
+        return "混炼胶库"
+
+    def material_name(self):
+        return self.material_no
+
+    def unit(self):
+        return "kg"
+
+    def order_type(self):
+        return "出库"
+
+    def inout_reason(self):
+        return self.inout_num_type
+
+    class Meta:
+        db_table = 'v_ASRS_TO_MES_RE_MESVIEW'
+        managed = False
+
+
+
+class MixGumInInventoryLog(models.Model):
+    """混炼胶库入库履历视图"""
+    order_no = models.CharField(max_length=50, db_column='BILLID', primary_key=True)
+    pallet_no = models.CharField(max_length=50, db_column='PALLETID')
+    location = models.CharField(max_length=50, db_column='CID')
+    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='Num')
+    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='SWeight')
+    quality_status = models.CharField(db_column='MStatus', max_length=50)
+    lot_no = models.CharField(max_length=200, db_column='LotNo', null=True, blank=True)
+    inout_num_type = models.CharField(max_length=20, db_column='IOCLASSNAME')
+    material_no = models.CharField(max_length=50, db_column='MID')
+    material_name = models.CharField(max_length=50, db_column='MATNAME')
+    fin_time = models.DateTimeField(db_column='LTIME')
+    project_no = models.CharField(db_column='PROJECTNO', max_length=50, null=True, blank=True)
+    class_id = models.BigIntegerField(db_column="IOCLASS_ID", null=True, blank=True)
+
+    def warehouse_no(self):
+        return "混炼胶库"
+
+    def warehouse_name(self):
+        return "混炼胶库"
+
+    def unit(self):
+        return "kg"
+
+    def order_type(self):
+        return "入库"
+
+    def inout_reason(self):
+        return self.inout_num_type
+
+    class Meta:
+        db_table = 'v_ASRS_LOG_IN_OPREATE_MESVIEW'
+        managed = False

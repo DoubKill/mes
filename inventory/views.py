@@ -22,7 +22,8 @@ from basics.models import GlobalCode
 from inventory.filters import InventoryLogFilter, StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
-    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation
+    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, MixGumOutInventoryLog, \
+    MixGumInInventoryLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -357,7 +358,20 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InventoryLogSerializer
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_class = InventoryLogFilter
+    # filter_class = InventoryLogFilter
+
+    def get_queryset(self):
+        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        store_type = self.request.query_params.get("store_type", "out")
+        if store_name == "混炼胶库":
+            if store_type == "out":
+                return MixGumOutInventoryLog.objects.using('bz').all()
+            else:
+                return MixGumInInventoryLog.objects.using('bz').all()
+        else:
+            return InventoryLog.objects.order_by('-start_time')
+
+
 
 
 @method_decorator([api_recorder], name="dispatch")
