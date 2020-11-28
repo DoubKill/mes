@@ -1,9 +1,8 @@
 import datetime
 
+from django.db import connection
 from django.utils import timezone
 from datetime import timedelta
-import requests
-from django.db.models import Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -18,6 +17,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
+from mes import settings
 from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
@@ -26,19 +26,18 @@ from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
-    DealSuggestionFilter, PalletFeedbacksTestFilter
+    DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
-    LabelPrint, Batch, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass
+    LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
     TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
-    BatchCommonSerializer, BatchProductNoSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer
+    BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
+    UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer
 from django.db.models import Q
-from django.db.models import Count
-from django.db.models import FloatField
 from quality.utils import print_mdr
 from recipe.models import Material, ProductBatching
 import logging
@@ -114,15 +113,21 @@ class TestIndicatorDataPointListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = []
-        test_indicators = TestIndicator.objects.all()
-        for test_indicator in test_indicators:
-            data_names = set(DataPoint.objects.filter(
-                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True))
-            data = {'test_type_id': test_indicator.id,
-                    'test_type_name': test_indicator.name,
-                    'data_indicator_detail': [data_name for data_name in data_names]
-                    }
-            ret.append(data)
+        test_indicators_names = ['门尼', '比重', '硬度', '流变', '钢拔']
+        for name in test_indicators_names:
+            test_indicator = TestIndicator.objects.filter(name__icontains=name).first()
+            if test_indicator:
+                data_indicator_detail = []
+                data_names = DataPoint.objects.filter(
+                    test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True)
+                for name in data_names:
+                    if name not in data_indicator_detail:
+                        data_indicator_detail.append(name)
+                data = {'test_type_id': test_indicator.id,
+                        'test_type_name': test_indicator.name,
+                        'data_indicator_detail': data_indicator_detail
+                        }
+                ret.append(data)
         return Response(ret)
 
 
@@ -722,6 +727,16 @@ class PrintMaterialDealResult(APIView):
         return print_mdr("results", mdr_set)
 
 
+class AllMixin:
+
+    def list(self, request, *args, **kwargs):
+        if 'all' in self.request.query_params:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return super().list(request, *args, **kwargs)
+
+
 def get_statics_query_dates(query_params):
     start_time = query_params.get('start_time')
     end_time = query_params.get('end_time')
@@ -735,7 +750,7 @@ def get_statics_query_dates(query_params):
     return start_time, end_time
 
 
-class BatchMonthStatisticsView(ReadOnlyModelViewSet):
+class BatchMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchMonth.objects.all()
     serializer_class = BatchMonthSerializer
 
@@ -767,7 +782,7 @@ def get_statics_query_date(query_params):
     return date
 
 
-class BatchDayStatisticsView(ReadOnlyModelViewSet):
+class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchDay.objects.all()
     serializer_class = BatchDaySerializer
 
@@ -782,7 +797,7 @@ class BatchDayStatisticsView(ReadOnlyModelViewSet):
         return batches
 
 
-class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
+class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoDaySerializer
     filter_backends = (DjangoFilterBackend,)
@@ -795,7 +810,7 @@ class BatchProductNoDayStatisticsView(ReadOnlyModelViewSet):
             batch__batch_month__date__month=date.month).distinct()
 
 
-class BatchProductNoMonthStatisticsView(ReadOnlyModelViewSet):
+class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoMonthSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -806,3 +821,252 @@ class BatchProductNoMonthStatisticsView(ReadOnlyModelViewSet):
         return BatchProductNo.objects.filter(
             batch__batch_month__date__gte=start_time,
             batch__batch_month__date__lte=end_time).distinct()
+
+
+class UnqualifiedOrderTrains(APIView):
+    """不合格车次汇总列表"""
+
+    def get(self, request, *args, **kwargs):
+        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.oracle':
+            engine = 1
+        else:
+            engine = 2
+        if engine == 2:
+            where_str = 'where mtr.level>1'
+        else:
+            where_str = 'where mtr."LEVEL">1'
+        st = self.request.query_params.get('st')
+        if st:
+            if engine == 2:
+                where_str += " and date(mto.production_factory_date)>='{}'".format(st)
+            else:
+                where_str += " and to_char(mto.PRODUCTION_FACTORY_DATE, 'yyyy-mm-dd') >= '{}'".format(st)
+        et = self.request.query_params.get('et')
+        if et:
+            if engine == 2:
+                where_str += " and date(mto.production_factory_date)<='{}'".format(et)
+            else:
+                where_str += " and to_char(mto.PRODUCTION_FACTORY_DATE, 'yyyy-mm-dd') <= '{}'".format(st)
+
+        classes = self.request.query_params.get('classes')
+        if classes:
+            where_str += " and mto.production_class='{}'".format(classes)
+        product_no = self.request.query_params.get('product_no')
+        if product_no:
+            where_str += " and mto.product_no='{}'".format(product_no)
+        if engine == 2:
+            sql = """
+            select
+                   mto.production_factory_date,
+                   mto.production_class,
+                   mto.production_equip_no,
+                   mto.product_no,
+                   mto.actual_trains,
+                   mtr.test_indicator_name,
+                   mtr.data_point_name,
+                   mtr.value,
+                   mtr.material_test_order_id,
+                   udod.id
+            from material_test_result mtr
+            inner join (select
+                   material_test_order_id,
+                   test_indicator_name,
+                   data_point_name,
+                    max(test_times) max_times
+                from material_test_result
+                group by test_indicator_name, data_point_name, material_test_order_id
+                ) tmp on tmp.material_test_order_id=mtr.material_test_order_id
+                             and tmp.data_point_name=mtr.data_point_name
+                             and tmp.test_indicator_name=mtr.test_indicator_name
+                             and tmp.max_times=mtr.test_times
+            inner join material_test_order mto on mtr.material_test_order_id = mto.id
+            left join unqualified_deal_order_detail udod on mto.id = udod.material_test_order_id
+            {};""".format(where_str)
+        else:
+            sql = """
+            select
+                   mto.PRODUCTION_FACTORY_DATE,
+                   mto.PRODUCTION_CLASS,
+                   mto.PRODUCTION_EQUIP_NO,
+                   mto.PRODUCT_NO,
+                   mto.ACTUAL_TRAINS,
+                   mtr.TEST_INDICATOR_NAME,
+                   mtr.DATA_POINT_NAME,
+                   mtr.VALUE,
+                   mtr.MATERIAL_TEST_ORDER_ID,
+                   udod.ID
+            from MATERIAL_TEST_RESULT mtr
+            inner join (
+                select
+                    MATERIAL_TEST_ORDER_ID,
+                    TEST_INDICATOR_NAME,
+                    DATA_POINT_NAME,
+                    max(TEST_TIMES) as max_times
+                from
+                     MATERIAL_TEST_RESULT
+                group by TEST_INDICATOR_NAME, DATA_POINT_NAME, MATERIAL_TEST_ORDER_ID
+                ) tmp on tmp.MATERIAL_TEST_ORDER_ID=mtr.MATERIAL_TEST_ORDER_ID
+                             and tmp.DATA_POINT_NAME=mtr.DATA_POINT_NAME
+                             and tmp.TEST_INDICATOR_NAME=mtr.TEST_INDICATOR_NAME
+                             and tmp.max_times=mtr.TEST_TIMES
+            inner join MATERIAL_TEST_ORDER mto on mtr.MATERIAL_TEST_ORDER_ID = mto.ID
+            left join UNQUALIFIED_DEAL_ORDER_DETAIL udod on mto.ID = udod.MATERIAL_TEST_ORDER_ID
+            {};""".format(where_str)
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        ret = {}
+        form_head_data = set()
+        for item in data:
+            if item[-1]:
+                continue
+            item_key = datetime.datetime.strftime(item[0], '%Y-%m-%d') + '-' + item[1] + '-' + item[2] + '-' + item[3]
+            data_point_key = item[6] if item[5] == '流变' else item[5]
+            form_head_data.add(data_point_key)
+            if item_key not in ret:
+                ret[item_key] = {
+                    'date': datetime.datetime.strftime(item[0], '%Y-%m-%d'),
+                    'classes': item[1],
+                    'equip_no': item[2],
+                    'product_no': item[3],
+                    'actual_trains': {item[4]},
+                    'indicator_data': {data_point_key: [item[7]]},
+                    'order_ids': {item[8]}
+                }
+            else:
+                ret[item_key]['actual_trains'].add(item[4])
+                ret[item_key]['order_ids'].add(item[8])
+                if data_point_key not in ret[item_key]['indicator_data']:
+                    ret[item_key]['indicator_data'][data_point_key] = [item[7]]
+                else:
+                    ret[item_key]['indicator_data'][data_point_key].append(item[7])
+        return Response({'form_head_data': form_head_data,
+                         'ret': ret.values()})
+
+
+class UnqualifiedDealOrderViewSet(ModelViewSet):
+    """不合格处置"""
+    queryset = UnqualifiedDealOrder.objects.all()
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = UnqualifiedDealOrderFilter
+
+    def get_queryset(self):
+        queryset = self.queryset
+        reason = self.request.query_params.get('reason')
+        t_deal_suggestion = self.request.query_params.get('t_deal_suggestion')
+        c_deal_suggestion = self.request.query_params.get('c_deal_suggestion')
+        if reason == 'true':  # 未处理
+            queryset = queryset.filter(reason__isnull=True)
+        elif reason == 'false':  # 已处理
+            queryset = queryset.filter(reason__isnull=False)
+        if t_deal_suggestion == 'true':  # 未处理
+            queryset = queryset.filter(t_deal_suggestion__isnull=True)
+        elif t_deal_suggestion == 'false':  # 已处理
+            queryset = queryset.filter(t_deal_suggestion__isnull=False)
+        if c_deal_suggestion == 'true':  # 未处理
+            queryset = queryset.filter(c_deal_suggestion__isnull=True)
+        elif c_deal_suggestion == 'false':  # 已处理
+            queryset = queryset.filter(c_deal_suggestion__isnull=False)
+        return queryset
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return UnqualifiedDealOrderCreateSerializer
+        if self.action in ('update', 'partial_update'):
+            return UnqualifiedDealOrderUpdateSerializer
+        else:
+            return UnqualifiedDealOrderSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.oracle':
+            engine = 1
+        else:
+            engine = 2
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        serializer_data = serializer.data
+        order_ids = instance.deal_details.values_list('material_test_order_id', flat=True)
+        create_data = datetime.datetime.strftime(instance.created_date, '%Y-%m-%d %H:%M:%S')
+        if engine == 2:
+            sql = """
+                select
+                       mto.production_factory_date,
+                       mto.production_class,
+                       mto.production_equip_no,
+                       mto.product_no,
+                       mto.actual_trains,
+                       mtr.test_indicator_name,
+                       mtr.data_point_name,
+                       mtr.value,
+                       mtr.material_test_order_id
+                from material_test_result mtr
+                inner join (select
+                       material_test_order_id,
+                       test_indicator_name,
+                       data_point_name,
+                        max(test_times) max_times
+                    from material_test_result
+                    where created_date<='{}'
+                    group by test_indicator_name, data_point_name, material_test_order_id
+                    ) tmp on tmp.material_test_order_id=mtr.material_test_order_id
+                                 and tmp.data_point_name=mtr.data_point_name
+                                 and tmp.test_indicator_name=mtr.test_indicator_name
+                                 and tmp.max_times=mtr.test_times
+                inner join material_test_order mto on mtr.material_test_order_id = mto.id
+                where mtr.level>1 and mto.id in ({});
+                """.format(create_data, ','.join([str(i) for i in order_ids]))
+        else:
+            sql = """
+            select
+                   mto.PRODUCTION_FACTORY_DATE,
+                   mto.PRODUCTION_CLASS,
+                   mto.PRODUCTION_EQUIP_NO,
+                   mto.PRODUCT_NO,
+                   mto.ACTUAL_TRAINS,
+                   mtr.TEST_INDICATOR_NAME,
+                   mtr.DATA_POINT_NAME,
+                   mtr.VALUE
+            from MATERIAL_TEST_RESULT mtr
+            inner join (
+                select
+                    MATERIAL_TEST_ORDER_ID,
+                    TEST_INDICATOR_NAME,
+                    DATA_POINT_NAME,
+                    max(TEST_TIMES) as max_times
+                from
+                     MATERIAL_TEST_RESULT
+                where to_char(CREATED_DATE, 'yyyy-mm-dd HH24:mi:ss')<='{}'
+                group by TEST_INDICATOR_NAME, DATA_POINT_NAME, MATERIAL_TEST_ORDER_ID
+                ) tmp on tmp.MATERIAL_TEST_ORDER_ID=mtr.MATERIAL_TEST_ORDER_ID
+                             and tmp.DATA_POINT_NAME=mtr.DATA_POINT_NAME
+                             and tmp.TEST_INDICATOR_NAME=mtr.TEST_INDICATOR_NAME
+                             and tmp.max_times=mtr.TEST_TIMES
+            inner join MATERIAL_TEST_ORDER mto on mtr.MATERIAL_TEST_ORDER_ID = mto.ID
+            where mtr."LEVEL">1 and mto.ID in ({});""".format(create_data, ','.join([str(i) for i in order_ids]))
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        ret = {}
+        form_head_data = set()
+        for item in data:
+            item_key = datetime.datetime.strftime(item[0], '%Y-%m-%d') + '-' + item[1] + '-' + item[2] + '-' + item[3]
+            data_point_key = item[6] if item[5] == '流变' else item[5]
+            form_head_data.add(data_point_key)
+            if item_key not in ret:
+                ret[item_key] = {
+                    'date': datetime.datetime.strftime(item[0], '%Y-%m-%d'),
+                    'classes': item[1],
+                    'equip_no': item[2],
+                    'product_no': item[3],
+                    'actual_trains': {item[4]},
+                    'indicator_data': {data_point_key: [item[7]]},
+                }
+            else:
+                ret[item_key]['actual_trains'].add(item[4])
+                if data_point_key not in ret[item_key]['indicator_data']:
+                    ret[item_key]['indicator_data'][data_point_key] = [item[7]]
+                else:
+                    ret[item_key]['indicator_data'][data_point_key].append(item[7])
+        serializer_data['form_head_data'] = form_head_data
+        serializer_data['deal_details'] = ret.values()
+        return Response(serializer_data)

@@ -18,8 +18,9 @@ from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult, TestIndicator, LabelPrint, Batch, TestDataPoint, BatchMonth, BatchDay, BatchEquip, \
-    BatchClass, BatchProductNo, MaterialDealResult, LevelResult, TestIndicator, LabelPrint
+    TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
+    TestIndicator, LabelPrint, UnqualifiedDealOrder, \
+    UnqualifiedDealOrderDetail
 from recipe.models import MaterialAttribute
 
 
@@ -163,11 +164,11 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['data_point_indicator'] = indicator
                     item['level'] = indicator.level
                 else:
-                    item['mes_result'] = '不合格'
-                    item['level'] = 3
+                    item['mes_result'] = '三等品'
+                    item['level'] = 2
             else:
-                item['mes_result'] = '不合格'
-                item['level'] = 3
+                item['mes_result'] = '三等品'
+                item['level'] = 2
             item['created_user'] = self.context['request'].user  # 加一个create_user
             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
@@ -176,6 +177,43 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialTestOrder
         exclude = ('material_test_order_uid', 'production_group')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
+    order_ids = serializers.PrimaryKeyRelatedField(help_text='检测单列表', many=True,
+                                                   write_only=True, queryset=MaterialTestOrder.objects.all())
+
+    @atomic()
+    def create(self, validated_data):
+        order_ids = validated_data.pop('order_ids')
+        validated_data['unqualified_deal_order_uid'] = UUidTools.uuid1_hex('UDO')
+        instance = super().create(validated_data)
+        for order_id in order_ids:
+            detail = {"unqualified_deal_order": instance,
+                      "unqualified_deal_order_detail_uid": UUidTools.uuid1_hex('UDOD'),
+                      "material_test_order": order_id}
+            UnqualifiedDealOrderDetail.objects.create(**detail)
+        return instance
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        exclude = ('unqualified_deal_order_uid', )
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class UnqualifiedDealOrderSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        fields = '__all__'
+
+
+class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        exclude = ('unqualified_deal_order_uid', 'status')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -425,9 +463,9 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             return None
         max_mtr = mtr_list[0]
         for mtr_obj in mtr_list:
-            if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
-                continue
-            if mtr_obj.data_point_indicator.level > max_mtr.data_point_indicator.level:
+            # if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
+            #     continue
+            if mtr_obj.level > max_mtr.level:
                 max_mtr = mtr_obj
         if max_mtr.test_times == 1:
             test_status = '正常'
@@ -477,15 +515,40 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                                                             test_indicator_name=mtr_max_obj['test_indicator_name'],
                                                             data_point_name=mtr_max_obj['data_point_name'],
                                                             test_times=mtr_max_obj['max_test_times']).last()
-                if mtr_obj.level==1:
-                    result='一等品'
+                if mtr_obj.level == 1:
+                    result = '一等品'
                 else:
                     result = '三等品'
+                # 判断加减
+                data_point_name = mtr_obj.data_point_name  # 数据点名称
+                test_method_name = mtr_obj.test_method_name  # 试验方法名称
+                test_indicator_name = mtr_obj.test_indicator_name  # 检测指标名称
+                product_no = mtr_obj.material_test_order.product_no  # 胶料编码
+                # 根据material-test-orders接口逻辑找到data_point_indicator
+                material_test_method = MaterialTestMethod.objects.filter(
+                    material__material_no=product_no,
+                    test_method__name=test_method_name,
+                    test_method__test_type__test_indicator__name=test_indicator_name,
+                    data_point__name=data_point_name,
+                    data_point__test_type__test_indicator__name=test_indicator_name).first()
+                add_subtract = None  # 页面的加减
+                if material_test_method:
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        material_test_method=material_test_method,
+                        data_point__name=data_point_name,
+                        data_point__test_type__test_indicator__name=test_indicator_name, level=1).first()
+                    if indicator:  # 判断value与上下限的比较
+                        if mtr_obj.value > indicator.upper_limit:
+                            add_subtract = '+'
+                        elif mtr_obj.value < indicator.lower_limit:
+                            add_subtract = '-'
+
                 mtr_max_list.append(
                     {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
                      'value': mtr_obj.value,
-                     'result':  result,
-                     'max_test_times': mtr_obj.level})
+                     'result': result,
+                     'max_test_times': mtr_obj.level,
+                     'add_subtract': add_subtract})
 
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
@@ -584,6 +647,7 @@ class TestDataPointSerializer(serializers.ModelSerializer):
             Count('testresult__train', distinct=True,
                   filter=Q(testresult__qualified=False,
                            testresult__value__lt=F('data_point_indicator__lower_limit'))))
+
         return points
 
 
@@ -591,6 +655,10 @@ class PercentOfPassSerializer(serializers.Serializer):
     yc_percent_of_pass = serializers.SerializerMethodField()
     lb_percent_of_pass = serializers.SerializerMethodField()
     zh_percent_of_pass = serializers.SerializerMethodField()
+    train_count = serializers.SerializerMethodField()
+
+    def get_train_count(self, obj):
+        return obj.train_count
 
     def get_yc_percent_of_pass(self, obj):
         return to_bfb(obj.yc_test_pass_count / obj.yc_train_count) if obj.yc_train_count else None
@@ -603,10 +671,10 @@ class PercentOfPassSerializer(serializers.Serializer):
 
     @classmethod
     def batch_annotate(cls, batches):
-        yc_train_count = Count('batch__lot__train', distinct=True,
+        yc_train_count = Count('batch__lot__train__testresult', distinct=True,
                                filter=~Q(batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        yc_test_pass_count = Count('batch__lot__train', distinct=True,
+        yc_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
                                    filter=
                                    Q(~Q(batch__lot__train__testresult__point__indicator__name='流变') &
                                      Q(batch__lot__train__testresult__qualified=True)),
@@ -615,10 +683,10 @@ class PercentOfPassSerializer(serializers.Serializer):
             .annotate(yc_test_pass_count=yc_test_pass_count)
 
         # 流变
-        lb_train_count = Count('batch__lot__train', distinct=True,
+        lb_train_count = Count('batch__lot__train__testresult',distinct=True,
                                filter=Q(batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        lb_test_pass_count = Count('batch__lot__train', distinct=True,
+        lb_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
                                    filter=
                                    Q(batch__lot__train__testresult__point__indicator__name='流变',
                                      batch__lot__train__testresult__qualified=True),
@@ -627,12 +695,16 @@ class PercentOfPassSerializer(serializers.Serializer):
             .annotate(lb_test_pass_count=lb_test_pass_count)
 
         # 综合
-        zh_train_count = Count('batch__lot__train', distinct=True, output_field=FloatField())
-        zh_test_pass_count = Count('batch__lot__train', distinct=True,
+        zh_train_count = Count('batch__lot__train__testresult', distinct=True,
+                               output_field=FloatField())
+        zh_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
                                    filter=Q(batch__lot__train__testresult__qualified=True),
                                    output_field=FloatField())
         batches = batches.annotate(zh_train_count=zh_train_count) \
             .annotate(zh_test_pass_count=zh_test_pass_count)
+
+        train_count = Count('batch__lot__train', distinct=True)
+        batches = batches.annotate(train_count=train_count)
 
         return batches
 
@@ -685,6 +757,7 @@ class BatchCommonSerializer(PercentOfPassSerializer, serializers.ModelSerializer
     class Meta:
         fields = ['id',
                   'date',
+                  'train_count',
                   'yc_percent_of_pass',
                   'lb_percent_of_pass',
                   'zh_percent_of_pass',
@@ -765,10 +838,16 @@ class BatchDaySerializer(BatchCommonSerializer):
 
 
 class BatchDateProductNoSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+
+    def __init__(self, *args, **kwargs):
+        self.batch_product_no_obj = kwargs.pop('batch_product_no_obj', None)
+        super().__init__(*args, **kwargs)
+
     points = serializers.SerializerMethodField()
 
     class Meta:
         fields = ['date',
+                  'train_count',
                   'yc_percent_of_pass',
                   'lb_percent_of_pass',
                   'zh_percent_of_pass',
@@ -789,7 +868,8 @@ class BatchDayProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchDay
 
     def query_points(self, obj):
-        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj)
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj,
+                                            testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
 
 class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
@@ -797,7 +877,8 @@ class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchMonth
 
     def query_points(self, obj):
-        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj)
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj,
+                                            testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
 
 class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
@@ -811,11 +892,11 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
 
     def get_dates(self, batch_product_no_obj):
         batches = self.batch_date_model.objects.filter(batch__batch_product_no=batch_product_no_obj)
-        yc_train_count = Count('batch__lot__train', distinct=True,
+        yc_train_count = Count('batch__lot__train__testresult', distinct=True,
                                filter=~Q(batch__batch_product_no=batch_product_no_obj,
                                          batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        yc_test_pass_count = Count('batch__lot__train', distinct=True,
+        yc_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
                                    filter=
                                    Q(~Q(batch__lot__train__testresult__point__indicator__name='流变') &
                                      Q(batch__batch_product_no=batch_product_no_obj) &
@@ -825,11 +906,11 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
             .annotate(yc_train_count=yc_train_count) \
             .annotate(yc_test_pass_count=yc_test_pass_count)
         # 流变
-        lb_train_count = Count('batch__lot__train', distinct=True,
+        lb_train_count = Count('batch__lot__train__testresult', distinct=True,
                                filter=Q(batch__batch_product_no=batch_product_no_obj,
                                         batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
-        lb_test_pass_count = Count('batch__lot__train', distinct=True,
+        lb_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
                                    filter=Q(batch__batch_product_no=batch_product_no_obj,
                                             batch__lot__train__testresult__point__indicator__name='流变',
                                             batch__lot__train__testresult__qualified=True),
@@ -839,10 +920,10 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
             .annotate(lb_test_pass_count=lb_test_pass_count)
 
         # 综合
-        zh_train_count = Count('batch__lot__train', distinct=True,
+        zh_train_count = Count('batch__lot__train__testresult', distinct=True,
                                filter=Q(batch__batch_product_no=batch_product_no_obj),
                                output_field=FloatField())
-        zh_test_pass_count = Count('batch__lot__train', distinct=True,
+        zh_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
                                    filter=Q(batch__batch_product_no=batch_product_no_obj,
                                             batch__lot__train__testresult__qualified=True),
                                    output_field=FloatField())
@@ -850,8 +931,13 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
         batches = batches \
             .annotate(zh_train_count=zh_train_count) \
             .annotate(zh_test_pass_count=zh_test_pass_count)
+
+        train_count = Count('batch__lot__train', distinct=True)
+        batches = batches.annotate(train_count=train_count)
+
         batches = batches.order_by('date')
-        return self.batch_date_product_no_serializer(batches, many=True).data
+        batch_date_product_no_serializer = self.batch_date_product_no_serializer(batches, many=True, batch_product_no_obj=batch_product_no_obj)
+        return batch_date_product_no_serializer.data
 
 
 class BatchProductNoDaySerializer(BatchProductNoDateCommonSerializer):

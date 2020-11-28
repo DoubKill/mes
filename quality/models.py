@@ -131,7 +131,6 @@ class Batch(models.Model):
     batch_product_no = models.ForeignKey(BatchProductNo, on_delete=models.SET_NULL, null=True, blank=True)
 
 
-
 class Lot(models.Model):
     """统计用中间表 add by fq   一拖胶"""
     lot_no = models.CharField('收皮条码', max_length=64, help_text='收皮条码')
@@ -300,3 +299,37 @@ class LabelPrint(models.Model):
     class Meta:
         db_table = 'label_print'
         verbose_name_plural = verbose_name = '标签打印'
+
+
+class UnqualifiedDealOrder(AbstractEntity):
+    """不合格处置单"""
+    unqualified_deal_order_uid = models.CharField(max_length=64, help_text='唯一码')
+    department = models.CharField(max_length=64, help_text='发生部门', blank=True, null=True)
+    deal_department = models.CharField(max_length=64, help_text='部门', blank=True, null=True)
+    status = models.CharField(max_length=64, help_text='状态', blank=True, null=True)
+    deal_user = models.CharField(max_length=64, help_text='经办人', blank=True, null=True)
+    deal_date = models.DateField(max_length=64, help_text='经办日期', blank=True, null=True)
+    reason = models.TextField(help_text='原因', blank=True, null=True)
+    t_deal_suggestion = models.TextField(help_text='技术部门处理意见', blank=True, null=True)
+    c_deal_suggestion = models.TextField(help_text='检查部门处理意见', blank=True, null=True)
+    t_deal_user = models.CharField(max_length=64, help_text='技术部门处理人', blank=True, null=True)
+    t_deal_date = models.DateField(help_text='技术日期', blank=True, null=True)
+    c_deal_user = models.CharField(max_length=64, help_text='检查部门处理人', blank=True, null=True)
+    c_deal_date = models.DateField(help_text='检查日期', blank=True, null=True)
+    desc = models.TextField(help_text='描述', blank=True, null=True)
+
+    class Meta:
+        db_table = 'unqualified_deal_order'
+        verbose_name_plural = verbose_name = '不合格处置单'
+
+
+class UnqualifiedDealOrderDetail(AbstractEntity):
+    unqualified_deal_order = models.ForeignKey(UnqualifiedDealOrder, help_text='处置单',
+                                               on_delete=models.CASCADE, related_name='deal_details')
+    unqualified_deal_order_detail_uid = models.CharField(max_length=64, help_text='唯一码', unique=True)
+    material_test_order = models.OneToOneField(MaterialTestOrder, help_text='物料检测单',
+                                               on_delete=models.CASCADE, related_name='unqualified_order')
+
+    class Meta:
+        db_table = 'unqualified_deal_order_detail'
+        verbose_name_plural = verbose_name = '不合格处置单详情'

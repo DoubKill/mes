@@ -89,8 +89,8 @@ class OUTWORKUploader(BaseUploader):
 
 
 class OUTWORKUploaderLB(BaseUploader):
-    dict_filter = {'正常出库': "http://10.4.23.101:1011/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK",
-                   '指定出库': "http://10.4.23.101:1011/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK_KJYC"}
+    dict_filter = {'正常出库': "http://10.4.23.101:1020/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK",
+                   '指定出库': "http://10.4.23.101:1020/Service1.asmx?op=TRANS_MES_TO_WMS_OUTWORK_KJYC"}
 
     def __init__(self, end_type):
         self.end_type = end_type

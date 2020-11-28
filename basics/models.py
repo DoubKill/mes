@@ -44,6 +44,8 @@ class WorkSchedule(AbstractEntity):
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+    work_procedure = models.ForeignKey(GlobalCode, models.CASCADE, help_text='工序', verbose_name='工序',
+                                       related_name="work_schedules", default=14)
 
     def __str__(self):
         return self.schedule_name
@@ -144,7 +146,6 @@ class PlanSchedule(AbstractEntity):
     day_time = models.DateField(help_text='日期', verbose_name='日期')
     work_schedule = models.ForeignKey(WorkSchedule, models.CASCADE,
                                       help_text='倒班id', verbose_name='工作日程id', related_name="plan_schedule")
-
     class Meta:
         db_table = 'plan_schedule'
         verbose_name_plural = verbose_name = '排班管理'
