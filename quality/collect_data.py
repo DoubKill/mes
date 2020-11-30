@@ -166,7 +166,7 @@ def main():
                             production_class=production_class,
                             production_group=group,
                             production_equip_no=equip_no,
-                            production_factory_date=product_date,
+                            production_factory_date=pallet.end_time
                         )
                     if not MaterialTestResult.objects.filter(
                             material_test_order=test_order,
