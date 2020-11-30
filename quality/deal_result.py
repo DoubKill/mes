@@ -107,10 +107,10 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             else:
                 mdr_dict['deal_result'] = '三等品'
         else:
-            mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
+            mdr_dict['level'] = 3
             mdr_dict['deal_result'] = '三等品'
     else:
-        mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
+        mdr_dict['level'] = 3
         mdr_dict['deal_result'] = '三等品'
 
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).last()
@@ -124,8 +124,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
-
-
 
 
 def receive_deal_result(lot_no):
