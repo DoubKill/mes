@@ -5,6 +5,7 @@ import re
 import requests
 from django.db.models import Max, Sum
 from django.db.transaction import atomic
+from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins
@@ -17,6 +18,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from basics.models import PlanSchedule
 from mes.conf import EQUIP_LIST
+from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
@@ -29,6 +31,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
 from rest_framework.generics import ListAPIView
 
 
+@method_decorator([api_recorder], name="dispatch")
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
                              mixins.RetrieveModelMixin,
                              GenericViewSet):
@@ -68,6 +71,7 @@ class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
         return Response(serializer.data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PalletFeedbacksViewSet(mixins.CreateModelMixin,
                              mixins.ListModelMixin,
                              GenericViewSet):
@@ -101,6 +105,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         return Response(serializer.data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipStatusViewSet(mixins.CreateModelMixin,
                          mixins.ListModelMixin,
                          GenericViewSet):
@@ -140,6 +145,7 @@ class EquipStatusViewSet(mixins.CreateModelMixin,
         return Response(serializer.data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PlanStatusViewSet(mixins.CreateModelMixin,
                         mixins.RetrieveModelMixin,
                         mixins.ListModelMixin,
@@ -160,6 +166,7 @@ class PlanStatusViewSet(mixins.CreateModelMixin,
     filter_class = PlanStatusFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ExpendMaterialViewSet(mixins.CreateModelMixin,
                             mixins.RetrieveModelMixin,
                             mixins.ListModelMixin,
@@ -180,6 +187,7 @@ class ExpendMaterialViewSet(mixins.CreateModelMixin,
     filter_class = ExpendMaterialFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class OperationLogViewSet(mixins.CreateModelMixin,
                           mixins.RetrieveModelMixin,
                           mixins.ListModelMixin,
@@ -197,6 +205,7 @@ class OperationLogViewSet(mixins.CreateModelMixin,
     serializer_class = OperationLogSerializer
 
 
+@method_decorator([api_recorder], name="dispatch")
 class QualityControlViewSet(mixins.CreateModelMixin,
                             mixins.RetrieveModelMixin,
                             mixins.ListModelMixin,
@@ -217,6 +226,7 @@ class QualityControlViewSet(mixins.CreateModelMixin,
     filter_class = QualityControlFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PlanRealityViewSet(mixins.ListModelMixin,
                          GenericViewSet):
 
@@ -245,7 +255,8 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         # 班次计划号列表
         uid_list = pcp_set.values_list("plan_classes_uid", flat=True)
         # 日计划号对比
-        day_plan_list = pcp_set.values_list("product_batching__stage_product_batch_no", flat=True)
+        day_plan_list_temp = pcp_set.values_list("product_batching__stage_product_batch_no", "equip__equip_no")
+        day_plan_list = list(set([x[0] + x[1] for x in day_plan_list_temp]))
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Sum('actual_weight'), begin_time=Max('begin_time'),
             actual_time=Max('product_time'))
@@ -275,7 +286,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                 continue
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
-            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S')
+            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2]
             day_plan_dict[day_plan_id]["actual_time"] = tf_dict[plan_classes_uid][3].strftime('%Y-%m-%d %H:%M:%S')
         temp_data = {}
         for equip_no in EQUIP_LIST:
@@ -295,6 +306,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         return Response({"data": datas})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductActualViewSet(mixins.ListModelMixin,
                            GenericViewSet):
     """密炼实绩"""
@@ -324,7 +336,8 @@ class ProductActualViewSet(mixins.ListModelMixin,
                                                                                           'product_day_plan_id',
                                                                                           "work_schedule_plan__plan_schedule__plan_schedule_no")
         uid_list = pcp_set.values_list("plan_classes_uid", flat=True)
-        day_plan_list = pcp_set.values_list("product_batching__stage_product_batch_no", flat=True)
+        day_plan_list_temp = pcp_set.values_list("product_batching__stage_product_batch_no", "equip__equip_no")
+        day_plan_list = list(set([x[0] + x[1] for x in day_plan_list_temp]))
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Max('actual_weight'), classes=Max('classes'))
         tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x
@@ -386,10 +399,10 @@ class ProductActualViewSet(mixins.ListModelMixin,
         return Response(ret)
 
 
-
+@method_decorator([api_recorder], name="dispatch")
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-id")
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-product_time")
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -397,6 +410,7 @@ class ProductionRecordViewSet(mixins.ListModelMixin,
     filter_class = PalletFeedbacksFilter
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialInventory(GenericViewSet,
                         mixins.ListModelMixin, ):
 
@@ -424,6 +438,7 @@ class MaterialInventory(GenericViewSet,
         return Response({'results': results})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductInventory(GenericViewSet,
                        mixins.ListModelMixin, ):
 
@@ -463,6 +478,7 @@ class ProductInventory(GenericViewSet,
         return Response({'results': results})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class TrainsFeedbacksBatch(APIView):
     """批量同步车次生产数据接口"""
 
@@ -474,6 +490,7 @@ class TrainsFeedbacksBatch(APIView):
         return Response("sync success", status=201)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PalletFeedbacksBatch(APIView):
     """批量同步托次生产数据接口"""
 
@@ -485,6 +502,7 @@ class PalletFeedbacksBatch(APIView):
         return Response("sync success", status=201)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipStatusBatch(APIView):
     """批量同步设备生产数据接口"""
 
@@ -496,6 +514,7 @@ class EquipStatusBatch(APIView):
         return Response("sync success", status=201)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PlanStatusBatch(APIView):
     """批量同步计划状态数据接口"""
 
@@ -507,6 +526,7 @@ class PlanStatusBatch(APIView):
         return Response("sync success", status=201)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ExpendMaterialBatch(APIView):
     """批量同步原材料消耗数据接口"""
 
@@ -518,6 +538,7 @@ class ExpendMaterialBatch(APIView):
         return Response("sync success", status=201)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PalletTrainFeedback(APIView):
     """获取托盘开始车次-结束车次的数据，过滤字段：equip_no=设备编码&factory_date=工厂日期&classes=班次&product_no=胶料编码"""
 

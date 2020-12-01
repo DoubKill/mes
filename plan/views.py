@@ -420,7 +420,7 @@ class ProductClassesPlanReceive(CreateAPIView):
     serializer_class = ProductClassesPlansySerializer
     queryset = ProductClassesPlan.objects.all()
 
-
+@method_decorator([api_recorder], name="dispatch")
 class MaterialReceive(CreateAPIView):
     """原材料表同步"""
     serializer_class = MaterialsySerializer
