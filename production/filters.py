@@ -7,10 +7,11 @@ class TrainsFeedbacksFilter(django_filters.rest_framework.FilterSet):
     plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
+    day_time = django_filters.DateFilter(field_name='product_time', lookup_expr="date", help_text='日期筛选')
 
     class Meta:
         model = TrainsFeedbacks
-        fields = ('plan_classes_uid', 'equip_no', 'product_no')
+        fields = ('plan_classes_uid', 'equip_no', 'product_no', "day_time")
 
 
 class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
