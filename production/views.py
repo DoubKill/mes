@@ -259,9 +259,9 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         day_plan_list = list(set([x[0] + x[1] for x in day_plan_list_temp]))
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Sum('actual_weight'), begin_time=Max('begin_time'),
-            actual_time=Max('product_time'))
-        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("begin_time"),
-                                               x.get("actual_time")] for x in tf_set}
+            actual_time=Max('end_time'))
+        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("begin_time", ""),
+                                               x.get("actual_time", "")] for x in tf_set}
         day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0, "plan_time": 0,
                              "start_rate": None}
                          for x in day_plan_list}
@@ -281,8 +281,6 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             if not tf_dict.get(plan_classes_uid):
                 day_plan_dict[day_plan_id]["actual_trains"] += 0
                 day_plan_dict[day_plan_id]["actual_weight"] += 0
-                day_plan_dict[day_plan_id]["begin_time"] = ""
-                day_plan_dict[day_plan_id]["actual_time"] = ""
                 continue
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
@@ -296,7 +294,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                     temp_data[equip_no].append(temp)
         datas = []
         for equip_data in temp_data.values():
-            equip_data.sort(key=lambda x: (x.get("equip_no"), x.get("begin_time")))
+            equip_data.sort(key=lambda x: (x.get("equip_no", ""), x.get("begin_time", "")))
             new_equip_data = []
             for _ in equip_data:
                 _.update(sn=equip_data.index(_) + 1)
