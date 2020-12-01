@@ -269,7 +269,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                                   'product_batching__stage_product_batch_no',
                                   'product_day_plan_id', 'time', 'product_batching__stage__global_name')
         for pcp in pcp_data:
-            day_plan_id = pcp.get("product_batching__stage_product_batch_no") + pcp.get("equip_equip_no")
+            day_plan_id = pcp.get("product_batching__stage_product_batch_no") + pcp.get("equip__equip_no")
             plan_classes_uid = pcp.get('plan_classes_uid')
             day_plan_dict[day_plan_id].update(
                 equip_no=pcp.get('equip__equip_no'),
@@ -355,7 +355,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                                   "work_schedule_plan__plan_schedule__plan_schedule_no")
         for pcp in pcp_data:
             class_name = pcp.get("work_schedule_plan__classes__global_name")
-            day_plan_id = pcp.get("product_batching__stage_product_batch_no") + pcp.get("equip_equip_no")
+            day_plan_id = pcp.get("product_batching__stage_product_batch_no") + pcp.get("equip__equip_no")
             plan_classes_uid = pcp.get('plan_classes_uid')
             day_plan_dict[day_plan_id].update(
                 equip_no=pcp.get('equip__equip_no'),
