@@ -528,8 +528,8 @@ class DealSuggestionView(APIView):
     """处理意见展示"""
 
     def get(self, request, *args, **kwargs):
-        queryset = MaterialDealResult.objects.filter(delete_flag=False).values('deal_suggestion').annotate().distinct()
-        return Response(queryset.values_list('deal_suggestion', flat=True))
+        queryset = DealSuggestion.objects.filter(delete_flag=False).values('suggestion_desc').annotate().distinct()
+        return Response(queryset.values_list('suggestion_desc', flat=True))
 
 
 @method_decorator([api_recorder], name="dispatch")
