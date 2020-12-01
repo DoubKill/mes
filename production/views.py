@@ -259,7 +259,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         day_plan_list = list(set([x[0] + x[1] for x in day_plan_list_temp]))
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
             actual_trains=Max('actual_trains'), actual_weight=Sum('actual_weight'), begin_time=Max('begin_time'),
-            actual_time=Max('end_time'))
+            actual_time=Max('product_time'))
         tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("begin_time", ""),
                                                x.get("actual_time", "")] for x in tf_set}
         day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0, "plan_time": 0,
