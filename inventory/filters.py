@@ -1,5 +1,8 @@
 import django_filters
-from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation
+from django_filters.rest_framework import DjangoFilterBackend
+
+from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
+    MixGumOutInventoryLog, MixGumInInventoryLog
 
 from inventory.models import DeliveryPlan
 
@@ -81,3 +84,49 @@ class DispatchLocationFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = DispatchLocation
         fields = ['use_flag']
+
+
+class MixGumInFilter(django_filters.rest_framework.FilterSet):
+    start_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='gte')
+    end_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='lte')
+    location = django_filters.CharFilter(field_name='location')
+    material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+
+    class Meta:
+        model = MixGumInInventoryLog
+        fields = ['start_time', 'end_time', 'location', 'material_no']
+
+
+class MixGumOutFilter(django_filters.rest_framework.FilterSet):
+    start_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='gte')
+    end_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='lte')
+    location = django_filters.CharFilter(field_name='location')
+    material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+
+    class Meta:
+        model = MixGumOutInventoryLog
+        fields = ['start_time', 'end_time', 'location', 'material_no']
+
+
+
+class InventoryFilterBackend(DjangoFilterBackend):
+
+    def get_filterset(self, request, queryset, view):
+        params = request.query_params
+        store_name = params.get("store_name", "混炼胶库")
+        order_type = params.get("order_type", "出库")
+        # TODO 待其他库存对接上了之后需补充
+        if store_name == "混炼胶库":
+            if order_type == "出库":
+                temp_filter = MixGumOutFilter
+            else:
+                temp_filter = MixGumInFilter
+        else:
+            temp_filter = InventoryLogFilter
+        setattr(view, 'filter_class', temp_filter)
+        filterset_class = self.get_filterset_class(view, queryset)
+        if filterset_class is None:
+            return None
+
+        kwargs = self.get_filterset_kwargs(request, queryset, view)
+        return filterset_class(**kwargs)
