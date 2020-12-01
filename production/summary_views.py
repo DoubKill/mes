@@ -67,7 +67,7 @@ class ClassesBanBurySummaryView(ListAPIView):
         select_str = """plan_classes_uid,
                     equip_no,
                     product_no,
-                   to_char({}, '{}'),
+                   to_char({}, '{}') AS "date",
                    MAX(actual_trains) AS max_trains,
                    MIN(actual_trains) AS min_trains,
                    max(ceil(
@@ -122,8 +122,8 @@ class ClassesBanBurySummaryView(ListAPIView):
            FROM
            trains_feedbacks
            where {}
-           GROUP BY
-           {}""".format(select_str, where_str, group_by_str)
+           GROUP BY {}
+           order by "date";""".format(select_str, where_str, group_by_str)
         ret = {}
         cursor = connection.cursor()
         cursor.execute(sql)
@@ -190,7 +190,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
 
         select_str = """plan_classes_uid,
                             equip_no,
-                           to_char({}, '{}'),
+                           to_char({}, '{}') AS "date",
                            MAX(actual_trains) AS max_trains,
                            MIN(actual_trains) AS min_trains,
                            sum(ceil(
@@ -234,8 +234,8 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                    FROM
                    trains_feedbacks
                    where {}
-                   GROUP BY
-                   {}""".format(select_str, where_str, group_by_str)
+                   GROUP BY {}
+                   order by "date";""".format(select_str, where_str, group_by_str)
         ret = {}
         cursor = connection.cursor()
         cursor.execute(sql)
