@@ -18,8 +18,9 @@ from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
-    MaterialDealResult, LevelResult, TestIndicator, LabelPrint, Batch, TestDataPoint, BatchMonth, BatchDay, BatchEquip, \
-    BatchClass, BatchProductNo, MaterialDealResult, LevelResult, TestIndicator, LabelPrint
+    TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
+    TestIndicator, LabelPrint, UnqualifiedDealOrder, \
+    UnqualifiedDealOrderDetail
 from recipe.models import MaterialAttribute
 
 
@@ -163,11 +164,11 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['data_point_indicator'] = indicator
                     item['level'] = indicator.level
                 else:
-                    item['mes_result'] = '不合格'
-                    item['level'] = 3
+                    item['mes_result'] = '三等品'
+                    item['level'] = 2
             else:
-                item['mes_result'] = '不合格'
-                item['level'] = 3
+                item['mes_result'] = '三等品'
+                item['level'] = 2
             item['created_user'] = self.context['request'].user  # 加一个create_user
             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
@@ -176,6 +177,43 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialTestOrder
         exclude = ('material_test_order_uid', 'production_group')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
+    order_ids = serializers.PrimaryKeyRelatedField(help_text='检测单列表', many=True,
+                                                   write_only=True, queryset=MaterialTestOrder.objects.all())
+
+    @atomic()
+    def create(self, validated_data):
+        order_ids = validated_data.pop('order_ids')
+        validated_data['unqualified_deal_order_uid'] = UUidTools.uuid1_hex('UDO')
+        instance = super().create(validated_data)
+        for order_id in order_ids:
+            detail = {"unqualified_deal_order": instance,
+                      "unqualified_deal_order_detail_uid": UUidTools.uuid1_hex('UDOD'),
+                      "material_test_order": order_id}
+            UnqualifiedDealOrderDetail.objects.create(**detail)
+        return instance
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        exclude = ('unqualified_deal_order_uid', )
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class UnqualifiedDealOrderSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        fields = '__all__'
+
+
+class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        exclude = ('unqualified_deal_order_uid', 'status')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -609,6 +647,7 @@ class TestDataPointSerializer(serializers.ModelSerializer):
             Count('testresult__train', distinct=True,
                   filter=Q(testresult__qualified=False,
                            testresult__value__lt=F('data_point_indicator__lower_limit'))))
+
         return points
 
 
@@ -799,6 +838,11 @@ class BatchDaySerializer(BatchCommonSerializer):
 
 
 class BatchDateProductNoSerializer(PercentOfPassSerializer, serializers.ModelSerializer):
+
+    def __init__(self, *args, **kwargs):
+        self.batch_product_no_obj = kwargs.pop('batch_product_no_obj', None)
+        super().__init__(*args, **kwargs)
+
     points = serializers.SerializerMethodField()
 
     class Meta:
@@ -824,7 +868,8 @@ class BatchDayProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchDay
 
     def query_points(self, obj):
-        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj)
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_day=obj,
+                                            testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
 
 class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
@@ -832,7 +877,8 @@ class BatchMonthProductNoSerializer(BatchDateProductNoSerializer):
         model = BatchMonth
 
     def query_points(self, obj):
-        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj)
+        return TestDataPoint.objects.filter(testresult__train__lot__batch__batch_month=obj,
+                                            testresult__train__lot__batch__batch_product_no=self.batch_product_no_obj)
 
 
 class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
@@ -890,7 +936,8 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
         batches = batches.annotate(train_count=train_count)
 
         batches = batches.order_by('date')
-        return self.batch_date_product_no_serializer(batches, many=True).data
+        batch_date_product_no_serializer = self.batch_date_product_no_serializer(batches, many=True, batch_product_no_obj=batch_product_no_obj)
+        return batch_date_product_no_serializer.data
 
 
 class BatchProductNoDaySerializer(BatchProductNoDateCommonSerializer):

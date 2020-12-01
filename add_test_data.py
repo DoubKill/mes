@@ -5,6 +5,7 @@ import os
 import string
 import traceback
 
+
 """
 只添加基础和系统模块数据
 """
@@ -22,6 +23,7 @@ from system.models import GroupExtension, User, Section, SystemConfig, ChildSyst
 from production.models import MaterialTankStatus
 from django.contrib.auth.models import Permission
 from quality.models import DealSuggestion
+from inventory.models import DispatchLocation
 
 last_names = ['赵', '钱', '孙', '李', '周', '吴', '郑', '王', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '尤', '许',
               '何', '吕', '施', '张', '孔', '曹', '严', '华', '金', '魏', '陶', '姜', '戚', '谢', '邹', '喻', '柏', '水', '窦', '章',
@@ -104,7 +106,7 @@ def add_global_codes():
         elif i == 5:
             items = ["a班", "b班", "c班"]
         elif i == 6:
-            items = ["早班", "中班", "晚班"]
+            items = ["早班", "中班", "夜班"]
         elif i == 7:
             items = ["密炼设备", "快检设备", "传送设备"]
         elif i == 8:
@@ -1409,6 +1411,17 @@ def delete_permission():
     Permission.objects.filter(name__contains='if').delete()
 
 
+# 新增发货地
+def add_dispatch_location():
+    create_list = [
+        {'no': '123', 'name': '安吉', 'desc': '测试专用', 'use_flag': True},
+        {'no': '456', 'name': '下沙', 'desc': '测试专用', 'use_flag': True},
+        {'no': '789', 'name': '富阳', 'desc': '测试专用', 'use_flag': True}
+    ]
+    for create_dict in create_list:
+        DispatchLocation.objects.create(**create_dict)
+
+
 if __name__ == '__main__':
     delete_permission()  # 删除中间表的权限
     add_global_codes()
@@ -1433,3 +1446,5 @@ if __name__ == '__main__':
     print("product is ok")
     add_system_config()
     add_oil_material()
+    add_dispatch_location()
+    print('add dispatch_location ok')

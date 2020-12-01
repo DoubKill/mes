@@ -1,7 +1,7 @@
 import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
-    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult
+    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -79,3 +79,12 @@ class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MaterialDealResult
         fields = ('suggestion_desc',)
+
+
+class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
+    st = django_filters.DateFilter(field_name='created_date__date', lookup_expr='gte', help_text='开始时间')
+    et = django_filters.DateFilter(field_name='created_date__date', lookup_expr='lte', help_text='结束时间')
+
+    class Meta:
+        model = UnqualifiedDealOrder
+        fields = ('st', 'et')

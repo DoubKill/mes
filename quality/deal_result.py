@@ -10,7 +10,7 @@ from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestRe
 from production.models import PalletFeedbacks
 from quality.serializers import MaterialDealResultListSerializer
 from django.db.transaction import atomic
-from django.db.models import Max, Min
+from django.db.models import Max, Min, Q
 import logging
 
 logger = logging.getLogger('send_log')
@@ -18,7 +18,6 @@ logger = logging.getLogger('send_log')
 
 def synthesize_to_material_deal_result(mdr_lot_no):
     """等级综合判定"""
-
     # 1、先找到这个胶料所有指标
     logger.error("1、先找到这个胶料所有指标")
     mto_set_all = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('product_no', flat=True)
@@ -108,10 +107,10 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             else:
                 mdr_dict['deal_result'] = '三等品'
         else:
-            mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
+            mdr_dict['level'] = 3
             mdr_dict['deal_result'] = '三等品'
     else:
-        mdr_dict['level'] = MaterialDataPointIndicator.objects.aggregate(Max('level'))['level__max']
+        mdr_dict['level'] = 3
         mdr_dict['deal_result'] = '三等品'
 
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).last()
@@ -125,45 +124,6 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     else:
         mdr_dict['test_time'] = 1
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
-
-    # 5、向北自接口发送数据
-    # 5.1、先判断库存和线边库里有没有数据
-    pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
-    bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(container_no=pfb_obj.pallet_no).last()
-    mi_obj = MaterialInventory.objects.filter(lot_no=mdr_obj.lot_no).first()
-    # 5.2、一个库里有就发给北自，没有就不发给北自
-    if bz_obj or mi_obj:
-        try:
-            # 4、update_store_test_flag这个字段用choise 1对应成功 2对应失败 3对应库存线边库都没有
-            msg_ids = order_no()
-            mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
-            item = []
-            item_dict = {"WORKID": str(int(msg_ids) + 1),
-                         "MID": mto_obj.product_no,
-                         "PICI": str(pfb_obj.plan_classes_uid),
-                         "RFID": pfb_obj.pallet_no,
-                         "DJJG": mdr_obj.deal_result,
-                         "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
-            item.append(item_dict)
-            # 向北自发送数据
-            logger.error("向北自发送数据")
-            res = update_wms_kjjg(msg_id=msg_ids, items=item)
-            if not res:  # res为空代表成功
-                mdr_obj.update_store_test_flag = 1
-                mdr_obj.save()
-                logger.error("向北自发送数据,发送成功")
-            else:
-                mdr_obj.update_store_test_flag = 2
-                mdr_obj.save()
-                logger.error(f"发送失败{res}")
-        except Exception as e:
-            logger.error(f"调北自接口发生异常：{e}")
-            pass
-    else:  # 两个库都没有
-        mdr_obj.update_store_test_flag = 3
-        mdr_obj.save()
-        logger.error("没有发送，两个库存和线边库里都没有")
 
 
 def receive_deal_result(lot_no):

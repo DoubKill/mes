@@ -328,7 +328,7 @@ class DispatchLocation(AbstractEntity):
     """发货地"""
 
     no = models.CharField('发货地编码', max_length=64, help_text='发货地编码')
-    name = models.CharField('发货地名称', max_length=64, help_text='发货地名称')
+    name = models.CharField('发货地名称', max_length=64, help_text='发货地名称', unique=True)
     desc = models.CharField('备注', max_length=64, help_text='备注', blank=True, default='')
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
@@ -356,7 +356,7 @@ class DispatchLog(AbstractEntity):
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
     quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
-    order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
+    order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型', null=True)
     status = models.PositiveIntegerField(verbose_name="发货状态", help_text="发货状态", choices=STATUS_CHOICES)
     qty = models.PositiveIntegerField(verbose_name='单托数量', help_text='单托数量', default=2)
     weight = models.DecimalField(verbose_name='单托重量', help_text='单托重量', decimal_places=2, max_digits=8)
@@ -388,15 +388,14 @@ class DispatchPlan(AbstractEntity):
                                  blank=True, null=True)
     dispatch_type = models.ForeignKey(GlobalCode, verbose_name='发货类型', help_text='发货类型', on_delete=models.SET_NULL,
                                       blank=True, null=True)
-    order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型')
+    order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型', null=True)
     actual_qty = models.PositiveIntegerField(verbose_name='已发数量', help_text='已发数量', default=0)
     actual_weight = models.DecimalField(verbose_name='已发重量', help_text='已发重量', decimal_places=2,
                                         max_digits=8, default=0)
     status = models.PositiveIntegerField(verbose_name="状态", help_text="状态", choices=STATUS_CHOICES, default=4)
     qty = models.PositiveIntegerField(verbose_name='单托数量', help_text='单托数量', blank=True, null=True)
     dispatch_location = models.ForeignKey(DispatchLocation, verbose_name='目的地', help_text='目的地',
-                                          on_delete=models.SET_NULL,
-                                          blank=True, null=True)
+                                          on_delete=models.SET_NULL, blank=True, null=True)
     dispatch_user = models.CharField(max_length=16, verbose_name='发货人', help_text='发货人', null=True, blank=True)
     start_time = models.DateTimeField(verbose_name="发起时间", help_text="发起时间", auto_now_add=True)
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', null=True, blank=True)

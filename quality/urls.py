@@ -11,9 +11,10 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialTestOrderViewSet, TestTypeViewSet, DataPointViewSet, MaterialTestMethodViewSet, \
     MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
     DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
-    MaterialDealResultUpdateValidTime, MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, \
-    LabelPrintViewSet, DealSuggestionView, MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, \
-    PrintMaterialDealResult, BatchDayStatisticsView, BatchProductNoDayStatisticsView, BatchProductNoMonthStatisticsView
+    MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, LabelPrintViewSet, DealSuggestionView, \
+    MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, PrintMaterialDealResult, \
+    BatchDayStatisticsView, BatchProductNoDayStatisticsView, BatchProductNoMonthStatisticsView, \
+    UnqualifiedDealOrderViewSet, UnqualifiedOrderTrains
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -50,6 +51,9 @@ router.register('batch-product-no-day-statistics', BatchProductNoDayStatisticsVi
 # 胶料月合格率统计
 router.register('batch-product-no-month-statistics', BatchProductNoMonthStatisticsView)
 
+# 不合格处置单
+router.register('unqualified-deal-orders', UnqualifiedDealOrderViewSet)
+
 urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
@@ -63,5 +67,6 @@ urlpatterns = [
     path('deal-suggestion-view/', DealSuggestionView.as_view()),  # 处理意见展示
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
     path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
+    path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
     path('', include(router.urls)),
 ]

@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from basics.models import WorkSchedulePlan
 from mes.derorators import api_recorder
+from mes.paginations import DefaultPageNumberPagination
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
@@ -20,6 +21,7 @@ from rest_framework.response import Response
 class ClassesBanBurySummaryView(ListAPIView):
     """班次密炼统计"""
     queryset = TrainsFeedbacks.objects.all()
+    pagination_class = None
 
     @staticmethod
     def get_class_dimension_page_data(page):
@@ -65,7 +67,7 @@ class ClassesBanBurySummaryView(ListAPIView):
         select_str = """plan_classes_uid,
                     equip_no,
                     product_no,
-                   to_char({}, '{}'),
+                   to_char({}, '{}') AS "date",
                    MAX(actual_trains) AS max_trains,
                    MIN(actual_trains) AS min_trains,
                    max(ceil(
@@ -120,8 +122,8 @@ class ClassesBanBurySummaryView(ListAPIView):
            FROM
            trains_feedbacks
            where {}
-           GROUP BY
-           {}""".format(select_str, where_str, group_by_str)
+           GROUP BY {}
+           order by "date";""".format(select_str, where_str, group_by_str)
         ret = {}
         cursor = connection.cursor()
         cursor.execute(sql)
@@ -154,11 +156,11 @@ class ClassesBanBurySummaryView(ListAPIView):
                 if ret[item_key]['min_train_time'] > item[7]:
                     ret[item_key]['min_train_time'] = item[7]
 
-        page = self.paginate_queryset(list(ret.values()))
+        data = ret.values()
         if day_type == '2' and dimension == '1':
-            page = self.get_class_dimension_page_data(page)
+            data = self.get_class_dimension_page_data(ret.values())
 
-        return self.get_paginated_response(page)
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -188,7 +190,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
 
         select_str = """plan_classes_uid,
                             equip_no,
-                           to_char({}, '{}'),
+                           to_char({}, '{}') AS "date",
                            MAX(actual_trains) AS max_trains,
                            MIN(actual_trains) AS min_trains,
                            sum(ceil(
@@ -232,8 +234,8 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                    FROM
                    trains_feedbacks
                    where {}
-                   GROUP BY
-                   {}""".format(select_str, where_str, group_by_str)
+                   GROUP BY {}
+                   order by "date";""".format(select_str, where_str, group_by_str)
         ret = {}
         cursor = connection.cursor()
         cursor.execute(sql)
@@ -259,17 +261,17 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
                 ret[item_key]['total_trains'] += diff_trains
                 ret[item_key]['total_time'] += item_dict['total_time']
 
-        page = self.paginate_queryset(list(ret.values()))
+        data = ret.values()
         if day_type == '2' and dimension == '1':
-            page = self.get_class_dimension_page_data(page)
+            data = self.get_class_dimension_page_data(ret.values())
 
-        return self.get_paginated_response(page)
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
 class CollectTrainsFeedbacksList(ListAPIView):
     """胶料单车次时间汇总"""
-    queryset = TrainsFeedbacks.objects.filter(delete_flag=False).order_by('plan_classes_uid')
+    queryset = TrainsFeedbacks.objects.filter(delete_flag=False).order_by('product_time')
     serializer_class = CollectTrainsFeedbacksSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = CollectTrainsFeedbacksFilter

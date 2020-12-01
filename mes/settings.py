@@ -201,6 +201,15 @@ LOGGING = {
             'formatter': 'standard',
             'interval': 1,
         },
+        'qualityFile': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'quality.log'),
+            'when': 'midnight',
+            'backupCount': 10,
+            'formatter': 'standard',
+            'interval': 1,
+        },
     },
     'loggers': {
         'django.db.backends': {
@@ -231,6 +240,10 @@ LOGGING = {
         },
         'send_log': {
             'handlers': ['sendFile'],
+            'level': 'INFO',
+        },
+        'quality_log': {
+            'handlers': ['qualityFile'],
             'level': 'INFO',
         },
     },
