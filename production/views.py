@@ -281,12 +281,12 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             if not tf_dict.get(plan_classes_uid):
                 day_plan_dict[day_plan_id]["actual_trains"] += 0
                 day_plan_dict[day_plan_id]["actual_weight"] += 0
-                day_plan_dict[day_plan_id]["begin_time"] = datetime.datetime.now()
-                day_plan_dict[day_plan_id]["actual_time"] = datetime.datetime.now()
+                day_plan_dict[day_plan_id]["begin_time"] = ""
+                day_plan_dict[day_plan_id]["actual_time"] = ""
                 continue
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
-            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2]
+            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if tf_dict[plan_classes_uid][2] else ""
             day_plan_dict[day_plan_id]["actual_time"] = tf_dict[plan_classes_uid][3].strftime('%Y-%m-%d %H:%M:%S')
         temp_data = {}
         for equip_no in EQUIP_LIST:
