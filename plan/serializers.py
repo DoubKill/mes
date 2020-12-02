@@ -165,6 +165,8 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
 
 class ProductBatchingSerializer(BaseModelSerializer):
     """胶料配料标准同步"""
+    delete_flag = serializers.BooleanField(write_only=True)
+    created_date = serializers.DateTimeField(write_only=True)
     factory__global_no = serializers.CharField(write_only=True, required=False)
     site__global_no = serializers.CharField(write_only=True, required=False)
     product_info__product_no = serializers.CharField(write_only=True, required=False)
@@ -238,12 +240,15 @@ class ProductBatchingSerializer(BaseModelSerializer):
             'factory__global_no', 'site__global_no', 'product_info__product_no', 'precept', 'stage_product_batch_no',
             'dev_type__category_no', 'stage__global_no', 'versions', 'used_type', 'batching_weight',
             'manual_material_weight', 'auto_material_weight', 'volume', 'production_time_interval', 'equip__equip_no',
-            'batching_type')
+            'batching_type', 'delete_flag',
+            'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class ProductBatchingDetailSerializer(BaseModelSerializer):
     """胶料配料标准同步"""
+    delete_flag = serializers.BooleanField(write_only=True)
+    created_date = serializers.DateTimeField(write_only=True)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
     material__material_no = serializers.CharField(write_only=True)
 
@@ -275,12 +280,15 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
         fields = (
             'product_batching__stage_product_batch_no', 'sn', 'material__material_no', 'actual_weight',
             'standard_error',
-            'auto_flag', 'type')
+            'auto_flag', 'type', 'delete_flag',
+            'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class ProductDayPlansySerializer(BaseModelSerializer):
     """胶料日计划表同步"""
+    delete_flag = serializers.BooleanField(write_only=True)
+    created_date = serializers.DateTimeField(write_only=True)
     equip__equip_no = serializers.CharField(write_only=True)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
     plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
@@ -315,12 +323,17 @@ class ProductDayPlansySerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductDayPlan
-        fields = ('equip__equip_no', 'product_batching__stage_product_batch_no', 'plan_schedule__plan_schedule_no')
+        fields = (
+            'equip__equip_no', 'product_batching__stage_product_batch_no', 'plan_schedule__plan_schedule_no',
+            'delete_flag',
+            'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class ProductClassesPlansySerializer(BaseModelSerializer):
     """胶料日计划表同步"""
+    delete_flag = serializers.BooleanField(write_only=True)
+    created_date = serializers.DateTimeField(write_only=True)
     work_schedule_plan__work_schedule_plan_no = serializers.CharField(write_only=True)
     equip__equip_no = serializers.CharField(write_only=True, required=False)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True, required=False)
@@ -392,7 +405,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'equip__equip_no', 'product_batching__stage_product_batch_no',
                   'status',
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
-                  'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag','created_date')
+                  'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag', 'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
