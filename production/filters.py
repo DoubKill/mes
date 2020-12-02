@@ -74,7 +74,7 @@ class QualityControlFilter(django_filters.rest_framework.FilterSet):
 
 
 class CollectTrainsFeedbacksFilter(django_filters.rest_framework.FilterSet):
-    st = django_filters.DateTimeFilter(field_name='begin_time__date', help_text='开始时间')
+    st = django_filters.DateFilter(field_name='factory_date', help_text='工厂时间')
     classes = django_filters.CharFilter(field_name='classes', help_text='班次')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='设备编号')
     product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料编码', lookup_expr='icontains')
