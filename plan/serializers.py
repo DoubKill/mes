@@ -392,7 +392,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'equip__equip_no', 'product_batching__stage_product_batch_no',
                   'status',
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
-                  'product_day_plan__plan_schedule__plan_schedule_no')
+                  'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag','created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 

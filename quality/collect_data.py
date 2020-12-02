@@ -95,10 +95,6 @@ def main():
                 value = item[0]
                 product_no = item[1].strip(' ')  # 胶料代码
                 production_class = item[2].strip(' ') + '班'  # 生产班次
-                if production_class == '夜班':
-                    classes = '晚班'
-                else:
-                    classes = production_class
                 data_point_name = item[4].strip(' ')  # 数据点
                 method_name = item[5].strip(' ')  # 试验方法名称
                 result = item[6].strip(' ')  # 结果
@@ -131,7 +127,7 @@ def main():
                 schedule_plan = WorkSchedulePlan.objects.filter(
                     plan_schedule__work_schedule__schedule_name='三班两运转',
                     plan_schedule__day_time=product_date,
-                    classes__global_name=classes
+                    classes__global_name=production_class
                 ).first()
                 if schedule_plan:
                     group = schedule_plan.group.global_name

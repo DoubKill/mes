@@ -106,7 +106,7 @@ def add_global_codes():
         elif i == 5:
             items = ["a班", "b班", "c班"]
         elif i == 6:
-            items = ["早班", "中班", "晚班"]
+            items = ["早班", "中班", "夜班"]
         elif i == 7:
             items = ["密炼设备", "快检设备", "传送设备"]
         elif i == 8:

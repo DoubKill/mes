@@ -343,7 +343,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
         day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0,
                              "classes_data": [{"plan_trains": 0, "actual_trains": 0, "classes": "早班"},
                                               {"plan_trains": 0, "actual_trains": 0, "classes": "中班"},
-                                              {"plan_trains": 0, "actual_trains": 0, "classes": "晚班"}
+                                              {"plan_trains": 0, "actual_trains": 0, "classes": "夜班"}
                                               ]}
                          for x in day_plan_list}
         pcp_data = pcp_set.values("plan_classes_uid", "weight", "plan_trains", 'equip__equip_no',
@@ -373,11 +373,11 @@ class ProductActualViewSet(mixins.ListModelMixin,
                         "actual_trains": 0,
                         "classes": "中班"
                     }
-                if class_name in ["夜班", "晚班"]:
+                if class_name == "夜班":
                     day_plan_dict[day_plan_id]["classes_data"][2] = {
                         "plan_trains": pcp.get('plan_trains'),
                         "actual_trains": 0,
-                        "classes": "晚班"
+                        "classes": "夜班"
                     }
                 continue
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
@@ -388,7 +388,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             if tf_dict[plan_classes_uid][2] == "中班":
                 day_plan_dict[day_plan_id]["classes_data"][1]["plan_trains"] += pcp.get('plan_trains')
                 day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
-            if tf_dict[plan_classes_uid][2] in ["夜班", "晚班"]:
+            if tf_dict[plan_classes_uid][2] == "夜班":
                 day_plan_dict[day_plan_id]["classes_data"][2]["plan_trains"] += pcp.get('plan_trains')
                 day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
         ret_list = [_ for _ in day_plan_dict.values()]
