@@ -3,7 +3,7 @@ import datetime
 import re
 
 import requests
-from django.db.models import Max, Sum
+from django.db.models import Max, Sum, Min
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -234,6 +234,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         params = request.query_params
         search_time_str = params.get("search_time")
         target_equip_no = params.get('equip_no')
+        time_now = datetime.datetime.now()
         if search_time_str:
             if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
                 raise ValidationError("查询时间格式异常")
@@ -258,12 +259,13 @@ class PlanRealityViewSet(mixins.ListModelMixin,
         day_plan_list_temp = pcp_set.values_list("product_batching__stage_product_batch_no", "equip__equip_no")
         day_plan_list = list(set([x[0] + x[1] for x in day_plan_list_temp]))
         tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
-            actual_trains=Max('actual_trains'), actual_weight=Sum('actual_weight'), begin_time=Max('begin_time'),
+            actual_trains=Max('actual_trains'), actual_weight=Sum('actual_weight'), begin_time=Min('begin_time'),
             actual_time=Max('product_time'))
-        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("begin_time", ""),
-                                               x.get("actual_time", "")] for x in tf_set}
+        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"),
+                                               x.get("begin_time", time_now), x.get("actual_time", time_now),
+                                               (x.get("actual_time", time_now) - x.get("begin_time", time_now)).total_seconds()] for x in tf_set}
         day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0, "plan_time": 0,
-                             "start_rate": None}
+                             "start_rate": None, "all_time": 0}
                          for x in day_plan_list}
         pcp_data = pcp_set.values("plan_classes_uid", "weight", "plan_trains", 'equip__equip_no',
                                   'product_batching__stage_product_batch_no',
@@ -286,6 +288,8 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
             day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if tf_dict[plan_classes_uid][2] else ""
             day_plan_dict[day_plan_id]["actual_time"] = tf_dict[plan_classes_uid][3].strftime('%Y-%m-%d %H:%M:%S')
+            day_plan_dict[day_plan_id]["plan_time"] += pcp.get("time", 0)
+            day_plan_dict[day_plan_id]["all_time"] += tf_dict[plan_classes_uid][4]
         temp_data = {}
         for equip_no in EQUIP_LIST:
             temp_data[equip_no] = []
