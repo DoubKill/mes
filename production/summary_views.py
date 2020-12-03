@@ -290,7 +290,7 @@ class SumCollectTrains(APIView):
         product_no = params.get("product_no", None)  # 胶料编码
         dict_filter = {'delete_flag': False}
         if st:
-            dict_filter['begin_time__date'] = st
+            dict_filter['factory_date'] = st
         if classes:
             dict_filter['classes'] = classes
         if equip_no:
