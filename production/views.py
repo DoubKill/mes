@@ -2,12 +2,13 @@ import json
 import datetime
 import re
 
+import math
 import requests
-from django.db.models import Max, Sum
+from django.db.models import Max, Sum, Count, Min
 from django.db.transaction import atomic
 from django_filters.rest_framework import DjangoFilterBackend
 
-from rest_framework import mixins
+from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -20,13 +21,15 @@ from mes.conf import EQUIP_LIST
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
-    PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter
+    PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
-    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer
-from rest_framework.generics import ListAPIView
+    ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
+    ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer
+from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
+    get_object_or_404
 
 
 class TrainsFeedbacksViewSet(mixins.CreateModelMixin,
@@ -373,18 +376,20 @@ class ProductActualViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["actual_weight"] += tf_dict[plan_classes_uid][1]
             if tf_dict[plan_classes_uid][2] == "早班":
                 day_plan_dict[day_plan_id]["classes_data"][0]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
             if tf_dict[plan_classes_uid][2] == "中班":
                 day_plan_dict[day_plan_id]["classes_data"][1]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
             if tf_dict[plan_classes_uid][2] in ["夜班", "晚班"]:
                 day_plan_dict[day_plan_id]["classes_data"][2]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
         ret_list = [_ for _ in day_plan_dict.values()]
-        ret_list.sort(key= lambda x: x.get("equip_no"))
+        ret_list.sort(key=lambda x: x.get("equip_no"))
         ret = {"data": ret_list}
         return Response(ret)
-
 
 
 class ProductionRecordViewSet(mixins.ListModelMixin,
@@ -538,7 +543,7 @@ class PalletTrainFeedback(APIView):
         for pallet_feed_back in pallet_feed_backs:
             begin_trains = pallet_feed_back.begin_trains
             end_trains = pallet_feed_back.end_trains
-            for i in range(begin_trains, end_trains+1):
+            for i in range(begin_trains, end_trains + 1):
                 data = {
                     'product_no': pallet_feed_back.product_no,
                     'lot_no': pallet_feed_back.lot_no,
@@ -551,3 +556,129 @@ class PalletTrainFeedback(APIView):
                 ret.append(data)
         ret.sort(key=lambda x: x.get('actual_trains'))
         return Response(ret)
+
+
+class UpdateUnReachedCapacityCauseView(UpdateAPIView):
+    queryset = UnReachedCapacityCause.objects.all()
+    serializer_class = UnReachedCapacityCauseSerializer
+
+    def get_object(self):
+        data = dict(self.request.data)
+        filter_kwargs = {
+            'factory_date': data.get('factory_date')[0],
+            'classes': data.get('classes')[0],
+            'equip_no': data.get('equip_no')[0]
+        }
+        obj = get_object_or_404(self.get_queryset(), **filter_kwargs)
+        return obj
+
+
+def get_trains_feed_backs_query_params(view):
+    query_params = view.request.query_params
+    hour_step = int(query_params.get('hour_step', 2))
+    classes = query_params.getlist('classes[]')
+    factory_date = query_params.get('factory_date')
+    return hour_step, classes, factory_date
+
+
+# 产量计划实际分析
+class ProductionPlanRealityAnalysisView(ListAPIView):
+    queryset = TrainsFeedbacks.objects.all()
+    serializer_class = ProductionPlanRealityAnalysisSerializer
+
+    def get_serializer_context(self):
+        hour_step = get_trains_feed_backs_query_params(self)[0]
+        context = super().get_serializer_context()
+        context.update({'hour_step': hour_step})
+        return context
+
+    def list(self, request, *args, **kwargs):
+        hour_step, classes, factory_date = get_trains_feed_backs_query_params(self)
+        trains_feed_backs = TrainsFeedbacks.objects \
+            .filter(factory_date=factory_date) \
+            .values('factory_date',
+                    'classes',
+                    'equip_no') \
+            .order_by('-factory_date',
+                      'equip_no') \
+            .annotate(plan_train_sum=Sum('plan_trains'),
+                      finished_train_count=Count('id', distinct=True))
+        data = {
+            'headers': list(range(hour_step, 13, hour_step))
+        }
+        for class_ in classes:
+            feed_backs = trains_feed_backs.filter(classes=class_)
+            serializer = self.get_serializer(feed_backs, many=True)
+            data[class_] = serializer.data
+        return Response(data)
+
+
+# 区间产量统计
+class IntervalOutputStatisticsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        hour_step, classes, factory_date = get_trains_feed_backs_query_params(self)
+
+        if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
+            return Response({})
+        day_start_end_times = TrainsFeedbacks.objects \
+            .filter(factory_date=factory_date) \
+            .aggregate(day_end_time=Max('end_time'),
+                       day_start_time=Min('end_time'))
+        day_start_time = day_start_end_times.get('day_start_time')
+        day_end_time = day_start_end_times.get('day_end_time')
+        time_spans = []
+        end_time = day_start_time
+        while end_time < day_end_time:
+            time_spans.append(end_time)
+            end_time = end_time + datetime.timedelta(hours=hour_step)
+        time_spans.append(day_end_time)
+
+        data = {
+            'equips': TrainsFeedbacks.objects
+                .filter(factory_date=factory_date)
+                .values_list('equip_no', flat=True)
+                .distinct()
+        }
+
+        for class_ in classes:
+            data[class_] = []
+            for i in range(len(time_spans) - 1):
+                time_span_data = {}
+                data[class_].append(time_span_data)
+                interval_trains_feed_backs = TrainsFeedbacks.objects \
+                    .filter(classes=class_,
+                            factory_date=factory_date,
+                            end_time__gte=time_spans[i],
+                            end_time__lte=time_spans[i + 1]) \
+                    .order_by('equip_no') \
+                    .values('equip_no') \
+                    .annotate(interval_finished_train_count=Count('id', distinct=True))
+
+                total_trains_feed_backs = TrainsFeedbacks.objects \
+                    .filter(classes=class_,
+                            factory_date=factory_date,
+                            end_time__gte=day_start_time,
+                            end_time__lte=time_spans[i + 1]) \
+                    .order_by('equip_no') \
+                    .values('equip_no') \
+                    .annotate(total_finished_train_count=Count('id', distinct=True))
+
+                time_span_data['time_span'] = "{0}:00-{1}:00".format(time_spans[i].hour,
+                                                                     time_spans[i + 1].hour
+                                                                     if time_spans[i + 1].hour != time_spans[i].hour
+                                                                     else time_spans[i + 1].hour + hour_step)
+
+                for total_trains_feed_back in total_trains_feed_backs:
+                    equip_no = total_trains_feed_back.get('equip_no')
+                    same_equip_no_interval_trains_feed_back = None
+                    for interval_trains_feed_back in interval_trains_feed_backs:
+                        if interval_trains_feed_back.get('equip_no') == equip_no:
+                            same_equip_no_interval_trains_feed_back = interval_trains_feed_back
+                            break
+                    time_span_data[equip_no] = (total_trains_feed_back
+                                                .get('total_finished_train_count'),
+                                                same_equip_no_interval_trains_feed_back
+                                                .get('interval_finished_train_count')
+                                                if same_equip_no_interval_trains_feed_back else 0)
+        return Response(data)

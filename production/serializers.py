@@ -1,12 +1,14 @@
 import datetime
 
+import math
 from rest_framework import serializers
+from rest_framework.fields import Field
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
-    OperationLog
+    OperationLog, UnReachedCapacityCause
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -155,3 +157,40 @@ class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
     class Meta:
         model = TrainsFeedbacks
         fields = ('id', 'equip_no', 'product_no', 'actual_trains', 'time_consuming', 'classes')
+
+
+class UnReachedCapacityCauseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UnReachedCapacityCause
+        fields = ['factory_date', 'classes', 'equip_no', 'cause']
+
+
+class ProductionPlanRealityAnalysisSerializer(serializers.ModelSerializer):
+    plan_train_sum = serializers.SerializerMethodField()
+    time_span_train_count = serializers.SerializerMethodField()
+    cause = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TrainsFeedbacks
+        fields = ['factory_date', 'classes', 'equip_no', 'plan_train_sum', 'time_span_train_count', 'cause']
+
+    def get_cause(self, obj):
+        cause, _ = UnReachedCapacityCause.objects.get_or_create(
+            factory_date=obj['factory_date'],
+            classes=obj['classes'],
+            equip_no=obj['equip_no'])
+        return cause.cause
+
+    def get_plan_train_sum(self, obj):
+        return obj.get('plan_train_sum')
+
+    def get_time_span_train_count(self, obj):
+        hour_step = self.context.get('hour_step', 2)
+        time_span_train_count = {}
+        for time_span in range(hour_step, 13, hour_step):
+            time_span_train_count.update({
+                time_span: [math.ceil(obj.get('plan_train_sum', 0) / 12 * time_span),
+                            math.ceil(obj.get('finished_train_count', 0) / 12 * time_span)]
+            })
+        return time_span_train_count
+
