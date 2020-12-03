@@ -148,15 +148,32 @@ class ProductionRecordSerializer(BaseModelSerializer):
 class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
     """胶料单车次时间汇总"""
     time_consuming = serializers.SerializerMethodField(read_only=True, help_text='耗时')
+    interval_time = serializers.SerializerMethodField(read_only=True, help_text='间隔时间')
 
     def get_time_consuming(self, obj):
         if not obj.end_time or not obj.begin_time:
             return None
         return obj.end_time - obj.begin_time
 
+    def get_interval_time(self, obj):
+        if obj.actual_trains > 1:
+            actual_trains = obj.actual_trains - 1
+            tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid,
+                                                     actual_trains=actual_trains).last()
+            if tfb_obj:
+                return obj.begin_time - tfb_obj.end_time
+            else:
+                return None
+        elif obj.actual_trains == 1:
+            tfb_obj = TrainsFeedbacks.objects.filter(equip_no=obj.equip_no, id__lt=obj.id).last()
+            if tfb_obj:
+                return obj.begin_time - tfb_obj.end_time
+            else:
+                return None
+
     class Meta:
         model = TrainsFeedbacks
-        fields = ('id', 'equip_no', 'product_no', 'actual_trains', 'time_consuming', 'classes')
+        fields = ('id', 'equip_no', 'product_no', 'actual_trains', 'time_consuming', 'classes', 'interval_time')
 
 
 class UnReachedCapacityCauseSerializer(serializers.ModelSerializer):
