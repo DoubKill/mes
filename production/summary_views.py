@@ -271,7 +271,7 @@ class EquipBanBurySummaryView(ClassesBanBurySummaryView):
 @method_decorator([api_recorder], name="dispatch")
 class CollectTrainsFeedbacksList(ListAPIView):
     """胶料单车次时间汇总"""
-    queryset = TrainsFeedbacks.objects.filter(delete_flag=False).order_by('product_time')
+    queryset = TrainsFeedbacks.objects.filter(delete_flag=False).order_by('product_time', 'actual_trains')
     serializer_class = CollectTrainsFeedbacksSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = CollectTrainsFeedbacksFilter
@@ -290,7 +290,7 @@ class SumCollectTrains(APIView):
         product_no = params.get("product_no", None)  # 胶料编码
         dict_filter = {'delete_flag': False}
         if st:
-            dict_filter['begin_time__date'] = st
+            dict_filter['factory_date'] = st
         if classes:
             dict_filter['classes'] = classes
         if equip_no:
@@ -339,7 +339,7 @@ class CutTimeCollect(APIView):
         if equip_no:  # 设备
             dict_filter['equip_no'] = equip_no
         if st:
-            dict_filter['end_time__date'] = st
+            dict_filter['factory_date'] = st
         # 统计过程
         return_list = []
         tfb_equip_uid_list = TrainsFeedbacks.objects.filter(delete_flag=False, **dict_filter).values(
@@ -357,8 +357,8 @@ class CutTimeCollect(APIView):
             tfb_equip_uid_dict_later = tfb_equip_uid_list[j + 1]
             # 这里也要加筛选
             if st:
-                tfb_equip_uid_dict_ago['end_time__date'] = st
-                tfb_equip_uid_dict_later['end_time__date'] = st
+                tfb_equip_uid_dict_ago['factory_date'] = st
+                tfb_equip_uid_dict_later['factory_date'] = st
 
             tfb_pn_age = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict_ago).last()
             tfb_pn_later = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict_later).first()
@@ -377,7 +377,7 @@ class CutTimeCollect(APIView):
                                                        end_time__date=mst).first()
             if m_tfb_obj:
                 tfb_equip_uid_dict = tfb_equip_uid_list[-1]
-                tfb_equip_uid_dict['end_time__date'] = st
+                tfb_equip_uid_dict['factory_date'] = st
 
                 tfb_pn_age = TrainsFeedbacks.objects.filter(delete_flag=False, **tfb_equip_uid_dict).last()
                 if tfb_pn_age.plan_classes_uid != m_tfb_obj.plan_classes_uid:
