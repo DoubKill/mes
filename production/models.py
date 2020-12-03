@@ -77,7 +77,7 @@ class PalletFeedbacks(AbstractEntity):
             models.Index(fields=["classes"]),
             models.Index(fields=["pallet_no"]),
             models.Index(fields=["end_time"]),
-            models.Index(fields=["lot_no"]),]
+            models.Index(fields=["lot_no"]), ]
 
 
 class EquipStatus(AbstractEntity):
@@ -209,3 +209,13 @@ class MaterialTankStatus(AbstractEntity):
         db_table = 'material_tank_status'
         verbose_name_plural = verbose_name = '储料罐状态'
         indexes = [models.Index(fields=['equip_no']), ]
+
+
+class UnReachedCapacityCause(models.Model):
+    factory_date = models.DateField('工厂日期')
+    classes = models.CharField('班次', max_length=64)
+    equip_no = models.CharField("机台号", max_length=64)
+    cause = models.TextField('未达产能原因', blank=True, default='')
+
+    class Meta:
+        unique_together = ('factory_date', 'classes', 'equip_no')
