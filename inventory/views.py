@@ -162,7 +162,13 @@ class ProductInventory(GenericViewSet,
         else:
             sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
                 FROM v_ASRS_STORE_MESVIEW group by 物料编码"""
+        sql_all = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW"""
+        sql_fm = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW where 物料编码 like '%FM%'"""
         sc = SqlClient(sql=sql)
+        sc_fm = SqlClient(sql=sql_fm)
+        sc_all = SqlClient(sql=sql_all)
+        fm_count = sc_fm.all()[0][0]
+        other_count = sc_all.all()[0][0] - fm_count
         temp = sc.all()
         result = []
         for instance in temp:
@@ -180,7 +186,7 @@ class ProductInventory(GenericViewSet,
         count = len(result)
         result = result[st:et]
         sc.close()
-        return Response({'results': result, "count": count})
+        return Response({'results': result, "count": count, "fm_count": fm_count, "other_count": other_count})
 
 
 @method_decorator([api_recorder], name="dispatch")

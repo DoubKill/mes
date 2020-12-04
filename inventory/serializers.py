@@ -439,6 +439,25 @@ class XBKMaterialInventorySerializer(serializers.ModelSerializer):
 
 
 class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
+
+    product_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_product_info(self, obj):
+        lot_no = obj.lot_no
+        pf = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
+        product_time = ""
+        if pf:
+            try:
+                product_time = pf.product_time.strftime('%Y%m%d %H:%M:%S')
+            except:
+                product_time = ""
+        return {
+            "equip_no": pf.equip_no if pf else "",
+            "classes": pf.classes if pf else "",
+            "product_time": product_time
+        }
+
+
     class Meta:
         model = BzFinalMixingRubberInventory
         fields = ['material_type',
@@ -450,7 +469,8 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
                   'unit',
                   'unit_weight',
                   'total_weight',
-                  'quality_status']
+                  'quality_status',
+                  'product_info']
 
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
