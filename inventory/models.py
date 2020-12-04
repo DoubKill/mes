@@ -148,6 +148,30 @@ class BzFinalMixingRubberInventoryLB(models.Model):
     def unit_weight(self):
         return str(round(self.total_weight / self.qty, 3))
 
+    # def equip_no(self):
+    #     try:
+    #         equip_no = self.lot_no[4:7]
+    #     except:
+    #         equip_no = ""
+    #     if len(equip_no) != 3:
+    #         equip_no = self.bill_id[-3:]
+    #     if equip_no.startswith("Z"):
+    #         return equip_no
+    #     return ""
+
+    # def class_name(self):
+    #     class_map = {
+    #         1: "早班",
+    #         2: "中班",
+    #         3: "夜班"
+    #     }
+    #     try:
+    #         class_id = int(self.lot_no[-5])
+    #     except:
+    #         return ""
+    #     else:
+    #         return class_map[class_id]
+
     class Meta:
         db_table = 'v_ASRS_STORE_MESVIEW'
         managed = False
