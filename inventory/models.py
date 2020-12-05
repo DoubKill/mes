@@ -365,12 +365,8 @@ class DispatchLog(AbstractEntity):
     """发货履历"""
     STATUS_CHOICES = (
         (1, '完成'),
-        (2, '执行中'),
-        (3, '失败'),
-        (4, '新建'),
-        (5, '关闭')
+        (2, '撤销')
     )
-
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
     need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量')
