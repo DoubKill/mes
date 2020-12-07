@@ -93,19 +93,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     ordering_fields = ('id', 'product_time')
     filter_class = PalletFeedbacksFilter
 
-    def list(self, request, *args, **kwargs):
-        day_time = request.query_params.get("day_time", )
-        if day_time:
-            queryset = self.filter_queryset(self.get_queryset().filter(end_time__date=day_time))
-        else:
-            queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
