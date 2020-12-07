@@ -25,11 +25,12 @@ from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
-    QualityControl
+    QualityControl, ProcessFeedback
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
-    ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer
+    ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
+    CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 
@@ -92,8 +93,6 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id', 'product_time')
     filter_class = PalletFeedbacksFilter
-
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -718,3 +717,101 @@ class IntervalOutputStatisticsView(APIView):
                                                 .get('interval_finished_train_count')
                                                 if same_equip_no_interval_trains_feed_back else 0)
         return Response(data)
+
+
+# 将群控的车次报表移植过来 （中间表就吗，没有用了 关于中间表的代码直接删除了）
+@method_decorator([api_recorder], name="dispatch")
+class TrainsFeedbacksAPIView(mixins.ListModelMixin,
+                             GenericViewSet):
+    """车次报表展示接口"""
+    queryset = TrainsFeedbacks.objects.all()
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    serializer_class = TrainsFeedbacksSerializer2
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_class = TrainsFeedbacksFilter
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+        equip_no = params.get("equip_no", None)
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data_list = serializer.data
+            data_list.append({'version': 'v2'})
+            return self.get_paginated_response(data_list)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class CurveInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           GenericViewSet):
+    """工艺曲线信息"""
+    queryset = EquipStatus.objects.filter()
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    pagination_class = SinglePageNumberPagination
+    serializer_class = CurveInformationSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+
+    def get_queryset(self):
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            irc_queryset = EquipStatus.objects.filter(equip_no=tfb_obk.equip_no,
+                                                      plan_classes_uid=tfb_obk.plan_classes_uid,
+                                                      product_time__gte=tfb_obk.begin_time,
+                                                      product_time__lte=tfb_obk.end_time).order_by('product_time')
+        except:
+            raise ValidationError('车次产出反馈或车次报表工艺曲线数据表没有数据')
+
+        return irc_queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MixerInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           GenericViewSet):
+    """密炼信息"""
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    serializer_class = MixerInformationSerializer2
+
+    def get_queryset(self):
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        params = self.request.query_params
+        equip_no = params.get("equip_no", None)
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            irm_queryset = ProcessFeedback.objects.filter(plan_classes_uid=tfb_obk.plan_classes_uid,
+                                                          equip_no=tfb_obk.equip_no,
+                                                          product_no=tfb_obk.product_no,
+                                                          current_trains=tfb_obk.actual_trains
+                                                          )
+        except:
+            raise ValidationError('车次产出反馈或胶料配料标准步序详情没有数据')
+        return irm_queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WeighInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           GenericViewSet):
+    """称量信息"""
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    serializer_class = WeighInformationSerializer2
+
+    def get_queryset(self):
+        params = self.request.query_params
+        equip_no = params.get("equip_no", None)
+
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            irw_queryset = ExpendMaterial.objects.filter(equip_no=tfb_obk.equip_no,
+                                                         plan_classes_uid=tfb_obk.plan_classes_uid,
+                                                         product_no=tfb_obk.product_no,
+                                                         trains=tfb_obk.actual_trains, delete_flag=False)
+        except:
+            raise ValidationError('车次产出反馈或车次报表材料重量没有数据')
+        return irw_queryset
