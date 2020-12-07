@@ -266,7 +266,9 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             actual_time=Max('product_time'))
         tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"),
                                                x.get("begin_time", time_now), x.get("actual_time", time_now),
-                                               (x.get("actual_time", time_now) - x.get("begin_time", time_now)).total_seconds()] for x in tf_set}
+                                               (x.get("actual_time", time_now) - x.get("begin_time",
+                                                                                       time_now)).total_seconds()] for x
+                   in tf_set}
         day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0, "plan_time": 0,
                              "start_rate": None, "all_time": 0}
                          for x in day_plan_list}
@@ -289,7 +291,8 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                 continue
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
-            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if tf_dict[plan_classes_uid][2] else ""
+            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if \
+            tf_dict[plan_classes_uid][2] else ""
             day_plan_dict[day_plan_id]["actual_time"] = tf_dict[plan_classes_uid][3].strftime('%Y-%m-%d %H:%M:%S')
             day_plan_dict[day_plan_id]["plan_time"] += pcp.get("time", 0)
             day_plan_dict[day_plan_id]["all_time"] += tf_dict[plan_classes_uid][4]
@@ -391,15 +394,18 @@ class ProductActualViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["actual_weight"] += tf_dict[plan_classes_uid][1]
             if tf_dict[plan_classes_uid][2] == "早班":
                 day_plan_dict[day_plan_id]["classes_data"][0]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
             if tf_dict[plan_classes_uid][2] == "中班":
                 day_plan_dict[day_plan_id]["classes_data"][1]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
             if tf_dict[plan_classes_uid][2] == "夜班":
                 day_plan_dict[day_plan_id]["classes_data"][2]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
         ret_list = [_ for _ in day_plan_dict.values()]
-        ret_list.sort(key= lambda x: x.get("equip_no"))
+        ret_list.sort(key=lambda x: x.get("equip_no"))
         ret = {"data": ret_list}
         return Response(ret)
 
@@ -564,7 +570,7 @@ class PalletTrainFeedback(APIView):
         for pallet_feed_back in pallet_feed_backs:
             begin_trains = pallet_feed_back.begin_trains
             end_trains = pallet_feed_back.end_trains
-            for i in range(begin_trains, end_trains+1):
+            for i in range(begin_trains, end_trains + 1):
                 data = {
                     'product_no': pallet_feed_back.product_no,
                     'lot_no': pallet_feed_back.lot_no,
@@ -586,9 +592,9 @@ class UpdateUnReachedCapacityCauseView(UpdateAPIView):
     def get_object(self):
         data = dict(self.request.data)
         filter_kwargs = {
-            'factory_date': data.get('factory_date')[0],
-            'classes': data.get('classes')[0],
-            'equip_no': data.get('equip_no')[0]
+            'factory_date': data.get('factory_date'),
+            'classes': data.get('classes'),
+            'equip_no': data.get('equip_no')
         }
         obj = get_object_or_404(self.get_queryset(), **filter_kwargs)
         return obj
@@ -642,6 +648,7 @@ class IntervalOutputStatisticsView(APIView):
 
         if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
             return Response({})
+
         day_start_end_times = TrainsFeedbacks.objects \
             .filter(factory_date=factory_date) \
             .aggregate(day_end_time=Max('end_time'),
@@ -659,6 +666,7 @@ class IntervalOutputStatisticsView(APIView):
             'equips': TrainsFeedbacks.objects
                 .filter(factory_date=factory_date)
                 .values_list('equip_no', flat=True)
+                .order_by('-equip_no')
                 .distinct()
         }
 
@@ -667,23 +675,42 @@ class IntervalOutputStatisticsView(APIView):
             for i in range(len(time_spans) - 1):
                 time_span_data = {}
                 data[class_].append(time_span_data)
-                interval_trains_feed_backs = TrainsFeedbacks.objects \
-                    .filter(classes=class_,
-                            factory_date=factory_date,
-                            end_time__gte=time_spans[i],
-                            end_time__lte=time_spans[i + 1]) \
-                    .order_by('equip_no') \
-                    .values('equip_no') \
-                    .annotate(interval_finished_train_count=Count('id', distinct=True))
+                interval_trains_feed_backs = None
+                total_trains_feed_backs = None
+                if class_ == '整日':
+                    interval_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(factory_date=factory_date,
+                                end_time__gte=time_spans[i],
+                                end_time__lte=time_spans[i + 1]) \
+                        .order_by('equip_no') \
+                        .values('equip_no') \
+                        .annotate(interval_finished_train_count=Count('id', distinct=True))
 
-                total_trains_feed_backs = TrainsFeedbacks.objects \
-                    .filter(classes=class_,
-                            factory_date=factory_date,
-                            end_time__gte=day_start_time,
-                            end_time__lte=time_spans[i + 1]) \
-                    .order_by('equip_no') \
-                    .values('equip_no') \
-                    .annotate(total_finished_train_count=Count('id', distinct=True))
+                    total_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(factory_date=factory_date,
+                                end_time__gte=day_start_time,
+                                end_time__lte=time_spans[i + 1]) \
+                        .order_by('equip_no') \
+                        .values('equip_no') \
+                        .annotate(total_finished_train_count=Count('id', distinct=True))
+                else:
+                    interval_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(classes=class_,
+                                factory_date=factory_date,
+                                end_time__gte=time_spans[i],
+                                end_time__lte=time_spans[i + 1]) \
+                        .order_by('equip_no') \
+                        .values('equip_no') \
+                        .annotate(interval_finished_train_count=Count('id', distinct=True))
+
+                    total_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(classes=class_,
+                                factory_date=factory_date,
+                                end_time__gte=day_start_time,
+                                end_time__lte=time_spans[i + 1]) \
+                        .order_by('equip_no') \
+                        .values('equip_no') \
+                        .annotate(total_finished_train_count=Count('id', distinct=True))
 
                 time_span_data['time_span'] = "{0}:00-{1}:00".format(time_spans[i].hour,
                                                                      time_spans[i + 1].hour
