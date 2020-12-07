@@ -51,7 +51,7 @@ urlpatterns = [
     path('equip-banbury-summary/', EquipBanBurySummaryView.as_view()),
     path('expend-material-batch/', ExpendMaterialBatch.as_view()),
     path('pallet-trains-feedbacks/', PalletTrainFeedback.as_view()),  # 托盘开始到结束车次列表
-    path('production-plan-reality-analysis/', ProductionPlanRealityAnalysisView.as_view()), # 产量计划实际分析
+    path('production-plan-reality-analysis/', ProductionPlanRealityAnalysisView.as_view()),  # 产量计划实际分析
     path('update-cause/', UpdateUnReachedCapacityCauseView.as_view()),  # 创建未达产能原因
     path('interval-output-statistics/', IntervalOutputStatisticsView.as_view())  # 区间产量统计
 ]
