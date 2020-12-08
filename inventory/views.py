@@ -1,45 +1,42 @@
 import datetime
-import json
 import logging
 import random
-import time
 
-import requests
 from django.db.models import Sum
 from django.db.transaction import atomic
-from django.shortcuts import render
 
-# Create your views here.
 from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
+from rest_framework.mixins import CreateModelMixin, ListModelMixin
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
-from inventory.filters import InventoryLogFilter, StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
+from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
-    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, MixGumOutInventoryLog, \
-    MixGumInInventoryLog
+    BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
+    MixGumOutInventoryLog, MixGumInInventoryLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
-    DispatchLogSerializer, DispatchLocationSerializer
+    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
-from inventory.utils import BaseUploader
-from mes.common_code import SqlClient, CommonDeleteMixin
+from mes.common_code import SqlClient
 from mes.conf import WMS_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
-from recipe.models import ProductBatching, Material
+from recipe.models import Material
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -469,6 +466,7 @@ class PutPlanManagementLB(ModelViewSet):
     serializer_class = PutPlanManagementSerializerLB
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementLBFilter
+    permission_classes = (IsAuthenticated,)
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -490,18 +488,23 @@ class PutPlanManagementLB(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class DispatchPlanViewSet(ModelViewSet):
-    """发货计划管理"""
     """
-    发货终端设计67调用的接口在这
-    6、发货页面：点击关闭调用改发货计划接口				
-    7、发货页面：点击完成调用改发货计划接口		
-    个人理解：
-        67两点应该是调用PATCH方法对status字段进行修改
+    list:
+        发货计划列表
+    create:
+        新建发货计划
+    retrieve:
+        发货计划详情
+    update:
+        修改发货计划
+    destroy:
+        关闭发货计划
     """
     queryset = DispatchPlan.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = DispatchPlanSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DispatchPlanFilter
+    permission_classes = (IsAuthenticated,)
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -531,6 +534,7 @@ class DispatchLocationViewSet(ModelViewSet):
     serializer_class = DispatchLocationSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DispatchLocationFilter
+    permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -549,63 +553,16 @@ class DispatchLocationViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class DispatchLogViewSet(ModelViewSet):
-    """发货履历管理"""
+@method_decorator([api_recorder], name="dispatch")
+class DispatchLogView(ListAPIView):
     """
-    发货终端设计123调用的接口在这
-    1、详情页： 调用 查询发货履历接口					
-    2、撤销页查询：调用查询发货履历接口 参数为lotno					
-    3、撤销页确认：调用新增发货履历接口
-    个人理解：
-           详情页应该就是list展示
-           撤销页查询应该就是通过lotno筛选，但是不明白撤销是什么意思，现有的表里是没有那个字段表示撤销的含义的
-           撤销页确认应该就是新增一条发货履历表数据
+    list:
+        发货履历列表
+    create:
+        新建/撤销发货
     """
     queryset = DispatchLog.objects.filter(delete_flag=False)
     serializer_class = DispatchLogSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = DispatchLogFilter
-
-
-class DispatchPlanList(APIView):
-    """发货终端设计4"""
-    """	4、发货页面：调用获取未完成单号接口获取单号列表					
-    """
-
-    # 伪代码
-    def get(self, request):
-        order_no_list = DispatchPlan.objects.filter(delete_flag=False).exclude(status=1).values_list('order_no',
-                                                                                                     flat=True)
-        return Response(order_no_list)
-
-
-class DispatchPlanUpdate(APIView):
-    """发货终端设计5"""
-    """5、发货页面：每次扫码成功，更新已发数量和重量,后端需要写发货履历	
-    个人理解：
-        这里的逻辑应该是每次扫码之后 通过某个值去找到发货计划的一条具体数据A
-        然后更新A的已发数量和重量（这两个值也应该是扫码传过来的）
-        再然后根据A的数据在发货履历表里新增一条数据
-    """
-
-    # 伪代码
-    def get(self, request):
-        dp_obj = DispatchPlan.objects.get(id=1)
-        dl_dict = {'order_no': dp_obj.order_no,
-                   'pallet_no': '托盘号不知道咋取',
-                   'need_qty': dp_obj.need_qty,
-                   'need_weight': dp_obj.need_weight,
-                   'dispatch_type': dp_obj.dispatch_type,
-                   'material_no': dp_obj.material.material_no,
-                   'quality_status': '',  # 这个字段不知道咋取
-                   'lot_no': 'lot_no不知道咋取',
-                   'order_type': dp_obj.order_type,
-                   'status': dp_obj.status,
-                   'qty': dp_obj.qty if dp_obj.qty else 1,  # 因为出库计划表里的一些字段目前没法存值，导致在新建出库履历时也为空，所以先写个1放着
-                   'weight': 1,  # 这个字段不知道咋取 先默认写个1
-                   'dispatch_location': dp_obj.dispatch_location,
-                   'dispatch_user': dp_obj.dispatch_user,
-                   'fin_time': dp_obj.fin_time
-                   }
-        DispatchLog.objects.create(**dl_dict)
-        return Response('OK')
+    permission_classes = (IsAuthenticated,)

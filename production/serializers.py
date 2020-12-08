@@ -8,7 +8,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
-    OperationLog, UnReachedCapacityCause
+    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -195,3 +195,73 @@ class ProductionPlanRealityAnalysisSerializer(serializers.ModelSerializer):
             })
         return time_span_train_count
 
+
+# 将群控的车次报表直接移植过来
+class TrainsFeedbacksSerializer2(BaseModelSerializer):
+    """车次产出反馈"""
+    status = serializers.SerializerMethodField(read_only=True)
+    actual_weight = serializers.SerializerMethodField(read_only=True)
+    mixer_time = serializers.SerializerMethodField(read_only=True)
+
+    def get_mixer_time(self, obj):
+        try:
+            return obj.end_time - obj.begin_time
+        except:
+            return None
+
+    def get_actual_weight(self, obj):
+        if not obj.actual_weight:
+            return None
+        else:
+            return str(obj.actual_weight / 100)
+
+    def get_status(self, object):
+        ps_obj = PlanStatus.objects.filter(equip_no=object.equip_no,
+                                           plan_classes_uid=object.plan_classes_uid,
+                                           product_no=object.product_no,
+                                           actual_trains=object.actual_trains).order_by('product_time').last()
+        if ps_obj:
+            status = ps_obj.status
+        else:
+            status = None
+        return status
+
+    class Meta:
+        model = TrainsFeedbacks
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class CurveInformationSerializer(serializers.ModelSerializer):
+    """工艺曲线信息"""
+
+    class Meta:
+        model = EquipStatus
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MixerInformationSerializer2(serializers.ModelSerializer):
+    """密炼信息"""
+
+    class Meta:
+        model = ProcessFeedback
+        fields = "__all__"
+
+
+class WeighInformationSerializer2(serializers.ModelSerializer):
+    """称量信息"""
+
+    class Meta:
+        model = ExpendMaterial
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class AlarmLogSerializer(serializers.ModelSerializer):
+    """报警信息"""
+
+    class Meta:
+        model = AlarmLog
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

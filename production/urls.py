@@ -37,6 +37,18 @@ router.register(r'plan-reality', PlanRealityViewSet, basename="plan-reality")
 # 密炼实绩
 router.register(r'product-actual', ProductActualViewSet, basename="product-actual")
 
+# 将群控的车次报表直接移植过来
+# 称量信息展示
+router.register(r'weigh-information-list', WeighInformationList, basename="weigh-information-list")
+# 密炼信息展示
+router.register(r'mixer-information-list', MixerInformationList, basename="mixer-information-list")
+# 工艺曲线信息展示
+router.register(r'curve-information-list', CurveInformationList, basename="curve-information-list")
+# 报警信息展示
+router.register(r'alarm_log-list', AlarmLogList, basename="alarm_log-list")
+# 车次报表展示
+router.register(r'trains-feedbacks-apiview', TrainsFeedbacksAPIView, basename="trains-feedbacks-apiview")
+
 urlpatterns = [
     path('', include(router.urls)),
     path('trains-feedbacks-batch/', TrainsFeedbacksBatch.as_view()),

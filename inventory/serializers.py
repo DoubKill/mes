@@ -582,3 +582,86 @@ class DispatchLogSerializer(BaseModelSerializer):
     class Meta:
         model = DispatchLog
         fields = '__all__'
+
+
+class DispatchLogCreateSerializer(BaseModelSerializer):
+    """发货履历"""
+
+    def validate(self, attrs):
+        order_no = attrs['order_no']
+        lot_no = attrs['lot_no']
+        status = attrs['status']
+        dispatch_plan = DispatchPlan.objects.filter(order_no=order_no).first()
+        if not dispatch_plan:
+            raise serializers.ValidationError('error order_no')
+        pallet = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+        if not pallet:
+            raise serializers.ValidationError('error lot_no')
+        if not dispatch_plan.material.material_no == pallet.product_no:
+            raise serializers.ValidationError('该托盘胶料与发货单计划胶料不一致')
+        if status == 1:  # 发货防止扫描重复
+            last_dispatch_log = DispatchLog.objects.filter(order_no=order_no, lot_no=lot_no).last()
+            if last_dispatch_log:
+                if last_dispatch_log.status == 1:
+                    raise serializers.ValidationError('请勿重复扫描')
+        attrs['pallet_no'] = pallet.pallet_no
+        attrs['need_weight'] = dispatch_plan.need_weight
+        attrs['need_qty'] = dispatch_plan.need_qty
+        attrs['dispatch_type'] = dispatch_plan.dispatch_type
+        attrs['material_no'] = dispatch_plan.material.material_no
+        attrs['quality_status'] = '合格'
+        attrs['order_type'] = dispatch_plan.order_type
+        attrs['qty'] = pallet.end_trains - pallet.begin_trains + 1
+        attrs['weight'] = pallet.actual_weight
+        attrs['dispatch_location'] = dispatch_plan.dispatch_location.name
+        attrs['pallet_no'] = pallet.pallet_no
+        attrs['dispatch_plan'] = dispatch_plan
+        attrs['dispatch_user'] = self.context['request'].user.username
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        dispatch_plan = validated_data.pop('dispatch_plan')
+        status = validated_data['status']
+        if status == 1:  # 完成
+            dispatch_plan.actual_qty += validated_data['qty']
+            dispatch_plan.actual_weight += validated_data['weight']
+        else:  # 撤销
+            dispatch_plan.actual_qty -= validated_data['qty']
+            dispatch_plan.actual_weight -= validated_data['weight']
+        dispatch_plan.save()
+        return super().create(validated_data)
+
+    class Meta:
+        model = DispatchLog
+        fields = ('order_no', 'lot_no', 'status')
+
+
+class DispatchPlanUpdateSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        instance.status = 1
+        instance.fin_time = datetime.datetime.now()
+        instance.save()
+        DispatchLog.objects.filter(order_no=instance.order_no).update(fin_time=datetime.datetime.now())
+        return instance
+
+    class Meta:
+        model = DispatchPlan
+        fields = ('id', )
+
+
+class TerminalDispatchPlanUpdateSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        status = validated_data['status']
+        instance.status = status
+        if status == 1:
+            instance.fin_time = datetime.datetime.now()
+            DispatchLog.objects.filter(order_no=instance.order_no).update(fin_time=datetime.datetime.now())
+        instance.save()
+        return instance
+
+    class Meta:
+        model = DispatchPlan
+        fields = ('id', 'status')

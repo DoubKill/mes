@@ -8,8 +8,9 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, DispatchPlanList, \
-    DispatchPlanUpdate
+from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
+from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
+    DispatchLogView
 
 router = DefaultRouter()
 
@@ -49,14 +50,15 @@ router.register(r'dispatch-plan', views.DispatchPlanViewSet)  # 发货终端设�
 # 目的地
 router.register(r'dispatch-location', views.DispatchLocationViewSet)
 
-# 发货履历管理
-router.register(r'dispatch-log', views.DispatchLogViewSet)  # 发货终端设计123
+# 终端发货履历管理
+router.register(r'terminal-dispatch-log', TerminalDispatchLogViewSet)
+
+# 终端发货履历管理
+router.register(r'terminal-dispatch-plan', TerminalDispatchViewSet)
 
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),
     path('outwork_feedback/', OutWorkFeedBack.as_view()),
-    path('dispatch-plan-list/', DispatchPlanList.as_view()),  # 发货终端设计4
-    path('dispatch-plan-update/', DispatchPlanUpdate.as_view()),  # 发货终端设计5
-
+    path('dispatch-log/', DispatchLogView.as_view()),  # 发货历史记录
     path('', include(router.urls)),
 ]
