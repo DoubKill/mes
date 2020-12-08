@@ -8,7 +8,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
-    OperationLog, UnReachedCapacityCause, ProcessFeedback
+    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -254,5 +254,14 @@ class WeighInformationSerializer2(serializers.ModelSerializer):
 
     class Meta:
         model = ExpendMaterial
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class AlarmLogSerializer(serializers.ModelSerializer):
+    """报警信息"""
+
+    class Meta:
+        model = AlarmLog
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS

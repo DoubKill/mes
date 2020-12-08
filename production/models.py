@@ -271,3 +271,14 @@ class ProcessFeedback(models.Model):
     class Meta:
         db_table = 'process_feedback'
         verbose_name_plural = verbose_name = '步序反馈报表'
+
+class AlarmLog(AbstractEntity):
+    """报警日志"""
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
+    content = models.TextField(max_length=1024, help_text="内容", verbose_name='内容')
+    product_time = models.DateTimeField(help_text="报警时间", verbose_name='报警时间')
+
+    class Meta:
+        db_table = 'alarm_log'
+        verbose_name_plural = verbose_name = '报警日志'
+        indexes = [models.Index(fields=['equip_no']), models.Index(fields=['product_time'])]

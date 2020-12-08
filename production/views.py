@@ -25,12 +25,12 @@ from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
-    QualityControl, ProcessFeedback
+    QualityControl, ProcessFeedback, AlarmLog
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
-    CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2
+    CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 
@@ -815,3 +815,24 @@ class WeighInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
         except:
             raise ValidationError('车次产出反馈或车次报表材料重量没有数据')
         return irw_queryset
+
+@method_decorator([api_recorder], name="dispatch")
+class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                   GenericViewSet):
+    """报警信息"""
+    queryset = AlarmLog.objects.filter()
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    serializer_class = AlarmLogSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+
+    def get_queryset(self):
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            al_queryset = AlarmLog.objects.filter(equip_no=tfb_obk.equip_no,
+                                                  product_time__gte=tfb_obk.begin_time,
+                                                  product_time__lte=tfb_obk.end_time).order_by('product_time')
+        except:
+            raise ValidationError('报警日志没有数据')
+
+        return al_queryset
