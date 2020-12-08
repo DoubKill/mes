@@ -22,7 +22,7 @@ logger = logging.getLogger('quality_log')
 
 data_bases = [
     {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.141", "user": "gz", "password": "mes2020", "name": "NIDAS3"}
+    {"server": "10.4.23.141", "user": "guozi", "password": "mes2020", "name": "NIDAS3"}
 ]
 
 
@@ -141,7 +141,7 @@ def main():
                         equip_no=equip_no,
                         product_no__icontains=product_no,
                         classes=production_class,
-                        end_time__date=product_date,
+                        factory_date=product_date,
                         begin_trains__lte=i,
                         end_trains__gte=i
                     ).first()
