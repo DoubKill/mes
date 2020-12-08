@@ -9,7 +9,6 @@ from rest_framework.views import APIView
 
 from basics.models import WorkSchedulePlan
 from mes.derorators import api_recorder
-from mes.paginations import DefaultPageNumberPagination
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
@@ -87,10 +86,13 @@ class ClassesBanBurySummaryView(ListAPIView):
                    equip_no,
                    product_no,
                    to_char({}, '{}')""".format(group_date_field, date_format)
+        classes_order = ''
 
         if dimension == '1':
             group_by_str += ' ,classes'
             select_str += ' ,classes'
+            classes_order = ',classes desc'
+        order_by_str = """ "date",product_no {}, equip_no""".format(classes_order)
 
         if equip_no:
             where_str += """and equip_no like '%{}%' """.format(equip_no)
@@ -123,7 +125,7 @@ class ClassesBanBurySummaryView(ListAPIView):
            trains_feedbacks
            where {}
            GROUP BY {}
-           order by "date";""".format(select_str, where_str, group_by_str)
+           order by {};""".format(select_str, where_str, group_by_str, order_by_str)
         ret = {}
         cursor = connection.cursor()
         cursor.execute(sql)

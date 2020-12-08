@@ -654,12 +654,14 @@ class DispatchPlanUpdateSerializer(BaseModelSerializer):
 class TerminalDispatchPlanUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
-        instance.status = 1
-        instance.fin_time = datetime.datetime.now()
-        DispatchLog.objects.filter(order_no=instance.order_no).update(fin_time=datetime.datetime.now())
+        status = validated_data['status']
+        instance.status = status
+        if status == 1:
+            instance.fin_time = datetime.datetime.now()
+            DispatchLog.objects.filter(order_no=instance.order_no).update(fin_time=datetime.datetime.now())
         instance.save()
         return instance
 
     class Meta:
         model = DispatchPlan
-        fields = ('id', )
+        fields = ('id', 'status')

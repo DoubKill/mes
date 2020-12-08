@@ -19,8 +19,8 @@ class TerminalDispatchViewSet(ListModelMixin,
     """
     list:
         发货单列表
-    create:
-        完成发货
+    update:
+        完成/关闭发货
     """
     queryset = DispatchPlan.objects.filter(status__in=(2, 4))
     serializer_class = DispatchPlanSerializer
