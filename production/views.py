@@ -279,7 +279,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
             day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if \
-            tf_dict[plan_classes_uid][2] else ""
+                tf_dict[plan_classes_uid][2] else ""
             day_plan_dict[day_plan_id]["actual_time"] = tf_dict[plan_classes_uid][3].strftime('%Y-%m-%d %H:%M:%S')
             day_plan_dict[day_plan_id]["plan_time"] += pcp.get("time", 0)
             day_plan_dict[day_plan_id]["all_time"] += tf_dict[plan_classes_uid][4]
@@ -595,6 +595,10 @@ def get_trains_feed_backs_query_params(view):
     return hour_step, classes, factory_date
 
 
+def zno_(obj):
+    return int(obj['equip_no'].lower()[1:])
+
+
 # 产量计划实际分析
 class ProductionPlanRealityAnalysisView(ListAPIView):
     queryset = TrainsFeedbacks.objects.all()
@@ -613,8 +617,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
             .values('factory_date',
                     'classes',
                     'equip_no') \
-            .order_by('-factory_date',
-                      'equip_no') \
+            .order_by('-factory_date') \
             .annotate(plan_train_sum=Sum('plan_trains'),
                       finished_train_count=Count('id', distinct=True))
         data = {
@@ -622,6 +625,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
         }
         for class_ in classes:
             feed_backs = trains_feed_backs.filter(classes=class_)
+            feed_backs = sorted(feed_backs, key=zno_)
             serializer = self.get_serializer(feed_backs, many=True)
             data[class_] = serializer.data
         return Response(data)
@@ -650,11 +654,7 @@ class IntervalOutputStatisticsView(APIView):
         time_spans.append(day_end_time)
 
         data = {
-            'equips': TrainsFeedbacks.objects
-                .filter(factory_date=factory_date)
-                .values_list('equip_no', flat=True)
-                .order_by('-equip_no')
-                .distinct()
+            'equips': sorted(TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(), key=lambda e: int(e.lower()[1:]))
         }
 
         for class_ in classes:
@@ -669,7 +669,6 @@ class IntervalOutputStatisticsView(APIView):
                         .filter(factory_date=factory_date,
                                 end_time__gte=time_spans[i],
                                 end_time__lte=time_spans[i + 1]) \
-                        .order_by('equip_no') \
                         .values('equip_no') \
                         .annotate(interval_finished_train_count=Count('id', distinct=True))
 
@@ -677,7 +676,6 @@ class IntervalOutputStatisticsView(APIView):
                         .filter(factory_date=factory_date,
                                 end_time__gte=day_start_time,
                                 end_time__lte=time_spans[i + 1]) \
-                        .order_by('equip_no') \
                         .values('equip_no') \
                         .annotate(total_finished_train_count=Count('id', distinct=True))
                 else:
@@ -686,7 +684,6 @@ class IntervalOutputStatisticsView(APIView):
                                 factory_date=factory_date,
                                 end_time__gte=time_spans[i],
                                 end_time__lte=time_spans[i + 1]) \
-                        .order_by('equip_no') \
                         .values('equip_no') \
                         .annotate(interval_finished_train_count=Count('id', distinct=True))
 
@@ -695,7 +692,6 @@ class IntervalOutputStatisticsView(APIView):
                                 factory_date=factory_date,
                                 end_time__gte=day_start_time,
                                 end_time__lte=time_spans[i + 1]) \
-                        .order_by('equip_no') \
                         .values('equip_no') \
                         .annotate(total_finished_train_count=Count('id', distinct=True))
 
