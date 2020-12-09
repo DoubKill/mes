@@ -812,6 +812,7 @@ class WeighInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
             raise ValidationError('车次产出反馈或车次报表材料重量没有数据')
         return irw_queryset
 
+
 @method_decorator([api_recorder], name="dispatch")
 class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
                    GenericViewSet):
