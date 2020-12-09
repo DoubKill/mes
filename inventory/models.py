@@ -148,6 +148,30 @@ class BzFinalMixingRubberInventoryLB(models.Model):
     def unit_weight(self):
         return str(round(self.total_weight / self.qty, 3))
 
+    # def equip_no(self):
+    #     try:
+    #         equip_no = self.lot_no[4:7]
+    #     except:
+    #         equip_no = ""
+    #     if len(equip_no) != 3:
+    #         equip_no = self.bill_id[-3:]
+    #     if equip_no.startswith("Z"):
+    #         return equip_no
+    #     return ""
+
+    # def class_name(self):
+    #     class_map = {
+    #         1: "早班",
+    #         2: "中班",
+    #         3: "夜班"
+    #     }
+    #     try:
+    #         class_id = int(self.lot_no[-5])
+    #     except:
+    #         return ""
+    #     else:
+    #         return class_map[class_id]
+
     class Meta:
         db_table = 'v_ASRS_STORE_MESVIEW'
         managed = False
@@ -341,12 +365,8 @@ class DispatchLog(AbstractEntity):
     """发货履历"""
     STATUS_CHOICES = (
         (1, '完成'),
-        (2, '执行中'),
-        (3, '失败'),
-        (4, '新建'),
-        (5, '关闭')
+        (2, '撤销')
     )
-
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
     need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量')
