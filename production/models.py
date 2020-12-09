@@ -237,7 +237,7 @@ class MaterialTankStatus(AbstractEntity):
         indexes = [models.Index(fields=['equip_no']), ]
 
 
-class UnReachedCapacityCause(models.Model):
+class UnReachedCapacityCause(AbstractEntity):
     factory_date = models.DateField('工厂日期')
     classes = models.CharField('班次', max_length=64)
     equip_no = models.CharField("机台号", max_length=64)
@@ -248,7 +248,7 @@ class UnReachedCapacityCause(models.Model):
 
 
 # 将群控的车次报表移植过来
-class ProcessFeedback(models.Model):
+class ProcessFeedback(AbstractEntity):
     """步序反馈表"""
     sn = models.PositiveIntegerField(help_text='序号/步骤号')
     condition = models.CharField(max_length=20, help_text='条件', blank=True, null=True)
