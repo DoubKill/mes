@@ -90,7 +90,8 @@ class ProductBatching(AbstractEntity):
         (3, '校对'),
         (4, '启用'),
         (5, '驳回'),
-        (6, '废弃')
+        (6, '废弃'),
+        (7, '停用')
     )
     BATCHING_TYPE_CHOICE = (
         (1, '机台'),

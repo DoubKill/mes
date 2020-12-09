@@ -25,11 +25,12 @@ from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
-    QualityControl
+    QualityControl, ProcessFeedback, AlarmLog
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
-    ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer
+    ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
+    CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 
@@ -92,8 +93,6 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id', 'product_time')
     filter_class = PalletFeedbacksFilter
-
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -254,7 +253,9 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             actual_time=Max('product_time'))
         tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"),
                                                x.get("begin_time", time_now), x.get("actual_time", time_now),
-                                               (x.get("actual_time", time_now) - x.get("begin_time", time_now)).total_seconds()] for x in tf_set}
+                                               (x.get("actual_time", time_now) - x.get("begin_time",
+                                                                                       time_now)).total_seconds()] for x
+                   in tf_set}
         day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0, "plan_time": 0,
                              "start_rate": None, "all_time": 0}
                          for x in day_plan_list}
@@ -277,7 +278,8 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                 continue
             day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
             day_plan_dict[day_plan_id]["actual_weight"] += round(tf_dict[plan_classes_uid][1] / 100, 2)
-            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if tf_dict[plan_classes_uid][2] else ""
+            day_plan_dict[day_plan_id]["begin_time"] = tf_dict[plan_classes_uid][2].strftime('%Y-%m-%d %H:%M:%S') if \
+                tf_dict[plan_classes_uid][2] else ""
             day_plan_dict[day_plan_id]["actual_time"] = tf_dict[plan_classes_uid][3].strftime('%Y-%m-%d %H:%M:%S')
             day_plan_dict[day_plan_id]["plan_time"] += pcp.get("time", 0)
             day_plan_dict[day_plan_id]["all_time"] += tf_dict[plan_classes_uid][4]
@@ -379,15 +381,18 @@ class ProductActualViewSet(mixins.ListModelMixin,
             day_plan_dict[day_plan_id]["actual_weight"] += tf_dict[plan_classes_uid][1]
             if tf_dict[plan_classes_uid][2] == "早班":
                 day_plan_dict[day_plan_id]["classes_data"][0]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
             if tf_dict[plan_classes_uid][2] == "中班":
                 day_plan_dict[day_plan_id]["classes_data"][1]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
             if tf_dict[plan_classes_uid][2] == "夜班":
                 day_plan_dict[day_plan_id]["classes_data"][2]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][0]
+                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
+                    0]
         ret_list = [_ for _ in day_plan_dict.values()]
-        ret_list.sort(key= lambda x: x.get("equip_no"))
+        ret_list.sort(key=lambda x: x.get("equip_no"))
         ret = {"data": ret_list}
         return Response(ret)
 
@@ -552,7 +557,7 @@ class PalletTrainFeedback(APIView):
         for pallet_feed_back in pallet_feed_backs:
             begin_trains = pallet_feed_back.begin_trains
             end_trains = pallet_feed_back.end_trains
-            for i in range(begin_trains, end_trains+1):
+            for i in range(begin_trains, end_trains + 1):
                 data = {
                     'product_no': pallet_feed_back.product_no,
                     'lot_no': pallet_feed_back.lot_no,
@@ -574,9 +579,9 @@ class UpdateUnReachedCapacityCauseView(UpdateAPIView):
     def get_object(self):
         data = dict(self.request.data)
         filter_kwargs = {
-            'factory_date': data.get('factory_date')[0],
-            'classes': data.get('classes')[0],
-            'equip_no': data.get('equip_no')[0]
+            'factory_date': data.get('factory_date'),
+            'classes': data.get('classes'),
+            'equip_no': data.get('equip_no')
         }
         obj = get_object_or_404(self.get_queryset(), **filter_kwargs)
         return obj
@@ -588,6 +593,10 @@ def get_trains_feed_backs_query_params(view):
     classes = query_params.getlist('classes[]')
     factory_date = query_params.get('factory_date')
     return hour_step, classes, factory_date
+
+
+def zno_(obj):
+    return int(obj['equip_no'].lower()[1:])
 
 
 # 产量计划实际分析
@@ -608,8 +617,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
             .values('factory_date',
                     'classes',
                     'equip_no') \
-            .order_by('-factory_date',
-                      'equip_no') \
+            .order_by('-factory_date') \
             .annotate(plan_train_sum=Sum('plan_trains'),
                       finished_train_count=Count('id', distinct=True))
         data = {
@@ -617,6 +625,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
         }
         for class_ in classes:
             feed_backs = trains_feed_backs.filter(classes=class_)
+            feed_backs = sorted(feed_backs, key=zno_)
             serializer = self.get_serializer(feed_backs, many=True)
             data[class_] = serializer.data
         return Response(data)
@@ -630,6 +639,7 @@ class IntervalOutputStatisticsView(APIView):
 
         if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
             return Response({})
+
         day_start_end_times = TrainsFeedbacks.objects \
             .filter(factory_date=factory_date) \
             .aggregate(day_end_time=Max('end_time'),
@@ -644,10 +654,7 @@ class IntervalOutputStatisticsView(APIView):
         time_spans.append(day_end_time)
 
         data = {
-            'equips': TrainsFeedbacks.objects
-                .filter(factory_date=factory_date)
-                .values_list('equip_no', flat=True)
-                .distinct()
+            'equips': sorted(TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(), key=lambda e: int(e.lower()[1:]))
         }
 
         for class_ in classes:
@@ -655,23 +662,38 @@ class IntervalOutputStatisticsView(APIView):
             for i in range(len(time_spans) - 1):
                 time_span_data = {}
                 data[class_].append(time_span_data)
-                interval_trains_feed_backs = TrainsFeedbacks.objects \
-                    .filter(classes=class_,
-                            factory_date=factory_date,
-                            end_time__gte=time_spans[i],
-                            end_time__lte=time_spans[i + 1]) \
-                    .order_by('equip_no') \
-                    .values('equip_no') \
-                    .annotate(interval_finished_train_count=Count('id', distinct=True))
+                interval_trains_feed_backs = None
+                total_trains_feed_backs = None
+                if class_ == '整日':
+                    interval_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(factory_date=factory_date,
+                                end_time__gte=time_spans[i],
+                                end_time__lte=time_spans[i + 1]) \
+                        .values('equip_no') \
+                        .annotate(interval_finished_train_count=Count('id', distinct=True))
 
-                total_trains_feed_backs = TrainsFeedbacks.objects \
-                    .filter(classes=class_,
-                            factory_date=factory_date,
-                            end_time__gte=day_start_time,
-                            end_time__lte=time_spans[i + 1]) \
-                    .order_by('equip_no') \
-                    .values('equip_no') \
-                    .annotate(total_finished_train_count=Count('id', distinct=True))
+                    total_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(factory_date=factory_date,
+                                end_time__gte=day_start_time,
+                                end_time__lte=time_spans[i + 1]) \
+                        .values('equip_no') \
+                        .annotate(total_finished_train_count=Count('id', distinct=True))
+                else:
+                    interval_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(classes=class_,
+                                factory_date=factory_date,
+                                end_time__gte=time_spans[i],
+                                end_time__lte=time_spans[i + 1]) \
+                        .values('equip_no') \
+                        .annotate(interval_finished_train_count=Count('id', distinct=True))
+
+                    total_trains_feed_backs = TrainsFeedbacks.objects \
+                        .filter(classes=class_,
+                                factory_date=factory_date,
+                                end_time__gte=day_start_time,
+                                end_time__lte=time_spans[i + 1]) \
+                        .values('equip_no') \
+                        .annotate(total_finished_train_count=Count('id', distinct=True))
 
                 time_span_data['time_span'] = "{0}:00-{1}:00".format(time_spans[i].hour,
                                                                      time_spans[i + 1].hour
@@ -691,3 +713,123 @@ class IntervalOutputStatisticsView(APIView):
                                                 .get('interval_finished_train_count')
                                                 if same_equip_no_interval_trains_feed_back else 0)
         return Response(data)
+
+
+# 将群控的车次报表移植过来 （中间表就吗，没有用了 关于中间表的代码直接删除了）
+@method_decorator([api_recorder], name="dispatch")
+class TrainsFeedbacksAPIView(mixins.ListModelMixin,
+                             GenericViewSet):
+    """车次报表展示接口"""
+    queryset = TrainsFeedbacks.objects.all()
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    serializer_class = TrainsFeedbacksSerializer2
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filter_class = TrainsFeedbacksFilter
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+        equip_no = params.get("equip_no", None)
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data_list = serializer.data
+            data_list.append({'version': 'v2'})
+            return self.get_paginated_response(data_list)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class CurveInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           GenericViewSet):
+    """工艺曲线信息"""
+    queryset = EquipStatus.objects.filter()
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    pagination_class = SinglePageNumberPagination
+    serializer_class = CurveInformationSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+
+    def get_queryset(self):
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            irc_queryset = EquipStatus.objects.filter(equip_no=tfb_obk.equip_no,
+                                                      plan_classes_uid=tfb_obk.plan_classes_uid,
+                                                      product_time__gte=tfb_obk.begin_time,
+                                                      product_time__lte=tfb_obk.end_time).order_by('product_time')
+        except:
+            raise ValidationError('车次产出反馈或车次报表工艺曲线数据表没有数据')
+
+        return irc_queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MixerInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           GenericViewSet):
+    """密炼信息"""
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    serializer_class = MixerInformationSerializer2
+
+    def get_queryset(self):
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        params = self.request.query_params
+        equip_no = params.get("equip_no", None)
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            irm_queryset = ProcessFeedback.objects.filter(plan_classes_uid=tfb_obk.plan_classes_uid,
+                                                          equip_no=tfb_obk.equip_no,
+                                                          product_no=tfb_obk.product_no,
+                                                          current_trains=tfb_obk.actual_trains
+                                                          )
+        except:
+            raise ValidationError('车次产出反馈或胶料配料标准步序详情没有数据')
+        return irm_queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WeighInformationList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                           GenericViewSet):
+    """称量信息"""
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    serializer_class = WeighInformationSerializer2
+
+    def get_queryset(self):
+        params = self.request.query_params
+        equip_no = params.get("equip_no", None)
+
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            irw_queryset = ExpendMaterial.objects.filter(equip_no=tfb_obk.equip_no,
+                                                         plan_classes_uid=tfb_obk.plan_classes_uid,
+                                                         product_no=tfb_obk.product_no,
+                                                         trains=tfb_obk.actual_trains, delete_flag=False)
+        except:
+            raise ValidationError('车次产出反馈或车次报表材料重量没有数据')
+        return irw_queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
+                   GenericViewSet):
+    """报警信息"""
+    queryset = AlarmLog.objects.filter()
+    permission_classes = (IsAuthenticatedOrReadOnly,)
+    serializer_class = AlarmLogSerializer
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+
+    def get_queryset(self):
+        feed_back_id = self.request.query_params.get('feed_back_id')
+        try:
+            tfb_obk = TrainsFeedbacks.objects.get(id=feed_back_id)
+            al_queryset = AlarmLog.objects.filter(equip_no=tfb_obk.equip_no,
+                                                  product_time__gte=tfb_obk.begin_time,
+                                                  product_time__lte=tfb_obk.end_time).order_by('product_time')
+        except:
+            raise ValidationError('报警日志没有数据')
+
+        return al_queryset
