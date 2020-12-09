@@ -30,7 +30,8 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
-    CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer
+    CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
+    ProcessFeedbackSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 
@@ -535,6 +536,29 @@ class ExpendMaterialBatch(APIView):
         serializer.save()
         return Response("sync success", status=201)
 
+
+@method_decorator([api_recorder], name="dispatch")
+class ProcessFeedbackBatch(APIView):
+    """批量同步原材料消耗数据接口"""
+
+    @atomic
+    def post(self, request):
+        serializer = ProcessFeedbackSerializer(data=request.data, many=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class AlarmLogBatch(APIView):
+    """批量同步原材料消耗数据接口"""
+
+    @atomic
+    def post(self, request):
+        serializer = AlarmLogSerializer(data=request.data, many=True, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response("sync success", status=201)
 
 @method_decorator([api_recorder], name="dispatch")
 class PalletTrainFeedback(APIView):
