@@ -254,11 +254,14 @@ class PlanScheduleSerializer(BaseModelSerializer):
                                                         classes=plan['classes'], delete_flag=False).first()
             if not class_detail:
                 raise serializers.ValidationError('暂无此班次倒班数据')
-            if classes.global_name == '夜班':  # 夜班的结束时间小于等于早班的开始时间，日期则加一天
+            if classes.global_name == '夜班':
                 if all([morning_class, evening_class]):
-                    # if evening_class.start_time <= morning_class.end_time:
-                    #     start_day_time = (day_time + timedelta(days=1)).strftime("%Y-%m-%d")
+                    if evening_class.start_time <= morning_class.start_time:
+                        # 夜班的开始时间小于等于早班的开始时间，则早班跨天
+                        start_day_time = (day_time + timedelta(days=1)).strftime("%Y-%m-%d")
+                        end_day_time = (day_time + timedelta(days=1)).strftime("%Y-%m-%d")
                     if evening_class.end_time <= morning_class.start_time:
+                        # 夜班的结束时间小于等于早班的开始时间，则晚班班跨天
                         end_day_time = (day_time + timedelta(days=1)).strftime("%Y-%m-%d")
             plan['start_time'] = str(start_day_time) + ' ' + str(class_detail.start_time)
             plan['end_time'] = str(end_day_time) + ' ' + str(class_detail.end_time)
