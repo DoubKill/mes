@@ -102,6 +102,24 @@ class ExpendMaterialSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class ProcessFeedbackSerializer(BaseModelSerializer):
+    """步序反馈报表"""
+
+    class Meta:
+        model = ProcessFeedback
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class AlarmLogSerializer(BaseModelSerializer):
+    """步序反馈报表"""
+
+    class Meta:
+        model = AlarmLog
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class OperationLogSerializer(BaseModelSerializer):
     """操作日志"""
 
@@ -254,14 +272,5 @@ class WeighInformationSerializer2(serializers.ModelSerializer):
 
     class Meta:
         model = ExpendMaterial
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class AlarmLogSerializer(serializers.ModelSerializer):
-    """报警信息"""
-
-    class Meta:
-        model = AlarmLog
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
