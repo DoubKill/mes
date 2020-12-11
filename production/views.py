@@ -640,7 +640,9 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
             .filter(factory_date=factory_date) \
             .values('factory_date',
                     'classes',
-                    'equip_no') \
+                    'equip_no',
+                    'plan_classes_uid'
+                    ) \
             .order_by('-factory_date') \
             .annotate(plan_train_sum=Sum('plan_trains'),
                       finished_train_count=Count('id', distinct=True))
@@ -650,7 +652,26 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
         for class_ in classes:
             feed_backs = trains_feed_backs.filter(classes=class_)
             feed_backs = sorted(feed_backs, key=zno_)
-            serializer = self.get_serializer(feed_backs, many=True)
+            train_count_group = {}
+            for feed_back in feed_backs:
+                train_counts = train_count_group.setdefault((feed_back['factory_date'],
+                                                             feed_back['classes'],
+                                                             feed_back['equip_no']), {
+                                                                'plan_train_sum': 0,
+                                                                'finished_train_count': 0
+                                                            })
+                train_counts['plan_train_sum'] += feed_back['plan_train_sum']
+                train_counts['finished_train_count'] += feed_back['finished_train_count']
+            group_feed_backs = []
+            for key, value in train_count_group.items():
+                feed_back = {
+                    'factory_date': key[0],
+                    'classes': key[1],
+                    'equip_no': key[2],
+                }
+                feed_back.update(**value)
+                group_feed_backs.append(feed_back)
+            serializer = self.get_serializer(group_feed_backs, many=True)
             data[class_] = serializer.data
         return Response(data)
 
@@ -678,7 +699,9 @@ class IntervalOutputStatisticsView(APIView):
         time_spans.append(day_end_time)
 
         data = {
-            'equips': sorted(TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(), key=lambda e: int(e.lower()[1:]))
+            'equips': sorted(
+                TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(),
+                key=lambda e: int(e.lower()[1:]))
         }
 
         for class_ in classes:
