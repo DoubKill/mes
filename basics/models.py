@@ -168,3 +168,18 @@ class WorkSchedulePlan(AbstractEntity):
     class Meta:
         db_table = 'work_schedule_plan'
         verbose_name_plural = verbose_name = '排班详情'
+
+class Location(AbstractEntity):
+    """位置点"""
+    no = models.CharField(help_text='编码', max_length=64, unique=True)
+    name = models.CharField(help_text='名称', max_length=64, unique=True)
+    desc = models.CharField(help_text='备注', max_length=64, null=True)
+    used_flag = models.IntegerField(help_text='是否启动', default=1)
+    type = models.ForeignKey(GlobalCode, help_text='类型id',
+                             on_delete=models.CASCADE, related_name='location_gc', blank=True, null=True)
+    image_url = models.CharField(help_text='位置相关照片', max_length=128, null=True)
+
+    # image_url=models.ImageField(help_text='位置相关照片') 这个字段是图片 个人觉得用这个字段比较合理 但是设计是上面一个 而且页面功能暂时也不做这个，所以就先按照上面的来
+    class Meta:
+        db_table = 'location'
+        verbose_name_plural = verbose_name = '位置点'
