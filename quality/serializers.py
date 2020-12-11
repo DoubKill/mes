@@ -198,19 +198,17 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
 
     class Meta:
         model = UnqualifiedDealOrder
-        exclude = ('unqualified_deal_order_uid', )
+        exclude = ('unqualified_deal_order_uid',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class UnqualifiedDealOrderSerializer(BaseModelSerializer):
-
     class Meta:
         model = UnqualifiedDealOrder
         fields = '__all__'
 
 
 class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
-
     class Meta:
         model = UnqualifiedDealOrder
         exclude = ('unqualified_deal_order_uid', 'status')
@@ -683,7 +681,7 @@ class PercentOfPassSerializer(serializers.Serializer):
             .annotate(yc_test_pass_count=yc_test_pass_count)
 
         # 流变
-        lb_train_count = Count('batch__lot__train__testresult',distinct=True,
+        lb_train_count = Count('batch__lot__train__testresult', distinct=True,
                                filter=Q(batch__lot__train__testresult__point__indicator__name='流变'),
                                output_field=FloatField())
         lb_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
@@ -890,8 +888,12 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
         model = BatchProductNo
         fields = ['product_no', 'dates']
 
+    def filter_batch_date_model(self, batches, *args, **kwargs):
+        return batches
+
     def get_dates(self, batch_product_no_obj):
         batches = self.batch_date_model.objects.filter(batch__batch_product_no=batch_product_no_obj)
+        batches = self.filter_batch_date_model(batches)
         yc_train_count = Count('batch__lot__train__testresult', distinct=True,
                                filter=~Q(batch__batch_product_no=batch_product_no_obj,
                                          batch__lot__train__testresult__point__indicator__name='流变'),
@@ -936,7 +938,8 @@ class BatchProductNoDateCommonSerializer(serializers.ModelSerializer):
         batches = batches.annotate(train_count=train_count)
 
         batches = batches.order_by('date')
-        batch_date_product_no_serializer = self.batch_date_product_no_serializer(batches, many=True, batch_product_no_obj=batch_product_no_obj)
+        batch_date_product_no_serializer = self.batch_date_product_no_serializer(batches, many=True,
+                                                                                 batch_product_no_obj=batch_product_no_obj)
         return batch_date_product_no_serializer.data
 
 
@@ -944,7 +947,17 @@ class BatchProductNoDaySerializer(BatchProductNoDateCommonSerializer):
     batch_date_model = BatchDay
     batch_date_product_no_serializer = BatchDayProductNoSerializer
 
+    def filter_batch_date_model(self, batches, *args, **kwargs):
+        date = self.context['date']
+        batches = batches.filter(date__year=date.year, date__month=date.month)
+        return batches
+
 
 class BatchProductNoMonthSerializer(BatchProductNoDateCommonSerializer):
     batch_date_model = BatchMonth
     batch_date_product_no_serializer = BatchMonthProductNoSerializer
+
+    def filter_batch_date_model(self, batches, *args, **kwargs):
+        start_time, end_time = self.context['start_time'], self.context['end_time']
+        batches = batches.filter(date__gte=start_time, date__lte=end_time)
+        return batches

@@ -803,6 +803,12 @@ class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['product_no']
 
+    def get_serializer_context(self):
+        date = get_statics_query_date(self.request.query_params)
+        context = super().get_serializer_context()
+        context['date'] = date
+        return context
+
     def get_queryset(self):
         date = get_statics_query_date(self.request.query_params)
         return BatchProductNo.objects.filter(
@@ -815,6 +821,13 @@ class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     serializer_class = BatchProductNoMonthSerializer
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['product_no']
+
+    def get_serializer_context(self):
+        start_time, end_time = get_statics_query_dates(self.request.query_params)
+        context = super().get_serializer_context()
+        context['start_time'] = start_time
+        context['end_time'] = end_time
+        return context
 
     def get_queryset(self):
         start_time, end_time = get_statics_query_dates(self.request.query_params)
