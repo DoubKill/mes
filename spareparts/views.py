@@ -67,7 +67,7 @@ class SpareInventoryViewSet(ModelViewSet):
                                          material_no=si_obj.material.material_no,
                                          material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
                                          type='入库',
-                                         src_qty=befor_qty, dst_qty=si_obj.qty)
+                                         src_qty=befor_qty, dst_qty=si_obj.qty, created_user=request.user)
         return Response('入库成功')
 
     @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated], url_path='out_storage',
@@ -93,7 +93,7 @@ class SpareInventoryViewSet(ModelViewSet):
                                          material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
                                          type='出库',
                                          src_qty=befor_qty, dst_qty=si_obj.qty, receive_user=receive_user,
-                                         purpose=purpose, reason=reason
+                                         purpose=purpose, reason=reason, created_user=request.user
                                          )
         return Response('出库成功')
 
@@ -114,7 +114,7 @@ class SpareInventoryViewSet(ModelViewSet):
                                          material_no=si_obj.material.material_no,
                                          material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
                                          type='盘点',
-                                         src_qty=befor_qty, dst_qty=si_obj.qty, reason=reason
+                                         src_qty=befor_qty, dst_qty=si_obj.qty, reason=reason, created_user=request.user
                                          )
         return Response('盘点成功')
 
