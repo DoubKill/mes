@@ -644,8 +644,8 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
                     'plan_classes_uid'
                     ) \
             .order_by('-factory_date') \
-            .annotate(plan_train_sum=Sum('plan_trains'),
-                      finished_train_count=Count('id', distinct=True))
+            .annotate(plan_train_sum=Max('plan_trains'),
+                      finished_train_count=Max('actual_trains'))
         data = {
             'headers': list(range(hour_step, 13, hour_step))
         }
