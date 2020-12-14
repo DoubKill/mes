@@ -53,7 +53,7 @@ class SpareInventoryViewSet(ModelViewSet):
     @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated], url_path='put_storage',
             url_name='put_storage')
     def put_storage(self, request, pk=None):
-        # 入库
+        """入库"""
         si_obj = self.get_object()
         qty = request.data.get('qty', 0)
         befor_qty = si_obj.qty
@@ -73,7 +73,7 @@ class SpareInventoryViewSet(ModelViewSet):
     @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated], url_path='out_storage',
             url_name='out_storage')
     def out_storage(self, request, pk=None):
-        # 出库
+        """出库"""
         si_obj = self.get_object()
         qty = request.data.get('qty', 0)
         receive_user = request.data.get('receive_user', None)  # 领用人
@@ -100,7 +100,7 @@ class SpareInventoryViewSet(ModelViewSet):
     @action(methods=['post'], detail=True, permission_classes=[IsAuthenticated], url_path='check_storage',
             url_name='check_storage')
     def check_storage(self, request, pk=None):
-        # 盘点
+        """盘点"""
         si_obj = self.get_object()
         qty = request.data.get('qty', 0)
         reason = request.data.get('reason', None)  # 原因
@@ -121,6 +121,7 @@ class SpareInventoryViewSet(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='count_spare_inventory',
             url_name='count_spare_inventory')
     def count_spare_inventory(self, request, pk=None):
+        """统计"""
         query_params = self.request.query_params
         material_no = query_params.get('material_no', None)
         material_name = query_params.get('material_name', None)
