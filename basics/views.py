@@ -300,7 +300,7 @@ class LocationViewSet(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='name_list',
             url_name='name_list')
     def name_list(self, request, pk=None):
-        # 展示Location所以的name
+        """展示Location所以的name"""
         name_list = Location.objects.filter(delete_flag=False).all().values('id', 'name', 'used_flag')
         # names = list(set(name_list))
         return Response(name_list)
