@@ -181,13 +181,13 @@ class CollectTrainsFeedbacksSerializer(BaseModelSerializer):
             if tfb_obj:
                 return obj.begin_time - tfb_obj.end_time
             else:
-                return None
+                return 0
         elif obj.actual_trains == 1:
             tfb_obj = TrainsFeedbacks.objects.filter(equip_no=obj.equip_no, id__lt=obj.id).last()
             if tfb_obj:
                 return obj.begin_time - tfb_obj.end_time
             else:
-                return None
+                return 0
 
     class Meta:
         model = TrainsFeedbacks

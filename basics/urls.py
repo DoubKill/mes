@@ -2,7 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from basics.views import GlobalCodeTypeViewSet, GlobalCodeViewSet, WorkScheduleViewSet, EquipCategoryViewSet, \
-    EquipViewSet, PlanScheduleViewSet, ClassesDetailViewSet, PlanScheduleManyCreate
+    EquipViewSet, PlanScheduleViewSet, ClassesDetailViewSet, PlanScheduleManyCreate, LocationViewSet
 
 # app_name = 'basics'
 router = DefaultRouter()
@@ -28,6 +28,8 @@ router.register(r'classes', ClassesDetailViewSet)
 # 排班管理
 router.register(r'plan-schedule', PlanScheduleViewSet)
 
+# 位置点
+router.register('location', LocationViewSet)
 urlpatterns = [
     path(r'plan-schedules/', PlanScheduleManyCreate.as_view()),
     path('', include(router.urls)),
