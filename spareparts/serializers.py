@@ -20,7 +20,7 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
 
     def validate_location(self, value):
         si_obj = value.si_location.all().filter(qty__gt=0).first()
-        if not si_obj:
+        if si_obj:
             raise serializers.ValidationError('此库位点已经有物料了')
         return value
 
@@ -46,7 +46,7 @@ class SpareInventorySerializer(BaseModelSerializer):
                                          material_no=instance.material.material_no,
                                          material_name=instance.material.material_name, fin_time=datetime.date.today(),
                                          type='入库',
-                                         src_qty=0, dst_qty=instance.qty,created_user=instance.created_user)
+                                         src_qty=0, dst_qty=instance.qty, created_user=instance.created_user)
         return instance
 
     class Meta:

@@ -169,6 +169,7 @@ class WorkSchedulePlan(AbstractEntity):
         db_table = 'work_schedule_plan'
         verbose_name_plural = verbose_name = '排班详情'
 
+
 class Location(AbstractEntity):
     """位置点"""
     no = models.CharField(help_text='编码', max_length=64, unique=True)
