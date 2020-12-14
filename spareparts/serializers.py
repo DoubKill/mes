@@ -18,11 +18,13 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
     material_name = serializers.ReadOnlyField(source='material.material_name', help_text='名称', default='')
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
 
-    def validate_location(self, value):
-        si_obj = value.si_location.all().filter(qty__gt=0).first()
-        if si_obj:
-            raise serializers.ValidationError('此库位点已经有物料了')
-        return value
+    def validate(self, attrs):
+        location = attrs.get('location', None)
+        material = attrs.get('material', None)
+        mlb = MaterialLocationBinding.objects.filter(location=location, delete_flag=False).first()
+        if mlb:
+            raise serializers.ValidationError('此库存位已经绑定了物料了')
+        return attrs
 
     class Meta:
         model = MaterialLocationBinding
