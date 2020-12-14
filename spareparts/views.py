@@ -24,7 +24,7 @@ from django.db.models import Sum
 @method_decorator([api_recorder], name="dispatch")
 class MaterialLocationBindingViewSet(ModelViewSet):
     """位置点和物料绑定"""
-    queryset = MaterialLocationBinding.objects.all()
+    queryset = MaterialLocationBinding.objects.filter(delete_flag=False).all()
     serializer_class = MaterialLocationBindingSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -32,10 +32,10 @@ class MaterialLocationBindingViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.delete_flag:
-            instance.delete_flag = False
-        else:
-            instance.delete_flag = True
+        si_obj = instance.location.si_location.all().filter(qty__gt=0).first()
+        if si_obj:
+            raise ValidationError('此库位点已经有物料了,不允许删除')
+        instance.delete_flag = True
         instance.last_updated_user = request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
