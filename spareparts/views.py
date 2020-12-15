@@ -40,6 +40,16 @@ class MaterialLocationBindingViewSet(ModelViewSet):
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'location', 'material', 'location__name')
+            for data_dict in data:
+                data_dict.update({'name': data_dict.pop("location__name")})
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class SpareInventoryViewSet(ModelViewSet):
