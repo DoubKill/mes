@@ -49,6 +49,11 @@ class SpareInventoryLog(AbstractEntity):
         (1, "完成"),
         (2, "撤销"),
     )
+    CHOICE1 = (
+        ('出库', "出库"),
+        ('入库', "入库"),
+        ('数量变更', "数量变更"),
+    )
     warehouse_no = models.CharField(help_text='仓库编号', max_length=64)
     warehouse_name = models.CharField(help_text='仓库名称', max_length=64)
     pallet_no = models.CharField(help_text='托盘号', max_length=64, null=True)
@@ -59,9 +64,9 @@ class SpareInventoryLog(AbstractEntity):
     material_no = models.CharField(help_text='物料编码', max_length=64)
     material_name = models.CharField(help_text='物料名称', max_length=64)
     fin_time = models.DateField(help_text='完成时间')
-    type = models.CharField(help_text='类型', max_length=8)
+    type = models.CharField(help_text='类型', max_length=32, choices=CHOICE1)
     cost = models.DecimalField(max_digits=15, decimal_places=3, db_column='费用', null=True)
-    reason = models.CharField(help_text='出库原因', max_length=64, null=True)
+    reason = models.CharField(help_text='出库原因/备注', max_length=64, null=True)
     receive_user = models.CharField(help_text='领用人', max_length=64, null=True)
     purpose = models.CharField(help_text='用途', max_length=64, null=True)
     status = models.IntegerField(help_text='状态', choices=CHOICE, default=1)
