@@ -123,7 +123,7 @@ class SpareInventoryViewSet(ModelViewSet):
                                          qty=qty, quality_status=si_obj.quality_status,
                                          material_no=si_obj.material.material_no,
                                          material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
-                                         type='盘点',
+                                         type='数量变更',
                                          src_qty=befor_qty, dst_qty=si_obj.qty, reason=reason, created_user=request.user
                                          )
         return Response('盘点成功')
