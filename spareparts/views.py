@@ -149,9 +149,9 @@ class SpareInventoryViewSet(ModelViewSet):
                 raise ValidationError("page/page_size值异常")
         filter_dict = {'delete_flag': False}
         if material_no:
-            filter_dict = {'material__material_no': material_no}
+            filter_dict.update(material__material_no=material_no)
         if material_name:
-            filter_dict = {'material__material_name': material_name}
+            filter_dict.update(material__material_name=material_name)
         si_set = SpareInventory.objects.filter(**filter_dict).values('material__material_name',
                                                                      'material__material_no').annotate(
             sum_qty=Sum('qty'))
