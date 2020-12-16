@@ -23,14 +23,22 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
         location = attrs.get('location', None)
         if location.type.global_name == '备品备件地面':  # 因此公用代码轻易不要动
             return attrs
-        if instance_obj:
+
+        if instance_obj:  # 修改
+            si_obj = instance_obj.location.si_location.all().filter(qty__gt=0).first()
+            if si_obj:
+                raise serializers.ValidationError('当前物料已存在当前库存点了,不允许修改')
             mlb = MaterialLocationBinding.objects.exclude(
                 id=instance_obj.id).filter(location=location, delete_flag=False).first()
-        else:
-            mlb = MaterialLocationBinding.objects.filter(location=location, delete_flag=False).first()
+            if mlb:
+                raise serializers.ValidationError('此库存位已经绑定了物料了')
+            SpareInventory.objects.filter(material=instance_obj.material, location=instance_obj.location).update(
+                delete_flag=True)
 
-        if mlb:
-            raise serializers.ValidationError('此库存位已经绑定了物料了')
+        else:  # 新增
+            mlb = MaterialLocationBinding.objects.filter(location=location, delete_flag=False).first()
+            if mlb:
+                raise serializers.ValidationError('此库存位已经绑定了物料了')
         return attrs
 
     class Meta:
