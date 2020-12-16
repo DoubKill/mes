@@ -38,6 +38,7 @@ class MaterialLocationBindingViewSet(ModelViewSet):
         instance.delete_flag = True
         instance.last_updated_user = request.user
         instance.save()
+        SpareInventory.objects.filter(material=instance.material, location=instance.location).update(delete_flag=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def list(self, request, *args, **kwargs):
