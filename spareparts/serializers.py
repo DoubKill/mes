@@ -26,6 +26,10 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
             si_obj = instance_obj.location.si_location.all().filter(qty__gt=0).first()
             if si_obj:
                 raise serializers.ValidationError('当前物料已存在当前库存点了,不允许修改')
+            if location.type.global_name == '备品备件地面':  # 因此公用代码轻易不要动
+                SpareInventory.objects.filter(material=instance_obj.material, location=instance_obj.location).update(
+                    delete_flag=True)
+                return attrs
             mlb = MaterialLocationBinding.objects.exclude(
                 id=instance_obj.id).filter(location=location, delete_flag=False).first()
             if mlb:
