@@ -6,7 +6,7 @@ from django.db.transaction import atomic
 
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedule, Equip, SysbaseEquipLevel, \
-    WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute
+    WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute, Location
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
 from spareparts.models import SpareInventory, MaterialLocationBinding, SpareInventoryLog
@@ -19,10 +19,16 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
 
     def validate(self, attrs):
+        instance_obj = self.instance
         location = attrs.get('location', None)
         if location.type.global_name == '备品备件地面':  # 因此公用代码轻易不要动
             return attrs
-        mlb = MaterialLocationBinding.objects.filter(location=location, delete_flag=False).first()
+        if instance_obj:
+            mlb = MaterialLocationBinding.objects.exclude(
+                id=instance_obj.id).filter(location=location, delete_flag=False).first()
+        else:
+            mlb = MaterialLocationBinding.objects.filter(location=location, delete_flag=False).first()
+
         if mlb:
             raise serializers.ValidationError('此库存位已经绑定了物料了')
         return attrs
@@ -41,6 +47,11 @@ class SpareInventorySerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
+        if not validated_data['location']:
+            location_obj = Location.objects.filter(type__global_name='备品备件地面').first()
+            if not location_obj:
+                raise serializers.ValidationError('请先创建一个类型为备品备件地面的库存位，因为不选库存位，我们默认是地面')
+            validated_data['location'] = location_obj
         instance = super().create(validated_data)
         SpareInventoryLog.objects.create(warehouse_no=instance.warehouse_info.no,
                                          warehouse_name=instance.warehouse_info.name,
