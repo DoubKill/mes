@@ -20,7 +20,8 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
 
     def validate(self, attrs):
         location = attrs.get('location', None)
-        material = attrs.get('material', None)
+        if location.type.global_name == '备品备件地面':  # 因此公用代码轻易不要动
+            return attrs
         mlb = MaterialLocationBinding.objects.filter(location=location, delete_flag=False).first()
         if mlb:
             raise serializers.ValidationError('此库存位已经绑定了物料了')
