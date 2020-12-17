@@ -156,12 +156,13 @@ class SpareInventoryViewSet(ModelViewSet):
             filter_dict.update(material__material_name=material_name)
         si_set = SpareInventory.objects.filter(**filter_dict).values('material__material_name',
                                                                      'material__material_no').annotate(
-            sum_qty=Sum('qty'))
+            sum_qty=Sum('qty'),total_count=Sum('total_count'))
         for si_obj in si_set:
             m_obj = Material.objects.filter(material_no=si_obj['material__material_no'],
                                             material_name=si_obj['material__material_name'], delete_flag=False).first()
 
             ma_obj = MaterialAttribute.objects.filter(material=m_obj).first()
+            si_obj['unit_count'] = m_obj.si_material.all().first().unit_count
             if ma_obj:
                 if si_obj['sum_qty'] < ma_obj.safety_inventory:
                     bound = '-'
