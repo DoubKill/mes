@@ -24,12 +24,12 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
         instance_obj = self.instance
         location = attrs.get('location', None)
         if location.used_flag == 0:
-            raise serializers.ValidationError('该库存点已被停用，不可选')
+            raise serializers.ValidationError('该库存位已被停用，不可选')
 
         if instance_obj:  # 修改
             si_obj = instance_obj.location.si_location.all().filter(qty__gt=0).first()
             if si_obj:
-                raise serializers.ValidationError('当前物料已存在当前库存点了,不允许修改')
+                raise serializers.ValidationError('当前物料已存在当前库存位了,不允许修改')
             if location.type.global_name == '备品备件地面':  # 因此公用代码轻易不要动
                 SpareInventory.objects.filter(material=instance_obj.material, location=instance_obj.location).update(
                     delete_flag=True)

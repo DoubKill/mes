@@ -35,7 +35,7 @@ class MaterialLocationBindingViewSet(ModelViewSet):
         instance = self.get_object()
         si_obj = instance.location.si_location.all().filter(qty__gt=0).first()
         if si_obj:
-            raise ValidationError('此库位点已经有物料了,不允许删除')
+            raise ValidationError('此库存位已经有物料了,不允许删除')
         instance.delete_flag = True
         instance.last_updated_user = request.user
         instance.save()
@@ -162,7 +162,7 @@ class SpareInventoryViewSet(ModelViewSet):
                                             material_name=si_obj['material__material_name'], delete_flag=False).first()
 
             ma_obj = MaterialAttribute.objects.filter(material=m_obj).first()
-            si_obj['unit_count'] = m_obj.si_material.all().first().unit_count
+            si_obj['unit_count'] = m_obj.si_material.all().last().unit_count
             if ma_obj:
                 if si_obj['sum_qty'] < ma_obj.safety_inventory:
                     bound = '-'
