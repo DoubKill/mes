@@ -12,6 +12,7 @@ from mes.derorators import api_recorder
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 
+from recipe.models import Material, MaterialAttribute
 from spareparts.filters import MaterialLocationBindingFilter, SpareInventoryLogFilter, SpareInventoryFilter
 from spareparts.models import SpareInventory, MaterialLocationBinding, SpareInventoryLog
 from spareparts.serializers import SpareInventorySerializer, MaterialLocationBindingSerializer, \
@@ -156,6 +157,19 @@ class SpareInventoryViewSet(ModelViewSet):
         si_set = SpareInventory.objects.filter(**filter_dict).values('material__material_name',
                                                                      'material__material_no').annotate(
             sum_qty=Sum('qty'))
+        for si_obj in si_set:
+            m_obj = Material.objects.filter(material_no=si_obj['material__material_no'],
+                                            material_name=si_obj['material__material_name'], delete_flag=False).first()
+
+            ma_obj = MaterialAttribute.objects.filter(material=m_obj).first()
+            if ma_obj:
+                if si_obj['sum_qty'] < ma_obj.safety_inventory:
+                    bound = '-'
+                else:
+                    bound = None
+            else:
+                bound = None
+            si_obj['bound'] = bound
         count = len(si_set)
         result = si_set[st:et]
         return Response({'results': result, "count": count})
