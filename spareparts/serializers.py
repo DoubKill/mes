@@ -21,6 +21,8 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
     def validate(self, attrs):
         instance_obj = self.instance
         location = attrs.get('location', None)
+        if location.used_flag == 0:
+            raise serializers.ValidationError('该库存点已被停用，不可选')
 
         if instance_obj:  # 修改
             si_obj = instance_obj.location.si_location.all().filter(qty__gt=0).first()
