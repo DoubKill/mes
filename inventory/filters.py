@@ -58,13 +58,14 @@ class DispatchPlanFilter(django_filters.rest_framework.FilterSet):
     """发货计划管理筛选"""
     start_time = django_filters.DateFilter(field_name='start_time__date', help_text='时间')
     status = django_filters.CharFilter(field_name='status', help_text='订单状态')
-    material = django_filters.CharFilter(field_name='material__id', help_text='物料编码')
+    material = django_filters.CharFilter(field_name='material__id', help_text='物料编码id')
     dispatch_type = django_filters.CharFilter(field_name='dispatch_type__id', help_text='发货类型')
     dispatch_location = django_filters.CharFilter(field_name='dispatch_location__id', help_text='目的地')
+    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='物料编码')
 
     class Meta:
         model = DispatchPlan
-        fields = ['start_time', 'status', 'material', 'dispatch_type', 'dispatch_location']
+        fields = ['start_time', 'status', 'material', 'dispatch_type', 'dispatch_location', 'material_no']
 
 
 class DispatchLogFilter(django_filters.rest_framework.FilterSet):
@@ -106,7 +107,6 @@ class MixGumOutFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MixGumOutInventoryLog
         fields = ['start_time', 'end_time', 'location', 'material_no']
-
 
 
 class InventoryFilterBackend(DjangoFilterBackend):
