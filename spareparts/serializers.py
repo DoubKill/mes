@@ -66,6 +66,13 @@ class SpareInventorySerializer(BaseModelSerializer):
             if not location_obj:
                 raise serializers.ValidationError('请先创建一个类型为备品备件地面的库存位，因为不选库存位，我们默认是地面')
             validated_data['location'] = location_obj
+
+        material = validated_data['material']
+        location = validated_data['location']
+        si_obj = SpareInventory.objects.filter(material=material, location=location, delete_flag=False).first()
+        if si_obj:
+            raise serializers.ValidationError('已存在该位置点和物料的数据')
+
         instance = super().create(validated_data)
         SpareInventoryLog.objects.create(warehouse_no=instance.warehouse_info.no,
                                          warehouse_name=instance.warehouse_info.name,

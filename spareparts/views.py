@@ -55,7 +55,7 @@ class MaterialLocationBindingViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class SpareInventoryViewSet(ModelViewSet):
     """备品备件库"""
-    queryset = SpareInventory.objects.filter(delete_flag=False).all().order_by('created_date')
+    queryset = SpareInventory.objects.filter(delete_flag=False).all().order_by('location__name')
     serializer_class = SpareInventorySerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -164,7 +164,7 @@ class SpareInventoryViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class SpareInventoryLogViewSet(ModelViewSet):
     """履历"""
-    queryset = SpareInventoryLog.objects.filter(delete_flag=False).all().order_by('created_date')
+    queryset = SpareInventoryLog.objects.filter(delete_flag=False).all().order_by('location')
     serializer_class = SpareInventoryLogSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
