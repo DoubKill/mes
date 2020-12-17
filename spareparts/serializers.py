@@ -9,7 +9,9 @@ from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedul
     WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute, Location
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
+from recipe.models import MaterialAttribute
 from spareparts.models import SpareInventory, MaterialLocationBinding, SpareInventoryLog
+from django.db.models import Avg, Max, Min, Count, Sum  # 引入函数
 
 
 class MaterialLocationBindingSerializer(BaseModelSerializer):
@@ -58,6 +60,18 @@ class SpareInventorySerializer(BaseModelSerializer):
     material_no = serializers.ReadOnlyField(source='material.material_no', help_text='编码', default='')
     material_name = serializers.ReadOnlyField(source='material.material_name', help_text='名称', default='')
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
+    bound = serializers.SerializerMethodField(help_text='上下限', read_only=True)
+
+    def get_bound(self, obj):
+        ma_obj = MaterialAttribute.objects.filter(material=obj.material).first()
+        si_obj = SpareInventory.objects.filter(material=obj.material, delete_flag=False).aggregate(sum_qty=Sum("qty"))
+        if ma_obj:
+            if si_obj['sum_qty'] < ma_obj.safety_inventory:
+                return '-'
+            else:
+                return None
+        else:
+            return None
 
     @atomic()
     def create(self, validated_data):
