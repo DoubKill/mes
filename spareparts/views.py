@@ -13,19 +13,20 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelV
 from django_filters.rest_framework import DjangoFilterBackend
 
 from recipe.models import Material, MaterialAttribute
-from spareparts.filters import MaterialLocationBindingFilter, SpareInventoryLogFilter, SpareInventoryFilter
-from spareparts.models import SpareInventory, MaterialLocationBinding, SpareInventoryLog
+from spareparts.filters import MaterialLocationBindingFilter, SpareInventoryLogFilter, SpareInventoryFilter, \
+    SpareLocationFilter, SpareTypeFilter, SpareFilter
+from spareparts.models import SpareInventory, SpareLocationBinding, SpareInventoryLog, Spare, SpareLocation, SpareType
 from spareparts.serializers import SpareInventorySerializer, MaterialLocationBindingSerializer, \
-    SpareInventoryLogSerializer
+    SpareInventoryLogSerializer, SpareLocationSerializer, SpareTypeSerializer, SpareSerializer
 from rest_framework import status
 from rest_framework.response import Response
 from django.db.models import Sum
 
 
 @method_decorator([api_recorder], name="dispatch")
-class MaterialLocationBindingViewSet(ModelViewSet):
+class SpareLocationBindingViewSet(ModelViewSet):
     """位置点和物料绑定"""
-    queryset = MaterialLocationBinding.objects.filter(delete_flag=False).all()
+    queryset = SpareLocationBinding.objects.filter(delete_flag=False).all()
     serializer_class = MaterialLocationBindingSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -33,19 +34,19 @@ class MaterialLocationBindingViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        si_obj = instance.location.si_location.all().filter(qty__gt=0).first()
+        si_obj = instance.location.si_spare_location.all().filter(qty__gt=0).first()
         if si_obj:
             raise ValidationError('此库存位已经有物料了,不允许删除')
         instance.delete_flag = True
         instance.last_updated_user = request.user
         instance.save()
-        SpareInventory.objects.filter(material=instance.material, location=instance.location).update(delete_flag=True)
+        SpareInventory.objects.filter(spare=instance.spare, location=instance.location).update(delete_flag=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'location', 'material', 'location__name')
+            data = queryset.values('id', 'location', 'spare', 'location__name')
             for data_dict in data:
                 data_dict.update({'name': data_dict.pop("location__name")})
             return Response({'results': data})
@@ -68,16 +69,25 @@ class SpareInventoryViewSet(ModelViewSet):
         """入库"""
         si_obj = self.get_object()
         qty = request.data.get('qty', 0)
+
         befor_qty = si_obj.qty
         qty_add = befor_qty + qty
         si_obj.qty = qty_add
+
+        befor_total_count = si_obj.total_count
+        total_count_add = befor_total_count + qty * si_obj.spare.cost
+        si_obj.total_count = total_count_add
+
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
                                          location=si_obj.location.name,
                                          qty=+qty, quality_status=si_obj.quality_status,
-                                         material_no=si_obj.material.material_no,
-                                         material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
+                                         spare_no=si_obj.spare.no,
+                                         spare_name=si_obj.spare.name,
+                                         spare_type=si_obj.spare.type.name,
+                                         cost=qty * si_obj.spare.cost,
+                                         unit_count=si_obj.spare.cost, fin_time=datetime.date.today(),
                                          type='入库',
                                          src_qty=befor_qty, dst_qty=si_obj.qty, created_user=request.user)
         return Response('入库成功')
@@ -96,13 +106,21 @@ class SpareInventoryViewSet(ModelViewSet):
             raise ValidationError('超过可取出数量')
         qty_subtract = befor_qty - qty
         si_obj.qty = qty_subtract
+
+        befor_total_count = si_obj.total_count
+        total_count_subtract = befor_total_count - qty * si_obj.spare.cost
+        si_obj.total_count = total_count_subtract
+
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
                                          location=si_obj.location.name,
                                          qty=-qty, quality_status=si_obj.quality_status,
-                                         material_no=si_obj.material.material_no,
-                                         material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
+                                         spare_no=si_obj.spare.no,
+                                         spare_name=si_obj.spare.name,
+                                         spare_type=si_obj.spare.type.name,
+                                         cost=qty * si_obj.spare.cost,
+                                         unit_count=si_obj.spare.cost, fin_time=datetime.date.today(),
                                          type='出库',
                                          src_qty=befor_qty, dst_qty=si_obj.qty, receive_user=receive_user,
                                          purpose=purpose, reason=reason, created_user=request.user
@@ -123,8 +141,11 @@ class SpareInventoryViewSet(ModelViewSet):
                                          warehouse_name=si_obj.warehouse_info.name,
                                          location=si_obj.location.name,
                                          qty=qty, quality_status=si_obj.quality_status,
-                                         material_no=si_obj.material.material_no,
-                                         material_name=si_obj.material.material_name, fin_time=datetime.date.today(),
+                                         spare_no=si_obj.spare.no,
+                                         spare_name=si_obj.spare.name,
+                                         spare_type=si_obj.spare.type.name,
+                                         cost=qty * si_obj.spare.cost,
+                                         unit_count=si_obj.spare.cost, fin_time=datetime.date.today(),
                                          type='数量变更',
                                          src_qty=befor_qty, dst_qty=si_obj.qty, reason=reason, created_user=request.user
                                          )
@@ -135,8 +156,9 @@ class SpareInventoryViewSet(ModelViewSet):
     def count_spare_inventory(self, request, pk=None):
         """统计"""
         query_params = self.request.query_params
-        material_no = query_params.get('material_no', None)
-        material_name = query_params.get('material_name', None)
+        spare_no = query_params.get('spare_no', None)
+        spare_name = query_params.get('spare_name', None)
+        type_name = query_params.get('type_name', None)
         page = query_params.get("page", 1)
         page_size = query_params.get("page_size", 10)
         try:
@@ -150,26 +172,30 @@ class SpareInventoryViewSet(ModelViewSet):
             if et not in range(0, 99999):
                 raise ValidationError("page/page_size值异常")
         filter_dict = {'delete_flag': False}
-        if material_no:
-            filter_dict.update(material__material_no=material_no)
-        if material_name:
-            filter_dict.update(material__material_name=material_name)
-        si_set = SpareInventory.objects.filter(**filter_dict).values('material__material_name',
-                                                                     'material__material_no').annotate(
-            sum_qty=Sum('qty'),total_count=Sum('total_count'))
+        if spare_no:
+            filter_dict.update(spare__no=spare_no)
+        if spare_name:
+            filter_dict.update(spare__name=spare_name)
+        if type_name:
+            filter_dict.update(spare__type__name=type_name)
+        si_set = SpareInventory.objects.filter(**filter_dict).values('spare__name',
+                                                                     'spare__no').annotate(
+            sum_qty=Sum('qty'), total_count=Sum('total_count'))
         for si_obj in si_set:
-            m_obj = Material.objects.filter(material_no=si_obj['material__material_no'],
-                                            material_name=si_obj['material__material_name'], delete_flag=False).first()
+            m_obj = Spare.objects.filter(no=si_obj['spare__no'],
+                                         name=si_obj['spare__name'], delete_flag=False).first()
 
-            ma_obj = MaterialAttribute.objects.filter(material=m_obj).first()
-            si_obj['unit_count'] = m_obj.si_material.all().last().unit_count
-            if ma_obj:
-                if si_obj['sum_qty'] < ma_obj.safety_inventory:
-                    bound = '-'
-                else:
-                    bound = None
+            si_obj['unit_count'] = m_obj.cost
+            si_obj['type_name'] = m_obj.type.name
+
+            if si_obj['sum_qty'] < m_obj.lower:
+                bound = '-'
+            elif si_obj['sum_qty'] > m_obj.upper:
+                bound = '+'
+
             else:
                 bound = None
+
             si_obj['bound'] = bound
         count = len(si_set)
         result = si_set[st:et]
@@ -184,3 +210,78 @@ class SpareInventoryLogViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = SpareInventoryLogFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SpareTypeViewSet(ModelViewSet):
+    """备品备件类型"""
+    queryset = SpareType.objects.filter(delete_flag=False).all()
+    serializer_class = SpareTypeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = SpareTypeFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'name', 'no')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SpareViewSet(ModelViewSet):
+    """备品备件信息"""
+    queryset = Spare.objects.filter(delete_flag=False).all()
+    serializer_class = SpareSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = SpareFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'name', 'no')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SpareLocationViewSet(ModelViewSet):
+    """位置点"""
+    queryset = SpareLocation.objects.filter(delete_flag=False).all()
+    serializer_class = SpareLocationSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = SpareLocationFilter
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='name_list',
+            url_name='name_list')
+    def name_list(self, request, pk=None):
+        """展示Location所以的name"""
+        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name', 'used_flag')
+        # names = list(set(name_list))
+        return Response(name_list)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.used_flag:
+            mlb_obj = SpareLocationBinding.objects.filter(location=instance, delete_flag=False).first()
+            if mlb_obj:
+                raise ValidationError('此站点已经绑定了物料，无法禁用！')
+            instance.used_flag = 0
+        else:
+            instance.used_flag = 1
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_queryset(self):
+        query_params = self.request.query_params
+        type_name = query_params.getlist('type_name[]')
+        if not type_name:
+            return super().get_queryset()
+        l_set = SpareLocation.objects.filter(type__global_name__in=type_name).all()
+        return l_set

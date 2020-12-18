@@ -21,7 +21,7 @@ from mes.paginations import SinglePageNumberPagination
 from rest_framework.decorators import action
 from rest_framework import status
 
-from spareparts.models import MaterialLocationBinding
+from spareparts.models import SpareLocationBinding
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -310,9 +310,9 @@ class LocationViewSet(ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         if instance.used_flag:
-            mlb_obj = MaterialLocationBinding.objects.filter(location=instance, delete_flag=False).first()
-            if mlb_obj:
-                raise ValidationError('此站点已经绑定了物料，无法禁用！')
+            # mlb_obj = SpareLocationBinding.objects.filter(location=instance, delete_flag=False).first()
+            # if mlb_obj:
+            #     raise ValidationError('此站点已经绑定了物料，无法禁用！')
             instance.used_flag = 0
         else:
             instance.used_flag = 1
