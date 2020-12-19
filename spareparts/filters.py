@@ -4,7 +4,7 @@ from spareparts.models import MaterialLocationBinding, SpareInventoryLog, SpareI
 
 
 class SpareInventoryFilter(django_filters.rest_framework.FilterSet):
-    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='编码', lookup_expr='icontains')
+    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='编码')
     material_name = django_filters.CharFilter(field_name='material__material_name', help_text='名称',
                                               lookup_expr='icontains')
     location_name = django_filters.CharFilter(field_name='location__name', help_text='库存位',lookup_expr='icontains')
