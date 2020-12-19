@@ -16,8 +16,8 @@ from django.db.models import Avg, Max, Min, Count, Sum  # 引入函数
 
 class MaterialLocationBindingSerializer(BaseModelSerializer):
     """位置点和物料绑定"""
-    material_no = serializers.ReadOnlyField(source='material.material_no', help_text='编码', default='')
-    material_name = serializers.ReadOnlyField(source='material.material_name', help_text='名称', default='')
+    spare_no = serializers.ReadOnlyField(source='spare.no', help_text='编码', default='')
+    spare_name = serializers.ReadOnlyField(source='spare.name', help_text='名称', default='')
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
 
     def validate(self, attrs):
@@ -57,11 +57,12 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
 
 class SpareInventorySerializer(BaseModelSerializer):
     # 备品备件库
-    material_no = serializers.ReadOnlyField(source='material.material_no', help_text='编码', default='')
+    spare_no = serializers.ReadOnlyField(source='spare.no', help_text='编码', default='')
     cost = serializers.ReadOnlyField(source='spare.cost', help_text='单价', default='')
-    material_name = serializers.ReadOnlyField(source='material.material_name', help_text='名称', default='')
+    spare_name = serializers.ReadOnlyField(source='spare.name', help_text='名称', default='')
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
-    type_name = serializers.ReadOnlyField(source='spare.type.name', help_text='库存位', default='')
+    type_name = serializers.ReadOnlyField(source='spare.type.name', help_text='物料类型', default='')
+    cost = serializers.ReadOnlyField(source='spare.cost', help_text='物料单价', default='')
     bound = serializers.SerializerMethodField(help_text='上下限', read_only=True)
 
     def get_bound(self, obj):
@@ -87,6 +88,7 @@ class SpareInventorySerializer(BaseModelSerializer):
         if si_obj:
             raise serializers.ValidationError('已存在该位置点和物料的数据')
         validated_data['total_count'] = validated_data['qty'] * validated_data['spare'].cost
+        validated_data['unit'] = validated_data['spare'].unit
         instance = super().create(validated_data)
         SpareInventoryLog.objects.create(warehouse_no=instance.warehouse_info.no,
                                          warehouse_name=instance.warehouse_info.name,
