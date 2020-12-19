@@ -29,7 +29,7 @@ class MaterialLocationBindingFilter(django_filters.rest_framework.FilterSet):
 class SpareInventoryLogFilter(django_filters.rest_framework.FilterSet):
     spare_no = django_filters.CharFilter(field_name='spare_no', help_text='编码', lookup_expr='icontains')
     spare_name = django_filters.CharFilter(field_name='spare_name', help_text='名称', lookup_expr='icontains')
-    spare_type = django_filters.CharFilter(field_name='spare_type', help_text='备品备件类型', lookup_expr='icontains')
+    type_name = django_filters.CharFilter(field_name='spare_type', help_text='备品备件类型', lookup_expr='icontains')
     location_name = django_filters.CharFilter(field_name='location', help_text='库存位', lookup_expr='icontains')
     type = django_filters.CharFilter(field_name='type', help_text='类型', lookup_expr='icontains')
     begin_time = django_filters.DateTimeFilter(field_name='fin_time', lookup_expr="gte",
@@ -39,7 +39,7 @@ class SpareInventoryLogFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = SpareInventoryLog
-        fields = ('spare_no', 'spare_name', 'location_name', 'begin_time', 'end_time', 'type', 'spare_type')
+        fields = ('spare_no', 'spare_name', 'location_name', 'begin_time', 'end_time', 'type', 'type_name')
 
 
 class SpareLocationFilter(django_filters.rest_framework.FilterSet):
