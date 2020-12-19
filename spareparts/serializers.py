@@ -16,8 +16,8 @@ from django.db.models import Avg, Max, Min, Count, Sum  # 引入函数
 
 class MaterialLocationBindingSerializer(BaseModelSerializer):
     """位置点和物料绑定"""
-    material_no = serializers.ReadOnlyField(source='material.material_no', help_text='编码', default='')
-    material_name = serializers.ReadOnlyField(source='material.material_name', help_text='名称', default='')
+    spare_no = serializers.ReadOnlyField(source='spare.no', help_text='编码', default='')
+    spare_name = serializers.ReadOnlyField(source='spare.name', help_text='名称', default='')
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
 
     def validate(self, attrs):
