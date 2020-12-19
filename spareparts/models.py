@@ -21,7 +21,7 @@ class SpareType(AbstractEntity):
 class Spare(AbstractEntity):
     """备品备件基本信息"""
     no = models.CharField(help_text='备品备件编码', max_length=64, unique=True)
-    name = models.CharField(help_text='备品备件编码', max_length=64, unique=True)
+    name = models.CharField(help_text='备品备件名称', max_length=64, unique=True)
     type = models.ForeignKey(SpareType, help_text='备品备件类别id', on_delete=models.CASCADE, related_name='s_spare_type',
                              blank=True, null=True)
     unit = models.CharField(help_text='单位', max_length=64)

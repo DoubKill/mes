@@ -122,7 +122,16 @@ class SpareTypeSerializer(BaseModelSerializer):
 
 
 class SpareSerializer(BaseModelSerializer):
-    # 备品备件类型
+    # 备品备件信息
+    type_name = serializers.ReadOnlyField(source='type.name', help_text='物料类型')
+
+    def validate(self, attrs):
+        upper = attrs.get('upper', None)  # 上
+        lower = attrs.get('lower', None)  # 下
+        if upper < lower:
+            raise serializers.ValidationError('上限不能小于下限！')
+        return attrs
+
     class Meta:
         model = Spare
         fields = '__all__'
