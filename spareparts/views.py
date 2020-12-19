@@ -215,7 +215,7 @@ class SpareInventoryLogViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class SpareTypeViewSet(ModelViewSet):
     """备品备件类型"""
-    queryset = SpareType.objects.filter(delete_flag=False).all()
+    queryset = SpareType.objects.all()
     serializer_class = SpareTypeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -228,6 +228,19 @@ class SpareTypeViewSet(ModelViewSet):
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.delete_flag:
+            instance.delete_flag = False
+        else:
+            s_obj = instance.s_spare_type.all().filter(delete_flag=False).first()
+            if s_obj:
+                raise ValidationError('此类型已被备品备件物料绑定了，不可禁用')
+            instance.delete_flag = True
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -246,6 +259,16 @@ class SpareViewSet(ModelViewSet):
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        slb_obj=instance.slb_spare.all().first()
+        if slb_obj:
+            raise ValidationError('此物料已经和库存位绑定了，不能删除')
+        instance.delete_flag = True
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name="dispatch")
