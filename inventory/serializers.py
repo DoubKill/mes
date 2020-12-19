@@ -448,7 +448,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
         product_time = ""
         if pf:
             try:
-                product_time = pf.product_time.strftime('%Y%m%d %H:%M:%S')
+                product_time = pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
             except:
                 product_time = ""
         return {

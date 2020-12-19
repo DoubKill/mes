@@ -108,6 +108,8 @@ class WorkScheduleSerializer(BaseModelSerializer):
                                                 help_text="""[{"classes":班次id,"classes_name":班次名称,
                                                 "start_time":"12:12:12","end_time":"12:12:12",
                                                 "classes_type_name":"正常"}]""", )
+    work_procedure_name = serializers.CharField(source="work_procedure.global_name", read_only=True)
+
 
     @atomic()
     def create(self, validated_data):
@@ -232,7 +234,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     def validate(self, attrs):
         day_time = attrs['day_time']
         work_schedule = attrs['work_schedule']
-        if PlanSchedule.objects.filter(day_time=day_time, work_schedule=work_schedule).exists():
+        if PlanSchedule.objects.filter(day_time=day_time, work_schedule__work_procedure__global_name=work_schedule.work_procedure.global_name).exists():
             raise serializers.ValidationError('日期:{}  已存在相同倒班'.format(day_time))
         return attrs
 
