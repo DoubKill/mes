@@ -1,7 +1,7 @@
 from django.db import models
 
 # Create your models here.
-from basics.models import GlobalCode
+from basics.models import GlobalCode, Equip
 from recipe.models import Material, ProductBatching
 from system.models import AbstractEntity, User
 
@@ -249,6 +249,10 @@ class DeliveryPlan(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+                                   related_name='dispatch_mix_deliverys')
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+                                      related_name='equip_mix_deliverys')
 
     class Meta:
         db_table = 'delivery_plan'
@@ -278,6 +282,10 @@ class DeliveryPlanLB(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+                                   related_name='dispatch_lb_deliverys')
+    dispatch = models.ManyToManyField("DispatchPlan", verbose_name="发货单", help_text="发货单", blank=True, null=True,
+                                      related_name='equip_lb_deliverys')
 
     class Meta:
         db_table = 'delivery_plan_lb'
@@ -307,6 +315,10 @@ class DeliveryPlanFinal(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+                                   related_name='dispatch_final_deliverys')
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+                                      related_name='equip_final_deliverys')
 
     class Meta:
         db_table = 'delivery_plan_final'
@@ -460,7 +472,6 @@ class MixGumOutInventoryLog(models.Model):
     class Meta:
         db_table = 'v_ASRS_TO_MES_RE_MESVIEW'
         managed = False
-
 
 
 class MixGumInInventoryLog(models.Model):
