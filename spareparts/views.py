@@ -23,6 +23,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.db.models import Sum
 
+from spareparts.tasks import spare_template
+
 
 @method_decorator([api_recorder], name="dispatch")
 class SpareLocationBindingViewSet(ModelViewSet):
@@ -311,8 +313,11 @@ class SpareLocationViewSet(ModelViewSet):
         return l_set
 
 
-class SpareImportAPIView(APIView):
+class SpareImportExportAPIView(APIView):
     """备品备件基本信息导入"""
+
+    def get(self, request, *args, **kwargs):
+        return spare_template()
 
     def post(self, request, *args, **kwargs):
         return Response('导入成功')
