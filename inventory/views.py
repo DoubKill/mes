@@ -21,12 +21,12 @@ from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanM
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
-    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer
+    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -271,13 +271,13 @@ class PutPlanManagement(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        if not isinstance(data, list):
-            raise ValidationError('参数错误')
-        for item in data:
-            s = PutPlanManagementSerializer(data=item, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
+        # if not isinstance(data, list):
+        #     raise ValidationError('参数错误')
+        # for item in data:
+        s = PutPlanManagementSerializer(data=data, context={'request': request})
+        if not s.is_valid():
+            raise ValidationError(s.errors)
+        s.save()
         return Response('新建成功')
 
 
@@ -478,6 +478,32 @@ class PutPlanManagementLB(ModelViewSet):
                 s.save()
         elif isinstance(data, dict):
             s = PutPlanManagementSerializerLB(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementFianl(ModelViewSet):
+    queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerFinal
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementLBFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            for item in data:
+                s = PutPlanManagementSerializerFinal(data=item, context={'request': request})
+                if not s.is_valid():
+                    raise ValidationError(s.errors)
+                s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
