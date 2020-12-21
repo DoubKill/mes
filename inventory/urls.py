@@ -18,8 +18,15 @@ router = DefaultRouter()
 router.register(r'material-inventory-view', views.MaterialInventoryView, basename="material-inventory")
 # 胶料立库
 router.register(r'product-inventory', views.ProductInventory, basename="product-inventory")
+
 # 出库计划管理
 router.register('put-plan-management', PutPlanManagement)
+
+# 帘布库出库管理
+router.register(r'lb-plan-management', views.PutPlanManagementLB)
+
+# 终炼胶出库管理
+router.register(r'final-plan-management', views.PutPlanManagementLB)
 
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
@@ -40,8 +47,6 @@ router.register(r'station-info', views.StationInfoViewSet)
 # 仓库物料类型
 router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 
-# 帘布库出库管理
-router.register(r'lb-plan-management', views.PutPlanManagementLB)
 
 '''在后面加发货终端设计的url表示发货终端设计所需要的接口和mes页面所需要的接口耦合了，在此提示说明一下，防止重复开发'''
 # 发货计划管理

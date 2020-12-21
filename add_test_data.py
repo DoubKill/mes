@@ -109,7 +109,7 @@ def add_global_codes():
         elif i == 7:
             items = ["密炼设备", "快检设备", "传送设备"]
         elif i == 8:
-            items = ["一段", "二段", "三段"]
+            items = ["一段", "二段", "三段", "密炼"]
         elif i == 9:
             items = ['400', '500', '600']
         elif i == 10:

@@ -233,6 +233,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
             search_time_str = str(datetime.date.today())
         if target_equip_no:
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=search_time_str,
+                                                        work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
                                                         equip__equip_no=target_equip_no,
                                                         delete_flag=False).select_related(
                 'equip__equip_no',
@@ -240,6 +241,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                 'product_day_plan_id', 'time', 'product_batching__stage__global_name')
         else:
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=search_time_str,
+                                                        work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
                                                         delete_flag=False).select_related(
                 'equip__equip_no',
                 'product_batching__stage_product_batch_no',
@@ -318,6 +320,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
             search_time_str = str(datetime.date.today())
         if target_equip_no:
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=search_time_str,
+                                                        work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
                                                         equip__equip_no=target_equip_no,
                                                         delete_flag=False).select_related('equip__equip_no',
                                                                                           'product_batching__stage_product_batch_no',
@@ -326,6 +329,7 @@ class ProductActualViewSet(mixins.ListModelMixin,
                                                                                           "work_schedule_plan__plan_schedule__plan_schedule_no")
         else:
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=search_time_str,
+                                                        work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
                                                         delete_flag=False).select_related('equip__equip_no',
                                                                                           'product_batching__stage_product_batch_no',
                                                                                           'work_schedule_plan__classes__global_name',
