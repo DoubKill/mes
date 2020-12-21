@@ -2,7 +2,10 @@
 import os
 
 import xlrd
+import xlwt
 from django.http import HttpResponse
+from io import BytesIO
+
 from xlrd import xldate_as_datetime
 
 from mes import settings
@@ -57,3 +60,35 @@ def upload(request):
         return HttpResponse(e)
 
     return HttpResponse('导入成功')
+
+
+def spare_template():
+    """备品备件基本信息导入模板"""
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    filename = '备品备件基本信息'
+    response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode('ISO-8859-1') + '.xls'
+    # 创建工作簿
+    style = xlwt.XFStyle()
+    style.alignment.wrap = 1
+    ws = xlwt.Workbook(encoding='utf-8')
+
+    # 添加第一页数据表
+    w = ws.add_sheet('备品备件基本信息')  # 新建sheet（sheet的名称为"sheet1"）
+    # for j in [1, 4, 5, 7]:
+    #     first_col = w.col(j)
+    #     first_col.width = 256 * 20
+    # 写入表头
+    w.write(0, 0, u'No')
+    w.write(0, 1, u'物料类型')
+    w.write(0, 2, u'物料编码')
+    w.write(0, 3, u'物料名称')
+    w.write(0, 4, u'单价（元）')
+    w.write(0, 5, u'安全库存下限')
+    w.write(0, 6, u'安全库存上限')
+    w.write(0, 7, u'单位')
+    output = BytesIO()
+    ws.save(output)
+    # 重新定位到开始
+    output.seek(0)
+    response.write(output.getvalue())
+    return response
