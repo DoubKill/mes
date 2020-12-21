@@ -26,7 +26,7 @@ router.register('put-plan-management', PutPlanManagement)
 router.register(r'lb-plan-management', views.PutPlanManagementLB)
 
 # 终炼胶出库管理
-router.register(r'final-plan-management', views.PutPlanManagementLB)
+router.register(r'final-plan-management', views.PutPlanManagementFianl)
 
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
