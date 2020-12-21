@@ -7,6 +7,7 @@ from django.utils.decorators import method_decorator
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 
 from mes.derorators import api_recorder
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
@@ -308,3 +309,10 @@ class SpareLocationViewSet(ModelViewSet):
             return super().get_queryset()
         l_set = SpareLocation.objects.filter(type__global_name__in=type_name).all()
         return l_set
+
+
+class SpareImportAPIView(APIView):
+    """备品备件基本信息导入"""
+
+    def post(self, request, *args, **kwargs):
+        return Response('导入成功')

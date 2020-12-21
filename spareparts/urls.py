@@ -8,7 +8,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from spareparts.views import SpareInventoryViewSet, SpareLocationBindingViewSet, SpareInventoryLogViewSet, \
-    SpareLocationViewSet, SpareTypeViewSet, SpareViewSet
+    SpareLocationViewSet, SpareTypeViewSet, SpareViewSet, SpareImportAPIView
 
 router = DefaultRouter()
 # 备品备件库
@@ -28,4 +28,6 @@ router.register('spare', SpareViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('spare-import/', SpareImportAPIView.as_view()),  # 备品备件基本信息导入
+
 ]
