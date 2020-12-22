@@ -6,14 +6,16 @@ import xlwt
 from django.http import HttpResponse
 from io import BytesIO
 
+from rest_framework.exceptions import ValidationError
 from xlrd import xldate_as_datetime
 
+from basics.models import GlobalCode, GlobalCodeType
+from inventory.models import WarehouseInfo
 from mes import settings
-from spareparts.models import SpareType, Spare
+from spareparts.models import SpareType, Spare, SpareLocation, SpareLocationBinding, SpareInventory
 
 
 def spare_wrdb(filename, upload_root):
-
     # 打开上传 excel 表格
     readboot = xlrd.open_workbook(upload_root + "/" + filename)
     sheet = readboot.sheet_by_index(0)
@@ -44,20 +46,44 @@ def spare_inventory_wrdb(filename, upload_root):
     SpareType.objects.all().delete()
     for i in range(1, nrows):
         row = sheet.row_values(i)
+        print(row[1])  # 物料类型
+        print(row[2])  # 物料编码
+        print(row[3])  # 物料名称
+        print(row[4])  # 库存位
+        print(row[5])  # 库存位类型
+        print(row[6])  # 数量
+        print(row[7])  # 单价
+        print(row[8])  # 总价
+        gc_obj = GlobalCode.objects.filter(global_no=row[5]).first()
+        if not gc_obj:
+            gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
+            gc_obj = GlobalCode.objects.create(global_type=gct_obj, global_no=row[5], global_name=row[5])
+
+        sl_obj = SpareLocation.objects.filter(name=row[4]).first()
+        if not sl_obj:
+            sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
+
         st_obj = SpareType.objects.filter(name=row[1]).first()
         if not st_obj:
             st_obj = SpareType.objects.create(no=row[1], name=row[1])
+
         s_obj = Spare.objects.filter(no=row[2]).first()
         if not s_obj:
-            Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[7], upper=row[6], lower=row[5],
-                                 cost=row[4])
+            raise ValidationError(f'请先导入{row[2]}物料')
+
+        slb_obj = SpareLocationBinding.objects.filter(location=sl_obj, spare=s_obj).first()
+        if not slb_obj:
+            slb_obj = SpareLocationBinding.objects.create(location=st_obj, spare=s_obj)
+        whi_obj = WarehouseInfo.objects.filter(name='备品备件仓库').first()
+        SpareInventory.objects.create(spare=s_obj, qty=row[6], unit=s_obj.unit, location=sl_obj, total_count=row[8],
+                                      warehouse_info=whi_obj)
 
 
 def spare_upload(request, type):
     # 根name取 file 的值
     file = request.FILES.get('file')
     # 创建upload文件夹
-    spareparts_root = os.path.join(settings.UPLOAD_ROOT, 'spareparts')
+    spareparts_root = os.path.join(settings.BASE_DIR, 'spareparts')
     upload_root = os.path.join(spareparts_root, 'upload')
 
     if not os.path.exists(upload_root):

@@ -26,7 +26,6 @@ from django.db.models import Sum
 from spareparts.tasks import spare_template, spare_upload, spare_inventory_template
 
 
-
 @method_decorator([api_recorder], name="dispatch")
 class SpareLocationBindingViewSet(ModelViewSet):
     """位置点和物料绑定"""
@@ -214,6 +213,17 @@ class SpareInventoryLogViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = SpareInventoryLogFilter
+
+    @action(methods=['patch'], detail=True, permission_classes=[IsAuthenticated], url_path='revocation_log',
+            url_name='revocation_log')
+    def revocation_log(self, request, pk=None):
+        """出库撤销"""
+        sil_obj = self.get_object()
+        if sil_obj.type == '出库':
+            sil_obj.status = 2
+            return Response('撤销成功')
+        else:
+            raise ValidationError('只有出库履历还可以撤销')
 
 
 @method_decorator([api_recorder], name="dispatch")
