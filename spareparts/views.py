@@ -23,7 +23,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.db.models import Sum
 
-from spareparts.tasks import spare_template
+from spareparts.tasks import spare_template, upload, wrdb
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -314,10 +314,13 @@ class SpareLocationViewSet(ModelViewSet):
 
 
 class SpareImportExportAPIView(APIView):
-    """备品备件基本信息导入"""
+    """备品备件基本信息导入导出"""
 
     def get(self, request, *args, **kwargs):
+        """备品备件基本信息导出"""
         return spare_template()
 
     def post(self, request, *args, **kwargs):
+        """备品备件基本信息导出"""
+        upload(request)
         return Response('导入成功')
