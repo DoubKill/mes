@@ -85,7 +85,7 @@ class SpareInventoryViewSet(ModelViewSet):
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
-                                         location=si_obj.location.name,
+                                         location=si_obj.location.no,
                                          qty=+qty, quality_status=si_obj.quality_status,
                                          spare_no=si_obj.spare.no,
                                          spare_name=si_obj.spare.name,
@@ -118,7 +118,7 @@ class SpareInventoryViewSet(ModelViewSet):
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
-                                         location=si_obj.location.name,
+                                         location=si_obj.location.no,
                                          qty=-qty, quality_status=si_obj.quality_status,
                                          spare_no=si_obj.spare.no,
                                          spare_name=si_obj.spare.name,
@@ -143,7 +143,7 @@ class SpareInventoryViewSet(ModelViewSet):
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
-                                         location=si_obj.location.name,
+                                         location=si_obj.location.no,
                                          qty=qty, quality_status=si_obj.quality_status,
                                          spare_no=si_obj.spare.no,
                                          spare_name=si_obj.spare.name,
