@@ -348,6 +348,5 @@ class SpareInventoryImportExportAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
         """备品备件入库信息导入"""
-        # spare_upload(request,2)
-
+        spare_upload(request,2)
         return Response('导入成功')
