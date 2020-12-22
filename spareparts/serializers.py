@@ -61,6 +61,7 @@ class SpareInventorySerializer(BaseModelSerializer):
     cost = serializers.ReadOnlyField(source='spare.cost', help_text='单价', default='')
     spare_name = serializers.ReadOnlyField(source='spare.name', help_text='名称', default='')
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
+    location_no = serializers.ReadOnlyField(source='location.no', help_text='库存位', default='')
     type_name = serializers.ReadOnlyField(source='spare.type.name', help_text='物料类型', default='')
     bound = serializers.SerializerMethodField(help_text='上下限', read_only=True)
 
@@ -91,7 +92,7 @@ class SpareInventorySerializer(BaseModelSerializer):
         instance = super().create(validated_data)
         SpareInventoryLog.objects.create(warehouse_no=instance.warehouse_info.no,
                                          warehouse_name=instance.warehouse_info.name,
-                                         location=instance.location.name,
+                                         location=instance.location.no,
                                          qty=instance.qty, quality_status=instance.quality_status,
                                          spare_no=instance.spare.no,
                                          spare_name=instance.spare.name,
