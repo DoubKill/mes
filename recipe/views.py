@@ -3,23 +3,26 @@ from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelViewSet
 
 from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
-    MaterialAttributeFilter
+    MaterialAttributeFilter, WeighBatchingFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
-    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer
+    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, WeighBatchingSerializer, WeighCntTypeSerializer, \
+    WeighBatchingChangeUsedTypeSerializer, ProductBatchingDetailMaterialSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier
+    ProductBatchingDetail, MaterialSupplier, WeighBatching, WeighCntType
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -255,3 +258,41 @@ class RecipeNoticeAPiView(APIView):
         except Exception as e:
             raise ValidationError(e)
         return Response('发送成功', status=status.HTTP_200_OK)
+
+
+class WeighBatchingViewSet(ModelViewSet):
+    """小料称量配方标准"""
+    queryset = WeighBatching.objects.filter(delete_flag=False).order_by('-created_date')
+    serializer_class = WeighBatchingSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = WeighBatchingFilter
+
+    def perform_create(self, serializer):
+        serializer.save(created_user=self.request.user)
+
+    @action(detail=True, methods=['put'])
+    def change_used_type(self, request, pk=None):
+        serializer = WeighBatchingChangeUsedTypeSerializer(self.get_object(), data=request.data, context={
+            'request': request
+        })
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'used_type': serializer.instance.used_type})
+        else:
+            return Response(serializer.errors,
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
+class WeighCntTypeViewSet(ModelViewSet):
+    queryset = WeighCntType.objects.all()
+    serializer_class = WeighCntTypeSerializer
+    permission_classes = (IsAuthenticated,)
+
+
+class ProductBatchingDetailListView(ReadOnlyModelViewSet):
+    queryset = ProductBatchingDetail.objects.filter(delete_flag=False)
+    serializer_class = ProductBatchingDetailMaterialSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('product_batching', )

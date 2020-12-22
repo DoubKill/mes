@@ -1,6 +1,8 @@
 from datetime import datetime
 import logging
+from django.utils import timezone
 
+from django.db.models import Q
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -11,7 +13,7 @@ from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
 from plan.uuidfield import UUidTools
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute, MaterialSupplier
+    MaterialAttribute, MaterialSupplier, WeighBatching, WeighBatchingDetail, WeighCntType
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 logger = logging.getLogger('api_log')
@@ -27,9 +29,9 @@ class MaterialSerializer(BaseModelSerializer):
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
     update_user_name = serializers.CharField(source='last_updated_user.username', default=None, read_only=True)
     safety_inventory = serializers.IntegerField(source='material_attr.safety_inventory', read_only=True, default=None)
-    period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True, default=None)
+    period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True,
+                                                  default=None)
     validity_unit = serializers.CharField(source='material_attr.validity_unit', read_only=True, default=None)
-
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
@@ -64,14 +66,14 @@ class MaterialSupplierSerializer(BaseModelSerializer):
     material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True)
-    
+
     def create(self, validated_data):
         validated_data['supplier_no'] = UUidTools.uuid1_hex('CD')
         return super(MaterialSupplierSerializer, self).create(validated_data)
-    
+
     class Meta:
         model = MaterialSupplier
-        exclude = ('supplier_no', )
+        exclude = ('supplier_no',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -330,3 +332,125 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = ProductBatching
         fields = ('id', 'pass_flag')
+
+
+class WeighBatchingDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WeighBatchingDetail
+        fields = ('id', 'material', 'standard_weight')
+
+
+class WeighCntTypeSerializer(serializers.ModelSerializer):
+    weighbatchingdetail_set = WeighBatchingDetailSerializer(many=True)
+
+    class Meta:
+        model = WeighCntType
+        fields = ('id', 'weigh_type', 'package_cnt', 'weighbatchingdetail_set')
+        read_only_fields = ('weigh_type',)
+
+    @atomic()
+    def update(self, instance, validated_data):
+        weighbatchingdetail_set = validated_data.pop('weighbatchingdetail_set')
+        material_list = []
+        for detail in weighbatchingdetail_set:
+            material = detail['material']
+            material_list.append(material)
+            weight_batching_detail = None
+            try:
+                weight_batching_detail = WeighBatchingDetail.objects.get(weigh_cnt_type=instance, material=material)
+            except WeighBatchingDetail.DoesNotExist:
+                weight_batching_detail = WeighBatchingDetail.objects.create(weigh_cnt_type=instance, material=material)
+            weight_batching_detail.standard_weight = detail['standard_weight']
+            weight_batching_detail.save()
+        WeighBatchingDetail.objects.filter(Q(weigh_cnt_type=instance), ~Q(material__in=material_list)).delete()
+        return super().update(instance, validated_data)
+
+
+class WeighBatchingSerializer(serializers.ModelSerializer):
+    stage_product_batch_no = serializers.ReadOnlyField(source='product_batching.stage_product_batch_no', default='')
+    category_name = serializers.ReadOnlyField(source='product_batching.dev_type.category_name', default='')
+    production_time_interval = serializers.ReadOnlyField(source='product_batching.production_time_interval')
+    created_user = serializers.ReadOnlyField(source='created_user.username', default='')
+    weighcnttype_set = WeighCntTypeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = WeighBatching
+        fields = ('id',
+                  'product_batching',
+                  'weight_batch_no',
+                  'stage_product_batch_no',
+                  'category_name',
+                  'sulfur_weight',
+                  'a_weight',
+                  'b_weight',
+                  'production_time_interval',
+                  'used_type',
+                  'send_cnt',
+                  'created_user',
+                  'created_date',
+                  'weighcnttype_set')
+        read_only_fields = (
+            'weight_batch_no',
+            'sulfur_weight',
+            'a_weight',
+            'b_weight',
+            'used_type',
+            'send_cnt',
+            'created_date')
+
+    def create(self, validated_data):
+        is_fm = validated_data['product_batching'].stage.global_name.lower() == 'fm'
+        weigh_batching = WeighBatching.objects.create(**validated_data)
+        weigh_types = (1, 2, 3) if is_fm else (1, 2)
+        weigh_type_objs = [WeighCntType(weigh_batching=weigh_batching, weigh_type=weigh_type)
+                           for weigh_type in weigh_types]
+        WeighCntType.objects.bulk_create(weigh_type_objs)
+        return weigh_batching
+
+
+class WeighBatchingChangeUsedTypeSerializer(serializers.ModelSerializer):
+    used_type = serializers.IntegerField(required=False, allow_null=True)
+
+    class Meta:
+        model = WeighBatching
+        fields = ('used_type',)
+
+    def update(self, instance, validated_data):
+        target_used_type = validated_data.get('used_type')
+        if instance.used_type == 1:  # 编辑 => 提交
+            instance.submit_user = self.context['request'].user
+            instance.submit_time = timezone.now()
+            instance.used_type = 2
+        elif instance.used_type == 2:  # 提交 => 校对 or 提交 => 驳回
+            if target_used_type == 3 or target_used_type == 5:
+                instance.used_type = target_used_type
+        elif instance.used_type == 3:  # 校对 => 启用 or 校对 => 驳回
+            if target_used_type == 4 or target_used_type == 5:
+                instance.used_type = target_used_type
+        elif instance.used_type == 4:  # 启用 => 废弃
+            instance.used_type = 6
+            instance.obsolete_user = self.context['request'].user
+            instance.obsolete_time = timezone.now()
+        elif instance.used_type == 5:  # 驳回 => 编辑 or 驳回 => 废弃
+            instance.used_type = target_used_type
+
+        if target_used_type == 5:  # 驳回
+            instance.reject_user = self.context['request'].user
+            instance.reject_time = timezone.now()
+        elif target_used_type == 4:  # 启用
+            instance.used_user = self.context['request'].user
+            instance.used_time = timezone.now()
+        elif target_used_type == 6:
+            instance.obsolete_user = self.context['request'].user
+            instance.obsolete_time = timezone.now()
+        instance.save()
+        return instance
+
+
+class ProductBatchingDetailMaterialSerializer(serializers.ModelSerializer):
+    material_name = serializers.ReadOnlyField(source='material.material_name')
+    material_no = serializers.ReadOnlyField(source='material.material_no')
+
+    class Meta:
+        model = ProductBatchingDetail
+        fields = ('id', 'material', 'material_name', 'material_no', 'actual_weight')
