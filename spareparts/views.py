@@ -221,6 +221,7 @@ class SpareInventoryLogViewSet(ModelViewSet):
         sil_obj = self.get_object()
         if sil_obj.type == '出库':
             sil_obj.status = 2
+            sil_obj.save()
             return Response('撤销成功')
         else:
             raise ValidationError('只有出库履历还可以撤销')
