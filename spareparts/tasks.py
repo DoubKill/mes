@@ -13,6 +13,7 @@ from spareparts.models import SpareType, Spare
 
 
 def spare_wrdb(filename, upload_root):
+
     # 打开上传 excel 表格
     readboot = xlrd.open_workbook(upload_root + "/" + filename)
     sheet = readboot.sheet_by_index(0)
@@ -74,6 +75,7 @@ def spare_upload(request, type):
             spare_wrdb(file.name, upload_root)
         elif type == 2:
             spare_inventory_wrdb(file.name, upload_root)
+
     except Exception as e:
         return HttpResponse(e)
 

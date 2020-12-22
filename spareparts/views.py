@@ -26,6 +26,7 @@ from django.db.models import Sum
 from spareparts.tasks import spare_template, spare_upload, spare_inventory_template
 
 
+
 @method_decorator([api_recorder], name="dispatch")
 class SpareLocationBindingViewSet(ModelViewSet):
     """位置点和物料绑定"""
@@ -318,6 +319,7 @@ class SpareImportExportAPIView(APIView):
 
     def get(self, request, *args, **kwargs):
         """备品备件基本信息模板导出"""
+
         return spare_template()
 
     def post(self, request, *args, **kwargs):
@@ -336,4 +338,5 @@ class SpareInventoryImportExportAPIView(APIView):
     def post(self, request, *args, **kwargs):
         """备品备件入库信息导入"""
         # spare_upload(request,2)
+
         return Response('导入成功')
