@@ -293,7 +293,7 @@ class SpareViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        slb_obj = instance.slb_spare.all(delete_flag=False).first()
+        slb_obj = instance.slb_spare.all().filter(delete_flag=False).first()
         if slb_obj:
             raise ValidationError('此物料已经和库存位绑定了，不能删除')
         instance.delete_flag = True
