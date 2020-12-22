@@ -223,7 +223,7 @@ class SpareInventoryLogViewSet(ModelViewSet):
         if sil_obj.type == '出库':
             sil_obj.status = 2
             sil_obj.save()
-            sl_obj = SpareLocation.objects.get(name=sil_obj.location)
+            sl_obj = SpareLocation.objects.get(no=sil_obj.location)
             s_obj = Spare.objects.get(no=sil_obj.spare_no)
             si_obj = SpareInventory.objects.filter(spare=s_obj, location=sl_obj, delete_flag=False).first()
 
