@@ -334,7 +334,7 @@ class SpareImportExportAPIView(APIView):
 
         return spare_template()
 
-    @action()
+    @atomic()
     def post(self, request, *args, **kwargs):
         """备品备件基本信息导入"""
         spare_upload(request, 1)
@@ -348,7 +348,7 @@ class SpareInventoryImportExportAPIView(APIView):
         """备品备件入库信息模板导出"""
         return spare_inventory_template()
 
-    @action()
+    @atomic()
     def post(self, request, *args, **kwargs):
         """备品备件入库信息导入"""
         spare_upload(request, 2)
