@@ -223,6 +223,21 @@ class SpareInventoryLogViewSet(ModelViewSet):
         if sil_obj.type == '出库':
             sil_obj.status = 2
             sil_obj.save()
+            sl_obj = SpareLocation.objects.get(name=sil_obj.location)
+            s_obj = Spare.objects.get(no=sil_obj.spare_no)
+            si_obj = SpareInventory.objects.filter(spare=s_obj, location=sl_obj, delete_flag=False).first()
+
+
+            befor_qty = si_obj.qty
+            qty_add = befor_qty + sil_obj.qty
+            si_obj.qty = qty_add
+
+            befor_total_count = si_obj.total_count
+            total_count_add = befor_total_count + sil_obj.qty * si_obj.spare.cost
+            si_obj.total_count = total_count_add
+
+            si_obj.save()
+
             return Response('撤销成功')
         else:
             raise ValidationError('只有出库履历还可以撤销')
