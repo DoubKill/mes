@@ -22,8 +22,6 @@ def spare_wrdb(filename, upload_root):
     # 获取excel的行和列
     nrows = sheet.nrows  # 行
     ncols = sheet.ncols  # 列
-    Spare.objects.all().delete()
-    SpareType.objects.all().delete()
     for i in range(1, nrows):
         row = sheet.row_values(i)
         st_obj = SpareType.objects.filter(name=row[1]).first()
@@ -42,18 +40,16 @@ def spare_inventory_wrdb(filename, upload_root):
     # 获取excel的行和列
     nrows = sheet.nrows  # 行
     ncols = sheet.ncols  # 列
-    Spare.objects.all().delete()
-    SpareType.objects.all().delete()
     for i in range(1, nrows):
         row = sheet.row_values(i)
-        print(row[1])  # 物料类型
-        print(row[2])  # 物料编码
-        print(row[3])  # 物料名称
-        print(row[4])  # 库存位
-        print(row[5])  # 库存位类型
-        print(row[6])  # 数量
-        print(row[7])  # 单价
-        print(row[8])  # 总价
+        # print(row[1])  # 物料类型
+        # print(row[2])  # 物料编码
+        # print(row[3])  # 物料名称
+        # print(row[4])  # 库存位
+        # print(row[5])  # 库存位类型
+        # print(row[6])  # 数量
+        # print(row[7])  # 单价
+        # print(row[8])  # 总价
         gc_obj = GlobalCode.objects.filter(global_no=row[5]).first()
         if not gc_obj:
             gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
@@ -73,7 +69,7 @@ def spare_inventory_wrdb(filename, upload_root):
 
         slb_obj = SpareLocationBinding.objects.filter(location=sl_obj, spare=s_obj).first()
         if not slb_obj:
-            slb_obj = SpareLocationBinding.objects.create(location=st_obj, spare=s_obj)
+            slb_obj = SpareLocationBinding.objects.create(location=sl_obj, spare=s_obj)
         whi_obj = WarehouseInfo.objects.filter(name='备品备件仓库').first()
         SpareInventory.objects.create(spare=s_obj, qty=row[6], unit=s_obj.unit, location=sl_obj, total_count=row[8],
                                       warehouse_info=whi_obj)
@@ -88,22 +84,23 @@ def spare_upload(request, type):
 
     if not os.path.exists(upload_root):
         os.makedirs(upload_root)
-    try:
-        if file is None:
-            return HttpResponse('请选择要上传的文件')
-        # 循环二进制写入
-        with open(upload_root + "/" + file.name, 'wb') as f:
-            for i in file.readlines():
-                f.write(i)
+    # try:
+    if file is None:
+        return HttpResponse('请选择要上传的文件')
+    # 循环二进制写入
+    with open(upload_root + "/" + file.name, 'wb') as f:
+        for i in file.readlines():
+            f.write(i)
 
-        # # 写入 mysql
-        if type == 1:
-            spare_wrdb(file.name, upload_root)
-        elif type == 2:
-            spare_inventory_wrdb(file.name, upload_root)
+    # # 写入 mysql
+    if type == 1:
+        spare_wrdb(file.name, upload_root)
+    elif type == 2:
+        spare_inventory_wrdb(file.name, upload_root)
 
-    except Exception as e:
-        return HttpResponse(e)
+    # except Exception as e:
+    #     print(e)
+    #     return HttpResponse(e)
 
 
 def spare_template():
