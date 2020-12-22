@@ -1,6 +1,6 @@
 import django_filters
 
-from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute
+from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, WeighBatching
 
 
 class MaterialFilter(django_filters.rest_framework.FilterSet):
@@ -41,9 +41,20 @@ class ProductBatchingFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialAttributeFilter(django_filters.rest_framework.FilterSet):
-    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='原材料编码', lookup_expr='icontains')
+    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='原材料编码',
+                                            lookup_expr='icontains')
     material_type = django_filters.CharFilter(field_name='material__material_type__global_name', help_text='原材料类型')
 
     class Meta:
         model = MaterialAttribute
         fields = ('material_no', 'material_type')
+
+
+class WeighBatchingFilter(django_filters.rest_framework.FilterSet):
+    used_type = django_filters.CharFilter(field_name='used_type')
+    stage_id = django_filters.CharFilter(field_name='product_batching__stage_id')
+    stage_product_batch_no = django_filters.CharFilter(field_name='product_batching__stage_product_batch_no', lookup_expr='icontains',
+                                                       )
+    class Meta:
+        model = WeighBatching
+        fields = ('used_type', 'stage_id', 'stage_product_batch_no')
