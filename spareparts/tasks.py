@@ -9,25 +9,37 @@ from io import BytesIO
 from xlrd import xldate_as_datetime
 
 from mes import settings
+from spareparts.models import SpareType, Spare
 
 
-def wrdb(filename):
+def wrdb(filename, upload_root):
     # 打开上传 excel 表格
-    readboot = xlrd.open_workbook(settings.UPLOAD_ROOT + "/" + filename)
+    readboot = xlrd.open_workbook(upload_root + "/" + filename)
     sheet = readboot.sheet_by_index(0)
     # 获取excel的行和列
-    nrows = sheet.nrows
-    ncols = sheet.ncols
+    nrows = sheet.nrows  # 行
+    ncols = sheet.ncols  # 列
+    Spare.objects.all().delete()
+    SpareType.objects.all().delete()
     print(ncols, nrows)
-    sql = "insert into working_hours (jobnum,name,workingtime,category,project,date,createtime) VALUES"
     for i in range(1, nrows):
         row = sheet.row_values(i)
-        jobnum = row[4]
-        name = row[5]
-        workingtime = row[2]
-        category = row[8]
-        project = row[1]
-        date = xldate_as_datetime(row[3], 0).strftime('%Y/%m/%d')
+        print(row[0])  #
+        print(row[1])  # 物料类型
+        print(row[2])  # 物料编码
+        print(row[3])  # 物料名称
+        print(row[4])  # 单价
+        print(row[5])  # 下限
+        print(row[6])  # 上限
+        print(row[7])  # 单位
+
+        st_obj = SpareType.objects.filter(name=row[1]).first()
+        if not st_obj:
+            st_obj = SpareType.objects.create(no=row[1], name=row[1])
+        s_obj = Spare.objects.filter(no=row[2]).first()
+        if not s_obj:
+            Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[7], upper=row[6], lower=row[5],
+                                 cost=row[4])
 
 
 #         values = "('%s','%s','%s','%s','%s','%s','%s')"%(jobnum,name,workingtime,category,project,date,datetime.datetime.now())
@@ -44,22 +56,26 @@ def upload(request):
     file = request.FILES.get('file')
     print('uplaod:%s' % file)
     # 创建upload文件夹
-    if not os.path.exists(settings.UPLOAD_ROOT):
-        os.makedirs(settings.UPLOAD_ROOT)
+    spareparts_root = os.path.join(settings.UPLOAD_ROOT, 'spareparts')
+    upload_root = os.path.join(spareparts_root, 'upload')
+
+    if not os.path.exists(upload_root):
+        os.makedirs(upload_root)
     try:
         if file is None:
             return HttpResponse('请选择要上传的文件')
         # 循环二进制写入
-        with open(settings.UPLOAD_ROOT + "/" + file.name, 'wb') as f:
+        with open(upload_root + "/" + file.name, 'wb') as f:
             for i in file.readlines():
                 f.write(i)
 
-        # 写入 mysql
-        wrdb(file.name)
+        # # 写入 mysql
+        wrdb(file, upload_root)
     except Exception as e:
+        print(e)
         return HttpResponse(e)
 
-    return HttpResponse('导入成功')
+
 
 
 def spare_template():
