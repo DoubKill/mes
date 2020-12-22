@@ -31,8 +31,8 @@ class SpareInventoryLogFilter(django_filters.rest_framework.FilterSet):
     spare_name = django_filters.CharFilter(field_name='spare_name', help_text='名称', lookup_expr='icontains')
     type_name = django_filters.CharFilter(field_name='spare_type', help_text='备品备件类型', lookup_expr='icontains')
     location_name = django_filters.CharFilter(field_name='location', help_text='库存位', lookup_expr='icontains')
-    type = django_filters.CharFilter(field_name='type', help_text='状态')
-    status = django_filters.NumberFilter(field_name='status', help_text='类型', lookup_expr='icontains')
+    type = django_filters.CharFilter(field_name='type', help_text='状态', lookup_expr='icontains')
+    status = django_filters.NumberFilter(field_name='status', help_text='类型')
     begin_time = django_filters.DateTimeFilter(field_name='fin_time', lookup_expr="gte",
                                                help_text='开始时间')
     end_time = django_filters.DateTimeFilter(field_name='fin_time', lookup_expr="lte",
