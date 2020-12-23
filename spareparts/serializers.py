@@ -112,10 +112,15 @@ class SpareInventorySerializer(BaseModelSerializer):
 class SpareInventoryLogSerializer(BaseModelSerializer):
     # 履历
     location = serializers.SerializerMethodField(help_text='location_name', read_only=True)
+    unit = serializers.SerializerMethodField(help_text='单位', read_only=True)
 
     def get_location(self, obj):
         sl_obj = SpareLocation.objects.get(no=obj.location)
         return sl_obj.name
+
+    def get_unit(self, obj):
+        s_obj = Spare.objects.get(no=obj.spare_no)
+        return s_obj.unit
 
     class Meta:
         model = SpareInventoryLog
