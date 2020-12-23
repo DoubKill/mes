@@ -140,7 +140,12 @@ class SpareInventoryViewSet(ModelViewSet):
         reason = request.data.get('reason', None)  # 原因
         befor_qty = si_obj.qty
         si_obj.qty = qty
+
+        total_count_subtract = qty * si_obj.spare.cost
+        si_obj.total_count = total_count_subtract
+
         si_obj.save()
+
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
                                          location=si_obj.location.no,
