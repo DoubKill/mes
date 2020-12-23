@@ -98,7 +98,7 @@ class SpareInventoryLog(AbstractEntity):
     warehouse_no = models.CharField(help_text='仓库编号', max_length=64)
     warehouse_name = models.CharField(help_text='仓库名称', max_length=64)
     pallet_no = models.CharField(help_text='托盘号', max_length=64, null=True)
-    location = models.CharField(help_text='货位地址', max_length=64)
+    location = models.CharField(help_text='货位地址,location_no', max_length=64)
     qty = models.IntegerField(help_text='变更数量')
     weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量', default=0)
     quality_status = models.CharField(help_text='品质状态', max_length=64)

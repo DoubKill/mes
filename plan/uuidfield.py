@@ -19,3 +19,12 @@ class UUidTools(object):
         else:
             only_no = datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(i).rjust(2, '0')
         return only_no
+
+    @staticmethod
+    def location_no(name):
+        global i
+        if i >= 99:
+            i = 0
+        i += 1
+        only_no = name + datetime.datetime.now().strftime('%Y%m%d%H%M%S') + str(i).rjust(2, '0')
+        return only_no
