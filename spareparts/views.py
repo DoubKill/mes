@@ -228,11 +228,11 @@ class SpareInventoryLogViewSet(ModelViewSet):
             si_obj = SpareInventory.objects.filter(spare=s_obj, location=sl_obj, delete_flag=False).first()
 
             befor_qty = si_obj.qty
-            qty_add = befor_qty + sil_obj.qty
+            qty_add = befor_qty + abs(sil_obj.qty)
             si_obj.qty = qty_add
 
             befor_total_count = si_obj.total_count
-            total_count_add = befor_total_count + sil_obj.qty * si_obj.spare.cost
+            total_count_add = befor_total_count + abs(sil_obj.qty) * si_obj.spare.cost
             si_obj.total_count = total_count_add
 
             si_obj.save()
