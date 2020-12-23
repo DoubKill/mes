@@ -191,6 +191,7 @@ class SpareInventoryViewSet(ModelViewSet):
 
             si_obj['unit_count'] = m_obj.cost
             si_obj['type_name'] = m_obj.type.name
+            si_obj['unit'] = m_obj.unit
 
             if si_obj['sum_qty'] < m_obj.lower:
                 bound = '-'

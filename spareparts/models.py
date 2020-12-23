@@ -27,7 +27,7 @@ class Spare(AbstractEntity):
     unit = models.CharField(help_text='单位', max_length=64)
     upper = models.IntegerField(help_text='库存上限')
     lower = models.IntegerField(help_text='库存下限')
-    cost = models.DecimalField(max_digits=15, decimal_places=3, db_column='单位价')
+    cost = models.DecimalField(max_digits=15, decimal_places=2, db_column='单位价')
 
     class Meta:
         db_table = 'spare'
@@ -77,7 +77,7 @@ class SpareInventory(AbstractEntity):
                                  on_delete=models.CASCADE, related_name='si_spare_location', blank=True, null=True)
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="si_warehouse_info",
                                        blank=True, null=True, help_text='仓库')
-    total_count = models.DecimalField(max_digits=15, decimal_places=3, db_column='总价', null=True)
+    total_count = models.DecimalField(max_digits=15, decimal_places=2, db_column='总价', null=True)
 
     class Meta:
         db_table = 'spare_inventory'
@@ -100,21 +100,21 @@ class SpareInventoryLog(AbstractEntity):
     pallet_no = models.CharField(help_text='托盘号', max_length=64, null=True)
     location = models.CharField(help_text='货位地址,location_no', max_length=64)
     qty = models.IntegerField(help_text='变更数量')
-    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量', default=0)
+    weight = models.DecimalField(max_digits=15, decimal_places=2, db_column='重量', default=0)
     quality_status = models.CharField(help_text='品质状态', max_length=64)
     spare_no = models.CharField(help_text='备品备件编码', max_length=64)
     spare_name = models.CharField(help_text='备品备件名称', max_length=64)
     spare_type = models.CharField(help_text='备品备件类型', max_length=64)
     fin_time = models.DateField(help_text='完成时间')
     type = models.CharField(help_text='类型', max_length=32, choices=CHOICE1)
-    cost = models.DecimalField(max_digits=15, decimal_places=3, db_column='费用', null=True)
+    cost = models.DecimalField(max_digits=15, decimal_places=2, db_column='费用', null=True)
     reason = models.CharField(help_text='出库原因/备注', max_length=64, null=True)
     receive_user = models.CharField(help_text='领用人', max_length=64, null=True)
     purpose = models.CharField(help_text='用途', max_length=64, null=True)
     status = models.IntegerField(help_text='状态', choices=CHOICE, default=1)
     src_qty = models.IntegerField(help_text='变更前数量')
     dst_qty = models.IntegerField(help_text='变更后数量')
-    unit_count= models.DecimalField(max_digits=15, decimal_places=3, db_column='单价', null=True)
+    unit_count= models.DecimalField(max_digits=15, decimal_places=2, db_column='单价', null=True)
 
     class Meta:
         db_table = 'spare_inventory_log'
