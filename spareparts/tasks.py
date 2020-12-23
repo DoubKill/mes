@@ -50,6 +50,17 @@ def spare_inventory_wrdb(filename, upload_root):
         # print(row[6])  # 数量
         # print(row[7])  # 单价
         # print(row[8])  # 总价
+        # print(row[9])  # 安全库存下限
+        # print(row[10])  # 安全库存上限
+        # print(row[11])  # 单位
+
+        st_obj = SpareType.objects.filter(name=row[1]).first()
+        if not st_obj:
+            st_obj = SpareType.objects.create(no=row[1], name=row[1])
+        s_obj = Spare.objects.filter(no=row[2]).first()
+        if not s_obj:
+            s_obj = Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[11], upper=row[10], lower=row[9],
+                                         cost=row[7])
         gc_obj = GlobalCode.objects.filter(global_no=row[5]).first()
         if not gc_obj:
             gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
@@ -58,14 +69,6 @@ def spare_inventory_wrdb(filename, upload_root):
         sl_obj = SpareLocation.objects.filter(name=row[4]).first()
         if not sl_obj:
             sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
-
-        st_obj = SpareType.objects.filter(name=row[1]).first()
-        if not st_obj:
-            st_obj = SpareType.objects.create(no=row[1], name=row[1])
-
-        s_obj = Spare.objects.filter(no=row[2]).first()
-        if not s_obj:
-            raise ValidationError(f'请先导入{row[2]}物料')
 
         slb_obj = SpareLocationBinding.objects.filter(location=sl_obj, spare=s_obj).first()
         if not slb_obj:
@@ -160,6 +163,9 @@ def spare_inventory_template():
     w.write(0, 6, u'数量')
     w.write(0, 7, u'单价（元）')
     w.write(0, 8, u'总价')
+    w.write(0, 9, u'安全库存下限')
+    w.write(0, 10, u'安全库存上限')
+    w.write(0, 11, u'单位')
 
     output = BytesIO()
     ws.save(output)
