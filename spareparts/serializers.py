@@ -150,7 +150,7 @@ class SpareLocationSerializer(BaseModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.global_name')
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.uuid1_hex('LT')
+        validated_data['no'] = UUidTools.location_no(validated_data['name'])
         type = validated_data.get('type', None)
         if not type:
             validated_data['type'] = GlobalCode.objects.filter(global_name='备品备件地面').first()
