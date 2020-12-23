@@ -227,7 +227,6 @@ class SpareInventoryLogViewSet(ModelViewSet):
             s_obj = Spare.objects.get(no=sil_obj.spare_no)
             si_obj = SpareInventory.objects.filter(spare=s_obj, location=sl_obj, delete_flag=False).first()
 
-
             befor_qty = si_obj.qty
             qty_add = befor_qty + sil_obj.qty
             si_obj.qty = qty_add
@@ -255,7 +254,7 @@ class SpareTypeViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name', 'no')
+            data = queryset.values('id', 'name', 'no', 'delete_flag')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
