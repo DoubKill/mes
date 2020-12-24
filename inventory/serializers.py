@@ -45,6 +45,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     actual = serializers.SerializerMethodField(read_only=True)
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
+    destination = serializers.SerializerMethodField(read_only=True)
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -56,6 +57,12 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
         items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
+
+    def get_destination(self, object):
+        equip_list = list(object.equip.all().values_list("equip_no", flat=True))
+        dispatch_list = list(object.dispatch.all().values_list("dispatch_location__name", flat=True))
+        destination = ",".join(set(equip_list + dispatch_list))
+        return destination
 
     @atomic()
     def create(self, validated_data):
@@ -214,6 +221,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
     actual = serializers.SerializerMethodField(read_only=True)
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
+    destination = serializers.SerializerMethodField(read_only=True)
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -225,6 +233,12 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
         items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
+
+    def get_destination(self, object):
+        equip_list = list(object.equip.all().values_list("equip_no", flat=True))
+        dispatch_list = list(object.dispatch.all().values_list("dispatch_location__name", flat=True))
+        destination = ",".join(set(equip_list + dispatch_list))
+        return destination
 
     @atomic()
     def create(self, validated_data):
@@ -381,6 +395,7 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     actual = serializers.SerializerMethodField(read_only=True)
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
+    destination = serializers.SerializerMethodField(read_only=True)
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -392,6 +407,12 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
         # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
         items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
+
+    def get_destination(self, object):
+        equip_list = list(object.equip.all().values_list("equip_no", flat=True))
+        dispatch_list = list(object.dispatch.all().values_list("dispatch_location__name", flat=True))
+        destination = ",".join(set(equip_list + dispatch_list))
+        return destination
 
     @atomic()
     def create(self, validated_data):
