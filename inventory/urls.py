@@ -10,7 +10,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView, MixGumOutInventoryLogViewSet
+    DispatchLogView, InventoryLogOutViewSet
 
 router = DefaultRouter()
 
@@ -60,7 +60,7 @@ router.register(r'terminal-dispatch-log', TerminalDispatchLogViewSet)
 # 终端发货履历管理
 router.register(r'terminal-dispatch-plan', TerminalDispatchViewSet)
 # 出库看板
-router.register(r'mix-gum-out-inventory-log', MixGumOutInventoryLogViewSet)
+router.register(r'inventory-log-out', InventoryLogOutViewSet)
 
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),

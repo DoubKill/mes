@@ -53,10 +53,12 @@ def spare_inventory_wrdb(filename, upload_root):
         # print(row[9])  # 安全库存下限
         # print(row[10])  # 安全库存上限
         # print(row[11])  # 单位
-
-        st_obj = SpareType.objects.filter(name=row[1]).first()
-        if not st_obj:
-            st_obj = SpareType.objects.create(no=row[1], name=row[1])
+        if row[1]:
+            st_obj = SpareType.objects.filter(name=row[1]).first()
+            if not st_obj:
+                st_obj = SpareType.objects.create(no=row[1], name=row[1])
+        else:
+            st_obj=None
         s_obj = Spare.objects.filter(no=row[2]).first()
         if not s_obj:
             s_obj = Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[11], upper=row[10], lower=row[9],
