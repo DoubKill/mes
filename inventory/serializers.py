@@ -820,7 +820,7 @@ class TerminalDispatchPlanUpdateSerializer(BaseModelSerializer):
         fields = ('id', 'status')
 
 
-class MixGumOutInventoryLogSerializer(BaseModelSerializer):
+class InventoryLogOutSerializer(BaseModelSerializer):
     class Meta:
-        model = MixGumOutInventoryLog
+        model = InventoryLog
         fields = '__all__'
