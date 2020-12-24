@@ -63,6 +63,7 @@ class SpareInventorySerializer(BaseModelSerializer):
     location_name = serializers.ReadOnlyField(source='location.name', help_text='库存位', default='')
     location_no = serializers.ReadOnlyField(source='location.no', help_text='库存位', default='')
     type_name = serializers.ReadOnlyField(source='spare.type.name', help_text='物料类型', default='')
+    unit = serializers.ReadOnlyField(source='spare.unit', help_text='单位', default='')
     bound = serializers.SerializerMethodField(help_text='上下限', read_only=True)
 
     def get_bound(self, obj):
