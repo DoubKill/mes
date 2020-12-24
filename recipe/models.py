@@ -185,7 +185,7 @@ class WeighBatching(AbstractEntity):
         (6, '废弃'),
         (7, '停用')
     )
-    product_batching = models.ForeignKey(ProductBatching, verbose_name='胶料配料标准', on_delete=models.CASCADE)
+    product_batching = models.OneToOneField(ProductBatching, verbose_name='胶料配料标准', on_delete=models.CASCADE)
     # weight_batch_no = models.CharField('小料配方编码', max_length=64, blank=True, default='')
     # a_weight = models.FloatField('A重量', default=0.0)
     # b_weight = models.FloatField('B重量', default=0.0)

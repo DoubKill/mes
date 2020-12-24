@@ -1,8 +1,9 @@
 from django.db import models
+from django.db.models import Sum
 
 from basics.models import Equip, PlanSchedule, ClassesDetail, WorkSchedulePlan
-from recipe.models import ProductBatching, Material
-from system.models import AbstractEntity
+from recipe.models import ProductBatching, Material, WeighCntType
+from system.models import AbstractEntity, User
 
 
 # Create your models here.
@@ -134,3 +135,24 @@ class MaterialRequisitionClasses(AbstractEntity):
     class Meta:
         db_table = 'material_requisition_classes'
         verbose_name_plural = verbose_name = '领料日班次计划'
+
+
+class BatchingClassesPlan(AbstractEntity):
+    """配料日班次计划"""
+    work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
+    weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
+    status = models.CharField(max_length=16, default='未下发')
+    send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    send_time = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('work_schedule_plan', 'weigh_cnt_type')
+        db_table = 'batching_classes_plan'
+        verbose_name_plural = verbose_name = '配料日班次计划'
+
+    def plan_package(self):  # 计划包数
+        return ProductClassesPlan.objects.filter(
+            delete_flag=False,
+            work_schedule_plan=self.work_schedule_plan,
+            product_batching=self.weigh_cnt_type.weigh_batching.product_batching
+        ).aggregate(plan_sum_trains=Sum('plan_trains'))['plan_sum_trains'] * self.weigh_cnt_type.package_cnt
