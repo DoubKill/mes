@@ -13,7 +13,7 @@ django.setup()
 
 from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
-from quality.models import MaterialTestOrder, MaterialTestResult
+from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMethod, MaterialDataPointIndicator
 from basics.models import WorkSchedulePlan
 
 import pymssql
@@ -94,7 +94,7 @@ def main():
             for item in data:
                 value = item[0]
                 product_no = item[1].strip(' ')  # 胶料代码
-                production_class = item[2].strip(' ') + '班'  # 生产班次
+                production_class = item[2].strip(' ')  # 生产班次
                 data_point_name = item[4].strip(' ')  # 数据点
                 method_name = item[5].strip(' ')  # 试验方法名称
                 result = item[6].strip(' ')  # 结果
@@ -112,7 +112,6 @@ def main():
                 except Exception:
                     interval = 1
                 test_group = item[3].strip(' ')  # 试验班组
-                test_type_name = item[14].strip(' ')
 
                 # 根据机器名称找到指标点
                 if machine_name == '流变仪':
@@ -132,7 +131,7 @@ def main():
                 if schedule_plan:
                     group = schedule_plan.group.global_name
                 else:
-                    group = 'a'
+                    group = 'A'
 
                 # 关键看能不能找到托盘反馈数据
                 for i in range(trains, trains+interval):
@@ -164,6 +163,30 @@ def main():
                             production_equip_no=equip_no,
                             production_factory_date=pallet.end_time
                         )
+                    # TODO   由MES判断检测结果
+                    # material_test_method = MaterialTestMethod.objects.filter(
+                    #     material__material_no=product_no,
+                    #     test_method__name=method_name,
+                    #     test_method__test_type__test_indicator__name=indicator_name,
+                    #     data_point__name=data_point_name,
+                    #     data_point__test_type__test_indicator__name=indicator_name).first()
+                    # if material_test_method:
+                    #     indicator = MaterialDataPointIndicator.objects.filter(
+                    #         material_test_method=material_test_method,
+                    #         data_point__name=data_point_name,
+                    #         data_point__test_type__test_indicator__name=indicator_name,
+                    #         upper_limit__gte=value,
+                    #         lower_limit__lte=value).first()
+                    #     if indicator:
+                    #         mes_result = indicator.result
+                    #         level = indicator.level
+                    #     else:
+                    #         mes_result = '三等品'
+                    #         level = 2
+                    # else:
+                    #     mes_result = '三等品'
+                    #     level = 2
+
                     if not MaterialTestResult.objects.filter(
                             material_test_order=test_order,
                             test_times=test_times,
