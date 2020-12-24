@@ -114,7 +114,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
             pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
             pici = pallet.bath_no if pallet else "1"  # 批次号
-            num = validated_data.get('need_qty', '1')
+            num = instance.need_qty
             msg_count = "1"
             location = instance.location if instance.location else ""
             # 发起时间
@@ -280,7 +280,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
             pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
             pici = pallet.bath_no if pallet else "1"  # 批次号
-            num = validated_data.get('need_qty', '1')
+            num = instance.need_qty
             msg_count = "1"
             location = instance.location if instance.location else ""
             # 发起时间
@@ -447,7 +447,7 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
             pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
             pici = pallet.bath_no if pallet else "1"  # 批次号
-            num = validated_data.get('need_qty', '1')
+            num = instance.need_qty
             msg_count = "1"
             location = instance.location if instance.location else ""
             # 发起时间
