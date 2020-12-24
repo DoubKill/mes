@@ -96,7 +96,7 @@ class SpareInventorySerializer(BaseModelSerializer):
                                          qty=instance.qty, quality_status=instance.quality_status,
                                          spare_no=instance.spare.no,
                                          spare_name=instance.spare.name,
-                                         spare_type=instance.spare.type.name,
+                                         spare_type= instance.spare.type.name if instance.spare.type else '',
                                          cost=instance.qty * instance.spare.cost,
                                          unit_count=instance.spare.cost,
                                          fin_time=datetime.date.today(),

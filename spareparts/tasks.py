@@ -141,7 +141,7 @@ def spare_template():
 def spare_inventory_template():
     """备品备件导入模板"""
     response = HttpResponse(content_type='application/vnd.ms-excel')
-    filename = '备品备件入库信息'
+    filename = '备品备件信息导入模板'
     response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode('ISO-8859-1') + '.xls'
     # 创建工作簿
     style = xlwt.XFStyle()
@@ -149,7 +149,7 @@ def spare_inventory_template():
     ws = xlwt.Workbook(encoding='utf-8')
 
     # 添加第一页数据表
-    w = ws.add_sheet('备品备件入库信息')  # 新建sheet（sheet的名称为"sheet1"）
+    w = ws.add_sheet('备品备件信息导入模板')  # 新建sheet（sheet的名称为"sheet1"）
     # for j in [1, 4, 5, 7]:
     #     first_col = w.col(j)
     #     first_col.width = 256 * 20
