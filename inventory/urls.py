@@ -10,7 +10,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView
+    DispatchLogView, MixGumOutInventoryLogViewSet
 
 router = DefaultRouter()
 
@@ -47,7 +47,6 @@ router.register(r'station-info', views.StationInfoViewSet)
 # 仓库物料类型
 router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 
-
 '''在后面加发货终端设计的url表示发货终端设计所需要的接口和mes页面所需要的接口耦合了，在此提示说明一下，防止重复开发'''
 # 发货计划管理
 router.register(r'dispatch-plan', views.DispatchPlanViewSet)  # 发货终端设计67
@@ -60,6 +59,8 @@ router.register(r'terminal-dispatch-log', TerminalDispatchLogViewSet)
 
 # 终端发货履历管理
 router.register(r'terminal-dispatch-plan', TerminalDispatchViewSet)
+# 出库看板
+router.register(r'mix-gum-out-inventory-log', MixGumOutInventoryLogViewSet)
 
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),
