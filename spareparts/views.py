@@ -22,6 +22,7 @@ from spareparts.serializers import SpareInventorySerializer, MaterialLocationBin
 from rest_framework import status
 from rest_framework.response import Response
 from django.db.models import Sum
+from django.db.transaction import atomic
 
 from spareparts.tasks import spare_template, spare_upload, spare_inventory_template
 
@@ -84,11 +85,11 @@ class SpareInventoryViewSet(ModelViewSet):
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
-                                         location=si_obj.location.name,
+                                         location=si_obj.location.no,
                                          qty=+qty, quality_status=si_obj.quality_status,
                                          spare_no=si_obj.spare.no,
                                          spare_name=si_obj.spare.name,
-                                         spare_type=si_obj.spare.type.name,
+                                         spare_type=si_obj.spare.type.name if si_obj.spare.type else '',
                                          cost=qty * si_obj.spare.cost,
                                          unit_count=si_obj.spare.cost, fin_time=datetime.date.today(),
                                          type='入库',
@@ -117,11 +118,11 @@ class SpareInventoryViewSet(ModelViewSet):
         si_obj.save()
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
-                                         location=si_obj.location.name,
+                                         location=si_obj.location.no,
                                          qty=-qty, quality_status=si_obj.quality_status,
                                          spare_no=si_obj.spare.no,
                                          spare_name=si_obj.spare.name,
-                                         spare_type=si_obj.spare.type.name,
+                                         spare_type=si_obj.spare.type.name if si_obj.spare.type else '',
                                          cost=qty * si_obj.spare.cost,
                                          unit_count=si_obj.spare.cost, fin_time=datetime.date.today(),
                                          type='出库',
@@ -139,14 +140,19 @@ class SpareInventoryViewSet(ModelViewSet):
         reason = request.data.get('reason', None)  # 原因
         befor_qty = si_obj.qty
         si_obj.qty = qty
+
+        total_count_subtract = qty * si_obj.spare.cost
+        si_obj.total_count = total_count_subtract
+
         si_obj.save()
+
         SpareInventoryLog.objects.create(warehouse_no=si_obj.warehouse_info.no,
                                          warehouse_name=si_obj.warehouse_info.name,
-                                         location=si_obj.location.name,
+                                         location=si_obj.location.no,
                                          qty=qty, quality_status=si_obj.quality_status,
                                          spare_no=si_obj.spare.no,
                                          spare_name=si_obj.spare.name,
-                                         spare_type=si_obj.spare.type.name,
+                                         spare_type=si_obj.spare.type.name if si_obj.spare.type else '',
                                          cost=qty * si_obj.spare.cost,
                                          unit_count=si_obj.spare.cost, fin_time=datetime.date.today(),
                                          type='数量变更',
@@ -190,6 +196,7 @@ class SpareInventoryViewSet(ModelViewSet):
 
             si_obj['unit_count'] = m_obj.cost
             si_obj['type_name'] = m_obj.type.name
+            si_obj['unit'] = m_obj.unit
 
             if si_obj['sum_qty'] < m_obj.lower:
                 bound = '-'
@@ -222,6 +229,20 @@ class SpareInventoryLogViewSet(ModelViewSet):
         if sil_obj.type == '出库':
             sil_obj.status = 2
             sil_obj.save()
+            sl_obj = SpareLocation.objects.get(no=sil_obj.location)
+            s_obj = Spare.objects.get(no=sil_obj.spare_no)
+            si_obj = SpareInventory.objects.filter(spare=s_obj, location=sl_obj, delete_flag=False).first()
+
+            befor_qty = si_obj.qty
+            qty_add = befor_qty + abs(sil_obj.qty)
+            si_obj.qty = qty_add
+
+            befor_total_count = si_obj.total_count
+            total_count_add = befor_total_count + abs(sil_obj.qty) * si_obj.spare.cost
+            si_obj.total_count = total_count_add
+
+            si_obj.save()
+
             return Response('撤销成功')
         else:
             raise ValidationError('只有出库履历还可以撤销')
@@ -239,7 +260,7 @@ class SpareTypeViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name', 'no')
+            data = queryset.values('id', 'name', 'no', 'delete_flag')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
@@ -277,7 +298,7 @@ class SpareViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        slb_obj = instance.slb_spare.all(delete_flag=False).first()
+        slb_obj = instance.slb_spare.all().filter(delete_flag=False).first()
         if slb_obj:
             raise ValidationError('此物料已经和库存位绑定了，不能删除')
         instance.delete_flag = True
@@ -333,8 +354,9 @@ class SpareImportExportAPIView(APIView):
 
         return spare_template()
 
+    @atomic()
     def post(self, request, *args, **kwargs):
-        """备品备件基本信息导出"""
+        """备品备件基本信息导入"""
         spare_upload(request, 1)
         return Response('导入成功')
 
@@ -346,8 +368,8 @@ class SpareInventoryImportExportAPIView(APIView):
         """备品备件入库信息模板导出"""
         return spare_inventory_template()
 
+    @atomic()
     def post(self, request, *args, **kwargs):
         """备品备件入库信息导入"""
-        # spare_upload(request,2)
-
+        spare_upload(request, 2)
         return Response('导入成功')
