@@ -597,7 +597,7 @@ class DispatchLogView(ListAPIView):
 
 class InventoryLogOutViewSet(ModelViewSet):
     """混炼胶库出库履历视图"""
-    queryset = InventoryLog.objects.order_by('-fin_time')
+    queryset = InventoryLog.objects.filter(order_type='出库').order_by('-fin_time')
     serializer_class = InventoryLogOutSerializer
     filter_backends = [DjangoFilterBackend]
     # filter_class = MixGumOutInventoryLogFilter
