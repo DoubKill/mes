@@ -260,6 +260,7 @@ class RecipeNoticeAPiView(APIView):
         return Response('发送成功', status=status.HTTP_200_OK)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WeighBatchingViewSet(ModelViewSet):
     """小料称量配方标准"""
     queryset = WeighBatching.objects.filter(delete_flag=False).order_by('-created_date')
@@ -284,15 +285,17 @@ class WeighBatchingViewSet(ModelViewSet):
                             status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WeighCntTypeViewSet(ModelViewSet):
     queryset = WeighCntType.objects.all()
     serializer_class = WeighCntTypeSerializer
     permission_classes = (IsAuthenticated,)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductBatchingDetailListView(ReadOnlyModelViewSet):
     queryset = ProductBatchingDetail.objects.filter(delete_flag=False)
     serializer_class = ProductBatchingDetailMaterialSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('product_batching', )
+    filter_fields = ('product_batching',)
