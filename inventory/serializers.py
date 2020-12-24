@@ -18,7 +18,7 @@ from mes.base_serializer import BaseModelSerializer
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal
+    DeliveryPlanFinal, MixGumOutInventoryLog
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -594,7 +594,6 @@ class XBKMaterialInventorySerializer(serializers.ModelSerializer):
 
 
 class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
-
     product_info = serializers.SerializerMethodField(read_only=True)
 
     def get_product_info(self, obj):
@@ -611,7 +610,6 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
             "classes": pf.classes if pf else "",
             "product_time": product_time
         }
-
 
     class Meta:
         model = BzFinalMixingRubberInventory
@@ -803,7 +801,7 @@ class DispatchPlanUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = DispatchPlan
-        fields = ('id', )
+        fields = ('id',)
 
 
 class TerminalDispatchPlanUpdateSerializer(BaseModelSerializer):
@@ -820,3 +818,9 @@ class TerminalDispatchPlanUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = DispatchPlan
         fields = ('id', 'status')
+
+
+class InventoryLogOutSerializer(BaseModelSerializer):
+    class Meta:
+        model = InventoryLog
+        fields = '__all__'
