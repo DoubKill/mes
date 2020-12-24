@@ -335,9 +335,12 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
 
 
 class WeighBatchingDetailSerializer(serializers.ModelSerializer):
+    material_name = serializers.ReadOnlyField(source='material.material_name')
+    material_no = serializers.ReadOnlyField(source='material.material_no')
+
     class Meta:
         model = WeighBatchingDetail
-        fields = ('id', 'material', 'standard_weight')
+        fields = ('id', 'material', 'material_name', 'material_no', 'standard_weight')
 
 
 class WeighCntTypeSerializer(serializers.ModelSerializer):
@@ -348,7 +351,6 @@ class WeighCntTypeSerializer(serializers.ModelSerializer):
         fields = ('id', 'weigh_type', 'package_cnt', 'weighbatchingdetail_set')
         read_only_fields = ('weigh_type',)
 
-    @atomic()
     def update(self, instance, validated_data):
         weighbatchingdetail_set = validated_data.pop('weighbatchingdetail_set')
         material_list = []
