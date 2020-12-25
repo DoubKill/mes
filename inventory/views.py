@@ -18,7 +18,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
-    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend
+    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal
@@ -272,13 +272,19 @@ class PutPlanManagement(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        # if not isinstance(data, list):
-        #     raise ValidationError('参数错误')
-        # for item in data:
-        s = PutPlanManagementSerializer(data=data, context={'request': request})
-        if not s.is_valid():
-            raise ValidationError(s.errors)
-        s.save()
+        if isinstance(data, list):
+            for item in data:
+                s = PutPlanManagementSerializer(data=item, context={'request': request})
+                if not s.is_valid():
+                    raise ValidationError(s.errors)
+                s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializer(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
         return Response('新建成功')
 
 
@@ -492,7 +498,7 @@ class PutPlanManagementFianl(ModelViewSet):
     queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializerFinal
     filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementLBFilter
+    filter_class = PutPlanManagementFinalFilter
     permission_classes = (IsAuthenticated,)
 
     def create(self, request, *args, **kwargs):
@@ -608,8 +614,11 @@ class InventoryLogOutViewSet(ModelViewSet):
     def inventory_now(self, request, pk=None):
         """当前出库信息"""
         il_obj = InventoryLog.objects.filter(order_type='出库').last()
-        result = {'order_no': il_obj.order_no, 'material_no': il_obj.material_no,
-                  'lot_no': il_obj.lot_no, 'location': il_obj.location}
+        if il_obj:
+            result = {'order_no': il_obj.order_no, 'material_no': il_obj.material_no,
+                      'lot_no': il_obj.lot_no, 'location': il_obj.location}
+        else:
+            result = None
         return Response({'results': result})
 
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='inventory-today',

@@ -40,7 +40,7 @@ def spare_inventory_wrdb(filename, upload_root):
     # 获取excel的行和列
     nrows = sheet.nrows  # 行
     ncols = sheet.ncols  # 列
-    for i in range(1, nrows):
+    for i in range(2, nrows):
         row = sheet.row_values(i)
         # print(row[1])  # 物料类型
         # print(row[2])  # 物料编码
@@ -58,7 +58,7 @@ def spare_inventory_wrdb(filename, upload_root):
             if not st_obj:
                 st_obj = SpareType.objects.create(no=row[1], name=row[1])
         else:
-            st_obj=None
+            st_obj = None
         s_obj = Spare.objects.filter(no=row[2]).first()
         if not s_obj:
             s_obj = Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[11], upper=row[10], lower=row[9],
@@ -76,7 +76,8 @@ def spare_inventory_wrdb(filename, upload_root):
         if not slb_obj:
             slb_obj = SpareLocationBinding.objects.create(location=sl_obj, spare=s_obj)
         whi_obj = WarehouseInfo.objects.filter(name='备品备件仓库').first()
-        SpareInventory.objects.create(spare=s_obj, qty=row[6], unit=s_obj.unit, location=sl_obj, total_count=row[8],
+        SpareInventory.objects.create(spare=s_obj, qty=row[6], unit=s_obj.unit, location=sl_obj,
+                                      total_count=row[6] * row[7],
                                       warehouse_info=whi_obj)
 
 
@@ -156,18 +157,19 @@ def spare_inventory_template():
     #     first_col = w.col(j)
     #     first_col.width = 256 * 20
     # 写入表头
-    w.write(0, 0, u'No')
-    w.write(0, 1, u'物料类型')
-    w.write(0, 2, u'物料编码')
-    w.write(0, 3, u'物料名称')
-    w.write(0, 4, u'库存位')
-    w.write(0, 5, u'库存位类型')
-    w.write(0, 6, u'数量')
-    w.write(0, 7, u'单价（元）')
-    w.write(0, 8, u'总价')
-    w.write(0, 9, u'安全库存下限')
-    w.write(0, 10, u'安全库存上限')
-    w.write(0, 11, u'单位')
+    w.write(0, 0, u'单价不知道填0，总价可以不填(总价=单价乘以数量)，上限不知道填9999，下限不知道填0,库存位类型只有备品备件货架和备品备件地面两种')
+    w.write(1, 0, u'No')
+    w.write(1, 1, u'物料类型')
+    w.write(1, 2, u'物料编码')
+    w.write(1, 3, u'物料名称')
+    w.write(1, 4, u'库存位')
+    w.write(1, 5, u'库存位类型')
+    w.write(1, 6, u'数量')
+    w.write(1, 7, u'单价（元）')
+    w.write(1, 8, u'总价')
+    w.write(1, 9, u'安全库存下限')
+    w.write(1, 10, u'安全库存上限')
+    w.write(1, 11, u'单位')
 
     output = BytesIO()
     ws.save(output)
