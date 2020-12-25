@@ -18,15 +18,16 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
-    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend
+    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
-    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer
+    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
+    InventoryLogOutSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -254,12 +255,12 @@ class OutWorkFeedBack(APIView):
                 MaterialInventory.objects.create(**material_inventory_dict)
             except Exception as e:
                 logger.error(e)
-                result = {"99": "FALSE", f"message":"反馈失败，原因: {e}"}
+                result = {"99": "FALSE", f"message": "反馈失败，原因: {e}"}
             else:
-                result = {"01":"TRUES", "message":"反馈成功，OK"}
+                result = {"01": "TRUES", "message": "反馈成功，OK"}
 
             return Response(result)
-        return Response({"99": "FALSE", "message":"反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
+        return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -271,13 +272,19 @@ class PutPlanManagement(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        if not isinstance(data, list):
-            raise ValidationError('参数错误')
-        for item in data:
-            s = PutPlanManagementSerializer(data=item, context={'request': request})
+        if isinstance(data, list):
+            for item in data:
+                s = PutPlanManagementSerializerLB(data=item, context={'request': request})
+                if not s.is_valid():
+                    raise ValidationError(s.errors)
+                s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerLB(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
+        else:
+            raise ValidationError('参数错误')
         return Response('新建成功')
 
 
@@ -487,6 +494,32 @@ class PutPlanManagementLB(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementFianl(ModelViewSet):
+    queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerFinal
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFinalFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            for item in data:
+                s = PutPlanManagementSerializerFinal(data=item, context={'request': request})
+                if not s.is_valid():
+                    raise ValidationError(s.errors)
+                s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
 class DispatchPlanViewSet(ModelViewSet):
     """
     list:
@@ -566,3 +599,32 @@ class DispatchLogView(ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filter_class = DispatchLogFilter
     permission_classes = (IsAuthenticated,)
+
+
+class InventoryLogOutViewSet(ModelViewSet):
+    """混炼胶库出库履历视图"""
+    queryset = InventoryLog.objects.filter(order_type='出库').order_by('-fin_time')
+    serializer_class = InventoryLogOutSerializer
+    filter_backends = [DjangoFilterBackend]
+    # filter_class = MixGumOutInventoryLogFilter
+    permission_classes = (IsAuthenticated,)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='inventory-now',
+            url_name='inventory-now')
+    def inventory_now(self, request, pk=None):
+        """当前出库信息"""
+        il_obj = InventoryLog.objects.filter(order_type='出库').last()
+        if il_obj:
+            result = {'order_no': il_obj.order_no, 'material_no': il_obj.material_no,
+                      'lot_no': il_obj.lot_no, 'location': il_obj.location}
+        else:
+            result = None
+        return Response({'results': result})
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='inventory-today',
+            url_name='inventory-today')
+    def inventory_today(self, request, pk=None):
+        """今日出库量"""
+        il_set = InventoryLog.objects.filter(order_type='出库', fin_time__date=datetime.date.today()).values(
+            'material_no').annotate(sum_qty=Sum('qty'))
+        return Response({'results': il_set})

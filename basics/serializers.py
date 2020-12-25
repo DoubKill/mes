@@ -5,7 +5,7 @@ from django.db.transaction import atomic
 
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedule, Equip, SysbaseEquipLevel, \
-    WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute
+    WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute, Location
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.uuidfield import UUidTools
@@ -108,6 +108,8 @@ class WorkScheduleSerializer(BaseModelSerializer):
                                                 help_text="""[{"classes":班次id,"classes_name":班次名称,
                                                 "start_time":"12:12:12","end_time":"12:12:12",
                                                 "classes_type_name":"正常"}]""", )
+    work_procedure_name = serializers.CharField(source="work_procedure.global_name", read_only=True)
+
 
     @atomic()
     def create(self, validated_data):
@@ -211,7 +213,7 @@ class WorkSchedulePlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = WorkSchedulePlan
-        exclude = ('plan_schedule','work_schedule_plan_no')
+        exclude = ('plan_schedule', 'work_schedule_plan_no')
         read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
                             'delete_flag', 'created_user', 'last_updated_user',
                             'delete_user', 'start_time', 'end_time')
@@ -232,7 +234,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     def validate(self, attrs):
         day_time = attrs['day_time']
         work_schedule = attrs['work_schedule']
-        if PlanSchedule.objects.filter(day_time=day_time, work_schedule=work_schedule).exists():
+        if PlanSchedule.objects.filter(day_time=day_time, work_schedule__work_procedure__global_name=work_schedule.work_procedure.global_name).exists():
             raise serializers.ValidationError('日期:{}  已存在相同倒班'.format(day_time))
         return attrs
 
@@ -270,3 +272,19 @@ class PlanScheduleSerializer(BaseModelSerializer):
             work_schedule_plan_list.append(WorkSchedulePlan(**plan))
         WorkSchedulePlan.objects.bulk_create(work_schedule_plan_list)
         return instance
+
+
+class LocationSerializer(BaseModelSerializer):
+    # 位置点
+    type_name = serializers.ReadOnlyField(source='type.global_name')
+
+    def create(self, validated_data):
+        validated_data['no'] = UUidTools.uuid1_hex('LT')
+        type = validated_data.get('type', None)
+        if not type:
+            validated_data['type'] = GlobalCode.objects.filter(global_name='备品备件地面').first()
+        return super().create(validated_data)
+
+    class Meta:
+        model = Location
+        fields = ('id', 'type_name', 'name', 'type', 'used_flag')

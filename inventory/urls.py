@@ -10,7 +10,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView
+    DispatchLogView, InventoryLogOutViewSet
 
 router = DefaultRouter()
 
@@ -18,8 +18,15 @@ router = DefaultRouter()
 router.register(r'material-inventory-view', views.MaterialInventoryView, basename="material-inventory")
 # 胶料立库
 router.register(r'product-inventory', views.ProductInventory, basename="product-inventory")
+
 # 出库计划管理
 router.register('put-plan-management', PutPlanManagement)
+
+# 帘布库出库管理
+router.register(r'lb-plan-management', views.PutPlanManagementLB)
+
+# 终炼胶出库管理
+router.register(r'final-plan-management', views.PutPlanManagementFianl)
 
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
@@ -40,9 +47,6 @@ router.register(r'station-info', views.StationInfoViewSet)
 # 仓库物料类型
 router.register(r'warehouse-material-type', views.WarehouseMaterialTypeViewSet)
 
-# 帘布库出库管理
-router.register(r'lb-plan-management', views.PutPlanManagementLB)
-
 '''在后面加发货终端设计的url表示发货终端设计所需要的接口和mes页面所需要的接口耦合了，在此提示说明一下，防止重复开发'''
 # 发货计划管理
 router.register(r'dispatch-plan', views.DispatchPlanViewSet)  # 发货终端设计67
@@ -55,6 +59,8 @@ router.register(r'terminal-dispatch-log', TerminalDispatchLogViewSet)
 
 # 终端发货履历管理
 router.register(r'terminal-dispatch-plan', TerminalDispatchViewSet)
+# 出库看板
+router.register(r'inventory-log-out', InventoryLogOutViewSet)
 
 urlpatterns = [
     path('material_count/', MaterialCount.as_view()),

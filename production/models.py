@@ -63,7 +63,8 @@ class TrainsFeedbacks(AbstractEntity):
             models.Index(fields=['product_no']),
             models.Index(fields=['operation_user']),
             models.Index(fields=['begin_time']),
-            models.Index(fields=['end_time']), ]
+            models.Index(fields=['end_time']),
+            models.Index(fields=['factory_date'])]
 
 
 class PalletFeedbacks(AbstractEntity):
@@ -101,7 +102,8 @@ class PalletFeedbacks(AbstractEntity):
             models.Index(fields=["classes"]),
             models.Index(fields=["pallet_no"]),
             models.Index(fields=["end_time"]),
-            models.Index(fields=["lot_no"]), ]
+            models.Index(fields=["lot_no"]),
+            models.Index(fields=['factory_date'])]
 
 
 class EquipStatus(AbstractEntity):

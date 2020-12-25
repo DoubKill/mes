@@ -9,15 +9,19 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.filters import EquipFilter, GlobalCodeTypeFilter, WorkScheduleFilter, GlobalCodeFilter, \
-    EquipCategoryFilter, ClassDetailFilter, PlanScheduleFilter
+    EquipCategoryFilter, ClassDetailFilter, PlanScheduleFilter, LocationFilter
 from basics.models import GlobalCodeType, GlobalCode, WorkSchedule, Equip, SysbaseEquipLevel, \
-    WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute
+    WorkSchedulePlan, ClassesDetail, PlanSchedule, EquipCategoryAttribute, Location
 from basics.serializers import GlobalCodeTypeSerializer, GlobalCodeSerializer, WorkScheduleSerializer, \
     EquipSerializer, SysbaseEquipLevelSerializer, WorkSchedulePlanSerializer, WorkScheduleUpdateSerializer, \
-    PlanScheduleSerializer, EquipCategoryAttributeSerializer, ClassesSimpleSerializer
+    PlanScheduleSerializer, EquipCategoryAttributeSerializer, ClassesSimpleSerializer, LocationSerializer
 from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from rest_framework.decorators import action
+from rest_framework import status
+
+from spareparts.models import SpareLocationBinding
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -32,9 +36,9 @@ class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除公共代码类型
     """
-    queryset = GlobalCodeType.objects.filter(delete_flag=False)
+    queryset = GlobalCodeType.objects.filter(delete_flag=False).order_by("id")
     serializer_class = GlobalCodeTypeSerializer
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = GlobalCodeTypeFilter
 
@@ -51,7 +55,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除公共代码
     """
-    queryset = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1)
+    queryset = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1).order_by("id")
     serializer_class = GlobalCodeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -284,3 +288,42 @@ class PlanScheduleManyCreate(APIView):
                 raise ValidationError(s.errors)
             s.save()
         return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class LocationViewSet(ModelViewSet):
+    """位置点"""
+    queryset = Location.objects.filter(delete_flag=False).all()
+    serializer_class = LocationSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = LocationFilter
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='name_list',
+            url_name='name_list')
+    def name_list(self, request, pk=None):
+        """展示Location所以的name"""
+        name_list = Location.objects.filter(delete_flag=False).all().values('id', 'name', 'used_flag')
+        # names = list(set(name_list))
+        return Response(name_list)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.used_flag:
+            # mlb_obj = SpareLocationBinding.objects.filter(location=instance, delete_flag=False).first()
+            # if mlb_obj:
+            #     raise ValidationError('此站点已经绑定了物料，无法禁用！')
+            instance.used_flag = 0
+        else:
+            instance.used_flag = 1
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_queryset(self):
+        query_params = self.request.query_params
+        type_name = query_params.getlist('type_name[]')
+        if not type_name:
+            return super().get_queryset()
+        l_set = Location.objects.filter(type__global_name__in=type_name).all()
+        return l_set

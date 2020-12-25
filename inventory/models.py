@@ -1,7 +1,7 @@
 from django.db import models
 
 # Create your models here.
-from basics.models import GlobalCode
+from basics.models import GlobalCode, Equip
 from recipe.models import Material, ProductBatching
 from system.models import AbstractEntity, User
 
@@ -249,6 +249,10 @@ class DeliveryPlan(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+                                   related_name='dispatch_mix_deliverys')
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+                                      related_name='equip_mix_deliverys')
 
     class Meta:
         db_table = 'delivery_plan'
@@ -278,6 +282,10 @@ class DeliveryPlanLB(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+                                   related_name='dispatch_lb_deliverys')
+    dispatch = models.ManyToManyField("DispatchPlan", verbose_name="发货单", help_text="发货单", blank=True, null=True,
+                                      related_name='equip_lb_deliverys')
 
     class Meta:
         db_table = 'delivery_plan_lb'
@@ -307,6 +315,10 @@ class DeliveryPlanFinal(AbstractEntity):
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+                                   related_name='dispatch_final_deliverys')
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+                                      related_name='equip_final_deliverys')
 
     class Meta:
         db_table = 'delivery_plan_final'
@@ -427,17 +439,17 @@ class DispatchPlan(AbstractEntity):
 
 class MixGumOutInventoryLog(models.Model):
     """混炼胶库出库履历视图"""
-    order_no = models.CharField(max_length=100, db_column='BILLID', primary_key=True)
-    pallet_no = models.CharField(max_length=50, db_column='PALLETID')
-    location = models.CharField(max_length=50, db_column='CID')
-    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='CarNum')
-    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='Weight')
-    quality_status = models.CharField(db_column='MStatus', max_length=6)
+    order_no = models.CharField(max_length=100, db_column='BILLID', primary_key=True, help_text='出库单号')
+    pallet_no = models.CharField(max_length=50, db_column='PALLETID', help_text='托盘号')
+    location = models.CharField(max_length=50, db_column='CID', help_text='目的地')
+    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='CarNum', help_text='数量')
+    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='Weight', help_text='已发重量')
+    quality_status = models.CharField(db_column='MStatus', max_length=6, help_text='品质状态')
     lot_no = models.CharField(max_length=100, db_column='Lot_no', null=True, blank=True)
-    inout_num_type = models.CharField(max_length=50, db_column='OutType')
-    initiator = models.CharField(max_length=50, db_column='OutUser')
-    material_no = models.CharField(max_length=100, db_column='MID')
-    fin_time = models.DateTimeField(db_column='DEALTIME')
+    inout_num_type = models.CharField(max_length=50, db_column='OutType', help_text='出入库数类型')
+    initiator = models.CharField(max_length=50, db_column='OutUser', help_text='发起人')
+    material_no = models.CharField(max_length=100, db_column='MID', help_text='物料编码')
+    fin_time = models.DateTimeField(db_column='DEALTIME', help_text='完成时间')
 
     def warehouse_no(self):
         return "混炼胶库"

@@ -2,7 +2,7 @@ import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal
 
 from inventory.models import DeliveryPlan
 
@@ -33,6 +33,19 @@ class PutPlanManagementLBFilter(django_filters.rest_framework.FilterSet):
         fields = ('st', 'et', 'status', 'material_no', 'name')
 
 
+class PutPlanManagementFinalFilter(django_filters.rest_framework.FilterSet):
+    """帘布库出库计划过滤器"""
+    st = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="gte")
+    et = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="lte")
+    status = django_filters.CharFilter(field_name="status", help_text='订单状态')
+    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码')
+    name = django_filters.CharFilter(field_name="warehouse_info__name", help_text='仓库名称')
+
+    class Meta:
+        model = DeliveryPlanFinal
+        fields = ('st', 'et', 'status', 'material_no', 'name')
+
+
 class InventoryLogFilter(django_filters.rest_framework.FilterSet):
     start_time = django_filters.CharFilter(field_name='start_time', lookup_expr='gte')
     end_time = django_filters.CharFilter(field_name='start_time', lookup_expr='lte')
@@ -58,13 +71,14 @@ class DispatchPlanFilter(django_filters.rest_framework.FilterSet):
     """发货计划管理筛选"""
     start_time = django_filters.DateFilter(field_name='start_time__date', help_text='时间')
     status = django_filters.CharFilter(field_name='status', help_text='订单状态')
-    material = django_filters.CharFilter(field_name='material__id', help_text='物料编码')
+    material = django_filters.CharFilter(field_name='material__id', help_text='物料编码id')
     dispatch_type = django_filters.CharFilter(field_name='dispatch_type__id', help_text='发货类型')
     dispatch_location = django_filters.CharFilter(field_name='dispatch_location__id', help_text='目的地')
+    material_no = django_filters.CharFilter(field_name='material__material_no', help_text='物料编码')
 
     class Meta:
         model = DispatchPlan
-        fields = ['start_time', 'status', 'material', 'dispatch_type', 'dispatch_location']
+        fields = ['start_time', 'status', 'material', 'dispatch_type', 'dispatch_location', 'material_no']
 
 
 class DispatchLogFilter(django_filters.rest_framework.FilterSet):
@@ -106,7 +120,6 @@ class MixGumOutFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MixGumOutInventoryLog
         fields = ['start_time', 'end_time', 'location', 'material_no']
-
 
 
 class InventoryFilterBackend(DjangoFilterBackend):

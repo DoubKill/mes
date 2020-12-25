@@ -258,7 +258,7 @@ def init_permissions():
 
 def main():
     print('开始迁移数据库')
-    apps = ('system', 'basics', 'plan', 'production', 'recipe', 'quality', 'inventory')
+    apps = ('system', 'basics', 'plan', 'production', 'recipe', 'quality', 'inventory', 'spareparts')
 
     for app in apps:
         try:

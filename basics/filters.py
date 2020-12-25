@@ -1,7 +1,7 @@
 import django_filters
 
 from basics.models import Equip, GlobalCodeType, WorkSchedule, GlobalCode, EquipCategoryAttribute, ClassesDetail, \
-    PlanSchedule
+    PlanSchedule, Location
 
 
 class EquipFilter(django_filters.rest_framework.FilterSet):
@@ -31,10 +31,11 @@ class GlobalCodeTypeFilter(django_filters.rest_framework.FilterSet):
 class WorkScheduleFilter(django_filters.rest_framework.FilterSet):
     schedule_no = django_filters.CharFilter(field_name='schedule_no', lookup_expr='icontains', help_text='日程编号')
     schedule_name = django_filters.CharFilter(field_name='schedule_name', lookup_expr='icontains', help_text='日程名称')
+    work_procedure = django_filters.CharFilter(field_name="work_procedure__global_name", help_text="工序")
 
     class Meta:
         model = WorkSchedule
-        fields = ('schedule_no', 'schedule_name')
+        fields = ('schedule_no', 'schedule_name', 'work_procedure')
 
 
 class GlobalCodeFilter(django_filters.rest_framework.FilterSet):
@@ -75,3 +76,12 @@ class PlanScheduleFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = PlanSchedule
         fields = ('day_time', 'month', 'year', 'work_schedule__schedule_name')
+
+
+class LocationFilter(django_filters.rest_framework.FilterSet):
+    name = django_filters.CharFilter(field_name='name', help_text='名称',lookup_expr='icontains')
+    type_name = django_filters.CharFilter(field_name='type__global_name', help_text='类型')
+
+    class Meta:
+        model = Location
+        fields = ('name', 'type_name')
