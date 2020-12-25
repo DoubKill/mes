@@ -87,7 +87,7 @@ first_names = ['的', '一', '是', '了', '我', '不', '人', '在', '他', '�
 
 def add_global_codes():
     names = ['胶料状态', '产地', '包装单位', '原材料类别', '胶料段次', '班组', '班次', '设备类型', '工序', '炼胶机类型', '设备层次',
-             'SITE', '胶料', '处理类型', '发货类型', '备品备件类型', '出库原因', '用途', '部位']
+             'SITE', '胶料', '处理类型', '发货类型', '备品备件类型', '出库原因', '用途', '部位', '站点类型']
     j = 1
     for i, name in enumerate(names):
         instance, _ = GlobalCodeType.objects.get_or_create(type_no=str(i + 1), type_name=name, use_flag=1)
@@ -130,6 +130,8 @@ def add_global_codes():
             items = ['设备', '其他']
         elif i == 18:
             items = ['部位1', '部位2', '部位3']
+        elif i == 19:
+            items = ["正常点", "异常点"]
         for item in items:
             GlobalCode.objects.get_or_create(global_no=str(j), global_name=item, global_type=instance)
             j += 1
@@ -1431,6 +1433,10 @@ def add_dispatch_location():
 
 # 新增仓库
 def add_warehouseInfo():
+    WarehouseInfo.objects.create(no='混炼胶库', name='混炼胶库')
+    WarehouseInfo.objects.create(no='终炼胶库', name='终炼胶库')
+    WarehouseInfo.objects.create(no='帘布库', name='帘布库')
+    WarehouseInfo.objects.create(no='原材料库', name='原材料库')
     WarehouseInfo.objects.create(no='备品备件仓库', name='备品备件仓库')
 
 
