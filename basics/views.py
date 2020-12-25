@@ -36,7 +36,7 @@ class GlobalCodeTypeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除公共代码类型
     """
-    queryset = GlobalCodeType.objects.filter(delete_flag=False)
+    queryset = GlobalCodeType.objects.filter(delete_flag=False).order_by("id")
     serializer_class = GlobalCodeTypeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -55,7 +55,7 @@ class GlobalCodeViewSet(CommonDeleteMixin, ModelViewSet):
     destroy:
         删除公共代码
     """
-    queryset = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1)
+    queryset = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1).order_by("id")
     serializer_class = GlobalCodeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
