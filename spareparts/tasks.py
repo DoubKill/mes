@@ -99,14 +99,14 @@ def spare_upload(request, type):
             f.write(i)
 
     # # 写入 mysql
-    if type == 1:
-        spare_wrdb(file.name, upload_root)
-    elif type == 2:
-        spare_inventory_wrdb(file.name, upload_root)
+    try:
+        if type == 1:
+            spare_wrdb(file.name, upload_root)
+        elif type == 2:
+            spare_inventory_wrdb(file.name, upload_root)
 
-    # except Exception as e:
-    #     print(e)
-    #     return HttpResponse(e)
+    except Exception as e:
+        raise ValidationError(f'异常信息{e}')
 
 
 def spare_template():
