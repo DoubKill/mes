@@ -186,7 +186,7 @@ class WeighBatching(AbstractEntity):
         (7, '停用')
     )
     product_batching = models.OneToOneField(ProductBatching, verbose_name='胶料配料标准', on_delete=models.CASCADE)
-    # weight_batch_no = models.CharField('小料配方编码', max_length=64, blank=True, default='')
+    weight_batch_no = models.CharField('小料配方编码', max_length=64, blank=True, default='')
     # a_weight = models.FloatField('A重量', default=0.0)
     # b_weight = models.FloatField('B重量', default=0.0)
     # sulfur_weight = models.FloatField('硫磺重量', default=0.0)
@@ -218,9 +218,14 @@ class WeighBatching(AbstractEntity):
                                       on_delete=models.CASCADE)
     obsolete_time = models.DateTimeField(help_text='弃用时间', verbose_name='弃用时间', blank=True, null=True)
 
-    def weight_batch_no(self):
-        return self.product_batching.stage_product_batch_no + \
-               '-' + (self.product_batching.dev_type.category_name if self.product_batching.dev_type else 'null')
+    def weight_batch_no_(self):
+        weight_batch_no = self.product_batching.stage_product_batch_no + \
+                          '-' + (
+                              self.product_batching.dev_type.category_name if self.product_batching.dev_type else 'null')
+        if self.weight_batch_no != weight_batch_no:
+            self.weight_batch_no = weight_batch_no
+            self.save()
+        return weight_batch_no
 
     def material_sum_weight(self, weigh_type):
         return self.weighcnttype_set \
@@ -264,7 +269,7 @@ class WeighBatchingDetail(models.Model):
     standard_weight = models.DecimalField('计算重量', decimal_places=2, max_digits=8, default=0.0)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
 
-    # single_weight = models.FloatField('单包重量', default=0.0) # 又计算重量和包数计算
+    # single_weight = models.FloatField('单包重量', default=0.0) # 由计算重量和包数计算
     # unit = models.CharField('单位', max_length=8, default='') #原材料中有重量
 
     def single_weight(self):

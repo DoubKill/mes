@@ -6,7 +6,6 @@ from .models import ProductClassesPlan, BatchingClassesPlan
 @receiver(post_save, sender=ProductClassesPlan)
 def product_classes_plan_save_handler(sender, **kwargs):
     product_classes_plan = kwargs['instance']
-    print(product_classes_plan, 'product_classes_plan_____')
     if product_classes_plan.delete_flag:  # 所有相同排班 和 配方的计划被删除
         if not ProductClassesPlan.objects.filter(
                 delete_flag=False,

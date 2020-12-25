@@ -10,7 +10,7 @@ from rest_framework.validators import UniqueValidator
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
-from plan.models import ProductClassesPlan
+from plan.models import ProductClassesPlan, BatchingClassesPlan
 from plan.uuidfield import UUidTools
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatching, WeighBatchingDetail, WeighCntType
@@ -379,7 +379,7 @@ class WeighBatchingSerializer(serializers.ModelSerializer):
         model = WeighBatching
         fields = ('id',
                   'product_batching',
-                  'weight_batch_no',
+                  'weight_batch_no_',
                   'stage_product_batch_no',
                   'category_name',
                   'sulfur_weight',
@@ -430,10 +430,15 @@ class WeighBatchingChangeUsedTypeSerializer(serializers.ModelSerializer):
             if target_used_type == 4 or target_used_type == 5:
                 instance.used_type = target_used_type
         elif instance.used_type == 4:  # 启用 => 废弃
+            if BatchingClassesPlan.objects.filter(
+                    ~Q(status=1), weigh_cnt_type__weigh_batching=instance).exists():
+                raise serializers.ValidationError('该配方已关联下发计划，不可废弃')
             instance.used_type = 6
             instance.obsolete_user = self.context['request'].user
             instance.obsolete_time = timezone.now()
         elif instance.used_type == 5:  # 驳回 => 编辑 or 驳回 => 废弃
+            instance.used_type = target_used_type
+        elif instance.used_type == 6:  # 废弃 => 编辑 临时补全逻辑
             instance.used_type = target_used_type
 
         if target_used_type == 5:  # 驳回

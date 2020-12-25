@@ -139,9 +139,15 @@ class MaterialRequisitionClasses(AbstractEntity):
 
 class BatchingClassesPlan(AbstractEntity):
     """配料日班次计划"""
+    PLAN_STATUSES = (
+        (1, '未下发'),
+        (2, '已下发'),
+        (3, '执行中'),
+        (4, '已完成')
+    )
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
-    status = models.CharField(max_length=16, default='未下发')
+    status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
     send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     send_time = models.DateTimeField(null=True, blank=True)
 
@@ -151,8 +157,14 @@ class BatchingClassesPlan(AbstractEntity):
         verbose_name_plural = verbose_name = '配料日班次计划'
 
     def plan_package(self):  # 计划包数
-        return ProductClassesPlan.objects.filter(
+        plan_sum_trains = ProductClassesPlan.objects.filter(
             delete_flag=False,
             work_schedule_plan=self.work_schedule_plan,
             product_batching=self.weigh_cnt_type.weigh_batching.product_batching
-        ).aggregate(plan_sum_trains=Sum('plan_trains'))['plan_sum_trains'] * self.weigh_cnt_type.package_cnt
+        ).aggregate(plan_sum_trains=Sum('plan_trains')).get('plan_sum_trains')
+        return (plan_sum_trains if plan_sum_trains else 0) * self.weigh_cnt_type.package_cnt
+
+    def single_weight(self):  # 单包重量
+        standard_sum_weight = self.weigh_cnt_type \
+            .weighbatchingdetail_set.aggregate(standard_sum_weight=Sum('standard_weight'))
+        return standard_sum_weight.get('standard_sum_weight')

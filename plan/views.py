@@ -5,28 +5,30 @@ import requests
 from django.db import connection
 from django.db.models import Sum, Max
 from django.db.transaction import atomic
+from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
-from rest_framework.generics import ListAPIView, CreateAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView, UpdateAPIView, GenericAPIView, get_object_or_404
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
+import plan
 from basics.models import WorkSchedulePlan, GlobalCode
 from basics.views import CommonDeleteMixin
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductClassesPlanSyncInterface
-from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter
-from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded
+from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter, BatchingClassesPlanFilter
+from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
-    ProductClassesPlansySerializer, MaterialsySerializer
+    ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer
 from production.models import PlanStatus, TrainsFeedbacks
 from recipe.models import ProductBatching, ProductBatchingDetail, Material
 from system.serializers import PlanReceiveSerializer
@@ -426,3 +428,27 @@ class MaterialReceive(CreateAPIView):
     """原材料表同步"""
     serializer_class = MaterialsySerializer
     queryset = Material.objects.all()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BatchingClassesPlanView(ListAPIView):
+    """配料日班次计划"""
+    queryset = BatchingClassesPlan.objects.filter(delete_flag=False).order_by('-created_date')
+    serializer_class = BatchingClassesPlanSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = BatchingClassesPlanFilter
+
+
+class IssueBatchingClassesPlanView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def put(self, request, *args, **kwargs):
+        pk = self.kwargs['pk']
+        queryset = BatchingClassesPlan.objects.filter(delete_flag=False)
+        plan_ = get_object_or_404(queryset, pk=pk)
+        if plan_.status == 1:
+            plan_.status = 2
+            plan_.send_user = self.request.user
+            plan_.send_time = timezone.now()
+            plan_.save()
+        return Response(plan_.status)
