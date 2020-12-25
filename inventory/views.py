@@ -608,8 +608,11 @@ class InventoryLogOutViewSet(ModelViewSet):
     def inventory_now(self, request, pk=None):
         """当前出库信息"""
         il_obj = InventoryLog.objects.filter(order_type='出库').last()
-        result = {'order_no': il_obj.order_no, 'material_no': il_obj.material_no,
-                  'lot_no': il_obj.lot_no, 'location': il_obj.location}
+        if il_obj:
+            result = {'order_no': il_obj.order_no, 'material_no': il_obj.material_no,
+                      'lot_no': il_obj.lot_no, 'location': il_obj.location}
+        else:
+            result = None
         return Response({'results': result})
 
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='inventory-today',
