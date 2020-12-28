@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -25,6 +27,9 @@ def product_classes_plan_save_handler(sender, **kwargs):
                     batching_classes_plan, created = BatchingClassesPlan.objects.get_or_create(
                         work_schedule_plan=product_classes_plan.work_schedule_plan,
                         weigh_cnt_type=cnt_type)
+                    if created:
+                        batching_classes_plan.plan_classes_uid = uuid.uuid1().hex
+                        batching_classes_plan.save()
                     if not created and batching_classes_plan.delete_flag:
                         batching_classes_plan.delete_flag = False
                         batching_classes_plan.save()
