@@ -321,7 +321,7 @@ class SpareLocationViewSet(ModelViewSet):
             url_name='name_list')
     def name_list(self, request, pk=None):
         """展示Location所以的name"""
-        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name', 'used_flag')
+        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name','no', 'used_flag')
         # names = list(set(name_list))
         return Response(name_list)
 
