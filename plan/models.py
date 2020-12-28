@@ -150,6 +150,8 @@ class BatchingClassesPlan(AbstractEntity):
     status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
     send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     send_time = models.DateTimeField(null=True, blank=True)
+    equip = models.ForeignKey(Equip, blank=True, null=True, on_delete=models.SET_NULL)
+    # 计划唯一码 用时再加
 
     class Meta:
         unique_together = ('work_schedule_plan', 'weigh_cnt_type')
