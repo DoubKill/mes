@@ -9,10 +9,11 @@ class SpareInventoryFilter(django_filters.rest_framework.FilterSet):
                                            lookup_expr='icontains')
     location_name = django_filters.CharFilter(field_name='location__name', help_text='库存位', lookup_expr='icontains')
     type_name = django_filters.CharFilter(field_name='spare__type__name', help_text='类型', lookup_expr='icontains')
+    location_no = django_filters.CharFilter(field_name='location__no', help_text='库存位', lookup_expr='icontains')
 
     class Meta:
         model = SpareInventory
-        fields = ('spare_no', 'spare_name', 'location_id', 'type_name')
+        fields = ('spare_no', 'spare_name', 'location_id', 'type_name','location_no')
 
 
 class MaterialLocationBindingFilter(django_filters.rest_framework.FilterSet):
@@ -20,10 +21,11 @@ class MaterialLocationBindingFilter(django_filters.rest_framework.FilterSet):
     spare_name = django_filters.CharFilter(field_name='spare__name', help_text='名称',
                                            lookup_expr='icontains')
     location_name = django_filters.CharFilter(field_name='location__name', help_text='库存位', lookup_expr='icontains')
+    location_no = django_filters.CharFilter(field_name='location__no', help_text='库存位', lookup_expr='icontains')
 
     class Meta:
         model = SpareLocationBinding
-        fields = ('spare_no', 'spare_name', 'location_name')
+        fields = ('spare_no', 'spare_name', 'location_name','location_no')
 
 
 class SpareInventoryLogFilter(django_filters.rest_framework.FilterSet):
