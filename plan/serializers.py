@@ -4,7 +4,8 @@ from rest_framework import serializers
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan
+from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan, \
+    BatchingClassesPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
 from recipe.models import ProductBatching, ProductInfo, ProductBatchingDetail, Material
@@ -446,3 +447,33 @@ class MaterialsySerializer(BaseModelSerializer):
             'material_no', 'material_name', 'for_short', 'material_type__global_no', 'package_unit__global_no',
             'use_flag')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class BatchingClassesPlanSerializer(serializers.ModelSerializer):
+    day_time = serializers.ReadOnlyField(source='work_schedule_plan.plan_schedule.day_time', default='')
+    classes_name = serializers.ReadOnlyField(source='work_schedule_plan.classes.global_name', default='')
+    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.weight_batch_no_', default='')
+    category_name = serializers.ReadOnlyField(
+        source='weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name', default='')
+    stage_product_batch_no = serializers.ReadOnlyField(
+        source='weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no', default='')
+    send_user = serializers.ReadOnlyField(source='send_user.username', default='')
+    weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.used_type')
+
+    class Meta:
+        model = BatchingClassesPlan
+        fields = ('id',
+                  'day_time',
+                  'classes_name',
+                  'weight_batch_no',
+                  'category_name',
+                  'stage_product_batch_no',
+                  'plan_package',
+                  'status',
+                  'send_user',
+                  'send_time',
+                  'weigh_batching_used_type',
+                  'weigh_cnt_type',
+                  'single_weight'
+                  )
+

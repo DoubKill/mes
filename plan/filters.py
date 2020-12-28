@@ -1,5 +1,6 @@
 import django_filters
-from plan.models import ProductDayPlan, MaterialDemanded, ProductBatchingDayPlan, ProductClassesPlan
+from plan.models import ProductDayPlan, MaterialDemanded, ProductBatchingDayPlan, ProductClassesPlan, \
+    BatchingClassesPlan
 
 
 class ProductDayPlanFilter(django_filters.rest_framework.FilterSet):
@@ -47,3 +48,15 @@ class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = ProductClassesPlan
         fields = ('classes', 'product_no', 'begin_time', 'end_time', 'equip_no', 'schedule_name', 'day_time')
+
+
+class BatchingClassesPlanFilter(django_filters.rest_framework.FilterSet):
+    day_time = django_filters.DateFilter(field_name='work_schedule_plan__plan_schedule__day_time')
+    dev_type = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_batching__product_batching__dev_type')
+    weight_batch_no = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_batching__weight_batch_no', lookup_expr='icontains')
+    classes_name = django_filters.CharFilter(field_name='work_schedule_plan__classes__global_name')
+    status = django_filters.CharFilter(field_name='status')
+
+    class Meta:
+        model = BatchingClassesPlan
+        fields = ('day_time', 'dev_type', 'weight_batch_no', 'classes_name')

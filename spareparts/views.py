@@ -24,7 +24,7 @@ from rest_framework.response import Response
 from django.db.models import Sum
 from django.db.transaction import atomic
 
-from spareparts.tasks import spare_template, spare_upload, spare_inventory_template
+from spareparts.tasks import *
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -321,7 +321,7 @@ class SpareLocationViewSet(ModelViewSet):
             url_name='name_list')
     def name_list(self, request, pk=None):
         """展示Location所以的name"""
-        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name', 'used_flag')
+        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name','no', 'used_flag')
         # names = list(set(name_list))
         return Response(name_list)
 
@@ -347,21 +347,6 @@ class SpareLocationViewSet(ModelViewSet):
         return l_set
 
 
-class SpareImportExportAPIView(APIView):
-    """备品备件基本信息导入导出"""
-
-    def get(self, request, *args, **kwargs):
-        """备品备件基本信息模板导出"""
-
-        return spare_template()
-
-    @atomic()
-    def post(self, request, *args, **kwargs):
-        """备品备件基本信息导入"""
-        spare_upload(request, 1)
-        return Response('导入成功')
-
-
 class SpareInventoryImportExportAPIView(APIView):
     """备品备件入库信息导入导出"""
 
@@ -372,5 +357,5 @@ class SpareInventoryImportExportAPIView(APIView):
     @atomic()
     def post(self, request, *args, **kwargs):
         """备品备件入库信息导入"""
-        spare_upload(request, 2)
+        spare_upload(request)
         return Response('导入成功')
