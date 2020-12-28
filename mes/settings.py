@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'quality.apps.QualityConfig',
     'inventory.apps.InventoryConfig',
     'spareparts.apps.SparepartsConfig',
+    'terminal.apps.TerminalConfig'
 ]
 
 MIDDLEWARE = [

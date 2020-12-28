@@ -4,6 +4,9 @@ from django.db.models import Sum
 from basics.models import Equip, PlanSchedule, ClassesDetail, WorkSchedulePlan
 from recipe.models import ProductBatching, Material, WeighCntType
 from system.models import AbstractEntity, User
+from basics.models import Equip, PlanSchedule, ClassesDetail, WorkSchedulePlan, GlobalCode, EquipCategoryAttribute
+from recipe.models import ProductBatching, Material
+from system.models import AbstractEntity
 
 
 # Create your models here.
@@ -145,6 +148,7 @@ class BatchingClassesPlan(AbstractEntity):
         (3, '执行中'),
         (4, '已完成')
     )
+    plan_batching_uid = models.CharField(max_length=64, help_text='UID')
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
     status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
@@ -158,6 +162,7 @@ class BatchingClassesPlan(AbstractEntity):
         db_table = 'batching_classes_plan'
         verbose_name_plural = verbose_name = '配料日班次计划'
 
+    @property
     def plan_package(self):  # 计划包数
         plan_sum_trains = ProductClassesPlan.objects.filter(
             delete_flag=False,
@@ -170,3 +175,38 @@ class BatchingClassesPlan(AbstractEntity):
         standard_sum_weight = self.weigh_cnt_type \
             .weighbatchingdetail_set.aggregate(standard_sum_weight=Sum('standard_weight'))
         return standard_sum_weight.get('standard_sum_weight')
+
+
+class BatchingProductPlanRelation(models.Model):
+    batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE)
+    product_classes_plan = models.ForeignKey(ProductClassesPlan, on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'batching_product_plan_relation'
+        verbose_name_plural = verbose_name = '配料日计划和胶料日计划关连'
+
+
+class BatchingClassesDemand(models.Model):
+    batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE,
+                                              related_name='classes_demands')
+    material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE)
+    plan_weight = models.DecimalField(help_text='重量', decimal_places=2, max_digits=8)
+    actual_weight = models.DecimalField(help_text='重量', decimal_places=2, max_digits=8, default=0)
+
+    class Meta:
+        db_table = 'batching_classes_demand'
+        verbose_name_plural = verbose_name = '班次小料需求量'
+
+
+class ClassesPlanIssue(models.Model):
+    STATUS_CHOICE = (
+        (1, '下发成功'),
+        (2, '未下发'),
+        (3, '下发失败')
+    )
+    product_classes_plan = models.ForeignKey(ProductClassesPlan, on_delete=models.CASCADE, help_text='胶料日班次计划表id')
+    status = models.IntegerField(help_text='下发状态', default=2)
+
+    class Meta:
+        db_table = 'classes_plan_issue'
+        verbose_name_plural = verbose_name = '计划下发至快检系统'
