@@ -206,6 +206,7 @@ def main():
                             machine_name=indicator_name+'仪',
                             test_group=test_group,
                             level=1 if result == '合格' else 2,
+                            test_class=production_class,
                             origin=idx+1)
             conn.close()
             min_id += 1000
