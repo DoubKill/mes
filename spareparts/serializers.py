@@ -43,6 +43,10 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
 
         else:  # 新增
             if location.type.global_name == '备品备件地面':  # 因此公用代码轻易不要动
+                spare = attrs['spare']
+                slb_obj = SpareLocationBinding.objects.filter(location=location, spare=spare, delete_flag=False).first()
+                if slb_obj:
+                    raise serializers.ValidationError('这个绑定关系已存在')
                 return attrs
             mlb = SpareLocationBinding.objects.filter(location=location, delete_flag=False).first()
             if mlb:
@@ -97,7 +101,7 @@ class SpareInventorySerializer(BaseModelSerializer):
                                          qty=instance.qty, quality_status=instance.quality_status,
                                          spare_no=instance.spare.no,
                                          spare_name=instance.spare.name,
-                                         spare_type= instance.spare.type.name if instance.spare.type else '',
+                                         spare_type=instance.spare.type.name if instance.spare.type else '',
                                          cost=instance.qty * instance.spare.cost,
                                          unit_count=instance.spare.cost,
                                          fin_time=datetime.date.today(),
