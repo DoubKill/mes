@@ -148,16 +148,13 @@ class BatchingClassesPlan(AbstractEntity):
         (3, '执行中'),
         (4, '已完成')
     )
-    plan_batching_uid = models.CharField(max_length=64, help_text='UID')
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
     status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
     send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     send_time = models.DateTimeField(null=True, blank=True)
     equip = models.ForeignKey(Equip, blank=True, null=True, on_delete=models.SET_NULL)
-
-    plan_classes_uid = models.CharField('计划唯一编码', max_length=64, unique=True, null=True)
-
+    plan_batching_uid = models.CharField('计划唯一编码', max_length=64, unique=True)
 
     class Meta:
         unique_together = ('work_schedule_plan', 'weigh_cnt_type')

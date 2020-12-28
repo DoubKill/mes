@@ -175,6 +175,7 @@ class Version(models.Model):
         (2, "密炼投料"),
         (3, "小料包产出"),
         (4, "小料称量"),
+        (5, "人工称量")
     )
     type = models.PositiveIntegerField(choices=VERSION_CHOICE, verbose_name="类别")
     number = models.CharField(max_length=20, verbose_name="版本号")

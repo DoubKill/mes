@@ -306,11 +306,7 @@ class BarCodeTank(APIView):
 
     def get(self, request):
         bar_code = self.request.query_params.get('bar_code')
-
-        if settings.DEBUG:
-            return Response(WeightTankStatus.objects.filter().values('tank_no')[0])
-        else:
-            pass
+        return Response(WeightTankStatus.objects.filter().values('tank_no')[0])
 
 
 class DevTypeView(APIView):
