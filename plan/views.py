@@ -28,7 +28,8 @@ from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFee
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
-    ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer
+    ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
+    IssueBatchingClassesPlanSerializer
 from production.models import PlanStatus, TrainsFeedbacks
 from recipe.models import ProductBatching, ProductBatchingDetail, Material
 from system.serializers import PlanReceiveSerializer
@@ -439,16 +440,11 @@ class BatchingClassesPlanView(ListAPIView):
     filter_class = BatchingClassesPlanFilter
 
 
-class IssueBatchingClassesPlanView(APIView):
+@method_decorator([api_recorder], name="dispatch")
+class IssueBatchingClassesPlanView(UpdateAPIView):
+    queryset = BatchingClassesPlan.objects.filter(delete_flag=False)
+    serializer_class = IssueBatchingClassesPlanSerializer
     permission_classes = (IsAuthenticated,)
 
-    def put(self, request, *args, **kwargs):
-        pk = self.kwargs['pk']
-        queryset = BatchingClassesPlan.objects.filter(delete_flag=False)
-        plan_ = get_object_or_404(queryset, pk=pk)
-        if plan_.status == 1:
-            plan_.status = 2
-            plan_.send_user = self.request.user
-            plan_.send_time = timezone.now()
-            plan_.save()
-        return Response(plan_.status)
+    def perform_update(self, serializer):
+        serializer.save(send_user=self.request.user)

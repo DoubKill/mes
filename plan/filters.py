@@ -56,7 +56,8 @@ class BatchingClassesPlanFilter(django_filters.rest_framework.FilterSet):
     weight_batch_no = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_batching__weight_batch_no', lookup_expr='icontains')
     classes_name = django_filters.CharFilter(field_name='work_schedule_plan__classes__global_name')
     status = django_filters.CharFilter(field_name='status')
+    equip = django_filters.CharFilter(field_name='equip')
 
     class Meta:
         model = BatchingClassesPlan
-        fields = ('day_time', 'dev_type', 'weight_batch_no', 'classes_name')
+        fields = ('day_time', 'dev_type', 'weight_batch_no', 'classes_name', 'equip')

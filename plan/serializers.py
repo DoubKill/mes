@@ -1,6 +1,6 @@
 from django.db.transaction import atomic
 from rest_framework import serializers
-
+from django.utils import timezone
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -459,6 +459,7 @@ class BatchingClassesPlanSerializer(serializers.ModelSerializer):
         source='weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no', default='')
     send_user = serializers.ReadOnlyField(source='send_user.username', default='')
     weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.used_type')
+    equip_name = serializers.ReadOnlyField(source='equip.equip_name', default='')
 
     class Meta:
         model = BatchingClassesPlan
@@ -474,6 +475,23 @@ class BatchingClassesPlanSerializer(serializers.ModelSerializer):
                   'send_time',
                   'weigh_batching_used_type',
                   'weigh_cnt_type',
-                  'single_weight'
+                  'single_weight',
+                  'equip',
+                  'equip_name',
                   )
 
+
+class IssueBatchingClassesPlanSerializer(serializers.ModelSerializer):
+    equip = serializers.PrimaryKeyRelatedField(queryset=Equip.objects.filter(use_flag=True,
+                                                                             delete_flag=False,
+                                                                             category__equip_type__global_name='称量设备'))
+
+    class Meta:
+        model = BatchingClassesPlan
+        fields = ('equip', )
+
+    def update(self, instance, validated_data):
+        if instance.status == 1:
+            instance.status = 2
+            instance.send_time = timezone.now()
+        return super().update(instance, validated_data)
