@@ -38,6 +38,11 @@ class SpareLocationBindingViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if not instance.location:
+            instance.delete_flag = True
+            instance.last_updated_user = request.user
+            instance.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         si_obj = instance.location.si_spare_location.all().filter(qty__gt=0, delete_flag=False,
                                                                   spare=instance.spare).first()
         if si_obj:
