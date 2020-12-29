@@ -27,6 +27,14 @@ class MaterialLocationBindingSerializer(BaseModelSerializer):
             raise serializers.ValidationError('该库存位已被停用，不可选')
 
         if instance_obj:  # 修改
+            if instance_obj.location == None:
+                mlb = SpareLocationBinding.objects.exclude(
+                    id=instance_obj.id).filter(location=location, delete_flag=False).first()
+                if mlb:
+                    raise serializers.ValidationError('此库存位已经绑定了物料了')
+                SpareLocationBinding.objects.filter(id=instance_obj.id).update(location=location)
+                SpareInventory.objects.filter(spare=instance_obj.spare, location=None).update(location=location)
+                return attrs
             si_obj = instance_obj.location.si_spare_location.all().filter(qty__gt=0).first()
             if si_obj:
                 raise serializers.ValidationError('当前物料已存在当前库存位了,不允许修改')
