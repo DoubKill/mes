@@ -73,6 +73,8 @@ class SpareInventoryViewSet(ModelViewSet):
     def put_storage(self, request, pk=None):
         """入库"""
         si_obj = self.get_object()
+        if not si_obj.location:
+            raise ValidationError('该物料没有绑定库存位')
         qty = request.data.get('qty', 0)
 
         befor_qty = si_obj.qty
@@ -102,6 +104,8 @@ class SpareInventoryViewSet(ModelViewSet):
     def out_storage(self, request, pk=None):
         """出库"""
         si_obj = self.get_object()
+        if not si_obj.location:
+            raise ValidationError('该物料没有绑定库存位')
         qty = request.data.get('qty', 0)
         receive_user = request.data.get('receive_user', None)  # 领用人
         purpose = request.data.get('purpose', None)  # 用途
@@ -137,6 +141,8 @@ class SpareInventoryViewSet(ModelViewSet):
     def check_storage(self, request, pk=None):
         """盘点"""
         si_obj = self.get_object()
+        if not si_obj.location:
+            raise ValidationError('该物料没有绑定库存位')
         qty = request.data.get('qty', 0)
         reason = request.data.get('reason', None)  # 原因
         befor_qty = si_obj.qty
@@ -321,7 +327,7 @@ class SpareLocationViewSet(ModelViewSet):
             url_name='name_list')
     def name_list(self, request, pk=None):
         """展示Location所以的name"""
-        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name','no', 'used_flag')
+        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name', 'no', 'used_flag')
         # names = list(set(name_list))
         return Response(name_list)
 
