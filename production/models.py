@@ -1,6 +1,6 @@
 from django.db import models
 
-from basics.models import AbstractEntity
+from basics.models import AbstractEntity, GlobalCode
 
 
 class TrainsFeedbacks(AbstractEntity):
@@ -274,6 +274,7 @@ class ProcessFeedback(AbstractEntity):
         db_table = 'process_feedback'
         verbose_name_plural = verbose_name = '步序反馈报表'
 
+
 class AlarmLog(AbstractEntity):
     """报警日志"""
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
@@ -284,3 +285,46 @@ class AlarmLog(AbstractEntity):
         db_table = 'alarm_log'
         verbose_name_plural = verbose_name = '报警日志'
         indexes = [models.Index(fields=['equip_no']), models.Index(fields=['product_time'])]
+
+
+class LocationPoint(AbstractEntity):
+    no = models.CharField(max_length=64, help_text='位置点名称')
+    name = models.CharField(max_length=64, help_text='位置点名称')
+    desc = models.CharField(max_length=64, help_text='描述', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+    location_type = models.ForeignKey(GlobalCode, models.CASCADE, help_text='类型')
+    img_url = models.CharField(max_length=64, help_text='图片地址', blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'location_point'
+        verbose_name_plural = verbose_name = '位置点'
+
+
+class ProductionLine(models.Model):
+    no = models.CharField(max_length=64, help_text="编码", verbose_name='编码')
+    name = models.CharField(max_length=64, help_text="产线名称", verbose_name='产线名称')
+    desc = models.CharField(max_length=64, help_text='说明')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+    work_procedure = models.ForeignKey(GlobalCode, models.CASCADE, help_text='工序')
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        db_table = 'production_line'
+        verbose_name_plural = verbose_name = '产线'
+
+
+class ProductionLineLocation(models.Model):
+    location = models.ForeignKey(LocationPoint, help_text='位置点', on_delete=models.CASCADE)
+    production_line = models.ForeignKey(ProductionLine, help_text='产线', on_delete=models.CASCADE)
+
+    def __str__(self):
+        return '{}-{}'.format(self.location, self.production_line)
+
+    class Meta:
+        db_table = 'production_line_location'
+        verbose_name_plural = verbose_name = '产线位置点'
