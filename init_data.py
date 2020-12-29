@@ -299,7 +299,7 @@ permission_data = [
 
     {'id': 226, 'code': 'spare_outbound', 'name': '备品备件出库管理', 'parent_id': None},
     {'id': 227, 'code': 'view_spare_outbound', 'name': '查看', 'parent_id': 226},
-    {'id': 228, 'code': 'add_spare_outbound', 'name': '新增', 'parent_id': 226},
+    {'id': 228, 'code': 'cancel_spare_outbound', 'name': '撤销', 'parent_id': 226},
     {'id': 229, 'code': 'inbound_spare_outbound', 'name': '出库', 'parent_id': 226},
     {'id': 230, 'code': 'history_spare_outbound', 'name': '查看履历', 'parent_id': 226},
     {'id': 231, 'code': 'price_spare_outbound', 'name': '查看单价', 'parent_id': 226},
@@ -318,6 +318,7 @@ permission_data = [
     {'id': 241, 'code': 'view_outbound_history', 'name': '查看', 'parent_id': 240},
     {'id': 242, 'code': 'export_outbound_history', 'name': '导出', 'parent_id': 240},
     {'id': 243, 'code': 'price_outbound_history', 'name': '查看单价', 'parent_id': 240},
+    {'id': 270, 'code': 'cancel_outbound_history', 'name': '撤销', 'parent_id': 240},
 
     {'id': 244, 'code': 'stock_history', 'name': '备品备件盘点履历', 'parent_id': None},
     {'id': 245, 'code': 'view_stock_history', 'name': '查看', 'parent_id': 244},
