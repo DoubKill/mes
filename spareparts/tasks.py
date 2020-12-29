@@ -50,11 +50,12 @@ def spare_inventory_wrdb(filename, upload_root):
             if not gc_obj:
                 gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
                 gc_obj = GlobalCode.objects.create(global_type=gct_obj, global_no=row[5], global_name=row[5])
-
-            sl_obj = SpareLocation.objects.filter(name=row[4]).first()
-            if not sl_obj:
-                sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
-
+            if row[4]:
+                sl_obj = SpareLocation.objects.filter(name=row[4]).first()
+                if not sl_obj:
+                    sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
+            else:
+                sl_obj=None
             slb_obj = SpareLocationBinding.objects.filter(location=sl_obj, spare=s_obj).first()
             if not slb_obj:
                 slb_obj = SpareLocationBinding.objects.create(location=sl_obj, spare=s_obj)
@@ -105,7 +106,7 @@ def spare_inventory_template():
     #     first_col.width = 256 * 20
     # 写入表头
     w.write(0, 0,
-            u'库存位不知道填地面，库存位类型只有备品备件货架和备品备件地面两种，库存位类型不知道填备品备件地面，数量不知道填0，单价不知道填0，总价可以不填(总价=单价乘以数量)，上限不知道填9999，下限不知道填0,')
+            u'库存位不知道可以不填，库存位类型只有备品备件货架和备品备件地面两种，库存位类型不知道填备品备件地面，数量不知道填0，单价不知道填0，总价可以不填(总价=单价乘以数量)，上限不知道填9999，下限不知道填0,')
     w.write(1, 0, u'No')
     w.write(1, 1, u'物料类型')
     w.write(1, 2, u'物料编码')
