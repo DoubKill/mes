@@ -46,16 +46,19 @@ def spare_inventory_wrdb(filename, upload_root):
                 s_obj = Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[11], upper=row[10],
                                              lower=row[9],
                                              cost=row[7])
-            gc_obj = GlobalCode.objects.filter(global_name=row[5]).first()
-            if not gc_obj:
-                gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
-                gc_obj = GlobalCode.objects.create(global_type=gct_obj, global_no=row[5], global_name=row[5])
+            if row[5]:
+                gc_obj = GlobalCode.objects.filter(global_name=row[5]).first()
+                if not gc_obj:
+                    gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
+                    gc_obj = GlobalCode.objects.create(global_type=gct_obj, global_no=row[5], global_name=row[5])
+            else:
+                gc_obj = None
             if row[4]:
                 sl_obj = SpareLocation.objects.filter(name=row[4]).first()
                 if not sl_obj:
                     sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
             else:
-                sl_obj=None
+                sl_obj = None
             slb_obj = SpareLocationBinding.objects.filter(location=sl_obj, spare=s_obj).first()
             if not slb_obj:
                 slb_obj = SpareLocationBinding.objects.create(location=sl_obj, spare=s_obj)
