@@ -318,7 +318,6 @@ permission_data = [
     {'id': 241, 'code': 'view_outbound_history', 'name': '查看', 'parent_id': 240},
     {'id': 242, 'code': 'export_outbound_history', 'name': '导出', 'parent_id': 240},
     {'id': 243, 'code': 'price_outbound_history', 'name': '查看单价', 'parent_id': 240},
-    {'id': 270, 'code': 'cancel_outbound_history', 'name': '撤销', 'parent_id': 240},
 
     {'id': 244, 'code': 'stock_history', 'name': '备品备件盘点履历', 'parent_id': None},
     {'id': 245, 'code': 'view_stock_history', 'name': '查看', 'parent_id': 244},
