@@ -560,6 +560,12 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         for i in sorted(table_head_count.items(), key=lambda x: len(x[1]), reverse=False):
             table_head_top[i[0]] = i[-1]
         mtr_list_return['table_head'] = table_head_top
+        for value in mtr_list_return.values():  # 将每个数据点排序
+            if isinstance(value, list):
+                value.sort(key=lambda x: x['data_point_name'], reverse=False)
+            else:
+                for i in value.values():
+                    i.sort(reverse=False)
         return mtr_list_return
 
     def get_actual_trains(self, obj):
