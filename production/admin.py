@@ -5,4 +5,8 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, LocationPoint
 
 admin.site.register([TrainsFeedbacks])
 admin.site.register(PalletFeedbacks)
-admin.site.register(LocationPoint)
+
+
+@admin.register(LocationPoint)
+class BankAdmin(admin.ModelAdmin):
+    list_display = ['name', 'no', 'location_type', 'img_url', 'desc']

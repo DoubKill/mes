@@ -54,8 +54,6 @@ class BatchingClassesPlanSerializer(BaseModelSerializer):
     product_factory_date = serializers.CharField(source='work_schedule_plan.plan_schedule.day_time', read_only=True)
     plan_trains = serializers.IntegerField(source='plan_package', read_only=True)
     classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True)
-    dev_type = serializers.CharField(source='weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no',
-                                     read_only=True)
 
     class Meta:
         model = BatchingClassesPlan
