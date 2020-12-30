@@ -479,9 +479,14 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             test_user = None
         test_note = max_mtr.material_test_order.note  # 备注
         result = max_mtr.result  # 检测结果,改了
+        pfb_obj = self.pfb_obj
+        if pfb_obj:  # 托盘号
+            pallet_no = pfb_obj.pallet_no
+        else:
+            pallet_no = None
         return {'test_status': test_status, 'test_factory_date': test_factory_date, 'test_class': test_class,
                 'test_user': test_user,
-                'test_note': test_note, 'result': result}
+                'test_note': test_note, 'result': result, "pallet_no": pallet_no}
 
     def get_mtr_list(self, obj):
         mtr_list_return = {}
