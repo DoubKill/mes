@@ -401,7 +401,7 @@ class WeighBatchingSerializer(serializers.ModelSerializer):
             'created_date')
 
     def create(self, validated_data):
-        is_fm = validated_data['product_batching'].stage.global_name.lower() == 'fm'
+        is_fm = bool(validated_data['product_batching'].stage) and validated_data['product_batching'].stage.global_name.lower() == 'fm'
         weigh_batching = WeighBatching.objects.create(**validated_data)
         weigh_types = (1, 2, 3) if is_fm else (1, 2)
         weigh_type_objs = [WeighCntType(weigh_batching=weigh_batching, weigh_type=weigh_type)
