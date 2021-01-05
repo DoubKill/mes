@@ -127,18 +127,14 @@ class WeightTankStatus(AbstractEntity):
         (1, '低位'),
         (2, '高位')
     )
-    TANK_TYPE_CHOICE = (
-        (1, '炭黑罐'),
-        (2, '油料罐'),
-    )
-    tank_type = models.PositiveIntegerField(help_text='物料罐类型', choices=TANK_TYPE_CHOICE)
+    # tank_type = models.PositiveIntegerField(help_text='物料罐类型，1：炭黑罐  2：油料罐', choices=TANK_TYPE_CHOICE)
     tank_name = models.CharField(max_length=64, help_text='物料罐名称')
     tank_no = models.CharField(max_length=64, help_text='物料罐编号')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
     material_no = models.CharField(max_length=64, help_text='原材料编码')
     use_flag = models.BooleanField(help_text='使用与否', default=True)
-    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE)
-    open_flag = models.BooleanField(help_text='开启与否', default=True)
+    status = models.PositiveIntegerField(help_text='状态，1：低位  2：高位', choices=STATUS_CHOICE)
+    open_flag = models.BooleanField(help_text='开启与否', default=False)
     equip_no = models.CharField(max_length=64, help_text='机台编号')
 
     class Meta:

@@ -10,20 +10,15 @@ django.setup()
 
 from django.utils import timezone
 from datetime import timedelta, datetime
-from basics.models import PlanSchedule, WorkSchedulePlan
-from quality.models import MaterialTestOrder, \
-    MaterialTestResult, Lot, Train, \
-    Indicator, TestDataPoint, TestResult, Batch, BatchEquip, BatchMonth, BatchDay, BatchClass, BatchProductNo, BatchYear
-from django.db.models import Q, F
-from django.db.models import Count
-from django.db.models import FloatField
+from quality.models import MaterialTestOrder, Lot, Train, Indicator, TestDataPoint, TestResult, \
+    Batch, BatchEquip, BatchMonth, BatchDay, BatchClass, BatchProductNo, BatchYear
 
 # for model in BatchYear, BatchMonth, BatchDay, BatchEquip, BatchClass, \
 # BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
 #     model.objects.all().delete()
 
 # 中间表分发数据
-for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timezone.now() - timedelta(days=30)):
+for order in MaterialTestOrder.objects.filter(production_factory_date__gte=(timezone.now()-timedelta(days=30)).date()):
     production_factory_date = order.production_factory_date
     batch_year, _ = BatchYear.objects.get_or_create(date=datetime(year=production_factory_date.year,
                                                                   month=1,
