@@ -145,8 +145,6 @@ class BatchingClassesPlan(AbstractEntity):
     PLAN_STATUSES = (
         (1, '未下发'),
         (2, '已下发'),
-        (3, '执行中'),
-        (4, '已完成')
     )
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
