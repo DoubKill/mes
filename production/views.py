@@ -4,6 +4,7 @@ import re
 
 import math
 import requests
+from django.utils import timezone
 from django.db.models import Max, Sum, Count, Min
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -34,6 +35,9 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
+
+from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear
+from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -564,6 +568,7 @@ class AlarmLogBatch(APIView):
         serializer.save()
         return Response("sync success", status=201)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class PalletTrainFeedback(APIView):
     """获取托盘开始车次-结束车次的数据，过滤字段：equip_no=设备编码&factory_date=工厂日期&classes=班次&product_no=胶料编码"""
@@ -884,3 +889,40 @@ class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
             raise ValidationError('报警日志没有数据')
 
         return al_queryset
+
+
+class MaterialPassRealView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        data = None
+        query_unit = self.request.query_params.get('query_unit', 'day')
+        material_no = self.request.query_params.get('material_no')
+        batch_product_nos = BatchProductNo.objects.all()
+        if material_no:
+            batch_product_nos = BatchProductNo.objects.filter(
+                product_no=material_no)
+        if query_unit == 'day':
+            data = BatchProductNoDateZhPassSerializer(
+                batch_product_nos,
+                many=True,
+                context={'batch_date_model': BatchDay}).data
+        elif query_unit == 'month':
+            data = BatchProductNoDateZhPassSerializer(
+                batch_product_nos,
+                many=True,
+                context={'batch_date_model': BatchMonth}).data
+        elif query_unit == 'year':
+            data = BatchProductNoDateZhPassSerializer(
+                batch_product_nos,
+                many=True,
+                context={'batch_date_model': BatchYear}).data
+        elif query_unit == 'classes':
+            data = BatchProductNoClassZhPassSerializer(
+                batch_product_nos,
+                many=True).data
+        else:
+            raise ValidationError('查询维度不支持')
+        return Response({
+            'time': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'data': data
+        })
