@@ -29,9 +29,14 @@ def product_classes_plan_save_handler(sender, **kwargs):
                         weigh_cnt_type=cnt_type)
                     if created:
                         batching_classes_plan.plan_batching_uid = uuid.uuid1().hex
-                        batching_classes_plan.save()
+                    else:
+                        plan_package_from_product_classes_plan = batching_classes_plan\
+                            .plan_package_from_product_classes_plan()
+                        if plan_package_from_product_classes_plan != batching_classes_plan.plan_package:
+                            batching_classes_plan.plan_package = plan_package_from_product_classes_plan
+                            batching_classes_plan.package_changed = True
                     if not created and batching_classes_plan.delete_flag:
                         batching_classes_plan.delete_flag = False
-                        batching_classes_plan.save()
+                    batching_classes_plan.save()
         except ObjectDoesNotExist as e:
             pass

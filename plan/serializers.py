@@ -478,6 +478,7 @@ class BatchingClassesPlanSerializer(serializers.ModelSerializer):
                   'single_weight',
                   'equip',
                   'equip_name',
+                  'package_changed'
                   )
 
 
@@ -493,5 +494,6 @@ class IssueBatchingClassesPlanSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if instance.status == 1:
             instance.status = 2
-            instance.send_time = timezone.now()
+        instance.package_changed = False
+        instance.send_time = timezone.now()
         return super().update(instance, validated_data)
