@@ -23,5 +23,5 @@ class BankAdmin(admin.ModelAdmin):
 
 @admin.register(WeightTankStatus)
 class BankAdmin(admin.ModelAdmin):
-    list_display = ['tank_type', 'tank_name', 'tank_no', 'material_name',
+    list_display = ['tank_name', 'tank_no', 'material_name',
                     'material_no', 'status', 'open_flag', 'equip_no']
