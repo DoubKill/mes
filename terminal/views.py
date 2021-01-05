@@ -10,15 +10,15 @@ from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import EquipCategoryAttribute
-from mes import settings
+from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import TrainsFeedbacks
 from recipe.models import ProductBatchingDetail
-from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter
+from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, WeightTankStatusFilter
 from terminal.models import TerminalLocation, EquipOperationLog, BatchChargeLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version
 from terminal.serializers import BatchChargeLogSerializer, BatchChargeLogCreateSerializer, \
@@ -110,16 +110,23 @@ class BatchProductBatchingVIew(APIView):
 
     def get(self, request):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
-        if not plan_classes_uid:
-            raise ValidationError('参数缺失')
-        classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
-        if not classes_plan:
-            raise ValidationError('该计划不存在')
-        product_batching_detail_data = ProductBatchingDetail.objects.filter(
-            product_batching=classes_plan.product_batching,
-            delete_flag=False
-        ).values('material__material_no',  'material__material_name',  'actual_weight')
-        return Response(product_batching_detail_data)
+        plan_batching_uid = self.request.query_params.get('plan_batching_uid')
+        if plan_classes_uid:
+            classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+            if not classes_plan:
+                raise ValidationError('该计划不存在')
+            ret = ProductBatchingDetail.objects.filter(
+                product_batching=classes_plan.product_batching,
+                delete_flag=False
+            ).values('material__material_no',  'material__material_name',  'actual_weight')
+        else:
+            batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
+            if not batching_class_plan:
+                raise ValidationError('配料计划uid不存在')
+            ret = batching_class_plan.weigh_cnt_type.weighbatchingdetail_set.values('material__material_no',
+                                                                                    'material__material_name',
+                                                                                    'standard_weight')
+        return Response(ret)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -200,7 +207,7 @@ class FeedingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericV
 
 
 @method_decorator([api_recorder], name="dispatch")
-class WeightTankStatusView(ListAPIView):
+class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
     """
     物料罐列表
     """
@@ -209,21 +216,20 @@ class WeightTankStatusView(ListAPIView):
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     serializer_class = WeightTankStatusSerializer
+    filter_class = WeightTankStatusFilter
 
     def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
         plan_batching_uid = self.request.query_params.get('plan_batching_uid')
         if plan_batching_uid:
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if batching_class_plan:
-                material_nos = batching_class_plan.weigh_cnt_type.weigh_batching\
+                material_nos = batching_class_plan.weigh_cnt_type.weigh_batching \
                     .product_batching.batching_details.filter(delete_flag=False
                                                               ).values_list('material__material_no', flat=True)
+                queryset = queryset.filter(material_no__in=material_nos)
             else:
-                raise ValidationError('参数错误')
-        else:
-            raise ValidationError('参数缺失')
-        queryset = WeightTankStatus.objects.filter(material_no__in=material_nos)
-        # queryset = WeightTankStatus.objects.all()
+                raise ValidationError('配料计划uid不存在')
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
