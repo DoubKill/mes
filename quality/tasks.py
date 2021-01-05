@@ -18,9 +18,9 @@ from django.db.models import Q, F
 from django.db.models import Count
 from django.db.models import FloatField
 
-for model in BatchYear, BatchMonth, BatchDay, BatchEquip, BatchClass, \
-BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
-    model.objects.all().delete()
+# for model in BatchYear, BatchMonth, BatchDay, BatchEquip, BatchClass, \
+# BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
+#     model.objects.all().delete()
 
 # 中间表分发数据
 for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timezone.now() - timedelta(days=30)):
