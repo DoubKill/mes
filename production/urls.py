@@ -67,5 +67,7 @@ urlpatterns = [
     path('pallet-trains-feedbacks/', PalletTrainFeedback.as_view()),  # 托盘开始到结束车次列表
     path('production-plan-reality-analysis/', ProductionPlanRealityAnalysisView.as_view()),  # 产量计划实际分析
     path('update-cause/', UpdateUnReachedCapacityCauseView.as_view()),  # 创建未达产能原因
-    path('interval-output-statistics/', IntervalOutputStatisticsView.as_view())  # 区间产量统计
+    path('interval-output-statistics/', IntervalOutputStatisticsView.as_view()),  # 区间产量统计
+    path('material-output-real/', MaterialOutputView.as_view()),  # 规格产量统计
+    path('equip-product-real/', EquipProductRealView.as_view())   # 实时机台生产信息
 ]
