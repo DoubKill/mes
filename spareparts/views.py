@@ -290,6 +290,15 @@ class SpareTypeViewSet(ModelViewSet):
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def create(self, request, *args, **kwargs):
+        st_no = SpareType.objects.filter(no=request.data['no']).first()
+        st_name = SpareType.objects.filter(name=request.data['name']).first()
+        if st_name:
+            raise ValidationError("此类型名称已存在")
+        if st_no:
+            raise ValidationError("此类型编码已存在")
+
+        return super().create(request, *args, **kwargs)
 
 @method_decorator([api_recorder], name="dispatch")
 class SpareViewSet(ModelViewSet):
@@ -356,6 +365,11 @@ class SpareLocationViewSet(ModelViewSet):
             return super().get_queryset()
         l_set = SpareLocation.objects.filter(type__global_name__in=type_name).all()
         return l_set
+
+    def create(self, request, *args, **kwargs):
+        if SpareLocation.objects.filter(name=request.data['name']).exists():
+            raise ValidationError('此库存位已存在')
+        return super().create(request, *args, **kwargs)
 
 
 class SpareInventoryImportExportAPIView(APIView):
