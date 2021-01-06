@@ -13,6 +13,11 @@ router = DefaultRouter()
 router.register(r'product-day-plans', ProductDayPlanViewSet)
 # 计划管理新增页面展示
 router.register(r'product-classes-plan-list', ProductClassesPlanList)
+
+# 配料日班次计划
+router.register(r'batching-classes-plan', BatchingClassesPlanView)
+
+
 urlpatterns = [
     path('', include(router.urls)),
     path('plan-receive/', PlanReceive.as_view()),  # 上辅机群控中计划同步回mes
@@ -28,6 +33,5 @@ urlpatterns = [
     path('product-day-plan-receive/', ProductDayPlanReceive.as_view()),  # 胶料日计划同步
     path('product-classes-plan-receive/', ProductClassesPlanReceive.as_view()),  # 胶料日班次计划同步
     path('material-receive/', MaterialReceive.as_view()),  # 原材料同步
-    path('batching-classes-plan/', BatchingClassesPlanView.as_view()),  # 配料日班次计划
     path('issue-batching-classes-plan/<int:pk>/', IssueBatchingClassesPlanView.as_view())
 ]

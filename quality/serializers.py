@@ -20,7 +20,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, \
-    UnqualifiedDealOrderDetail
+    UnqualifiedDealOrderDetail, BatchYear
 from recipe.models import MaterialAttribute
 
 
@@ -972,3 +972,97 @@ class BatchProductNoMonthSerializer(BatchProductNoDateCommonSerializer):
         start_time, end_time = self.context['start_time'], self.context['end_time']
         batches = batches.filter(date__gte=start_time, date__lte=end_time)
         return batches
+
+
+class BatchDayZhPassSerializer(serializers.ModelSerializer):
+    mbyl_pass = serializers.SerializerMethodField()
+
+    def get_mbyl_pass(self, obj):
+        return to_bfb(obj.zh_test_pass_count / obj.zh_train_count) if obj.zh_train_count else None
+
+    class Meta:
+        model = BatchDay
+        fields = ['date', 'mbyl_pass']
+
+
+class BatchMonthZhPassSerializer(serializers.ModelSerializer):
+    mbyl_pass = serializers.SerializerMethodField()
+
+    def get_mbyl_pass(self, obj):
+        return to_bfb(obj.zh_test_pass_count / obj.zh_train_count) if obj.zh_train_count else None
+
+    class Meta:
+        model = BatchMonth
+        fields = ['date', 'mbyl_pass']
+
+
+class BatchYearZhPassSerializer(serializers.ModelSerializer):
+    mbyl_pass = serializers.SerializerMethodField()
+
+    def get_mbyl_pass(self, obj):
+        return to_bfb(obj.zh_test_pass_count / obj.zh_train_count) if obj.zh_train_count else None
+
+    class Meta:
+        model = BatchYear
+        fields = ['date', 'mbyl_pass']
+
+
+class BatchProductNoDateZhPassSerializer(serializers.ModelSerializer):
+    dates = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BatchProductNo
+        fields = ['product_no', 'dates']
+
+    def get_dates(self, obj):
+        batch_date_model = self.context['batch_date_model']
+        batch_dates = batch_date_model.objects.filter(batch__batch_product_no=obj)
+        zh_train_count = Count('batch__lot__train__testresult', distinct=True,
+                               filter=Q(batch__batch_product_no=obj),
+                               output_field=FloatField())
+        zh_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
+                                   filter=Q(batch__batch_product_no=obj,
+                                            batch__lot__train__testresult__qualified=True),
+                                   output_field=FloatField())
+        batch_dates = batch_dates.annotate(zh_train_count=zh_train_count,
+                                           zh_test_pass_count=zh_test_pass_count)
+        batch_dates.order_by('date')
+        if batch_date_model == BatchDay:
+            return BatchDayZhPassSerializer(instance=batch_dates, many=True).data
+        elif batch_date_model == BatchMonth:
+            return BatchMonthZhPassSerializer(instance=batch_dates, many=True).data
+        elif batch_date_model == BatchYear:
+            return BatchYearZhPassSerializer(instance=batch_dates, many=True).data
+
+
+class BatchClassZhPassSerializer(serializers.ModelSerializer):
+    mbyl_pass = serializers.SerializerMethodField()
+
+    def get_mbyl_pass(self, obj):
+        return to_bfb(obj.zh_test_pass_count / obj.zh_train_count) if obj.zh_train_count else None
+
+    class Meta:
+        model = BatchClass
+        fields = ['production_class', 'mbyl_pass']
+
+
+class BatchProductNoClassZhPassSerializer(serializers.ModelSerializer):
+    classes = serializers.SerializerMethodField()
+
+    def get_classes(self, obj):
+        batch_classes = BatchClass.objects.filter(batch__batch_product_no=obj)
+        zh_train_count = Count('batch__lot__train__testresult', distinct=True,
+                               filter=Q(batch__batch_product_no=obj),
+                               output_field=FloatField())
+        zh_test_pass_count = Count('batch__lot__train__testresult', distinct=True,
+                                   filter=Q(batch__batch_product_no=obj,
+                                            batch__lot__train__testresult__qualified=True),
+                                   output_field=FloatField())
+        batch_classes = batch_classes.annotate(zh_train_count=zh_train_count,
+                                               zh_test_pass_count=zh_test_pass_count)
+
+        return BatchClassZhPassSerializer(batch_classes, many=True).data
+
+    class Meta:
+        model = BatchProductNo
+        fields = ['product_no', 'classes']

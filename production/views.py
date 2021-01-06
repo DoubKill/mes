@@ -4,6 +4,7 @@ import re
 
 import math
 import requests
+from django.utils import timezone
 from django.db.models import Max, Sum, Count, Min
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -12,7 +13,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
@@ -34,6 +35,9 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
+
+from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear
+from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -564,6 +568,7 @@ class AlarmLogBatch(APIView):
         serializer.save()
         return Response("sync success", status=201)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class PalletTrainFeedback(APIView):
     """获取托盘开始车次-结束车次的数据，过滤字段：equip_no=设备编码&factory_date=工厂日期&classes=班次&product_no=胶料编码"""
@@ -887,6 +892,7 @@ class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
 
 
 class MaterialOutputView(APIView):
+    permission_classes = IsAuthenticated
 
     def get(self, request, *args, **kwargs):
         param = request.query_params
@@ -909,24 +915,26 @@ class MaterialOutputView(APIView):
             num = 12
             unit = '吨/月'
         if query_unit == 'classes':
-            temp_set = TrainsFeedbacks.objects.values('classes').annotate().values_list('classes' ,flat=True).distinct()
-            num = len(set([x if x in ['早班', '中班', '夜班'] else '夜班' for x in temp_set ]))
+            temp_set = TrainsFeedbacks.objects.values('classes').annotate().values_list('classes', flat=True).distinct()
+            num = len(set([x if x in ['早班', '中班', '夜班'] else '夜班' for x in temp_set]))
             unit = '吨/班'
         if query_unit == 'hour':
-            num = 365*24
+            num = 365 * 24
             unit = '吨/小时'
-        product_set = TrainsFeedbacks.objects.values(*groups).filter(**filters).annotate(all_weight=Sum('actual_weight'))
-        data = [{"material_no": x.get("product_no"), 'output': round(x.get("all_weight", 0) / num, 2)} for x in product_set]
+        product_set = TrainsFeedbacks.objects.values(*groups).filter(**filters).annotate(
+            all_weight=Sum('actual_weight'))
+        data = [{"material_no": x.get("product_no"), 'output': round(x.get("all_weight", 0) / num, 2)} for x in
+                product_set]
         ret = {
             "time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             "unit": unit,
             "data": data
-            }
+        }
         return Response(ret)
 
 
-
 class EquipProductRealView(APIView):
+    permission_classes = IsAuthenticated
 
     def _instance_prepare(self, ret, equip_no):
         _ = EquipStatus.objects.filter(equip_no=equip_no).order_by('product_time').last()
@@ -991,3 +999,41 @@ class EquipProductRealView(APIView):
                 "product_time": _.product_time.strftime('%Y-%m-%d %H:%M:%S'),
             }
             ret["data"].append(new)
+
+
+class MaterialPassRealView(APIView):
+    permission_classes = IsAuthenticated
+
+    def get(self, request, *args, **kwargs):
+        data = None
+        query_unit = self.request.query_params.get('query_unit', 'day')
+        material_no = self.request.query_params.get('material_no')
+        batch_product_nos = BatchProductNo.objects.all()
+        if material_no:
+            batch_product_nos = BatchProductNo.objects.filter(
+                product_no=material_no)
+        if query_unit == 'day':
+            data = BatchProductNoDateZhPassSerializer(
+                batch_product_nos,
+                many=True,
+                context={'batch_date_model': BatchDay}).data
+        elif query_unit == 'month':
+            data = BatchProductNoDateZhPassSerializer(
+                batch_product_nos,
+                many=True,
+                context={'batch_date_model': BatchMonth}).data
+        elif query_unit == 'year':
+            data = BatchProductNoDateZhPassSerializer(
+                batch_product_nos,
+                many=True,
+                context={'batch_date_model': BatchYear}).data
+        elif query_unit == 'classes':
+            data = BatchProductNoClassZhPassSerializer(
+                batch_product_nos,
+                many=True).data
+        else:
+            raise ValidationError('查询维度不支持')
+        return Response({
+            'time': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'data': data
+        })

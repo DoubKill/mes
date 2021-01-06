@@ -432,12 +432,15 @@ class MaterialReceive(CreateAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class BatchingClassesPlanView(ListAPIView):
+class BatchingClassesPlanView(ModelViewSet):
     """配料日班次计划"""
     queryset = BatchingClassesPlan.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = BatchingClassesPlanSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = BatchingClassesPlanFilter
+
+    def perform_update(self, serializer):
+        serializer.save(package_changed=True)
 
 
 @method_decorator([api_recorder], name="dispatch")

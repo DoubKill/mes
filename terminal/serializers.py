@@ -1,5 +1,6 @@
-from django.db.models import Q
+from django.db.models import Q, Sum
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -54,6 +55,13 @@ class BatchingClassesPlanSerializer(BaseModelSerializer):
     product_factory_date = serializers.CharField(source='work_schedule_plan.plan_schedule.day_time', read_only=True)
     plan_trains = serializers.IntegerField(source='plan_package', read_only=True)
     classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True)
+    finished_trains = serializers.SerializerMethodField(read_only=True)
+
+    @staticmethod
+    def get_finished_trains(obj):
+        finished_trains = WeightPackageLog.objects.filter(plan_batching_uid=obj.plan_batching_uid
+                                                          ).aggregate(trains=Sum('quantity'))['trains']
+        return finished_trains if finished_trains else 0
 
     class Meta:
         model = BatchingClassesPlan
@@ -103,6 +111,9 @@ class FeedingLogSerializer(BaseModelSerializer):
 
 
 class WeightTankStatusSerializer(BaseModelSerializer):
+    tank_no = serializers.CharField(max_length=64, help_text='料罐编码',
+                                    validators=[UniqueValidator(queryset=WeightTankStatus.objects.all(),
+                                                                message='该料罐编号已存在！')])
 
     class Meta:
         model = WeightTankStatus

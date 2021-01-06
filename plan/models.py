@@ -145,8 +145,6 @@ class BatchingClassesPlan(AbstractEntity):
     PLAN_STATUSES = (
         (1, '未下发'),
         (2, '已下发'),
-        (3, '执行中'),
-        (4, '已完成')
     )
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
@@ -154,6 +152,8 @@ class BatchingClassesPlan(AbstractEntity):
     send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     send_time = models.DateTimeField(null=True, blank=True)
     equip = models.ForeignKey(Equip, blank=True, null=True, on_delete=models.SET_NULL)
+    plan_package = models.PositiveIntegerField(default=0)
+    package_changed = models.BooleanField(default=False)
     plan_batching_uid = models.CharField('计划唯一编码', max_length=64, unique=True)
 
     class Meta:
@@ -161,8 +161,7 @@ class BatchingClassesPlan(AbstractEntity):
         db_table = 'batching_classes_plan'
         verbose_name_plural = verbose_name = '配料日班次计划'
 
-    @property
-    def plan_package(self):  # 计划包数
+    def plan_package_from_product_classes_plan(self):  # 计划包数
         plan_sum_trains = ProductClassesPlan.objects.filter(
             delete_flag=False,
             work_schedule_plan=self.work_schedule_plan,

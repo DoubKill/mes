@@ -161,7 +161,7 @@ def main():
                             production_class=production_class,
                             production_group=group,
                             production_equip_no=equip_no,
-                            production_factory_date=pallet.end_time
+                            production_factory_date=product_date
                         )
                     # TODO   由MES判断检测结果
                     # material_test_method = MaterialTestMethod.objects.filter(

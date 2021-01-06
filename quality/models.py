@@ -97,7 +97,12 @@ class MaterialDataPointIndicator(AbstractEntity):
         verbose_name_plural = verbose_name = '数据点评判指标'
 
 
-# 统计用中间表 BatchMonth BatchDay Batch Lot Train Indicator TestDataPoint TestResult
+# 统计用中间表 BatchYear BatchMonth BatchDay Batch Lot Train Indicator TestDataPoint TestResult
+
+class BatchYear(models.Model):
+    """统计用中间表 add by fq   年批次"""
+    date = models.DateField()  # 只有年月 月为当年第一月
+
 
 class BatchMonth(models.Model):
     """统计用中间表 add by fq   月批次"""
@@ -123,7 +128,8 @@ class BatchProductNo(models.Model):
 
 class Batch(models.Model):
     """统计用中间表 add by fq   一批次"""
-    production_factory_date = models.DateTimeField(help_text='生产时间')
+    production_factory_date = models.DateField(help_text='工厂日期')
+    batch_year = models.ForeignKey(BatchYear, on_delete=models.SET_NULL, null=True, blank=True)
     batch_month = models.ForeignKey(BatchMonth, on_delete=models.SET_NULL, null=True, blank=True)
     batch_day = models.ForeignKey(BatchDay, on_delete=models.SET_NULL, null=True, blank=True)
     batch_equip = models.ForeignKey(BatchEquip, on_delete=models.SET_NULL, null=True, blank=True)
@@ -178,7 +184,7 @@ class MaterialTestOrder(AbstractEntity):
     production_class = models.CharField(max_length=64, help_text='生产班次名')
     production_group = models.CharField(max_length=64, help_text='生产班组名')
     production_equip_no = models.CharField(max_length=64, help_text='机台')
-    production_factory_date = models.DateTimeField(help_text='生产时间')
+    production_factory_date = models.DateField(help_text='工厂日期')
     note = models.TextField(max_length=100, help_text='备注', blank=True, null=True)
 
     class Meta:

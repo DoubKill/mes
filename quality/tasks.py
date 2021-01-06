@@ -3,7 +3,6 @@ import sys
 
 import django
 
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
@@ -11,25 +10,22 @@ django.setup()
 
 from django.utils import timezone
 from datetime import timedelta, datetime
-from basics.models import PlanSchedule, WorkSchedulePlan
-from quality.models import MaterialTestOrder, \
-    MaterialTestResult, Lot, Train, \
-    Indicator, TestDataPoint, TestResult, Batch, BatchEquip, BatchMonth, BatchDay, BatchClass, BatchProductNo
-from django.db.models import Q, F
-from django.db.models import Count
-from django.db.models import FloatField
+from quality.models import MaterialTestOrder, Lot, Train, Indicator, TestDataPoint, TestResult, \
+    Batch, BatchEquip, BatchMonth, BatchDay, BatchClass, BatchProductNo, BatchYear
 
-# for model in BatchMonth, BatchDay, BatchEquip, BatchClass, \
+# for model in BatchYear, BatchMonth, BatchDay, BatchEquip, BatchClass, \
 # BatchProductNo, Batch, Lot, Train, Indicator, TestDataPoint, TestResult:
 #     model.objects.all().delete()
 
 # 中间表分发数据
-for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timezone.now()-timedelta(days=30)):
+for order in MaterialTestOrder.objects.filter(production_factory_date__gte=(timezone.now()-timedelta(days=30)).date()):
     production_factory_date = order.production_factory_date
-    batch_month, _ = BatchMonth.objects.get_or_create(date=
-                                                      datetime(year=production_factory_date.year,
-                                                               month=production_factory_date.month,
-                                                               day=1))
+    batch_year, _ = BatchYear.objects.get_or_create(date=datetime(year=production_factory_date.year,
+                                                                  month=1,
+                                                                  day=1))
+    batch_month, _ = BatchMonth.objects.get_or_create(date=datetime(year=production_factory_date.year,
+                                                                    month=production_factory_date.month,
+                                                                    day=1))
     batch_day, _ = BatchDay.objects.get_or_create(date=
                                                   datetime(year=production_factory_date.year,
                                                            month=production_factory_date.month,
@@ -44,6 +40,7 @@ for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timez
                                                                order.product_no)
 
     batch, _ = Batch.objects.get_or_create(production_factory_date=order.production_factory_date,
+                                           batch_year=batch_year,
                                            batch_month=batch_month,
                                            batch_day=batch_day,
                                            batch_equip=batch_equip,
@@ -77,4 +74,3 @@ for order in MaterialTestOrder.objects.filter(production_factory_date__gte=timez
             result.value = test_result.value
             result.save()
 # level 为一是合格
-
