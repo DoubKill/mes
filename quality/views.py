@@ -499,7 +499,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
-        instance = self.get_queryset().filter(label_type=2, status=0).first()
+        instance = self.get_queryset().filter(label_type=2, status=0).order_by('id').first()
         if instance:
             serializer = self.get_serializer(instance)
             data = serializer.data
