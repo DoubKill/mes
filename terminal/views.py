@@ -140,7 +140,7 @@ class BatchChargeLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, Gene
     queryset = BatchChargeLog.objects.all()
     pagination_class = None
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('equip_no', 'production_classes', 'production_factory_date')
+    filter_fields = ('equip_no', 'production_classes', 'production_factory_date', 'plan_classes_uid')
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
