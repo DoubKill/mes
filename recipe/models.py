@@ -230,14 +230,17 @@ class WeighBatching(AbstractEntity):
     def material_sum_weight(self, weigh_type):
         return self.weighcnttype_set \
             .filter(weigh_type=weigh_type) \
-            .aggregate(sum_weight=Sum('weighbatchingdetail__standard_weight'))['sum_weight']
+            .aggregate(sum_weight=Sum('weighbatchingdetail__standard_weight'))['sum_weight'] or 0
 
+    @property
     def a_weight(self):
         return self.material_sum_weight(1)
 
+    @property
     def b_weight(self):
         return self.material_sum_weight(2)
 
+    @property
     def sulfur_weight(self):
         return self.material_sum_weight(3)
 
