@@ -112,13 +112,41 @@ class BatchProductBatchingVIew(APIView):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         plan_batching_uid = self.request.query_params.get('plan_batching_uid')
         if plan_classes_uid:
+            ret = []
+            material_ids = []
             classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
             if not classes_plan:
                 raise ValidationError('该计划不存在')
-            ret = ProductBatchingDetail.objects.filter(
-                product_batching=classes_plan.product_batching,
-                delete_flag=False
-            ).values('material__material_no',  'material__material_name',  'actual_weight')
+            if hasattr(classes_plan.product_batching, 'weighbatching'):
+                weight_batching = classes_plan.product_batching.weighbatching
+                weight_cnt_types = weight_batching.weighcnttype_set.all()
+                for item in weight_cnt_types:
+                    if item.weighbatchingdetail_set.filter():
+                        cnt_type_mat_ids = item.weighbatchingdetail_set.values_list('material_id', flat=True)
+                        material_ids.extend(cnt_type_mat_ids)
+                        if item.weigh_type == 1:
+                            ret.append({
+                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-a',
+                                'actual_weight': weight_batching.a_weight
+                            })
+                        elif item.weigh_type == 2:
+                            ret.append({
+                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-b',
+                                'actual_weight': weight_batching.b_weight
+                            })
+                        else:
+                            ret.append({
+                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-s',
+                                'actual_weight': weight_batching.sulfur_weight
+                            })
+                ret.extend(ProductBatchingDetail.objects.exclude(material_id__in=material_ids).filter(
+                    product_batching=classes_plan.product_batching, delete_flag=False
+                    ).values('material__material_name', 'actual_weight'))
+            else:
+                ret = ProductBatchingDetail.objects.filter(
+                    product_batching=classes_plan.product_batching,
+                    delete_flag=False
+                ).values('material__material_name',  'actual_weight')
         else:
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if not batching_class_plan:
