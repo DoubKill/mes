@@ -148,10 +148,6 @@ class BatchProductBatchingVIew(APIView):
                     product_batching=classes_plan.product_batching,
                     delete_flag=False
                 ).values('material__material_name',  'actual_weight')
-            ret = ProductBatchingDetail.objects.filter(
-                product_batching=classes_plan.product_batching,
-                delete_flag=False
-            ).values('material__material_no', 'material__material_name', 'actual_weight')
         else:
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if not batching_class_plan:
