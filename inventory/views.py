@@ -716,24 +716,39 @@ class MaterialInventoryAPIView(APIView):
 
             elif model == WmsInventoryStock:
 
-                    queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
-                                                                                       'material_no',
-                                                                                       'lot_no', 'location',
-                                                                                       'qty',
-                                                                                       'unit',
-                                                                                       'quality_status',)
+                queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
+                    'material_no',
+                    'lot_no', 'location',
+                    'qty',
+                    'unit',
+                    'quality_status', )
 
-                    for bz_dict in queryset:
-                        try:
-                            mt = bz_dict['material_no'].split("-")[1]
-                        except:
-                            mt = bz_dict['material_no']
-                        container_no = None
-                        unit_weight = None
-                        bz_dict['material_type'] = mt#表里是有的 但是加上这个字段就会报错
-                        bz_dict['container_no'] = container_no
-                        bz_dict['unit_weight'] = unit_weight
+                for bz_dict in queryset:
+                    try:
+                        mt = bz_dict['material_no'].split("-")[1]
+                    except:
+                        mt = bz_dict['material_no']
+                    container_no = None
+                    unit_weight = None
+                    bz_dict['material_type'] = mt  # 表里是有的 但是加上这个字段就会报错
+                    bz_dict['container_no'] = container_no
+                    bz_dict['unit_weight'] = unit_weight
             if queryset:
                 query_list.extend(queryset)
 
-        return Response({'results': query_list})
+        # 分页
+        page = self.request.query_params.get("page", 1)
+        page_size = self.request.query_params.get("page_size", 10)
+        try:
+            st = (int(page) - 1) * int(page_size)
+            et = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+        else:
+            if st not in range(0, 99999):
+                raise ValidationError("page/page_size值异常")
+            if et not in range(0, 99999):
+                raise ValidationError("page/page_size值异常")
+        count = len(query_list)
+        result = query_list[st:et]
+        return Response({'results': result, "count": count})
