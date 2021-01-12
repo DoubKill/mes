@@ -26,7 +26,7 @@ from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
-    QualityControl, ProcessFeedback, AlarmLog
+    QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -1037,3 +1037,10 @@ class MaterialPassRealView(APIView):
             'time': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
             'data': data
         })
+
+
+class MaterialTankStatusList(APIView):
+    def get(self, request):
+        """机台编号和罐编号"""
+        mts_set = MaterialTankStatus.objects.values('equip_no', 'tank_no').distinct()
+        return Response({"results": mts_set})

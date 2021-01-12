@@ -10,7 +10,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView, InventoryLogOutViewSet
+    DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView
 
 router = DefaultRouter()
 
@@ -66,5 +66,6 @@ urlpatterns = [
     path('material_count/', MaterialCount.as_view()),
     path('outwork_feedback/', OutWorkFeedBack.as_view()),
     path('dispatch-log/', DispatchLogView.as_view()),  # 发货历史记录
+    path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('', include(router.urls)),
 ]
