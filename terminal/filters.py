@@ -9,10 +9,11 @@ class BatchingClassesPlanFilter(django_filters.rest_framework.FilterSet):
                                                      help_text="日期")
     classes = django_filters.CharFilter(field_name="work_schedule_plan__classes__global_name", help_text="班次")
     weigh_type = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_type', help_text='类型， 1：a, 2:b, 3:硫磺')
+    equip_no = django_filters.CharFilter(field_name="equip__equip_no", help_text="机台编号")
 
     class Meta:
         model = BatchingClassesPlan
-        fields = ("product_factory_date", "classes", 'weigh_type')
+        fields = ("product_factory_date", "classes", 'weigh_type', 'equip_no')
 
 
 class FeedingLogFilter(django_filters.rest_framework.FilterSet):
