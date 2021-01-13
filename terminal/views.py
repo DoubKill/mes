@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import EquipCategoryAttribute
+from basics.models import EquipCategoryAttribute, WorkSchedulePlan
 from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
@@ -68,15 +68,18 @@ class BatchProductionInfoView(APIView):
         if not terminal_location:
             raise ValidationError('该终端位置点不存在')
         equip_no = terminal_location.equip.equip_no
-        classes_plans = ProductClassesPlan.objects.filter(
-            Q(work_schedule_plan__start_time__date=datetime.datetime.now().date()) |
-            Q(work_schedule_plan__end_time__date=datetime.datetime.now().date()),
-            equip__equip_no=equip_no,
-            work_schedule_plan__classes__global_name=classes,
-            delete_flag=False
-        )
+        now = datetime.datetime.now()
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            classes__global_name=classes,
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼')
         plan_actual_data = []  # 计划对比实际数据
         current_product_data = {}  # 当前生产数据
+        classes_plans = ProductClassesPlan.objects.filter(
+            work_schedule_plan__in=work_schedule_plan,
+            equip__equip_no=equip_no,
+            delete_flag=False)
         for plan in classes_plans:
             actual_trains = TrainsFeedbacks.objects.filter(
                 plan_classes_uid=plan.plan_classes_uid
