@@ -214,7 +214,10 @@ class OutWorkFeedBack(APIView):
                 else:
                     all_qty = int(data.get("qty"))
                 dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
-                need_qty = dp_obj.need_qty if dp_obj else 2
+                if dp_obj:
+                    need_qty = dp_obj.need_qty
+                else:
+                    return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
@@ -255,7 +258,7 @@ class OutWorkFeedBack(APIView):
                 MaterialInventory.objects.create(**material_inventory_dict)
             except Exception as e:
                 logger.error(e)
-                result = {"99": "FALSE", f"message": "反馈失败，原因: {e}"}
+                result = {"99": "FALSE", f"message": f"反馈失败，原因: {e}"}
             else:
                 result = {"01": "TRUES", "message": "反馈成功，OK"}
 
