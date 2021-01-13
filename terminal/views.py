@@ -1,4 +1,3 @@
-
 import datetime
 
 from django.db.models import Max, Q
@@ -12,19 +11,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import EquipCategoryAttribute
+from basics.models import EquipCategoryAttribute, WorkSchedulePlan
 from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import TrainsFeedbacks
 from recipe.models import ProductBatchingDetail
-from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, WeightTankStatusFilter
+from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, \
+    WeightTankStatusFilter, BatchChargeLogListFilter, WeightBatchingLogListFilter
 from terminal.models import TerminalLocation, EquipOperationLog, BatchChargeLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version
 from terminal.serializers import BatchChargeLogSerializer, BatchChargeLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
-    WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer
+    WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
+    BatchChargeLogListSerializer, WeightBatchingLogListSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -67,15 +68,18 @@ class BatchProductionInfoView(APIView):
         if not terminal_location:
             raise ValidationError('该终端位置点不存在')
         equip_no = terminal_location.equip.equip_no
-        classes_plans = ProductClassesPlan.objects.filter(
-            Q(work_schedule_plan__start_time__date=datetime.datetime.now().date()) |
-            Q(work_schedule_plan__end_time__date=datetime.datetime.now().date()),
-            equip__equip_no=equip_no,
-            work_schedule_plan__classes__global_name=classes,
-            delete_flag=False
-        )
+        now = datetime.datetime.now()
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            classes__global_name=classes,
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼')
         plan_actual_data = []  # 计划对比实际数据
         current_product_data = {}  # 当前生产数据
+        classes_plans = ProductClassesPlan.objects.filter(
+            work_schedule_plan__in=work_schedule_plan,
+            equip__equip_no=equip_no,
+            delete_flag=False)
         for plan in classes_plans:
             actual_trains = TrainsFeedbacks.objects.filter(
                 plan_classes_uid=plan.plan_classes_uid
@@ -112,13 +116,41 @@ class BatchProductBatchingVIew(APIView):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         plan_batching_uid = self.request.query_params.get('plan_batching_uid')
         if plan_classes_uid:
+            ret = []
+            material_ids = []
             classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
             if not classes_plan:
                 raise ValidationError('该计划不存在')
-            ret = ProductBatchingDetail.objects.filter(
-                product_batching=classes_plan.product_batching,
-                delete_flag=False
-            ).values('material__material_no',  'material__material_name',  'actual_weight')
+            if hasattr(classes_plan.product_batching, 'weighbatching'):
+                weight_batching = classes_plan.product_batching.weighbatching
+                weight_cnt_types = weight_batching.weighcnttype_set.all()
+                for item in weight_cnt_types:
+                    if item.weighbatchingdetail_set.filter():
+                        cnt_type_mat_ids = item.weighbatchingdetail_set.values_list('material_id', flat=True)
+                        material_ids.extend(cnt_type_mat_ids)
+                        if item.weigh_type == 1:
+                            ret.append({
+                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-a',
+                                'actual_weight': weight_batching.a_weight
+                            })
+                        elif item.weigh_type == 2:
+                            ret.append({
+                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-b',
+                                'actual_weight': weight_batching.b_weight
+                            })
+                        else:
+                            ret.append({
+                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-s',
+                                'actual_weight': weight_batching.sulfur_weight
+                            })
+                ret.extend(ProductBatchingDetail.objects.exclude(material_id__in=material_ids).filter(
+                    product_batching=classes_plan.product_batching, delete_flag=False
+                    ).values('material__material_name', 'actual_weight'))
+            else:
+                ret = ProductBatchingDetail.objects.filter(
+                    product_batching=classes_plan.product_batching,
+                    delete_flag=False
+                ).values('material__material_name',  'actual_weight')
         else:
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if not batching_class_plan:
@@ -137,10 +169,10 @@ class BatchChargeLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, Gene
     create:
         新增投料履历
     """
-    queryset = BatchChargeLog.objects.all()
+    queryset = BatchChargeLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('equip_no', 'production_classes', 'production_factory_date')
+    filter_fields = ('equip_no', 'production_classes', 'production_factory_date', 'plan_classes_uid')
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
@@ -177,10 +209,10 @@ class WeightBatchingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, G
     create:
         新增称量履历
     """
-    queryset = WeightBatchingLog.objects.all()
+    queryset = WeightBatchingLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('plan_batching_uid', )
+    filter_fields = ('plan_batching_uid',)
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
@@ -198,7 +230,7 @@ class FeedingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericV
     create:
         新增投料履历
     """
-    queryset = FeedingLog.objects.all()
+    queryset = FeedingLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
@@ -252,7 +284,7 @@ class WeightPackageLogViewSet(mixins.CreateModelMixin,
     update:
         重新打印
     """
-    queryset = WeightPackageLog.objects.all()
+    queryset = WeightPackageLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_class = WeightPackageLogFilter
@@ -278,7 +310,7 @@ class WeightPackageTrainsView(APIView):
         for log in logs:
             begin_trains = log.begin_trains
             end_trains = log.end_trains
-            for i in range(begin_trains, end_trains+1):
+            for i in range(begin_trains, end_trains + 1):
                 trains.add(i)
         return Response(trains)
 
@@ -320,3 +352,85 @@ class DevTypeView(APIView):
 
     def get(self, request):
         return Response(set(EquipCategoryAttribute.objects.values_list('category_name', flat=True)))
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BatchChargeLogListViewSet(ListAPIView):
+    """密炼投入履历
+    """
+    queryset = BatchChargeLog.objects.all()
+    serializer_class = BatchChargeLogListSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = BatchChargeLogListFilter
+
+    def get_queryset(self):
+        queryset = super(BatchChargeLogListViewSet, self).get_queryset()
+        mixing_finished = self.request.query_params.get('mixing_finished', None)
+        if mixing_finished:
+            if mixing_finished == "终炼":
+                queryset = queryset.filter(product_no__icontains="FM").all()
+            elif mixing_finished == "混炼":
+                queryset = queryset.exclude(product_no__icontains="FM").all()
+        return queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WeightBatchingLogListViewSet(ListAPIView):
+    """药品投入统计
+    """
+    queryset = WeightBatchingLog.objects.all()
+    serializer_class = WeightBatchingLogListSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = WeightBatchingLogListFilter
+
+    def get_queryset(self):
+        queryset = super(WeightBatchingLogListViewSet, self).get_queryset()
+        interval = self.request.query_params.get('interval', "日")  # 班次 日 周 月  年
+        production_factory_date = self.request.query_params.get('production_factory_date',None)
+        if interval and production_factory_date:
+            from datetime import timedelta
+            production_factory_date = datetime.datetime.strptime(production_factory_date, "%Y-%m-%d")
+            this_week_start = production_factory_date - timedelta(days=production_factory_date.weekday())  # 当天坐在的周的周一
+            this_week_end = production_factory_date + timedelta(days=6 - production_factory_date.weekday())  # 当天所在周的周日
+            if interval == "班次":
+                bcp_set = BatchingClassesPlan.objects.filter(
+                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                    work_schedule_plan__plan_schedule__day_time=production_factory_date).values_list(
+                    'plan_batching_uid', flat=True)
+                plan_batching_uid_list = list(bcp_set)
+                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
+            elif interval == "日":
+                bcp_set = BatchingClassesPlan.objects.filter(
+                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                    work_schedule_plan__plan_schedule__day_time=production_factory_date).values_list(
+                    'plan_batching_uid', flat=True)
+                plan_batching_uid_list = list(bcp_set)
+                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
+            elif interval == "周":
+                bcp_set = BatchingClassesPlan.objects.filter(
+                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                    work_schedule_plan__plan_schedule__day_time__gte=this_week_start.date(),
+                    work_schedule_plan__plan_schedule__day_time__lte=this_week_end.date()).values_list(
+                    'plan_batching_uid', flat=True)
+                plan_batching_uid_list = list(bcp_set)
+                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
+            elif interval == "月":
+                bcp_set = BatchingClassesPlan.objects.filter(
+                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                    work_schedule_plan__plan_schedule__day_time__year=production_factory_date.year,
+                    work_schedule_plan__plan_schedule__day_time__month=production_factory_date.month).values_list(
+                    'plan_batching_uid', flat=True)
+                plan_batching_uid_list = list(bcp_set)
+                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
+            elif interval == "年":
+                bcp_set = BatchingClassesPlan.objects.filter(
+                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
+                    work_schedule_plan__plan_schedule__day_time__year=production_factory_date.year).values_list(
+                    'plan_batching_uid', flat=True)
+                plan_batching_uid_list = list(bcp_set)
+                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
+        else:
+            raise ValidationError('参数不全')
+        return queryset

@@ -40,7 +40,6 @@ class BatchChargeLogCreateSerializer(BaseModelSerializer):
 
 
 class EquipOperationLogSerializer(BaseModelSerializer):
-
     class Meta:
         model = EquipOperationLog
         fields = '__all__'
@@ -69,7 +68,6 @@ class BatchingClassesPlanSerializer(BaseModelSerializer):
 
 
 class WeightBatchingLogSerializer(BaseModelSerializer):
-
     class Meta:
         model = WeightBatchingLog
         fields = ('material_no', 'material_name', 'bra_code', 'plan_weight', 'actual_weight', 'tank_no', 'created_date')
@@ -103,11 +101,10 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
 
 
 class FeedingLogSerializer(BaseModelSerializer):
-
     class Meta:
         model = FeedingLog
         fields = ('feeding_port', 'material_name', 'created_date')
-        read_only_fields = ('created_date', )
+        read_only_fields = ('created_date',)
 
 
 class WeightTankStatusSerializer(BaseModelSerializer):
@@ -122,7 +119,6 @@ class WeightTankStatusSerializer(BaseModelSerializer):
 
 
 class WeightPackageLogSerializer(BaseModelSerializer):
-
     class Meta:
         model = WeightPackageLog
         fields = '__all__'
@@ -133,7 +129,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
 
     @staticmethod
     def get_material_details(obj):
-        return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type.\
+        return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
             weighbatchingdetail_set.values('material__material_no', 'standard_weight')
 
     def validate(self, attr):
@@ -189,3 +185,36 @@ class WeightPackageUpdateLogSerializer(BaseModelSerializer):
                             'batch_group', 'location_no', 'dev_type', 'begin_trains', 'end_trains', 'quantity',
                             'production_factory_date', 'production_classes', 'production_group', 'created_date',
                             'material_details')
+
+
+class BatchChargeLogListSerializer(BaseModelSerializer):
+    mixing_finished = serializers.SerializerMethodField(help_text='混炼/终炼', read_only=True)
+
+    def get_mixing_finished(self, obj):
+        product_no = obj.product_no
+        if "FM" in product_no:
+            return '终炼'
+        else:
+            return "混炼"
+
+    class Meta:
+        model = BatchChargeLog
+        fields = '__all__'
+
+
+class WeightBatchingLogListSerializer(BaseModelSerializer):
+    weight_batch_no = serializers.SerializerMethodField(help_text='小料配方', read_only=True)
+
+    def get_weight_batch_no(self, obj):
+        try:
+            plan_batching_uid = obj.plan_batching_uid
+            bcp_obj = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid, delete_flag=False).first()
+            weight_batch_no = bcp_obj.weigh_cnt_type.weigh_batching.weight_batch_no
+            return weight_batch_no
+        except Exception as e:
+            # print(e)
+            return None
+
+    class Meta:
+        model = WeightBatchingLog
+        fields = '__all__'

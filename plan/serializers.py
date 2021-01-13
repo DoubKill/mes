@@ -460,6 +460,7 @@ class BatchingClassesPlanSerializer(serializers.ModelSerializer):
     send_user = serializers.ReadOnlyField(source='send_user.username', default='')
     weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.used_type')
     equip_name = serializers.ReadOnlyField(source='equip.equip_name', default='')
+    equip_no = serializers.ReadOnlyField(source='equip.equip_no', default='')
 
     class Meta:
         model = BatchingClassesPlan
@@ -478,6 +479,7 @@ class BatchingClassesPlanSerializer(serializers.ModelSerializer):
                   'single_weight',
                   'equip',
                   'equip_name',
+                  'equip_no',
                   'package_changed'
                   )
 

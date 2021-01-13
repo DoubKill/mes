@@ -245,8 +245,11 @@ class ProductClassesPlanManyCreate(APIView):
         if isinstance(request.data, dict):
             day_time = WorkSchedulePlan.objects.filter(
                 id=request.data['work_schedule_plan']).first().plan_schedule.day_time
+            schedule_no = WorkSchedulePlan.objects.filter(
+                id=request.data['work_schedule_plan']).first().plan_schedule.work_schedule.schedule_no
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                                        equip_id=request.data['equip'], delete_flag=False).all()
+                                                        equip_id=request.data['equip'], delete_flag=False,
+                                                        work_schedule_plan__plan_schedule__work_schedule__schedule_no=schedule_no).all()
             for pcp_obj in pcp_set:
                 pcp_obj.delete_flag = True
                 pcp_obj.save()
@@ -260,6 +263,8 @@ class ProductClassesPlanManyCreate(APIView):
             equip_list = []
             for class_dict in request.data:
                 work_list.append(class_dict['work_schedule_plan'])
+                schedule_no = WorkSchedulePlan.objects.filter(
+                    id=class_dict['work_schedule_plan']).first().plan_schedule.work_schedule.schedule_no
                 plan_list.append(class_dict['plan_classes_uid'])
                 equip_list.append(class_dict['equip'])
                 class_dict['status'] = '已保存'
@@ -282,7 +287,8 @@ class ProductClassesPlanManyCreate(APIView):
             day_time = WorkSchedulePlan.objects.filter(
                 id=class_dict['work_schedule_plan']).first().plan_schedule.day_time
             pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=day_time,
-                                                        equip_id__in=equip_list, delete_flag=False).exclude(
+                                                        equip_id__in=equip_list, delete_flag=False,
+                                                        work_schedule_plan__plan_schedule__work_schedule__schedule_no=schedule_no).exclude(
                 plan_classes_uid__in=plan_list)
             for pcp_obj in pcp_set:
                 # 删除前要先判断该数据的状态是不是非等待，只要等待中的计划才可以删除

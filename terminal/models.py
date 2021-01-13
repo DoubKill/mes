@@ -33,10 +33,9 @@ class TerminalLocation(AbstractEntity):
 
 class BatchChargeLog(AbstractEntity):
     STATUS_CHOICE = (
-        (1, '投料'),
-        (2, '撤销')
+        (1, '正常'),
+        (2, '异常')
     )
-
     equip_no = models.CharField(max_length=64, help_text='机台编号')
     plan_classes_uid = models.CharField(max_length=64, help_text='班次计划唯一码')
     trains = models.CharField(max_length=64, help_text='车次')
@@ -49,7 +48,7 @@ class BatchChargeLog(AbstractEntity):
     production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
     production_classes = models.CharField(max_length=64, help_text='生产班次')
     production_group = models.CharField(max_length=64, help_text='生产班组')
-    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
     # batch_time = models.DateTimeField(max_length=64, help_text='投入时间')
     batch_classes = models.CharField(max_length=64, help_text='投入班次')
     batch_group = models.CharField(max_length=64, help_text='投入班组')
