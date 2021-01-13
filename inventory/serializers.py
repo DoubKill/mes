@@ -602,16 +602,7 @@ class XBKMaterialInventorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MaterialInventory
-        fields = ['material_type',
-                  'material_no',
-                  'lot_no'
-                  'container_no',
-                  'location',
-                  'qty',
-                  'unit',
-                  'unit_weight',
-                  'total_weight',
-                  'quality_status']
+        fields = '__all__'
 
 
 class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
