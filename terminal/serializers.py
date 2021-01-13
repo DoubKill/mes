@@ -4,7 +4,7 @@ from rest_framework.validators import UniqueValidator
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingProductPlanRelation
+from plan.models import ProductClassesPlan, BatchingClassesPlan
 from terminal.models import BatchChargeLog, EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog
 
@@ -206,15 +206,14 @@ class WeightBatchingLogListSerializer(BaseModelSerializer):
     weight_batch_no = serializers.SerializerMethodField(help_text='小料配方', read_only=True)
 
     def get_weight_batch_no(self, obj):
-        # try:
-        plan_batching_uid = obj.plan_batching_uid
-        bcp_obj = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid, delete_flag=False).first()
-        bppr_obj = BatchingProductPlanRelation.objects.filter(batching_classes_plan=bcp_obj).first()
-        weight_batch_no = bppr_obj.product_classes_plan.product_batching.weighbatching.weight_batch_no
-        return weight_batch_no
-        # except Exception as e:
-        #     print(e)
-        #     return None
+        try:
+            plan_batching_uid = obj.plan_batching_uid
+            bcp_obj = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid, delete_flag=False).first()
+            weight_batch_no = bcp_obj.weigh_cnt_type.weigh_batching.weight_batch_no
+            return weight_batch_no
+        except Exception as e:
+            # print(e)
+            return None
 
     class Meta:
         model = WeightBatchingLog
