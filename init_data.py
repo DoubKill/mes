@@ -349,8 +349,41 @@ permission_data = [
     {'id': 266, 'code': 'close_compoundRubber_plan', 'name': '关闭', 'parent_id': 261},
     {'id': 267, 'code': 'change_compoundRubber_plan', 'name': '编辑', 'parent_id': 261},
 
-    {'id': 268, 'code': 'outbound_display', 'name': '出库看板', 'parent_id': None},
-    {'id': 269, 'code': 'view_outbound_display', 'name': '查看', 'parent_id': 268},
+    {'id': 270, 'code': 'weight_tank', 'name': '称量系统料仓信息管理', 'parent_id': None},
+    {'id': 271, 'code': 'view_weight_tank', 'name': '查看', 'parent_id': 270},
+    {'id': 272, 'code': 'change_weight_tank', 'name': '修改', 'parent_id': 270},
+    {'id': 273, 'code': 'add_weight_tank', 'name': '新增', 'parent_id': 270},
+    {'id': 274, 'code': 'delete_weight_tank', 'name': '启用/停用', 'parent_id': 270},
+
+    {'id': 275, 'code': 'weight_batching', 'name': '小料配料标准管理', 'parent_id': None},
+    {'id': 276, 'code': 'view_weight_batching', 'name': '查看', 'parent_id': 275},
+    {'id': 277, 'code': 'add_weight_batching', 'name': '增加', 'parent_id': 275},
+    {'id': 278, 'code': 'change_weight_batching', 'name': '修改', 'parent_id': 275},
+    {'id': 280, 'code': 'submit_weight_batching', 'name': '提交', 'parent_id': 275},
+    {'id': 281, 'code': 'check_weight_batching', 'name': '校对', 'parent_id': 275},
+    {'id': 282, 'code': 'use_weight_batching', 'name': '启用', 'parent_id': 275},
+    {'id': 283, 'code': 'refuse_weight_batching', 'name': '驳回', 'parent_id': 275},
+    {'id': 284, 'code': 'abandon_weight_batching', 'name': '弃用', 'parent_id': 275},
+
+    {'id': 285, 'code': 'batching_plan', 'name': '小料计划下达', 'parent_id': None},
+    {'id': 286, 'code': 'view_batching_plan', 'name': '查看', 'parent_id': 285},
+    {'id': 287, 'code': 'change_batching_plan', 'name': '修改', 'parent_id': 285},
+    {'id': 288, 'code': 'send_batching_plan', 'name': '下达', 'parent_id': 285},
+
+    {'id': 289, 'code': 'batching_reality', 'name': '小料称量计划与实际对比', 'parent_id': None},
+    {'id': 290, 'code': 'view_batching_reality', 'name': '查看', 'parent_id': 289},
+
+    {'id': 291, 'code': 'batch_log', 'name': '密炼投入履历', 'parent_id': None},
+    {'id': 292, 'code': 'view_batch_log', 'name': '查看', 'parent_id': 291},
+
+    {'id': 293, 'code': 'drug_analyze', 'name': '药品投入统计', 'parent_id': None},
+    {'id': 294, 'code': 'view_drug_analyze', 'name': '查看', 'parent_id': 293},
+
+    {'id': 295, 'code': 'zl_dashboard', 'name': '终炼胶出库看板', 'parent_id': None},
+    {'id': 296, 'code': 'view_fm_dashboard', 'name': '查看', 'parent_id': 295},
+
+    {'id': 297, 'code': 'hl_dashboard', 'name': '混炼胶出库看板', 'parent_id': None},
+    {'id': 298, 'code': 'view_hl_dashboard', 'name': '查看', 'parent_id': 297},
 ]
 
 

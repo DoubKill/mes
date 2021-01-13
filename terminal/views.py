@@ -166,7 +166,7 @@ class BatchChargeLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, Gene
     create:
         新增投料履历
     """
-    queryset = BatchChargeLog.objects.all()
+    queryset = BatchChargeLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_fields = ('equip_no', 'production_classes', 'production_factory_date', 'plan_classes_uid')
@@ -206,7 +206,7 @@ class WeightBatchingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, G
     create:
         新增称量履历
     """
-    queryset = WeightBatchingLog.objects.all()
+    queryset = WeightBatchingLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_fields = ('plan_batching_uid',)
@@ -227,7 +227,7 @@ class FeedingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericV
     create:
         新增投料履历
     """
-    queryset = FeedingLog.objects.all()
+    queryset = FeedingLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
@@ -281,7 +281,7 @@ class WeightPackageLogViewSet(mixins.CreateModelMixin,
     update:
         重新打印
     """
-    queryset = WeightPackageLog.objects.all()
+    queryset = WeightPackageLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_class = WeightPackageLogFilter
