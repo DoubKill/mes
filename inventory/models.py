@@ -84,7 +84,7 @@ class MaterialInventory(AbstractEntity):
 
 
 class BzFinalMixingRubberInventory(models.Model):
-    """bz混炼胶库 | 目前临时存的是终炼胶"""
+    """bz混炼胶库 | 目前混炼胶终炼胶都存"""
     id = models.PositiveIntegerField(db_column='库存索引', primary_key=True)
     store_id = models.CharField(max_length=20, db_column='库房编号')
     store_name = models.CharField(max_length=20, db_column='库房名称')
@@ -94,6 +94,7 @@ class BzFinalMixingRubberInventory(models.Model):
     qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='数量')
     total_weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量')
     quality_status = models.CharField(max_length=20, db_column='品质状态')
+    quality_level = models.CharField(max_length=6, db_column='品质等级')
     memo = models.CharField(max_length=250, db_column='车号')
     lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
