@@ -14,7 +14,7 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import EquipCategoryAttribute
 from mes.common_code import CommonDeleteMixin
 from mes.derorators import api_recorder
-from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingProductPlanRelation
+from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import TrainsFeedbacks
 from recipe.models import ProductBatchingDetail
 from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, \

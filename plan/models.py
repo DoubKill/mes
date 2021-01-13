@@ -175,25 +175,25 @@ class BatchingClassesPlan(AbstractEntity):
         return standard_sum_weight.get('standard_sum_weight')
 
 
-class BatchingProductPlanRelation(models.Model):
-    batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE)
-    product_classes_plan = models.ForeignKey(ProductClassesPlan, on_delete=models.CASCADE)
-
-    class Meta:
-        db_table = 'batching_product_plan_relation'
-        verbose_name_plural = verbose_name = '配料日计划和胶料日计划关连'
-
-
-class BatchingClassesDemand(models.Model):
-    batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE,
-                                              related_name='classes_demands')
-    material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE)
-    plan_weight = models.DecimalField(help_text='重量', decimal_places=2, max_digits=8)
-    actual_weight = models.DecimalField(help_text='重量', decimal_places=2, max_digits=8, default=0)
-
-    class Meta:
-        db_table = 'batching_classes_demand'
-        verbose_name_plural = verbose_name = '班次小料需求量'
+# class BatchingProductPlanRelation(models.Model):
+#     batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE)
+#     product_classes_plan = models.ForeignKey(ProductClassesPlan, on_delete=models.CASCADE)
+#
+#     class Meta:
+#         db_table = 'batching_product_plan_relation'
+#         verbose_name_plural = verbose_name = '配料日计划和胶料日计划关连'
+#
+#
+# class BatchingClassesDemand(models.Model):
+#     batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE,
+#                                               related_name='classes_demands')
+#     material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE)
+#     plan_weight = models.DecimalField(help_text='重量', decimal_places=2, max_digits=8)
+#     actual_weight = models.DecimalField(help_text='重量', decimal_places=2, max_digits=8, default=0)
+#
+#     class Meta:
+#         db_table = 'batching_classes_demand'
+#         verbose_name_plural = verbose_name = '班次小料需求量'
 
 
 class ClassesPlanIssue(models.Model):
