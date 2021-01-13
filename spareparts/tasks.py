@@ -43,17 +43,22 @@ def spare_inventory_wrdb(filename, upload_root):
                 st_obj = None
             s_obj = Spare.objects.filter(no=row[2]).first()
             if not s_obj:
-                s_obj = Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[11], upper=row[10], lower=row[9],
+                s_obj = Spare.objects.create(no=row[2], name=row[3], type=st_obj, unit=row[11], upper=row[10],
+                                             lower=row[9],
                                              cost=row[7])
-            gc_obj = GlobalCode.objects.filter(global_name=row[5]).first()
-            if not gc_obj:
-                gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
-                gc_obj = GlobalCode.objects.create(global_type=gct_obj, global_no=row[5], global_name=row[5])
-
-            sl_obj = SpareLocation.objects.filter(name=row[4]).first()
-            if not sl_obj:
-                sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
-
+            if row[5]:
+                gc_obj = GlobalCode.objects.filter(global_name=row[5]).first()
+                if not gc_obj:
+                    gct_obj = GlobalCodeType.objects.filter(type_name='备品备件类型').first()
+                    gc_obj = GlobalCode.objects.create(global_type=gct_obj, global_no=row[5], global_name=row[5])
+            else:
+                gc_obj = None
+            if row[4]:
+                sl_obj = SpareLocation.objects.filter(name=row[4]).first()
+                if not sl_obj:
+                    sl_obj = SpareLocation.objects.create(no=row[4], name=row[4], type=gc_obj)
+            else:
+                sl_obj = None
             slb_obj = SpareLocationBinding.objects.filter(location=sl_obj, spare=s_obj).first()
             if not slb_obj:
                 slb_obj = SpareLocationBinding.objects.create(location=sl_obj, spare=s_obj)
@@ -62,7 +67,8 @@ def spare_inventory_wrdb(filename, upload_root):
                                           total_count=row[6] * row[7],
                                           warehouse_info=whi_obj)
     except Exception as e:
-        raise ValidationError(f'Excel表第{i+1}行异常信息{e}')
+        raise ValidationError(f'Excel表第{i + 1}行异常信息{e}')
+
 
 def spare_upload(request):
     # 根name取 file 的值
@@ -86,7 +92,6 @@ def spare_upload(request):
     spare_inventory_wrdb(file.name, upload_root)
 
 
-
 def spare_inventory_template():
     """备品备件导入模板"""
     response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -103,7 +108,8 @@ def spare_inventory_template():
     #     first_col = w.col(j)
     #     first_col.width = 256 * 20
     # 写入表头
-    w.write(0, 0, u'单价不知道填0，总价可以不填(总价=单价乘以数量)，上限不知道填9999，下限不知道填0,库存位类型只有备品备件货架和备品备件地面两种')
+    w.write(0, 0,
+            u'库存位不知道可以不填，库存位类型只有备品备件货架和备品备件地面两种，库存位类型不知道填备品备件地面，数量不知道填0，单价不知道填0，总价可以不填(总价=单价乘以数量)，上限不知道填9999，下限不知道填0,')
     w.write(1, 0, u'No')
     w.write(1, 1, u'物料类型')
     w.write(1, 2, u'物料编码')

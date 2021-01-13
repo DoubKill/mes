@@ -161,7 +161,7 @@ def main():
                             production_class=production_class,
                             production_group=group,
                             production_equip_no=equip_no,
-                            production_factory_date=pallet.end_time
+                            production_factory_date=product_date
                         )
                     # TODO   由MES判断检测结果
                     # material_test_method = MaterialTestMethod.objects.filter(
@@ -206,6 +206,7 @@ def main():
                             machine_name=indicator_name+'仪',
                             test_group=test_group,
                             level=1 if result == '合格' else 2,
+                            test_class=production_class,
                             origin=idx+1)
             conn.close()
             min_id += 1000

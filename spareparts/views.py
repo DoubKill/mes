@@ -38,6 +38,11 @@ class SpareLocationBindingViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
+        if not instance.location:
+            instance.delete_flag = True
+            instance.last_updated_user = request.user
+            instance.save()
+            return Response(status=status.HTTP_204_NO_CONTENT)
         si_obj = instance.location.si_spare_location.all().filter(qty__gt=0, delete_flag=False,
                                                                   spare=instance.spare).first()
         if si_obj:
@@ -73,6 +78,8 @@ class SpareInventoryViewSet(ModelViewSet):
     def put_storage(self, request, pk=None):
         """入库"""
         si_obj = self.get_object()
+        if not si_obj.location:
+            raise ValidationError('该物料没有绑定库存位')
         qty = request.data.get('qty', 0)
 
         befor_qty = si_obj.qty
@@ -102,6 +109,8 @@ class SpareInventoryViewSet(ModelViewSet):
     def out_storage(self, request, pk=None):
         """出库"""
         si_obj = self.get_object()
+        if not si_obj.location:
+            raise ValidationError('该物料没有绑定库存位')
         qty = request.data.get('qty', 0)
         receive_user = request.data.get('receive_user', None)  # 领用人
         purpose = request.data.get('purpose', None)  # 用途
@@ -137,6 +146,8 @@ class SpareInventoryViewSet(ModelViewSet):
     def check_storage(self, request, pk=None):
         """盘点"""
         si_obj = self.get_object()
+        if not si_obj.location:
+            raise ValidationError('该物料没有绑定库存位')
         qty = request.data.get('qty', 0)
         reason = request.data.get('reason', None)  # 原因
         befor_qty = si_obj.qty
@@ -279,6 +290,15 @@ class SpareTypeViewSet(ModelViewSet):
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def create(self, request, *args, **kwargs):
+        st_no = SpareType.objects.filter(no=request.data['no']).first()
+        st_name = SpareType.objects.filter(name=request.data['name']).first()
+        if st_name:
+            raise ValidationError("此类型名称已存在")
+        if st_no:
+            raise ValidationError("此类型编码已存在")
+
+        return super().create(request, *args, **kwargs)
 
 @method_decorator([api_recorder], name="dispatch")
 class SpareViewSet(ModelViewSet):
@@ -321,7 +341,7 @@ class SpareLocationViewSet(ModelViewSet):
             url_name='name_list')
     def name_list(self, request, pk=None):
         """展示Location所以的name"""
-        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name','no', 'used_flag')
+        name_list = SpareLocation.objects.filter(delete_flag=False).all().values('id', 'name', 'no', 'used_flag')
         # names = list(set(name_list))
         return Response(name_list)
 
@@ -345,6 +365,11 @@ class SpareLocationViewSet(ModelViewSet):
             return super().get_queryset()
         l_set = SpareLocation.objects.filter(type__global_name__in=type_name).all()
         return l_set
+
+    def create(self, request, *args, **kwargs):
+        if SpareLocation.objects.filter(name=request.data['name']).exists():
+            raise ValidationError('此库存位已存在')
+        return super().create(request, *args, **kwargs)
 
 
 class SpareInventoryImportExportAPIView(APIView):

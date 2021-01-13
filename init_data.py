@@ -104,10 +104,10 @@ permission_data = [
     {'id': 71, 'code': 'pallet_feedback', 'name': '日别胶料收皮管理', 'parent_id': None},
     {'id': 72, 'code': 'view_pallet_feedback', 'name': '查看', 'parent_id': 71},
 
-    {'id': 73, 'code': 'material_inventory', 'name': '原材料库存', 'parent_id': None},
+    {'id': 73, 'code': 'material_inventory', 'name': '原料库存', 'parent_id': None},
     {'id': 74, 'code': 'view_material_inventory', 'name': '查看', 'parent_id': 73},
 
-    {'id': 75, 'code': 'product_inventory', 'name': '胶料库存', 'parent_id': None},
+    {'id': 75, 'code': 'product_inventory', 'name': '混炼胶库存', 'parent_id': None},
     {'id': 76, 'code': 'view_product_inventory', 'name': '查看', 'parent_id': 75},
 
     {'id': 78, 'code': 'test_indicator', 'name': '试验指标管理', 'parent_id': None},
@@ -188,10 +188,10 @@ permission_data = [
     {'id': 133, 'code': 'warehouse_summary', 'name': '胶料库存汇总', 'parent_id': None},
     {'id': 134, 'code': 'view_warehouse_summary', 'name': '查看', 'parent_id': 133},
 
-    {'id': 135, 'code': 'in_out_history', 'name': '出入库履历', 'parent_id': None},
+    {'id': 135, 'code': 'in_out_history', 'name': '物料出入库履历', 'parent_id': None},
     {'id': 136, 'code': 'view_in_out_history', 'name': '查看', 'parent_id': 135},
 
-    {'id': 137, 'code': 'goods', 'name': '物料库存管理', 'parent_id': None},
+    {'id': 137, 'code': 'goods', 'name': '物料库位信息', 'parent_id': None},
     {'id': 138, 'code': 'view_goods', 'name': '查看', 'parent_id': 137},
 
     {'id': 139, 'code': 'inventory_plan', 'name': '胶片库出库计划', 'parent_id': None},
@@ -247,6 +247,143 @@ permission_data = [
     {'id': 183, 'code': 'check_unqualified_trains', 'name': '检查编辑', 'parent_id': 179},
     {'id': 184, 'code': 'export_unqualified_trains', 'name': '导出', 'parent_id': 179},
 
+    {'id': 185, 'code': 'location', 'name': '库存位管理', 'parent_id': None},
+    {'id': 186, 'code': 'view_location', 'name': '查看', 'parent_id': 185},
+    {'id': 187, 'code': 'add_location', 'name': '新增', 'parent_id': 185},
+    {'id': 188, 'code': 'change_location', 'name': '修改', 'parent_id': 185},
+    {'id': 189, 'code': 'delete_location', 'name': '启用/停用', 'parent_id': 185},
+
+    {'id': 190, 'code': 'spare_location', 'name': '库存位管理', 'parent_id': None},
+    {'id': 191, 'code': 'view_spare_location', 'name': '查看', 'parent_id': 190},
+    {'id': 192, 'code': 'add_spare_location', 'name': '新增', 'parent_id': 190},
+    {'id': 193, 'code': 'change_spare_location', 'name': '修改', 'parent_id': 190},
+    {'id': 194, 'code': 'delete_spare_location', 'name': '启用/停用', 'parent_id': 190},
+
+    {'id': 195, 'code': 'spare_type', 'name': '类型管理', 'parent_id': None},
+    {'id': 196, 'code': 'view_spare_type', 'name': '查看', 'parent_id': 195},
+    {'id': 197, 'code': 'add_spare_type', 'name': '新增', 'parent_id': 195},
+    {'id': 198, 'code': 'change_spare_type', 'name': '修改', 'parent_id': 195},
+    {'id': 199, 'code': 'delete_spare_type', 'name': '启用/停用', 'parent_id': 195},
+
+    {'id': 200, 'code': 'spare_info', 'name': '备品备件基本信息管理', 'parent_id': None},
+    {'id': 201, 'code': 'view_spare_info', 'name': '查看', 'parent_id': 200},
+    {'id': 202, 'code': 'add_spare_info', 'name': '新增', 'parent_id': 200},
+    {'id': 203, 'code': 'change_spare_info', 'name': '修改', 'parent_id': 200},
+    {'id': 204, 'code': 'delete_spare_info', 'name': '删除', 'parent_id': 200},
+
+    {'id': 205, 'code': 'location_binding', 'name': '货架物料绑定管理', 'parent_id': None},
+    {'id': 206, 'code': 'view_location_binding', 'name': '查看', 'parent_id': 205},
+    {'id': 207, 'code': 'add_location_binding', 'name': '新增', 'parent_id': 205},
+    {'id': 208, 'code': 'change_location_binding', 'name': '修改', 'parent_id': 205},
+    {'id': 209, 'code': 'delete_location_binding', 'name': '删除', 'parent_id': 205},
+
+    {'id': 210, 'code': 'spare_inventory', 'name': '备品备件库位管理', 'parent_id': None},
+    {'id': 211, 'code': 'view_spare_inventory', 'name': '查看', 'parent_id': 210},
+    {'id': 212, 'code': 'price_spare_inventory', 'name': '查看单价', 'parent_id': 210},
+
+    {'id': 213, 'code': 'spare_stock', 'name': '备品备件库存管理', 'parent_id': None},
+    {'id': 214, 'code': 'view_spare_stock', 'name': '查看', 'parent_id': 213},
+    {'id': 215, 'code': 'price_spare_stock', 'name': '查看单价', 'parent_id': 213},
+
+    {'id': 216, 'code': 'spare_import', 'name': '备品备件库存导入', 'parent_id': None},
+    {'id': 217, 'code': 'view_spare_import', 'name': '查看', 'parent_id': 216},
+    {'id': 218, 'code': 'import_spare_import', 'name': '导入', 'parent_id': 216},
+    {'id': 219, 'code': 'download_spare_import', 'name': '下载', 'parent_id': 216},
+
+    {'id': 220, 'code': 'spare_inbound', 'name': '备品备件入库管理', 'parent_id': None},
+    {'id': 221, 'code': 'view_spare_inbound', 'name': '查看', 'parent_id': 220},
+    {'id': 222, 'code': 'add_spare_inbound', 'name': '新增', 'parent_id': 220},
+    {'id': 223, 'code': 'inbound_spare_inbound', 'name': '入库', 'parent_id': 220},
+    {'id': 224, 'code': 'history_spare_inbound', 'name': '查看履历', 'parent_id': 220},
+    {'id': 225, 'code': 'price_spare_inbound', 'name': '查看单价', 'parent_id': 220},
+
+    {'id': 226, 'code': 'spare_outbound', 'name': '备品备件出库管理', 'parent_id': None},
+    {'id': 227, 'code': 'view_spare_outbound', 'name': '查看', 'parent_id': 226},
+    {'id': 228, 'code': 'cancel_spare_outbound', 'name': '撤销', 'parent_id': 226},
+    {'id': 229, 'code': 'inbound_spare_outbound', 'name': '出库', 'parent_id': 226},
+    {'id': 230, 'code': 'history_spare_outbound', 'name': '查看履历', 'parent_id': 226},
+    {'id': 231, 'code': 'price_spare_outbound', 'name': '查看单价', 'parent_id': 226},
+
+    {'id': 232, 'code': 'stock_count', 'name': '备品备件盘点管理', 'parent_id': None},
+    {'id': 233, 'code': 'view_stock_count', 'name': '查看', 'parent_id': 232},
+    {'id': 234, 'code': 'change_stock_count', 'name': '更改', 'parent_id': 232},
+    {'id': 235, 'code': 'history_stock_count', 'name': '查看履历', 'parent_id': 232},
+
+    {'id': 236, 'code': 'inbound_history', 'name': '备品备件入库履历', 'parent_id': None},
+    {'id': 237, 'code': 'view_inbound_history', 'name': '查看', 'parent_id': 236},
+    {'id': 238, 'code': 'export_inbound_history', 'name': '导出', 'parent_id': 236},
+    {'id': 239, 'code': 'price_inbound_history', 'name': '查看单价', 'parent_id': 236},
+
+    {'id': 240, 'code': 'outbound_history', 'name': '备品备件出库履历', 'parent_id': None},
+    {'id': 241, 'code': 'view_outbound_history', 'name': '查看', 'parent_id': 240},
+    {'id': 242, 'code': 'export_outbound_history', 'name': '导出', 'parent_id': 240},
+    {'id': 243, 'code': 'price_outbound_history', 'name': '查看单价', 'parent_id': 240},
+
+    {'id': 244, 'code': 'stock_history', 'name': '备品备件盘点履历', 'parent_id': None},
+    {'id': 245, 'code': 'view_stock_history', 'name': '查看', 'parent_id': 244},
+    {'id': 246, 'code': 'export_stock_history', 'name': '导出', 'parent_id': 244},
+
+    {'id': 247, 'code': 'trains_report', 'name': '车次报表', 'parent_id': None},
+    {'id': 248, 'code': 'view_trains_report', 'name': '查看', 'parent_id': 247},
+
+    {'id': 249, 'code': 'production_analyze', 'name': '产量计划实际分析', 'parent_id': None},
+    {'id': 250, 'code': 'view_production_analyze', 'name': '查看', 'parent_id': 249},
+    {'id': 251, 'code': 'change_production_analyze', 'name': '编辑', 'parent_id': 249},
+
+    {'id': 252, 'code': 'section_production', 'name': '区间产量统计', 'parent_id': None},
+    {'id': 253, 'code': 'view_section_production', 'name': '查看', 'parent_id': 252},
+
+    {'id': 254, 'code': 'finalRubber_plan', 'name': '终炼胶出库计划', 'parent_id': None},
+    {'id': 255, 'code': 'view_finalRubber_plan', 'name': '查看', 'parent_id': 254},
+    {'id': 256, 'code': 'norman_finalRubber_plan', 'name': '正常出库', 'parent_id': 254},
+    {'id': 257, 'code': 'assign_finalRubber_plan', 'name': '指定出库', 'parent_id': 254},
+    {'id': 258, 'code': 'manual_finalRubber_plan', 'name': '人工出库', 'parent_id': 254},
+    {'id': 259, 'code': 'close_finalRubber_plan', 'name': '关闭', 'parent_id': 254},
+    {'id': 260, 'code': 'change_finalRubber_plan', 'name': '编辑', 'parent_id': 254},
+
+    {'id': 261, 'code': 'compoundRubber_plan', 'name': '混炼胶出库计划', 'parent_id': None},
+    {'id': 262, 'code': 'view_compoundRubber_plan', 'name': '查看', 'parent_id': 261},
+    {'id': 263, 'code': 'norman_compoundRubber_plan', 'name': '正常出库', 'parent_id': 261},
+    {'id': 264, 'code': 'assign_compoundRubber_plan', 'name': '指定出库', 'parent_id': 261},
+    {'id': 265, 'code': 'manual_compoundRubber_plan', 'name': '人工出库', 'parent_id': 261},
+    {'id': 266, 'code': 'close_compoundRubber_plan', 'name': '关闭', 'parent_id': 261},
+    {'id': 267, 'code': 'change_compoundRubber_plan', 'name': '编辑', 'parent_id': 261},
+
+    {'id': 270, 'code': 'weight_tank', 'name': '称量系统料仓信息管理', 'parent_id': None},
+    {'id': 271, 'code': 'view_weight_tank', 'name': '查看', 'parent_id': 270},
+    {'id': 272, 'code': 'change_weight_tank', 'name': '修改', 'parent_id': 270},
+    {'id': 273, 'code': 'add_weight_tank', 'name': '新增', 'parent_id': 270},
+    {'id': 274, 'code': 'delete_weight_tank', 'name': '启用/停用', 'parent_id': 270},
+
+    {'id': 275, 'code': 'weight_batching', 'name': '小料配料标准管理', 'parent_id': None},
+    {'id': 276, 'code': 'view_weight_batching', 'name': '查看', 'parent_id': 275},
+    {'id': 277, 'code': 'add_weight_batching', 'name': '增加', 'parent_id': 275},
+    {'id': 278, 'code': 'change_weight_batching', 'name': '修改', 'parent_id': 275},
+    {'id': 280, 'code': 'submit_weight_batching', 'name': '提交', 'parent_id': 275},
+    {'id': 281, 'code': 'check_weight_batching', 'name': '校对', 'parent_id': 275},
+    {'id': 282, 'code': 'use_weight_batching', 'name': '启用', 'parent_id': 275},
+    {'id': 283, 'code': 'refuse_weight_batching', 'name': '驳回', 'parent_id': 275},
+    {'id': 284, 'code': 'abandon_weight_batching', 'name': '弃用', 'parent_id': 275},
+
+    {'id': 285, 'code': 'batching_plan', 'name': '小料计划下达', 'parent_id': None},
+    {'id': 286, 'code': 'view_batching_plan', 'name': '查看', 'parent_id': 285},
+    {'id': 287, 'code': 'change_batching_plan', 'name': '修改', 'parent_id': 285},
+    {'id': 288, 'code': 'send_batching_plan', 'name': '下达', 'parent_id': 285},
+
+    {'id': 289, 'code': 'batching_reality', 'name': '小料称量计划与实际对比', 'parent_id': None},
+    {'id': 290, 'code': 'view_batching_reality', 'name': '查看', 'parent_id': 289},
+
+    {'id': 291, 'code': 'batch_log', 'name': '密炼投入履历', 'parent_id': None},
+    {'id': 292, 'code': 'view_batch_log', 'name': '查看', 'parent_id': 291},
+
+    {'id': 293, 'code': 'drug_analyze', 'name': '药品投入统计', 'parent_id': None},
+    {'id': 294, 'code': 'view_drug_analyze', 'name': '查看', 'parent_id': 293},
+
+    {'id': 295, 'code': 'zl_dashboard', 'name': '终炼胶出库看板', 'parent_id': None},
+    {'id': 296, 'code': 'view_fm_dashboard', 'name': '查看', 'parent_id': 295},
+
+    {'id': 297, 'code': 'hl_dashboard', 'name': '混炼胶出库看板', 'parent_id': None},
+    {'id': 298, 'code': 'view_hl_dashboard', 'name': '查看', 'parent_id': 297},
 ]
 
 
@@ -258,7 +395,9 @@ def init_permissions():
 
 def main():
     print('开始迁移数据库')
-    apps = ('system', 'basics', 'plan', 'production', 'recipe', 'quality', 'inventory', 'spareparts')
+    apps = ('system', 'basics', 'plan', 'production',
+            'recipe', 'quality', 'inventory', 'spareparts',
+            'terminal')
 
     for app in apps:
         try:

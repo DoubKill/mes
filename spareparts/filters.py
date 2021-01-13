@@ -65,7 +65,7 @@ class SpareTypeFilter(django_filters.rest_framework.FilterSet):
 
 class SpareFilter(django_filters.rest_framework.FilterSet):
     name = django_filters.CharFilter(field_name='name', help_text='名称', lookup_expr='icontains')
-    no = django_filters.CharFilter(field_name='no', help_text='类型')
+    no = django_filters.CharFilter(field_name='no', help_text='类型', lookup_expr='icontains')
     type_name = django_filters.CharFilter(field_name='type__name', help_text='类型')
 
     class Meta:

@@ -37,6 +37,7 @@ from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
+from mes.paginations import SinglePageNumberPagination
 from recipe.models import Material
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
@@ -214,7 +215,10 @@ class OutWorkFeedBack(APIView):
                 else:
                     all_qty = int(data.get("qty"))
                 dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
-                need_qty = dp_obj.need_qty if dp_obj else 2
+                if dp_obj:
+                    need_qty = dp_obj.need_qty
+                else:
+                    return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
@@ -255,7 +259,7 @@ class OutWorkFeedBack(APIView):
                 MaterialInventory.objects.create(**material_inventory_dict)
             except Exception as e:
                 logger.error(e)
-                result = {"99": "FALSE", f"message": "反馈失败，原因: {e}"}
+                result = {"99": "FALSE", f"message": f"反馈失败，原因: {e}"}
             else:
                 result = {"01": "TRUES", "message": "反馈成功，OK"}
 
@@ -606,6 +610,7 @@ class InventoryLogOutViewSet(ModelViewSet):
     queryset = InventoryLog.objects.filter(order_type='出库').order_by('-fin_time')
     serializer_class = InventoryLogOutSerializer
     filter_backends = [DjangoFilterBackend]
+    pagination_class = SinglePageNumberPagination
     # filter_class = MixGumOutInventoryLogFilter
     permission_classes = (IsAuthenticated,)
 
@@ -613,7 +618,14 @@ class InventoryLogOutViewSet(ModelViewSet):
             url_name='inventory-now')
     def inventory_now(self, request, pk=None):
         """当前出库信息"""
-        il_obj = InventoryLog.objects.filter(order_type='出库').last()
+        mixing_finished = self.request.query_params.get('mixing_finished', None)
+        if mixing_finished:
+            if mixing_finished == "终炼":
+                il_obj = InventoryLog.objects.filter(order_type='出库', material_no__icontains="FM").last()
+            elif mixing_finished == "混炼":
+                il_obj = InventoryLog.objects.exclude(material_no__icontains="FM").filter(order_type='出库').last()
+        else:
+            raise ValidationError('参数不全')
         if il_obj:
             result = {'order_no': il_obj.order_no, 'material_no': il_obj.material_no,
                       'lot_no': il_obj.lot_no, 'location': il_obj.location}
@@ -625,6 +637,121 @@ class InventoryLogOutViewSet(ModelViewSet):
             url_name='inventory-today')
     def inventory_today(self, request, pk=None):
         """今日出库量"""
-        il_set = InventoryLog.objects.filter(order_type='出库', fin_time__date=datetime.date.today()).values(
-            'material_no').annotate(sum_qty=Sum('qty'))
+        mixing_finished = self.request.query_params.get('mixing_finished', None)
+        if mixing_finished:
+            if mixing_finished == "终炼":
+                il_set = InventoryLog.objects.filter(order_type='出库', fin_time__date=datetime.date.today(),
+                                                     material_no__icontains="FM").values(
+                    'material_no').annotate(sum_qty=Sum('qty'))
+            elif mixing_finished == "混炼":
+                il_set = InventoryLog.objects.exclude(material_no__icontains="FM").filter(order_type='出库',
+                                                                                          fin_time__date=datetime.date.today()).values(
+                    'material_no').annotate(sum_qty=Sum('qty'))
+        else:
+            raise ValidationError('参数不全')
         return Response({'results': il_set})
+
+    def get_queryset(self):
+        queryset = super(InventoryLogOutViewSet, self).get_queryset()
+        mixing_finished = self.request.query_params.get('mixing_finished', None)
+        if mixing_finished:
+            if mixing_finished == "终炼":
+                queryset = queryset.filter(material_no__icontains="FM").all()
+            elif mixing_finished == "混炼":
+                queryset = queryset.exclude(material_no__icontains="FM").all()
+        else:
+            raise ValidationError('参数不全')
+        return queryset
+
+
+class MaterialInventoryAPIView(APIView):
+
+    def get(self, request):
+        """库存信息"""
+        lot_no = self.request.query_params.get('lot_no', None)
+        if not lot_no:
+            raise ValidationError('lot_no参数必填')
+        model_list = [XBMaterialInventory, BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB,
+                      WmsInventoryStock]
+        # 线边库  炼胶库  帘布库  原材料库
+        query_list = []
+        for model in model_list:
+            if model == XBMaterialInventory:
+                queryset = model.objects.filter(lot_no=lot_no).values('material__material_type',
+                                                                      'material__material_no',
+                                                                      'lot_no', 'container_no', 'location', 'qty',
+                                                                      'unit',
+                                                                      'unit_weight', 'quality_status')
+                for xbi_obj in queryset:
+                    xbi_obj.update({'material_type': xbi_obj.pop("material__material_type")})
+                    xbi_obj.update({'material_no': xbi_obj.pop("material__material_no")})
+            elif model == BzFinalMixingRubberInventory:
+                queryset = model.objects.using('bz').filter(lot_no=lot_no).values(
+                    'material_no',
+                    'lot_no', 'container_no', 'location',
+                    'qty',
+                    'quality_status', 'total_weight')
+                for bz_dict in queryset:
+                    try:
+                        mt = bz_dict['material_no'].split("-")[1]
+                    except:
+                        mt = bz_dict['material_no']
+                    unit = 'kg'
+                    unit_weight = str(round(bz_dict['total_weight'] / bz_dict['qty'], 3))
+                    bz_dict['material_type'] = mt
+                    bz_dict['unit'] = unit
+                    bz_dict['unit_weight'] = unit_weight
+            elif model == BzFinalMixingRubberInventoryLB:
+                queryset = model.objects.using('lb').filter(lot_no=lot_no).values('material_no',
+                                                                                  'lot_no', 'container_no', 'location',
+                                                                                  'qty',
+                                                                                  'quality_status', 'total_weight')
+                for bz_dict in queryset:
+                    try:
+                        mt = bz_dict['material_no'].split("-")[1]
+                    except:
+                        mt = bz_dict['material_no']
+                    unit = 'kg'
+                    unit_weight = str(round(bz_dict['total_weight'] / bz_dict['qty'], 3))
+                    bz_dict['material_type'] = mt
+                    bz_dict['unit'] = unit
+                    bz_dict['unit_weight'] = unit_weight
+
+            elif model == WmsInventoryStock:
+
+                queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
+                    'material_no',
+                    'lot_no', 'location',
+                    'qty',
+                    'unit',
+                    'quality_status', )
+
+                for bz_dict in queryset:
+                    try:
+                        mt = bz_dict['material_no'].split("-")[1]
+                    except:
+                        mt = bz_dict['material_no']
+                    container_no = None
+                    unit_weight = None
+                    bz_dict['material_type'] = mt  # 表里是有的 但是加上这个字段就会报错
+                    bz_dict['container_no'] = container_no
+                    bz_dict['unit_weight'] = unit_weight
+            if queryset:
+                query_list.extend(queryset)
+
+        # 分页
+        page = self.request.query_params.get("page", 1)
+        page_size = self.request.query_params.get("page_size", 10)
+        try:
+            st = (int(page) - 1) * int(page_size)
+            et = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+        else:
+            if st not in range(0, 99999):
+                raise ValidationError("page/page_size值异常")
+            if et not in range(0, 99999):
+                raise ValidationError("page/page_size值异常")
+        count = len(query_list)
+        result = query_list[st:et]
+        return Response({'results': result, "count": count})
