@@ -642,20 +642,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BzFinalMixingRubberInventory
-        fields = ['material_type',
-                  'material_no',
-                  'lot_no',
-                  'container_no',
-                  'location',
-                  'qty',
-                  'unit',
-                  'unit_weight',
-                  'total_weight',
-                  'quality_status',
-                  'product_info',
-                  'in_storage_time',
-                  'memo',
-                  'equip_no']
+        fields = "__all__"
 
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
@@ -669,16 +656,7 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
     class Meta:
         model = WmsInventoryStock
-        fields = ['material_type',
-                  'material_no',
-                  'lot_no',
-                  'container_no',
-                  'location',
-                  'qty',
-                  'unit',
-                  'unit_weight',
-                  'total_weight',
-                  'quality_status']
+        fields = "__all__"
 
 
 class InventoryLogSerializer(serializers.ModelSerializer):

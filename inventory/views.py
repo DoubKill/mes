@@ -340,7 +340,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = model.objects.using('bz').all()
             quality_status = self.request.query_params.get('quality_status', None)
             if quality_status:
-                queryset = queryset.filter(quality_status=quality_status)
+                queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
             # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
             if self.request.query_params.get("location_status"):
