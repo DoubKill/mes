@@ -320,7 +320,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         if warehouse_name and warehouse_name in self.INVENTORY_MODEL_BY_NAME:
             return self.INVENTORY_MODEL_BY_NAME[warehouse_name][index]
         else:
-            raise ValidationError('无此仓库名')
+            raise ValidationError(f'该仓库请移步{warehouse_name}专项页面查看')
 
     def get_query_params(self):
         for query in 'material_type', 'container_no', 'material_no':
@@ -349,7 +349,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = model.objects.using('lb').all()
             quality_status = self.request.query_params.get('quality_status', None)
             if quality_status:
-                queryset = queryset.filter(quality_status=quality_status)
+                queryset = queryset.filter(quality_level=quality_status)
         if queryset:
             if material_type and model != BzFinalMixingRubberInventory:
                 queryset = queryset.filter(material_type__icontains=material_type)
