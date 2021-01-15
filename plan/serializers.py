@@ -228,7 +228,9 @@ class ProductBatchingSerializer(BaseModelSerializer):
     def create(self, validated_data):
         stage_product_batch_no = validated_data['stage_product_batch_no']
         equip = validated_data['equip']
-        instance = ProductBatching.objects.filter(stage_product_batch_no=stage_product_batch_no, equip=equip)
+        batching_type = validated_data['batching_type']
+        instance = ProductBatching.objects.filter(stage_product_batch_no=stage_product_batch_no, equip=equip,
+                                                  batching_type=batching_type)
         if instance:
             instance.update(**validated_data)
         else:
@@ -491,7 +493,7 @@ class IssueBatchingClassesPlanSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BatchingClassesPlan
-        fields = ('equip', )
+        fields = ('equip',)
 
     def update(self, instance, validated_data):
         if instance.status == 1:
