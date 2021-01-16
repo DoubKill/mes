@@ -66,10 +66,10 @@ class WeightPackageLog(AbstractEntity):
     equip_no = models.CharField(max_length=64, help_text='称量设备编号')
     plan_batching_uid = models.CharField(max_length=64, help_text='小料称量计划号')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
-    # material_name = models.CharField(max_length=64, help_text='原材料名称')
-    # material_no = models.CharField(max_length=64, help_text='原材料编码')
-    # plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量')
-    # actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量')
+    material_name = models.CharField(max_length=64, help_text='物料打包名称')
+    material_no = models.CharField(max_length=64, help_text='物料打包编号')
+    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
+    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
     production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
     production_classes = models.CharField(max_length=64, help_text='生产班次')
@@ -185,3 +185,14 @@ class Version(models.Model):
 
     def __str__(self):
         return "{}----{}".format(self.get_type_display(), self.number)
+
+#
+# class MaterialSupplierCollect(AbstractEntity):
+#     bar_code = models.CharField(max_length=64, help_text='条形码')
+#     material_name = models.CharField(max_length=64, help_text='原材料名称')
+#     material_no = models.CharField(max_length=64, help_text='原材料编码')
+#     batch_no = models.CharField(max_length=64, help_text='批次号', blank=True, null=True)
+#
+#     class Meta:
+#         db_table = 'material_supplier_collect'
+#         verbose_name_plural = verbose_name = '物料条形码管理'

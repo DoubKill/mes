@@ -149,7 +149,9 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
         attr['production_group'] = batching_classes_plan.work_schedule_plan.group.global_name
         attr['dev_type'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name
         attr['product_no'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no
-        # attr['batch_time'] = datetime.datetime.now()
+        weigh_type_dict = {1: '-a', 2: '-b', 3: '-s'}
+        attr['material_no'] = attr['product_no'] + weigh_type_dict[batching_classes_plan.weigh_cnt_type.weigh_type]
+        attr['material_name'] = attr['product_no'] + weigh_type_dict[batching_classes_plan.weigh_cnt_type.weigh_type]
         return attr
 
     class Meta:
