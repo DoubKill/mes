@@ -327,6 +327,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             yield self.request.query_params.get(query, None)
 
     def get_queryset(self):
+        # 终炼胶，帘布库区分 货位地址开头1-4终炼胶   5-6帘布库
         model = self.divide_tool(self.MODEL)
         queryset = None
         material_type, container_no, material_no = self.get_query_params()
