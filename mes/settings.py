@@ -102,6 +102,15 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
 }
 
+
+REST_FRAMEWORK_EXTENSIONS = {
+    # 缓存时间(1小时)
+    'DEFAULT_CACHE_RESPONSE_TIMEOUT': 60 * 10,
+    # 缓存到哪里 (caches中配置的default)
+    'DEFAULT_USE_CACHE': 'default',
+}
+
+
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
     'JWT_ALLOW_REFRESH': True,
