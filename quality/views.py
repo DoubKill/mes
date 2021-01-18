@@ -350,11 +350,10 @@ class PalletFeedbacksTestListView(ListAPIView):
             pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
         if is_print == "已打印":
-            pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测', print_time=None)
+            filter_dict['print_time__isnull'] = False
         elif is_print == "未打印":
-            pfb_queryset = MaterialDealResult.objects.filter(**filter_dict, print_time=None).exclude(status='复测')
-        else:
-            pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
+            filter_dict['print_time__isnull'] = True
+        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
         return pfb_queryset
 
 
