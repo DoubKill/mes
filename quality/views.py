@@ -328,6 +328,7 @@ class PalletFeedbacksTestListView(ListAPIView):
         day_time = self.request.query_params.get('day_time', None)
         classes = self.request.query_params.get('classes', None)
         schedule_name = self.request.query_params.get('schedule_name', None)
+        is_print = self.request.query_params.get('is_print', None)
         filter_dict = {'delete_flag': False}
         pfb_filter = {}
         pcp_filter = {}
@@ -348,7 +349,12 @@ class PalletFeedbacksTestListView(ListAPIView):
         if pfb_filter:
             pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
-        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
+        if is_print == "已打印":
+            pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测', print_time=None)
+        elif is_print == "未打印":
+            pfb_queryset = MaterialDealResult.objects.filter(**filter_dict, print_time=None).exclude(status='复测')
+        else:
+            pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
         return pfb_queryset
 
 
@@ -519,7 +525,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             # If 'prefetch_related' has been applied to a queryset, we need to
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
-
+        MaterialDealResult.objects.filter(lot_no=instance.lot_no).update(print_time=datetime.datetime.now())
         return Response(serializer.data)
 
 
