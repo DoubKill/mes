@@ -15,6 +15,7 @@ from rest_framework import serializers
 
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
+from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
@@ -66,6 +67,19 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
 
     @atomic()
     def create(self, validated_data):
+        location = validated_data.get("location")
+        station = validated_data.get("station")
+        if not station:
+            raise serializers.ValidationError(f"请选择出库口")
+        if location:
+            if not location[0] in STATION_LOCATION_MAP[station]:
+                raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请先手动出库该托盘")
+        else:
+            material_no = validated_data.get("material_no")
+            location_set = BzFinalMixingRubberInventory.objects.filter(material_no=material_no).values_list("location", flat=True)
+            for location in location_set:
+                if not location[0] in STATION_LOCATION_MAP[station]:
+                    raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请先手动出库该托盘")
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
@@ -75,20 +89,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         order_type = validated_data.get('order_type', '出库')  # 订单类型
         validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
         #
-        # deliveryplan = DeliveryPlan.objects.create(order_no=order_no,
-        #                                            inventory_type=inventory_type,
-        #                                            material_no=material_no,
-        #                                            need_qty=need_qty,
-        #                                            warehouse_info=warehouse_info,
-        #                                            status=status,
-        #                                            order_type=order_type,
-        #                                            pallet_no=pallet_no,
-        #                                            unit=unit,
-        #                                            need_weight=need_weight,
-        #                                            created_user=created_user,
-        #                                            location=location,
-        #                                            inventory_reason=inventory_reason  # 出库原因
-        #                                            )
+
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
                                           order_type=order_type,

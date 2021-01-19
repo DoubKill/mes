@@ -277,11 +277,10 @@ class PutPlanManagement(ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data
         if isinstance(data, list):
-            for item in data:
-                s = PutPlanManagementSerializer(data=item, context={'request': request})
-                if not s.is_valid():
-                    raise ValidationError(s.errors)
-                s.save()
+            s = PutPlanManagementSerializer(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
         elif isinstance(data, dict):
             s = PutPlanManagementSerializer(data=data, context={'request': request})
             if not s.is_valid():

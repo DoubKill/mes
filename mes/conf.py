@@ -28,3 +28,10 @@ BZ_PASSWORD = "mes@_123"
 BZ_HOST = "10.4.23.101"
 
 WMS_CONF = dict(host='10.4.24.25', user='sa', database='zhada_wms_zhongc', password='Admin123$')
+
+STATION_LOCATION_MAP = {
+    "一层前端": ["3", "4"],
+    "一层后端": [],  # 暂未给出
+    "二层前端": ["1", "2"],
+    "二层后端": ["1", "2"]
+}

@@ -249,6 +249,7 @@ class DeliveryPlan(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
     equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
                                    related_name='dispatch_mix_deliverys')
@@ -282,6 +283,7 @@ class DeliveryPlanLB(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
     equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
                                    related_name='dispatch_lb_deliverys')
@@ -315,6 +317,7 @@ class DeliveryPlanFinal(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
     equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
                                    related_name='dispatch_final_deliverys')
