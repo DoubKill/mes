@@ -113,7 +113,6 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-        print(validated_data)
         order_results = validated_data.pop('order_results', None)
         test_order = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
                                                       actual_trains=validated_data['actual_trains']).first()
