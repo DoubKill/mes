@@ -1123,7 +1123,8 @@ class ImportAndExportView(APIView):
                 date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
                 factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
                 pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date, classes=i[3] + '班',
-                                                         product_no=i[0]).first()
+                                                         product_no=i[0], begin_trains__lte=i[6],
+                                                         end_trains__gte=i[6]).first()
                 test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
                                                               actual_trains=i[6]).first()
                 if test_order:
