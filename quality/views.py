@@ -15,6 +15,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
+from rest_framework_extensions.cache.decorators import cache_response
+
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 from mes import settings
@@ -734,6 +736,7 @@ class PrintMaterialDealResult(APIView):
 
 class AllMixin:
 
+    @cache_response(timeout=60 * 10, cache='default')
     def list(self, request, *args, **kwargs):
         if 'all' in self.request.query_params:
             queryset = self.filter_queryset(self.get_queryset())

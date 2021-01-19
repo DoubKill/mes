@@ -624,7 +624,7 @@ def get_trains_feed_backs_query_params(view):
     query_params = view.request.query_params
     hour_step = int(query_params.get('hour_step', 2))
     classes = query_params.getlist('classes[]')
-    factory_date = query_params.get('factory_date')
+    factory_date = query_params.get('factory_date', datetime.datetime.now().strftime('%Y-%m-%d'))
     return hour_step, classes, factory_date
 
 
@@ -633,6 +633,7 @@ def zno_(obj):
 
 
 # 产量计划实际分析
+@method_decorator([api_recorder], name="dispatch")
 class ProductionPlanRealityAnalysisView(ListAPIView):
     queryset = TrainsFeedbacks.objects.all()
     serializer_class = ProductionPlanRealityAnalysisSerializer
