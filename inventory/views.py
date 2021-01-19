@@ -267,29 +267,6 @@ class OutWorkFeedBack(APIView):
         return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
 
-@method_decorator([api_recorder], name="dispatch")
-class PutPlanManagement(ModelViewSet):
-    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
-    serializer_class = PutPlanManagementSerializer
-    filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementFilter
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if isinstance(data, list):
-            s = PutPlanManagementSerializer(data=data, context={'request': request}, many=True)
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        elif isinstance(data, dict):
-            s = PutPlanManagementSerializer(data=data, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        else:
-            raise ValidationError('参数错误')
-        return Response('新建成功')
-
 
 @method_decorator([api_recorder], name="dispatch")
 class OverdueMaterialManagement(ModelViewSet):
@@ -470,57 +447,6 @@ class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['warehouse_info']
 
-
-@method_decorator([api_recorder], name="dispatch")
-class PutPlanManagementLB(ModelViewSet):
-    queryset = DeliveryPlanLB.objects.filter().order_by("-created_date")
-    serializer_class = PutPlanManagementSerializerLB
-    filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementLBFilter
-    permission_classes = (IsAuthenticated,)
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if isinstance(data, list):
-            for item in data:
-                s = PutPlanManagementSerializerLB(data=item, context={'request': request})
-                if not s.is_valid():
-                    raise ValidationError(s.errors)
-                s.save()
-        elif isinstance(data, dict):
-            s = PutPlanManagementSerializerLB(data=data, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        else:
-            raise ValidationError('参数错误')
-        return Response('新建成功')
-
-
-@method_decorator([api_recorder], name="dispatch")
-class PutPlanManagementFianl(ModelViewSet):
-    queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
-    serializer_class = PutPlanManagementSerializerFinal
-    filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementFinalFilter
-    permission_classes = (IsAuthenticated,)
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if isinstance(data, list):
-            for item in data:
-                s = PutPlanManagementSerializerFinal(data=item, context={'request': request})
-                if not s.is_valid():
-                    raise ValidationError(s.errors)
-                s.save()
-        elif isinstance(data, dict):
-            s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        else:
-            raise ValidationError('参数错误')
-        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -755,3 +681,77 @@ class MaterialInventoryAPIView(APIView):
         count = len(query_list)
         result = query_list[st:et]
         return Response({'results': result, "count": count})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagement(ModelViewSet):
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFilter
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = PutPlanManagementSerializer(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializer(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementLB(ModelViewSet):
+    queryset = DeliveryPlanLB.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerLB
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementLBFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = PutPlanManagementSerializerLB(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerLB(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementFianl(ModelViewSet):
+    queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerFinal
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFinalFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = PutPlanManagementSerializerFinal(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
