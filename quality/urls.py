@@ -14,7 +14,7 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, LabelPrintViewSet, DealSuggestionView, \
     MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, PrintMaterialDealResult, \
     BatchDayStatisticsView, BatchProductNoDayStatisticsView, BatchProductNoMonthStatisticsView, \
-    UnqualifiedDealOrderViewSet, UnqualifiedOrderTrains
+    UnqualifiedDealOrderViewSet, UnqualifiedOrderTrains, ImportAndExportView
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -53,13 +53,14 @@ router.register('batch-product-no-month-statistics', BatchProductNoMonthStatisti
 
 # 不合格处置单
 router.register('unqualified-deal-orders', UnqualifiedDealOrderViewSet)
+# 快检信息综合管里详情
+router.register('pallet-feed-test', PalletFeedbacksTestListView),
 
 urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
     path('result-status/', MaterialDealStatusListView.as_view()),  # 不合格状态筛选
     path('deal-type/', DealTypeView.as_view()),
-    path('pallet-feed-test/', PalletFeedbacksTestListView.as_view()),  # 快检信息综合管里
     # path('material_valid_time/', MaterialDealResultUpdateValidTime.as_view()),  # 快检信息综合管理修改有效时间
     path('mat-test-indicator-methods/', MaterialTestIndicatorMethods.as_view()),
     path('product_day_statistics/', ProductDayStatistics.as_view()),  # 胶料日合格率统计
@@ -68,5 +69,6 @@ urlpatterns = [
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
     path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
     path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
+    path('import-material-test-orders/', ImportAndExportView.as_view()),  # 快检数据导入
     path('', include(router.urls)),
 ]

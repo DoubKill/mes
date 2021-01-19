@@ -327,7 +327,6 @@ class PalletFeedbacksTestListView(ModelViewSet):
     filter_class = PalletFeedbacksTestFilter
 
     def get_serializer_class(self):
-        print(self.action)
         if self.action == 'list':
             return MaterialDealResultListSerializer1
         elif self.action == "retrieve":
