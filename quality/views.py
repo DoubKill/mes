@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,6 +24,7 @@ from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan
+from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
@@ -38,9 +39,10 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
     TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
     BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
-    UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer
+    UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
+    MaterialDealResultListSerializer1
 from django.db.models import Q
-from quality.utils import print_mdr
+from quality.utils import print_mdr, get_cur_sheet, get_sheet_data
 from recipe.models import Material, ProductBatching
 import logging
 from django.db.models import Max, Sum
@@ -317,12 +319,21 @@ class MaterialDealResultUpdateValidTime(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class PalletFeedbacksTestListView(ListAPIView):
+class PalletFeedbacksTestListView(ModelViewSet):
     # 快检信息综合管里
     queryset = MaterialDealResult.objects.filter(delete_flag=False)
     serializer_class = MaterialDealResultListSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = PalletFeedbacksTestFilter
+
+    def get_serializer_class(self):
+        print(self.action)
+        if self.action == 'list':
+            return MaterialDealResultListSerializer1
+        elif self.action == "retrieve":
+            return MaterialDealResultListSerializer
+        else:
+            raise ValidationError('本接口只提供查询功能')
 
     def get_queryset(self):
         equip_no = self.request.query_params.get('equip_no', None)
@@ -1091,3 +1102,87 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         serializer_data['form_head_data'] = form_head_data
         serializer_data['deal_details'] = ret.values()
         return Response(serializer_data)
+
+
+class ImportAndExportView(APIView):
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        """快检数据导入"""
+        file = request.FILES.get('file')
+        cur_sheet = get_cur_sheet(file)
+        data = get_sheet_data(cur_sheet, start_row=2)
+        for i in data:
+            by_dict = {'比重': 7, '硬度': 8}
+            for j in ['比重', '硬度']:
+                m_obj = Material.objects.filter(material_name=i[0]).first()
+                dp_obj = DataPoint.objects.filter(name__contains=j).first()
+                mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
+                        'test_method_name': mtm_obj.test_method.name,
+                        'test_indicator_name': dp_obj.test_type.test_indicator.name}
+                delta = datetime.timedelta(days=i[2])
+                date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
+                factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+                pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date, classes=i[3] + '班',
+                                                         product_no=i[0]).first()
+                test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
+                                                              actual_trains=i[6]).first()
+                if test_order:
+                    instance = test_order
+                    created = False
+                else:
+                    validated_data = {}
+                    validated_data['material_test_order_uid'] = UUidTools.uuid1_hex('KJ')
+                    validated_data['actual_trains'] = i[6]
+                    validated_data['lot_no'] = pfb_obj.lot_no
+                    validated_data['product_no'] = i[0]
+                    validated_data['plan_classes_uid'] = pfb_obj.plan_classes_uid
+                    validated_data['production_class'] = i[3] + '班'
+                    validated_data['production_equip_no'] = i[4]
+                    validated_data['production_factory_date'] = factory_date
+                    instance = MaterialTestOrder.objects.create(**validated_data)
+                    created = True
+                material_no = i[0]
+                if not item.get('value'):
+                    continue
+                item['material_test_order'] = instance
+                item['test_factory_date'] = datetime.datetime.now()
+                if created:
+                    item['test_times'] = 1
+                else:
+                    last_test_result = MaterialTestResult.objects.filter(
+                        material_test_order=instance,
+                        test_indicator_name=item['test_indicator_name'],
+                        data_point_name=item['data_point_name'],
+                    ).order_by('-test_times').first()
+                    if last_test_result:
+                        item['test_times'] = last_test_result.test_times + 1
+                    else:
+                        item['test_times'] = 1
+                material_test_method = MaterialTestMethod.objects.filter(
+                    material__material_no=material_no,
+                    test_method__name=item['test_method_name'],
+                    test_method__test_type__test_indicator__name=item['test_indicator_name'],
+                    data_point__name=item['data_point_name'],
+                    data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+                if material_test_method:
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        material_test_method=material_test_method,
+                        data_point__name=item['data_point_name'],
+                        data_point__test_type__test_indicator__name=item['test_indicator_name'],
+                        upper_limit__gte=item['value'],
+                        lower_limit__lte=item['value']).first()
+                    if indicator:
+                        item['mes_result'] = indicator.result
+                        item['data_point_indicator'] = indicator
+                        item['level'] = indicator.level
+                    else:
+                        item['mes_result'] = '三等品'
+                        item['level'] = 2
+                else:
+                    item['mes_result'] = '三等品'
+                    item['level'] = 2
+                item['created_user'] = request.user  # 加一个create_user
+                item['test_class'] = i[3] + '班'  # 暂时先这么写吧
+                MaterialTestResult.objects.create(**item)
+        return Response('导入成功')

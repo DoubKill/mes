@@ -1,6 +1,9 @@
+import xlrd
 import xlwt
 from django.http import HttpResponse
 from io import BytesIO
+
+from rest_framework import serializers
 
 from quality.serializers import DealResultDealSerializer
 
@@ -66,3 +69,35 @@ def print_mdr(filename: str, queryset):
         output.seek(0)
         response.write(output.getvalue())
     return response
+
+def get_cur_sheet(excel_file):
+    """
+    获取当前工作sheet
+    @param excel_file: excel模板文件
+    @return: 当前工作sheet
+    """
+    file_name = excel_file.name
+    if not file_name.split('.')[-1] in ['xls', 'xlsx', 'xlsm']:
+        raise serializers.ValidationError('文件格式错误,仅支持 xls、xlsx、xlsm文件')
+    try:
+        data = xlrd.open_workbook(filename=None, file_contents=excel_file.read())
+        cur_sheet = data.sheets()[0]
+    except Exception:
+        raise serializers.ValidationError('打开文件错误')
+    return cur_sheet
+
+
+def get_sheet_data(sheet, start_row=1):
+    """
+    获取excel文件所有数据
+    @param start_row: 开始取数据的行数
+    @param sheet:当前工作sheet
+    @return: sheet列表数据
+    """
+    rows_num = sheet.nrows  # sheet行数
+    if rows_num <= start_row:
+        return []
+    ret = [None] * (rows_num - start_row)
+    for i in range(start_row, rows_num):
+        ret[i-start_row] = sheet.row_values(i)
+    return ret
