@@ -39,7 +39,7 @@ class BatchChargeLog(AbstractEntity):
     )
     equip_no = models.CharField(max_length=64, help_text='机台编号')
     plan_classes_uid = models.CharField(max_length=64, help_text='班次计划唯一码')
-    trains = models.IntegerField(max_length=64, help_text='车次')
+    trains = models.IntegerField(help_text='车次')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
     material_no = models.CharField(max_length=64, help_text='原材料编码')

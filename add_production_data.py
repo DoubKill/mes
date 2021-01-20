@@ -75,7 +75,7 @@ def main():
                         production_equip_no=pcp.equip.equip_no,
                         production_factory_date=pcp.work_schedule_plan.plan_schedule.day_time)
                     for i in range(random.randint(1, 3)):
-                        level = random.choice([1, 2])
+                        level = random.choice([1, 1, 1, 1, 2, 1, 1, 1, 1])
                         value = random.randint(1, 100) if level == 1 else random.randint(101, 200)
                         data = {
                             '门尼': {'门尼粘度': {'160*3': ['ML1+4']}},

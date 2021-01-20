@@ -333,7 +333,7 @@ class UnqualifiedDealOrder(AbstractEntity):
 class UnqualifiedDealOrderDetail(AbstractEntity):
     unqualified_deal_order = models.ForeignKey(UnqualifiedDealOrder, help_text='处置单',
                                                on_delete=models.CASCADE, related_name='deal_details')
-    unqualified_deal_order_detail_uid = models.CharField(max_length=64, help_text='唯一码', unique=True)
+    unqualified_deal_order_detail_uid = models.CharField(max_length=64, help_text='唯一码')
     material_test_order = models.OneToOneField(MaterialTestOrder, help_text='物料检测单',
                                                on_delete=models.CASCADE, related_name='unqualified_order')
 
