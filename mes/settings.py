@@ -102,6 +102,15 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
 }
 
+
+REST_FRAMEWORK_EXTENSIONS = {
+    # 缓存时间(1小时)
+    'DEFAULT_CACHE_RESPONSE_TIMEOUT': 60 * 10,
+    # 缓存到哪里 (caches中配置的default)
+    'DEFAULT_USE_CACHE': 'default',
+}
+
+
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
     'JWT_ALLOW_REFRESH': True,
@@ -297,6 +306,23 @@ DATABASES = {
         },
     }
 }
+
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'my_cache_table', # 设置一个数据库存放缓存的表名
+    },
+    'OPTIONS':{
+            'MAX_ENTRIES': 30,                                       # 最大缓存个数（默认300）
+            'CULL_FREQUENCY': 3,                                      # 缓存到达最大个数之后，剔除缓存个数的比例，即：1/CULL_FREQUENCY（默认3），3：表示1/3
+        },
+        # 这边只的是缓存的key：p1:1:func_name
+        'KEY_PREFIX': 'p1',                                             # 缓存key的前缀（默认空）
+        'VERSION': 1,                                                 # 缓存key的版本（默认1）
+        'KEY_FUNCTION':"func_name"                                   # 生成key的函数（默认函数会生成为：【前缀:版本:key】）
+}
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
