@@ -216,10 +216,23 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultListSerializer(BaseModelSerializer):
+    upper_lower = serializers.SerializerMethodField(read_only=True)
+
+    def get_upper_lower(self, obj):
+        mdp_obj = MaterialDataPointIndicator.objects.filter(
+            material_test_method__material__material_name=obj.material_test_order.product_no,
+            material_test_method__test_method__name=obj.test_method_name,
+            material_test_method__data_point__name=obj.data_point_name,
+            data_point__name=obj.data_point_name, level=1).first()
+        if not mdp_obj:
+            return None
+        else:
+            return f'{mdp_obj.lower_limit}-{mdp_obj.upper_limit}'
+
     class Meta:
         model = MaterialTestResult
         fields = ('test_times', 'value', 'data_point_name', 'test_method_name',
-                  'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level')
+                  'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level', 'upper_lower')
 
 
 class MaterialTestOrderListSerializer(BaseModelSerializer):
@@ -1079,7 +1092,6 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
     deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
     deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
     deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
-
 
     def get_deal_suggestion(self, obj):
         if obj.status == "已处理":
