@@ -6,7 +6,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan
 from terminal.models import BatchChargeLog, EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
-    WeightPackageLog
+    WeightPackageLog, MaterialSupplierCollect
 
 
 class BatchChargeLogSerializer(BaseModelSerializer):
@@ -18,25 +18,29 @@ class BatchChargeLogSerializer(BaseModelSerializer):
 
 class BatchChargeLogCreateSerializer(BaseModelSerializer):
 
-    def create(self, validated_data):
-        classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
+    def validate(self, attrs):
+        bra_code = attrs['bra_code']
+        mat_supplier_collect = MaterialSupplierCollect.objects.filter(bra_code=bra_code, delete_flag=False).first()
+        if not mat_supplier_collect:
+            raise serializers.ValidationError('未找到该条形码信息！')
+        classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=attrs['plan_classes_uid']).first()
         if not classes_plan:
-            raise serializers.ValidationError('该计划编号错误')
-        validated_data['production_factory_date'] = classes_plan.work_schedule_plan.plan_schedule.day_time
-        validated_data['production_classes'] = classes_plan.work_schedule_plan.classes.global_name
-        validated_data['production_group'] = classes_plan.work_schedule_plan.group.global_name
+            raise serializers.ValidationError('该计划不存在')
+        attrs['production_factory_date'] = classes_plan.work_schedule_plan.plan_schedule.day_time
+        attrs['production_classes'] = classes_plan.work_schedule_plan.classes.global_name
+        attrs['production_group'] = classes_plan.work_schedule_plan.group.global_name
+        attrs['product_no'] = classes_plan.product_batching.stage_product_batch_no
+        attrs['equip_no'] = classes_plan.equip.equip_no
+        if mat_supplier_collect.material_no not in classes_plan.product_batching.batching_material_nos:
+            attrs['status'] = 2
         # validated_data['batch_time'] = datetime.datetime.now()
-        # TODO 后期根据扫描的条形码找到绑定的原材料数据
-        validated_data['material_name'] = 'TEST_MATERIAL'
-        validated_data['material_no'] = 'TEST_NO'
-        validated_data['plan_weight'] = 111
-        validated_data['actual_weight'] = 111
-        return super().create(validated_data)
+        attrs['material_name'] = mat_supplier_collect.material_name
+        attrs['material_no'] = mat_supplier_collect.material_no
+        return attrs
 
     class Meta:
         model = BatchChargeLog
-        fields = ('equip_no', 'plan_classes_uid', 'product_no', 'bra_code',
-                  'status', 'batch_classes', 'batch_group', 'trains')
+        fields = ('plan_classes_uid', 'bra_code', 'batch_classes', 'batch_group', 'trains')
 
 
 class EquipOperationLogSerializer(BaseModelSerializer):
@@ -79,6 +83,9 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         batching_classes_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=attr['plan_batching_uid']).first()
         if not batching_classes_plan:
             raise serializers.ValidationError('参数错误')
+        mat_supplier_collect = MaterialSupplierCollect.objects.filter(bra_code=attr['bra_code'], delete_flag=False).first()
+        if not mat_supplier_collect:
+            raise serializers.ValidationError('未找到该条形码信息！')
         attr['trains'] = batching_classes_plan.plan_package
         attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
         attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
@@ -86,11 +93,10 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         attr['dev_type'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name
         attr['product_no'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no
         # attr['batch_time'] = datetime.datetime.now()
-        # TODO 后期根据扫描的条形码找到绑定的原材料数据
-        attr['material_name'] = 'TEST_MATERIAL'
-        attr['material_no'] = 'TEST_NO'
-        attr['actual_weight'] = 111
-        attr['plan_weight'] = 0
+        if mat_supplier_collect.material_no not in batching_classes_plan.weigh_cnt_type.weighting_material_nos:
+            attr['status'] = 2
+        attr['material_name'] = mat_supplier_collect.material_name
+        attr['material_no'] = mat_supplier_collect.material_no
         return attr
 
     class Meta:

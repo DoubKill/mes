@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Max, Q
+from django.db.models import Max
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import EquipCategoryAttribute, WorkSchedulePlan
-from mes.common_code import CommonDeleteMixin
+from basics.models import WorkSchedulePlan
+from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
 from production.models import TrainsFeedbacks
@@ -100,7 +100,7 @@ class BatchProductionInfoView(APIView):
                     current_product_data['trains'] = train_feedback.actual_trains
                     current_product_data['weight'] = train_feedback.actual_weight
                 else:
-                    current_product_data['trains'] = 1
+                    current_product_data['trains'] = 2
                     current_product_data['weight'] = 0
 
         return Response({'plan_actual_data': plan_actual_data,
@@ -162,7 +162,7 @@ class BatchProductBatchingVIew(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class BatchChargeLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericViewSet):
+class BatchChargeLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         投料履历
@@ -223,7 +223,7 @@ class WeightBatchingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, G
 
 
 @method_decorator([api_recorder], name="dispatch")
-class FeedingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericViewSet):
+class FeedingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         投料履历
@@ -271,7 +271,7 @@ class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class WeightPackageLogViewSet(mixins.CreateModelMixin,
+class WeightPackageLogViewSet(TerminalCreateAPIView,
                               mixins.ListModelMixin,
                               mixins.UpdateModelMixin,
                               mixins.RetrieveModelMixin,
@@ -345,13 +345,6 @@ class BarCodeTank(APIView):
     def get(self, request):
         bar_code = self.request.query_params.get('bar_code')
         return Response(WeightTankStatus.objects.filter().values('tank_no')[0])
-
-
-class DevTypeView(APIView):
-    """获取所以机型下拉框"""
-
-    def get(self, request):
-        return Response(set(EquipCategoryAttribute.objects.values_list('category_name', flat=True)))
 
 
 @method_decorator([api_recorder], name="dispatch")

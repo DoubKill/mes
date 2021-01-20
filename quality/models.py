@@ -186,6 +186,7 @@ class MaterialTestOrder(AbstractEntity):
     production_equip_no = models.CharField(max_length=64, help_text='机台')
     production_factory_date = models.DateField(help_text='工厂日期')
     note = models.TextField(max_length=100, help_text='备注', blank=True, null=True)
+    is_qualified = models.BooleanField(help_text='是否合格', default=True)
 
     class Meta:
         db_table = 'material_test_order'
