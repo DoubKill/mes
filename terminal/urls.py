@@ -23,7 +23,7 @@ urlpatterns = [
     path('', include(router.urls)),
     path('check-version/', CheckVersion.as_view()),  # 开机检查版本
     path('batch-bacisinfo/', BatchBasicInfoView.as_view()),  # 获取设备基础信息
-    path('batch-productinfo/', BatchProductionInfoView.as_view()),  # 投料-获取生产信息
+    path('batch-productinfo/', BatchProductionInfoView.as_view()),  # 投料-获取当前班次计划信息以及当前投料信息
     path('batch-batching-info/', BatchProductBatchingVIew.as_view()),  # 投料-获取配方信息
     path('batch-equip-operation-log/', EquipOperationLogView.as_view()),  # 投料-机台停机/开机操作
     path('batching-classes-plan/', BatchingClassesPlanView.as_view()),  # 配料班次计划列表

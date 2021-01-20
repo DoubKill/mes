@@ -146,21 +146,21 @@ class ProductBatching(AbstractEntity):
 
     @property
     def batching_material_nos(self):
-        material_nos = []
-        detail_material_nos = list(self.batching_details.filter(
-            delete_flag=False).values_list('material__material_no', flat=True))
-        material_nos.extend(detail_material_nos)
+        material_nos = set((self.batching_details.filter(
+            delete_flag=False).values_list('material__material_no', flat=True)))
         weight_batching = getattr(self, 'weighbatching', None)
         if weight_batching:
             cnt_types = weight_batching.weighcnttype_set.filter()
             for cnt_type in cnt_types:
                 if cnt_type.weighbatchingdetail_set.filter():
+                    material_nos = material_nos.difference(
+                        set(cnt_type.weighbatchingdetail_set.values_list('material__material_no', flat=True)))
                     if cnt_type.weigh_type == 1:
-                        material_nos.append(self.stage_product_batch_no + '-a')
+                        material_nos.add(self.stage_product_batch_no + '-a')
                     elif cnt_type.weigh_type == 2:
-                        material_nos.append(self.stage_product_batch_no + '-b')
+                        material_nos.add(self.stage_product_batch_no + '-b')
                     else:
-                        material_nos.append(self.stage_product_batch_no + '-s')
+                        material_nos.add(self.stage_product_batch_no + '-s')
         return material_nos
 
     class Meta:

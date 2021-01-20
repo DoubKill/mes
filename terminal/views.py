@@ -56,7 +56,7 @@ class BatchBasicInfoView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BatchProductionInfoView(APIView):
-    """根据mac地址、班次， 获取生产信息和当前生产的规格；参数：?mac_address=xxx&classes=xxx"""
+    """根据mac地址、班次， 获取生产计划信息和当前生产的规格；参数：?mac_address=xxx&classes=xxx"""
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
@@ -95,13 +95,37 @@ class BatchProductionInfoView(APIView):
             )
             if plan.status == '运行中':
                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
-                train_feedback = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).last()
-                if train_feedback:
-                    current_product_data['trains'] = train_feedback.actual_trains
-                    current_product_data['weight'] = train_feedback.actual_weight
+                current_product_data['weight'] = 0
+                max_trains = BatchChargeLog.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid,
+                        status=1).aggregate(max_train=Max('trains'))['max_train']
+
+                # 投料成功次数小于等于该配方的标准数量，则车次为1
+                print(BatchChargeLog.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid,
+                        status=1
+                ).count())
+                print(len(plan.product_batching.batching_material_nos))
+                if BatchChargeLog.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid,
+                        status=1
+                ).count() < len(plan.product_batching.batching_material_nos):
+                    current_product_data['trains'] = 1
+
+                # 如果配方的标准都投入成功则当前车次为最大车次加1，否则当前车次就是最大车次
                 else:
-                    current_product_data['trains'] = 2
-                    current_product_data['weight'] = 0
+                    if max_trains == plan.plan_trains:
+                        current_product_data['trains'] = max_trains
+                    else:
+                        current_train = max_trains + 1
+                        for material_no in plan.product_batching.batching_material_nos:
+                            if not BatchChargeLog.objects.filter(
+                                    plan_classes_uid=plan.plan_classes_uid,
+                                    status=1,
+                                    material_no=material_no,
+                                    trains=max_trains):
+                                current_train = max_trains
+                        current_product_data['trains'] = current_train
 
         return Response({'plan_actual_data': plan_actual_data,
                          'current_product_data': current_product_data})
