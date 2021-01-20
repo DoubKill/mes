@@ -42,7 +42,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
     MaterialDealResultListSerializer1
 from django.db.models import Q
-from quality.utils import print_mdr, get_cur_sheet, get_sheet_data
+from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching
 import logging
 from django.db.models import Max, Sum
@@ -199,7 +199,8 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
-    pagination_class = None
+
+    # pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -1104,6 +1105,11 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
 
 
 class ImportAndExportView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        """快检数据导入模板"""
+        return export_mto()
+
     @atomic()
     def post(self, request, *args, **kwargs):
         """快检数据导入"""
@@ -1114,17 +1120,26 @@ class ImportAndExportView(APIView):
             by_dict = {'比重': 7, '硬度': 8}
             for j in ['比重', '硬度']:
                 m_obj = Material.objects.filter(material_name=i[0].strip()).first()
+                if not m_obj:
+                    raise ValidationError(f'{i[0]}胶料信息不存在')
                 dp_obj = DataPoint.objects.filter(name__contains=j).first()
+                if not dp_obj:
+                    raise ValidationError(f'{j}数据点信息不存在')
                 mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                if not mtm_obj:
+                    raise ValidationError(f"{i[0]}与{j}d的物料实验方法不存在")
                 item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
                         'test_method_name': mtm_obj.test_method.name,
                         'test_indicator_name': dp_obj.test_type.test_indicator.name}
                 delta = datetime.timedelta(days=i[2])
                 date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
                 factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
-                pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date, classes=i[3].strip() + '班',
+                pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date,
+                                                         classes=i[3].strip() + '班',
                                                          product_no=i[0].strip(), begin_trains__lte=i[6],
                                                          end_trains__gte=i[6]).first()
+                if not pfb_obj:
+                    raise ValidationError('托盘产出反馈不存在')
                 test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
                                                               actual_trains=i[6]).first()
                 if test_order:

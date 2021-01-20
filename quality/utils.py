@@ -70,6 +70,7 @@ def print_mdr(filename: str, queryset):
         response.write(output.getvalue())
     return response
 
+
 def get_cur_sheet(excel_file):
     """
     获取当前工作sheet
@@ -99,5 +100,41 @@ def get_sheet_data(sheet, start_row=1):
         return []
     ret = [None] * (rows_num - start_row)
     for i in range(start_row, rows_num):
-        ret[i-start_row] = sheet.row_values(i)
+        ret[i - start_row] = sheet.row_values(i)
     return ret
+
+
+def export_mto():
+    """快检数据导入模板"""
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    filename = '快检数据导入模板'
+    response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode('ISO-8859-1') + '.xls'
+    # 创建工作簿
+    style = xlwt.XFStyle()
+    style.alignment.wrap = 1
+    ws = xlwt.Workbook(encoding='utf-8')
+
+    # 添加第一页数据表
+    w = ws.add_sheet('快检数据导入模板')  # 新建sheet（sheet的名称为"sheet1"）
+    for j in [0, 1, 2, 3, 4, 5, 9]:
+        first_col = w.col(j)
+        first_col.width = 256 * 20
+    # 写入表头
+    w.write(0, 0, u'检测数据录入')
+    w.write(1, 0, u'胶料规格编码')
+    w.write(1, 1, u'判定日期(2020/01/01)')
+    w.write(1, 2, u'密炼日期(2020/01/01)')
+    w.write(1, 3, u'''班次\n（早、中、夜）''')
+    w.write(1, 4, u'机台\n（Z01-Z15）')
+    w.write(1, 5, u'检测班组(A,B,C）')
+    w.write(1, 6, u'车次')
+    w.write(1, 7, u'比重值')
+    w.write(1, 8, u'硬度值')
+    w.write(1, 9, u'是否合格\n（Y：合格 N：不合格）')
+
+    output = BytesIO()
+    ws.save(output)
+    # 重新定位到开始
+    output.seek(0)
+    response.write(output.getvalue())
+    return response
