@@ -1113,7 +1113,7 @@ class ImportAndExportView(APIView):
         for i in data:
             by_dict = {'比重': 7, '硬度': 8}
             for j in ['比重', '硬度']:
-                m_obj = Material.objects.filter(material_name=i[0]).first()
+                m_obj = Material.objects.filter(material_name=i[0].strip()).first()
                 dp_obj = DataPoint.objects.filter(name__contains=j).first()
                 mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
                 item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
@@ -1122,8 +1122,8 @@ class ImportAndExportView(APIView):
                 delta = datetime.timedelta(days=i[2])
                 date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
                 factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
-                pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date, classes=i[3] + '班',
-                                                         product_no=i[0], begin_trains__lte=i[6],
+                pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date, classes=i[3].strip() + '班',
+                                                         product_no=i[0].strip(), begin_trains__lte=i[6],
                                                          end_trains__gte=i[6]).first()
                 test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
                                                               actual_trains=i[6]).first()
@@ -1135,14 +1135,14 @@ class ImportAndExportView(APIView):
                     validated_data['material_test_order_uid'] = UUidTools.uuid1_hex('KJ')
                     validated_data['actual_trains'] = i[6]
                     validated_data['lot_no'] = pfb_obj.lot_no
-                    validated_data['product_no'] = i[0]
+                    validated_data['product_no'] = i[0].strip()
                     validated_data['plan_classes_uid'] = pfb_obj.plan_classes_uid
-                    validated_data['production_class'] = i[3] + '班'
+                    validated_data['production_class'] = i[3].strip() + '班'
                     validated_data['production_equip_no'] = i[4]
                     validated_data['production_factory_date'] = factory_date
                     instance = MaterialTestOrder.objects.create(**validated_data)
                     created = True
-                material_no = i[0]
+                material_no = i[0].strip()
                 if not item.get('value'):
                     continue
                 item['material_test_order'] = instance
@@ -1183,6 +1183,6 @@ class ImportAndExportView(APIView):
                     item['mes_result'] = '三等品'
                     item['level'] = 2
                 item['created_user'] = request.user  # 加一个create_user
-                item['test_class'] = i[3] + '班'  # 暂时先这么写吧
+                item['test_class'] = i[3].strip() + '班'  # 暂时先这么写吧
                 MaterialTestResult.objects.create(**item)
         return Response('导入成功')
