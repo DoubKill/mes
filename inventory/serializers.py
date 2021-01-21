@@ -19,7 +19,7 @@ from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal, MixGumOutInventoryLog
+    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -54,8 +54,6 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                                                           actual_weight=Sum('weight'))
         actual_qty = actual['actual_qty']
         actual_weight = actual['actual_weight']
-        # 无法合计
-        # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
         items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
 
@@ -96,12 +94,6 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                                           status=status,
                                           created_user=created_user,
                                           )
-        # dps_dict = {'warehouse_info': warehouse_info,
-        #             'order_no': order_no,
-        #             "order_type": order_type,
-        #             "status": status}
-        #
-        # self.create_dps(DeliveryPlan, dps_dict)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -230,8 +222,6 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
                                                                           actual_weight=Sum('weight'))
         actual_qty = actual['actual_qty']
         actual_weight = actual['actual_weight']
-        # 无法合计
-        # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
         items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
         return items
 
@@ -265,33 +255,12 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         validated_data["created_user"] = created_user
         order_type = validated_data.get('order_type', '出库')  # 订单类型
         validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
-
-        # deliveryplan = DeliveryPlanLB.objects.create(order_no=order_no,
-        #                                            inventory_type=inventory_type,
-        #                                            material_no=material_no,
-        #                                            need_qty=need_qty,
-        #                                            warehouse_info=warehouse_info,
-        #                                            status=status,
-        #                                            order_type=order_type,
-        #                                            pallet_no=pallet_no,
-        #                                            unit=unit,
-        #                                            need_weight=need_weight,
-        #                                            created_user=created_user,
-        #                                            location=location,
-        #                                            inventory_reason=inventory_reason  # 出库原因
-        #                                            )
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
                                           order_type=order_type,
                                           status=status,
                                           created_user=created_user,
                                           )
-        # dps_dict = {'warehouse_info': warehouse_info,
-        #             'order_no': order_no,
-        #             "order_type": order_type,
-        #             "status": status}
-        #
-        # self.create_dps(DeliveryPlan, dps_dict)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -653,30 +622,48 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = WmsInventoryStock
         fields = "__all__"
 
 
 class InventoryLogSerializer(serializers.ModelSerializer):
-    initiator = serializers.ReadOnlyField(source='initiator.username')
+    product_info = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = InventoryLog
-        fields = ['order_type',
-                  'order_no',
-                  # 'warehouse_type',
-                  'pallet_no',
-                  'material_no',
-                  'inout_reason',
-                  'inout_num_type',
-                  'qty',
-                  'unit',
-                  'weight',
-                  'initiator',
-                  'start_time',
-                  'fin_time'
-                  ]
+        fields = "__all__"
+
+    def get_product_info(self, obj):
+        if obj.lot_no:
+            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+            return {
+                "equip_no": pf.equip_no,
+                "classes": f"{pf.factory_date}/{pf.classes}",
+                "memo": f"{pf.begin_trains},{pf.end_trains}"
+            }
+        else:
+            return {
+                "equip_no": "",
+                "classes": "",
+                "memo": "",
+            }
+
+
+
+class MixGumOutInventoryLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = MixGumOutInventoryLog
+        fields = "__all__"
+
+
+class MixGumInInventoryLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = MixGumInInventoryLog
+        fields = "__all__"
 
 
 class WarehouseInfoSerializer(serializers.ModelSerializer):

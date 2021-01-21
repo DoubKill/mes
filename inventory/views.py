@@ -27,7 +27,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
-    InventoryLogOutSerializer
+    InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -355,11 +355,29 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         order_type = self.request.query_params.get("order_type", "出库")
         if store_name == "混炼胶库":
             if order_type == "出库":
-                return MixGumOutInventoryLog.objects.using('bz').all()
+                filter_dict = {}
+                if self.request.query_params.get("type") == "正常出库":
+                    filter_dict.update(out_num_type="生产出库")
+                elif self.request.query_params.get("type") == "指定出库":
+                    filter_dict.update(out_num_type="快检出库")
+                else:
+                    pass
+                return MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict)
             else:
-                return MixGumInInventoryLog.objects.using('bz').all()
+                return MixGumInInventoryLog.objects.using('bz').filter()
         else:
-            return InventoryLog.objects.order_by('-start_time')
+            return InventoryLog.objects.filter().order_by('-start_time')
+
+    # def get_serializer_class(self):
+    #     store_name = self.request.query_params.get("store_name", "混炼胶库")
+    #     order_type = self.request.query_params.get("order_type", "出库")
+    #     if store_name == "混炼胶库":
+    #         if order_type == "出库":
+    #             return MixGumOutInventoryLogSerializer
+    #         else:
+    #             return MixGumInInventoryLogSerializer
+    #     else:
+    #         return InventoryLogSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
