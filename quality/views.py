@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,6 +24,7 @@ from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan
+from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
@@ -38,9 +39,10 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     DealSuggestionSerializer, DealResultDealSerializer, MaterialDealResultListSerializer, LevelResultSerializer, \
     TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
     BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
-    UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer
+    UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
+    MaterialDealResultListSerializer1
 from django.db.models import Q
-from quality.utils import print_mdr
+from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching
 import logging
 from django.db.models import Max, Sum
@@ -197,7 +199,8 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
-    pagination_class = None
+
+    # pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -317,12 +320,20 @@ class MaterialDealResultUpdateValidTime(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class PalletFeedbacksTestListView(ListAPIView):
+class PalletFeedbacksTestListView(ModelViewSet):
     # 快检信息综合管里
     queryset = MaterialDealResult.objects.filter(delete_flag=False)
     serializer_class = MaterialDealResultListSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = PalletFeedbacksTestFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return MaterialDealResultListSerializer1
+        elif self.action == "retrieve":
+            return MaterialDealResultListSerializer
+        else:
+            raise ValidationError('本接口只提供查询功能')
 
     def get_queryset(self):
         equip_no = self.request.query_params.get('equip_no', None)
@@ -330,26 +341,30 @@ class PalletFeedbacksTestListView(ListAPIView):
         day_time = self.request.query_params.get('day_time', None)
         classes = self.request.query_params.get('classes', None)
         schedule_name = self.request.query_params.get('schedule_name', None)
+        is_print = self.request.query_params.get('is_print', None)
         filter_dict = {'delete_flag': False}
         pfb_filter = {}
-        pcp_filter = {}
         if day_time:
-            pcp_filter['work_schedule_plan__plan_schedule__day_time'] = day_time
-        if schedule_name:
-            pcp_filter['work_schedule_plan__plan_schedule__work_schedule__schedule_name'] = schedule_name
-        if pcp_filter:
-            pcp_uid_list = ProductClassesPlan.objects.filter(**pcp_filter).values_list('plan_classes_uid', flat=True)
-            pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
+            pfb_filter['production_factory_date'] = day_time
+        # if schedule_name:
+        #     pcp_filter['work_schedule_plan__plan_schedule__work_schedule__schedule_name'] = schedule_name
+        # if pcp_filter:
+        #     pcp_uid_list = ProductClassesPlan.objects.filter(**pcp_filter).values_list('plan_classes_uid', flat=True)
+        #     pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
 
         if equip_no:
-            pfb_filter['equip_no'] = equip_no
+            pfb_filter['production_equip_no'] = equip_no
         if product_no:
             pfb_filter['product_no__icontains'] = product_no
         if classes:
-            pfb_filter['classes'] = classes
+            pfb_filter['production_class'] = classes
         if pfb_filter:
-            pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
+            pfb_product_list = MaterialTestOrder.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
+        if is_print == "已打印":
+            filter_dict['print_time__isnull'] = False
+        elif is_print == "未打印":
+            filter_dict['print_time__isnull'] = True
         pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
         return pfb_queryset
 
@@ -509,6 +524,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             data = {}
         return Response(data)
 
+    @atomic()
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
@@ -521,7 +537,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             # If 'prefetch_related' has been applied to a queryset, we need to
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
-
+        MaterialDealResult.objects.filter(lot_no=instance.lot_no).update(print_time=datetime.datetime.now())
         return Response(serializer.data)
 
 
@@ -1086,3 +1102,105 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         serializer_data['form_head_data'] = form_head_data
         serializer_data['deal_details'] = ret.values()
         return Response(serializer_data)
+
+
+class ImportAndExportView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        """快检数据导入模板"""
+        return export_mto()
+
+    @atomic()
+    def post(self, request, *args, **kwargs):
+        """快检数据导入"""
+        file = request.FILES.get('file')
+        cur_sheet = get_cur_sheet(file)
+        data = get_sheet_data(cur_sheet, start_row=2)
+        for i in data:
+            by_dict = {'比重': 7, '硬度': 8}
+            for j in ['比重', '硬度']:
+                m_obj = Material.objects.filter(material_name=i[0].strip()).first()
+                if not m_obj:
+                    raise ValidationError(f'{i[0]}胶料信息不存在,请检查Excel表格或者使用复制功能')
+                dp_obj = DataPoint.objects.filter(name__contains=j).first()
+                if not dp_obj:
+                    raise ValidationError(f'{j}数据点信息不存在,请检查Excel表格或者使用复制功能')
+                # mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                mtm_obj = MaterialTestMethod.objects.filter(material__material_name=i[0].strip(),
+                                                            data_point__name__contains=j).first()
+                if not mtm_obj:
+                    raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在,请检查Excel表格或者使用复制功能")
+                item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
+                        'test_method_name': mtm_obj.test_method.name,
+                        'test_indicator_name': dp_obj.test_type.test_indicator.name}
+                delta = datetime.timedelta(days=i[2])
+                date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
+                factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+                pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date,
+                                                         classes=i[3].strip() + '班',
+                                                         product_no=i[0].strip(), begin_trains__lte=i[6],
+                                                         end_trains__gte=i[6]).first()
+                if not pfb_obj:
+                    raise ValidationError('托盘产出反馈不存在,,请检查Excel表格或者使用复制功能')
+                test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
+                                                              actual_trains=i[6]).first()
+                if test_order:
+                    instance = test_order
+                    created = False
+                else:
+                    validated_data = {}
+                    validated_data['material_test_order_uid'] = UUidTools.uuid1_hex('KJ')
+                    validated_data['actual_trains'] = i[6]
+                    validated_data['lot_no'] = pfb_obj.lot_no
+                    validated_data['product_no'] = i[0].strip()
+                    validated_data['plan_classes_uid'] = pfb_obj.plan_classes_uid
+                    validated_data['production_class'] = i[3].strip() + '班'
+                    validated_data['production_equip_no'] = i[4]
+                    validated_data['production_factory_date'] = factory_date
+                    instance = MaterialTestOrder.objects.create(**validated_data)
+                    created = True
+                material_no = i[0].strip()
+                if not item.get('value'):
+                    continue
+                item['material_test_order'] = instance
+                item['test_factory_date'] = datetime.datetime.now()
+                if created:
+                    item['test_times'] = 1
+                else:
+                    last_test_result = MaterialTestResult.objects.filter(
+                        material_test_order=instance,
+                        test_indicator_name=item['test_indicator_name'],
+                        data_point_name=item['data_point_name'],
+                    ).order_by('-test_times').first()
+                    if last_test_result:
+                        item['test_times'] = last_test_result.test_times + 1
+                    else:
+                        item['test_times'] = 1
+                material_test_method = MaterialTestMethod.objects.filter(
+                    material__material_no=material_no,
+                    test_method__name=item['test_method_name'],
+                    test_method__test_type__test_indicator__name=item['test_indicator_name'],
+                    data_point__name=item['data_point_name'],
+                    data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+                if material_test_method:
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        material_test_method=material_test_method,
+                        data_point__name=item['data_point_name'],
+                        data_point__test_type__test_indicator__name=item['test_indicator_name'],
+                        upper_limit__gte=item['value'],
+                        lower_limit__lte=item['value']).first()
+                    if indicator:
+                        item['mes_result'] = indicator.result
+                        item['data_point_indicator'] = indicator
+                        item['level'] = indicator.level
+                    else:
+                        item['mes_result'] = '三等品'
+                        item['level'] = 2
+                else:
+                    item['mes_result'] = '三等品'
+                    item['level'] = 2
+                item['created_user'] = request.user  # 加一个create_user
+                item['test_class'] = i[3].strip() + '班'  # 暂时先这么写吧
+                item['test_group'] = i[5].strip() + '班'
+                MaterialTestResult.objects.create(**item)
+        return Response('导入成功')

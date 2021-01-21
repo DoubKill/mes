@@ -16,6 +16,7 @@ router = DefaultRouter()
 
 # 原材料立库
 router.register(r'material-inventory-view', views.MaterialInventoryView, basename="material-inventory")
+
 # 胶料立库
 router.register(r'product-inventory', views.ProductInventory, basename="product-inventory")
 

@@ -149,30 +149,6 @@ class BzFinalMixingRubberInventoryLB(models.Model):
     def unit_weight(self):
         return str(round(self.total_weight / self.qty, 3))
 
-    # def equip_no(self):
-    #     try:
-    #         equip_no = self.lot_no[4:7]
-    #     except:
-    #         equip_no = ""
-    #     if len(equip_no) != 3:
-    #         equip_no = self.bill_id[-3:]
-    #     if equip_no.startswith("Z"):
-    #         return equip_no
-    #     return ""
-
-    # def class_name(self):
-    #     class_map = {
-    #         1: "早班",
-    #         2: "中班",
-    #         3: "夜班"
-    #     }
-    #     try:
-    #         class_id = int(self.lot_no[-5])
-    #     except:
-    #         return ""
-    #     else:
-    #         return class_map[class_id]
-
     class Meta:
         db_table = 'v_ASRS_STORE_MESVIEW'
         managed = False
@@ -249,6 +225,7 @@ class DeliveryPlan(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
     equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
                                    related_name='dispatch_mix_deliverys')
@@ -282,6 +259,7 @@ class DeliveryPlanLB(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
     equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
                                    related_name='dispatch_lb_deliverys')
@@ -315,6 +293,7 @@ class DeliveryPlanFinal(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
     equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
                                    related_name='dispatch_final_deliverys')
@@ -442,7 +421,7 @@ class MixGumOutInventoryLog(models.Model):
     """混炼胶库出库履历视图"""
     order_no = models.CharField(max_length=100, db_column='BILLID', primary_key=True, help_text='出库单号')
     pallet_no = models.CharField(max_length=50, db_column='PALLETID', help_text='托盘号')
-    location = models.CharField(max_length=50, db_column='CID', help_text='目的地')
+    location = models.CharField(max_length=50, db_column='CID', help_text="货位地址")
     qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='CarNum', help_text='数量')
     weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='Weight', help_text='已发重量')
     quality_status = models.CharField(db_column='MStatus', max_length=6, help_text='品质状态')
@@ -450,10 +429,16 @@ class MixGumOutInventoryLog(models.Model):
     inout_num_type = models.CharField(max_length=50, db_column='OutType', help_text='出入库数类型')
     initiator = models.CharField(max_length=50, db_column='OutUser', help_text='发起人')
     material_no = models.CharField(max_length=100, db_column='MID', help_text='物料编码')
-    fin_time = models.DateTimeField(db_column='DEALTIME', help_text='完成时间')
+    fin_time = models.DateTimeField(db_column='DEALTIME', help_text='发起时间')
 
     def warehouse_no(self):
         return "混炼胶库"
+
+    # def inout_num_type(self):
+    #     if self.out_num_type == "快检出库":
+    #         return "指定出库"
+    #     else:
+    #         return "正常出库"
 
     def warehouse_name(self):
         return "混炼胶库"
@@ -467,7 +452,11 @@ class MixGumOutInventoryLog(models.Model):
     def order_type(self):
         return "出库"
 
+    #TODO 这里可以搞几个map用来做映射
     def inout_reason(self):
+        return self.inout_num_type
+
+    def inventory_type(self):
         return self.inout_num_type
 
     class Meta:
@@ -480,7 +469,7 @@ class MixGumInInventoryLog(models.Model):
     """混炼胶库入库履历视图"""
     order_no = models.CharField(max_length=50, db_column='BILLID', primary_key=True)
     pallet_no = models.CharField(max_length=50, db_column='PALLETID')
-    location = models.CharField(max_length=50, db_column='CID')
+    location = models.CharField(max_length=50, db_column='CID', help_text="货位地址")
     qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='Num')
     weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='SWeight')
     quality_status = models.CharField(db_column='MStatus', max_length=50)
@@ -504,9 +493,40 @@ class MixGumInInventoryLog(models.Model):
     def order_type(self):
         return "入库"
 
+    def inventory_type(self):
+        return self.inout_num_type
+
     def inout_reason(self):
         return self.inout_num_type
 
     class Meta:
         db_table = 'v_ASRS_LOG_IN_OPREATE_MESVIEW'
         managed = False
+
+
+class InventoryLog(AbstractEntity):
+    """出入库履历"""
+    warehouse_no = models.CharField(max_length=64, verbose_name='仓库编号', help_text='仓库编号')
+    warehouse_name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
+    order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
+    pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
+    qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
+    weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
+                                 max_digits=8)
+    material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
+    quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
+    lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
+    order_type = models.CharField(max_length=64, verbose_name='订单类型', help_text='订单类型')
+    inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
+    inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+    inventory_type = models.CharField(max_length=64, verbose_name='BZ出入库类型', help_text='BZ出入库数类型')  # 生产出库/快检异常出库
+    unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
+    initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
+                                 help_text='发起人')
+    start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
+    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
+
+    class Meta:
+        db_table = 'inventory_log'
+        verbose_name_plural = verbose_name = '出入库履历'
