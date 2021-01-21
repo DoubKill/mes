@@ -225,7 +225,7 @@ class OutWorkFeedBack(APIView):
                     dp_obj.save()
                     DeliveryPlanStatus.objects.create(warehouse_info=dp_obj.warehouse_info,
                                                       order_no=order_no,
-                                                      order_type=dp_obj.order_type,
+                                                      order_type=dp_obj.order_type if dp_obj.order_type else "出库",
                                                       status=1,
                                                       created_user=dp_obj.created_user,
                                                       )
@@ -237,7 +237,7 @@ class OutWorkFeedBack(APIView):
                 il_dict['initiator'] = dp_obj.created_user
                 il_dict['material_no'] = dp_obj.material_no
                 il_dict['start_time'] = dp_obj.created_date
-                il_dict['order_type'] = dp_obj.order_type
+                il_dict['order_type'] = dp_obj.order_type if dp_obj.order_type else "出库"
                 material = Material.objects.filter(material_no=dp_obj.material_no).first()
                 material_inventory_dict = {
                     "material": material,
@@ -250,7 +250,7 @@ class OutWorkFeedBack(APIView):
                     "quality_status": data.get("quality_status"),
                     "lot_no": data.get("lot_no"),
                     "location": "预留",
-                    "warehouse_info": dp_obj.warehouse_info
+                    "warehouse_info": dp_obj.warehouse_info,
                 }
             else:
                 raise ValidationError("订单号不能为空")
@@ -363,7 +363,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         filter_dict = {}
-        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        store_name = self.request.query_params.get("store_name")
+        if not store_name:
+            store_name = "混炼胶库"
         order_type = self.request.query_params.get("order_type", "出库")
         start_time = self.request.query_params.get("start_time")
         end_time = self.request.query_params.get("end_time")
@@ -382,15 +384,17 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             filter_dict.update(order_no__icontains=order_no)
         if store_name == "混炼胶库":
             if order_type == "出库":
-
                 if self.request.query_params.get("type") == "正常出库":
                     actual_type = "生产出库"
-                    filter_dict.update(inout_num_type="生产出库")
-                else:
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
                     actual_type = "快检出库"
-                filter_dict.update(inout_num_type=actual_type)
-                temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-fin_time')) + \
-                           list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type, **filter_dict).order_by('-fin_time'))
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-fin_time'))
+                filter_dict.pop("inout_num_type", None)
+                temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type, **filter_dict).order_by('-fin_time'))
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)

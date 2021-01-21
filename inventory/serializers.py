@@ -84,7 +84,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         status = validated_data['status']
         created_user = self.context['request'].user
         validated_data["created_user"] = created_user
-        order_type = validated_data.get('order_type', '出库')  # 订单类型
+        validated_data['order_type'] = "出库"
+        order_type = '出库'  # 订单类型
         validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
         #
 
