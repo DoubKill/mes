@@ -1120,15 +1120,15 @@ class ImportAndExportView(APIView):
             for j in ['比重', '硬度']:
                 m_obj = Material.objects.filter(material_name=i[0].strip()).first()
                 if not m_obj:
-                    raise ValidationError(f'{i[0]}胶料信息不存在')
+                    raise ValidationError(f'{i[0]}胶料信息不存在,请检查Excel表格或者使用复制功能')
                 dp_obj = DataPoint.objects.filter(name__contains=j).first()
                 if not dp_obj:
-                    raise ValidationError(f'{j}数据点信息不存在')
+                    raise ValidationError(f'{j}数据点信息不存在,请检查Excel表格或者使用复制功能')
                 # mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
                 mtm_obj = MaterialTestMethod.objects.filter(material__material_name=i[0].strip(),
                                                             data_point__name__contains=j).first()
                 if not mtm_obj:
-                    raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在")
+                    raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在,请检查Excel表格或者使用复制功能")
                 item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
                         'test_method_name': mtm_obj.test_method.name,
                         'test_indicator_name': dp_obj.test_type.test_indicator.name}
@@ -1140,7 +1140,7 @@ class ImportAndExportView(APIView):
                                                          product_no=i[0].strip(), begin_trains__lte=i[6],
                                                          end_trains__gte=i[6]).first()
                 if not pfb_obj:
-                    raise ValidationError('托盘产出反馈不存在')
+                    raise ValidationError('托盘产出反馈不存在,,请检查Excel表格或者使用复制功能')
                 test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
                                                               actual_trains=i[6]).first()
                 if test_order:
