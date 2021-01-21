@@ -219,15 +219,18 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
     upper_lower = serializers.SerializerMethodField(read_only=True)
 
     def get_upper_lower(self, obj):
-        mdp_obj = MaterialDataPointIndicator.objects.filter(
-            material_test_method__material__material_name=obj.material_test_order.product_no,
-            material_test_method__test_method__name=obj.test_method_name,
-            material_test_method__data_point__name=obj.data_point_name,
-            data_point__name=obj.data_point_name, level=1).first()
-        if not mdp_obj:
+        try:
+            mdp_obj = MaterialDataPointIndicator.objects.filter(
+                material_test_method__material__material_name=obj.material_test_order.product_no,
+                material_test_method__test_method__name=obj.test_method_name,
+                material_test_method__data_point__name=obj.data_point_name,
+                data_point__name=obj.data_point_name, level=1).first()
+            if not mdp_obj:
+                return None
+            else:
+                return f'{mdp_obj.lower_limit}-{mdp_obj.upper_limit}'
+        except:
             return None
-        else:
-            return f'{mdp_obj.lower_limit}-{mdp_obj.upper_limit}'
 
     class Meta:
         model = MaterialTestResult
@@ -1089,65 +1092,69 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
     actual_weight = serializers.SerializerMethodField(read_only=True, help_text='收皮重量')
     residual_weight = serializers.SerializerMethodField(read_only=True, help_text='余量')
     test = serializers.SerializerMethodField(read_only=True, )
-    deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
-    deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
-    deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
 
-    def get_deal_suggestion(self, obj):
-        if obj.status == "已处理":
-            return obj.deal_suggestion
-        return None
+    # deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
+    # deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
+    # deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
 
-    def get_deal_user(self, obj):
-        if obj.status == "已处理":
-            return obj.deal_user
-        return None
-
-    def get_deal_time(self, obj):
-        if obj.status == "已处理":
-            return obj.deal_time.strftime("%Y-%m-%d %H:%M:%S")
-        return None
+    # def get_deal_suggestion(self, obj):
+    #     if obj.status == "已处理":
+    #         return obj.deal_suggestion
+    #     return None
+    #
+    # def get_deal_user(self, obj):
+    #     if obj.status == "已处理":
+    #         return obj.deal_user
+    #     return None
+    #
+    # def get_deal_time(self, obj):
+    #     if obj.status == "已处理":
+    #         return obj.deal_time.strftime("%Y-%m-%d %H:%M:%S")
+    #     return None
 
     def get_day_time(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        self.__setattr__("pfb_obj", pfb_obj)
-        if not pfb_obj:
+        mto_obj = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).first()
+        self.__setattr__("mto_obj", mto_obj)
+        if not mto_obj:
             return None
-        pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
-        if pcp_obj:
-            return pcp_obj.work_schedule_plan.plan_schedule.day_time
-        else:
-            return None
+        return mto_obj.production_factory_date
+        # pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
+        # if pcp_obj:
+        #     return pcp_obj.work_schedule_plan.plan_schedule.day_time
+        # else:
+        #     return None
 
     def get_classes_group(self, obj):
         # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
+        mto_obj = self.mto_obj
+        if not mto_obj:
             return None
-        pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
-        if pcp_obj:
-            return f"{pfb_obj.classes}/{pcp_obj.work_schedule_plan.group.global_name}"
         else:
-            return f"{pfb_obj.classes}/None"
+            return f"{mto_obj.production_class}/{mto_obj.production_group}"
+        # pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
+        # if pcp_obj:
+        #     return f"{pfb_obj.classes}/{pcp_obj.work_schedule_plan.group.global_name}"
+        # else:
+        #     return f"{pfb_obj.classes}/None"
 
     def get_equip_no(self, obj):
         # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
+        mto_obj = self.mto_obj
+        if not mto_obj:
             return None
-        return pfb_obj.equip_no
+        return mto_obj.production_equip_no
 
     def get_product_no(self, obj):
         # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
+        mto_obj = self.mto_obj
+        if not mto_obj:
             return None
-        self.__setattr__("product_no", pfb_obj.product_no)
-        return pfb_obj.product_no
+        self.__setattr__("product_no", mto_obj.product_no)
+        return mto_obj.product_no
 
     def get_actual_weight(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
+        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        # pfb_obj = self.pfb_obj
         if not pfb_obj:
             return None
         return pfb_obj.actual_weight
@@ -1158,31 +1165,32 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
     def get_test(self, obj):
         mtr_list = []
         # 找到每个车次检测次数最多的那一条
-        mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
-        for mto_obj in mto_set:
-            mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj).order_by('test_times').last()
-            if not mtr_obj:
-                continue
-            mtr_list.append(mtr_obj)
+        # mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
+        # for mto_obj in mto_set:
+        mtr_obj = MaterialTestResult.objects.filter(material_test_order__lot_no=obj.lot_no).order_by(
+            'test_times').last()
+        # if not mtr_obj:
+        #     continue
+        # mtr_list.append(mtr_obj)
         # 找到level等级最大的那一条
-        if len(mtr_list) == 0:
-            return None
-        max_mtr = mtr_list[0]
-        for mtr_obj in mtr_list:
-            # if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
-            #     continue
-            if mtr_obj.level > max_mtr.level:
-                max_mtr = mtr_obj
-        if max_mtr.test_times == 1:
+        # if len(mtr_list) == 0:
+        #     return None
+        # max_mtr = mtr_list[0]
+        # for mtr_obj in mtr_list:
+        #     # if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
+        #     #     continue
+        #     if mtr_obj.level > max_mtr.level:
+        #         max_mtr = mtr_obj
+        if mtr_obj.test_times == 1:
             test_status = '正常'
-        elif max_mtr.test_times > 1:
+        elif mtr_obj.test_times > 1:
             test_status = '复检'
         else:
             test_status = None  # 检测状态
-        test_factory_date = max_mtr.test_factory_date.strftime('%Y-%m-%d %H:%M:%S')  # 检测时间
-        test_class = max_mtr.test_class  # 检测班次
+        test_factory_date = mtr_obj.test_factory_date.strftime('%Y-%m-%d %H:%M:%S')  # 检测时间
+        test_class = mtr_obj.test_class  # 检测班次
         try:
-            test_user = max_mtr.created_user.username  # 检测员
+            test_user = mtr_obj.created_user.username  # 检测员
         except:
             test_user = None
         return {'test_status': test_status, 'test_factory_date': test_factory_date, 'test_class': test_class,
