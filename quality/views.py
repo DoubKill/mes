@@ -524,6 +524,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             data = {}
         return Response(data)
 
+    @atomic()
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()

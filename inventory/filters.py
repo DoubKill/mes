@@ -100,22 +100,24 @@ class DispatchLocationFilter(django_filters.rest_framework.FilterSet):
         fields = ['use_flag']
 
 
-class MixGumInFilter(django_filters.rest_framework.FilterSet):
+class MixGumFilter(django_filters.rest_framework.FilterSet):
     start_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='gte')
     end_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='lte')
-    location = django_filters.CharFilter(field_name='location')
+    location = django_filters.CharFilter(field_name='location', lookup_expr='icontains')
     material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+
+    class Meta:
+        fields = ['start_time', 'end_time', 'location', 'material_no']
+
+
+class MixGumInFilter(MixGumFilter):
 
     class Meta:
         model = MixGumInInventoryLog
         fields = ['start_time', 'end_time', 'location', 'material_no']
 
 
-class MixGumOutFilter(django_filters.rest_framework.FilterSet):
-    start_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='gte')
-    end_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='lte')
-    location = django_filters.CharFilter(field_name='location')
-    material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+class MixGumOutFilter(MixGumFilter):
 
     class Meta:
         model = MixGumOutInventoryLog
