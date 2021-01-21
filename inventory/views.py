@@ -369,6 +369,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
+        order_no = self.request.query_params.get("order_no")
         if start_time:
             filter_dict.update(fin_time__gte=start_time)
         if end_time:
@@ -377,6 +378,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             filter_dict.update(location__icontains=location)
         if material_no:
             filter_dict.update(material_no__icontains=material_no)
+        if order_no:
+            filter_dict.update(order_no__icontains=order_no)
         if store_name == "混炼胶库":
             if order_type == "出库":
 
