@@ -74,7 +74,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
         else:
             material_no = validated_data.get("material_no")
-            location_set = BzFinalMixingRubberInventory.objects.filter(material_no=material_no).values_list("location", flat=True)
+            location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
             for location in location_set:
                 if not location[0] in STATION_LOCATION_MAP[station]:
                     raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
@@ -116,7 +116,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
             pici = pallet.bath_no if pallet else "1"  # 批次号
             num = instance.need_qty
             msg_count = "1"
-            location = instance.location if instance.location else ""
+            location = instance.station if instance.station else ""
             # 发起时间
             time = validated_data.get('created_date', datetime.datetime.now())
             created_time = time.strftime('%Y%m%d %H:%M:%S')
@@ -630,26 +630,41 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
 
 class InventoryLogSerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
+    inout_num_type = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = InventoryLog
         fields = "__all__"
 
+    def get_inout_num_type(self, obj):
+        if obj.inout_num_type == "快检出库":
+            return "指定出库"
+        elif obj.inout_num_type == "生产出库":
+            return "正常出库"
+        else:
+            return obj.inout_num_type
+
     def get_product_info(self, obj):
         if obj.lot_no:
             pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
-            return {
-                "equip_no": pf.equip_no,
-                "classes": f"{pf.factory_date}/{pf.classes}",
-                "memo": f"{pf.begin_trains},{pf.end_trains}"
-            }
+            if pf:
+                return {
+                    "equip_no": pf.equip_no,
+                    "classes": f"{pf.factory_date}/{pf.classes}",
+                    "memo": f"{pf.begin_trains},{pf.end_trains}"
+                }
+            else:
+                return {
+                    "equip_no": "",
+                    "classes": "",
+                    "memo": "",
+                }
         else:
             return {
                 "equip_no": "",
                 "classes": "",
                 "memo": "",
             }
-
 
 
 class MixGumOutInventoryLogSerializer(serializers.ModelSerializer):

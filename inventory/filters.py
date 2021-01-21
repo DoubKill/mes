@@ -123,6 +123,7 @@ class MixGumOutFilter(MixGumFilter):
         model = MixGumOutInventoryLog
         fields = ['start_time', 'end_time', 'location', 'material_no']
 
+
 class InventoryFilterBackend(DjangoFilterBackend):
 
     def get_filterset(self, request, queryset, view):

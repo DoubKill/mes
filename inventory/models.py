@@ -426,7 +426,7 @@ class MixGumOutInventoryLog(models.Model):
     weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='Weight', help_text='已发重量')
     quality_status = models.CharField(db_column='MStatus', max_length=6, help_text='品质状态')
     lot_no = models.CharField(max_length=100, db_column='Lot_no', null=True, blank=True)
-    out_num_type = models.CharField(max_length=50, db_column='OutType', help_text='出入库数类型')
+    inout_num_type = models.CharField(max_length=50, db_column='OutType', help_text='出入库数类型')
     initiator = models.CharField(max_length=50, db_column='OutUser', help_text='发起人')
     material_no = models.CharField(max_length=100, db_column='MID', help_text='物料编码')
     fin_time = models.DateTimeField(db_column='DEALTIME', help_text='发起时间')
@@ -434,11 +434,11 @@ class MixGumOutInventoryLog(models.Model):
     def warehouse_no(self):
         return "混炼胶库"
 
-    def inout_num_type(self):
-        if self.out_num_type == "快检出库":
-            return "指定出库"
-        else:
-            return "正常出库"
+    # def inout_num_type(self):
+    #     if self.out_num_type == "快检出库":
+    #         return "指定出库"
+    #     else:
+    #         return "正常出库"
 
     def warehouse_name(self):
         return "混炼胶库"
@@ -452,11 +452,12 @@ class MixGumOutInventoryLog(models.Model):
     def order_type(self):
         return "出库"
 
+    #TODO 这里可以搞几个map用来做映射
     def inout_reason(self):
-        return self.out_num_type
+        return self.inout_num_type
 
     def inventory_type(self):
-        return self.out_num_type
+        return self.inout_num_type
 
     class Meta:
         db_table = 'v_ASRS_TO_MES_RE_MESVIEW'
