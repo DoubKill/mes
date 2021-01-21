@@ -44,6 +44,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialFilter
 
+    def get_queryset(self):
+        material_type_ids = self.request.query_params.get('material_type_ids')
+        if material_type_ids:
+            material_type_ids = material_type_ids.split(',')
+            return self.queryset.filter(material_type_id__in=material_type_ids)
+        return self.queryset
+
     def get_permissions(self):
         if self.request.query_params.get('all'):
             return ()

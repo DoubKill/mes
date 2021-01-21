@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -20,12 +21,12 @@ from recipe.models import ProductBatchingDetail
 from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, BatchChargeLogListFilter, WeightBatchingLogListFilter
 from terminal.models import TerminalLocation, EquipOperationLog, BatchChargeLog, WeightBatchingLog, FeedingLog, \
-    WeightTankStatus, WeightPackageLog, Version
+    WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect
 from terminal.serializers import BatchChargeLogSerializer, BatchChargeLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
-    BatchChargeLogListSerializer, WeightBatchingLogListSerializer
+    BatchChargeLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -451,3 +452,15 @@ class WeightBatchingLogListViewSet(ListAPIView):
         else:
             raise ValidationError('参数不全')
         return queryset
+
+
+class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
+                                     mixins.ListModelMixin,
+                                     mixins.UpdateModelMixin,
+                                     mixins.RetrieveModelMixin,
+                                     GenericViewSet):
+    queryset = MaterialSupplierCollect.objects.filter(material__isnull=False)
+    serializer_class = MaterialSupplierCollectSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_fields = ('material_id', )

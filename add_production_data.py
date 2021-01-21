@@ -21,7 +21,7 @@ from plan.uuidfield import UUidTools
 
 
 def main():
-    for pcp in ProductClassesPlan.objects.filter(delete_flag=False, status__in=('完成', '已下达', '运行中')):
+    for pcp in ProductClassesPlan.objects.filter(delete_flag=False, status__in=('已下达', '运行中')):
         max_train = TrainsFeedbacks.objects.filter(
             plan_classes_uid=pcp.plan_classes_uid).aggregate(max_train=Max('actual_trains'))['max_train']
         if not max_train:
@@ -119,6 +119,9 @@ def main():
                                             item['mes_result'] = '三等品'
                                             item['level'] = 2
                                         MaterialTestResult.objects.create(**item)
+        else:
+            pcp.status = '完成'
+            pcp.save()
 
 
 if __name__ == '__main__':

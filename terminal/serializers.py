@@ -226,3 +226,12 @@ class WeightBatchingLogListSerializer(BaseModelSerializer):
     class Meta:
         model = WeightBatchingLog
         fields = '__all__'
+
+
+class MaterialSupplierCollectSerializer(BaseModelSerializer):
+    child_system_name = serializers.CharField(source='child_system.global_name', read_only=True, default=None)
+
+    class Meta:
+        model = MaterialSupplierCollect
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

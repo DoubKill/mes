@@ -39,13 +39,13 @@ def main():
                     weight=random.randint(200, 500),
                     product_day_plan=pdp,
                     sn=1,
-                    plan_trains=random.randint(80, 500),
+                    plan_trains=random.randint(20, 50),
                     unit='车',
                     work_schedule_plan=wsp,
                     plan_classes_uid=UUidTools.uuid1_hex(pdp.equip.equip_no),
                     equip=pdp.equip,
                     product_batching=pdp.product_batching,
-                    status=random.choice(['已保存', '等待', '已下达', '运行中', '完成', '待停止'])
+                    status=random.choice(['已保存', '等待', '已下达', '运行中', '待停止'])
                 )
                 PlanStatus.objects.create(
                     plan_classes_uid=pcp.plan_classes_uid,
