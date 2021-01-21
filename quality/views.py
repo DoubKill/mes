@@ -1124,7 +1124,9 @@ class ImportAndExportView(APIView):
                 dp_obj = DataPoint.objects.filter(name__contains=j).first()
                 if not dp_obj:
                     raise ValidationError(f'{j}数据点信息不存在')
-                mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                # mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                mtm_obj = MaterialTestMethod.objects.filter(material__material_name=i[0].strip(),
+                                                            data_point__name__contains=j).first()
                 if not mtm_obj:
                     raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在")
                 item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
@@ -1198,6 +1200,6 @@ class ImportAndExportView(APIView):
                     item['level'] = 2
                 item['created_user'] = request.user  # 加一个create_user
                 item['test_class'] = i[3].strip() + '班'  # 暂时先这么写吧
-                item['test_group']=i[5].strip()+'班'
+                item['test_group'] = i[5].strip() + '班'
                 MaterialTestResult.objects.create(**item)
         return Response('导入成功')
