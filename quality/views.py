@@ -347,23 +347,22 @@ class PalletFeedbacksTestListView(ModelViewSet):
         is_print = self.request.query_params.get('is_print', None)
         filter_dict = {'delete_flag': False}
         pfb_filter = {}
-        pcp_filter = {}
         if day_time:
-            pcp_filter['work_schedule_plan__plan_schedule__day_time'] = day_time
-        if schedule_name:
-            pcp_filter['work_schedule_plan__plan_schedule__work_schedule__schedule_name'] = schedule_name
-        if pcp_filter:
-            pcp_uid_list = ProductClassesPlan.objects.filter(**pcp_filter).values_list('plan_classes_uid', flat=True)
-            pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
+            pfb_filter['production_factory_date'] = day_time
+        # if schedule_name:
+        #     pcp_filter['work_schedule_plan__plan_schedule__work_schedule__schedule_name'] = schedule_name
+        # if pcp_filter:
+        #     pcp_uid_list = ProductClassesPlan.objects.filter(**pcp_filter).values_list('plan_classes_uid', flat=True)
+        #     pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
 
         if equip_no:
-            pfb_filter['equip_no'] = equip_no
+            pfb_filter['production_equip_no'] = equip_no
         if product_no:
             pfb_filter['product_no__icontains'] = product_no
         if classes:
-            pfb_filter['classes'] = classes
+            pfb_filter['production_class'] = classes
         if pfb_filter:
-            pfb_product_list = PalletFeedbacks.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
+            pfb_product_list = MaterialTestOrder.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
             filter_dict['lot_no__in'] = list(pfb_product_list)
         if is_print == "已打印":
             filter_dict['print_time__isnull'] = False
@@ -528,6 +527,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             data = {}
         return Response(data)
 
+    @atomic()
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
@@ -1130,13 +1130,15 @@ class ImportAndExportView(APIView):
             for j in ['比重', '硬度']:
                 m_obj = Material.objects.filter(material_name=i[0].strip()).first()
                 if not m_obj:
-                    raise ValidationError(f'{i[0]}胶料信息不存在')
+                    raise ValidationError(f'{i[0]}胶料信息不存在,请检查Excel表格或者使用复制功能')
                 dp_obj = DataPoint.objects.filter(name__contains=j).first()
                 if not dp_obj:
-                    raise ValidationError(f'{j}数据点信息不存在')
-                mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                    raise ValidationError(f'{j}数据点信息不存在,请检查Excel表格或者使用复制功能')
+                # mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
+                mtm_obj = MaterialTestMethod.objects.filter(material__material_name=i[0].strip(),
+                                                            data_point__name__contains=j).first()
                 if not mtm_obj:
-                    raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在")
+                    raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在,请检查Excel表格或者使用复制功能")
                 item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
                         'test_method_name': mtm_obj.test_method.name,
                         'test_indicator_name': dp_obj.test_type.test_indicator.name}
@@ -1148,7 +1150,7 @@ class ImportAndExportView(APIView):
                                                          product_no=i[0].strip(), begin_trains__lte=i[6],
                                                          end_trains__gte=i[6]).first()
                 if not pfb_obj:
-                    raise ValidationError('托盘产出反馈不存在')
+                    raise ValidationError('托盘产出反馈不存在,,请检查Excel表格或者使用复制功能')
                 test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
                                                               actual_trains=i[6]).first()
                 if test_order:
@@ -1208,6 +1210,6 @@ class ImportAndExportView(APIView):
                     item['level'] = 2
                 item['created_user'] = request.user  # 加一个create_user
                 item['test_class'] = i[3].strip() + '班'  # 暂时先这么写吧
-                item['test_group']=i[5].strip()+'班'
+                item['test_group'] = i[5].strip() + '班'
                 MaterialTestResult.objects.create(**item)
         return Response('导入成功')
