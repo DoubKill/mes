@@ -1343,42 +1343,42 @@ def add_product_batching():
 
 
 if __name__ == '__main__':
-    add_global_codes()
-    print("global_codes is ok")
-
-    add_materials()
+    # add_global_codes()
+    # print("global_codes is ok")
+    #
+    # add_materials()
     add_oil_material()
-    print("materials is ok")
-
-    add_schedules()
-    print("schedules is ok")
-
-    add_equip_attribute()
-    print("equip_attribute is ok")
-
-    add_equips()
-    print("equips is ok")
-
-    add_plan_schedule()
-    print("plan_schedule is ok")
-
-    add_product()
-    print("product is ok")
-
-    add_system_config()
-    print('system_config iok')
-
-    add_dispatch_location()
-    print('add dispatch_location ok')
-
-    add_warehouseInfo()
-    print('add warehouseInfo ok')
-
-    add_tanks()
-    print('add tanks ok')
-
-    add_suggestions()
-    print('add suggestions ok')
-
-    add_product_batching()
-    print('add product_batching ok')
+    # print("materials is ok")
+    #
+    # add_schedules()
+    # print("schedules is ok")
+    #
+    # add_equip_attribute()
+    # print("equip_attribute is ok")
+    #
+    # add_equips()
+    # print("equips is ok")
+    #
+    # add_plan_schedule()
+    # print("plan_schedule is ok")
+    #
+    # add_product()
+    # print("product is ok")
+    #
+    # add_system_config()
+    # print('system_config iok')
+    #
+    # add_dispatch_location()
+    # print('add dispatch_location ok')
+    #
+    # add_warehouseInfo()
+    # print('add warehouseInfo ok')
+    #
+    # add_tanks()
+    # print('add tanks ok')
+    #
+    # add_suggestions()
+    # print('add suggestions ok')
+    #
+    # add_product_batching()
+    # print('add product_batching ok')

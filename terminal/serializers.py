@@ -74,7 +74,8 @@ class BatchingClassesPlanSerializer(BaseModelSerializer):
 class WeightBatchingLogSerializer(BaseModelSerializer):
     class Meta:
         model = WeightBatchingLog
-        fields = ('material_no', 'material_name', 'bra_code', 'plan_weight', 'actual_weight', 'tank_no', 'created_date')
+        fields = ('material_no', 'material_name', 'bra_code', 'status',
+                  'plan_weight', 'actual_weight', 'tank_no', 'created_date')
 
 
 class WeightBatchingLogCreateSerializer(BaseModelSerializer):

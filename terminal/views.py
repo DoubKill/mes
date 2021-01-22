@@ -6,7 +6,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
-from rest_framework.mixins import CreateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -102,11 +101,11 @@ class BatchProductionInfoView(APIView):
                         status=1).aggregate(max_train=Max('trains'))['max_train']
 
                 # 投料成功次数小于等于该配方的标准数量，则车次为1
-                print(BatchChargeLog.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid,
-                        status=1
-                ).count())
-                print(len(plan.product_batching.batching_material_nos))
+                # print(BatchChargeLog.objects.filter(
+                #         plan_classes_uid=plan.plan_classes_uid,
+                #         status=1
+                # ).count())
+                # print(len(plan.product_batching.batching_material_nos))
                 if BatchChargeLog.objects.filter(
                         plan_classes_uid=plan.plan_classes_uid,
                         status=1
@@ -227,7 +226,7 @@ class BatchingClassesPlanView(ListAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class WeightBatchingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericViewSet):
+class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         称量履历
@@ -454,13 +453,22 @@ class WeightBatchingLogListViewSet(ListAPIView):
         return queryset
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
                                      mixins.ListModelMixin,
                                      mixins.UpdateModelMixin,
                                      mixins.RetrieveModelMixin,
                                      GenericViewSet):
-    queryset = MaterialSupplierCollect.objects.filter(material__isnull=False)
+    queryset = MaterialSupplierCollect.objects.filter(delete_flag=False)
     serializer_class = MaterialSupplierCollectSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_fields = ('material_id', )
+
+    def get_queryset(self):
+        if self.request.query_params.get('mes_system'):
+            # mes生成的条码
+            return self.queryset.filter(child_system__isnull=True)
+        else:
+            # 没有绑定原材料则认为是子系统的数据
+            return self.queryset.filter(child_system__isnull=False)
