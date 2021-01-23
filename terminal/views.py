@@ -25,7 +25,8 @@ from terminal.serializers import BatchChargeLogSerializer, BatchChargeLogCreateS
     EquipOperationLogSerializer, BatchingClassesPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
-    BatchChargeLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer
+    BatchChargeLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer, \
+    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -309,16 +310,29 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         重新打印
     """
     queryset = WeightPackageLog.objects.all().order_by('-created_date')
-    pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_class = WeightPackageLogFilter
     filter_backends = [DjangoFilterBackend]
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('pagination'):
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def get_serializer_class(self):
         if self.action == 'list':
             return WeightPackageLogSerializer
-        if self.action == 'update':
+        if self.action == 'retrieve':
+            return WeightPackageRetrieveLogSerializer
+        if self.action == 'update':  # 重新打印（终端使用，修改打印次数）
             return WeightPackageUpdateLogSerializer
+        if self.action == 'partial_update':  # 重新打印（mes页面操作，修改条形码）
+            return WeightPackagePartialUpdateLogSerializer
         else:
             return WeightPackageLogCreateSerializer
 

@@ -29,10 +29,14 @@ class WeightPackageLogFilter(django_filters.rest_framework.FilterSet):
     plan_batching_uid = django_filters.CharFilter(field_name="plan_batching_uid", help_text="配料计划uid")
     product_no = django_filters.CharFilter(field_name="product_no", help_text="胶料编码", lookup_expr='icontains')
     dev_type = django_filters.CharFilter(field_name="dev_type", help_text="机型")
+    st = django_filters.DateFilter(field_name='production_factory_date', lookup_expr='gte', help_text='开始时间')
+    et = django_filters.DateFilter(field_name='production_factory_date', lookup_expr='lte', help_text='结束时间')
+    equip_no = django_filters.CharFilter(field_name="equip_no", help_text="配料机台", lookup_expr='icontains')
+    material_no = django_filters.CharFilter(field_name="material_no", help_text="料包编码", lookup_expr='icontains')
 
     class Meta:
         model = WeightPackageLog
-        fields = ("plan_batching_uid", "product_no", 'dev_type')
+        fields = ("plan_batching_uid", "product_no", 'dev_type', 'et', 'st', 'equip_no', 'material_no')
 
 
 class WeightTankStatusFilter(django_filters.rest_framework.FilterSet):
