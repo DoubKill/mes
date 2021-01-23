@@ -328,8 +328,10 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         if queryset:
-            if material_type and model != BzFinalMixingRubberInventory:
+            if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory, BzFinalMixingRubberInventoryLB]:
                 queryset = queryset.filter(material_type__icontains=material_type)
+            if material_type and model == XBMaterialInventory:
+                queryset = queryset.filter(material__material_type__global_name__icontains=material_type)
             if material_no:
                 queryset = queryset.filter(material_no__icontains=material_no)
             if container_no:

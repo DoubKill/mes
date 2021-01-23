@@ -161,11 +161,13 @@ class WmsInventoryStock(models.Model):
     material_name = models.CharField(max_length=64, db_column='MaterialName')
     total_weight = models.DecimalField(max_digits=18, decimal_places=2, db_column='WeightOfActual')
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
-    location = models.CharField(max_length=255, db_column='ProductionAddress')
+    location = models.CharField(max_length=255, db_column='SpaceId')
     unit = models.CharField(max_length=64, db_column='WeightUnit')
     quality_status = models.IntegerField(db_column='StockDetailState')
     material_type = models.CharField(max_length=64)
     lot_no = models.CharField(max_length=64, db_column='BatchNo')
+    container_no = models.CharField(max_length=32, db_column="LadenToolNumber")
+    in_storage_time = models.DateTimeField(db_column='CreaterTime')
 
     class Meta:
         db_table = 't_inventory_stock'
@@ -186,11 +188,11 @@ class WmsInventoryStock(models.Model):
                     """.format(material_type_filter, material_no_filter)
         return sql
 
-    def container_no(self):
-        return "Unknown"
-
     def unit_weight(self):
-        return "Unknown"
+        return self.total_weight / self.qty
+
+    def location_status(self):
+        return "暂未开放"
 
 
 class WmsInventoryMaterial(models.Model):
