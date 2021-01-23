@@ -10,6 +10,15 @@ from terminal.models import BatchChargeLog, EquipOperationLog, WeightBatchingLog
     WeightPackageLog, MaterialSupplierCollect
 
 
+def generate_bra_code(plan_id, equip_no, factory_date, classes, begin_trains, end_trains, update=False):
+    # 后端生成，工厂编码E101 + 称量机台号 + 小料计划的工厂日期8位补零 + 班次1 - 3 + 开始车次+结束车次。
+    # 重复打印条码规则不变，重新生成会比较麻烦，根据修改的工厂时间班次来生成，序列号改成字母。从A~Z
+    classes_dict = {'早班': '1', '中班': '2', '夜班': '3'}
+    return 'E101{}{}{}{}{}{}{}'.format(plan_id, equip_no, ''.join(str(factory_date).split('-')),
+                                       classes_dict[classes], begin_trains, end_trains,
+                                       'R' if update else '')
+
+
 class BatchChargeLogSerializer(BaseModelSerializer):
     class Meta:
         model = BatchChargeLog
@@ -30,7 +39,7 @@ class BatchChargeLogCreateSerializer(BaseModelSerializer):
         material_no = material_name = None
         if mat_supplier_collect:
             material_no = mat_supplier_collect.material.material_no
-            material_name = mat_supplier_collect.material_name
+            material_name = mat_supplier_collect.material.material_name
         if pallet_feedback:
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
@@ -190,6 +199,12 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
         weigh_type_dict = {1: '-a', 2: '-b', 3: '-s'}
         attr['material_no'] = attr['product_no'] + weigh_type_dict[batching_classes_plan.weigh_cnt_type.weigh_type]
         attr['material_name'] = attr['product_no'] + weigh_type_dict[batching_classes_plan.weigh_cnt_type.weigh_type]
+        attr['bra_code'] = generate_bra_code(batching_classes_plan.id,
+                                             attr['equip_no'],
+                                             attr['production_factory_date'],
+                                             attr['production_classes'],
+                                             attr['begin_trains'],
+                                             attr['end_trains'])
         return attr
 
     class Meta:
@@ -199,7 +214,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
                   'production_factory_date', 'production_classes', 'production_group', 'created_date',
                   'material_details')
         read_only_fields = ('production_factory_date', 'production_classes', 'dev_type', 'product_no',
-                            'production_group', 'created_date', 'material_details')
+                            'production_group', 'created_date', 'material_details', 'bra_code')
 
 
 class WeightPackageUpdateLogSerializer(BaseModelSerializer):
@@ -228,6 +243,19 @@ class WeightPackageUpdateLogSerializer(BaseModelSerializer):
 
 
 class WeightPackagePartialUpdateLogSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        batching_classes = BatchingClassesPlan.objects.filter(plan_batching_uid=instance.plan_batching_uid).first()
+        instance.bra_code = generate_bra_code(batching_classes.id,
+                                              instance.equip_no,
+                                              instance.production_factory_date,
+                                              instance.production_classes,
+                                              instance.begin_trains,
+                                              instance.end_trains,
+                                              update=True)
+        instance.save()
+        return instance
 
     class Meta:
         model = WeightPackageLog

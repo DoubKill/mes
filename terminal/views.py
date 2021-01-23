@@ -370,7 +370,7 @@ class CheckVersion(APIView):
         if current_version:
             new_version = Version.objects.filter(type=version_type, id__gt=current_version.id)
             if new_version:
-                return Response(new_version.values()[0])
+                return Response(list(new_version.values())[-1])  # 每次只找最新的更新包
             else:
                 return Response({})
         else:
