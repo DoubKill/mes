@@ -307,29 +307,30 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         model = self.divide_tool(self.MODEL)
         queryset = None
         material_type, container_no, material_no, order_no, location = self.get_query_params()
+        quality_status = self.request.query_params.get('quality_status', None)
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
-            if self.request.query_params.get("location_status"):
-                queryset = model.objects.using('bz').filter(location_status="有货货位")
-            else:
-                queryset = model.objects.using('bz').all()
-            quality_status = self.request.query_params.get('quality_status', None)
+            # if self.request.query_params.get("location_status"):
+            #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
+            # else:
+            queryset = model.objects.using('bz').all()
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
             # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
-            if self.request.query_params.get("location_status"):
-                queryset = model.objects.using('lb').filter(location_status="有货货位")
-            else:
-                queryset = model.objects.using('lb').all()
-            quality_status = self.request.query_params.get('quality_status', None)
+            # if self.request.query_params.get("location_status"):
+            #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
+            # else:
+            queryset = model.objects.using('lb').all()
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         if queryset:
-            if material_type and model != BzFinalMixingRubberInventory:
+            if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory, BzFinalMixingRubberInventoryLB]:
                 queryset = queryset.filter(material_type__icontains=material_type)
+            if material_type and model == XBMaterialInventory:
+                queryset = queryset.filter(material__material_type__global_name__icontains=material_type)
             if material_no:
                 queryset = queryset.filter(material_no__icontains=material_no)
             if container_no:
