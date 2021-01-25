@@ -425,19 +425,19 @@ class MaterialCount(APIView):
         if store_name == "终炼胶库":
             # TODO 暂时这么写
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter().values('material_no').annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("终炼胶库连接失败")
         elif store_name == "混炼胶库":
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("混炼胶库连接失败")
         elif store_name == "帘布库":
             try:
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').values('material_no').annotate(
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location_status="有货货位").values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("帘布库库连接失败")
