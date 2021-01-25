@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Max
+from django.db.models import Max, Min
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -15,7 +15,6 @@ from basics.models import WorkSchedulePlan
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
-from production.models import TrainsFeedbacks
 from recipe.models import ProductBatchingDetail
 from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, BatchChargeLogListFilter, WeightBatchingLogListFilter
@@ -82,14 +81,17 @@ class BatchProductionInfoView(APIView):
             equip__equip_no=equip_no,
             delete_flag=False)
         for plan in classes_plans:
-            actual_trains = TrainsFeedbacks.objects.filter(
-                plan_classes_uid=plan.plan_classes_uid
-            ).aggregate(max_trains=Max('actual_trains'))['max_trains']
+            max_min_train_data = BatchChargeLog.objects.filter(
+                plan_classes_uid=plan.plan_classes_uid,
+                status=1).aggregate(max_train=Max('trains'),
+                                    min_train=Min('trains'))
+            max_train = max_min_train_data['max_train'] if max_min_train_data['max_train'] else 0
+            min_train = max_min_train_data['min_train'] if max_min_train_data['min_train'] else 0
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
                     'plan_trains': plan.plan_trains,
-                    'actual_trains': actual_trains if actual_trains else 0,
+                    'actual_trains': max_train - min_train,
                     'plan_classes_uid': plan.plan_classes_uid,
                     'status': plan.status
                 }
@@ -102,11 +104,6 @@ class BatchProductionInfoView(APIView):
                         status=1).aggregate(max_train=Max('trains'))['max_train']
 
                 # 投料成功次数小于等于该配方的标准数量，则车次为1
-                # print(BatchChargeLog.objects.filter(
-                #         plan_classes_uid=plan.plan_classes_uid,
-                #         status=1
-                # ).count())
-                # print(len(plan.product_batching.batching_material_nos))
                 if BatchChargeLog.objects.filter(
                         plan_classes_uid=plan.plan_classes_uid,
                         status=1

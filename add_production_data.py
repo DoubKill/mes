@@ -28,6 +28,11 @@ def main():
             st = 1
         else:
             st = max_train + 1
+        now = datetime.datetime.now()
+        b_day = datetime.timedelta(seconds=-random.randint(10, 100))
+        e_day = datetime.timedelta(seconds=random.randint(10, 100))
+        begin_time = now + b_day
+        end_time = now + e_day
         if st <= pcp.plan_trains:
             TrainsFeedbacks.objects.create(
                 plan_classes_uid=pcp.plan_classes_uid,
@@ -38,11 +43,11 @@ def main():
                 product_no=pcp.product_batching.stage_product_batch_no,
                 plan_weight=1000,
                 actual_weight=1000,
-                begin_time=datetime.datetime.now(),
-                end_time=datetime.datetime.now(),
+                begin_time=begin_time,
+                end_time=end_time,
                 operation_user='admin',
                 classes=pcp.work_schedule_plan.classes.global_name,
-                product_time=datetime.datetime.now(),
+                product_time=now,
                 factory_date=pcp.work_schedule_plan.plan_schedule.day_time)
             if st % 2 == 0:
                 pf = PalletFeedbacks.objects.create(
@@ -52,8 +57,8 @@ def main():
                     product_no=pcp.product_batching.stage_product_batch_no,
                     plan_weight=1000,
                     actual_weight=1000,
-                    begin_time=datetime.datetime.now(),
-                    end_time=datetime.datetime.now(),
+                    begin_time=begin_time,
+                    end_time=end_time,
                     operation_user='admin',
                     begin_trains=st - 1,
                     end_trains=st,
