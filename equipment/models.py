@@ -9,8 +9,16 @@ from system.models import AbstractEntity
 
 class EquipCurrentStatus(AbstractEntity):
     """设备现况汇总"""
-    equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_current_status_equip")
-    status = models.CharField(max_length=64, verbose_name='状态', help_text='状态')
+    STATUSES = (
+        ('停机', '停机'),
+        ('故障', '故障'),
+        ('维修开始', '维修开始'),
+        ('维修结束', '维修结束'),
+        ('空转', '空转'),
+        ('运行中', '运行中'),
+    )
+    equip = models.OneToOneField(Equip, on_delete=models.CASCADE, related_name="equip_current_status_equip")
+    status = models.CharField(choices=STATUSES, max_length=64, verbose_name='状态', help_text='状态')
     user = models.CharField(max_length=64, verbose_name='操作员', help_text='操作员')
 
     class Meta:

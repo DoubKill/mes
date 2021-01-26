@@ -5,7 +5,7 @@ from rest_framework import serializers
 from django.db.transaction import atomic
 
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
-from equipment.models import EquipDownType, EquipDownReason
+from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus
 from mes.base_serializer import BaseModelSerializer
 
 
