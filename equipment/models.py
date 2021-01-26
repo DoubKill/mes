@@ -30,8 +30,7 @@ class EquipDownType(AbstractEntity):
 
 class EquipDownReason(AbstractEntity):
     """设备停机原因"""
-    no = models.CharField(max_length=64, verbose_name='类型代码', help_text='类型代码')
-    name = models.CharField(max_length=64, verbose_name='类型名称', help_text='类型名称')
+    no = models.CharField(max_length=64, verbose_name='原因代码', help_text='类型代码')
     equip_down_type = models.ForeignKey(EquipDownType, on_delete=models.CASCADE, related_name="equip_down_reason_type")
     desc = models.CharField(max_length=256, verbose_name='描述', help_text='描述')
 
