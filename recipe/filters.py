@@ -6,7 +6,7 @@ from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttrib
 class MaterialFilter(django_filters.rest_framework.FilterSet):
     material_type_name = django_filters.CharFilter(field_name='material_type__global_name', help_text='原材料类别名称')
     material_type_id = django_filters.NumberFilter(field_name='material_type', help_text='原材料类别')
-    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否使用')
+    # use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否使用')
     material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料代码', lookup_expr='icontains')
     material_name = django_filters.CharFilter(field_name='material_name', help_text='原材料名称', lookup_expr='icontains')
 

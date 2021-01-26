@@ -9,7 +9,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView, RetrieveAPIView
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -124,9 +124,9 @@ class TestIndicatorDataPointListView(ListAPIView):
                 data_indicator_detail = []
                 data_names = DataPoint.objects.filter(
                     test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True)
-                for name in data_names:
-                    if name not in data_indicator_detail:
-                        data_indicator_detail.append(name)
+                for data_name in data_names:
+                    if data_name not in data_indicator_detail:
+                        data_indicator_detail.append(data_name)
                 data = {'test_type_id': test_indicator.id,
                         'test_type_name': test_indicator.name,
                         'data_indicator_detail': data_indicator_detail
@@ -194,13 +194,16 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         手工录入数据
     """
     queryset = MaterialTestOrder.objects.filter(
-        delete_flag=False).prefetch_related('order_results').order_by('lot_no', 'product_no', 'actual_trains')
+        delete_flag=False).prefetch_related(
+        'order_results').order_by('-production_factory_date',
+                                  '-production_class',
+                                  'production_equip_no',
+                                  'product_no',
+                                  'actual_trains')
     serializer_class = MaterialTestOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestOrderFilter
-
-    # pagination_class = None
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -769,6 +772,7 @@ def get_statics_query_dates(query_params):
     return start_time, end_time
 
 
+@method_decorator([api_recorder], name="dispatch")
 class BatchMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchMonth.objects.all()
     serializer_class = BatchMonthSerializer
@@ -801,6 +805,7 @@ def get_statics_query_date(query_params):
     return date
 
 
+@method_decorator([api_recorder], name="dispatch")
 class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchDay.objects.all()
     serializer_class = BatchDaySerializer
@@ -816,6 +821,7 @@ class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
         return batches
 
 
+@method_decorator([api_recorder], name="dispatch")
 class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoDaySerializer
@@ -835,6 +841,7 @@ class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
             batch__batch_month__date__month=date.month).distinct()
 
 
+@method_decorator([api_recorder], name="dispatch")
 class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoMonthSerializer
@@ -855,6 +862,7 @@ class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
             batch__batch_month__date__lte=end_time).distinct()
 
 
+@method_decorator([api_recorder], name="dispatch")
 class UnqualifiedOrderTrains(APIView):
     """不合格车次汇总列表"""
 
@@ -976,6 +984,7 @@ class UnqualifiedOrderTrains(APIView):
                          'ret': ret.values()})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class UnqualifiedDealOrderViewSet(ModelViewSet):
     """不合格处置"""
     queryset = UnqualifiedDealOrder.objects.all()
