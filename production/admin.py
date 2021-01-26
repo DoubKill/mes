@@ -1,10 +1,11 @@
 from django.contrib import admin
 
 # Register your models here.
-from production.models import TrainsFeedbacks, PalletFeedbacks, LocationPoint
+from production.models import TrainsFeedbacks, PalletFeedbacks, LocationPoint, MaterialTankStatus
 
 admin.site.register([TrainsFeedbacks])
 admin.site.register(PalletFeedbacks)
+admin.site.register(MaterialTankStatus)
 
 
 @admin.register(LocationPoint)

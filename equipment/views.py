@@ -55,6 +55,14 @@ class EquipDownReasonViewSet(ModelViewSet):
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'no', 'desc')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipCurrentStatusList(APIView):
@@ -70,3 +78,13 @@ class EquipCurrentStatusList(APIView):
                                                                              'status': ecs_obj.status,
                                                                              'user': ecs_obj.user})
         return Response({'results': temp_dict})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipCurrentStatusViewSet(ModelViewSet):
+    """设备现况"""
+    queryset = EquipCurrentStatus.objects.filter(delete_flag=False).all()
+    serializer_class = EquipCurrentStatusSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    # filter_class = EquipCurrentStatusFilter
