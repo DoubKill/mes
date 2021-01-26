@@ -61,19 +61,12 @@ class EquipCurrentStatusList(APIView):
     """设备现况汇总"""
 
     def get(self, request):
-        data_dict = {}
-        ecs_set = EquipCurrentStatus.objects.filter(delete_flag=False).all()
+        ecs_set = EquipCurrentStatus.objects.filter(delete_flag=False).select_related()
+        temp_dict = {x.equip.category.equip_type.global_name: [] for x in ecs_set}
+        # print(temp_dict)
         for ecs_obj in ecs_set:
-            name = data_dict.get(ecs_obj.equip.category.equip_type.global_name, None)
-            if not name:
-                data_dict[ecs_obj.equip.category.equip_type.global_name] = [{'equip_name': ecs_obj.equip.equip_name,
+            temp_dict[ecs_obj.equip.category.equip_type.global_name].append({'equip_name': ecs_obj.equip.equip_name,
                                                                              'equip_no': ecs_obj.equip.equip_no,
                                                                              'status': ecs_obj.status,
-                                                                             'user': ecs_obj.user}]
-            else:
-
-                data_dict[ecs_obj.equip.category.equip_type.global_name].append({'equip_name': ecs_obj.equip.equip_name,
-                                                                                 'equip_no': ecs_obj.equip.equip_no,
-                                                                                 'status': ecs_obj.status,
-                                                                                 'user': ecs_obj.user})
-        return Response({'results': data_dict})
+                                                                             'user': ecs_obj.user})
+        return Response({'results': temp_dict})
