@@ -17,3 +17,4 @@ drf-extensions==0.6.0
 # sqlserver by fq
 django-pyodbc-azure==2.1.0.0
 pyodbc==4.0.30
+drf-extensions==0.6.0
