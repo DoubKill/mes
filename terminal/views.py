@@ -87,14 +87,17 @@ class BatchProductionInfoView(APIView):
                                     min_train=Min('trains'))
             max_train = max_min_train_data['max_train'] if max_min_train_data['max_train'] else 0
             min_train = max_min_train_data['min_train'] if max_min_train_data['min_train'] else 0
+            if not max_train:
+                diff_train = 0
+            else:
+                diff_train = max_train - min_train + 1
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
                     'plan_trains': plan.plan_trains,
-                    'actual_trains': max_train - min_train,
+                    'actual_trains': diff_train,
                     'plan_classes_uid': plan.plan_classes_uid,
-                    'status': plan.status
-                }
+                    'status': plan.status}
             )
             if plan.status == '运行中':
                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
