@@ -3,15 +3,18 @@ from django.db import models
 # Create your models here.
 from django.db import models
 
-from basics.models import Equip
+from basics.models import Equip, Location
 from system.models import AbstractEntity
 
 
 class EquipPart(AbstractEntity):
     no = models.CharField(max_length=64, help_text='部位编号', verbose_name='编号')
     name = models.CharField(max_length=64, help_text='部位名称', verbose_name='名称')
-    location_id = models.PositiveIntegerField(help_text='所处位置', verbose_name='所处位置')
-    equip_id = models.PositiveIntegerField(help_text='设备', verbose_name='设备')
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name="equip_part_location",
+                                 help_text='所处位置',
+                                 verbose_name='所处位置', null=True)
+    equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_part_equip",
+                              help_text='设备', verbose_name='设备', null=True)
 
     class Meta:
         db_table = 'equip_part'

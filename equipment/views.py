@@ -4,8 +4,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter
-from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus
+from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter
+from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipPart
 from equipment.serializers import *
 from mes.derorators import api_recorder
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
@@ -88,3 +88,19 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     # filter_class = EquipCurrentStatusFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipPartViewSet(ModelViewSet):
+    """设备部位"""
+    queryset = EquipPart.objects.filter(delete_flag=False).all()
+    serializer_class = EquipPartSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipPartFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
