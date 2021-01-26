@@ -3,8 +3,6 @@ import uuid
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
-from recipe.models import ProductBatching
 from .models import ProductClassesPlan, BatchingClassesPlan
 
 
@@ -26,18 +24,22 @@ def product_classes_plan_save_handler(sender, **kwargs):
                 for cnt_type in product_classes_plan.product_batching.weighbatching.weighcnttype_set.all():
                     if not cnt_type.weighbatchingdetail_set.exists():  # 小料无配料 跳过
                         continue
-                    batching_classes_plan, created = BatchingClassesPlan.objects.get_or_create(
+                    batching_classes_plan = BatchingClassesPlan.objects.filter(
                         work_schedule_plan=product_classes_plan.work_schedule_plan,
-                        weigh_cnt_type=cnt_type)
-                    if created:
-                        batching_classes_plan.plan_batching_uid = uuid.uuid1().hex
-                    if not created and batching_classes_plan.delete_flag:
-                        batching_classes_plan.delete_flag = False
+                        weigh_cnt_type=cnt_type).first()
+                    created = False
+                    if not batching_classes_plan:
+                        batching_classes_plan = BatchingClassesPlan.objects.create(
+                            work_schedule_plan=product_classes_plan.work_schedule_plan,
+                            weigh_cnt_type=cnt_type,
+                            plan_batching_uid=uuid.uuid1().hex)
+                        created = True
                     plan_package_from_product_classes_plan = batching_classes_plan \
                         .plan_package_from_product_classes_plan()
-                    if plan_package_from_product_classes_plan != batching_classes_plan.plan_package:
-                        batching_classes_plan.plan_package = plan_package_from_product_classes_plan
-                        batching_classes_plan.package_changed = True
+                    if not created:
+                        if plan_package_from_product_classes_plan != batching_classes_plan.plan_package:
+                            batching_classes_plan.package_changed = True
+                    batching_classes_plan.plan_package = plan_package_from_product_classes_plan
                     batching_classes_plan.save()
         except ObjectDoesNotExist as e:
             pass

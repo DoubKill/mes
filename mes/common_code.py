@@ -5,6 +5,7 @@ import time
 import pymssql
 from DBUtils.PooledDB import PooledDB
 from rest_framework import status, mixins
+from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
@@ -13,6 +14,7 @@ from datetime import date, timedelta, datetime
 from mes.conf import BZ_HOST, BZ_USR, BZ_PASSWORD
 from mes.permissions import PermissonsDispatch
 from system.models import User, Permissions
+from rest_framework import status as rf_status
 
 
 # 启用-》禁用    禁用-》启用
@@ -197,3 +199,24 @@ class DecimalEncoder(json.JSONEncoder):
             return float(o)
 
         super(DecimalEncoder, self).default(o)
+
+
+def response(success, data=None, message=None):
+    info = {
+            'success': success,
+            'message': message,
+            'data': data
+        }
+    return Response(data=info, status=rf_status.HTTP_200_OK)
+
+
+class TerminalCreateAPIView(CreateAPIView):
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return response(
+                success=False,
+                message=list(serializer.errors.values())[0][0])  # 只返回一条错误信息
+        self.perform_create(serializer)
+        return response(success=True)

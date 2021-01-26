@@ -44,6 +44,13 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialFilter
 
+    def get_queryset(self):
+        material_type_ids = self.request.query_params.get('material_type_ids')
+        if material_type_ids:
+            material_type_ids = material_type_ids.split(',')
+            return self.queryset.filter(material_type_id__in=material_type_ids)
+        return self.queryset
+
     def get_permissions(self):
         if self.request.query_params.get('all'):
             return ()
@@ -203,7 +210,15 @@ class ProductBatchingViewSet(ModelViewSet):
                                    'used_type')
             return Response({'results': data})
         else:
-            return super().list(request, *args, **kwargs)
+            if self.request.query_params.get('weight_batching'):  # 拉取还没有新建小料配方的标准配方
+                queryset = queryset.filter(weighbatching__isnull=True)
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
 
     def get_permissions(self):
         if self.request.query_params.get('all'):
