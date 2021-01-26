@@ -3,7 +3,7 @@ from basics.models import Equip
 from rest_framework import serializers
 
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
-from equipment.models import EquipDownType, EquipDownReason
+from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus
 from mes.base_serializer import BaseModelSerializer
 
 class EquipRealtimeSerializer(BaseModelSerializer):
