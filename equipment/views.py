@@ -199,7 +199,6 @@ class PropertyViewSet(ModelViewSet):
             url_name='export-property')
     def export_property(self, request, pk=None):
         """模板下载"""
-
         return property_template()
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-property',
@@ -207,9 +206,5 @@ class PropertyViewSet(ModelViewSet):
     def import_property(self, request, pk=None):
         """模板导入"""
         file = request.FILES.get('file')
-        try:
-            property_import(file)
-        except Exception as e:
-            print(e)
-            raise ValidationError('格式不对')
+        property_import(file)
         return Response('导入成功')

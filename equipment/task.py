@@ -68,14 +68,21 @@ def property_import(file):
 
         p_obj = Property.objects.filter(property_no=i[1], delete_flag=False).first()
         if not p_obj:
-            leave_factory_date = datetime.timedelta(days=i[13])
-            leave_factory_date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + leave_factory_date
-            leave_factory_date = datetime.datetime.strftime(leave_factory_date_1, '%Y-%m-%d')
-            use_date = datetime.timedelta(days=i[14])
-            use_date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + use_date
-            use_date = datetime.datetime.strftime(use_date_1, '%Y-%m-%d')
-            Property.objects.create(property_no=i[1], src_no=i[2], financial_no=i[3], equip_type=i[4], equip_no=i[5],
-                                    equip_name=i[6], made_in=i[7], capacity=i[8], price=i[9], status=status,
-                                    property_type_node=ptn_obj, leave_factory_no=i[12],
-                                    leave_factory_date=leave_factory_date, use_date=use_date)
+            try:
+                leave_factory_date = datetime.timedelta(days=i[13])
+                leave_factory_date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + leave_factory_date
+                leave_factory_date = datetime.datetime.strftime(leave_factory_date_1, '%Y-%m-%d')
+                use_date = datetime.timedelta(days=i[14])
+                use_date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + use_date
+                use_date = datetime.datetime.strftime(use_date_1, '%Y-%m-%d')
+            except Exception as e:
+                raise ValidationError('时间格式不对')
+            try:
+                Property.objects.create(property_no=i[1], src_no=i[2], financial_no=i[3], equip_type=i[4],
+                                        equip_no=i[5],
+                                        equip_name=i[6], made_in=i[7], capacity=i[8], price=i[9], status=status,
+                                        property_type_node=ptn_obj, leave_factory_no=i[12],
+                                        leave_factory_date=leave_factory_date, use_date=use_date)
+            except Exception as e:
+                raise ValidationError('导入失败，请检查文件格式')
     return True
