@@ -1,6 +1,6 @@
 import django_filters
 
-from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder
+from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -21,8 +21,8 @@ class EquipDownReasonFilter(django_filters.rest_framework.FilterSet):
 
 
 class EquipPartFilter(django_filters.rest_framework.FilterSet):
-    equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='设备编码')
-    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='设备名称')
+    equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='设备编码', lookup_expr='icontains')
+    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='设备名称', lookup_expr='icontains')
     equip_type = django_filters.CharFilter(field_name='equip__category__equip_type__global_name', help_text='设备类型')
 
     class Meta:
@@ -37,3 +37,13 @@ class EquipMaintenanceOrderFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipMaintenanceOrder
         fields = ('equip_no', 'equip_name',)
+
+
+class PropertyFilter(django_filters.rest_framework.FilterSet):
+    property_no = django_filters.CharFilter(field_name='property_no', help_text='设备编码', lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='设备名称', lookup_expr='icontains')
+    property_type = django_filters.CharFilter(field_name='property_type_node__name', help_text='设备名称')
+
+    class Meta:
+        model = Property
+        fields = ('property_no', 'equip_no', 'property_type')
