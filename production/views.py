@@ -982,8 +982,8 @@ class EquipProductRealView(APIView):
                 plan = ProductClassesPlan.objects.filter(plan_classes_uid=_.plan_classes_uid).last()
                 plan_trains = plan.plan_trains
                 product_no = plan.product_batching.stage_product_batch_no
-            except:
-                raise ValidationError(f"计划:{_.plan_classes_uid}缺失")
+            except Exception as e:
+                raise ValidationError(f"错误信息:{e}")
             new = {
                 "equip_no": _.equip_no,
                 "temperature": _.temperature,

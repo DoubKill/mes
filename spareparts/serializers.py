@@ -175,6 +175,12 @@ class SpareLocationSerializer(BaseModelSerializer):
             validated_data['type'] = GlobalCode.objects.filter(global_name='备品备件地面').first()
         return super().create(validated_data)
 
+    def update(self, instance, validated_data):
+        if instance.type != validated_data['type'] and instance.type.global_name == '备品备件地面':
+            if instance.slb_location.filter(delete_flag=False).all().count() > 1:
+                raise serializers.ValidationError('当前库存位类型为地面且绑定了多个物料，不可切换成货架类型')
+        return super().update(instance, validated_data)
+
     class Meta:
         model = SpareLocation
         fields = ('id', 'type_name', 'name', 'type', 'used_flag')
