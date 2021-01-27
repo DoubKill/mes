@@ -18,6 +18,7 @@ router.register('equip-down-reason', EquipDownReasonViewSet)
 
 # 设备现况
 router.register('equip-current-status', EquipCurrentStatusViewSet)
+router.register('equip-part', EquipPartViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
