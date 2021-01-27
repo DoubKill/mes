@@ -76,7 +76,8 @@ class PropertyTypeNodeSerializer(BaseModelSerializer):
 
 
 class PropertySerializer(BaseModelSerializer):
-    property_type = serializers.CharField(source='property_type_node.name', read_only=True)
+    property_type = serializers.CharField(source='property_type_node.name', read_only=True, help_text='类型')
+    status = serializers.CharField(source='get_status_display', read_only=True, help_text='状态')
 
     class Meta:
         model = Property
