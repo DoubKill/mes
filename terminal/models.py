@@ -1,7 +1,6 @@
 from django.db import models
 
-from basics.models import Equip, GlobalCode
-from production.models import LocationPoint
+from basics.models import Equip, GlobalCode, Location
 from recipe.models import Material
 from system.models import AbstractEntity
 
@@ -20,7 +19,7 @@ class Terminal(AbstractEntity):
 
 
 class TerminalLocation(AbstractEntity):
-    location = models.ForeignKey(LocationPoint, help_text='位置点', on_delete=models.CASCADE)
+    location = models.ForeignKey(Location, help_text='位置点', on_delete=models.CASCADE)
     terminal = models.ForeignKey(Terminal, help_text='终端', on_delete=models.CASCADE)
     equip = models.ForeignKey(Equip, help_text='设备', on_delete=models.CASCADE)
 
