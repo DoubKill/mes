@@ -893,7 +893,7 @@ class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
 
 
 class MaterialOutputView(APIView):
-    permission_classes = IsAuthenticated
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         param = request.query_params
@@ -935,7 +935,7 @@ class MaterialOutputView(APIView):
 
 
 class EquipProductRealView(APIView):
-    permission_classes = IsAuthenticated
+    permission_classes = (IsAuthenticated,)
 
     def _instance_prepare(self, ret, equip_no):
         _ = EquipStatus.objects.filter(equip_no=equip_no).order_by('product_time').last()
@@ -1003,7 +1003,7 @@ class EquipProductRealView(APIView):
 
 
 class MaterialPassRealView(APIView):
-    permission_classes = IsAuthenticated
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         data = None
