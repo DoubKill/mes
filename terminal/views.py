@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Max, Q
+from django.db.models import Max, Min
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -11,21 +11,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import EquipCategoryAttribute, WorkSchedulePlan
-from mes.common_code import CommonDeleteMixin
+from basics.models import WorkSchedulePlan
+from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
-from production.models import TrainsFeedbacks
 from recipe.models import ProductBatchingDetail
 from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, BatchChargeLogListFilter, WeightBatchingLogListFilter
 from terminal.models import TerminalLocation, EquipOperationLog, BatchChargeLog, WeightBatchingLog, FeedingLog, \
-    WeightTankStatus, WeightPackageLog, Version
+    WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect
 from terminal.serializers import BatchChargeLogSerializer, BatchChargeLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
-    BatchChargeLogListSerializer, WeightBatchingLogListSerializer
+    BatchChargeLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer, \
+    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -56,7 +56,7 @@ class BatchBasicInfoView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BatchProductionInfoView(APIView):
-    """根据mac地址、班次， 获取生产信息和当前生产的规格；参数：?mac_address=xxx&classes=xxx"""
+    """根据mac地址、班次， 获取生产计划信息和当前生产的规格；参数：?mac_address=xxx&classes=xxx"""
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
@@ -81,27 +81,52 @@ class BatchProductionInfoView(APIView):
             equip__equip_no=equip_no,
             delete_flag=False)
         for plan in classes_plans:
-            actual_trains = TrainsFeedbacks.objects.filter(
-                plan_classes_uid=plan.plan_classes_uid
-            ).aggregate(max_trains=Max('actual_trains'))['max_trains']
+            max_min_train_data = BatchChargeLog.objects.filter(
+                plan_classes_uid=plan.plan_classes_uid,
+                status=1).aggregate(max_train=Max('trains'),
+                                    min_train=Min('trains'))
+            max_train = max_min_train_data['max_train'] if max_min_train_data['max_train'] else 0
+            min_train = max_min_train_data['min_train'] if max_min_train_data['min_train'] else 0
+            if not max_train:
+                diff_train = 0
+            else:
+                diff_train = max_train - min_train + 1
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
                     'plan_trains': plan.plan_trains,
-                    'actual_trains': actual_trains if actual_trains else 0,
+                    'actual_trains': diff_train,
                     'plan_classes_uid': plan.plan_classes_uid,
-                    'status': plan.status
-                }
+                    'status': plan.status}
             )
             if plan.status == '运行中':
                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
-                train_feedback = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).last()
-                if train_feedback:
-                    current_product_data['trains'] = train_feedback.actual_trains
-                    current_product_data['weight'] = train_feedback.actual_weight
-                else:
+                current_product_data['weight'] = 0
+                max_trains = BatchChargeLog.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid,
+                        status=1).aggregate(max_train=Max('trains'))['max_train']
+
+                # 投料成功次数小于等于该配方的标准数量，则车次为1
+                if BatchChargeLog.objects.filter(
+                        plan_classes_uid=plan.plan_classes_uid,
+                        status=1
+                ).count() < len(plan.product_batching.batching_material_nos):
                     current_product_data['trains'] = 1
-                    current_product_data['weight'] = 0
+
+                # 如果配方的标准都投入成功则当前车次为最大车次加1，否则当前车次就是最大车次
+                else:
+                    if max_trains == plan.plan_trains:
+                        current_product_data['trains'] = max_trains
+                    else:
+                        current_train = max_trains + 1
+                        for material_no in plan.product_batching.batching_material_nos:
+                            if not BatchChargeLog.objects.filter(
+                                    plan_classes_uid=plan.plan_classes_uid,
+                                    status=1,
+                                    material_no=material_no,
+                                    trains=max_trains):
+                                current_train = max_trains
+                        current_product_data['trains'] = current_train
 
         return Response({'plan_actual_data': plan_actual_data,
                          'current_product_data': current_product_data})
@@ -162,7 +187,7 @@ class BatchProductBatchingVIew(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class BatchChargeLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericViewSet):
+class BatchChargeLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         投料履历
@@ -202,7 +227,7 @@ class BatchingClassesPlanView(ListAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class WeightBatchingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericViewSet):
+class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         称量履历
@@ -223,7 +248,7 @@ class WeightBatchingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, G
 
 
 @method_decorator([api_recorder], name="dispatch")
-class FeedingLogViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, GenericViewSet):
+class FeedingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         投料履历
@@ -271,7 +296,7 @@ class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class WeightPackageLogViewSet(mixins.CreateModelMixin,
+class WeightPackageLogViewSet(TerminalCreateAPIView,
                               mixins.ListModelMixin,
                               mixins.UpdateModelMixin,
                               mixins.RetrieveModelMixin,
@@ -285,16 +310,29 @@ class WeightPackageLogViewSet(mixins.CreateModelMixin,
         重新打印
     """
     queryset = WeightPackageLog.objects.all().order_by('-created_date')
-    pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_class = WeightPackageLogFilter
     filter_backends = [DjangoFilterBackend]
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('pagination'):
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     def get_serializer_class(self):
         if self.action == 'list':
             return WeightPackageLogSerializer
-        if self.action == 'update':
+        if self.action == 'retrieve':
+            return WeightPackageRetrieveLogSerializer
+        if self.action == 'update':  # 重新打印（终端使用，修改打印次数）
             return WeightPackageUpdateLogSerializer
+        if self.action == 'partial_update':  # 重新打印（mes页面操作，修改条形码）
+            return WeightPackagePartialUpdateLogSerializer
         else:
             return WeightPackageLogCreateSerializer
 
@@ -332,7 +370,7 @@ class CheckVersion(APIView):
         if current_version:
             new_version = Version.objects.filter(type=version_type, id__gt=current_version.id)
             if new_version:
-                return Response(new_version.values()[0])
+                return Response(list(new_version.values())[-1])  # 每次只找最新的更新包
             else:
                 return Response({})
         else:
@@ -345,13 +383,6 @@ class BarCodeTank(APIView):
     def get(self, request):
         bar_code = self.request.query_params.get('bar_code')
         return Response(WeightTankStatus.objects.filter().values('tank_no')[0])
-
-
-class DevTypeView(APIView):
-    """获取所以机型下拉框"""
-
-    def get(self, request):
-        return Response(set(EquipCategoryAttribute.objects.values_list('category_name', flat=True)))
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -434,3 +465,24 @@ class WeightBatchingLogListViewSet(ListAPIView):
         else:
             raise ValidationError('参数不全')
         return queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
+                                     mixins.ListModelMixin,
+                                     mixins.UpdateModelMixin,
+                                     mixins.RetrieveModelMixin,
+                                     GenericViewSet):
+    queryset = MaterialSupplierCollect.objects.filter(delete_flag=False)
+    serializer_class = MaterialSupplierCollectSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_fields = ('material_id', )
+
+    def get_queryset(self):
+        if self.request.query_params.get('mes_system'):
+            # mes生成的条码
+            return self.queryset.filter(child_system__isnull=True)
+        else:
+            # 没有绑定原材料则认为是子系统的数据
+            return self.queryset.filter(child_system__isnull=False)

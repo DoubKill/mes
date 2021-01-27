@@ -144,6 +144,25 @@ class ProductBatching(AbstractEntity):
     def __str__(self):
         return self.stage_product_batch_no
 
+    @property
+    def batching_material_nos(self):
+        material_nos = set((self.batching_details.filter(
+            delete_flag=False).values_list('material__material_no', flat=True)))
+        weight_batching = getattr(self, 'weighbatching', None)
+        if weight_batching:
+            cnt_types = weight_batching.weighcnttype_set.filter()
+            for cnt_type in cnt_types:
+                if cnt_type.weighbatchingdetail_set.filter():
+                    material_nos = material_nos.difference(
+                        set(cnt_type.weighbatchingdetail_set.values_list('material__material_no', flat=True)))
+                    if cnt_type.weigh_type == 1:
+                        material_nos.add(self.stage_product_batch_no + '-a')
+                    elif cnt_type.weigh_type == 2:
+                        material_nos.add(self.stage_product_batch_no + '-b')
+                    else:
+                        material_nos.add(self.stage_product_batch_no + '-s')
+        return material_nos
+
     class Meta:
         db_table = 'product_batching'
         verbose_name_plural = verbose_name = '胶料配料标准'
@@ -259,6 +278,10 @@ class WeighCntType(models.Model):
     weigh_batching = models.ForeignKey(WeighBatching, verbose_name='小料称量配方标准', on_delete=models.CASCADE)
     weigh_type = models.PositiveIntegerField('称重分类', choices=WEIGH_TYPE_CHOICE, default=1)
     package_cnt = models.PositiveIntegerField('分包数量', default=1)
+
+    @property
+    def weighting_material_nos(self):
+        return list(self.weighbatchingdetail_set.values_list('material__material_no', flat=True))
 
     class Meta:
         db_table = 'weigh_cnt_type'

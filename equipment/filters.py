@@ -1,6 +1,6 @@
 import django_filters
 
-from equipment.models import EquipDownType, EquipDownReason
+from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -18,3 +18,22 @@ class EquipDownReasonFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipDownReason
         fields = ('equip_down_type_name',)
+
+
+class EquipPartFilter(django_filters.rest_framework.FilterSet):
+    equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='设备编码')
+    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='设备名称')
+    equip_type = django_filters.CharFilter(field_name='equip__category__equip_type__global_name', help_text='设备类型')
+
+    class Meta:
+        model = EquipPart
+        fields = ('equip_no', 'equip_name', 'equip_type')
+
+
+class EquipMaintenanceOrderFilter(django_filters.rest_framework.FilterSet):
+    equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='设备编码')
+    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='设备名称')
+
+    class Meta:
+        model = EquipMaintenanceOrder
+        fields = ('equip_no', 'equip_name',)

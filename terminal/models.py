@@ -2,6 +2,7 @@ from django.db import models
 
 from basics.models import Equip, GlobalCode
 from production.models import LocationPoint
+from recipe.models import Material
 from system.models import AbstractEntity
 
 
@@ -38,12 +39,12 @@ class BatchChargeLog(AbstractEntity):
     )
     equip_no = models.CharField(max_length=64, help_text='机台编号')
     plan_classes_uid = models.CharField(max_length=64, help_text='班次计划唯一码')
-    trains = models.CharField(max_length=64, help_text='车次')
+    trains = models.IntegerField(help_text='车次')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
     material_no = models.CharField(max_length=64, help_text='原材料编码')
-    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量')
-    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='时实际重量')
+    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
+    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='时实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
     production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
     production_classes = models.CharField(max_length=64, help_text='生产班次')
@@ -66,10 +67,10 @@ class WeightPackageLog(AbstractEntity):
     equip_no = models.CharField(max_length=64, help_text='称量设备编号')
     plan_batching_uid = models.CharField(max_length=64, help_text='小料称量计划号')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
-    # material_name = models.CharField(max_length=64, help_text='原材料名称')
-    # material_no = models.CharField(max_length=64, help_text='原材料编码')
-    # plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量')
-    # actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量')
+    material_name = models.CharField(max_length=64, help_text='物料打包名称')
+    material_no = models.CharField(max_length=64, help_text='物料打包编号')
+    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
+    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
     production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
     production_classes = models.CharField(max_length=64, help_text='生产班次')
@@ -91,23 +92,23 @@ class WeightPackageLog(AbstractEntity):
 
 
 class WeightBatchingLog(AbstractEntity):
-    # STATUS_CHOICE = (
-    #     (1, '投料'),
-    #     (2, '撤销')
-    # )
+    STATUS_CHOICE = (
+        (1, '正常'),
+        (2, '异常')
+    )
     equip_no = models.CharField(max_length=64, help_text='称量设备编号')
     plan_batching_uid = models.CharField(max_length=64, help_text='小料称量计划号')
     trains = models.IntegerField(help_text='车次')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
     material_no = models.CharField(max_length=64, help_text='原材料编码')
-    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量')
-    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量')
+    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
+    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
     production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
     production_classes = models.CharField(max_length=64, help_text='生产班次')
     production_group = models.CharField(max_length=64, help_text='生产班组')
-    # status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
     # batch_time = models.DateTimeField(max_length=64, help_text='投入时间')
     batch_classes = models.CharField(max_length=64, help_text='投入班次')
     batch_group = models.CharField(max_length=64, help_text='投入班组')
@@ -185,3 +186,17 @@ class Version(models.Model):
 
     def __str__(self):
         return "{}----{}".format(self.get_type_display(), self.number)
+
+
+class MaterialSupplierCollect(AbstractEntity):
+    bra_code = models.CharField(max_length=64, help_text='子系统条形码')
+    material_name = models.CharField(max_length=64, help_text='子系统物料名称')
+    material_no = models.CharField(max_length=64, help_text='子系统物料编码')
+    batch_no = models.CharField(max_length=64, help_text='批次号', null=True)
+    child_system = models.ForeignKey(GlobalCode, help_text='子系统', on_delete=models.CASCADE, blank=True, null=True)
+    material = models.ForeignKey(Material, help_text='原材料', null=True,
+                                 on_delete=models.CASCADE, related_name='supplier_materials')
+
+    class Meta:
+        db_table = 'material_supplier_collect'
+        verbose_name_plural = verbose_name = '物料条形码管理'
