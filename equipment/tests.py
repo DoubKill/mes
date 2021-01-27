@@ -63,7 +63,6 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
             "content": msg
         },
         "at": {  # @
-            # "atMobiles": ["17356530633"],  # 专门@某一个人 同时下面的isAtAll要为False
             "atMobiles": atMobiles,  # 专门@某一个人 同时下面的isAtAll要为False
             "isAtAll": isAtAll  # 为真是@所有人
         }
@@ -77,13 +76,18 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
     return r
 
 
-mm = send_ding_msg(url=url, secret=secret, msg='1242421421', isAtAll=False, atMobiles=['17356530633'])
+mm = send_ding_msg(url=url, secret=secret, msg='1242421421', isAtAll=False, atMobiles=['17fd35多个0633'])
 print(mm)
 """
-当secret填写不对时，会提示如下信息
-{'errcode': 310000, 'errmsg': 'sign not match, more: [https://ding-doc.dingtalk.com/doc#/serverapi2/qf2nxq]'}
-当url填写不对时，会提示如下信息
-{'errcode': 300001, 'errmsg': 'token is not exist'}
-当发送成功时，会提示如下信息
-{'errcode': 0, 'errmsg': 'ok'}
+1、当secret填写不对时，会提示如下信息
+    {'errcode': 310000, 'errmsg': 'sign not match, more: [https://ding-doc.dingtalk.com/doc#/serverapi2/qf2nxq]'}
+2、当url填写不对时，会提示如下信息
+    {'errcode': 300001, 'errmsg': 'token is not exist'}
+3、当发送成功时，会提示如下信息
+    {'errcode': 0, 'errmsg': 'ok'}
+4、当想要@某人时 但是手机号填写错误或者不写时，会提示如下信息
+    {'errcode': 0, 'errmsg': 'ok'}
+    会变成不@人，单纯的发送信息
+    返回的信息和上面发送成功一样 所以除了查看钉钉信息 无法区分是否@某人成功
+    所以建议后期使用钉钉提醒功能时，文案里加上@人的名字 不然无法区分是否是普通消息还是@人失败的消息
 """
