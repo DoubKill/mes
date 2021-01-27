@@ -55,7 +55,7 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
 
     if atMobiles:
         if not isinstance(atMobiles, list):
-            raise ValidationError('atMobiles要么不传，要么给个列表')
+            return {'errcode': 404, 'errmsg': 'atMobiles不是列表'}
     # 这里使用  文本类型
     data = {
         "msgtype": "text",
@@ -76,7 +76,7 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
     return r
 
 
-mm = send_ding_msg(url=url, secret=secret, msg='1242421421', isAtAll=False, atMobiles=['17fd35多个0633'])
+mm = send_ding_msg(url=url, secret=secret, msg='1242421421', isAtAll=123, atMobiles=['17bryj30633'])
 print(mm)
 """
 1、当secret填写不对时，会提示如下信息
@@ -90,4 +90,6 @@ print(mm)
     会变成不@人，单纯的发送信息
     返回的信息和上面发送成功一样 所以除了查看钉钉信息 无法区分是否@某人成功
     所以建议后期使用钉钉提醒功能时，文案里加上@人的名字 不然无法区分是否是普通消息还是@人失败的消息
+5、当想要@某人 但是atMobiles不是列表，会提示如下信息
+    {'errcode': 404, 'errmsg': 'atMobiles不是列表'}
 """
