@@ -87,7 +87,32 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     serializer_class = EquipCurrentStatusSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
+
     # filter_class = EquipCurrentStatusFilter
+
+    @atomic()
+    def update(self, request, *args, **kwargs):
+        data = request.data
+        instance = self.get_object()
+        if instance.status in ['运行中', '空转']:
+            wsp_obj = WorkSchedulePlan.objects.filter(start_time__lte=data['note_time'],
+                                                      end_time__gte=data['note_time'],
+                                                      plan_schedule__work_schedule__work_procedure__global_name__icontains='密炼').first()
+            if not wsp_obj:
+                raise ValidationError('当前日期没有工厂时间')
+            EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'), equip=instance.equip,
+                                                 first_down_reason=data['first_down_reason'],
+                                                 first_down_type=data['first_down_type'],
+                                                 order_src='mes设备维修申请页面',
+                                                 note_time=data['note_time'],
+                                                 down_flag=data['down_flag'],
+                                                 factory_date=wsp_obj.plan_schedule.day_time)
+        elif instance.status in ['停机', '维修结束']:
+            instance.status = '运行中'
+            instance.save()
+        else:
+            raise ValidationError('此状态不允许有操作')
+        return Response('操作成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
