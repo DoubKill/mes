@@ -6,6 +6,18 @@ name: 触发任务，
 desc: 快检结果更新到mes，mes将触发该脚本将快检结果同步至wms
 """
 import json
+import os
+import sys
+
+import django
+
+from inventory.models import MixGumInInventoryLog, MixGumOutInventoryLog, InventoryLog
+from mes.conf import INVENTORY_MAP
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
+django.setup()
 
 from inventory.utils import BaseUploader
 from mes.common_code import order_no
@@ -91,3 +103,66 @@ def update_wms_kjjg(msg_id, items=[
     sender = KJJGUploader()
     ret = sender.request(*get_base_data())
     return ret
+
+
+class OutworkHistorySync(object):
+
+    INVENTORY = INVENTORY_MAP
+
+    @classmethod
+    def get_model_list(cls, queryset, **kwargs):
+        ret = []
+        model =  kwargs.get("model")
+        order_type = kwargs.get("order_type")
+        info = kwargs.get("info")
+        for temp in queryset:
+            data = {
+                "warehouse_no": info[2],
+                "warehouse_name": info[1],
+                "order_no": temp.order_no,
+                "pallet_no": temp.pallet_no,
+                "location":  temp.location,
+                "qty": temp.qty,
+                "weight": temp.weight,
+                "material_no": temp.material_no,
+                "quality_status": temp.quality_status,
+                "lot_no": temp.lot_no,
+                "order_type": order_type,
+                "inout_reason": temp.inout_reason,
+                "inout_num_type": temp.inout_num_type,
+                "inventory_type": temp.inventory_type,
+                "unit": temp.unit,
+                "initiator": temp.initiator,
+                "start_time": temp.start_time,
+                "fin_time": temp.fin_time,
+                "classes" : "",
+                "equip_no": "",
+                "io_location": "",
+                "dst_location": "",
+            }
+            ret.append(model(**data))
+        return ret
+
+    @classmethod
+    def sync(cls):
+        for info, model_dict in cls.INVENTORY.items():
+            db = info[0]
+            warehouse = info[1]
+            if not model_dict:
+                continue
+            for order_type, model in model_dict.items():
+                # if order_type == "出库":
+                if not model:
+                    continue
+                temp = InventoryLog.objects.filter(order_type=order_type, warehouse_name=warehouse).last()
+                if not temp:
+                    continue
+                target_time = temp.start_time
+                temp_set = model.objects.using(db).filter(start_time__gt=target_time)
+                ret = cls.get_model_list(temp_set, info=info, model=model)
+                InventoryLog.objects.bulk_create(ret)
+
+
+
+if __name__ == '__main__':
+    OutworkHistorySync.sync()
