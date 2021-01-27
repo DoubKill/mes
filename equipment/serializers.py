@@ -45,9 +45,11 @@ class EquipCurrentStatusSerializer(BaseModelSerializer):
                                                  factory_date=validated_data['factory_date'], order_src='mes设备维修申请页面',
                                                  note_time=validated_data['note_time'],
                                                  down_flag=validated_data['down_flag'])
-        else:
+        elif instance.status in ['停机', '维修结束']:
             instance.status = '运行中'
             instance.save()
+        else:
+            raise serializers.ValidationError('此状态不允许有操作')
         return instance
 
     class Meta:
@@ -67,3 +69,13 @@ class EquipPartSerializer(BaseModelSerializer):
         fields = "__all__"
         validators = [UniqueTogetherValidator(queryset=EquipPart.objects.filter(delete_flag=False).all(),
                                               fields=('no', 'name', 'equip', 'location'), message='该数据已存在')]
+
+
+class EquipMaintenanceOrderSerializer(BaseModelSerializer):
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True, help_text='设备编码')
+    equip_name = serializers.CharField(source='equip.equip_name', read_only=True, help_text='设备名称')
+    part_name = serializers.CharField(source='part.name', read_only=True, help_text='设备部位名称')
+
+    class Meta:
+        model = EquipMaintenanceOrder
+        fields = '__all__'
