@@ -77,11 +77,13 @@ class PropertyTypeNodeSerializer(BaseModelSerializer):
     class Meta:
         model = PropertyTypeNode
         fields = '__all__'
+        validators = [UniqueTogetherValidator(queryset=PropertyTypeNode.objects.filter(delete_flag=False).all(),
+                                              fields=('name',), message='该数据已存在')]
 
 
 class PropertySerializer(BaseModelSerializer):
     property_type = serializers.CharField(source='property_type_node.name', read_only=True, help_text='类型')
-    status = serializers.CharField(source='get_status_display', read_only=True, help_text='状态')
+    status_name = serializers.CharField(source='get_status_display', help_text='状态',read_only=True)
 
     class Meta:
         model = Property
@@ -90,7 +92,6 @@ class PropertySerializer(BaseModelSerializer):
 
 
 class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
-
     class Meta:
         fields = ('id', 'status', 'maintenance_user', 'down_reason')
         model = EquipMaintenanceOrder

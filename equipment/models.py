@@ -1,4 +1,3 @@
-
 # Create your models here.
 from django.db import models
 
@@ -83,11 +82,12 @@ class EquipMaintenanceOrder(AbstractEntity):
     first_down_reason = models.CharField(max_length=64, verbose_name='初诊原因', help_text='初诊原因')
     first_down_type = models.CharField(max_length=64, verbose_name='初诊类型', help_text='初诊类型')
     down_flag = models.BooleanField(help_text='是否已经停机', verbose_name='是否已经停机', default=False)
-    image = models.ImageField(upload_to='equipment/%Y/%m/', help_text='相关照片', verbose_name='相关照片', null=True)
+    image = models.ImageField(upload_to='equipment/%Y/%m/', help_text='相关照片', verbose_name='相关照片', null=True,
+                              blank=True)
     factory_date = models.DateField(help_text='设备故障工厂日期', verbose_name='设备故障工厂日期')
     down_time = models.DateTimeField(help_text='设备故障时间', verbose_name='设备故障时间')
     order_src = models.CharField(max_length=64, help_text='订单来源', verbose_name='订单来源',
-                                 choices=ORDER_SRC_CHOICE, default=1)
+                                 choices=ORDER_SRC_CHOICE, default=1, blank=True)
     maintenance_user = models.CharField(max_length=64, help_text='维修人', verbose_name='维修人', null=True)
     assign_user = models.CharField(max_length=64, help_text='指派人', verbose_name='指派人', null=True)
     begin_time = models.DateTimeField(help_text='开始维修时间', verbose_name='开始维修时间', null=True)
@@ -111,7 +111,7 @@ class EquipMaintenanceOrder(AbstractEntity):
 
 class PropertyTypeNode(AbstractEntity):
     """资产类型节点"""
-    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', unique=True)
+    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称')
     parent = models.ForeignKey('self', help_text='父节点', related_name='children_property_type_node',
                                blank=True, null=True, on_delete=models.CASCADE)
 
@@ -125,7 +125,6 @@ class Property(AbstractEntity):
         (1, '使用中'),
         (2, '废弃'),
         (3, '限制'),
-
     )
     no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', null=True)
     name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', null=True)

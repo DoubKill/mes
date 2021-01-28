@@ -43,9 +43,9 @@ class EquipMaintenanceOrderFilter(django_filters.rest_framework.FilterSet):
 
 
 class PropertyFilter(django_filters.rest_framework.FilterSet):
-    property_no = django_filters.CharFilter(field_name='property_no', help_text='设备编码', lookup_expr='icontains')
-    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='设备名称', lookup_expr='icontains')
-    property_type = django_filters.CharFilter(field_name='property_type_node__name', help_text='设备名称')
+    property_no = django_filters.CharFilter(field_name='property_no', help_text='固定资产编码', lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='设备编码', lookup_expr='icontains')
+    property_type = django_filters.CharFilter(field_name='property_type_node__name', help_text='固定资产类型')
 
     class Meta:
         model = Property

@@ -14,7 +14,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.db.transaction import atomic
 from rest_framework.decorators import action
-
+import datetime
 
 # Create your views here.
 from plan.uuidfield import UUidTools
@@ -107,11 +107,12 @@ class EquipCurrentStatusViewSet(ModelViewSet):
             if data['down_flag']:
                 instance.status = '停机'
                 instance.save()
-            EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'), equip=instance.equip,
+            EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'),
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
-                                                 order_src='mes设备维修申请页面',
-                                                 note_time=data['note_time'],
+                                                 order_src=1,
+                                                 note_time=datetime.datetime.now(),
+                                                 down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
                                                  factory_date=wsp_obj.plan_schedule.day_time)
         elif instance.status in ['停机', '维修结束']:
