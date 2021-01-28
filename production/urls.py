@@ -72,4 +72,7 @@ urlpatterns = [
     path('equip-product-real/', EquipProductRealView.as_view()),  # 实时机台生产信息
     path('material-pass-real/', MaterialPassRealView.as_view()),
     path('equip-tank/', MaterialTankStatusList.as_view()),  # 机台编号和罐编号
+    path('equip-output-statistics/', WeekdayProductStatisticsView.as_view()), # 上周所有机台每日总产能
+    path('output-statistics/', ProductionStatisticsView.as_view()), # 上月每日炼胶总产能
+    path('equip-output-real/', DayCapacityView.as_view()),  # 单日产能
 ]
