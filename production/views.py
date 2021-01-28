@@ -1185,6 +1185,8 @@ class EquipInfoReal(APIView):
                 if not emo_set:
                     continue
                 for emo_obj in emo_set:
+                    if not emo_obj.begin_time:
+                        continue
                     wx_time = emo_obj.affirm_time - emo_obj.begin_time
                     total_time = total_time - wx_time
             tfb_set["fault_time"] = str(total_time)
