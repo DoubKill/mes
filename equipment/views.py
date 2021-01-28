@@ -4,15 +4,18 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter
-from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipPart
+from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
+    PropertyFilter
+from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipPart, PropertyTypeNode, Property
 from equipment.serializers import *
+from equipment.task import property_template, property_import
 from mes.derorators import api_recorder
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.response import Response
 from django.db.transaction import atomic
+from rest_framework.decorators import action
 
 
 # Create your views here.
@@ -100,6 +103,9 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                       plan_schedule__work_schedule__work_procedure__global_name__icontains='密炼').first()
             if not wsp_obj:
                 raise ValidationError('当前日期没有工厂时间')
+            if data['down_flag']:
+                instance.status = '停机'
+                instance.save()
             EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'), equip=instance.equip,
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
@@ -139,3 +145,66 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PropertyTypeNodeViewSet(ModelViewSet):
+    """资产类型节点"""
+    queryset = PropertyTypeNode.objects.filter(delete_flag=False).all()
+    serializer_class = PropertyTypeNodeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+
+    def partent_children(self, partent_set):
+        options = [{'id': i.id, 'value': i.name} for i in partent_set]
+        for children in options:
+            partent_set = PropertyTypeNode.objects.filter(parent=children['id'], delete_flag=False).all()
+            if partent_set:
+                children['children'] = self.partent_children(partent_set)
+        return options
+
+    def list(self, request, *args, **kwargs):
+        partent_set = PropertyTypeNode.objects.filter(parent__isnull=True, delete_flag=False).all()
+        options = self.partent_children(partent_set)
+        return Response(options)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if PropertyTypeNode.objects.filter(parent=instance.id, delete_flag=False).exists():
+            raise ValidationError(f'{instance.name}节点有子节点，不允许删除')
+        if instance.property_type_node_name.filter(delete_flag=False).exists():
+            raise ValidationError(f'{instance.name}节点已被使用，不允许删除')
+
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PropertyViewSet(ModelViewSet):
+    """资产"""
+    queryset = Property.objects.filter(delete_flag=False).all()
+    serializer_class = PropertySerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PropertyFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export-property',
+            url_name='export-property')
+    def export_property(self, request, pk=None):
+        """模板下载"""
+        return property_template()
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-property',
+            url_name='import-property')
+    def import_property(self, request, pk=None):
+        """模板导入"""
+        file = request.FILES.get('file')
+        property_import(file)
+        return Response('导入成功')

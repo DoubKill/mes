@@ -106,7 +106,7 @@ class EquipMaintenanceOrder(AbstractEntity):
 
 class PropertyTypeNode(AbstractEntity):
     """资产类型节点"""
-    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称')
+    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', unique=True)
     parent = models.ForeignKey('self', help_text='父节点', related_name='children_property_type_node',
                                blank=True, null=True, on_delete=models.CASCADE)
 
@@ -122,9 +122,9 @@ class Property(AbstractEntity):
         (3, '限制'),
 
     )
-    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
-    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称')
-    property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码')
+    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', null=True)
+    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', null=True)
+    property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码', unique=True)
     src_no = models.CharField(max_length=64, help_text='原编码', verbose_name='原编码')
     financial_no = models.CharField(max_length=64, help_text='财务编码', verbose_name='财务编码')
     equip_type = models.CharField(max_length=64, help_text='设备型号', verbose_name='设备型号')

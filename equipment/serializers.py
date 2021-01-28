@@ -7,7 +7,8 @@ from django.db.transaction import atomic
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from basics.models import WorkSchedulePlan
-from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart
+from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
+    PropertyTypeNode, Property
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
 
@@ -65,4 +66,19 @@ class EquipMaintenanceOrderSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipMaintenanceOrder
+        fields = '__all__'
+
+
+class PropertyTypeNodeSerializer(BaseModelSerializer):
+    class Meta:
+        model = PropertyTypeNode
+        fields = '__all__'
+
+
+class PropertySerializer(BaseModelSerializer):
+    property_type = serializers.CharField(source='property_type_node.name', read_only=True, help_text='类型')
+    status = serializers.CharField(source='get_status_display', read_only=True, help_text='状态')
+
+    class Meta:
+        model = Property
         fields = '__all__'

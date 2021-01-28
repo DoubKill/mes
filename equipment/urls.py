@@ -25,6 +25,12 @@ router.register('equip-part', EquipPartViewSet)
 # 维修表单
 router.register('equip-maintenance-order', EquipMaintenanceOrderViewSet)
 
+# 资产类型节点
+router.register('property-type-node', PropertyTypeNodeViewSet)
+
+# 资产
+router.register('property', PropertyViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),  # 设备现况汇总
