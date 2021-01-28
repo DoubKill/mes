@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -6,11 +5,10 @@ from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter
-from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipPart, PropertyTypeNode, Property
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.derorators import api_recorder
-from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
+from rest_framework.viewsets import ModelViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.response import Response
@@ -19,6 +17,9 @@ from rest_framework.decorators import action
 
 
 # Create your views here.
+from plan.uuidfield import UUidTools
+
+
 @method_decorator([api_recorder], name="dispatch")
 class EquipDownTypeViewSet(ModelViewSet):
     """设备停机类型"""
@@ -145,6 +146,14 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return EquipMaintenanceCreateOrderSerializer
+        if self.action in ('update', 'partial_update'):
+            return EquipMaintenanceOrderUpdateSerializer
+        else:
+            return EquipMaintenanceOrderSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")

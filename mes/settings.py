@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     'quality.apps.QualityConfig',
     'inventory.apps.InventoryConfig',
     'spareparts.apps.SparepartsConfig',
-    'terminal.apps.TerminalConfig'
+    'terminal.apps.TerminalConfig',
+    'equipment.apps.EquipmentConfig'
 ]
 
 MIDDLEWARE = [
@@ -363,6 +364,9 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, 'static'),# 项目默认会有的路径，如果你部署的不仅是前端打包的静态文件，项目目录static文件下还有其他文件，最好不要删
     os.path.join(BASE_DIR, "dist/static"),  # 加上这条
 ]
+
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, "media/"))
+MEDIA_URL = '/media/'
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),
