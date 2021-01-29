@@ -1059,7 +1059,10 @@ class PlanInfoReal(APIView):
         value = self.request.query_params.get('value', None)
         if not all([type, value]):
             raise ValidationError('参数不全，query_unit和value都得传')
-        production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        try:
+            production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        except:
+            raise ValidationError('时间格式不正确')
         if type == 'day':
             filter_dict = {'factory_date': value, 'delete_flag': False}
         elif type == 'week':
@@ -1118,7 +1121,7 @@ class EquipInfoReal(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
                 start_times=Min('start_time'),
                 end_times=Max('end_time'))
-            if not work_schedule_plan:
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
                 raise ValidationError('日期传参不正确')
             if now <= work_schedule_plan['end_times']:
                 end_time = now
@@ -1134,7 +1137,7 @@ class EquipInfoReal(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
                 start_times=Min('start_time'),
                 end_times=Max('end_time'))
-            if not work_schedule_plan:
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
                 raise ValidationError('日期传参不正确')
             if now <= work_schedule_plan['end_times']:
                 end_time = now
@@ -1150,7 +1153,7 @@ class EquipInfoReal(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
                 start_times=Min('start_time'),
                 end_times=Max('end_time'))
-            if not work_schedule_plan:
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
                 raise ValidationError('日期传参不正确')
             if now <= work_schedule_plan['end_times']:
                 end_time = now
