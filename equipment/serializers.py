@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.db.transaction import atomic
 from rest_framework import serializers
 
 from rest_framework.validators import UniqueTogetherValidator
@@ -65,8 +66,11 @@ class EquipPartSerializer(BaseModelSerializer):
 
 class EquipMaintenanceOrderSerializer(BaseModelSerializer):
     equip_no = serializers.CharField(source='equip_part.equip.equip_no', read_only=True, help_text='设备编码')
-    equip_name = serializers.CharField(source='equip_part.equip_name', read_only=True, help_text='设备名称')
+    equip_name = serializers.CharField(source='equip_part.equip.equip_name', read_only=True, help_text='设备名称')
     part_name = serializers.CharField(source='equip_part.name', read_only=True, help_text='设备部位名称')
+    affirm_username = serializers.CharField(source='affirm_user.username', read_only=True)
+    assign_username = serializers.CharField(source='assign_user.username', read_only=True)
+    maintenance_username = serializers.CharField(source='maintenance_user.username', read_only=True)
 
     class Meta:
         model = EquipMaintenanceOrder
@@ -83,7 +87,7 @@ class PropertyTypeNodeSerializer(BaseModelSerializer):
 
 class PropertySerializer(BaseModelSerializer):
     property_type = serializers.CharField(source='property_type_node.name', read_only=True, help_text='类型')
-    status_name = serializers.CharField(source='get_status_display', help_text='状态',read_only=True)
+    status_name = serializers.CharField(source='get_status_display', help_text='状态', read_only=True)
 
     class Meta:
         model = Property
@@ -92,8 +96,31 @@ class PropertySerializer(BaseModelSerializer):
 
 
 class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
+
+    @atomic()
+    def update(self, instance, validated_data):
+        if 'status' in validated_data:
+            if validated_data['status'] == 3:  # 开始维修
+                validated_data['begin_time'] = datetime.now()
+            if validated_data['status'] == 7:  # 退回,重建一张维修单，将之前的维修单状态改为关闭
+                validated_data['status'] = 6
+                EquipMaintenanceOrder.objects.create(
+                    order_uid=UUidTools.uuid1_hex('WXD'),
+                    factory_date=instance.factory_date,
+                    equip_part=instance.equip_part,
+                    first_down_reason=instance.first_down_reason,
+                    first_down_type=instance.first_down_type,
+                    down_flag=instance.down_flag,
+                    image=instance.image,
+                    down_time=instance.down_time,
+                    order_src=instance.order_src,
+                    note=instance.note,
+                    relevance_order_uid=instance.relevance_order_uid
+                )
+        return super().update(instance, validated_data)
+
     class Meta:
-        fields = ('id', 'status', 'maintenance_user', 'down_reason')
+        fields = ('id', 'status', 'maintenance_user', 'down_reason', 'take_time')
         model = EquipMaintenanceOrder
 
 

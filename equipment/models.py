@@ -2,7 +2,7 @@
 from django.db import models
 
 from basics.models import Equip, Location
-from system.models import AbstractEntity
+from system.models import AbstractEntity, User
 
 
 class EquipPart(AbstractEntity):
@@ -12,7 +12,7 @@ class EquipPart(AbstractEntity):
                                  help_text='所处位置',
                                  verbose_name='所处位置', null=True)
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_part_equip",
-                              help_text='设备', verbose_name='设备', null=True)
+                              help_text='设备', verbose_name='设备')
 
     class Meta:
         db_table = 'equip_part'
@@ -52,7 +52,7 @@ class EquipDownReason(AbstractEntity):
     """设备停机原因"""
     no = models.CharField(max_length=64, verbose_name='原因代码', help_text='类型代码')
     equip_down_type = models.ForeignKey(EquipDownType, on_delete=models.CASCADE, related_name="equip_down_reason_type")
-    desc = models.CharField(max_length=256, verbose_name='描述', help_text='描述')
+    desc = models.CharField(max_length=256, verbose_name='描述', help_text='描述', blank=True, null=True)
 
     class Meta:
         db_table = 'equip_down_reason'
@@ -82,18 +82,21 @@ class EquipMaintenanceOrder(AbstractEntity):
     first_down_reason = models.CharField(max_length=64, verbose_name='初诊原因', help_text='初诊原因')
     first_down_type = models.CharField(max_length=64, verbose_name='初诊类型', help_text='初诊类型')
     down_flag = models.BooleanField(help_text='是否已经停机', verbose_name='是否已经停机', default=False)
-    image = models.ImageField(upload_to='equipment/%Y/%m/', help_text='相关照片', verbose_name='相关照片', null=True,
-                              blank=True)
+    image = models.ImageField(upload_to='equipment/%Y/%m/', help_text='相关照片', verbose_name='相关照片',
+                              blank=True, null=True)
     factory_date = models.DateField(help_text='设备故障工厂日期', verbose_name='设备故障工厂日期')
     down_time = models.DateTimeField(help_text='设备故障时间', verbose_name='设备故障时间')
     order_src = models.CharField(max_length=64, help_text='订单来源', verbose_name='订单来源',
-                                 choices=ORDER_SRC_CHOICE, default=1, blank=True)
-    maintenance_user = models.CharField(max_length=64, help_text='维修人', verbose_name='维修人', null=True)
-    assign_user = models.CharField(max_length=64, help_text='指派人', verbose_name='指派人', null=True)
+                                 choices=ORDER_SRC_CHOICE, default=1)
+    maintenance_user = models.ForeignKey(User, help_text='维修人', verbose_name='维修人',
+                                         null=True, on_delete=models.CASCADE, related_name='m_order')
+    assign_user = models.ForeignKey(User, help_text='指派人', verbose_name='指派人', null=True,
+                                    on_delete=models.CASCADE, related_name='ass_order')
     begin_time = models.DateTimeField(help_text='开始维修时间', verbose_name='开始维修时间', null=True)
     end_time = models.DateTimeField(help_text='结束维修时间', verbose_name='结束维修时间', null=True)
     affirm_time = models.DateTimeField(help_text='确认启动时间', verbose_name='确认启动时间', null=True)
-    affirm_user = models.CharField(max_length=64, help_text='确认启动人', verbose_name='确认启动人', null=True)
+    affirm_user = models.ForeignKey(User, help_text='确认启动人', verbose_name='确认启动人', null=True,
+                                    on_delete=models.CASCADE, related_name='aff_order')
     down_reason = models.CharField(max_length=256, help_text='维修原因', verbose_name='维修原因', null=True)
     down_type = models.CharField(max_length=64, help_text='维修类型', verbose_name='维修类型', null=True)
     take_time = models.DateTimeField(help_text='接单时间', verbose_name='接单时间', null=True)
