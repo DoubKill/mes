@@ -47,7 +47,7 @@ class EquipDownTypeViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipDownReasonViewSet(ModelViewSet):
     """设备停机原因"""
-    queryset = EquipDownReason.objects.filter(delete_flag=False).all()
+    queryset = EquipDownReason.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipDownReasonSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -126,11 +126,19 @@ class EquipCurrentStatusViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipPartViewSet(ModelViewSet):
     """设备部位"""
-    queryset = EquipPart.objects.filter(delete_flag=False).all()
+    queryset = EquipPart.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPartSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'no', 'name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -142,7 +150,7 @@ class EquipPartViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipMaintenanceOrderViewSet(ModelViewSet):
     """维修表单"""
-    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).all()
+    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipMaintenanceOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
