@@ -27,7 +27,7 @@ class EquipCurrentStatus(AbstractEntity):
         ('维修开始', '维修开始'),
         ('维修结束', '维修结束'),
         ('空转', '空转'),
-        ('运行中', '运行中'),
+        ('运行', '运行'),
     )
     equip = models.OneToOneField(Equip, on_delete=models.CASCADE, related_name="equip_current_status_equip")
     status = models.CharField(choices=STATUSES, max_length=64, verbose_name='状态', help_text='状态')
@@ -78,7 +78,7 @@ class EquipMaintenanceOrder(AbstractEntity):
     # equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_maintenance_order_equip",
     #                           help_text='设备', verbose_name='设备')
     equip_part = models.ForeignKey(EquipPart, on_delete=models.CASCADE, related_name="equip_maintenance_order_part",
-                                   help_text='设备部位', verbose_name='部位')
+                                   help_text='设备部位', verbose_name='部位', null=True)
     first_down_reason = models.CharField(max_length=64, verbose_name='初诊原因', help_text='初诊原因')
     first_down_type = models.CharField(max_length=64, verbose_name='初诊类型', help_text='初诊类型')
     down_flag = models.BooleanField(help_text='是否已经停机', verbose_name='是否已经停机', default=False)

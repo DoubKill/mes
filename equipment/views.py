@@ -104,7 +104,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                       plan_schedule__work_schedule__work_procedure__global_name__icontains='密炼').first()
             if not wsp_obj:
                 raise ValidationError('当前日期没有工厂时间')
-            if data['down_flag']:
+            if data['down_flag'] == True:
                 instance.status = '停机'
                 instance.save()
             EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'),
