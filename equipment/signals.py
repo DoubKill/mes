@@ -5,8 +5,9 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from equipment.models import EquipMaintenanceOrder, InformContent, PlatformConfig
-from equipment.tests import send_ding_msg
 import logging
+
+from equipment.task import send_ding_msg
 
 logger = logging.getLogger('send_log')
 
@@ -25,5 +26,5 @@ def equip_maintenance_order_post_save(sender, instance=None, created=False, upda
             ic_obj.sent_flag = True
             ic_obj.save()
         else:
-            print(mm)
+            # print(mm)
             logger.error(f"{mm}")
