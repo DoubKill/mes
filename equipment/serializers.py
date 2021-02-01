@@ -151,3 +151,5 @@ class PlatformConfigSerializer(BaseModelSerializer):
     class Meta:
         model = PlatformConfig
         fields = '__all__'
+        validators = [UniqueTogetherValidator(queryset=PlatformConfig.objects.filter(delete_flag=False).all(),
+                                              fields=('platform',), message='已存在该平台的通知配置')]

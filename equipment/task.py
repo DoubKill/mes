@@ -21,6 +21,7 @@ import base64
 import urllib.parse
 from rest_framework.exceptions import ValidationError
 
+
 def property_template():
     """资产导入模板"""
     response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -96,6 +97,7 @@ def property_import(file):
                 raise ValidationError('导入失败，请检查文件格式')
     return True
 
+
 def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
     """
     url:钉钉群机器人的Webhook
@@ -135,7 +137,7 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
         r = requests.post(url, data=json.dumps(data), headers=headers, timeout=3)
         r = r.json()
     except Exception as e:
-        r = {'errcode': 400, 'errmsg': '网络错误'}
+        r = {'errcode': 400, 'errmsg': '网络异常'}
     return r
 
 
@@ -153,4 +155,6 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
     所以建议后期使用钉钉提醒功能时，文案里加上@人的名字 不然无法区分是否是普通消息还是@人失败的消息
 5、当想要@某人 但是atMobiles不是列表，会提示如下信息
     {'errcode': 404, 'errmsg': 'atMobiles不是列表'}
+6、当请求失败时，会提示如下信息
+    {'errcode': 400, 'errmsg': '网络异常'}
 """
