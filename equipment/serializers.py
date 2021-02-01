@@ -7,7 +7,7 @@ from rest_framework.validators import UniqueTogetherValidator
 
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
-    PropertyTypeNode, Property
+    PropertyTypeNode, Property, PlatformConfig
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.uuidfield import UUidTools
@@ -145,3 +145,9 @@ class EquipMaintenanceCreateOrderSerializer(BaseModelSerializer):
         fields = ('equip_part', 'first_down_reason', 'first_down_type', 'down_flag', 'image',
                   'down_time', 'order_src', 'note')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class PlatformConfigSerializer(BaseModelSerializer):
+    class Meta:
+        model = PlatformConfig
+        fields = '__all__'

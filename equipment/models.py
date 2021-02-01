@@ -27,7 +27,7 @@ class EquipCurrentStatus(AbstractEntity):
         ('维修开始', '维修开始'),
         ('维修结束', '维修结束'),
         ('空转', '空转'),
-        ('运行', '运行'),
+        ('运行中', '运行中'),
     )
     equip = models.OneToOneField(Equip, on_delete=models.CASCADE, related_name="equip_current_status_equip")
     status = models.CharField(choices=STATUSES, max_length=64, verbose_name='状态', help_text='状态')
@@ -150,3 +150,29 @@ class Property(AbstractEntity):
     class Meta:
         db_table = 'property'
         verbose_name_plural = verbose_name = '资产'
+
+
+class PlatformConfig(AbstractEntity):
+    """通知配置"""
+    platform = models.CharField(max_length=64, help_text='平台', verbose_name='平台')
+    url = models.CharField(max_length=256, help_text='url', verbose_name='url')
+    tag = models.CharField(max_length=256, help_text='标签', verbose_name='标签', null=True)
+    private_key = models.CharField(max_length=256, help_text='秘钥', verbose_name='秘钥')
+    token = models.CharField(max_length=64, help_text='token', verbose_name='token', null=True)
+
+    class Meta:
+        db_table = 'platform_config'
+        verbose_name_plural = verbose_name = '通知配置'
+
+
+class InformContent(AbstractEntity):
+    """通知内容"""
+    platform = models.ForeignKey(PlatformConfig, on_delete=models.CASCADE,
+                                 related_name="platform_config_platform")
+    content = models.TextField(help_text='内容', verbose_name='内容')
+    config_value = models.TextField(help_text='接受者', verbose_name='接受者',null=True)
+    sent_flag = models.BooleanField(help_text='是否发送完成', verbose_name='是否发送完成', default=False)
+
+    class Meta:
+        db_table = 'inform_content'
+        verbose_name_plural = verbose_name = '通知内容'

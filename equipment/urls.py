@@ -31,6 +31,9 @@ router.register('property-type-node', PropertyTypeNodeViewSet)
 # 资产
 router.register('property', PropertyViewSet)
 
+# 通知配置
+router.register('platform-config', PlatformConfigViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),  # 设备现况汇总

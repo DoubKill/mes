@@ -1,16 +1,6 @@
-from django.test import TestCase
-
-# Create your tests here.
-from django.test import TestCase
-
-# Create your tests here.
 import json
-import os
+from socket import timeout
 
-import django
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
-django.setup()
 import requests
 import time
 import hmac
@@ -28,9 +18,11 @@ SpareLocationBinding.objects.all().delete()
 SpareInventory.objects.all().delete()
 SpareInventoryLog.objects.all().delete()
 """
+
+
 # url = 'https://oapi.dingtalk.com/robot/send?access_token=e789c3009a916030e74f8f740a792bd92f7c4e02f66d1ffcc3d16e35c23a5d15'
-url = 'https://oapi.dingtalk.com/robot/send?access_token=7ab5afe7f9982ac5407ec619dfb1dd6a5e2a149fd191557527f027bc131d8635'
-secret = 'SEC3c1de736eed3d8542c8116ebcea98bff51a158f7fc84fde2f4204b972ccc9706'
+# url = 'https://oapi.dingtalk.com/robot/send?access_token=7ab5afe7f9982ac5407ec619dfb1dd6a5e2a149fd191557527f027bc131d8635'
+# secret = 'SEC3c1de736eed3d8542c8116ebcea98bff51a158f7fc84fde2f4204b972ccc9706'
 
 
 def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
@@ -69,15 +61,13 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
     }
 
     try:
-        r = requests.post(url, data=json.dumps(data), headers=headers)
+        r = requests.post(url, data=json.dumps(data), headers=headers, timeout=3)
         r = r.json()
     except Exception as e:
-        r = None
+        r = {'errcode': 400, 'errmsg': '网络错误'}
     return r
 
 
-mm = send_ding_msg(url=url, secret=secret, msg='1242421421', isAtAll=123, atMobiles=['17bryj30633'])
-print(mm)
 """
 1、当secret填写不对时，会提示如下信息
     {'errcode': 310000, 'errmsg': 'sign not match, more: [https://ding-doc.dingtalk.com/doc#/serverapi2/qf2nxq]'}

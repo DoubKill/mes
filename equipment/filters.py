@@ -1,6 +1,6 @@
 import django_filters
 
-from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property
+from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -50,3 +50,11 @@ class PropertyFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = Property
         fields = ('property_no', 'equip_no', 'property_type')
+
+
+class PlatformConfigFilter(django_filters.rest_framework.FilterSet):
+    platform = django_filters.CharFilter(field_name='platform', help_text='平台', lookup_expr='icontains')
+
+    class Meta:
+        model = PlatformConfig
+        fields = ('platform',)

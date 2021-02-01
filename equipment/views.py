@@ -4,7 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
-    PropertyFilter
+    PropertyFilter, PlatformConfigFilter
+from equipment.models import PlatformConfig
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.derorators import api_recorder
@@ -98,13 +99,13 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     def update(self, request, *args, **kwargs):
         data = request.data
         instance = self.get_object()
-        if instance.status in ['运行', '空转']:
+        if instance.status in ['运行中', '空转']:
             wsp_obj = WorkSchedulePlan.objects.filter(start_time__lte=data['note_time'],
                                                       end_time__gte=data['note_time'],
                                                       plan_schedule__work_schedule__work_procedure__global_name__icontains='密炼').first()
             if not wsp_obj:
                 raise ValidationError('当前日期没有工厂时间')
-            if data['down_flag'] == True:
+            if data['down_flag']:
                 instance.status = '停机'
                 instance.save()
             EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'),
@@ -114,9 +115,10 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                  note_time=datetime.datetime.now(),
                                                  down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
+                                                 equip_part_id=data['equip_part'],
                                                  factory_date=wsp_obj.plan_schedule.day_time)
         elif instance.status in ['停机', '维修结束']:
-            instance.status = '运行'
+            instance.status = '运行中'
             instance.save()
         else:
             raise ValidationError('此状态不允许有操作')
@@ -226,3 +228,19 @@ class PropertyViewSet(ModelViewSet):
         file = request.FILES.get('file')
         property_import(file)
         return Response('导入成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlatformConfigViewSet(ModelViewSet):
+    """通知配置"""
+    queryset = PlatformConfig.objects.filter(delete_flag=False).all()
+    serializer_class = PlatformConfigSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PlatformConfigFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
