@@ -98,7 +98,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     def update(self, request, *args, **kwargs):
         data = request.data
         instance = self.get_object()
-        if instance.status in ['运行中', '空转']:
+        if instance.status in ['运行', '空转']:
             wsp_obj = WorkSchedulePlan.objects.filter(start_time__lte=data['note_time'],
                                                       end_time__gte=data['note_time'],
                                                       plan_schedule__work_schedule__work_procedure__global_name__icontains='密炼').first()
@@ -116,7 +116,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                  down_flag=data['down_flag'],
                                                  factory_date=wsp_obj.plan_schedule.day_time)
         elif instance.status in ['停机', '维修结束']:
-            instance.status = '运行中'
+            instance.status = '运行'
             instance.save()
         else:
             raise ValidationError('此状态不允许有操作')
