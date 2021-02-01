@@ -27,7 +27,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
-    InventoryLogOutSerializer
+    InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -225,7 +225,7 @@ class OutWorkFeedBack(APIView):
                     dp_obj.save()
                     DeliveryPlanStatus.objects.create(warehouse_info=dp_obj.warehouse_info,
                                                       order_no=order_no,
-                                                      order_type=dp_obj.order_type,
+                                                      order_type=dp_obj.order_type if dp_obj.order_type else "出库",
                                                       status=1,
                                                       created_user=dp_obj.created_user,
                                                       )
@@ -237,7 +237,7 @@ class OutWorkFeedBack(APIView):
                 il_dict['initiator'] = dp_obj.created_user
                 il_dict['material_no'] = dp_obj.material_no
                 il_dict['start_time'] = dp_obj.created_date
-                il_dict['order_type'] = dp_obj.order_type
+                il_dict['order_type'] = dp_obj.order_type if dp_obj.order_type else "出库"
                 material = Material.objects.filter(material_no=dp_obj.material_no).first()
                 material_inventory_dict = {
                     "material": material,
@@ -250,7 +250,7 @@ class OutWorkFeedBack(APIView):
                     "quality_status": data.get("quality_status"),
                     "lot_no": data.get("lot_no"),
                     "location": "预留",
-                    "warehouse_info": dp_obj.warehouse_info
+                    "warehouse_info": dp_obj.warehouse_info,
                 }
             else:
                 raise ValidationError("订单号不能为空")
@@ -266,30 +266,6 @@ class OutWorkFeedBack(APIView):
             return Response(result)
         return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
-
-@method_decorator([api_recorder], name="dispatch")
-class PutPlanManagement(ModelViewSet):
-    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
-    serializer_class = PutPlanManagementSerializer
-    filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementFilter
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if isinstance(data, list):
-            for item in data:
-                s = PutPlanManagementSerializer(data=item, context={'request': request})
-                if not s.is_valid():
-                    raise ValidationError(s.errors)
-                s.save()
-        elif isinstance(data, dict):
-            s = PutPlanManagementSerializer(data=data, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        else:
-            raise ValidationError('参数错误')
-        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -320,43 +296,49 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         if warehouse_name and warehouse_name in self.INVENTORY_MODEL_BY_NAME:
             return self.INVENTORY_MODEL_BY_NAME[warehouse_name][index]
         else:
-            raise ValidationError('无此仓库名')
+            raise ValidationError(f'该仓库请移步{warehouse_name}专项页面查看')
 
     def get_query_params(self):
-        for query in 'material_type', 'container_no', 'material_no':
+        for query in 'material_type', 'container_no', 'material_no', "order_no", "location":
             yield self.request.query_params.get(query, None)
 
     def get_queryset(self):
+        # 终炼胶，帘布库区分 货位地址开头1-4终炼胶   5-6帘布库
         model = self.divide_tool(self.MODEL)
         queryset = None
-        material_type, container_no, material_no = self.get_query_params()
+        material_type, container_no, material_no, order_no, location = self.get_query_params()
+        quality_status = self.request.query_params.get('quality_status', None)
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
             # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
-            if self.request.query_params.get("location_status"):
-                queryset = model.objects.using('bz').filter(location_status="有货货位")
-            else:
-                queryset = model.objects.using('bz').all()
-            quality_status = self.request.query_params.get('quality_status', None)
+            # if self.request.query_params.get("location_status"):
+            #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
+            # else:
+            queryset = model.objects.using('bz').all()
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
             # 出库计划弹框展示的库位数据需要更具库位状态进行筛选其他页面不需要
-            if self.request.query_params.get("location_status"):
-                queryset = model.objects.using('lb').filter(location_status="有货货位")
-            else:
-                queryset = model.objects.using('lb').all()
-            quality_status = self.request.query_params.get('quality_status', None)
+            # if self.request.query_params.get("location_status"):
+            #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
+            # else:
+            queryset = model.objects.using('lb').all()
             if quality_status:
-                queryset = queryset.filter(quality_status=quality_status)
+                queryset = queryset.filter(quality_level=quality_status)
         if queryset:
-            if material_type and model != BzFinalMixingRubberInventory:
+            if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory, BzFinalMixingRubberInventoryLB]:
                 queryset = queryset.filter(material_type__icontains=material_type)
+            if material_type and model == XBMaterialInventory:
+                queryset = queryset.filter(material__material_type__global_name__icontains=material_type)
             if material_no:
                 queryset = queryset.filter(material_no__icontains=material_no)
             if container_no:
                 queryset = queryset.filter(container_no__icontains=container_no)
+            if order_no and model in [BzFinalMixingRubberInventory, BzFinalMixingRubberInventoryLB]:
+                queryset = queryset.filter(bill_id__icontains=order_no)
+            if location:
+                queryset = queryset.filter(location__icontains=location)
             return queryset
         if model == WmsInventoryStock:
             queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
@@ -365,24 +347,71 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_class(self):
         return self.divide_tool(self.SERIALIZER)
 
+class NewList(list):
+
+    @property
+    @classmethod
+    def model(self):
+        return InventoryLog.objects.model
+
 
 @method_decorator([api_recorder], name="dispatch")
 class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InventoryLog.objects.order_by('-start_time')
     serializer_class = InventoryLogSerializer
     permission_classes = (permissions.IsAuthenticated,)
-    filter_backends = (InventoryFilterBackend,)
+    # filter_backends = (InventoryFilterBackend,)
 
     def get_queryset(self):
-        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        filter_dict = {}
+        store_name = self.request.query_params.get("store_name")
+        if not store_name:
+            store_name = "混炼胶库"
         order_type = self.request.query_params.get("order_type", "出库")
+        start_time = self.request.query_params.get("start_time")
+        end_time = self.request.query_params.get("end_time")
+        location = self.request.query_params.get("location")
+        material_no = self.request.query_params.get("material_no")
+        order_no = self.request.query_params.get("order_no")
+        if start_time:
+            filter_dict.update(fin_time__gte=start_time)
+        if end_time:
+            filter_dict.update(fin_time__lte=end_time)
+        if location:
+            filter_dict.update(location__icontains=location)
+        if material_no:
+            filter_dict.update(material_no__icontains=material_no)
+        if order_no:
+            filter_dict.update(order_no__icontains=order_no)
         if store_name == "混炼胶库":
             if order_type == "出库":
-                return MixGumOutInventoryLog.objects.using('bz').all()
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-fin_time'))
+                filter_dict.pop("inout_num_type", None)
+                temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type, **filter_dict).order_by('-fin_time'))
+                return temp_set
             else:
-                return MixGumInInventoryLog.objects.using('bz').all()
+                return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
         else:
-            return InventoryLog.objects.order_by('-start_time')
+            return InventoryLog.objects.filter(**filter_dict).order_by('-start_time')
+
+    # def get_serializer_class(self):
+    #     store_name = self.request.query_params.get("store_name", "混炼胶库")
+    #     order_type = self.request.query_params.get("order_type", "出库")
+    #     if store_name == "混炼胶库":
+    #         if order_type == "出库":
+    #             return MixGumOutInventoryLogSerializer
+    #         else:
+    #             return MixGumInInventoryLogSerializer
+    #     else:
+    #         return InventoryLogSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -394,21 +423,21 @@ class MaterialCount(APIView):
         if not store_name:
             raise ValidationError("缺少立库名参数，请检查后重试")
         if store_name == "终炼胶库":
+            # TODO 暂时这么写
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("终炼胶库连接失败")
         elif store_name == "混炼胶库":
-            # TODO 暂时这么写
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').values('material_no').annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("混炼胶库连接失败")
         elif store_name == "帘布库":
             try:
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').values('material_no').annotate(
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location_status="有货货位").values('material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("帘布库库连接失败")
@@ -470,57 +499,6 @@ class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['warehouse_info']
 
-
-@method_decorator([api_recorder], name="dispatch")
-class PutPlanManagementLB(ModelViewSet):
-    queryset = DeliveryPlanLB.objects.filter().order_by("-created_date")
-    serializer_class = PutPlanManagementSerializerLB
-    filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementLBFilter
-    permission_classes = (IsAuthenticated,)
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if isinstance(data, list):
-            for item in data:
-                s = PutPlanManagementSerializerLB(data=item, context={'request': request})
-                if not s.is_valid():
-                    raise ValidationError(s.errors)
-                s.save()
-        elif isinstance(data, dict):
-            s = PutPlanManagementSerializerLB(data=data, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        else:
-            raise ValidationError('参数错误')
-        return Response('新建成功')
-
-
-@method_decorator([api_recorder], name="dispatch")
-class PutPlanManagementFianl(ModelViewSet):
-    queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
-    serializer_class = PutPlanManagementSerializerFinal
-    filter_backends = [DjangoFilterBackend]
-    filter_class = PutPlanManagementFinalFilter
-    permission_classes = (IsAuthenticated,)
-
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if isinstance(data, list):
-            for item in data:
-                s = PutPlanManagementSerializerFinal(data=item, context={'request': request})
-                if not s.is_valid():
-                    raise ValidationError(s.errors)
-                s.save()
-        elif isinstance(data, dict):
-            s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        else:
-            raise ValidationError('参数错误')
-        return Response('新建成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -755,3 +733,77 @@ class MaterialInventoryAPIView(APIView):
         count = len(query_list)
         result = query_list[st:et]
         return Response({'results': result, "count": count})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagement(ModelViewSet):
+    queryset = DeliveryPlan.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFilter
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = PutPlanManagementSerializer(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializer(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementLB(ModelViewSet):
+    queryset = DeliveryPlanLB.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerLB
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementLBFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = PutPlanManagementSerializerLB(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerLB(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PutPlanManagementFianl(ModelViewSet):
+    queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
+    serializer_class = PutPlanManagementSerializerFinal
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PutPlanManagementFinalFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = PutPlanManagementSerializerFinal(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')

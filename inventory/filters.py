@@ -12,7 +12,7 @@ class PutPlanManagementFilter(django_filters.rest_framework.FilterSet):
     st = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="gte")
     et = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="lte")
     status = django_filters.CharFilter(field_name="status", help_text='订单状态')
-    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码')
+    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码', lookup_expr='icontains')
     name = django_filters.CharFilter(field_name="warehouse_info__name", help_text='仓库名称')
 
     class Meta:
@@ -25,7 +25,7 @@ class PutPlanManagementLBFilter(django_filters.rest_framework.FilterSet):
     st = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="gte")
     et = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="lte")
     status = django_filters.CharFilter(field_name="status", help_text='订单状态')
-    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码')
+    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码', lookup_expr='icontains')
     name = django_filters.CharFilter(field_name="warehouse_info__name", help_text='仓库名称')
 
     class Meta:
@@ -38,7 +38,7 @@ class PutPlanManagementFinalFilter(django_filters.rest_framework.FilterSet):
     st = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="gte")
     et = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="lte")
     status = django_filters.CharFilter(field_name="status", help_text='订单状态')
-    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码')
+    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码', lookup_expr='icontains')
     name = django_filters.CharFilter(field_name="warehouse_info__name", help_text='仓库名称')
 
     class Meta:
@@ -100,22 +100,24 @@ class DispatchLocationFilter(django_filters.rest_framework.FilterSet):
         fields = ['use_flag']
 
 
-class MixGumInFilter(django_filters.rest_framework.FilterSet):
+class MixGumFilter(django_filters.rest_framework.FilterSet):
     start_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='gte')
     end_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='lte')
-    location = django_filters.CharFilter(field_name='location')
+    location = django_filters.CharFilter(field_name='location', lookup_expr='icontains')
     material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+
+    class Meta:
+        fields = ['start_time', 'end_time', 'location', 'material_no']
+
+
+class MixGumInFilter(MixGumFilter):
 
     class Meta:
         model = MixGumInInventoryLog
         fields = ['start_time', 'end_time', 'location', 'material_no']
 
 
-class MixGumOutFilter(django_filters.rest_framework.FilterSet):
-    start_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='gte')
-    end_time = django_filters.CharFilter(field_name='fin_time', lookup_expr='lte')
-    location = django_filters.CharFilter(field_name='location')
-    material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+class MixGumOutFilter(MixGumFilter):
 
     class Meta:
         model = MixGumOutInventoryLog
