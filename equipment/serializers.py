@@ -120,7 +120,13 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
         return super().update(instance, validated_data)
 
     class Meta:
-        fields = ('id', 'status', 'maintenance_user', 'down_reason', 'take_time')
+        fields = (
+            'id', 'status', 'maintenance_user', 'down_reason', 'take_time', 'first_down_reason', 'first_down_type',
+            'note')
+        extra_kwargs = {'first_down_reason': {'required': False},
+                        'first_down_type': {'required': False},
+                        'note': {'required': False}}
+        # fields = ('id', 'status', 'maintenance_user', 'down_reason', 'take_time')
         model = EquipMaintenanceOrder
 
 
