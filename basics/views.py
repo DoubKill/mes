@@ -300,6 +300,14 @@ class LocationViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = LocationFilter
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'no', 'name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='name_list',
             url_name='name_list')
     def name_list(self, request, pk=None):

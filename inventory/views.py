@@ -38,7 +38,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
-from recipe.models import Material
+from recipe.models import Material, MaterialAttribute
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -267,7 +267,6 @@ class OutWorkFeedBack(APIView):
         return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
 
-
 @method_decorator([api_recorder], name="dispatch")
 class OverdueMaterialManagement(ModelViewSet):
     queryset = MaterialInventory.objects.filter()
@@ -327,7 +326,8 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         if queryset:
-            if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory, BzFinalMixingRubberInventoryLB]:
+            if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory,
+                                               BzFinalMixingRubberInventoryLB]:
                 queryset = queryset.filter(material_type__icontains=material_type)
             if material_type and model == XBMaterialInventory:
                 queryset = queryset.filter(material__material_type__global_name__icontains=material_type)
@@ -347,6 +347,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     def get_serializer_class(self):
         return self.divide_tool(self.SERIALIZER)
 
+
 class NewList(list):
 
     @property
@@ -360,6 +361,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InventoryLog.objects.order_by('-start_time')
     serializer_class = InventoryLogSerializer
     permission_classes = (permissions.IsAuthenticated,)
+
     # filter_backends = (InventoryFilterBackend,)
 
     def get_queryset(self):
@@ -395,7 +397,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                     actual_type = "生产出库"
                 temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-fin_time'))
                 filter_dict.pop("inout_num_type", None)
-                temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type, **filter_dict).order_by('-fin_time'))
+                temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
+                                                             **filter_dict).order_by('-fin_time'))
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
@@ -425,19 +428,22 @@ class MaterialCount(APIView):
         if store_name == "终炼胶库":
             # TODO 暂时这么写
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values('material_no').annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values(
+                    'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("终炼胶库连接失败")
         elif store_name == "混炼胶库":
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values('material_no').annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values(
+                    'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("混炼胶库连接失败")
         elif store_name == "帘布库":
             try:
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location_status="有货货位").values('material_no').annotate(
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location_status="有货货位").values(
+                    'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("帘布库库连接失败")
@@ -498,7 +504,6 @@ class WarehouseMaterialTypeViewSet(ReversalUseFlagMixin, viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filterset_fields = ['warehouse_info']
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -664,11 +669,14 @@ class MaterialInventoryAPIView(APIView):
                     xbi_obj.update({'material_type': xbi_obj.pop("material__material_type")})
                     xbi_obj.update({'material_no': xbi_obj.pop("material__material_no")})
             elif model == BzFinalMixingRubberInventory:
-                queryset = model.objects.using('bz').filter(lot_no=lot_no).values(
-                    'material_no',
-                    'lot_no', 'container_no', 'location',
-                    'qty',
-                    'quality_status', 'total_weight')
+                try:
+                    queryset = model.objects.using('bz').filter(lot_no=lot_no).values(
+                        'material_no',
+                        'lot_no', 'container_no', 'location',
+                        'qty',
+                        'quality_status', 'total_weight')
+                except:
+                    raise ValidationError('bz混炼胶库连接失败')
                 for bz_dict in queryset:
                     try:
                         mt = bz_dict['material_no'].split("-")[1]
@@ -680,10 +688,14 @@ class MaterialInventoryAPIView(APIView):
                     bz_dict['unit'] = unit
                     bz_dict['unit_weight'] = unit_weight
             elif model == BzFinalMixingRubberInventoryLB:
-                queryset = model.objects.using('lb').filter(lot_no=lot_no).values('material_no',
-                                                                                  'lot_no', 'container_no', 'location',
-                                                                                  'qty',
-                                                                                  'quality_status', 'total_weight')
+                try:
+                    queryset = model.objects.using('lb').filter(lot_no=lot_no).values('material_no',
+                                                                                      'lot_no', 'container_no',
+                                                                                      'location',
+                                                                                      'qty',
+                                                                                      'quality_status', 'total_weight')
+                except:
+                    raise ValidationError('bz帘布连接失败')
                 for bz_dict in queryset:
                     try:
                         mt = bz_dict['material_no'].split("-")[1]
@@ -696,14 +708,15 @@ class MaterialInventoryAPIView(APIView):
                     bz_dict['unit_weight'] = unit_weight
 
             elif model == WmsInventoryStock:
-
-                queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
-                    'material_no',
-                    'lot_no', 'location',
-                    'qty',
-                    'unit',
-                    'quality_status', )
-
+                try:
+                    queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
+                        'material_no',
+                        'lot_no', 'location',
+                        'qty',
+                        'unit',
+                        'quality_status', )
+                except:
+                    raise ValidationError('wms原材料库连接失败')
                 for bz_dict in queryset:
                     try:
                         mt = bz_dict['material_no'].split("-")[1]
@@ -807,3 +820,55 @@ class PutPlanManagementFianl(ModelViewSet):
         else:
             raise ValidationError('参数错误')
         return Response('新建成功')
+
+
+class MateriaTypeNameToAccording(APIView):
+    # materia_type_name_to_according
+    """根据物料类型和编码找到存在的仓库表"""
+
+    def get(self, request):
+        material_type = self.request.query_params.get('material_type')
+        material_no = self.request.query_params.get('material_no')
+        if not all([material_no, material_type]):
+            raise ValidationError('物料名称和物料类型都必传！')
+        warehouse_name_list = WarehouseMaterialType.objects.filter(
+            material_type__global_name=material_type).values_list(
+            'warehouse_info__name', flat=True).distinct()
+        if not warehouse_name_list:
+            raise ValidationError('该物料类型没有对应的仓库')
+        warehouse_name_according = {'线边库': MaterialInventory,
+                                    '原材料库': WmsInventoryStock,
+                                    '混炼胶库': BzFinalMixingRubberInventory,
+                                    '帘布库': BzFinalMixingRubberInventoryLB,
+                                    '终炼胶库': BzFinalMixingRubberInventory}
+        according_list = []
+        for warehouse_name in warehouse_name_list:
+            materia_no_filte = {}
+            if warehouse_name_according[warehouse_name] == MaterialInventory:
+                materia_no_filte['material__material_no'] = material_no
+            else:
+                materia_no_filte['material_no'] = material_no
+            if warehouse_name_according[warehouse_name].objects.filter(**materia_no_filte).exists():
+                according_list.append(warehouse_name_according[warehouse_name].__name__)
+        return Response(according_list)
+
+
+class SamplingRules(APIView):
+
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        material_no = params.get("material_no")
+        material_name = params.get("material_name")
+        filter_dict = {}
+        if material_no:
+            filter_dict.update(material__material_no=material_no)
+        if material_name:
+            filter_dict.update(material__material_name=material_name)
+        queryset = MaterialAttribute.objects.filter(**filter_dict).order_by("id")
+        if not queryset.exists():
+            raise ValidationError(f"{material_no}|{material_name}未能在MES中检索到")
+        instance = queryset.last()
+        return Response({"result": {"material_no": material_no,
+                                    "material_name": material_name,
+                                    "sampling_rate": instance.sampling_rate}})

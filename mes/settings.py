@@ -50,7 +50,8 @@ INSTALLED_APPS = [
     'quality.apps.QualityConfig',
     'inventory.apps.InventoryConfig',
     'spareparts.apps.SparepartsConfig',
-    'terminal.apps.TerminalConfig'
+    'terminal.apps.TerminalConfig',
+    'equipment.apps.EquipmentConfig',
 ]
 
 MIDDLEWARE = [
@@ -263,10 +264,10 @@ LOGGING = {
 DATABASES = {
     'default': {
             'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
-            'NAME': os.getenv('MES_DATABASE_NAME', 'zcaj1'),  # 数据库名称 SID
-            'USER': os.getenv('MES_DATABASE_USERNAME', 'MES'),  # 用户名
-            'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes2020'),  # 密码
-            'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.4.10.17'),  # HOST
+            'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 数据库名称 SID
+            'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
+            'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
+            'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
             'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
         },
     'bz': {
@@ -306,7 +307,6 @@ DATABASES = {
         },
     }
 }
-
 
 CACHES = {
     'default': {
@@ -363,6 +363,9 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, 'static'),# 项目默认会有的路径，如果你部署的不仅是前端打包的静态文件，项目目录static文件下还有其他文件，最好不要删
     os.path.join(BASE_DIR, "dist/static"),  # 加上这条
 ]
+
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, "media/"))
+MEDIA_URL = '/media/'
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),
