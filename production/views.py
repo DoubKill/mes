@@ -894,6 +894,7 @@ class AlarmLogList(mixins.ListModelMixin, mixins.RetrieveModelMixin,
 
         return al_queryset
 
+
 @method_decorator([api_recorder], name="dispatch")
 class MaterialOutputView(APIView):
     permission_classes = (IsAuthenticated,)
@@ -935,6 +936,7 @@ class MaterialOutputView(APIView):
             "data": data
         }
         return Response(ret)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipProductRealView(APIView):
@@ -1004,6 +1006,7 @@ class EquipProductRealView(APIView):
             }
             ret["data"].append(new)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class MaterialPassRealView(APIView):
     permission_classes = (IsAuthenticated,)
@@ -1051,7 +1054,6 @@ class MaterialTankStatusList(APIView):
         return Response({"results": mts_set})
 
 
-
 @method_decorator([api_recorder], name="dispatch")
 class WeekdayProductStatisticsView(APIView):
 
@@ -1077,7 +1079,7 @@ class WeekdayProductStatisticsView(APIView):
             TrainsFeedbacks.objects.filter(factory_date__week=3).values("equip_no", "factory_date"). \
             annotate(all_weight=Sum("actual_weight")).order_by("factory_date").values("equip_no", "factory_date",
                                                                                    "all_weight"))
-        ret = {"Z%02d" % x: [] for x in range(1,16)}
+        ret = {"Z%02d" % x: [] for x in range(1, 16)}
         day_week_map = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
         for data in temp_list:
             try:
@@ -1145,7 +1147,7 @@ class DayCapacityView(APIView):
         temp_set = None
         if query_type == "week":
             monday = factory_date - timedelta(days=factory_date.weekday())
-            sunday = factory_date + timedelta(days=6-factory_date.weekday())
+            sunday = factory_date + timedelta(days=6 - factory_date.weekday())
             # __week=4查当周  3，2，1 上周 上上周， 上上上周
             temp_set = TrainsFeedbacks.objects.filter(factory_date__range=(monday, sunday))
         elif query_type == "month":
@@ -1174,7 +1176,7 @@ class PlanInfoReal(APIView):
         type = self.request.query_params.get('type', None)
         value = self.request.query_params.get('value', None)
         if not all([type, value]):
-            raise ValidationError('参数不全，query_unit和value都得传')
+            raise ValidationError('参数不全，type和value都得传')
         try:
             production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
         except:
@@ -1214,8 +1216,11 @@ class EquipInfoReal(APIView):
         type = self.request.query_params.get('type', None)
         value = self.request.query_params.get('value', None)
         if not all([type, value]):
-            raise ValidationError('参数不全，query_unit和value都得传')
-        production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+            raise ValidationError('参数不全，type和value都得传')
+        try:
+            production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        except:
+            raise ValidationError('时间格式不正确')
         now = datetime.datetime.now()
         if type == 'day':
             work_schedule_plan = WorkSchedulePlan.objects.filter(
@@ -1238,7 +1243,7 @@ class EquipInfoReal(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
                 start_times=Min('start_time'),
                 end_times=Max('end_time'))
-            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_times']:
                 raise ValidationError('日期传参不正确')
             if now <= work_schedule_plan['end_times']:
                 end_time = now
@@ -1254,7 +1259,7 @@ class EquipInfoReal(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
                 start_times=Min('start_time'),
                 end_times=Max('end_time'))
-            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_times']:
                 raise ValidationError('日期传参不正确')
             if now <= work_schedule_plan['end_times']:
                 end_time = now
@@ -1270,7 +1275,7 @@ class EquipInfoReal(APIView):
                 plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
                 start_times=Min('start_time'),
                 end_times=Max('end_time'))
-            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_times']:
                 raise ValidationError('日期传参不正确')
             if now <= work_schedule_plan['end_times']:
                 end_time = now
@@ -1279,6 +1284,8 @@ class EquipInfoReal(APIView):
             total_time = end_time - work_schedule_plan['start_times']
             filter_dict = {'factory_date__year': production_factory_date.year,
                            'delete_flag': False}
+        else:
+            raise ValidationError('type只能传day，week，month，year')
         e_set = Equip.objects.filter(delete_flag=False).all()
         resluts = []
         for e_obj in e_set:
@@ -1299,9 +1306,10 @@ class EquipInfoReal(APIView):
                 tfb_set['status'] = '未知'
             epe_set = e_obj.equip_part_equip.filter(delete_flag=False).all()
             if not epe_set:
-                continue
+                # continue
+                tfb_set["fault_time"] = total_time
             for epe_obj in epe_set:
-                emo_set = epe_obj.equip_maintenance_order_part.filter(affirm_time__isnull=False).all()
+                emo_set = epe_obj.equip_maintenance_order_part.filter(affirm_time__isnull=False, **filter_dict).all()
                 if not emo_set:
                     continue
                 for emo_obj in emo_set:
