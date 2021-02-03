@@ -1,15 +1,10 @@
-import datetime
 import json
-import time
 
-from inventory.models import BzFinalMixingRubberInventory, MaterialInventory
-from inventory.tasks import update_wms_kjjg
 from mes.common_code import order_no, DecimalEncoder
 from quality.models import MaterialDealResult, MaterialTestOrder, MaterialTestResult, LevelResult, \
     MaterialDataPointIndicator, MaterialTestMethod
 from production.models import PalletFeedbacks
 from quality.serializers import MaterialDealResultListSerializer
-from django.db.transaction import atomic
 from django.db.models import Max, Min, Q
 import logging
 

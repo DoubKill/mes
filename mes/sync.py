@@ -121,6 +121,7 @@ class ProductClassesPlanSync(serializers.ModelSerializer):
 class ProductDayPlanSyncInterface(serializers.ModelSerializer):
     product_batching = serializers.CharField(source='product_batching.stage_product_batch_no')
     plan_schedule = serializers.CharField(source='plan_schedule.plan_schedule_no')
+    equip = serializers.CharField(source='equip.equip_no')
 
     class Meta:
         model = ProductDayPlan

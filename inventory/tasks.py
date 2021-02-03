@@ -13,14 +13,13 @@ import django
 
 from inventory.models import MixGumInInventoryLog, MixGumOutInventoryLog, InventoryLog
 from mes.conf import INVENTORY_MAP
+from inventory.utils import BaseUploader
+from mes.common_code import order_no
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
-
-from inventory.utils import BaseUploader
-from mes.common_code import order_no
 
 
 class KJJGUploader(BaseUploader):
@@ -163,6 +162,6 @@ class OutworkHistorySync(object):
                 InventoryLog.objects.bulk_create(ret)
 
 
-
-if __name__ == '__main__':
-    OutworkHistorySync.sync()
+#
+# if __name__ == '__main__':
+#     OutworkHistorySync.sync()

@@ -1,18 +1,20 @@
-from django.shortcuts import render
+import datetime
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter
-from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipPart
+from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
+    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter
+from equipment.models import PlatformConfig
 from equipment.serializers import *
+from equipment.task import property_template, property_import
 from mes.derorators import api_recorder
-from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.response import Response
 from django.db.transaction import atomic
+from rest_framework.decorators import action
 
 
 # Create your views here.
@@ -21,6 +23,8 @@ from rest_framework.viewsets import ModelViewSet
 
 from basics.models import Equip
 from equipment.serializers import EquipRealtimeSerializer
+from mes.paginations import SinglePageNumberPagination
+from plan.uuidfield import UUidTools
 
 
 class EquipRealtimeViewSet(ModelViewSet):
@@ -30,6 +34,7 @@ class EquipRealtimeViewSet(ModelViewSet):
         prefetch_related('equip_current_status_equip__status', 'equip_current_status_equip__user')
     pagination_class = None
     serializer_class = EquipRealtimeSerializer
+
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -59,7 +64,7 @@ class EquipDownTypeViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipDownReasonViewSet(ModelViewSet):
     """设备停机原因"""
-    queryset = EquipDownReason.objects.filter(delete_flag=False).all()
+    queryset = EquipDownReason.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipDownReasonSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -116,12 +121,17 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                       plan_schedule__work_schedule__work_procedure__global_name__icontains='密炼').first()
             if not wsp_obj:
                 raise ValidationError('当前日期没有工厂时间')
-            EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'), equip=instance.equip,
+            if data['down_flag']:
+                instance.status = '停机'
+                instance.save()
+            EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'),
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
-                                                 order_src='mes设备维修申请页面',
-                                                 note_time=data['note_time'],
+                                                 order_src=1,
+                                                 note_time=datetime.datetime.now(),
+                                                 down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
+                                                 equip_part_id=data['equip_part'],
                                                  factory_date=wsp_obj.plan_schedule.day_time)
         elif instance.status in ['停机', '维修结束']:
             instance.status = '运行中'
@@ -134,11 +144,19 @@ class EquipCurrentStatusViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipPartViewSet(ModelViewSet):
     """设备部位"""
-    queryset = EquipPart.objects.filter(delete_flag=False).all()
+    queryset = EquipPart.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPartSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'no', 'name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -150,8 +168,106 @@ class EquipPartViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipMaintenanceOrderViewSet(ModelViewSet):
     """维修表单"""
-    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).all()
+    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipMaintenanceOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return EquipMaintenanceCreateOrderSerializer
+        if self.action in ('update', 'partial_update'):
+            return EquipMaintenanceOrderUpdateSerializer
+        else:
+            return EquipMaintenanceOrderSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PropertyTypeNodeViewSet(ModelViewSet):
+    """资产类型节点"""
+    queryset = PropertyTypeNode.objects.filter(delete_flag=False).all()
+    serializer_class = PropertyTypeNodeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+
+    def partent_children(self, partent_set):
+        options = [{'id': i.id, 'value': i.name} for i in partent_set]
+        for children in options:
+            partent_set = PropertyTypeNode.objects.filter(parent=children['id'], delete_flag=False).all()
+            if partent_set:
+                children['children'] = self.partent_children(partent_set)
+        return options
+
+    def list(self, request, *args, **kwargs):
+        partent_set = PropertyTypeNode.objects.filter(parent__isnull=True, delete_flag=False).all()
+        options = self.partent_children(partent_set)
+        return Response(options)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if PropertyTypeNode.objects.filter(parent=instance.id, delete_flag=False).exists():
+            raise ValidationError(f'{instance.name}节点有子节点，不允许删除')
+        if instance.property_type_node_name.filter(delete_flag=False).exists():
+            raise ValidationError(f'{instance.name}节点已被使用，不允许删除')
+
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PropertyViewSet(ModelViewSet):
+    """资产"""
+    queryset = Property.objects.filter(delete_flag=False).all()
+    serializer_class = PropertySerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PropertyFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export-property',
+            url_name='export-property')
+    def export_property(self, request, pk=None):
+        """模板下载"""
+        return property_template()
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-property',
+            url_name='import-property')
+    def import_property(self, request, pk=None):
+        """模板导入"""
+        file = request.FILES.get('file')
+        property_import(file)
+        return Response('导入成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlatformConfigViewSet(ModelViewSet):
+    """通知配置"""
+    queryset = PlatformConfig.objects.filter(delete_flag=False).all()
+    serializer_class = PlatformConfigSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PlatformConfigFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipMaintenanceOrderLogViewSet(ModelViewSet):
+    """#设备维修履历"""
+    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('equip_part__equip')
+    serializer_class = EquipMaintenanceOrderLogSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMaintenanceOrderLogFilter
+    pagination_class = SinglePageNumberPagination

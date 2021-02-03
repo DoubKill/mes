@@ -1,10 +1,8 @@
-from django.db import models
-
 # Create your models here.
 from django.db import models
 
 from basics.models import Equip, Location
-from system.models import AbstractEntity
+from system.models import AbstractEntity, User
 
 
 class EquipPart(AbstractEntity):
@@ -14,7 +12,7 @@ class EquipPart(AbstractEntity):
                                  help_text='所处位置',
                                  verbose_name='所处位置', null=True)
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_part_equip",
-                              help_text='设备', verbose_name='设备', null=True)
+                              help_text='设备', verbose_name='设备')
 
     class Meta:
         db_table = 'equip_part'
@@ -54,7 +52,7 @@ class EquipDownReason(AbstractEntity):
     """设备停机原因"""
     no = models.CharField(max_length=64, verbose_name='原因代码', help_text='类型代码')
     equip_down_type = models.ForeignKey(EquipDownType, on_delete=models.CASCADE, related_name="equip_down_reason_type")
-    desc = models.CharField(max_length=256, verbose_name='描述', help_text='描述')
+    desc = models.CharField(max_length=256, verbose_name='描述', help_text='描述', blank=True, null=True)
 
     class Meta:
         db_table = 'equip_down_reason'
@@ -72,28 +70,38 @@ class EquipMaintenanceOrder(AbstractEntity):
         (6, '关闭'),
         (7, '退回'),
     )
+    ORDER_SRC_CHOICE = (
+        (1, 'MES'),
+        (2, '终端')
+    )
     order_uid = models.CharField(max_length=64, verbose_name='唯一码', help_text='唯一码')
-    equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_maintenance_order_equip",
-                              help_text='设备', verbose_name='设备', null=True)
-    part = models.ForeignKey(EquipPart, on_delete=models.CASCADE, related_name="equip_maintenance_order_part",
-                             help_text='部位', verbose_name='部位', null=True)
+    # equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_maintenance_order_equip",
+    #                           help_text='设备', verbose_name='设备')
+    equip_part = models.ForeignKey(EquipPart, on_delete=models.CASCADE, related_name="equip_maintenance_order_part",
+                                   help_text='设备部位', verbose_name='部位')
     first_down_reason = models.CharField(max_length=64, verbose_name='初诊原因', help_text='初诊原因')
     first_down_type = models.CharField(max_length=64, verbose_name='初诊类型', help_text='初诊类型')
     down_flag = models.BooleanField(help_text='是否已经停机', verbose_name='是否已经停机', default=False)
-    first_imgurl = models.CharField(max_length=64, help_text='相关照片', verbose_name='相关照片', null=True)
-    factory_date = models.DateField(help_text='工厂时间', verbose_name='工厂时间')
-    order_src = models.CharField(max_length=64, help_text='订单来源', verbose_name='订单来源')
-    maintenance_user = models.CharField(max_length=64, help_text='维修人', verbose_name='维修人', null=True)
-    assign_user = models.CharField(max_length=64, help_text='指派人', verbose_name='指派人', null=True)
+    image = models.ImageField(upload_to='equipment/%Y/%m/', help_text='相关照片', verbose_name='相关照片',
+                              blank=True, null=True)
+    factory_date = models.DateField(help_text='设备故障工厂日期', verbose_name='设备故障工厂日期')
+    down_time = models.DateTimeField(help_text='设备故障时间', verbose_name='设备故障时间')
+    order_src = models.CharField(max_length=64, help_text='订单来源', verbose_name='订单来源',
+                                 choices=ORDER_SRC_CHOICE, default=1)
+    maintenance_user = models.ForeignKey(User, help_text='维修人', verbose_name='维修人',
+                                         null=True, on_delete=models.CASCADE, related_name='m_order')
+    assign_user = models.ForeignKey(User, help_text='指派人', verbose_name='指派人', null=True,
+                                    on_delete=models.CASCADE, related_name='ass_order')
     begin_time = models.DateTimeField(help_text='开始维修时间', verbose_name='开始维修时间', null=True)
     end_time = models.DateTimeField(help_text='结束维修时间', verbose_name='结束维修时间', null=True)
     affirm_time = models.DateTimeField(help_text='确认启动时间', verbose_name='确认启动时间', null=True)
-    affirm_user = models.CharField(max_length=64, help_text='确认启动人', verbose_name='确认启动人', null=True)
+    affirm_user = models.ForeignKey(User, help_text='确认启动人', verbose_name='确认启动人', null=True,
+                                    on_delete=models.CASCADE, related_name='aff_order')
     down_reason = models.CharField(max_length=256, help_text='维修原因', verbose_name='维修原因', null=True)
     down_type = models.CharField(max_length=64, help_text='维修类型', verbose_name='维修类型', null=True)
     take_time = models.DateTimeField(help_text='接单时间', verbose_name='接单时间', null=True)
     first_note = models.CharField(max_length=256, help_text='初诊备注', verbose_name='初诊备注', null=True)
-    note = models.CharField(max_length=256, help_text='维修备注', verbose_name='维修备注', null=True)
+    note = models.CharField(max_length=256, help_text='维修备注', verbose_name='维修备注', blank=True, null=True)
     status = models.PositiveIntegerField(choices=STATUSES, default=1, help_text='状态', verbose_name='状态')
     note_time = models.DateTimeField(help_text='写原因时间', verbose_name='写原因时间', null=True)
     return_flag = models.BooleanField(help_text='是否退单', verbose_name='是否退单', default=False)
@@ -120,11 +128,10 @@ class Property(AbstractEntity):
         (1, '使用中'),
         (2, '废弃'),
         (3, '限制'),
-
     )
-    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', unique=True)
-    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称')
-    property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码')
+    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', null=True)
+    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', null=True)
+    property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码', unique=True)
     src_no = models.CharField(max_length=64, help_text='原编码', verbose_name='原编码')
     financial_no = models.CharField(max_length=64, help_text='财务编码', verbose_name='财务编码')
     equip_type = models.CharField(max_length=64, help_text='设备型号', verbose_name='设备型号')
@@ -143,3 +150,29 @@ class Property(AbstractEntity):
     class Meta:
         db_table = 'property'
         verbose_name_plural = verbose_name = '资产'
+
+
+class PlatformConfig(AbstractEntity):
+    """通知配置"""
+    platform = models.CharField(max_length=64, help_text='平台', verbose_name='平台')
+    url = models.CharField(max_length=256, help_text='url', verbose_name='url')
+    tag = models.CharField(max_length=256, help_text='标签', verbose_name='标签', null=True)
+    private_key = models.CharField(max_length=256, help_text='秘钥', verbose_name='秘钥')
+    token = models.CharField(max_length=64, help_text='token', verbose_name='token', null=True)
+
+    class Meta:
+        db_table = 'platform_config'
+        verbose_name_plural = verbose_name = '通知配置'
+
+
+class InformContent(AbstractEntity):
+    """通知内容"""
+    platform = models.ForeignKey(PlatformConfig, on_delete=models.CASCADE,
+                                 related_name="platform_config_platform")
+    content = models.TextField(help_text='内容', verbose_name='内容')
+    config_value = models.TextField(help_text='接受者', verbose_name='接受者',null=True)
+    sent_flag = models.BooleanField(help_text='是否发送完成', verbose_name='是否发送完成', default=False)
+
+    class Meta:
+        db_table = 'inform_content'
+        verbose_name_plural = verbose_name = '通知内容'

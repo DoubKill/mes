@@ -3,6 +3,8 @@ import datetime
 import re
 
 import math
+import time
+
 import requests
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
@@ -18,9 +20,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
-
-from basics.models import PlanSchedule, Equip, GlobalCode
-from datetime import timedelta
+from basics.models import PlanSchedule, Equip, GlobalCode, WorkSchedulePlan
 from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -37,6 +37,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProcessFeedbackSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
+from datetime import timedelta
 
 from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
@@ -1050,6 +1051,7 @@ class MaterialTankStatusList(APIView):
         return Response({"results": mts_set})
 
 
+
 @method_decorator([api_recorder], name="dispatch")
 class WeekdayProductStatisticsView(APIView):
 
@@ -1147,3 +1149,151 @@ class DayCapacityView(APIView):
             raise ValidationError("参数错误")
         ret = {"result": list(temp_set.values("equip_no", "product_no").annotate(output=Sum("actual_weight")).order_by("equip_no", "product_no"))}
         return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlanInfoReal(APIView):
+    """密炼状态信息"""
+
+    def get(self, request):
+        type = self.request.query_params.get('type', None)
+        value = self.request.query_params.get('value', None)
+        if not all([type, value]):
+            raise ValidationError('参数不全，query_unit和value都得传')
+        try:
+            production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        except:
+            raise ValidationError('时间格式不正确')
+        if type == 'day':
+            filter_dict = {'factory_date': value, 'delete_flag': False}
+        elif type == 'week':
+            this_week_start = production_factory_date - timedelta(days=production_factory_date.weekday())  # 当天坐在的周的周一
+            this_week_end = production_factory_date + timedelta(days=6 - production_factory_date.weekday())  # 当天所在周的周日
+            filter_dict = {'factory_date__lte': this_week_end.date(), 'factory_date__gte': this_week_start.date(),
+                           'delete_flag': False}
+        elif type == 'month':
+            filter_dict = {'factory_date__month': production_factory_date.month,
+                           'factory_date__year': production_factory_date.year,
+                           'delete_flag': False}
+        elif type == 'year':
+            filter_dict = {'factory_date__year': production_factory_date.year,
+                           'delete_flag': False}
+        else:
+            raise ValidationError('type只能传day，week，month，year')
+        tfb_set = TrainsFeedbacks.objects.filter(**filter_dict).values(
+            'equip_no', 'plan_classes_uid', 'product_no').annotate(
+            actual_trains=Max('actual_trains'), plan_trains=Max('plan_trains'), start_time=Min('begin_time'),
+            end_time=Max('end_time'))
+        for tfb_obj in tfb_set:
+            tfb_obj['start_time'] = tfb_obj['start_time'].strftime('%Y-%m-%d %H:%M:%S')
+            tfb_obj['end_time'] = tfb_obj['end_time'].strftime('%Y-%m-%d %H:%M:%S')
+        return Response({'resluts': tfb_set})
+
+
+# /api/v1/production/equip-info-real/
+@method_decorator([api_recorder], name="dispatch")
+class EquipInfoReal(APIView):
+    """设备状态信息"""
+
+    def get(self, request):
+        type = self.request.query_params.get('type', None)
+        value = self.request.query_params.get('value', None)
+        if not all([type, value]):
+            raise ValidationError('参数不全，query_unit和value都得传')
+        production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        now = datetime.datetime.now()
+        if type == 'day':
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                plan_schedule__day_time=production_factory_date,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+            if not work_schedule_plan:
+                raise ValidationError('日期传参不正确')
+            if now <= work_schedule_plan.end_time:
+                end_time = now
+            else:
+                end_time = work_schedule_plan.end_time
+            total_time = end_time - work_schedule_plan.start_time
+            filter_dict = {"factory_date": value, 'delete_flag': False}
+        elif type == 'week':
+            this_week_start = production_factory_date - timedelta(days=production_factory_date.weekday())  # 当天坐在的周的周一
+            this_week_end = production_factory_date + timedelta(days=6 - production_factory_date.weekday())  # 当天所在周的周日
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                plan_schedule__day_time__gte=this_week_start.date(),
+                plan_schedule__day_time__lte=this_week_end.date(),
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
+                start_times=Min('start_time'),
+                end_times=Max('end_time'))
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
+                raise ValidationError('日期传参不正确')
+            if now <= work_schedule_plan['end_times']:
+                end_time = now
+            else:
+                end_time = work_schedule_plan['end_times']
+            total_time = end_time - work_schedule_plan['start_times']
+            filter_dict = {"factory_date__gte": this_week_start.date(), "factory_date__lte": this_week_end.date(),
+                           'delete_flag': False}
+        elif type == 'month':
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                plan_schedule__day_time__month=production_factory_date.month,
+                plan_schedule__day_time__year=production_factory_date.year,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
+                start_times=Min('start_time'),
+                end_times=Max('end_time'))
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
+                raise ValidationError('日期传参不正确')
+            if now <= work_schedule_plan['end_times']:
+                end_time = now
+            else:
+                end_time = work_schedule_plan['end_times']
+            total_time = end_time - work_schedule_plan['start_times']
+            filter_dict = {'factory_date__month': production_factory_date.month,
+                           'factory_date__year': production_factory_date.year,
+                           'delete_flag': False}
+        elif type == 'year':
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                plan_schedule__day_time__year=production_factory_date.year,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').values().aggregate(
+                start_times=Min('start_time'),
+                end_times=Max('end_time'))
+            if not work_schedule_plan['end_times'] or not work_schedule_plan['start_time']:
+                raise ValidationError('日期传参不正确')
+            if now <= work_schedule_plan['end_times']:
+                end_time = now
+            else:
+                end_time = work_schedule_plan['end_times']
+            total_time = end_time - work_schedule_plan['start_times']
+            filter_dict = {'factory_date__year': production_factory_date.year,
+                           'delete_flag': False}
+        e_set = Equip.objects.filter(delete_flag=False).all()
+        resluts = []
+        for e_obj in e_set:
+            tfb_set = TrainsFeedbacks.objects.filter(equip_no=e_obj.equip_no, **filter_dict
+                                                     ).values(
+                'equip_no', 'plan_classes_uid').annotate(actual_trains=Max('actual_trains'),
+                                                         plan_trains=Max('plan_trains')).aggregate(
+                plan_trains_sum=Sum('plan_trains'), actual_trains_sum=Sum('actual_trains'))
+            tfb_set["plan_trains"] = tfb_set.pop("plan_trains_sum")
+            tfb_set["actual_trains"] = tfb_set.pop("actual_trains_sum")
+            tfb_set["equip_no"] = e_obj.equip_no
+            try:
+                if e_obj.equip_current_status_equip.status in ['故障', '维修开始', '维修结束', '空转']:
+                    tfb_set['status'] = '故障'
+                else:
+                    tfb_set['status'] = e_obj.equip_current_status_equip.status
+            except:
+                tfb_set['status'] = '未知'
+            epe_set = e_obj.equip_part_equip.filter(delete_flag=False).all()
+            if not epe_set:
+                continue
+            for epe_obj in epe_set:
+                emo_set = epe_obj.equip_maintenance_order_part.filter(affirm_time__isnull=False).all()
+                if not emo_set:
+                    continue
+                for emo_obj in emo_set:
+                    if not emo_obj.begin_time:
+                        continue
+                    wx_time = emo_obj.affirm_time - emo_obj.begin_time
+                    total_time = total_time - wx_time
+            tfb_set["fault_time"] = str(total_time)
+            resluts.append(tfb_set)
+        return Response({'resluts': resluts})

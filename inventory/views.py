@@ -669,11 +669,14 @@ class MaterialInventoryAPIView(APIView):
                     xbi_obj.update({'material_type': xbi_obj.pop("material__material_type")})
                     xbi_obj.update({'material_no': xbi_obj.pop("material__material_no")})
             elif model == BzFinalMixingRubberInventory:
-                queryset = model.objects.using('bz').filter(lot_no=lot_no).values(
-                    'material_no',
-                    'lot_no', 'container_no', 'location',
-                    'qty',
-                    'quality_status', 'total_weight')
+                try:
+                    queryset = model.objects.using('bz').filter(lot_no=lot_no).values(
+                        'material_no',
+                        'lot_no', 'container_no', 'location',
+                        'qty',
+                        'quality_status', 'total_weight')
+                except:
+                    raise ValidationError('bz混炼胶库连接失败')
                 for bz_dict in queryset:
                     try:
                         mt = bz_dict['material_no'].split("-")[1]
@@ -685,10 +688,14 @@ class MaterialInventoryAPIView(APIView):
                     bz_dict['unit'] = unit
                     bz_dict['unit_weight'] = unit_weight
             elif model == BzFinalMixingRubberInventoryLB:
-                queryset = model.objects.using('lb').filter(lot_no=lot_no).values('material_no',
-                                                                                  'lot_no', 'container_no', 'location',
-                                                                                  'qty',
-                                                                                  'quality_status', 'total_weight')
+                try:
+                    queryset = model.objects.using('lb').filter(lot_no=lot_no).values('material_no',
+                                                                                      'lot_no', 'container_no',
+                                                                                      'location',
+                                                                                      'qty',
+                                                                                      'quality_status', 'total_weight')
+                except:
+                    raise ValidationError('bz帘布连接失败')
                 for bz_dict in queryset:
                     try:
                         mt = bz_dict['material_no'].split("-")[1]
@@ -701,14 +708,15 @@ class MaterialInventoryAPIView(APIView):
                     bz_dict['unit_weight'] = unit_weight
 
             elif model == WmsInventoryStock:
-
-                queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
-                    'material_no',
-                    'lot_no', 'location',
-                    'qty',
-                    'unit',
-                    'quality_status', )
-
+                try:
+                    queryset = model.objects.using('wms').filter(lot_no=lot_no).values(
+                        'material_no',
+                        'lot_no', 'location',
+                        'qty',
+                        'unit',
+                        'quality_status', )
+                except:
+                    raise ValidationError('wms原材料库连接失败')
                 for bz_dict in queryset:
                     try:
                         mt = bz_dict['material_no'].split("-")[1]

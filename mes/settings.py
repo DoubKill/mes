@@ -263,53 +263,49 @@ LOGGING = {
 
 DATABASES = {
     'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+            'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
+            'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 数据库名称 SID
+            'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
+            'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
+            'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
+            'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
         },
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.oracle',
-    #     'NAME': 'zcaj1',  # 数据库SID
-    #     'USER': 'MES',
-    #     'PASSWORD': 'mes2020',
-    #     'HOST': '10.4.10.17',
-    #     'PORT': '1521'
-    # },
-    # 'bz': {
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'ASRS_ZC_AJ_2',
-    #     'HOST': '10.4.23.101',
-    #     'PORT': '1433',
-    #     'USER': 'GZ_MES',
-    #     'PASSWORD': 'mes@_123',
-    #     'OPTIONS': {
-    #         'driver': 'ODBC Driver 17 for SQL Server',
-    #         'MARS_Connection': True,
-    #     },
-    # },
-    # 'wms': {
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'zhada_wms_zhongc',
-    #     'HOST': '10.4.24.25',
-    #     'PORT': '1433',
-    #     'USER': 'sa',
-    #     'PASSWORD': 'Admin123$',
-    #     'OPTIONS': {
-    #         'driver': 'ODBC Driver 17 for SQL Server',
-    #         'MARS_Connection': True,
-    #     },
-    # },
-    # "lb": {  # 帘布库|终炼胶库缩写
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'ASRS_ZC_AJ_4',
-    #     'HOST': '10.4.23.101',
-    #     'PORT': '1433',
-    #     'USER': 'GZ_MES',
-    #     'PASSWORD': 'mes@_123',
-    #     'OPTIONS': {
-    #         'driver': 'ODBC Driver 17 for SQL Server',
-    #         'MARS_Connection': True,
-    #     },
-    # }
+    'bz': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_2',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+        },
+    },
+    'wms': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'zhada_wms_zhongc',
+        'HOST': '10.4.24.25',
+        'PORT': '1433',
+        'USER': 'sa',
+        'PASSWORD': 'Admin123$',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+        },
+    },
+    "lb": {  # 帘布库|终炼胶库缩写
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_4',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+        },
+    }
 }
 
 CACHES = {
@@ -367,6 +363,9 @@ STATICFILES_DIRS = [
     # os.path.join(BASE_DIR, 'static'),# 项目默认会有的路径，如果你部署的不仅是前端打包的静态文件，项目目录static文件下还有其他文件，最好不要删
     os.path.join(BASE_DIR, "dist/static"),  # 加上这条
 ]
+
+MEDIA_ROOT = os.environ.get('MEDIA_ROOT', os.path.join(BASE_DIR, "media/"))
+MEDIA_URL = '/media/'
 
 LANGUAGES = (
     ('en-us', ugettext_lazy(u"English")),
