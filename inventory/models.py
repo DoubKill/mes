@@ -541,5 +541,5 @@ class RubberInventoryLog(AbstractEntity):
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
 
     class Meta:
-        db_table = 'inventory_log'
+        db_table = 'rubber_inventory_log'
         verbose_name_plural = verbose_name = '出入库履历'
