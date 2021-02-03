@@ -4,6 +4,7 @@ auther:
 datetime: 2020/7/27
 name: 
 """
+from inventory.models import MixGumInInventoryLog, MixGumOutInventoryLog
 
 COMMON_READ_ONLY_FIELDS = ('created_date', 'last_updated_date', 'delete_date',
                            'delete_flag', 'created_user', 'last_updated_user',
@@ -35,3 +36,9 @@ STATION_LOCATION_MAP = {
     "二层前端": ["1", "2"],
     "二层后端": ["1", "2"]
 }
+
+INVENTORY_MAP = {
+        ("bz", "混炼胶库", "no1"): {"入库": MixGumInInventoryLog, "出库": MixGumOutInventoryLog, "出入库": None},
+        ("lb", "终炼胶库", "no2"): {},
+        ("wms", "原材料库", "no3"): {},
+    }

@@ -1,3 +1,4 @@
+import datetime
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -9,17 +10,31 @@ from equipment.models import PlatformConfig
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.derorators import api_recorder
-from rest_framework.viewsets import ModelViewSet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
 from rest_framework.response import Response
 from django.db.transaction import atomic
 from rest_framework.decorators import action
-import datetime
+
 
 # Create your views here.
+
+from rest_framework.viewsets import ModelViewSet
+
+from basics.models import Equip
+from equipment.serializers import EquipRealtimeSerializer
 from mes.paginations import SinglePageNumberPagination
 from plan.uuidfield import UUidTools
+
+
+class EquipRealtimeViewSet(ModelViewSet):
+
+    queryset = Equip.objects.filter(delete_flag=False).\
+        select_related('category__equip_type__global_name').\
+        prefetch_related('equip_current_status_equip__status', 'equip_current_status_equip__user')
+    pagination_class = None
+    serializer_class = EquipRealtimeSerializer
+
 
 
 @method_decorator([api_recorder], name="dispatch")

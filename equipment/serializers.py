@@ -1,3 +1,5 @@
+from basics.models import Equip
+
 from datetime import datetime
 
 from django.db.transaction import atomic
@@ -11,6 +13,12 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.uuidfield import UUidTools
+
+class EquipRealtimeSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = Equip
+        fields = "__all__"
 
 
 class EquipDownTypeSerializer(BaseModelSerializer):

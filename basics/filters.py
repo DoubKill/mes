@@ -72,10 +72,11 @@ class PlanScheduleFilter(django_filters.rest_framework.FilterSet):
     month = django_filters.NumberFilter(field_name='day_time__month', help_text='月份')
     work_schedule__schedule_name = django_filters.CharFilter(field_name="work_schedule__schedule_name",
                                                              lookup_expr='icontains', help_text="倒班名称")
+    work_procedure = django_filters.CharFilter(field_name='work_schedule__work_procedure', help_text="工序")
 
     class Meta:
         model = PlanSchedule
-        fields = ('day_time', 'month', 'year', 'work_schedule__schedule_name')
+        fields = ('day_time', 'month', 'year', 'work_schedule__schedule_name', 'work_procedure')
 
 
 class LocationFilter(django_filters.rest_framework.FilterSet):

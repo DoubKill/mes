@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     'inventory.apps.InventoryConfig',
     'spareparts.apps.SparepartsConfig',
     'terminal.apps.TerminalConfig',
-    'equipment.apps.EquipmentConfig'
+    'equipment.apps.EquipmentConfig',
 ]
 
 MIDDLEWARE = [
@@ -263,13 +263,13 @@ LOGGING = {
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.oracle',
-        'NAME': 'zcaj1',  # 数据库SID
-        'USER': 'MES',
-        'PASSWORD': 'mes2020',
-        'HOST': '10.4.10.17',
-        'PORT': '1521'
-    },
+            'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
+            'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 数据库名称 SID
+            'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
+            'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
+            'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
+            'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
+        },
     'bz': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_2',
@@ -307,7 +307,6 @@ DATABASES = {
         },
     }
 }
-
 
 CACHES = {
     'default': {

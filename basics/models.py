@@ -101,6 +101,11 @@ class EquipCategoryAttribute(AbstractEntity):
 
 class Equip(AbstractEntity):
     """设备表"""
+    EQUIP_STATUS = (
+        (1, "运行中"),
+        (2, "故障停机"),
+        (3, "维修中"),
+    )
     category = models.ForeignKey('EquipCategoryAttribute', models.CASCADE, related_name='equip_c',
                                  help_text='设备种类属性', verbose_name='设备种类属性')
     parent = models.ForeignKey('self', blank=True, null=True,
@@ -115,6 +120,7 @@ class Equip(AbstractEntity):
 
     equip_level = models.ForeignKey('GlobalCode', models.CASCADE, related_name='equip_l',
                                     help_text='层级', verbose_name='层级')
+    status = models.PositiveIntegerField(verbose_name='设备状态', help_text='设备状态', choices=EQUIP_STATUS, default=1)
 
     def __str__(self):
         return self.equip_name
