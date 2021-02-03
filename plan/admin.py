@@ -4,9 +4,9 @@ from django.contrib import admin
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import Permission
-from plan.models import ProductDayPlan, ProductClassesPlan
+from plan.models import ProductDayPlan, ProductClassesPlan, BatchingClassesPlan
 
-admin.site.register([ProductDayPlan])
+admin.site.register([ProductDayPlan,BatchingClassesPlan])
 
 
 @admin.register(ProductClassesPlan)

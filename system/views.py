@@ -43,6 +43,14 @@ class UserViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = UserFilter
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'username')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
     def destroy(self, request, *args, **kwargs):
         # 账号停用和启用
         instance = self.get_object()
@@ -172,6 +180,7 @@ class LoginView(ObtainJSONWebToken):
             token = serializer.object.get('token')
             return Response({"permissions": user.permissions_list,
                              "username": user.username,
+                             'id': user.id,
                              "token": token})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -263,7 +272,6 @@ class MaterialReceive(CreateAPIView):
             return Response('mes拥有当前原材料', status=status.HTTP_201_CREATED)
 
 
-
 def index(request):
     request.META["CSRF_COOKIE_USED"] = True
-    return render(request,'index.html')
+    return render(request, 'index.html')

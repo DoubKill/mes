@@ -55,7 +55,7 @@ class BatchChargeLogListFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='设备编码')
     production_classes = django_filters.CharFilter(field_name='production_classes', lookup_expr='icontains',
                                                    help_text='生产班次')
-    material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料编码/投入编码')
+    material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料编码/投入编码', lookup_expr='icontains')
 
     class Meta:
         model = BatchChargeLog
