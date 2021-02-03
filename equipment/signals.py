@@ -12,7 +12,7 @@ from equipment.task import send_ding_msg
 logger = logging.getLogger('send_log')
 
 
-@receiver(post_save, sender=EquipMaintenanceOrder)
+# @receiver(post_save, sender=EquipMaintenanceOrder)
 def equip_maintenance_order_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
     if created:
         try:
