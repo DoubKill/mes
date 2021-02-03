@@ -1208,7 +1208,10 @@ class EquipInfoReal(APIView):
         value = self.request.query_params.get('value', None)
         if not all([type, value]):
             raise ValidationError('参数不全，type和value都得传')
-        production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        try:
+            production_factory_date = datetime.datetime.strptime(value, "%Y-%m-%d")
+        except:
+            raise ValidationError('时间格式不正确')
         now = datetime.datetime.now()
         if type == 'day':
             work_schedule_plan = WorkSchedulePlan.objects.filter(
@@ -1272,6 +1275,8 @@ class EquipInfoReal(APIView):
             total_time = end_time - work_schedule_plan['start_times']
             filter_dict = {'factory_date__year': production_factory_date.year,
                            'delete_flag': False}
+        else:
+            raise ValidationError('type只能传day，week，month，year')
         e_set = Equip.objects.filter(delete_flag=False).all()
         resluts = []
         for e_obj in e_set:
