@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
-    PropertyFilter, PlatformConfigFilter
+    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter
 from equipment.models import PlatformConfig
 from equipment.serializers import *
 from equipment.task import property_template, property_import
@@ -18,6 +18,7 @@ from rest_framework.decorators import action
 import datetime
 
 # Create your views here.
+from mes.paginations import SinglePageNumberPagination
 from plan.uuidfield import UUidTools
 
 
@@ -244,3 +245,14 @@ class PlatformConfigViewSet(ModelViewSet):
         instance.delete_flag = True
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipMaintenanceOrderLogViewSet(ModelViewSet):
+    """#设备维修履历"""
+    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('equip_part__equip')
+    serializer_class = EquipMaintenanceOrderLogSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMaintenanceOrderLogFilter
+    pagination_class = SinglePageNumberPagination

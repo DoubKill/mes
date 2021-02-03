@@ -34,6 +34,9 @@ router.register('property', PropertyViewSet)
 # 通知配置
 router.register('platform-config', PlatformConfigViewSet)
 
+# 设备维修履历
+router.register('equip-maintenance-order-log', EquipMaintenanceOrderLogViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),  # 设备现况汇总

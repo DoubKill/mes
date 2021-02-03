@@ -159,3 +159,35 @@ class PlatformConfigSerializer(BaseModelSerializer):
         fields = '__all__'
         validators = [UniqueTogetherValidator(queryset=PlatformConfig.objects.filter(delete_flag=False).all(),
                                               fields=('platform',), message='已存在该平台的通知配置')]
+
+
+class EquipMaintenanceOrderLogSerializer(BaseModelSerializer):
+    equip_no = serializers.CharField(source='equip_part.equip.equip_no', read_only=True, help_text='设备编码')
+    equip_name = serializers.CharField(source='equip_part.equip.equip_name', read_only=True, help_text='设备名称')
+    equip_type = serializers.CharField(source='equip_part.equip.category.equip_type.global_name',
+                                       read_only=True, help_text='设备类型')
+    waiting_repair = serializers.SerializerMethodField(read_only=True, help_text='等待维修时间')
+    repair_time = serializers.SerializerMethodField(read_only=True, help_text='维修时间')
+    stop_time = serializers.SerializerMethodField(read_only=True, help_text='停机时间')
+
+    def get_repair_time(self, obj):
+        try:
+            return obj.end_time - obj.begin_time
+        except:
+            return None
+
+    def get_waiting_repair(self, obj):
+        try:
+            return obj.begin_time - obj.created_date
+        except:
+            return None
+
+    def get_stop_time(self, obj):
+        try:
+            return obj.affirm_time - obj.down_time
+        except:
+            return None
+
+    class Meta:
+        model = EquipMaintenanceOrder
+        fields = '__all__'
