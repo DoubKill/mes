@@ -395,10 +395,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                     filter_dict.update(inout_num_type=actual_type)
                 else:
                     actual_type = "生产出库"
-                temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-fin_time'))
+                temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-start_time'))
                 filter_dict.pop("inout_num_type", None)
                 temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
-                                                             **filter_dict).order_by('-fin_time'))
+                                                             **filter_dict).order_by('-start_time'))
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
