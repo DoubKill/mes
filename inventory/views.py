@@ -38,7 +38,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
-from recipe.models import Material
+from recipe.models import Material, MaterialAttribute
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -843,3 +843,24 @@ class MateriaTypeNameToAccording(APIView):
             if warehouse_name_according[warehouse_name].objects.filter(**materia_no_filte).exists():
                 according_list.append(warehouse_name_according[warehouse_name].__name__)
         return Response(according_list)
+
+
+class SamplingRules(APIView):
+
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        material_no = params.get("material_no")
+        material_name = params.get("material_name")
+        filter_dict = {}
+        if material_no:
+            filter_dict.update(material__material_no=material_no)
+        if material_name:
+            filter_dict.update(material__material_name=material_name)
+        queryset = MaterialAttribute.objects.filter(**filter_dict).order_by("id")
+        if not queryset.exists():
+            raise ValidationError(f"{material_no}|{material_name}未能在MES中检索到")
+        instance = queryset.last()
+        return Response({"result": {"material_no": material_no,
+                                    "material_name": material_name,
+                                    "sampling_rate": instance.sampling_rate}})
