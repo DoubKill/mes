@@ -41,11 +41,14 @@ class EquipMaintenanceOrderFilter(django_filters.rest_framework.FilterSet):
     order_uid = django_filters.CharFilter(field_name='order_uid', help_text='单号', lookup_expr='icontains')
     equip_type = django_filters.CharFilter(field_name='equip_part__equip__category__equip_type__global_name',
                                            help_text='设备类型', )
+    maintenance_username = django_filters.CharFilter(field_name='maintenance_user_id',
+                                                     help_text='维修人')
 
     class Meta:
         model = EquipMaintenanceOrder
         fields = (
-            'equip_no', 'equip_name', 'date', 'status', 'order_uid', 'equip_type', 'month', 'year')
+            'equip_no', 'equip_name', 'date', 'status', 'order_uid', 'equip_type', 'month', 'year',
+            'maintenance_username')
 
 
 class PropertyFilter(django_filters.rest_framework.FilterSet):

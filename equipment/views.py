@@ -128,7 +128,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
                                                  order_src=1,
-                                                 note_time=datetime.datetime.now(),
+                                                 note_time=datetime.now(),
                                                  down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
                                                  equip_part_id=data['equip_part'],
