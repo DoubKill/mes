@@ -85,7 +85,7 @@ class EquipDownReasonViewSet(ModelViewSet):
             return super().list(request, *args, **kwargs)
 
 
-@method_decorator([api_recorder], name="dispatch")
+# @method_decorator([api_recorder], name="dispatch")
 class EquipCurrentStatusList(APIView):
     """设备现况汇总"""
 
@@ -106,7 +106,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     """设备现况"""
     queryset = EquipCurrentStatus.objects.filter(delete_flag=False).all()
     serializer_class = EquipCurrentStatusSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
     # filter_class = EquipCurrentStatusFilter
@@ -146,7 +146,7 @@ class EquipPartViewSet(ModelViewSet):
     """设备部位"""
     queryset = EquipPart.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPartSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartFilter
 
@@ -170,7 +170,7 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
     """维修表单"""
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipMaintenanceOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
 
