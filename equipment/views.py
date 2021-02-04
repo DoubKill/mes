@@ -16,7 +16,6 @@ from rest_framework.response import Response
 from django.db.transaction import atomic
 from rest_framework.decorators import action
 
-
 # Create your views here.
 
 from rest_framework.viewsets import ModelViewSet
@@ -28,13 +27,11 @@ from plan.uuidfield import UUidTools
 
 
 class EquipRealtimeViewSet(ModelViewSet):
-
-    queryset = Equip.objects.filter(delete_flag=False).\
-        select_related('category__equip_type__global_name').\
+    queryset = Equip.objects.filter(delete_flag=False). \
+        select_related('category__equip_type__global_name'). \
         prefetch_related('equip_current_status_equip__status', 'equip_current_status_equip__user')
     pagination_class = None
     serializer_class = EquipRealtimeSerializer
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -132,7 +129,8 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                  down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
                                                  equip_part_id=data['equip_part'],
-                                                 factory_date=wsp_obj.plan_schedule.day_time)
+                                                 factory_date=wsp_obj.plan_schedule.day_time,
+                                                 created_user=request.user)
         elif instance.status in ['停机', '维修结束']:
             instance.status = '运行中'
             instance.save()
