@@ -137,9 +137,10 @@ class WmsInventoryStock(models.Model):
     unit = models.CharField(max_length=64, db_column='WeightUnit')
     quality_status = models.IntegerField(db_column='StockDetailState')
     material_type = models.CharField(max_length=64)
-    lot_no = models.CharField(max_length=64, db_column='BatchNo')
+    batch_no = models.CharField(max_length=64, db_column='BatchNo')
     container_no = models.CharField(max_length=32, db_column="LadenToolNumber")
     in_storage_time = models.DateTimeField(db_column='CreaterTime')
+    lot_no = models.CharField(max_length=64, db_column='TrackingNumber')
 
     class Meta:
         db_table = 't_inventory_stock'
