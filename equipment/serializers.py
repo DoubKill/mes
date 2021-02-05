@@ -129,6 +129,7 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
             validated_data['assign_user'] = self.context['user']
         else:
             validated_data['maintenance_user'] = self.context['user']
+            validated_data['assign_user'] = self.context['user']
         return super().update(instance, validated_data)
 
     class Meta:
