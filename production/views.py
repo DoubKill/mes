@@ -1077,8 +1077,8 @@ class WeekdayProductStatisticsView(APIView):
         # __week=4查当周  3，2，1 上周 上上周， 上上上周
         temp_list = list(
             TrainsFeedbacks.objects.filter(factory_date__week=3).values("equip_no", "factory_date"). \
-            annotate(all_weight=Sum("actual_weight")).order_by("factory_date").values("equip_no", "factory_date",
-                                                                                   "all_weight"))
+                annotate(all_weight=Sum("actual_weight")).order_by("factory_date").values("equip_no", "factory_date",
+                                                                                          "all_weight"))
         ret = {"Z%02d" % x: [] for x in range(1, 16)}
         day_week_map = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
         for data in temp_list:
@@ -1086,7 +1086,11 @@ class WeekdayProductStatisticsView(APIView):
                 index = data["factory_date"].isoweekday()
             except:
                 continue
+<<<<<<< Updated upstream
             ret[data["equip_no"]].append({day_week_map[index]: str(data["all_weight"]/1000)})
+=======
+            ret[data["equip_no"]].append({day_week_map[index]: data["all_weight"] / 1000})
+>>>>>>> Stashed changes
         return Response(ret)
 
 
@@ -1109,10 +1113,15 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
+<<<<<<< Updated upstream
                     ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
+=======
+                    ret = {
+                        my_key: [{_["factory_date"].strftime('%Y-%m-%d'): _["all_weight"] / 1000} for _ in middle_list]}
+>>>>>>> Stashed changes
                 elif unit == "month":
                     middle_list = list(temp_set.annotate(month=TruncMonth('factory_date')).values("month")
-                                       .annotate(all_weight=Sum("actual_weight")/1000).order_by("factory_date")
+                                       .annotate(all_weight=Sum("actual_weight") / 1000).order_by("factory_date")
                                        .values("month", "all_weight"))
                     ret = {value: [{_["month"].strftime('%Y-%m'): str(_["all_weight"])} for _ in middle_list]}
             elif query_type == "month":
@@ -1122,7 +1131,12 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
+<<<<<<< Updated upstream
                     ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
+=======
+                    ret = {
+                        my_key: [{_["factory_date"].strftime('%Y-%m-%d'): _["all_weight"] / 1000} for _ in middle_list]}
+>>>>>>> Stashed changes
         except Exception as e:
             raise ValidationError(f"参数错误，请检查是否符合接口标准: {e}")
         if not ret:
@@ -1202,6 +1216,8 @@ class PlanInfoReal(APIView):
             actual_trains=Max('actual_trains'), plan_trains=Max('plan_trains'), start_time=Min('begin_time'),
             end_time=Max('end_time'))
         for tfb_obj in tfb_set:
+            tfb_obj['actual_trains'] = str(tfb_obj['actual_trains'])
+            tfb_obj['plan_trains'] = str(tfb_obj['plan_trains'])
             tfb_obj['start_time'] = tfb_obj['start_time'].strftime('%Y-%m-%d %H:%M:%S')
             tfb_obj['end_time'] = tfb_obj['end_time'].strftime('%Y-%m-%d %H:%M:%S')
         return Response({'resluts': tfb_set})
@@ -1294,8 +1310,11 @@ class EquipInfoReal(APIView):
                 'equip_no', 'plan_classes_uid').annotate(actual_trains=Max('actual_trains'),
                                                          plan_trains=Max('plan_trains')).aggregate(
                 plan_trains_sum=Sum('plan_trains'), actual_trains_sum=Sum('actual_trains'))
-            tfb_set["plan_trains"] = tfb_set.pop("plan_trains_sum")
-            tfb_set["actual_trains"] = tfb_set.pop("actual_trains_sum")
+            plan_trains = tfb_set.pop("plan_trains_sum", None)
+            actual_trains = tfb_set.pop("actual_trains_sum", None)
+
+            tfb_set["plan_trains"] = str(plan_trains) if plan_trains else "0"
+            tfb_set["actual_trains"] = str(actual_trains) if actual_trains else "0"
             tfb_set["equip_no"] = e_obj.equip_no
             try:
                 if e_obj.equip_current_status_equip.status in ['故障', '维修开始', '维修结束', '空转']:
