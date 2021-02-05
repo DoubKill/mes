@@ -103,7 +103,6 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
 }
 
-
 REST_FRAMEWORK_EXTENSIONS = {
     # 缓存时间(1小时)
     'DEFAULT_CACHE_RESPONSE_TIMEOUT': 60 * 10,
@@ -111,218 +110,176 @@ REST_FRAMEWORK_EXTENSIONS = {
     'DEFAULT_USE_CACHE': 'default',
 }
 
-
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
     'JWT_ALLOW_REFRESH': True,
 }
 
-LOGGING_DIR = os.environ.get('LOGGING_DIR', os.path.join(BASE_DIR, 'logs'))
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
-        },
-        'simple': {
-            'format': '%(levelname)s %(message)s'
-        },
-        'standard': {
-            'format': '%(asctime)s [%(threadName)s:%(thread)d] [%(name)s:%(lineno)d] '
-                      '[%(module)s:%(funcName)s] [%(levelname)s]- %(message)s'
-        },
-        'django_request': {
-            'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s'
-                      ' status_code:%(status_code)d',
-            'datefmt': '%Y-%m-%d %H:%M:%S'
-        },
-        'django_db_backends': {
-            'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s',
-            'datefmt': '%Y-%m-%d %H:%M:%S'
-        },
-    },
-    'filters': {
-        'require_debug_true': {
-            '()': 'django.utils.log.RequireDebugTrue',
-        },
-
-    },
-    'handlers': {
-        'console': {
-            'level': 'DEBUG',
-            'filters': ['require_debug_true'],
-            'class': 'logging.StreamHandler',
-            'formatter': 'standard'
-        },
-        'django_db_backends': {
-            'level': 'DEBUG',
-            'filters': ['require_debug_true'],
-            'class': 'logging.StreamHandler',
-            'formatter': 'django_db_backends'
-        },
-        'django_request': {
-            'level': 'DEBUG',
-            'filters': ['require_debug_true'],
-            'class': 'logging.StreamHandler',
-            'formatter': 'django_request'
-        },
-        'timedRotatingFile': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGGING_DIR, 'api_log.log'),
-            'when': 'midnight',
-            'backupCount': 10,
-            'formatter': 'standard',
-            'interval': 1,
-        },
-        'errorFile': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGGING_DIR, 'error.log'),
-            'when': 'midnight',
-            'backupCount': 10,
-            'formatter': 'standard',
-            'interval': 1,
-        },
-        'syncFile': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGGING_DIR, 'sync.log'),
-            'when': 'midnight',
-            'backupCount': 10,
-            'formatter': 'standard',
-            'interval': 1,
-        },
-        'asyncFile': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGGING_DIR, 'async.log'),
-            'when': 'midnight',
-            'backupCount': 10,
-            'formatter': 'standard',
-            'interval': 1,
-        },
-        'sendFile': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGGING_DIR, 'send.log'),
-            'when': 'midnight',
-            'backupCount': 10,
-            'formatter': 'standard',
-            'interval': 1,
-        },
-        'qualityFile': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': os.path.join(LOGGING_DIR, 'quality.log'),
-            'when': 'midnight',
-            'backupCount': 10,
-            'formatter': 'standard',
-            'interval': 1,
-        },
-    },
-    'loggers': {
-        'django.db.backends': {
-            'handlers': ['django_db_backends'],
-            'propagate': True,
-            'level': 'DEBUG' if DEBUG else 'INFO',
-        },
-        'django.request': {
-            'handlers': ['django_request'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'api_log': {
-            'handlers': ['timedRotatingFile'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-        },
-        'error_log': {
-            'handlers': ['errorFile'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-        },
-        'sync_log': {
-            'handlers': ['syncFile'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-        },
-        'async_log': {
-            'handlers': ['asyncFile'],
-            'level': 'INFO',
-        },
-        'send_log': {
-            'handlers': ['sendFile'],
-            'level': 'INFO',
-        },
-        'quality_log': {
-            'handlers': ['qualityFile'],
-            'level': 'INFO',
-        },
-    },
-}
-
+# LOGGING_DIR = os.environ.get('LOGGING_DIR', os.path.join(BASE_DIR, 'logs'))
+#
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'verbose': {
+#             'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+#         },
+#         'simple': {
+#             'format': '%(levelname)s %(message)s'
+#         },
+#         'standard': {
+#             'format': '%(asctime)s [%(threadName)s:%(thread)d] [%(name)s:%(lineno)d] '
+#                       '[%(module)s:%(funcName)s] [%(levelname)s]- %(message)s'
+#         },
+#         'django_request': {
+#             'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s'
+#                       ' status_code:%(status_code)d',
+#             'datefmt': '%Y-%m-%d %H:%M:%S'
+#         },
+#         'django_db_backends': {
+#             'format': '%(levelname)s %(asctime)s %(pathname)s %(module)s %(lineno)d %(message)s',
+#             'datefmt': '%Y-%m-%d %H:%M:%S'
+#         },
+#     },
+#     'filters': {
+#         'require_debug_true': {
+#             '()': 'django.utils.log.RequireDebugTrue',
+#         },
+#
+#     },
+#     'handlers': {
+#         'console': {
+#             'level': 'DEBUG',
+#             'filters': ['require_debug_true'],
+#             'class': 'logging.StreamHandler',
+#             'formatter': 'standard'
+#         },
+#         'django_db_backends': {
+#             'level': 'DEBUG',
+#             'filters': ['require_debug_true'],
+#             'class': 'logging.StreamHandler',
+#             'formatter': 'django_db_backends'
+#         },
+#         'django_request': {
+#             'level': 'DEBUG',
+#             'filters': ['require_debug_true'],
+#             'class': 'logging.StreamHandler',
+#             'formatter': 'django_request'
+#         },
+#         'timedRotatingFile': {
+#             'level': 'DEBUG',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOGGING_DIR, 'api_log.log'),
+#             'when': 'midnight',
+#             'backupCount': 10,
+#             'formatter': 'standard',
+#             'interval': 1,
+#         },
+#         'errorFile': {
+#             'level': 'DEBUG',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOGGING_DIR, 'error.log'),
+#             'when': 'midnight',
+#             'backupCount': 10,
+#             'formatter': 'standard',
+#             'interval': 1,
+#         },
+#         'syncFile': {
+#             'level': 'DEBUG',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOGGING_DIR, 'sync.log'),
+#             'when': 'midnight',
+#             'backupCount': 10,
+#             'formatter': 'standard',
+#             'interval': 1,
+#         },
+#         'asyncFile': {
+#             'level': 'DEBUG',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOGGING_DIR, 'async.log'),
+#             'when': 'midnight',
+#             'backupCount': 10,
+#             'formatter': 'standard',
+#             'interval': 1,
+#         },
+#         'sendFile': {
+#             'level': 'DEBUG',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOGGING_DIR, 'send.log'),
+#             'when': 'midnight',
+#             'backupCount': 10,
+#             'formatter': 'standard',
+#             'interval': 1,
+#         },
+#         'qualityFile': {
+#             'level': 'DEBUG',
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': os.path.join(LOGGING_DIR, 'quality.log'),
+#             'when': 'midnight',
+#             'backupCount': 10,
+#             'formatter': 'standard',
+#             'interval': 1,
+#         },
+#     },
+#     'loggers': {
+#         'django.db.backends': {
+#             'handlers': ['django_db_backends'],
+#             'propagate': True,
+#             'level': 'DEBUG' if DEBUG else 'INFO',
+#         },
+#         'django.request': {
+#             'handlers': ['django_request'],
+#             'level': 'ERROR',
+#             'propagate': False,
+#         },
+#         'api_log': {
+#             'handlers': ['timedRotatingFile'],
+#             'level': 'DEBUG' if DEBUG else 'INFO',
+#         },
+#         'error_log': {
+#             'handlers': ['errorFile'],
+#             'level': 'DEBUG' if DEBUG else 'INFO',
+#         },
+#         'sync_log': {
+#             'handlers': ['syncFile'],
+#             'level': 'DEBUG' if DEBUG else 'INFO',
+#         },
+#         'async_log': {
+#             'handlers': ['asyncFile'],
+#             'level': 'INFO',
+#         },
+#         'send_log': {
+#             'handlers': ['sendFile'],
+#             'level': 'INFO',
+#         },
+#         'quality_log': {
+#             'handlers': ['qualityFile'],
+#             'level': 'INFO',
+#         },
+#     },
+# }
 DATABASES = {
     'default': {
-            'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
-            'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 数据库名称 SID
-            'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
-            'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
-            'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
-            'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
-        },
-    'bz': {
-        'ENGINE': 'sql_server.pyodbc',
-        'NAME': 'ASRS_ZC_AJ_2',
-        'HOST': '10.4.23.101',
-        'PORT': '1433',
-        'USER': 'GZ_MES',
-        'PASSWORD': 'mes@_123',
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-            'MARS_Connection': True,
-        },
-    },
-    'wms': {
-        'ENGINE': 'sql_server.pyodbc',
-        'NAME': 'zhada_wms_zhongc',
-        'HOST': '10.4.24.25',
-        'PORT': '1433',
-        'USER': 'sa',
-        'PASSWORD': 'Admin123$',
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-            'MARS_Connection': True,
-        },
-    },
-    "lb": {  # 帘布库|终炼胶库缩写
-        'ENGINE': 'sql_server.pyodbc',
-        'NAME': 'ASRS_ZC_AJ_4',
-        'HOST': '10.4.23.101',
-        'PORT': '1433',
-        'USER': 'GZ_MES',
-        'PASSWORD': 'mes@_123',
-        'OPTIONS': {
-            'driver': 'ODBC Driver 17 for SQL Server',
-            'MARS_Connection': True,
-        },
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
+
 
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'my_cache_table', # 设置一个数据库存放缓存的表名
+        'LOCATION': 'my_cache_table',  # 设置一个数据库存放缓存的表名
     },
-    'OPTIONS':{
-            'MAX_ENTRIES': 30,                                       # 最大缓存个数（默认300）
-            'CULL_FREQUENCY': 3,                                      # 缓存到达最大个数之后，剔除缓存个数的比例，即：1/CULL_FREQUENCY（默认3），3：表示1/3
-        },
-        # 这边只的是缓存的key：p1:1:func_name
-        'KEY_PREFIX': 'p1',                                             # 缓存key的前缀（默认空）
-        'VERSION': 1,                                                 # 缓存key的版本（默认1）
-        'KEY_FUNCTION':"func_name"                                   # 生成key的函数（默认函数会生成为：【前缀:版本:key】）
+    'OPTIONS': {
+        'MAX_ENTRIES': 30,  # 最大缓存个数（默认300）
+        'CULL_FREQUENCY': 3,  # 缓存到达最大个数之后，剔除缓存个数的比例，即：1/CULL_FREQUENCY（默认3），3：表示1/3
+    },
+    # 这边只的是缓存的key：p1:1:func_name
+    'KEY_PREFIX': 'p1',  # 缓存key的前缀（默认空）
+    'VERSION': 1,  # 缓存key的版本（默认1）
+    'KEY_FUNCTION': "func_name"  # 生成key的函数（默认函数会生成为：【前缀:版本:key】）
 }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {

@@ -1086,11 +1086,7 @@ class WeekdayProductStatisticsView(APIView):
                 index = data["factory_date"].isoweekday()
             except:
                 continue
-<<<<<<< Updated upstream
             ret[data["equip_no"]].append({day_week_map[index]: str(data["all_weight"]/1000)})
-=======
-            ret[data["equip_no"]].append({day_week_map[index]: data["all_weight"] / 1000})
->>>>>>> Stashed changes
         return Response(ret)
 
 
@@ -1113,12 +1109,8 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
-<<<<<<< Updated upstream
                     ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
-=======
-                    ret = {
-                        my_key: [{_["factory_date"].strftime('%Y-%m-%d'): _["all_weight"] / 1000} for _ in middle_list]}
->>>>>>> Stashed changes
+
                 elif unit == "month":
                     middle_list = list(temp_set.annotate(month=TruncMonth('factory_date')).values("month")
                                        .annotate(all_weight=Sum("actual_weight") / 1000).order_by("factory_date")
@@ -1131,12 +1123,7 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
-<<<<<<< Updated upstream
                     ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
-=======
-                    ret = {
-                        my_key: [{_["factory_date"].strftime('%Y-%m-%d'): _["all_weight"] / 1000} for _ in middle_list]}
->>>>>>> Stashed changes
         except Exception as e:
             raise ValidationError(f"参数错误，请检查是否符合接口标准: {e}")
         if not ret:
