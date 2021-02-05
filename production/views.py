@@ -1086,7 +1086,7 @@ class WeekdayProductStatisticsView(APIView):
                 index = data["factory_date"].isoweekday()
             except:
                 continue
-            ret[data["equip_no"]].append({day_week_map[index]: data["all_weight"]/1000})
+            ret[data["equip_no"]].append({day_week_map[index]: str(data["all_weight"]/1000)})
         return Response(ret)
 
 
@@ -1109,12 +1109,12 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
-                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): _["all_weight"]/1000} for _ in middle_list]}
+                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
                 elif unit == "month":
                     middle_list = list(temp_set.annotate(month=TruncMonth('factory_date')).values("month")
                                        .annotate(all_weight=Sum("actual_weight")/1000).order_by("factory_date")
                                        .values("month", "all_weight"))
-                    ret = {value: [{_["month"].strftime('%Y-%m'): _["all_weight"]} for _ in middle_list]}
+                    ret = {value: [{_["month"].strftime('%Y-%m'): str(_["all_weight"])} for _ in middle_list]}
             elif query_type == "month":
                 my_key = value[0:7]
                 value = datetime.datetime.strptime(value, "%Y-%m-%d").month
@@ -1122,7 +1122,7 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
-                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): _["all_weight"]/1000} for _ in middle_list]}
+                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
         except Exception as e:
             raise ValidationError(f"参数错误，请检查是否符合接口标准: {e}")
         if not ret:
@@ -1163,7 +1163,7 @@ class DayCapacityView(APIView):
         temp_list = list(temp_set.values("equip_no", "product_no").annotate(output=Sum("actual_weight")))
         temp_list.sort(key=lambda x: (x.get("equip_no", "product_no")))
         for x in temp_list:
-            x["output"] = x["output"] / 1000
+            x["output"] = str(x["output"] / 1000)
         ret = {"result": temp_list}
         return Response(ret)
 
