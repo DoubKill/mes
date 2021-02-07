@@ -6,10 +6,6 @@ import json
 import os
 import time
 import urllib
-# import matplotlib.pyplot as plt
-# from pyecharts import Bar
-# from snapshot_phantomjs import snapshot
-# from pyecharts.render import make_snapshot
 
 import requests
 
@@ -54,8 +50,8 @@ from pyecharts.charts import Bar
 from pyecharts import options as opts
 
 # 导入输出图片工具
-from pyecharts.render import make_snapshot
-from snapshot_phantomjs import snapshot
+# from pyecharts.render import make_snapshot
+# from snapshot_phantomjs import snapshot
 # 创建一个柱状图Bar实例
 
 bar = (
@@ -70,21 +66,21 @@ bar = (
 
     .set_global_opts(title_opts=opts.TitleOpts(title="各机台生产情况", subtitle=f"{factory_date.strftime('%Y-%m-%d') + time_str} -> {end_date.strftime('%Y-%m-%d') + time_str}"))
 )
-# bar.render(path="D:\index.html")
+bar.render(path="index.html")
 # # 输出保存为图片
-make_snapshot(snapshot, "D:\index.html", "D:\index.gif", pixel_ratio=1)
+# make_snapshot(snapshot, "D:\index.html", "D:\index.gif", pixel_ratio=1)
 # bar = Bar("各机台生产情况", f"{factory_date.strftime('%Y-%m-%d') + time_str} -> {end_date.strftime('%Y-%m-%d') + time_str}")
 # bar.add('计划车数', equip_list, plan_list, mark_point=['average']) # 标记点：商家1的平均值
 # bar.add('实际车数', equip_list, actual_list ,mark_line=['min', 'max']) # 标记线：商家2的最小/大值
-with open(r"D:\index.gif", 'rb') as f:
-    base64_data = base64.b64encode(f.read())
-    s = base64_data.decode()
+# with open(r"D:\index.gif", 'rb') as f:
+#     base64_data = base64.b64encode(f.read())
+#     s = base64_data.decode()
 
 message = {
     "msgtype": "markdown",
     "markdown": {
         "title": "每日通知",
-        "text": f"# 密炼机台产量统计(车) {mk_str}> ![screenshot](data:image/gif;base64,{s})\n> **发布时间:{now_time}** [[mes]](http://10.4.10.54) \n"
+        "text": f"# 密炼机台产量统计(车) {mk_str}> [[数据可视化]](http://10.4.10.54/data/)\n\n**发布时间:{now_time}** [[mes]](http://10.4.10.54/) \n"
     },
     "at": {
     "atMobiles": [],
