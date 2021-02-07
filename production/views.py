@@ -1104,7 +1104,7 @@ class ProductionStatisticsView(APIView):
         try:
             if query_type == "year":
                 my_key = value[0:4]
-                value = datetime.datetime.strptime(value, "%Y-%m-%d").year
+                value = datetime.datetime.strptime(value, "%Y-%m").year
                 temp_set = TrainsFeedbacks.objects.filter(factory_date__year=value)
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
@@ -1118,7 +1118,7 @@ class ProductionStatisticsView(APIView):
                     ret = {value: [{_["month"].strftime('%Y-%m'): str(_["all_weight"])} for _ in middle_list]}
             elif query_type == "month":
                 my_key = value[0:7]
-                value = datetime.datetime.strptime(value, "%Y-%m-%d").month
+                value = datetime.datetime.strptime(value, "%Y-%m").month
                 temp_set = TrainsFeedbacks.objects.filter(factory_date__month=value)
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
