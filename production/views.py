@@ -1110,7 +1110,6 @@ class ProductionStatisticsView(APIView):
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
                     ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
-
                 elif unit == "month":
                     middle_list = list(temp_set.annotate(month=TruncMonth('factory_date')).values("month")
                                        .annotate(all_weight=Sum("actual_weight") / 1000).order_by("factory_date")

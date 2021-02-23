@@ -16,7 +16,6 @@ from rest_framework.response import Response
 from django.db.transaction import atomic
 from rest_framework.decorators import action
 
-
 # Create your views here.
 
 from rest_framework.viewsets import ModelViewSet
@@ -28,13 +27,11 @@ from plan.uuidfield import UUidTools
 
 
 class EquipRealtimeViewSet(ModelViewSet):
-
-    queryset = Equip.objects.filter(delete_flag=False).\
-        select_related('category__equip_type__global_name').\
+    queryset = Equip.objects.filter(delete_flag=False). \
+        select_related('category__equip_type__global_name'). \
         prefetch_related('equip_current_status_equip__status', 'equip_current_status_equip__user')
     pagination_class = None
     serializer_class = EquipRealtimeSerializer
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -85,7 +82,7 @@ class EquipDownReasonViewSet(ModelViewSet):
             return super().list(request, *args, **kwargs)
 
 
-@method_decorator([api_recorder], name="dispatch")
+# @method_decorator([api_recorder], name="dispatch")
 class EquipCurrentStatusList(APIView):
     """设备现况汇总"""
 
@@ -106,7 +103,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     """设备现况"""
     queryset = EquipCurrentStatus.objects.filter(delete_flag=False).all()
     serializer_class = EquipCurrentStatusSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
     # filter_class = EquipCurrentStatusFilter
@@ -128,11 +125,12 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
                                                  order_src=1,
-                                                 note_time=datetime.datetime.now(),
+                                                 note_time=datetime.now(),
                                                  down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
                                                  equip_part_id=data['equip_part'],
-                                                 factory_date=wsp_obj.plan_schedule.day_time)
+                                                 factory_date=wsp_obj.plan_schedule.day_time,
+                                                 created_user=request.user)
         elif instance.status in ['停机', '维修结束']:
             instance.status = '运行中'
             instance.save()
@@ -146,7 +144,7 @@ class EquipPartViewSet(ModelViewSet):
     """设备部位"""
     queryset = EquipPart.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPartSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartFilter
 
@@ -170,7 +168,7 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
     """维修表单"""
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipMaintenanceOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
 
@@ -181,6 +179,11 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
             return EquipMaintenanceOrderUpdateSerializer
         else:
             return EquipMaintenanceOrderSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({'user': self.request.user})
+        return context
 
 
 @method_decorator([api_recorder], name="dispatch")

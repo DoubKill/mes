@@ -252,7 +252,7 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = PlanSchedule.objects.filter(
         delete_flag=False).select_related('work_schedule').prefetch_related('work_schedule_plan__classes',
-                                                                            'work_schedule_plan__group')
+                                                                            'work_schedule_plan__group').order_by("day_time")
     serializer_class = PlanScheduleSerializer
     filter_fields = ('day_time',)
     filter_backends = (DjangoFilterBackend,)

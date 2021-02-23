@@ -204,6 +204,7 @@ class ProductBatchingViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
+            queryset = ProductBatching.objects.filter(delete_flag=False, batching_type=1)
             data = queryset.values('id', 'stage_product_batch_no',
                                    'batching_weight',
                                    'production_time_interval',
