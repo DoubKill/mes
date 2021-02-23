@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan
-from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView
+from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan
 from recipe.models import ProductBatchingDetail
@@ -148,7 +148,7 @@ class BatchProductBatchingVIew(APIView):
                 raise ValidationError('该计划不存在')
             if hasattr(classes_plan.product_batching, 'weighbatching'):
                 weight_batching = classes_plan.product_batching.weighbatching
-                weight_cnt_types = weight_batching.weighcnttype_set.all()
+                weight_cnt_types = weight_batching.weight_types.all()
                 for item in weight_cnt_types:
                     if item.weighbatchingdetail_set.filter():
                         cnt_type_mat_ids = item.weighbatchingdetail_set.values_list('material_id', flat=True)
@@ -156,17 +156,17 @@ class BatchProductBatchingVIew(APIView):
                         if item.weigh_type == 1:
                             ret.append({
                                 'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-a',
-                                'actual_weight': weight_batching.a_weight
+                                'actual_weight': 0
                             })
                         elif item.weigh_type == 2:
                             ret.append({
                                 'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-b',
-                                'actual_weight': weight_batching.b_weight
+                                'actual_weight': 0
                             })
                         else:
                             ret.append({
                                 'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-s',
-                                'actual_weight': weight_batching.sulfur_weight
+                                'actual_weight': 0
                             })
                 ret.extend(ProductBatchingDetail.objects.exclude(material_id__in=material_ids).filter(
                     product_batching=classes_plan.product_batching, delete_flag=False
@@ -313,6 +313,15 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
     permission_classes = (IsAuthenticated,)
     filter_class = WeightPackageLogFilter
     filter_backends = [DjangoFilterBackend]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return response(
+                success=False,
+                message=list(serializer.errors.values())[0][0])  # 只返回一条错误信息
+        self.perform_create(serializer)
+        return response(success=True, data=serializer.data)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

@@ -1,5 +1,4 @@
 from django.db import models
-from django.db.models import Sum
 
 from basics.models import GlobalCode, Equip, EquipCategoryAttribute
 from system.models import AbstractEntity, User
@@ -150,7 +149,7 @@ class ProductBatching(AbstractEntity):
             delete_flag=False).values_list('material__material_no', flat=True)))
         weight_batching = getattr(self, 'weighbatching', None)
         if weight_batching:
-            cnt_types = weight_batching.weighcnttype_set.filter()
+            cnt_types = weight_batching.weight_types.filter()
             for cnt_type in cnt_types:
                 if cnt_type.weighbatchingdetail_set.filter():
                     material_nos = material_nos.difference(
@@ -206,10 +205,6 @@ class WeighBatching(AbstractEntity):
     )
     product_batching = models.OneToOneField(ProductBatching, verbose_name='胶料配料标准', on_delete=models.CASCADE)
     weight_batch_no = models.CharField('小料配方编码', max_length=64, blank=True, default='')
-    # a_weight = models.FloatField('A重量', default=0.0)
-    # b_weight = models.FloatField('B重量', default=0.0)
-    # sulfur_weight = models.FloatField('硫磺重量', default=0.0)
-    send_cnt = models.IntegerField('发送次数', default=0)
     used_type = models.PositiveSmallIntegerField('使用状态', choices=USE_TYPE_CHOICE, default=1)
     submit_user = models.ForeignKey(User, help_text='提交人',
                                     related_name='submit_wb_set',
@@ -237,32 +232,6 @@ class WeighBatching(AbstractEntity):
                                       on_delete=models.CASCADE)
     obsolete_time = models.DateTimeField(help_text='弃用时间', verbose_name='弃用时间', blank=True, null=True)
 
-    def weight_batch_no_(self):
-        weight_batch_no = self.product_batching.stage_product_batch_no + \
-                          '-' + (
-                              self.product_batching.dev_type.category_name if self.product_batching.dev_type else 'null')
-        if self.weight_batch_no != weight_batch_no:
-            self.weight_batch_no = weight_batch_no
-            self.save()
-        return weight_batch_no
-
-    def material_sum_weight(self, weigh_type):
-        return self.weighcnttype_set \
-            .filter(weigh_type=weigh_type) \
-            .aggregate(sum_weight=Sum('weighbatchingdetail__standard_weight'))['sum_weight'] or 0
-
-    @property
-    def a_weight(self):
-        return self.material_sum_weight(1)
-
-    @property
-    def b_weight(self):
-        return self.material_sum_weight(2)
-
-    @property
-    def sulfur_weight(self):
-        return self.material_sum_weight(3)
-
     class Meta:
         db_table = 'weigh_batching'
         verbose_name_plural = verbose_name = '小料称量配方标准'
@@ -271,35 +240,33 @@ class WeighBatching(AbstractEntity):
 class WeighCntType(models.Model):
     """小料称重分包分类"""
     WEIGH_TYPE_CHOICE = (
-        (1, 'a'),
-        (2, 'b'),
-        (3, '硫磺')
+        (1, '硫磺包'),
+        (2, '细料包'),
     )
-    weigh_batching = models.ForeignKey(WeighBatching, verbose_name='小料称量配方标准', on_delete=models.CASCADE)
-    weigh_type = models.PositiveIntegerField('称重分类', choices=WEIGH_TYPE_CHOICE, default=1)
+    PACKAGE_TYPE_CHOICE = (
+        (1, '自动'),
+        (2, '手动'),
+    )
+    weigh_batching = models.ForeignKey(WeighBatching, verbose_name='小料称量配方标准', on_delete=models.CASCADE,
+                                       related_name='weight_types')
+    weigh_type = models.PositiveIntegerField('料包类型', choices=WEIGH_TYPE_CHOICE, default=1)
     package_cnt = models.PositiveIntegerField('分包数量', default=1)
+    package_type = models.PositiveIntegerField('打包类型', choices=PACKAGE_TYPE_CHOICE, default=1)
 
     @property
     def weighting_material_nos(self):
-        return list(self.weighbatchingdetail_set.values_list('material__material_no', flat=True))
+        return list(self.weight_details.values_list('material__material_no', flat=True))
 
     class Meta:
         db_table = 'weigh_cnt_type'
         verbose_name_plural = verbose_name = '小料称重分包分类'
-        unique_together = ('weigh_batching', 'weigh_type')
 
 
 class WeighBatchingDetail(models.Model):
     """胶料配料称量明细"""
     material = models.ForeignKey(Material, verbose_name='原材料', on_delete=models.CASCADE)
     standard_weight = models.DecimalField('计算重量', decimal_places=2, max_digits=8, default=0.0)
-    weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
-
-    # single_weight = models.FloatField('单包重量', default=0.0) # 由计算重量和包数计算
-    # unit = models.CharField('单位', max_length=8, default='') #原材料中有重量
-
-    def single_weight(self):
-        self.standard_weight / self.weigh_cnt_type.package_cnt
+    weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE, related_name='weight_details')
 
     class Meta:
         unique_together = ('weigh_cnt_type', 'material')

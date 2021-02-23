@@ -343,71 +343,16 @@ class WeighBatchingDetailSerializer(serializers.ModelSerializer):
         fields = ('id', 'material', 'material_name', 'material_no', 'standard_weight')
 
 
-class WeighCntTypeSerializer(serializers.ModelSerializer):
-    weighbatchingdetail_set = WeighBatchingDetailSerializer(many=True)
-
-    class Meta:
-        model = WeighCntType
-        fields = ('id', 'weigh_type', 'package_cnt', 'weighbatchingdetail_set')
-        read_only_fields = ('weigh_type',)
-
-    def update(self, instance, validated_data):
-        weighbatchingdetail_set = validated_data.pop('weighbatchingdetail_set')
-        material_list = []
-        for detail in weighbatchingdetail_set:
-            material = detail['material']
-            material_list.append(material)
-            weight_batching_detail = None
-            try:
-                weight_batching_detail = WeighBatchingDetail.objects.get(weigh_cnt_type=instance, material=material)
-            except WeighBatchingDetail.DoesNotExist:
-                weight_batching_detail = WeighBatchingDetail.objects.create(weigh_cnt_type=instance, material=material)
-            weight_batching_detail.standard_weight = detail['standard_weight']
-            weight_batching_detail.save()
-        WeighBatchingDetail.objects.filter(Q(weigh_cnt_type=instance), ~Q(material__in=material_list)).delete()
-        return super().update(instance, validated_data)
-
-
-class WeighBatchingSerializer(serializers.ModelSerializer):
+class WeighBatchingSerializer(BaseModelSerializer):
     stage_product_batch_no = serializers.ReadOnlyField(source='product_batching.stage_product_batch_no', default='')
     category_name = serializers.ReadOnlyField(source='product_batching.dev_type.category_name', default='')
     production_time_interval = serializers.ReadOnlyField(source='product_batching.production_time_interval')
-    created_user = serializers.ReadOnlyField(source='created_user.username', default='')
-    weighcnttype_set = WeighCntTypeSerializer(many=True, read_only=True)
+    created_username = serializers.ReadOnlyField(source='created_user.username', default='')
 
     class Meta:
         model = WeighBatching
-        fields = ('id',
-                  'product_batching',
-                  'weight_batch_no_',
-                  'stage_product_batch_no',
-                  'category_name',
-                  'sulfur_weight',
-                  'a_weight',
-                  'b_weight',
-                  'production_time_interval',
-                  'used_type',
-                  'send_cnt',
-                  'created_user',
-                  'created_date',
-                  'weighcnttype_set')
-        read_only_fields = (
-            'weight_batch_no',
-            'sulfur_weight',
-            'a_weight',
-            'b_weight',
-            'used_type',
-            'send_cnt',
-            'created_date')
-
-    def create(self, validated_data):
-        is_fm = bool(validated_data['product_batching'].stage) and validated_data['product_batching'].stage.global_name.lower() == 'fm'
-        weigh_batching = WeighBatching.objects.create(**validated_data)
-        weigh_types = (1, 2, 3) if is_fm else (1, 2)
-        weigh_type_objs = [WeighCntType(weigh_batching=weigh_batching, weigh_type=weigh_type)
-                           for weigh_type in weigh_types]
-        WeighCntType.objects.bulk_create(weigh_type_objs)
-        return weigh_batching
+        fields = ('id', 'weight_batch_no', 'stage_product_batch_no', 'category_name', 'production_time_interval',
+                  'used_type', 'created_username', 'created_date')
 
 
 class WeighBatchingChangeUsedTypeSerializer(serializers.ModelSerializer):
@@ -454,6 +399,102 @@ class WeighBatchingChangeUsedTypeSerializer(serializers.ModelSerializer):
         return instance
 
 
+class WeighBatchingDetailCreateSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = WeighBatchingDetail
+        fields = ('material', 'standard_weight')
+
+
+class WeighCntTypeCreateSerializer(BaseModelSerializer):
+    weight_details = WeighBatchingDetailCreateSerializer(many=True)
+
+    class Meta:
+        model = WeighCntType
+        fields = ('weigh_type', 'package_cnt', 'package_type', 'weight_details')
+
+
+class WeighBatchingCreateSerializer(BaseModelSerializer):
+    weight_types = WeighCntTypeCreateSerializer(many=True, help_text="""[{"weigh_type": 料包类型(1硫磺包；2细料包), 
+                                                "package_cnt":打包数量, "package_type": 打包类型(1自动；2手动), 
+                                                "weight_details": [{"material": 原材料id, "standard_weight": 重量}]}]""")
+
+    @atomic()
+    def create(self, validated_data):
+        weight_types = validated_data.pop('weight_types', [])
+        product_batching = validated_data['product_batching']
+        validated_data['weight_batch_no'] = product_batching.stage_product_batch_no\
+                                            + '-' + product_batching.dev_type.category_name
+        instance = super(WeighBatchingCreateSerializer, self).create(validated_data)
+        for weight_type in weight_types:
+            weight_details = weight_type.pop('weight_details', [])
+            weight_type['weigh_batching'] = instance
+            weight_cne_type = WeighCntType.objects.create(**weight_type)
+            for weight_detail in weight_details:
+                weight_detail['weigh_cnt_type'] = weight_cne_type
+                WeighBatchingDetail.objects.create(**weight_detail)
+        return instance
+
+    class Meta:
+        model = WeighBatching
+        fields = ('product_batching', 'weight_types')
+
+
+class WeighBatchingDetailListSerializer(BaseModelSerializer):
+    material_no = serializers.ReadOnlyField(source='material.material_no')
+    material_name = serializers.ReadOnlyField(source='material.material_name')
+
+    class Meta:
+        model = WeighBatchingDetail
+        fields = ('material_no', 'material_name', 'standard_weight', 'material')
+
+
+class WeighCntTypeListSerializer(BaseModelSerializer):
+    weight_details = WeighBatchingDetailListSerializer(many=True)
+
+    class Meta:
+        model = WeighCntType
+        fields = ('weigh_type', 'package_cnt', 'package_type', 'weight_details')
+
+
+class WeighBatchingRetrieveSerializer(BaseModelSerializer):
+    stage_product_batch_no = serializers.ReadOnlyField(source='product_batching.stage_product_batch_no', default='')
+    category_name = serializers.ReadOnlyField(source='product_batching.dev_type.category_name', default='')
+    production_time_interval = serializers.ReadOnlyField(source='product_batching.production_time_interval')
+    weight_types = WeighCntTypeListSerializer(many=True)
+    batching_weight = serializers.ReadOnlyField(source='product_batching.batching_weight', default='')
+    product_name = serializers.ReadOnlyField(source='product_batching.product_info.product_name', default='')
+
+    class Meta:
+        model = WeighBatching
+        fields = ('id', 'weight_batch_no', 'stage_product_batch_no', 'category_name', 'batching_weight',
+                  'production_time_interval', 'used_type', 'weight_types', 'product_batching', 'product_name')
+
+
+class WeighBatchingUpdateSerializer(BaseModelSerializer):
+    weight_types = WeighCntTypeCreateSerializer(many=True, required=True,
+                                                help_text="""[{"weigh_type": 料包类型(1硫磺包；2细料包), "package_cnt":打包数量, 
+                                                    "package_type": 打包类型(1自动；2手动), "weight_details": 
+                                                    [{"material": 原材料id, "standard_weight": 重量}]}]""")
+
+    @atomic()
+    def update(self, instance, validated_data):
+        instance.weight_types.all().delete()
+        weight_types = validated_data.pop('weight_types', [])
+        for weight_type in weight_types:
+            weight_details = weight_type.pop('weight_details', [])
+            weight_type['weigh_batching'] = instance
+            weight_cne_type = WeighCntType.objects.create(**weight_type)
+            for weight_detail in weight_details:
+                weight_detail['weigh_cnt_type'] = weight_cne_type
+                WeighBatchingDetail.objects.create(**weight_detail)
+        return instance
+
+    class Meta:
+        model = WeighBatching
+        fields = ('id', 'weight_types')
+
+
 class ProductBatchingDetailMaterialSerializer(serializers.ModelSerializer):
     material_name = serializers.ReadOnlyField(source='material.material_name')
     material_no = serializers.ReadOnlyField(source='material.material_no')
@@ -461,3 +502,12 @@ class ProductBatchingDetailMaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductBatchingDetail
         fields = ('id', 'material', 'material_name', 'material_no', 'actual_weight')
+
+
+class WeighCntTypeSerializer(serializers.ModelSerializer):
+    weight_details = WeighBatchingDetailSerializer(many=True)
+
+    class Meta:
+        model = WeighCntType
+        fields = ('id', 'weigh_type', 'package_cnt', 'weight_details', 'package_type')
+        read_only_fields = ('weigh_type',)

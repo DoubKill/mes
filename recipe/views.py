@@ -3,9 +3,7 @@ from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
-from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,8 +17,10 @@ from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFil
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
-    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, WeighBatchingSerializer, WeighCntTypeSerializer, \
-    WeighBatchingChangeUsedTypeSerializer, ProductBatchingDetailMaterialSerializer
+    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, WeighBatchingSerializer, \
+    WeighBatchingChangeUsedTypeSerializer, WeighBatchingCreateSerializer, \
+    WeighBatchingRetrieveSerializer, WeighBatchingUpdateSerializer, ProductBatchingDetailMaterialSerializer, \
+    WeighCntTypeSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighBatching, WeighCntType
 
@@ -284,20 +284,17 @@ class WeighBatchingViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = WeighBatchingFilter
 
-    def perform_create(self, serializer):
-        serializer.save(created_user=self.request.user)
-
-    @action(detail=True, methods=['put'])
-    def change_used_type(self, request, pk=None):
-        serializer = WeighBatchingChangeUsedTypeSerializer(self.get_object(), data=request.data, context={
-            'request': request
-        })
-        if serializer.is_valid():
-            serializer.save()
-            return Response({'used_type': serializer.instance.used_type})
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return WeighBatchingSerializer
+        elif self.action == 'create':
+            return WeighBatchingCreateSerializer
+        elif self.action == 'retrieve':
+            return WeighBatchingRetrieveSerializer
+        elif self.action == 'partial_update':
+            return WeighBatchingChangeUsedTypeSerializer
         else:
-            return Response(serializer.errors,
-                            status=status.HTTP_400_BAD_REQUEST)
+            return WeighBatchingUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -314,3 +311,4 @@ class ProductBatchingDetailListView(ReadOnlyModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('product_batching',)
+    pagination_class = None

@@ -144,22 +144,25 @@ class BatchingClassesPlan(AbstractEntity):
     """配料日班次计划"""
     PLAN_STATUSES = (
         (1, '未下发'),
-        (2, '已下发'),
+        (2, '已下发')
     )
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE)
-    status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
-    send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    send_time = models.DateTimeField(null=True, blank=True)
-    equip = models.ForeignKey(Equip, blank=True, null=True, on_delete=models.SET_NULL)
-    plan_package = models.PositiveIntegerField(default=0)
-    package_changed = models.BooleanField(default=False)
     plan_batching_uid = models.CharField('计划唯一编码', max_length=64, unique=True)
+    plan_package = models.PositiveIntegerField(default=0, help_text='包数')
+    package_changed = models.BooleanField(default=False)
+    status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
 
     class Meta:
         unique_together = ('work_schedule_plan', 'weigh_cnt_type')
         db_table = 'batching_classes_plan'
         verbose_name_plural = verbose_name = '配料日班次计划'
+
+    @property
+    def undistributed_package(self):
+        sum_package = self.equip_plans.aggregate(sum_package=Sum('packages'))['sum_package']
+        sum_package = sum_package if sum_package else 0
+        return self.plan_package - sum_package
 
     def plan_package_from_product_classes_plan(self):  # 计划包数
         plan_sum_trains = ProductClassesPlan.objects.filter(
@@ -170,10 +173,23 @@ class BatchingClassesPlan(AbstractEntity):
         return (plan_sum_trains if plan_sum_trains else 0) * self.weigh_cnt_type.package_cnt
 
     def single_weight(self):  # 单包重量
-        standard_sum_weight = self.weigh_cnt_type \
-            .weighbatchingdetail_set.aggregate(standard_sum_weight=Sum('standard_weight'))
+        standard_sum_weight = self.weigh_cnt_type.weight_details.aggregate(standard_sum_weight=Sum('standard_weight'))
         return standard_sum_weight.get('standard_sum_weight')
 
+
+class BatchingClassesEquipPlan(models.Model):
+
+    batching_class_plan = models.ForeignKey(BatchingClassesPlan, help_text='小料配料计划id', on_delete=models.CASCADE,
+                                            related_name='equip_plans')
+    send_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    send_time = models.DateTimeField(null=True, blank=True)
+    equip = models.ForeignKey(Equip, blank=True, null=True, on_delete=models.SET_NULL)
+    package_changed = models.BooleanField(default=False)
+    packages = models.IntegerField(help_text='包数', default=0)
+
+    class Meta:
+        db_table = 'batching_classes_equip_plan'
+        verbose_name_plural = verbose_name = '小料配料机台计划'
 
 # class BatchingProductPlanRelation(models.Model):
 #     batching_classes_plan = models.ForeignKey(BatchingClassesPlan, on_delete=models.CASCADE)
