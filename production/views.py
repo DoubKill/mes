@@ -1164,7 +1164,7 @@ class DayCapacityView(APIView):
         temp_list.sort(key=lambda x: (x.get("equip_no", "product_no")))
         for x in temp_list:
             x["output"] = str(x["output"] / 1000)
-        ret = {"result": temp_list}
+        ret = {"results": temp_list}
         return Response(ret)
 
 
