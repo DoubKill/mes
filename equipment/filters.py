@@ -76,6 +76,7 @@ class EquipMaintenanceOrderLogFilter(django_filters.rest_framework.FilterSet):
     year = django_filters.NumberFilter(field_name='factory_date__year', help_text='生产日期-年')
     equip_type = django_filters.CharFilter(field_name='equip_part__equip__category__equip_type__global_name',
                                            help_text='设备类型', )
+    factory_date = django_filters.DateFilter(field_name='factory_date', help_text='日期')
 
     class Meta:
         model = EquipMaintenanceOrder
