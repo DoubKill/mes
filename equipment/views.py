@@ -270,7 +270,26 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
     """#设备维修履历"""
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('equip_part__equip')
     serializer_class = EquipMaintenanceOrderLogSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderLogFilter
     pagination_class = SinglePageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            i_list = [i.get('repair_time').seconds for i in serializer.data if i.get('repair_time') is not None]
+            data_list = serializer.data
+            if not i_list:
+                data_list.append(
+                    {'max_repair_time': None, 'min_repair_time': None, 'sum_repair_time': None})
+            else:
+                data_list.append(
+                    {'max_repair_time': max(i_list), 'min_repair_time': min(i_list), 'sum_repair_time': sum(i_list)})
+            return self.get_paginated_response(data_list)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
