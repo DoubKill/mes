@@ -1,6 +1,7 @@
 import django_filters
 
-from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig
+from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig, \
+    EquipCurrentStatus
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -81,3 +82,11 @@ class EquipMaintenanceOrderLogFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipMaintenanceOrder
         fields = ('equip_no', 'equip_type', 'month', 'year')
+
+
+class EquipCurrentStatusFilter(django_filters.rest_framework.FilterSet):
+    status = django_filters.CharFilter(field_name='status', help_text='状态')
+
+    class Meta:
+        model = EquipCurrentStatus
+        fields = ('status',)
