@@ -46,7 +46,7 @@ class UserViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'username')
+            data = queryset.values('id', 'username', 'num')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
