@@ -24,7 +24,8 @@ def product_classes_plan_save_handler(sender, **kwargs):
                 for cnt_type in product_classes_plan.product_batching.weighbatching.weight_types.all():
                     batching_classes_plan = BatchingClassesPlan.objects.filter(
                         work_schedule_plan=product_classes_plan.work_schedule_plan,
-                        weigh_cnt_type=cnt_type).first()
+                        weigh_cnt_type=cnt_type,
+                        delete_flag=False).first()
                     created = False
                     if not batching_classes_plan:
                         batching_classes_plan = BatchingClassesPlan.objects.create(

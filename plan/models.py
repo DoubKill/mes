@@ -154,7 +154,7 @@ class BatchingClassesPlan(AbstractEntity):
     status = models.PositiveIntegerField(choices=PLAN_STATUSES, default=1)
 
     class Meta:
-        unique_together = ('work_schedule_plan', 'weigh_cnt_type')
+        # unique_together = ('work_schedule_plan', 'weigh_cnt_type')
         db_table = 'batching_classes_plan'
         verbose_name_plural = verbose_name = '配料日班次计划'
 
