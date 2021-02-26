@@ -118,7 +118,8 @@ class ValidateProductVersionsView(APIView):
         if stage_product_batch_no:
             if ProductBatching.objects.exclude(
                     used_type=6).filter(stage_product_batch_no=stage_product_batch_no,
-                                        factory__isnull=True).exists():
+                                        factory__isnull=True,
+                                        batching_type=2).exists():
                 raise ValidationError('该配方已存在')
             return Response('OK')
         if not all([versions, factory, site, product_info, stage]):
@@ -130,9 +131,11 @@ class ValidateProductVersionsView(APIView):
             factory = int(factory)
         except Exception:
             raise ValidationError('参数错误')
-        product_batching = ProductBatching.objects.filter(factory_id=factory, site_id=site, stage_id=stage,
-                                                          product_info_id=product_info
-                                                          ).order_by('-versions').first()
+        product_batching = ProductBatching.objects.filter(factory_id=factory,
+                                                          site_id=site,
+                                                          stage_id=stage,
+                                                          product_info_id=product_info,
+                                                          batching_type=2).order_by('-versions').first()
         if product_batching:
             if product_batching.versions >= versions:
                 raise ValidationError({'versions': '该配方版本号不得小于现有版本号'})
