@@ -8,12 +8,12 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchProductBatchingVIew, \
-    BatchChargeLogViewSet, EquipOperationLogView, BatchingClassesPlanView, FeedingLogViewSet, \
+    LoadMaterialLogViewSet, EquipOperationLogView, BatchingClassesEquipPlanView, FeedingLogViewSet, \
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
     WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, MaterialSupplierCollectViewSet
 
 router = DefaultRouter()
-router.register('batch-log', BatchChargeLogViewSet)  # 投料履历管理
+router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
 router.register('feeding-log', FeedingLogViewSet)  # PDA投料履历
 router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
@@ -27,7 +27,7 @@ urlpatterns = [
     path('batch-productinfo/', BatchProductionInfoView.as_view()),  # 投料-获取当前班次计划信息以及当前投料信息
     path('batch-batching-info/', BatchProductBatchingVIew.as_view()),  # 投料-获取配方信息
     path('batch-equip-operation-log/', EquipOperationLogView.as_view()),  # 投料-机台停机/开机操作
-    path('batching-classes-plan/', BatchingClassesPlanView.as_view()),  # 配料班次计划列表
+    path('batching-classes-plan/', BatchingClassesEquipPlanView.as_view()),  # 配料班次计划列表
     path('weighting-package-trains/', WeightPackageTrainsView.as_view()),  # 称量打包车次列表
     path('bar-code-tank/', BarCodeTank.as_view()),
     path('batch-charge-log-list/', BatchChargeLogListViewSet.as_view()),  # 密炼投入履历

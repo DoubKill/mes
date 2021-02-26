@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Sum
 
 from basics.models import GlobalCode, Equip, EquipCategoryAttribute
 from system.models import AbstractEntity, User
@@ -151,15 +152,13 @@ class ProductBatching(AbstractEntity):
         if weight_batching:
             cnt_types = weight_batching.weight_types.filter()
             for cnt_type in cnt_types:
-                if cnt_type.weighbatchingdetail_set.filter():
+                if cnt_type.weight_details.filter():
                     material_nos = material_nos.difference(
-                        set(cnt_type.weighbatchingdetail_set.values_list('material__material_no', flat=True)))
+                        set(cnt_type.weight_details.values_list('material__material_no', flat=True)))
                     if cnt_type.weigh_type == 1:
-                        material_nos.add(self.stage_product_batch_no + '-a')
-                    elif cnt_type.weigh_type == 2:
-                        material_nos.add(self.stage_product_batch_no + '-b')
+                        material_nos.add(self.stage_product_batch_no + '硫磺包' + str(cnt_type.tag))
                     else:
-                        material_nos.add(self.stage_product_batch_no + '-s')
+                        material_nos.add(self.stage_product_batch_no + '细料包' + str(cnt_type.tag))
         return material_nos
 
     class Meta:
@@ -252,10 +251,15 @@ class WeighCntType(models.Model):
     weigh_type = models.PositiveIntegerField('料包类型', choices=WEIGH_TYPE_CHOICE, default=1)
     package_cnt = models.PositiveIntegerField('分包数量', default=1)
     package_type = models.PositiveIntegerField('打包类型', choices=PACKAGE_TYPE_CHOICE, default=1)
+    tag = models.PositiveIntegerField(default=1, help_text='区分码')
 
     @property
     def weighting_material_nos(self):
         return list(self.weight_details.values_list('material__material_no', flat=True))
+
+    @property
+    def total_weight(self):
+        return self.weight_details.aggregate(total_weight=Sum('standard_weight'))['total_weight']
 
     class Meta:
         db_table = 'weigh_cnt_type'

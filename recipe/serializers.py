@@ -2,7 +2,7 @@ from datetime import datetime
 import logging
 from django.utils import timezone
 
-from django.db.models import Q
+from django.db.models import Q, Max
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -427,6 +427,11 @@ class WeighBatchingCreateSerializer(BaseModelSerializer):
                                             + '-' + product_batching.dev_type.category_name
         instance = super(WeighBatchingCreateSerializer, self).create(validated_data)
         for weight_type in weight_types:
+            max_tag = WeighCntType.objects.filter(
+                weigh_type=weight_type['weigh_type'],
+                weigh_batching=instance).aggregate(max_tag=Max('tag'))['max_tag']
+            if max_tag:
+                weight_type['tag'] = max_tag + 1
             weight_details = weight_type.pop('weight_details', [])
             weight_type['weigh_batching'] = instance
             weight_cne_type = WeighCntType.objects.create(**weight_type)
@@ -454,7 +459,7 @@ class WeighCntTypeListSerializer(BaseModelSerializer):
 
     class Meta:
         model = WeighCntType
-        fields = ('weigh_type', 'package_cnt', 'package_type', 'weight_details')
+        fields = ('weigh_type', 'package_cnt', 'package_type', 'weight_details', 'tag')
 
 
 class WeighBatchingRetrieveSerializer(BaseModelSerializer):
@@ -483,6 +488,11 @@ class WeighBatchingUpdateSerializer(BaseModelSerializer):
         weight_types = validated_data.pop('weight_types', [])
         for weight_type in weight_types:
             weight_details = weight_type.pop('weight_details', [])
+            max_tag = WeighCntType.objects.filter(
+                weigh_type=weight_type['weigh_type'],
+                weigh_batching=instance).aggregate(max_tag=Max('tag'))['max_tag']
+            if max_tag:
+                weight_type['tag'] = max_tag + 1
             weight_type['weigh_batching'] = instance
             weight_cne_type = WeighCntType.objects.create(**weight_type)
             for weight_detail in weight_details:

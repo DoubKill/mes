@@ -31,31 +31,47 @@ class TerminalLocation(AbstractEntity):
         verbose_name_plural = verbose_name = '终端位置点绑定'
 
 
-class BatchChargeLog(AbstractEntity):
+class FeedingMaterialLog(models.Model):
     STATUS_CHOICE = (
         (1, '正常'),
         (2, '异常')
     )
-    equip_no = models.CharField(max_length=64, help_text='机台编号')
-    plan_classes_uid = models.CharField(max_length=64, help_text='班次计划唯一码')
+    feed_uid = models.CharField(max_length=64, help_text='进料uid')
+    equip_no = models.CharField(max_length=64, help_text='设备编号')
+    plan_classes_uid = models.CharField(verbose_name='班次计划唯一码', help_text='班次计划唯一码', max_length=64)
     trains = models.IntegerField(help_text='车次')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
-    material_name = models.CharField(max_length=64, help_text='原材料名称')
-    material_no = models.CharField(max_length=64, help_text='原材料编码')
-    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
-    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='时实际重量', default=0)
-    bra_code = models.CharField(max_length=64, help_text='条形码')
     production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
     production_classes = models.CharField(max_length=64, help_text='生产班次')
     production_group = models.CharField(max_length=64, help_text='生产班组')
-    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
-    # batch_time = models.DateTimeField(max_length=64, help_text='投入时间')
-    batch_classes = models.CharField(max_length=64, help_text='投入班次')
-    batch_group = models.CharField(max_length=64, help_text='投入班组')
+    batch_time = models.DateTimeField(help_text='投入时间', null=True)
+    batch_classes = models.CharField(max_length=64, help_text='投入班次', null=True)
+    batch_group = models.CharField(max_length=64, help_text='投入班组', null=True)
+    feedback_time = models.DateTimeField(help_text='重量反馈时间', null=True)
+    feed_begin_time = models.DateTimeField(help_text='进料开始时间', null=True)
+    feed_end_time = models.DateTimeField(help_text='进料结束时间', null=True)
+    failed_flag = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
+    judge_reason = models.CharField(max_length=64, help_text='防错结果', blank=True, null=True)
 
     class Meta:
-        db_table = 'batch_charge_log'
-        verbose_name_plural = verbose_name = '投料履历'
+        db_table = 'feed_material_log'
+        verbose_name_plural = verbose_name = '进料履历'
+        # managed = False
+
+
+class LoadMaterialLog(models.Model):
+    feed_log = models.ForeignKey(FeedingMaterialLog, on_delete=models.CASCADE)
+    material_no = models.CharField(max_length=64, help_text='物料编码')
+    material_name = models.CharField(max_length=64, help_text='物料名称')
+    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
+    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
+    bra_code = models.CharField(max_length=64, help_text='条形码')
+    weight_time = models.DateTimeField(help_text='上料时间', null=True)
+
+    class Meta:
+        db_table = 'load_material_log'
+        verbose_name_plural = verbose_name = '上料履历'
+        # managed = False
 
 
 class WeightPackageLog(AbstractEntity):

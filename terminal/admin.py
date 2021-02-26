@@ -3,9 +3,7 @@ from django.contrib import admin
 # Register your models here.
 
 
-from terminal.models import Terminal, TerminalLocation, Version, WeightTankStatus, BatchChargeLog, WeightBatchingLog, \
-    MaterialSupplierCollect
-from terminal.models import Terminal, TerminalLocation, Version, WeightTankStatus, BatchChargeLog, WeightBatchingLog
+from terminal.models import Terminal, TerminalLocation, Version, WeightTankStatus, MaterialSupplierCollect, WeightBatchingLog
 
 
 @admin.register(Terminal)
@@ -34,6 +32,5 @@ class MaterialSupplierCollectAdmin(admin.ModelAdmin):
     list_display = ['bra_code', 'material_name', 'material_no', 'batch_no']
 
 
-admin.site.register(BatchChargeLog)
 admin.site.register(WeightBatchingLog)
 
