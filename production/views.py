@@ -1118,7 +1118,8 @@ class ProductionStatisticsView(APIView):
             elif query_type == "month":
                 my_key = value[0:7]
                 value = datetime.datetime.strptime(value, "%Y-%m").month
-                temp_set = TrainsFeedbacks.objects.filter(factory_date__month=value)
+                year = datetime.datetime.strptime(value, "%Y-%m").year
+                temp_set = TrainsFeedbacks.objects.filter(factory_date__month=value, factory_date__year=year)
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
@@ -1152,7 +1153,7 @@ class DayCapacityView(APIView):
             temp_set = TrainsFeedbacks.objects.filter(factory_date__range=(monday, sunday))
         elif query_type == "month":
             month = factory_date.month
-            temp_set = TrainsFeedbacks.objects.filter(factory_date__month=month)
+            temp_set = TrainsFeedbacks.objects.filter(factory_date__month=month, factory_date__year=factory_date.year)
         elif query_type == "day":
             temp_set = TrainsFeedbacks.objects.filter(factory_date=factory_date)
         elif query_type == "year":

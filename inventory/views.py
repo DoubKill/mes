@@ -40,6 +40,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
+from quality.deal_result import receive_deal_result
+from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
@@ -207,7 +209,17 @@ class OutWorkFeedBack(APIView):
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
         #         }
         if data:
+            lot_no = data.get("lot_no")
+            if lot_no:
+                label = receive_deal_result(lot_no)
+                LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
             data.pop("status", None)
+            if data.get("inventory_type") == "生产出库":
+                data["inout_num_type"] = "正常出库"
+            elif data.get("inventory_type") == "快检出库":
+                data["inout_num_type"] = "指定出库"
+            else:
+                data["inout_num_type"] = data.get("inventory_type")
             order_no = data.get('order_no')
             if order_no:
                 temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
@@ -225,12 +237,6 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
-                    DeliveryPlanStatus.objects.create(warehouse_info=dp_obj.warehouse_info,
-                                                      order_no=order_no,
-                                                      order_type=dp_obj.order_type if dp_obj.order_type else "出库",
-                                                      status=1,
-                                                      created_user=dp_obj.created_user,
-                                                      )
                 il_dict = {}
                 il_dict['warehouse_no'] = dp_obj.warehouse_info.no
                 il_dict['warehouse_name'] = dp_obj.warehouse_info.name
@@ -264,7 +270,6 @@ class OutWorkFeedBack(APIView):
                 result = {"99": "FALSE", f"message": f"反馈失败，原因: {e}"}
             else:
                 result = {"01": "TRUES", "message": "反馈成功，OK"}
-
             return Response(result)
         return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
@@ -348,14 +353,6 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         return self.divide_tool(self.SERIALIZER)
-
-
-class NewList(list):
-
-    @property
-    @classmethod
-    def model(self):
-        return InventoryLog.objects.model
 
 
 @method_decorator([api_recorder], name="dispatch")

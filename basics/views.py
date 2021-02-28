@@ -1,3 +1,5 @@
+import datetime
+
 from django.db.models import Prefetch
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -336,3 +338,19 @@ class LocationViewSet(ModelViewSet):
             return super().get_queryset()
         l_set = Location.objects.filter(type__global_name__in=type_name).all()
         return l_set
+
+
+class CurrentClassView(APIView):
+
+    def get(self, request):
+        now = datetime.datetime.now()
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+            "classes",
+            "plan_schedule"
+        ).order_by("id").last()
+        current_class = work_schedule_plan.classes.global_name
+        factory_date = work_schedule_plan.plan_schedule.day_time
+        return Response(f"{factory_date}/{current_class}")
