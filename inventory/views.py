@@ -218,6 +218,7 @@ class OutWorkFeedBack(APIView):
                 pass
             except Exception as e:
                 logger.error(f"未知错误{e}")
+            data = dict(data)
             data.pop("status", None)
             if data.get("inventory_type") == "生产出库":
                 data["inout_num_type"] = "正常出库"
