@@ -67,12 +67,12 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        try:
-            inventory = BzFinalMixingRubberInventory.objects.using('bz').get(location=location)
-        except:
-            raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
-        if inventory.location_status not in ["有货货位"]:
-            raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
+        # try:
+        #     inventory = BzFRuinalMixingbberInventory.objects.using('bz').get(location=location)
+        # except:
+        #     raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
+        # if inventory.location_status not in ["有货货位"]:
+        #     raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
         if location:
