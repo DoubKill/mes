@@ -82,7 +82,7 @@ class BatchProductionInfoView(APIView):
             equip__equip_no=equip_no,
             delete_flag=False)
         for plan in classes_plans:
-            last_feed_log = FeedingMaterialLog.objects.filter(plan_classes_uid=plan.plan_classes_uid,
+            last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
                                                                            feed_end_time__isnull=False).last()
             if last_feed_log:
                 actual_trains = last_feed_log.trains
@@ -97,11 +97,11 @@ class BatchProductionInfoView(APIView):
                     'status': plan.status}
             )
             if plan.status == '运行中':
-                max_feed_log_id = LoadMaterialLog.objects.filter(
+                max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
                     feed_log__plan_classes_uid=plan.plan_classes_uid).aggregate(
                     max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
                 if max_feed_log_id:
-                    max_feed_log = FeedingMaterialLog.objects.filter(id=max_feed_log_id).first()
+                    max_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(id=max_feed_log_id).first()
                     if max_feed_log.feed_begin_time:
                         trains = max_feed_log.trains + 1
                     else:
@@ -174,7 +174,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gener
     create:
         新增投料履历
     """
-    queryset = LoadMaterialLog.objects.all().order_by('-id')
+    queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
@@ -384,7 +384,7 @@ class BatchChargeLogListViewSet(ListAPIView):
     filter_class = LoadMaterialLogFilter
 
     def get_queryset(self):
-        queryset = LoadMaterialLog.objects.all()
+        queryset = LoadMaterialLog.objects.using('SFJ').all()
         mixing_finished = self.request.query_params.get('mixing_finished', None)
         if mixing_finished:
             if mixing_finished == "终炼":
