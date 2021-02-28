@@ -8,7 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
-    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter
+    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter
 from equipment.models import PlatformConfig
 from equipment.serializers import *
 from equipment.task import property_template, property_import
@@ -109,7 +109,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
-    # filter_class = EquipCurrentStatusFilter
+    filter_class = EquipCurrentStatusFilter
 
     @atomic()
     def update(self, request, *args, **kwargs):
