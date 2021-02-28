@@ -210,9 +210,14 @@ class OutWorkFeedBack(APIView):
         #         }
         if data:
             lot_no = data.get("lot_no")
-            if lot_no:
-                label = receive_deal_result(lot_no)
-                LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
+            try:
+                if lot_no:
+                    label = receive_deal_result(lot_no)
+                    LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
+            except AttributeError:
+                pass
+            except Exception as e:
+                logger.error(f"未知错误{e}")
             data.pop("status", None)
             if data.get("inventory_type") == "生产出库":
                 data["inout_num_type"] = "正常出库"
