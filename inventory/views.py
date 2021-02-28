@@ -18,16 +18,18 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
-    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter
+    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
+    MaterialPlanManagementFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
-    InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer
+    InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
+    MaterialPlanManagementSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -38,6 +40,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
+from quality.deal_result import receive_deal_result
+from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
@@ -205,7 +209,17 @@ class OutWorkFeedBack(APIView):
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
         #         }
         if data:
+            lot_no = data.get("lot_no")
+            if lot_no:
+                label = receive_deal_result(lot_no)
+                LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
             data.pop("status", None)
+            if data.get("inventory_type") == "生产出库":
+                data["inout_num_type"] = "正常出库"
+            elif data.get("inventory_type") == "快检出库":
+                data["inout_num_type"] = "指定出库"
+            else:
+                data["inout_num_type"] = data.get("inventory_type")
             order_no = data.get('order_no')
             if order_no:
                 temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
@@ -223,12 +237,6 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
-                    DeliveryPlanStatus.objects.create(warehouse_info=dp_obj.warehouse_info,
-                                                      order_no=order_no,
-                                                      order_type=dp_obj.order_type if dp_obj.order_type else "出库",
-                                                      status=1,
-                                                      created_user=dp_obj.created_user,
-                                                      )
                 il_dict = {}
                 il_dict['warehouse_no'] = dp_obj.warehouse_info.no
                 il_dict['warehouse_name'] = dp_obj.warehouse_info.name
@@ -262,7 +270,6 @@ class OutWorkFeedBack(APIView):
                 result = {"99": "FALSE", f"message": f"反馈失败，原因: {e}"}
             else:
                 result = {"01": "TRUES", "message": "反馈成功，OK"}
-
             return Response(result)
         return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
@@ -348,14 +355,6 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         return self.divide_tool(self.SERIALIZER)
 
 
-class NewList(list):
-
-    @property
-    @classmethod
-    def model(self):
-        return InventoryLog.objects.model
-
-
 @method_decorator([api_recorder], name="dispatch")
 class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InventoryLog.objects.order_by('-start_time')
@@ -423,31 +422,42 @@ class MaterialCount(APIView):
     def get(self, request):
         params = request.query_params
         store_name = params.get('store_name')
+        status = params.get("status")
         if not store_name:
             raise ValidationError("缺少立库名参数，请检查后重试")
+        filter_dict = dict(location_status="有货货位")
+        if status:
+            filter_dict.update(quality_level=status)
         if store_name == "终炼胶库":
             # TODO 暂时这么写
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("终炼胶库连接失败")
         elif store_name == "混炼胶库":
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位").values(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
                 raise ValidationError("混炼胶库连接失败")
         elif store_name == "帘布库":
             try:
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location_status="有货货位").values(
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
-                raise ValidationError("帘布库库连接失败")
-        # elif store_name == "原材料库":
+                raise ValidationError("帘布库连接失败")
+        elif store_name == "原材料库":
+            status_map = {"合格":1, "不合格":2}
+            try:
+                ret = WmsInventoryStock.objects.using('wms').filter(quality_status=status_map.get(status, 1)).values(
+                    'material_no').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+            except:
+                raise ValidationError("原材料库连接失败")
         else:
             ret = []
         return Response(ret)
@@ -820,6 +830,32 @@ class PutPlanManagementFianl(ModelViewSet):
         else:
             raise ValidationError('参数错误')
         return Response('新建成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialPlanManagement(ModelViewSet):
+    queryset = MaterialOutPlan.objects.filter().order_by("-created_date")
+    serializer_class = MaterialPlanManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = MaterialPlanManagementFilter
+    permission_classes = (IsAuthenticated,)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = MaterialPlanManagementSerializer(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = MaterialPlanManagementSerializer(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
 
 
 class MateriaTypeNameToAccording(APIView):

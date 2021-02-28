@@ -257,16 +257,24 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
     created_date = serializers.DateTimeField(write_only=True)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
     material__material_no = serializers.CharField(write_only=True)
+    product_batching__equip__equip_no = serializers.CharField(write_only=True)
+    product_batching__used_type = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
         product_batching1 = attrs.pop('product_batching__stage_product_batch_no')
         material1 = attrs.pop('material__material_no')
+        equip_no1 = attrs.pop('product_batching__equip__equip_no')
+        used_type1 = attrs.pop('product_batching__used_type')
         try:
             material = Material.objects.get(material_no=material1)
         except Material.DoesNotExist:
             raise serializers.ValidationError('原材料信息{}不存在'.format(material1))
-        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1,
-                                                batching_type=1).first()
+        pb_obj = ProductBatching.objects.filter(
+            stage_product_batch_no=product_batching1,
+            equip__equip_no=equip_no1,
+            batching_type=1,
+            used_type=used_type1
+        ).first()
         if not pb_obj:
             raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
         attrs['product_batching'] = pb_obj
@@ -291,7 +299,7 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
             'product_batching__stage_product_batch_no', 'sn', 'material__material_no', 'actual_weight',
             'standard_error',
             'auto_flag', 'type', 'delete_flag',
-            'created_date')
+            'created_date', 'product_batching__equip__equip_no', 'product_batching__used_type')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -371,7 +379,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             except Equip.DoesNotExist:
                 raise serializers.ValidationError('设备{}不存在'.format(equip1))
 
-            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1,batching_type=1).first()
+            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=1).first()
             if not pb_obj:
                 raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
             attrs['product_batching'] = pb_obj
@@ -394,7 +402,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             raise serializers.ValidationError('设备{}不存在'.format(pcp_equip))
         except PlanSchedule.DoesNotExist:
             raise serializers.ValidationError('排班管理{}不存在'.format(pcp_plan_schedule))
-        p_pb_obj = ProductBatching.objects.filter(stage_product_batch_no=pcp_product_batching,batching_type=1).first()
+        p_pb_obj = ProductBatching.objects.filter(stage_product_batch_no=pcp_product_batching, batching_type=1).first()
         if not p_pb_obj:
             raise serializers.ValidationError('胶料配料标准{}不存在'.format(pcp_product_batching))
         pdp_obj = ProductDayPlan.objects.filter(equip=p_equip, plan_schedule=p_plan_schedule,
