@@ -56,10 +56,14 @@ class FeedingMaterialLog(models.Model):
     class Meta:
         db_table = 'feed_material_log'
         verbose_name_plural = verbose_name = '进料履历'
-        # managed = False
+        managed = False
 
 
 class LoadMaterialLog(models.Model):
+    STATUS_CHOICE = (
+        (1, '正常'),
+        (2, '异常')
+    )
     feed_log = models.ForeignKey(FeedingMaterialLog, on_delete=models.CASCADE)
     material_no = models.CharField(max_length=64, help_text='物料编码')
     material_name = models.CharField(max_length=64, help_text='物料名称')
@@ -67,11 +71,12 @@ class LoadMaterialLog(models.Model):
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
     weight_time = models.DateTimeField(help_text='上料时间', null=True)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, blank=True, null=True)
 
     class Meta:
         db_table = 'load_material_log'
         verbose_name_plural = verbose_name = '上料履历'
-        # managed = False
+        managed = False
 
 
 class WeightPackageLog(AbstractEntity):

@@ -23,8 +23,8 @@ class User(AbstractUser):
     delete_user = models.ForeignKey('self', blank=True, null=True, related_name='d_%(app_label)s_%(class)s_related',
                                     help_text='删除人', verbose_name='删除人', on_delete=models.CASCADE,
                                     related_query_name='d_%(app_label)s_%(class)ss')
-    group_extensions = models.ManyToManyField('GroupExtension', help_text='角色', related_name='group_users', blank=True)
-    phone_number = models.CharField(max_length=11, help_text='手机号', verbose_name='手机号', null=True)
+    group_extensions = models.ManyToManyField('GroupExtension', help_text='角色', related_name='group_users', blank=True, null=True)
+    # phone_number = models.CharField(max_length=11, help_text='手机号', verbose_name='手机号', blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.username)

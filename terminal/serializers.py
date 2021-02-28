@@ -1,14 +1,17 @@
-
+import requests
 from django.db.models import Q, Sum
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
+import logging
+logger = logging.getLogger('api_log')
 
 
 def generate_bra_code(plan_id, equip_no, factory_date, classes, begin_trains, end_trains, update=False):
@@ -59,12 +62,18 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
-        print(dict(attrs))
+        if material_no not in classes_plan.product_batching.batching_material_nos:
+            attrs['status'] = 2
+        else:
+            attrs['status'] = 1
         # 发送条码信息到群控
         try:
-            pass
+            resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/', data=attrs)
+            code = resp.status_code
+            if code != 200:
+                logger.error('条码信息下发错误：{}'.format(resp.text))
         except Exception:
-            pass
+            logger.error('群控服务器错误！')
         if material_no not in classes_plan.product_batching.batching_material_nos:
             raise serializers.ValidationError('条码错误，该物料不在生产配方中！')
         return attrs
@@ -176,7 +185,7 @@ class WeightPackageRetrieveLogSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weighbatchingdetail_set.values('material__material_no', 'standard_weight')
+            weight_details.values('material__material_no', 'standard_weight')
 
     class Meta:
         model = WeightPackageLog
@@ -236,7 +245,7 @@ class WeightPackageUpdateLogSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weighbatchingdetail_set.values('material__material_no', 'standard_weight')
+            weight_details.values('material__material_no', 'standard_weight')
 
     def update(self, instance, validated_data):
         instance.times += 1

@@ -41,6 +41,8 @@ router.register('equip-maintenance-order-log', EquipMaintenanceOrderLogViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),
+    path('personal_repair_statistics/', PersonalStatisticsView.as_view()),
+    path('equip-maintenance-order/other/<pk>/', EquipMaintenanceOrderOtherView.as_view())
 ]
 
 
