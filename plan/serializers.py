@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db.transaction import atomic
 from rest_framework import serializers
 from django.utils import timezone
@@ -5,7 +7,7 @@ from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan, \
-    BatchingClassesPlan
+    BatchingClassesPlan, BatchingClassesEquipPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
 from recipe.models import ProductBatching, ProductInfo, ProductBatchingDetail, Material
@@ -255,16 +257,24 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
     created_date = serializers.DateTimeField(write_only=True)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
     material__material_no = serializers.CharField(write_only=True)
+    product_batching__equip__equip_no = serializers.CharField(write_only=True)
+    product_batching__used_type = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
         product_batching1 = attrs.pop('product_batching__stage_product_batch_no')
         material1 = attrs.pop('material__material_no')
+        equip_no1 = attrs.pop('product_batching__equip__equip_no')
+        used_type1 = attrs.pop('product_batching__used_type')
         try:
             material = Material.objects.get(material_no=material1)
         except Material.DoesNotExist:
             raise serializers.ValidationError('原材料信息{}不存在'.format(material1))
-        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1,
-                                                batching_type=1).first()
+        pb_obj = ProductBatching.objects.filter(
+            stage_product_batch_no=product_batching1,
+            equip__equip_no=equip_no1,
+            batching_type=1,
+            used_type=used_type1
+        ).first()
         if not pb_obj:
             raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
         attrs['product_batching'] = pb_obj
@@ -289,7 +299,7 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
             'product_batching__stage_product_batch_no', 'sn', 'material__material_no', 'actual_weight',
             'standard_error',
             'auto_flag', 'type', 'delete_flag',
-            'created_date')
+            'created_date', 'product_batching__equip__equip_no', 'product_batching__used_type')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -369,7 +379,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             except Equip.DoesNotExist:
                 raise serializers.ValidationError('设备{}不存在'.format(equip1))
 
-            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1,batching_type=1).first()
+            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=1).first()
             if not pb_obj:
                 raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
             attrs['product_batching'] = pb_obj
@@ -392,7 +402,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             raise serializers.ValidationError('设备{}不存在'.format(pcp_equip))
         except PlanSchedule.DoesNotExist:
             raise serializers.ValidationError('排班管理{}不存在'.format(pcp_plan_schedule))
-        p_pb_obj = ProductBatching.objects.filter(stage_product_batch_no=pcp_product_batching,batching_type=1).first()
+        p_pb_obj = ProductBatching.objects.filter(stage_product_batch_no=pcp_product_batching, batching_type=1).first()
         if not p_pb_obj:
             raise serializers.ValidationError('胶料配料标准{}不存在'.format(pcp_product_batching))
         pdp_obj = ProductDayPlan.objects.filter(equip=p_equip, plan_schedule=p_plan_schedule,
@@ -463,38 +473,47 @@ class MaterialsySerializer(BaseModelSerializer):
 class BatchingClassesPlanSerializer(serializers.ModelSerializer):
     day_time = serializers.ReadOnlyField(source='work_schedule_plan.plan_schedule.day_time', default='')
     classes_name = serializers.ReadOnlyField(source='work_schedule_plan.classes.global_name', default='')
-    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.weight_batch_no_', default='')
     category_name = serializers.ReadOnlyField(
         source='weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name', default='')
     stage_product_batch_no = serializers.ReadOnlyField(
         source='weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no', default='')
     send_user = serializers.ReadOnlyField(source='send_user.username', default='')
     weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.used_type')
-    equip_name = serializers.ReadOnlyField(source='equip.equip_name', default='')
-    equip_no = serializers.ReadOnlyField(source='equip.equip_no', default='')
     weigh_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_type')
+    package_type = serializers.ReadOnlyField(source='weigh_cnt_type.package_type')
+    undistributed_package = serializers.ReadOnlyField()
+    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.weight_batch_no')
 
     class Meta:
         model = BatchingClassesPlan
-        fields = ('id',
-                  'day_time',
-                  'classes_name',
-                  'weight_batch_no',
-                  'category_name',
-                  'stage_product_batch_no',
-                  'plan_package',
-                  'status',
-                  'send_user',
-                  'send_time',
-                  'weigh_batching_used_type',
-                  'weigh_cnt_type',
-                  'single_weight',
-                  'equip',
-                  'equip_name',
-                  'equip_no',
-                  'package_changed',
-                  'weigh_type'
-                  )
+        fields = '__all__'
+
+
+class BatchingClassesEquipPlanSerializer(serializers.ModelSerializer):
+    equip_no = serializers.ReadOnlyField(source='equip.equip_no')
+    equip_name = serializers.ReadOnlyField(source='equip.equip_name')
+    send_username = serializers.ReadOnlyField(source='send_user.username')
+
+    def create(self, validated_data):
+        validated_data['send_user'] = self.context['request'].user
+        validated_data['send_time'] = datetime.now()
+        equip_plan = BatchingClassesEquipPlan.objects.filter(
+            batching_class_plan=validated_data['batching_class_plan'],
+            equip=validated_data['equip']).first()
+        # 有相同的机台计划则累加
+        if equip_plan:
+            equip_plan.packages += validated_data['packages']
+            equip_plan.save()
+            return equip_plan
+        batching_class_plan = validated_data['batching_class_plan']
+        batching_class_plan.status = 2
+        batching_class_plan.save()
+        return super().create(validated_data)
+
+    class Meta:
+        model = BatchingClassesEquipPlan
+        fields = '__all__'
+        read_only_fields = ('send_user', 'send_time', 'package_changed', 'status')
 
 
 class IssueBatchingClassesPlanSerializer(serializers.ModelSerializer):

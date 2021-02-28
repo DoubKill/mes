@@ -1,6 +1,7 @@
 import django_filters
 
-from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig
+from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig, \
+    EquipCurrentStatus
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -41,11 +42,14 @@ class EquipMaintenanceOrderFilter(django_filters.rest_framework.FilterSet):
     order_uid = django_filters.CharFilter(field_name='order_uid', help_text='单号', lookup_expr='icontains')
     equip_type = django_filters.CharFilter(field_name='equip_part__equip__category__equip_type__global_name',
                                            help_text='设备类型', )
+    maintenance_username = django_filters.CharFilter(field_name='maintenance_user_id',
+                                                     help_text='维修人')
 
     class Meta:
         model = EquipMaintenanceOrder
         fields = (
-            'equip_no', 'equip_name', 'date', 'status', 'order_uid', 'equip_type', 'month', 'year')
+            'equip_no', 'equip_name', 'date', 'status', 'order_uid', 'equip_type', 'month', 'year',
+            'maintenance_username')
 
 
 class PropertyFilter(django_filters.rest_framework.FilterSet):
@@ -73,7 +77,16 @@ class EquipMaintenanceOrderLogFilter(django_filters.rest_framework.FilterSet):
     year = django_filters.NumberFilter(field_name='factory_date__year', help_text='生产日期-年')
     equip_type = django_filters.CharFilter(field_name='equip_part__equip__category__equip_type__global_name',
                                            help_text='设备类型', )
+    factory_date = django_filters.DateFilter(field_name='factory_date', help_text='日期')
 
     class Meta:
         model = EquipMaintenanceOrder
         fields = ('equip_no', 'equip_type', 'month', 'year')
+
+
+class EquipCurrentStatusFilter(django_filters.rest_framework.FilterSet):
+    status = django_filters.CharFilter(field_name='status', help_text='状态')
+
+    class Meta:
+        model = EquipCurrentStatus
+        fields = ('status',)

@@ -21,6 +21,8 @@ from quality.models import DealSuggestion, TestIndicator, TestType, DataPoint, T
     MaterialDataPointIndicator
 from inventory.models import DispatchLocation, WarehouseInfo
 from terminal.models import WeightTankStatus
+from equipment.models import EquipCurrentStatus
+from random import choice
 
 
 def add_global_codes():
@@ -1034,7 +1036,9 @@ def add_plan_schedule():
     ids = list(WorkSchedule.objects.values_list('id', flat=True))
     day_times = get_date("2021-01-01", 365)
     group_ids = list(GlobalCode.objects.filter(global_type__type_name='班组').values_list('id', flat=True))
-    classes_ids = list(GlobalCode.objects.filter(global_type__type_name='班次', global_name__in=('早班', '夜班')).values_list('id', flat=True))
+    classes_ids = list(
+        GlobalCode.objects.filter(global_type__type_name='班次', global_name__in=('早班', '夜班')).values_list('id',
+                                                                                                         flat=True))
     times = ['08:00:00', '20:00:00', '08:00:00']
     k = 1
     f = 1
@@ -1283,7 +1287,7 @@ def add_product_batching():
         for i in range(random.randint(7, 10)):
             ProductBatchingDetail.objects.create(
                 product_batching=pb,
-                sn=i+1,
+                sn=i + 1,
                 material_id=random.choice(Material.objects.values_list('id', flat=True)),
                 actual_weight=random.randrange(5, 300),
                 auto_flag=1
@@ -1292,10 +1296,10 @@ def add_product_batching():
             product_batching=pb,
             used_type=random.choice([i for i in range(1, 7)]),
         )
-        for i in range(3):
+        for i in range(2):
             wct = WeighCntType.objects.create(
                 weigh_batching=wb,
-                weigh_type=i+1,
+                weigh_type=i + 1,
                 package_cnt=random.randint(1, 5)
             )
             for j in range(2):
@@ -1324,7 +1328,8 @@ def add_product_batching():
                 for method_name, data_point_names in data3.items():
                     method, _ = TestMethod.objects.get_or_create(no=method_name, name=method_name, test_type=test_type)
                     for data_point_name in data_point_names:
-                        data_point, _ = DataPoint.objects.get_or_create(no=data_point_name, name=data_point_name, unit='s',
+                        data_point, _ = DataPoint.objects.get_or_create(no=data_point_name, name=data_point_name,
+                                                                        unit='s',
                                                                         test_type=test_type)
                         mtm, _ = MaterialTestMethod.objects.get_or_create(
                             material=Material.objects.get(material_no=pb.stage_product_batch_no),
@@ -1341,6 +1346,12 @@ def add_product_batching():
                             lower_limit=1
                         )
 
+
+def add_equip_current_status():
+    e_set = Equip.objects.all()
+    status_list = ['停机', '故障', '维修开始', '维修结束', '空转', '运行中']
+    for e_obj in e_set:
+        e=EquipCurrentStatus.objects.create(equip=e_obj, status=choice(status_list), user='mes')
 
 if __name__ == '__main__':
     add_global_codes()
@@ -1382,3 +1393,6 @@ if __name__ == '__main__':
 
     add_product_batching()
     print('add product_batching ok')
+
+    add_equip_current_status()
+    print('add add_equip_current_status ok')

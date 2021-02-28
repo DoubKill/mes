@@ -1,11 +1,14 @@
-import datetime
+import datetime as dt
+
+from django.db.models import F, Min, Max, Sum
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
-    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter
+    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter
 from equipment.models import PlatformConfig
 from equipment.serializers import *
 from equipment.task import property_template, property_import
@@ -15,7 +18,6 @@ from rest_framework import status
 from rest_framework.response import Response
 from django.db.transaction import atomic
 from rest_framework.decorators import action
-
 
 # Create your views here.
 
@@ -28,13 +30,11 @@ from plan.uuidfield import UUidTools
 
 
 class EquipRealtimeViewSet(ModelViewSet):
-
-    queryset = Equip.objects.filter(delete_flag=False).\
-        select_related('category__equip_type__global_name').\
+    queryset = Equip.objects.filter(delete_flag=False). \
+        select_related('category__equip_type__global_name'). \
         prefetch_related('equip_current_status_equip__status', 'equip_current_status_equip__user')
     pagination_class = None
     serializer_class = EquipRealtimeSerializer
-
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -85,7 +85,7 @@ class EquipDownReasonViewSet(ModelViewSet):
             return super().list(request, *args, **kwargs)
 
 
-@method_decorator([api_recorder], name="dispatch")
+# @method_decorator([api_recorder], name="dispatch")
 class EquipCurrentStatusList(APIView):
     """设备现况汇总"""
 
@@ -106,10 +106,10 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     """设备现况"""
     queryset = EquipCurrentStatus.objects.filter(delete_flag=False).all()
     serializer_class = EquipCurrentStatusSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
-    # filter_class = EquipCurrentStatusFilter
+    filter_class = EquipCurrentStatusFilter
 
     @atomic()
     def update(self, request, *args, **kwargs):
@@ -128,11 +128,12 @@ class EquipCurrentStatusViewSet(ModelViewSet):
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
                                                  order_src=1,
-                                                 note_time=datetime.datetime.now(),
+                                                 note_time=datetime.now(),
                                                  down_time=data['note_time'],
                                                  down_flag=data['down_flag'],
                                                  equip_part_id=data['equip_part'],
-                                                 factory_date=wsp_obj.plan_schedule.day_time)
+                                                 factory_date=wsp_obj.plan_schedule.day_time,
+                                                 created_user=request.user)
         elif instance.status in ['停机', '维修结束']:
             instance.status = '运行中'
             instance.save()
@@ -146,7 +147,7 @@ class EquipPartViewSet(ModelViewSet):
     """设备部位"""
     queryset = EquipPart.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPartSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartFilter
 
@@ -170,7 +171,7 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
     """维修表单"""
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipMaintenanceOrderSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
 
@@ -181,6 +182,38 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
             return EquipMaintenanceOrderUpdateSerializer
         else:
             return EquipMaintenanceOrderSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({'user': self.request.user})
+        return context
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipMaintenanceOrderOtherView(GenericAPIView):
+    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = EquipMaintenanceOrderUpdateSerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMaintenanceOrderFilter
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({'user': self.request.user})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        instance = EquipMaintenanceOrder.objects.get(id=pk)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        # self.perform_update(serializer)
+        serializer.save()
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -267,7 +300,59 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
     """#设备维修履历"""
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('equip_part__equip')
     serializer_class = EquipMaintenanceOrderLogSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderLogFilter
     pagination_class = SinglePageNumberPagination
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            i_list = [i.get('repair_time').seconds for i in serializer.data if i.get('repair_time') is not None]
+            data_list = serializer.data
+            if not i_list:
+                data_list.append(
+                    {'max_repair_time': None, 'min_repair_time': None, 'sum_repair_time': None})
+            else:
+                data_list.append(
+                    {'max_repair_time': max(i_list), 'min_repair_time': min(i_list), 'sum_repair_time': sum(i_list)})
+            return self.get_paginated_response(data_list)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class PersonalStatisticsView(APIView):
+
+    permission_classes = (IsAuthenticated,)
+    def get(self, request, *args, **kwargs):
+        all_flag = request.query_params.get("all")
+        today = datetime.now().date()
+        monday = today - dt.timedelta(days=today.weekday())
+        sunday = today + dt.timedelta(days=6 - today.weekday())
+        time_dispatch = {
+            "日": {"factory_date": today},
+            "月": {"factory_date__month": datetime.now().month, "factory_date__year": datetime.now().year},
+            "周": {"factory_date__range": (monday, sunday)},
+        }
+        base_filter = {}
+        ret = {}
+        if not all_flag:
+            base_filter = {"maintenance_user": request.user}
+        for k, v in time_dispatch.items():
+            filter_dict = {
+                "begin_time__isnull": False,
+                "end_time__isnull": False,
+            }
+            filter_dict.update(**v)
+            queryset = EquipMaintenanceOrder.objects.filter(**base_filter, **filter_dict).\
+                aggregate(min_time=Min((F('end_time')-F('begin_time'))/100000),
+                          max_time=Max((F('end_time')-F('begin_time'))/100000),
+                          all_time=Sum((F('end_time')-F('begin_time'))/100000))
+            ret.update(**{k:dict(queryset)})
+        return Response(ret)
+
+

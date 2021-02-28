@@ -1,6 +1,6 @@
 import datetime
 
-from django.db.models import Max, Min
+from django.db.models import Max
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins
@@ -12,20 +12,21 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan
-from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView
+from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response
 from mes.derorators import api_recorder
-from plan.models import ProductClassesPlan, BatchingClassesPlan
+from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from recipe.models import ProductBatchingDetail
-from terminal.filters import BatchingClassesPlanFilter, FeedingLogFilter, WeightPackageLogFilter, \
-    WeightTankStatusFilter, BatchChargeLogListFilter, WeightBatchingLogListFilter
-from terminal.models import TerminalLocation, EquipOperationLog, BatchChargeLog, WeightBatchingLog, FeedingLog, \
-    WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect
-from terminal.serializers import BatchChargeLogSerializer, BatchChargeLogCreateSerializer, \
-    EquipOperationLogSerializer, BatchingClassesPlanSerializer, WeightBatchingLogSerializer, \
+from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
+    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter, \
+    LoadMaterialLogFilter
+from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
+    WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
+from terminal.serializers import LoadMaterialLogCreateSerializer, \
+    EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
-    BatchChargeLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer, \
-    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer
+    LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer, \
+    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -81,52 +82,35 @@ class BatchProductionInfoView(APIView):
             equip__equip_no=equip_no,
             delete_flag=False)
         for plan in classes_plans:
-            max_min_train_data = BatchChargeLog.objects.filter(
-                plan_classes_uid=plan.plan_classes_uid,
-                status=1).aggregate(max_train=Max('trains'),
-                                    min_train=Min('trains'))
-            max_train = max_min_train_data['max_train'] if max_min_train_data['max_train'] else 0
-            min_train = max_min_train_data['min_train'] if max_min_train_data['min_train'] else 0
-            if not max_train:
-                diff_train = 0
+            last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
+                                                                           feed_end_time__isnull=False).last()
+            if last_feed_log:
+                actual_trains = last_feed_log.trains
             else:
-                diff_train = max_train - min_train + 1
+                actual_trains = 0
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
                     'plan_trains': plan.plan_trains,
-                    'actual_trains': diff_train,
+                    'actual_trains': actual_trains,
                     'plan_classes_uid': plan.plan_classes_uid,
                     'status': plan.status}
             )
             if plan.status == '运行中':
+                max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
+                    feed_log__plan_classes_uid=plan.plan_classes_uid).aggregate(
+                    max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
+                if max_feed_log_id:
+                    max_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(id=max_feed_log_id).first()
+                    if max_feed_log.feed_begin_time:
+                        trains = max_feed_log.trains + 1
+                    else:
+                        trains = max_feed_log.trains
+                else:
+                    trains = 1
                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
                 current_product_data['weight'] = 0
-                max_trains = BatchChargeLog.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid,
-                        status=1).aggregate(max_train=Max('trains'))['max_train']
-
-                # 投料成功次数小于等于该配方的标准数量，则车次为1
-                if BatchChargeLog.objects.filter(
-                        plan_classes_uid=plan.plan_classes_uid,
-                        status=1
-                ).count() < len(plan.product_batching.batching_material_nos):
-                    current_product_data['trains'] = 1
-
-                # 如果配方的标准都投入成功则当前车次为最大车次加1，否则当前车次就是最大车次
-                else:
-                    if max_trains == plan.plan_trains:
-                        current_product_data['trains'] = max_trains
-                    else:
-                        current_train = max_trains + 1
-                        for material_no in plan.product_batching.batching_material_nos:
-                            if not BatchChargeLog.objects.filter(
-                                    plan_classes_uid=plan.plan_classes_uid,
-                                    status=1,
-                                    material_no=material_no,
-                                    trains=max_trains):
-                                current_train = max_trains
-                        current_product_data['trains'] = current_train
+                current_product_data['trains'] = trains
 
         return Response({'plan_actual_data': plan_actual_data,
                          'current_product_data': current_product_data})
@@ -147,26 +131,22 @@ class BatchProductBatchingVIew(APIView):
             if not classes_plan:
                 raise ValidationError('该计划不存在')
             if hasattr(classes_plan.product_batching, 'weighbatching'):
+                stage_product_batch_no = classes_plan.product_batching.stage_product_batch_no
                 weight_batching = classes_plan.product_batching.weighbatching
-                weight_cnt_types = weight_batching.weighcnttype_set.all()
+                weight_cnt_types = weight_batching.weight_types.all()
                 for item in weight_cnt_types:
-                    if item.weighbatchingdetail_set.filter():
-                        cnt_type_mat_ids = item.weighbatchingdetail_set.values_list('material_id', flat=True)
+                    if item.weight_details.filter():
+                        cnt_type_mat_ids = item.weight_details.values_list('material_id', flat=True)
                         material_ids.extend(cnt_type_mat_ids)
                         if item.weigh_type == 1:
                             ret.append({
-                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-a',
-                                'actual_weight': weight_batching.a_weight
-                            })
-                        elif item.weigh_type == 2:
-                            ret.append({
-                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-b',
-                                'actual_weight': weight_batching.b_weight
+                                'material__material_name': stage_product_batch_no + '硫磺包' + str(item.tag),
+                                'actual_weight': item.total_weight
                             })
                         else:
                             ret.append({
-                                'material__material_name': classes_plan.product_batching.stage_product_batch_no + '-s',
-                                'actual_weight': weight_batching.sulfur_weight
+                                'material__material_name': stage_product_batch_no + '细料包' + str(item.tag),
+                                'actual_weight': item.total_weight
                             })
                 ret.extend(ProductBatchingDetail.objects.exclude(material_id__in=material_ids).filter(
                     product_batching=classes_plan.product_batching, delete_flag=False
@@ -180,31 +160,31 @@ class BatchProductBatchingVIew(APIView):
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if not batching_class_plan:
                 raise ValidationError('配料计划uid不存在')
-            ret = batching_class_plan.weigh_cnt_type.weighbatchingdetail_set.values('material__material_no',
-                                                                                    'material__material_name',
-                                                                                    'standard_weight')
+            ret = batching_class_plan.weigh_cnt_type.weight_details.values('material__material_no',
+                                                                            'material__material_name',
+                                                                            'standard_weight')
         return Response(ret)
 
 
 @method_decorator([api_recorder], name="dispatch")
-class BatchChargeLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
+class LoadMaterialLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
     """
     list:
         投料履历
     create:
         新增投料履历
     """
-    queryset = BatchChargeLog.objects.all().order_by('-created_date')
+    queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('equip_no', 'production_classes', 'production_factory_date', 'plan_classes_uid')
     filter_backends = [DjangoFilterBackend]
+    filter_classes = LoadMaterialLogFilter
 
     def get_serializer_class(self):
         if self.action == 'list':
-            return BatchChargeLogSerializer
+            return LoadMaterialLogSerializer
         else:
-            return BatchChargeLogCreateSerializer
+            return LoadMaterialLogCreateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -216,12 +196,12 @@ class EquipOperationLogView(CreateAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class BatchingClassesPlanView(ListAPIView):
+class BatchingClassesEquipPlanView(ListAPIView):
     """配料日班次计划列表"""
-    queryset = BatchingClassesPlan.objects.all()
-    serializer_class = BatchingClassesPlanSerializer
+    queryset = BatchingClassesEquipPlan.objects.all()
+    serializer_class = BatchingClassesEquipPlanSerializer
     permission_classes = (IsAuthenticated,)
-    filter_class = BatchingClassesPlanFilter
+    filter_class = BatchingClassesEquipPlanFilter
     filter_backends = [DjangoFilterBackend]
     pagination_class = None
 
@@ -314,6 +294,15 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
     filter_class = WeightPackageLogFilter
     filter_backends = [DjangoFilterBackend]
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return response(
+                success=False,
+                message=list(serializer.errors.values())[0][0])  # 只返回一条错误信息
+        self.perform_create(serializer)
+        return response(success=True, data=serializer.data)
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('pagination'):
@@ -389,20 +378,19 @@ class BarCodeTank(APIView):
 class BatchChargeLogListViewSet(ListAPIView):
     """密炼投入履历
     """
-    queryset = BatchChargeLog.objects.all()
-    serializer_class = BatchChargeLogListSerializer
+    serializer_class = LoadMaterialLogListSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_class = BatchChargeLogListFilter
+    filter_class = LoadMaterialLogFilter
 
     def get_queryset(self):
-        queryset = super(BatchChargeLogListViewSet, self).get_queryset()
+        queryset = LoadMaterialLog.objects.using('SFJ').all()
         mixing_finished = self.request.query_params.get('mixing_finished', None)
         if mixing_finished:
             if mixing_finished == "终炼":
-                queryset = queryset.filter(product_no__icontains="FM").all()
+                queryset = queryset.filter(feed_log__product_no__icontains="FM").all()
             elif mixing_finished == "混炼":
-                queryset = queryset.exclude(product_no__icontains="FM").all()
+                queryset = queryset.exclude(feed_log__product_no__icontains="FM").all()
         return queryset
 
 
@@ -486,3 +474,15 @@ class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
         else:
             # 没有绑定原材料则认为是子系统的数据
             return self.queryset.filter(child_system__isnull=False)
+
+
+class ForceFeedStock(APIView):
+    def post(self, request):
+        feedstock = self.request.query_params.get('plan_classes_uid')
+        if not feedstock:
+            raise ValidationError('缺失参数')
+        try:
+            pass
+        except Exception:
+            return response(success=False)
+        return response(success=True)

@@ -1,5 +1,5 @@
 import django_filters
-from plan.models import ProductDayPlan, MaterialDemanded, ProductBatchingDayPlan, ProductClassesPlan, \
+from plan.models import ProductDayPlan, MaterialDemanded, ProductClassesPlan, \
     BatchingClassesPlan
 
 
@@ -30,6 +30,7 @@ class MaterialDemandedFilter(django_filters.rest_framework.FilterSet):
         model = MaterialDemanded
         fields = ('plan_date', 'material_type', 'material_name', 'classes')
 
+
 class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
     """计划管理"""
     classes = django_filters.CharFilter(field_name='work_schedule_plan__classes__global_name', help_text='班次')
@@ -53,11 +54,11 @@ class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
 class BatchingClassesPlanFilter(django_filters.rest_framework.FilterSet):
     day_time = django_filters.DateFilter(field_name='work_schedule_plan__plan_schedule__day_time')
     dev_type = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_batching__product_batching__dev_type')
-    weight_batch_no = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_batching__weight_batch_no', lookup_expr='icontains')
+    weight_batch_no = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_batching__weight_batch_no',
+                                                lookup_expr='icontains')
     classes_name = django_filters.CharFilter(field_name='work_schedule_plan__classes__global_name')
     status = django_filters.CharFilter(field_name='status')
-    equip = django_filters.CharFilter(field_name='equip')
 
     class Meta:
         model = BatchingClassesPlan
-        fields = ('day_time', 'dev_type', 'weight_batch_no', 'classes_name', 'equip')
+        fields = ('day_time', 'dev_type', 'weight_batch_no', 'classes_name')

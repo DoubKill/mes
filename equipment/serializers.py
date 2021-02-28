@@ -14,8 +14,8 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.uuidfield import UUidTools
 
-class EquipRealtimeSerializer(BaseModelSerializer):
 
+class EquipRealtimeSerializer(BaseModelSerializer):
     class Meta:
         model = Equip
         fields = "__all__"
@@ -125,12 +125,17 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
                     note=instance.note,
                     relevance_order_uid=instance.relevance_order_uid
                 )
+        if validated_data.get('maintenance_user', None):
+            validated_data['assign_user'] = self.context['user']
+        else:
+            validated_data['maintenance_user'] = self.context['user']
+            validated_data['assign_user'] = self.context['user']
         return super().update(instance, validated_data)
 
     class Meta:
         fields = (
             'id', 'status', 'maintenance_user', 'down_reason', 'take_time', 'first_down_reason', 'first_down_type',
-            'note')
+            'note', 'assign_user')
         extra_kwargs = {'first_down_reason': {'required': False},
                         'first_down_type': {'required': False},
                         'note': {'required': False}}

@@ -1,19 +1,20 @@
 import django_filters
 
-from plan.models import BatchingClassesPlan
-from terminal.models import FeedingLog, WeightPackageLog, WeightTankStatus, BatchChargeLog, WeightBatchingLog
+from plan.models import BatchingClassesEquipPlan
+from terminal.models import FeedingLog, WeightPackageLog, WeightTankStatus, LoadMaterialLog, WeightBatchingLog
 
 
-class BatchingClassesPlanFilter(django_filters.rest_framework.FilterSet):
-    product_factory_date = django_filters.CharFilter(field_name="work_schedule_plan__plan_schedule__day_time",
-                                                     help_text="日期")
-    classes = django_filters.CharFilter(field_name="work_schedule_plan__classes__global_name", help_text="班次")
-    weigh_type = django_filters.CharFilter(field_name='weigh_cnt_type__weigh_type', help_text='类型， 1：a, 2:b, 3:硫磺')
+class BatchingClassesEquipPlanFilter(django_filters.rest_framework.FilterSet):
+    product_factory_date = django_filters.CharFilter(
+        field_name="batching_class_plan__work_schedule_plan__plan_schedule__day_time",
+        help_text="日期")
+    classes = django_filters.CharFilter(field_name="batching_class_plan__work_schedule_plan__classes__global_name",
+                                        help_text="班次")
     equip_no = django_filters.CharFilter(field_name="equip__equip_no", help_text="机台编号")
 
     class Meta:
-        model = BatchingClassesPlan
-        fields = ("product_factory_date", "classes", 'weigh_type', 'equip_no')
+        model = BatchingClassesEquipPlan
+        fields = ("product_factory_date", "classes", 'equip_no')
 
 
 class FeedingLogFilter(django_filters.rest_framework.FilterSet):
@@ -50,15 +51,18 @@ class WeightTankStatusFilter(django_filters.rest_framework.FilterSet):
         fields = ("tank_no", 'equip_no', 'material_no', 'status')
 
 
-class BatchChargeLogListFilter(django_filters.rest_framework.FilterSet):
-    production_factory_date = django_filters.DateFilter(field_name='production_factory_date', help_text='工厂时间')
-    equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='设备编码')
-    production_classes = django_filters.CharFilter(field_name='production_classes', lookup_expr='icontains',
+class LoadMaterialLogFilter(django_filters.rest_framework.FilterSet):
+    production_factory_date = django_filters.DateFilter(field_name='feed_log__production_factory_date',
+                                                        help_text='工厂时间')
+    equip_no = django_filters.CharFilter(field_name='feed_log__equip_no', lookup_expr='icontains', help_text='设备编码')
+    production_classes = django_filters.CharFilter(field_name='feed_log__production_classes', lookup_expr='icontains',
                                                    help_text='生产班次')
-    material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料编码/投入编码', lookup_expr='icontains')
+    material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料编码/投入编码',
+                                            lookup_expr='icontains')
+    plan_classes_uid = django_filters.CharFilter(field_name='feed_log__plan_classes_uid', help_text='计划编号')
 
     class Meta:
-        model = BatchChargeLog
+        model = LoadMaterialLog
         fields = ("production_factory_date", 'equip_no', 'production_classes', 'material_no')
 
 

@@ -103,14 +103,12 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
 }
 
-
 REST_FRAMEWORK_EXTENSIONS = {
     # 缓存时间(1小时)
     'DEFAULT_CACHE_RESPONSE_TIMEOUT': 60 * 10,
     # 缓存到哪里 (caches中配置的default)
     'DEFAULT_USE_CACHE': 'default',
 }
-
 
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
@@ -260,7 +258,6 @@ LOGGING = {
         },
     },
 }
-
 DATABASES = {
     'default': {
             'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
@@ -270,6 +267,14 @@ DATABASES = {
             'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
             'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
         },
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+    #     'NAME': os.getenv('SFJ_DATABASE_NAME', 'mes'),  # 数据库名称
+    #     'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
+    #     'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
+    #     'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
+    #     'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
+    # },
     'bz': {
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_2',
@@ -305,24 +310,32 @@ DATABASES = {
             'driver': 'ODBC Driver 17 for SQL Server',
             'MARS_Connection': True,
         },
-    }
+    },
+    'SFJ': {  # 上辅机群控地址
+            'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+            'NAME': os.getenv('SFJ_DATABASE_NAME', 'sfj'),  # 数据库名称
+            'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
+            'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
+            'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
+            'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
+        },
 }
+
 
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'my_cache_table', # 设置一个数据库存放缓存的表名
+        'LOCATION': 'my_cache_table',  # 设置一个数据库存放缓存的表名
     },
-    'OPTIONS':{
-            'MAX_ENTRIES': 30,                                       # 最大缓存个数（默认300）
-            'CULL_FREQUENCY': 3,                                      # 缓存到达最大个数之后，剔除缓存个数的比例，即：1/CULL_FREQUENCY（默认3），3：表示1/3
-        },
-        # 这边只的是缓存的key：p1:1:func_name
-        'KEY_PREFIX': 'p1',                                             # 缓存key的前缀（默认空）
-        'VERSION': 1,                                                 # 缓存key的版本（默认1）
-        'KEY_FUNCTION':"func_name"                                   # 生成key的函数（默认函数会生成为：【前缀:版本:key】）
+    'OPTIONS': {
+        'MAX_ENTRIES': 30,  # 最大缓存个数（默认300）
+        'CULL_FREQUENCY': 3,  # 缓存到达最大个数之后，剔除缓存个数的比例，即：1/CULL_FREQUENCY（默认3），3：表示1/3
+    },
+    # 这边只的是缓存的key：p1:1:func_name
+    'KEY_PREFIX': 'p1',  # 缓存key的前缀（默认空）
+    'VERSION': 1,  # 缓存key的版本（默认1）
+    'KEY_FUNCTION': "func_name"  # 生成key的函数（默认函数会生成为：【前缀:版本:key】）
 }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
