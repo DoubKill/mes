@@ -183,10 +183,6 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
         else:
             return EquipMaintenanceOrderSerializer
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context.update({'user': self.request.user})
-        return context
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipMaintenanceOrderOtherView(GenericAPIView):
@@ -195,11 +191,6 @@ class EquipMaintenanceOrderOtherView(GenericAPIView):
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context.update({'user': self.request.user})
-        return context
 
     def post(self, request, *args, **kwargs):
         pk = kwargs.get('pk')

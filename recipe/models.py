@@ -181,7 +181,7 @@ class ProductBatchingDetail(AbstractEntity):
                                          related_name='batching_details')
     sn = models.PositiveIntegerField(verbose_name='序号', help_text='序号')
     material = models.ForeignKey(Material, verbose_name='原材料', help_text='原材料', on_delete=models.CASCADE)
-    actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=2, max_digits=8)
+    actual_weight = models.DecimalField(verbose_name='重量', help_text='重量', decimal_places=3, max_digits=8)
     standard_error = models.DecimalField(help_text='误差值范围', decimal_places=2, max_digits=8, default=0)
     auto_flag = models.PositiveSmallIntegerField(help_text='手动/自动', choices=AUTO_FLAG)
     type = models.PositiveSmallIntegerField(help_text='类别', choices=TYPE_CHOICE, default=1)
