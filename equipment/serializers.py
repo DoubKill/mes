@@ -124,7 +124,7 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
                     order_src=instance.order_src,
                     note=instance.note,
                     relevance_order_uid=instance.relevance_order_uid,
-                    created_user=self.context['user']
+                    created_user=self.context["request"].user
                 )
         if validated_data.get('maintenance_user', None):
             validated_data['assign_user'] = self.context["request"].user
