@@ -78,12 +78,19 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         if location:
             if not location[0] in STATION_LOCATION_MAP[station]:
                 raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        else:
-            material_no = validated_data.get("material_no")
-            location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
-            for location in location_set:
-                if not location[0] in STATION_LOCATION_MAP[station]:
-                    raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+
+            temp_location = BzFinalMixingRubberInventory.objects.using('bz').filter(location=location).last()
+            if not temp_location:
+                raise serializers.ValidationError(f"无{location}货架")
+            else:
+                if temp_location.location_status != "有货货位":
+                    raise serializers.ValidationError(f"{location}货架为异常货架，请操作wms")
+        # else:
+        #     material_no = validated_data.get("material_no")
+        #     location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
+        #     for location in location_set:
+        #         if not location[0] in STATION_LOCATION_MAP[station]:
+        #             raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
