@@ -1,6 +1,9 @@
-import datetime
+import datetime as dt
+
+from django.db.models import F, Min, Max, Sum
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
@@ -185,6 +188,33 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
         context.update({'user': self.request.user})
         return context
 
+@method_decorator([api_recorder], name="dispatch")
+class EquipMaintenanceOrderOtherView(GenericAPIView):
+    queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = EquipMaintenanceOrderUpdateSerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMaintenanceOrderFilter
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({'user': self.request.user})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        instance = EquipMaintenanceOrder.objects.get(id=pk)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        # self.perform_update(serializer)
+        serializer.save()
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class PropertyTypeNodeViewSet(ModelViewSet):
@@ -293,3 +323,36 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class PersonalStatisticsView(APIView):
+
+    permission_classes = (IsAuthenticated,)
+    def get(self, request, *args, **kwargs):
+        all_flag = request.query_params.get("all")
+        today = datetime.now().date()
+        monday = today - dt.timedelta(days=today.weekday())
+        sunday = today + dt.timedelta(days=6 - today.weekday())
+        time_dispatch = {
+            "日": {"factory_date": today},
+            "月": {"factory_date__month": datetime.now().month, "factory_date__year": datetime.now().year},
+            "周": {"factory_date__range": (monday, sunday)},
+        }
+        base_filter = {}
+        ret = {}
+        if not all_flag:
+            base_filter = {"maintenance_user": request.user}
+        for k, v in time_dispatch.items():
+            filter_dict = {
+                "begin_time__isnull": False,
+                "end_time__isnull": False,
+            }
+            filter_dict.update(**v)
+            queryset = EquipMaintenanceOrder.objects.filter(**base_filter, **filter_dict).\
+                aggregate(min_time=Min((F('end_time')-F('begin_time'))/100000),
+                          max_time=Max((F('end_time')-F('begin_time'))/100000),
+                          all_time=Sum((F('end_time')-F('begin_time'))/100000))
+            ret.update(**{k:dict(queryset)})
+        return Response(ret)
+
+

@@ -22,7 +22,9 @@ from production.models import TrainsFeedbacks
 
 end_date = datetime.datetime.now().date()
 factory_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
-time_str = " 08:00:00"
+time_str_start = " 08:00:00"
+time_str_end = " 07:59:59"
+
 plan_set = ProductClassesPlan.objects.filter(
         work_schedule_plan__plan_schedule__day_time=factory_date,
         delete_flag=False)
@@ -40,7 +42,7 @@ for _ in ret_set:
     equip_list.append(_.get('equip_no'))
     plan_list.append(_.get('plan_sum'))
     actual_list.append(_.get('actual_sum'))
-mk_str = f"\n - \n计划车数/实际车数\n \n统计时间: {factory_date.strftime('%Y-%m-%d') + time_str} -> {end_date.strftime('%Y-%m-%d') + time_str}"
+mk_str = f"统计时间: {factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}\n - 计划车数/实际车数"
 for temp in ret_set:
     mk_str += f"""\n - {temp.get('equip_no')}:\t{temp.get('plan_sum')}/{temp.get('actual_sum')}"""
 mk_str += "\n"
@@ -64,7 +66,7 @@ bar = (
     .add_yaxis('实际车数', actual_list, color="#87CEFA")
     # 添加标题
 
-    .set_global_opts(title_opts=opts.TitleOpts(title="各机台生产情况", subtitle=f"{factory_date.strftime('%Y-%m-%d') + time_str} -> {end_date.strftime('%Y-%m-%d') + time_str}"))
+    .set_global_opts(title_opts=opts.TitleOpts(title="各机台生产情况", subtitle=f"{factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}"))
 )
 bar.render(path="index.html")
 # # 输出保存为图片
@@ -80,7 +82,7 @@ message = {
     "msgtype": "markdown",
     "markdown": {
         "title": "每日通知",
-        "text": f"# 密炼机台产量统计(车) {mk_str}> [[数据可视化]](http://10.4.10.54/data/)\n\n**发布时间:{now_time}** [[mes]](http://10.4.10.54/) \n"
+        "text": f"# 密炼机台产量统计(车)\n\n{mk_str}> [[数据可视化]](http://10.4.10.54/data/)\n\n**发布时间:{now_time}** [[mes]](http://10.4.10.54/) \n"
     },
     "at": {
     "atMobiles": [],

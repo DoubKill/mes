@@ -5,7 +5,6 @@ import requests
 from django.db import connection
 from django.db.models import Sum, Max
 from django.db.transaction import atomic
-from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, mixins
@@ -17,19 +16,19 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-import plan
-from basics.models import WorkSchedulePlan, GlobalCode
+from basics.models import WorkSchedulePlan
 from basics.views import CommonDeleteMixin
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter, BatchingClassesPlanFilter
-from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan
+from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
+    BatchingClassesEquipPlan
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
     ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
-    IssueBatchingClassesPlanSerializer
+    IssueBatchingClassesPlanSerializer, BatchingClassesEquipPlanSerializer
 from production.models import PlanStatus, TrainsFeedbacks
 from recipe.models import ProductBatching, ProductBatchingDetail, Material
 from system.serializers import PlanReceiveSerializer
@@ -444,6 +443,29 @@ class BatchingClassesPlanView(ModelViewSet):
     serializer_class = BatchingClassesPlanSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = BatchingClassesPlanFilter
+
+    def perform_update(self, serializer):
+        serializer.save(package_changed=True)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BatchingClassesEquipPlanViewSet(ModelViewSet):
+    """配料日班次计划"""
+    queryset = BatchingClassesEquipPlan.objects.order_by('-id')
+    serializer_class = BatchingClassesEquipPlanSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('batching_class_plan', )
+    pagination_class = None
+
+    def create(self, request, *args, **kwargs):
+        if not isinstance(request.data, list):
+            raise ValidationError('参数错误')
+        for item in request.data:
+            s = BatchingClassesEquipPlanSerializer(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功')
 
     def perform_update(self, serializer):
         serializer.save(package_changed=True)

@@ -1296,7 +1296,7 @@ def add_product_batching():
             product_batching=pb,
             used_type=random.choice([i for i in range(1, 7)]),
         )
-        for i in range(3):
+        for i in range(2):
             wct = WeighCntType.objects.create(
                 weigh_batching=wb,
                 weigh_type=i + 1,

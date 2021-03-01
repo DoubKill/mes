@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.db.transaction import atomic
 from rest_framework import serializers
 from django.utils import timezone
@@ -5,7 +7,7 @@ from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan, \
-    BatchingClassesPlan
+    BatchingClassesPlan, BatchingClassesEquipPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
 from recipe.models import ProductBatching, ProductInfo, ProductBatchingDetail, Material
@@ -471,38 +473,47 @@ class MaterialsySerializer(BaseModelSerializer):
 class BatchingClassesPlanSerializer(serializers.ModelSerializer):
     day_time = serializers.ReadOnlyField(source='work_schedule_plan.plan_schedule.day_time', default='')
     classes_name = serializers.ReadOnlyField(source='work_schedule_plan.classes.global_name', default='')
-    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.weight_batch_no_', default='')
     category_name = serializers.ReadOnlyField(
         source='weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name', default='')
     stage_product_batch_no = serializers.ReadOnlyField(
         source='weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no', default='')
     send_user = serializers.ReadOnlyField(source='send_user.username', default='')
     weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.used_type')
-    equip_name = serializers.ReadOnlyField(source='equip.equip_name', default='')
-    equip_no = serializers.ReadOnlyField(source='equip.equip_no', default='')
     weigh_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_type')
+    package_type = serializers.ReadOnlyField(source='weigh_cnt_type.package_type')
+    undistributed_package = serializers.ReadOnlyField()
+    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.weight_batch_no')
 
     class Meta:
         model = BatchingClassesPlan
-        fields = ('id',
-                  'day_time',
-                  'classes_name',
-                  'weight_batch_no',
-                  'category_name',
-                  'stage_product_batch_no',
-                  'plan_package',
-                  'status',
-                  'send_user',
-                  'send_time',
-                  'weigh_batching_used_type',
-                  'weigh_cnt_type',
-                  'single_weight',
-                  'equip',
-                  'equip_name',
-                  'equip_no',
-                  'package_changed',
-                  'weigh_type'
-                  )
+        fields = '__all__'
+
+
+class BatchingClassesEquipPlanSerializer(serializers.ModelSerializer):
+    equip_no = serializers.ReadOnlyField(source='equip.equip_no')
+    equip_name = serializers.ReadOnlyField(source='equip.equip_name')
+    send_username = serializers.ReadOnlyField(source='send_user.username')
+
+    def create(self, validated_data):
+        validated_data['send_user'] = self.context['request'].user
+        validated_data['send_time'] = datetime.now()
+        equip_plan = BatchingClassesEquipPlan.objects.filter(
+            batching_class_plan=validated_data['batching_class_plan'],
+            equip=validated_data['equip']).first()
+        # 有相同的机台计划则累加
+        if equip_plan:
+            equip_plan.packages += validated_data['packages']
+            equip_plan.save()
+            return equip_plan
+        batching_class_plan = validated_data['batching_class_plan']
+        batching_class_plan.status = 2
+        batching_class_plan.save()
+        return super().create(validated_data)
+
+    class Meta:
+        model = BatchingClassesEquipPlan
+        fields = '__all__'
+        read_only_fields = ('send_user', 'send_time', 'package_changed', 'status')
 
 
 class IssueBatchingClassesPlanSerializer(serializers.ModelSerializer):

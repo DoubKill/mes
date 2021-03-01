@@ -21,12 +21,11 @@ def product_classes_plan_save_handler(sender, **kwargs):
     else:
         try:
             if product_classes_plan.product_batching.weighbatching:  # 如果计划关联胶料配方有小料配方
-                for cnt_type in product_classes_plan.product_batching.weighbatching.weighcnttype_set.all():
-                    if not cnt_type.weighbatchingdetail_set.exists():  # 小料无配料 跳过
-                        continue
+                for cnt_type in product_classes_plan.product_batching.weighbatching.weight_types.all():
                     batching_classes_plan = BatchingClassesPlan.objects.filter(
                         work_schedule_plan=product_classes_plan.work_schedule_plan,
-                        weigh_cnt_type=cnt_type).first()
+                        weigh_cnt_type=cnt_type,
+                        delete_flag=False).first()
                     created = False
                     if not batching_classes_plan:
                         batching_classes_plan = BatchingClassesPlan.objects.create(

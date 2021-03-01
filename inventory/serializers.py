@@ -19,7 +19,7 @@ from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog
+    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -604,6 +604,28 @@ class XBKMaterialInventorySerializer(serializers.ModelSerializer):
 class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
     equip_no = serializers.SerializerMethodField(read_only=True)
+    unit = serializers.SerializerMethodField(read_only=True)
+    unit_weight = serializers.SerializerMethodField(read_only=True)
+    material_type = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.CharField(read_only=True, source='quality_level')
+
+    def get_material_type(self, object):
+        try:
+            mt = object.material_no.split("-")[1]
+        except:
+            mt = object.material_no
+        return mt
+
+    def get_unit(self, object):
+        return 'kg'
+
+    def get_unit_weight(self, object):
+        try:
+            unit_weight = object.total_weight / object.qty
+        except:
+            unit_weight = "数据异常"
+        return unit_weight
+
 
     def get_product_info(self, obj):
         lot_no = obj.lot_no
@@ -641,6 +663,20 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 
 
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
+    unit_weight = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.SerializerMethodField(read_only=True)
+
+
+    def get_unit_weight(self, object):
+        try:
+            unit_weight = object.total_weight / object.qty
+        except:
+            unit_weight = "数据异常"
+        return unit_weight
+
+    def get_quality_status(self, object):
+        status_map = {1: "合格", 2: "不合格"}
+        return status_map.get(object.quality_status, "不合格")
 
     class Meta:
         model = WmsInventoryStock
@@ -853,4 +889,85 @@ class TerminalDispatchPlanUpdateSerializer(BaseModelSerializer):
 class InventoryLogOutSerializer(BaseModelSerializer):
     class Meta:
         model = InventoryLog
+        fields = '__all__'
+
+
+# 原材料出库管理序列化器
+
+class MaterialPlanManagementSerializer(serializers.ModelSerializer):
+    no = serializers.CharField(source="warehouse_info.no", read_only=True)
+    name = serializers.CharField(source="warehouse_info.name", read_only=True)
+    actual = serializers.SerializerMethodField(read_only=True)
+    order_no = serializers.CharField(required=False)
+    quality_status = serializers.CharField(required=False)
+    destination = serializers.SerializerMethodField(read_only=True)
+
+    def get_actual(self, object):
+        order_no = object.order_no
+        actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
+                                                                          actual_weight=Sum('weight'))
+        actual_qty = actual['actual_qty']
+        actual_weight = actual['actual_weight']
+        # 无法合计
+        # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
+        items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
+        return items
+
+    def get_destination(self, object):
+        equip_list = list(object.equip.all().values_list("equip_no", flat=True))
+        dispatch_list = list(object.dispatch.all().values_list("dispatch_location__name", flat=True))
+        destination = ",".join(set(equip_list + dispatch_list))
+        return destination
+
+    @atomic()
+    def create(self, validated_data):
+        location = validated_data.get("location")
+        station = validated_data.get("station")
+        if not station:
+            raise serializers.ValidationError(f"请选择出库口")
+        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        validated_data["order_no"] = order_no
+        warehouse_info = validated_data['warehouse_info']
+        status = validated_data['status']
+        created_user = self.context['request'].user
+        validated_data["created_user"] = created_user
+        order_type = validated_data.get('order_type', '出库')  # 订单类型
+        validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
+        DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                          order_no=order_no,
+                                          order_type=order_type,
+                                          status=status,
+                                          created_user=created_user,
+                                          )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        out_type = validated_data.get('inventory_type')
+        status = validated_data.get('status')
+        inventory_reason = validated_data.get('inventory_reason')
+
+        if out_type == "正常出库" or out_type == "指定出库":
+            msg_id = validated_data['order_no']
+            str_user = self.context['request'].user.username
+            material_no = validated_data['material_no']
+            pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
+            pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
+            pici = pallet.bath_no if pallet else "1"  # 批次号
+            num = instance.need_qty
+            msg_count = "1"
+            location = instance.location if instance.location else ""
+            # 发起时间
+            time = validated_data.get('created_date', datetime.datetime.now())
+            created_time = time.strftime('%Y%m%d %H:%M:%S')
+            WORKID = msg_id
+            # 北自接口类型区分
+            # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["created_user"] = instance.created_user.username
+        return ret
+
+    class Meta:
+        model = MaterialOutPlan
         fields = '__all__'
