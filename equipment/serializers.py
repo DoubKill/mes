@@ -126,10 +126,10 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
                     relevance_order_uid=instance.relevance_order_uid
                 )
         if validated_data.get('maintenance_user', None):
-            validated_data['assign_user'] = self.context['user']
+            validated_data['assign_user'] = self.context["request"].user
         else:
-            validated_data['maintenance_user'] = self.context['user']
-            validated_data['assign_user'] = self.context['user']
+            validated_data['maintenance_user'] = self.context["request"].user
+            validated_data['assign_user'] = self.context["request"].user
         return super().update(instance, validated_data)
 
     class Meta:
