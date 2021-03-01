@@ -269,7 +269,7 @@ class WeighCntType(models.Model):
 class WeighBatchingDetail(models.Model):
     """胶料配料称量明细"""
     material = models.ForeignKey(Material, verbose_name='原材料', on_delete=models.CASCADE)
-    standard_weight = models.DecimalField('计算重量', decimal_places=2, max_digits=8, default=0.0)
+    standard_weight = models.DecimalField('计算重量', decimal_places=3, max_digits=8, default=0.0)
     weigh_cnt_type = models.ForeignKey(WeighCntType, on_delete=models.CASCADE, related_name='weight_details')
 
     class Meta:
