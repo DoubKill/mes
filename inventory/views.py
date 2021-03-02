@@ -209,11 +209,10 @@ class OutWorkFeedBack(APIView):
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
         #         }
         if data:
-            lot_no = data.get("lot_no")
+            lot_no = data.get("lot_no", "99999999") # 给一个无法查到的lot_no
             try:
-                if lot_no:
-                    label = receive_deal_result(lot_no)
-                    LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
+                label = receive_deal_result(lot_no)
+                LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
             except AttributeError:
                 pass
             except Exception as e:
