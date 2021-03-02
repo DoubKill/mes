@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import random
 
@@ -47,7 +48,7 @@ from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
 
-logger = logging.getLogger('send.log')
+logger = logging.getLogger(__name__)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -268,8 +269,11 @@ class OutWorkFeedBack(APIView):
             else:
                 raise ValidationError("订单号不能为空")
             try:
-                InventoryLog.objects.create(**data, **il_dict)
                 MaterialInventory.objects.create(**material_inventory_dict)
+            except Exception as e:
+                logger.error(str(e) + "data: " + json.dumps(material_inventory_dict))
+            try:
+                InventoryLog.objects.create(**data, **il_dict)
             except Exception as e:
                 logger.error(e)
                 result = {"99": "FALSE", f"message": f"反馈失败，原因: {e}"}
