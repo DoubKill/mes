@@ -6,11 +6,12 @@ import os
 import django
 import shutil
 
-from django.db.transaction import atomic
+
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
+from django.db.transaction import atomic
 from system.models import User, Permissions
 
 permission_data = [

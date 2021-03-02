@@ -91,7 +91,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         #     for location in location_set:
         #         if not location[0] in STATION_LOCATION_MAP[station]:
         #             raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        order_no = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")[2:-1]
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
         status = validated_data['status']

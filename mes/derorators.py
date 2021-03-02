@@ -2,6 +2,7 @@ import json
 import time
 import logging
 import traceback
+from json import JSONDecodeError
 
 from django.http.response import HttpResponseNotFound
 
@@ -28,6 +29,8 @@ def api_recorder(func):
             value.update(get=request.GET.dict())
             if request.content_type == 'application/json':
                 value.update(body=json.loads(request.body))
+        except JSONDecodeError:
+            pass
         except Exception as e:
             error_log.error(e)
         start = time.time()
