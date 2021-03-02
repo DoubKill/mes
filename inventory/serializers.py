@@ -67,24 +67,31 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        try:
-            inventory = BzFinalMixingRubberInventory.objects.using('bz').get(location=location)
-        except:
-            raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
-        if inventory.location_status not in ["有货货位"]:
-            raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
+        # try:
+        #     inventory = BzFRuinalMixingbberInventory.objects.using('bz').get(location=location)
+        # except:
+        #     raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
+        # if inventory.location_status not in ["有货货位"]:
+        #     raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
         if location:
             if not location[0] in STATION_LOCATION_MAP[station]:
                 raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        else:
-            material_no = validated_data.get("material_no")
-            location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
-            for location in location_set:
-                if not location[0] in STATION_LOCATION_MAP[station]:
-                    raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+
+            temp_location = BzFinalMixingRubberInventory.objects.using('bz').filter(location=location).last()
+            if not temp_location:
+                raise serializers.ValidationError(f"无{location}货架")
+            else:
+                if temp_location.location_status != "有货货位":
+                    raise serializers.ValidationError(f"{location}货架为异常货架，请操作wms")
+        # else:
+        #     material_no = validated_data.get("material_no")
+        #     location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
+        #     for location in location_set:
+        #         if not location[0] in STATION_LOCATION_MAP[station]:
+        #             raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+        order_no = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")[2:-1]
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
         status = validated_data['status']

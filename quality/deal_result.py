@@ -124,45 +124,84 @@ def synthesize_to_material_deal_result(mdr_lot_no):
 def receive_deal_result(lot_no):
     """将快检信息综合管理接口(就是打印的卡片信息)封装成一个类，需要的时候就调用一下"""
     mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
-    mdrls = MaterialDealResultListSerializer()
-    results = {}
-    # id
-    results['id'] = mdr_obj.id
-    # day_time
-    results['day_time'] = str(mdrls.get_day_time(mdr_obj))
-    # lot_no
-    results['lot_no'] = mdr_obj.lot_no
-    # classes_group
-    results['classes_group'] = mdrls.get_classes_group(mdr_obj)
-    # equip_no
-    results['equip_no'] = mdrls.get_equip_no(mdr_obj)
-    # product_no
-    results['product_no'] = mdrls.get_product_no(mdr_obj)
-    # actual_weight
-    results['actual_weight'] = mdrls.get_actual_weight(mdr_obj)
-    # residual_weight
-    results['residual_weight'] = mdrls.get_residual_weight(mdr_obj)
-    # production_factory_date
-    results['production_factory_date'] = str(mdr_obj.production_factory_date)
-    # valid_time
-    results['valid_time'] = mdrls.get_valid_time(mdr_obj)
-    # test
-    results['test'] = mdrls.get_test(mdr_obj)
-    # print_time
-    results['print_time'] = mdr_obj.print_time.strftime("%Y-%m-%d %H:%M:%S") if mdr_obj.print_time else None
-    # deal_user
-    results['deal_user'] = mdrls.get_deal_user(mdr_obj)
-    # deal_time
-    results['deal_time'] = mdrls.get_deal_time(mdr_obj)
-    # mtr_list
-    results['mtr_list'] = mdrls.get_mtr_list(mdr_obj)
-    # actual_trains
-    results['actual_trains'] = mdrls.get_actual_trains(mdr_obj)
-    # operation_user
-    results['operation_user'] = mdrls.get_operation_user(mdr_obj)
-    # deal_result
-    results['deal_result'] = mdr_obj.deal_result
-    # deal_suggestion
-    results['deal_suggestion'] = mdrls.get_deal_suggestion(mdr_obj)
-    results = json.dumps(results, cls=DecimalEncoder)
+    if mdr_obj:
+        mdrls = MaterialDealResultListSerializer()
+        results = {}
+        # id
+        results['id'] = mdr_obj.id
+        # day_time
+        results['day_time'] = str(mdrls.get_day_time(mdr_obj))
+        # lot_no
+        results['lot_no'] = mdr_obj.lot_no
+        # classes_group
+        results['classes_group'] = mdrls.get_classes_group(mdr_obj)
+        # equip_no
+        results['equip_no'] = mdrls.get_equip_no(mdr_obj)
+        # product_no
+        results['product_no'] = mdrls.get_product_no(mdr_obj)
+        # actual_weight
+        results['actual_weight'] = mdrls.get_actual_weight(mdr_obj)
+        # residual_weight
+        results['residual_weight'] = mdrls.get_residual_weight(mdr_obj)
+        # production_factory_date
+        results['production_factory_date'] = str(mdr_obj.production_factory_date)
+        # valid_time
+        results['valid_time'] = mdrls.get_valid_time(mdr_obj)
+        # test
+        results['test'] = mdrls.get_test(mdr_obj)
+        # print_time
+        results['print_time'] = mdr_obj.print_time.strftime("%Y-%m-%d %H:%M:%S") if mdr_obj.print_time else None
+        # deal_user
+        results['deal_user'] = mdrls.get_deal_user(mdr_obj)
+        # deal_time
+        results['deal_time'] = mdrls.get_deal_time(mdr_obj)
+        # mtr_list
+        results['mtr_list'] = mdrls.get_mtr_list(mdr_obj)
+        # actual_trains
+        results['actual_trains'] = mdrls.get_actual_trains(mdr_obj)
+        # operation_user
+        results['operation_user'] = mdrls.get_operation_user(mdr_obj)
+        # deal_result
+        results['deal_result'] = mdr_obj.deal_result
+        # deal_suggestion
+        results['deal_suggestion'] = mdrls.get_deal_suggestion(mdr_obj)
+        results = json.dumps(results, cls=DecimalEncoder)
+    else:
+        results = {"id": None, "day_time": "", "lot_no": "", "classes_group": "", "equip_no": "", "product_no": "",
+         "actual_weight": None, "residual_weight": None, "production_factory_date": "", "valid_time": None,
+         "test": {"test_status": "", "test_factory_date": "", "test_class": "", "test_user": "", "test_note": None,
+                  "result": None, "pallet_no": ""}, "print_time": None, "deal_user": None, "deal_time": None,
+         "mtr_list": {"": [
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""}], "": [
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""},
+             {"test_indicator_name": "", "data_point_name": "", "value": None, "result": "", "max_test_times": None,
+              "add_subtract": None, "status": ""}],
+                      "table_head": {"\u95e8\u5c3c": ["ML1+4"], "\u6bd4\u91cd": ["\u6bd4\u91cd\u503c"],
+                                     "\u786c\u5ea6": ["\u786c\u5ea6\u503c"],
+                                     "\u6d41\u53d8": ["MH", "TC10", "TC50", "TC90"]}}, "actual_trains": "",
+         "operation_user": "", "deal_result": "", "deal_suggestion": None}
     return results
