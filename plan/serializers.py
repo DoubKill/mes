@@ -119,7 +119,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     start_time = serializers.DateTimeField(source='work_schedule_plan.start_time', read_only=True)
     end_time = serializers.DateTimeField(source='work_schedule_plan.end_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
-    batching_type = serializers.IntegerField(source='product_day_plan.product_batching.batching_type')
+    batching_type = serializers.IntegerField(source='product_batching.batching_type', default=None)
 
     def get_status(self, obj):
         plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
