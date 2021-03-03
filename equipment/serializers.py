@@ -158,6 +158,10 @@ class EquipMaintenanceCreateOrderSerializer(BaseModelSerializer):
             factory_date = now.date()
         validated_data['order_uid'] = UUidTools.uuid1_hex('WXD')
         validated_data['factory_date'] = factory_date
+        down_flag = validated_data.get('down_flag', None)
+        if down_flag:
+            validated_data['equip_part'].equip.equip_current_status_equip.status = '停机'
+            validated_data['equip_part'].equip.equip_current_status_equip.save()
         return super().create(validated_data)
 
     class Meta:
