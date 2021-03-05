@@ -213,7 +213,8 @@ class OutWorkFeedBack(APIView):
             lot_no = data.get("lot_no", "99999999") # 给一个无法查到的lot_no
             try:
                 label = receive_deal_result(lot_no)
-                LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
+                if label:
+                    LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
             except AttributeError:
                 pass
             except Exception as e:
