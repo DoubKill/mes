@@ -19,7 +19,7 @@ from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan
+    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -665,7 +665,7 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     """终炼胶|帘布库共用序列化器"""
 
     class Meta:
-        model = BzFinalMixingRubberInventory
+        model = BzFinalMixingRubberInventoryLB
         fields = "__all__"
 
 
