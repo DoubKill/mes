@@ -48,7 +48,7 @@ from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('send.log')
 
 
 @method_decorator([api_recorder], name="dispatch")
