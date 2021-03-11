@@ -48,7 +48,7 @@ from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('api_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -315,14 +315,14 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             raise ValidationError(f'该仓库请移步{warehouse_name}专项页面查看')
 
     def get_query_params(self):
-        for query in 'material_type', 'container_no', 'material_no', "order_no", "location":
+        for query in ('material_type', 'container_no', 'material_no', "order_no", "location", 'tunnel'):
             yield self.request.query_params.get(query, None)
 
     def get_queryset(self):
         # 终炼胶，帘布库区分 货位地址开头1-4终炼胶   5-6帘布库
         model = self.divide_tool(self.MODEL)
         queryset = None
-        material_type, container_no, material_no, order_no, location = self.get_query_params()
+        material_type, container_no, material_no, order_no, location, tunnel = self.get_query_params()
         quality_status = self.request.query_params.get('quality_status', None)
         if model == XBMaterialInventory:
             queryset = model.objects.all()
@@ -341,7 +341,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # else:
             queryset = model.objects.using('lb').all()
             if quality_status:
-                queryset = queryset.filter(quality_level=quality_status)
+                queryset = queryset.filter(quality_status=quality_status)
         if queryset:
             if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory,
                                                BzFinalMixingRubberInventoryLB]:
@@ -356,6 +356,8 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(bill_id__icontains=order_no)
             if location:
                 queryset = queryset.filter(location__icontains=location)
+            if tunnel:
+                queryset = queryset.filter(location__istartswith=tunnel)
             return queryset
         if model == WmsInventoryStock:
             queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
@@ -405,9 +407,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 else:
                     actual_type = "生产出库"
                 temp_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-start_time'))
-                filter_dict.pop("inout_num_type", None)
-                temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
-                                                             **filter_dict).order_by('-start_time'))
+                # 目前先只查北自出入库履历
+                # filter_dict.pop("inout_num_type", None)
+                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
+                #                                              **filter_dict).order_by('-start_time'))
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
