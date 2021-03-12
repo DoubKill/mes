@@ -123,13 +123,14 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
                     down_time=instance.down_time,
                     order_src=instance.order_src,
                     note=instance.note,
-                    relevance_order_uid=instance.relevance_order_uid
+                    relevance_order_uid=instance.relevance_order_uid,
+                    created_user=self.context["request"].user
                 )
         if validated_data.get('maintenance_user', None):
-            validated_data['assign_user'] = self.context['user']
+            validated_data['assign_user'] = self.context["request"].user
         else:
-            validated_data['maintenance_user'] = self.context['user']
-            validated_data['assign_user'] = self.context['user']
+            validated_data['maintenance_user'] = self.context["request"].user
+            validated_data['assign_user'] = self.context["request"].user
         return super().update(instance, validated_data)
 
     class Meta:
@@ -157,6 +158,10 @@ class EquipMaintenanceCreateOrderSerializer(BaseModelSerializer):
             factory_date = now.date()
         validated_data['order_uid'] = UUidTools.uuid1_hex('WXD')
         validated_data['factory_date'] = factory_date
+        down_flag = validated_data.get('down_flag', None)
+        if down_flag:
+            validated_data['equip_part'].equip.equip_current_status_equip.status = '停机'
+            validated_data['equip_part'].equip.equip_current_status_equip.save()
         return super().create(validated_data)
 
     class Meta:

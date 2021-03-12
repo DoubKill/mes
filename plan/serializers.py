@@ -119,7 +119,7 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     start_time = serializers.DateTimeField(source='work_schedule_plan.start_time', read_only=True)
     end_time = serializers.DateTimeField(source='work_schedule_plan.end_time', read_only=True)
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
-    batching_type = serializers.IntegerField(source='product_day_plan.product_batching.batching_type')
+    batching_type = serializers.IntegerField(source='product_batching.batching_type', default=None)
 
     def get_status(self, obj):
         plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
@@ -322,7 +322,9 @@ class ProductDayPlansySerializer(BaseModelSerializer):
             raise serializers.ValidationError('设备{}不存在'.format(equip1))
         except PlanSchedule.DoesNotExist:
             raise serializers.ValidationError('排班管理{}不存在'.format(plan_schedule1))
-        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=1).first()
+        pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=2).last()
+        if not pb_obj:
+            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=1).last()
         if not pb_obj:
             raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
         attrs['product_batching'] = pb_obj
@@ -379,7 +381,11 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             except Equip.DoesNotExist:
                 raise serializers.ValidationError('设备{}不存在'.format(equip1))
 
-            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=1).first()
+            pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=2).last()
+            if not pb_obj:
+                pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1,
+                                                        batching_type=1).last()
+
             if not pb_obj:
                 raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
             attrs['product_batching'] = pb_obj

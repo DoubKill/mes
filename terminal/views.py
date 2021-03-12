@@ -17,8 +17,7 @@ from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from recipe.models import ProductBatchingDetail
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
-    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter, \
-    LoadMaterialLogFilter
+    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
@@ -174,11 +173,29 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gener
     create:
         新增投料履历
     """
-    queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_classes = LoadMaterialLogFilter
+    queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
+
+    def get_queryset(self):
+        queryset = self.queryset
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        production_factory_date = self.request.query_params.get('production_factory_date')
+        equip_no = self.request.query_params.get('equip_no')
+        production_classes = self.request.query_params.get('production_classes')
+        material_no = self.request.query_params.get('material_no')
+        if plan_classes_uid:
+            queryset = queryset.filter(feed_log__plan_classes_uid=plan_classes_uid)
+        if production_factory_date:
+            queryset = queryset.filter(feed_log__production_factory_date=production_factory_date)
+        if equip_no:
+            queryset = queryset.filter(feed_log__equip_no=equip_no)
+        if production_classes:
+            queryset = queryset.filter(feed_log__production_classes=production_classes)
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
+        return queryset
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -381,11 +398,25 @@ class BatchChargeLogListViewSet(ListAPIView):
     serializer_class = LoadMaterialLogListSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_class = LoadMaterialLogFilter
 
     def get_queryset(self):
-        queryset = LoadMaterialLog.objects.using('SFJ').all()
+        queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
         mixing_finished = self.request.query_params.get('mixing_finished', None)
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        production_factory_date = self.request.query_params.get('production_factory_date')
+        equip_no = self.request.query_params.get('equip_no')
+        production_classes = self.request.query_params.get('production_classes')
+        material_no = self.request.query_params.get('material_no')
+        if plan_classes_uid:
+            queryset = queryset.filter(feed_log__plan_classes_uid=plan_classes_uid)
+        if production_factory_date:
+            queryset = queryset.filter(feed_log__production_factory_date=production_factory_date)
+        if equip_no:
+            queryset = queryset.filter(feed_log__equip_no=equip_no)
+        if production_classes:
+            queryset = queryset.filter(feed_log__production_classes=production_classes)
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
         if mixing_finished:
             if mixing_finished == "终炼":
                 queryset = queryset.filter(feed_log__product_no__icontains="FM").all()

@@ -68,9 +68,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             attrs['status'] = 1
         # 发送条码信息到群控
         try:
-            resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/', data=attrs)
+            resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/',
+                                 data=attrs, timeout=5)
             code = resp.status_code
-            if code != 200:
+            if code == 200:
+                logger.error('条码信息下发成功：{}'.format(resp.text))
+            else:
                 logger.error('条码信息下发错误：{}'.format(resp.text))
         except Exception:
             logger.error('群控服务器错误！')
@@ -290,7 +293,7 @@ class LoadMaterialLogListSerializer(serializers.ModelSerializer):
     product_no = serializers.ReadOnlyField(source='feed_log.product_no')
     created_date = serializers.DateTimeField(source='feed_log.feed_begin_time')
     trains = serializers.ReadOnlyField(source='feed_log.trains')
-    production_factory_date = serializers.ReadOnlyField(source='feed_log.production_classes')
+    production_factory_date = serializers.ReadOnlyField(source='feed_log.production_factory_date')
     production_classes = serializers.ReadOnlyField(source='feed_log.production_classes')
 
     def get_mixing_finished(self, obj):
