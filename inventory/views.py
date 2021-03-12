@@ -2,9 +2,13 @@ import datetime
 import json
 import logging
 import random
+from io import BytesIO
 
+import xlwt
+from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.db.transaction import atomic
+from django.http import HttpResponse
 
 from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
@@ -20,17 +24,17 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import GlobalCode
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter
+    MaterialPlanManagementFilter, BarcodeQualityFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
     InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
-    MaterialPlanManagementSerializer
+    MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -210,7 +214,7 @@ class OutWorkFeedBack(APIView):
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
         #         }
         if data:
-            lot_no = data.get("lot_no", "99999999") # 给一个无法查到的lot_no
+            lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
             try:
                 label = receive_deal_result(lot_no)
                 if label:
@@ -464,7 +468,7 @@ class MaterialCount(APIView):
             except:
                 raise ValidationError("帘布库连接失败")
         elif store_name == "原材料库":
-            status_map = {"合格":1, "不合格":2}
+            status_map = {"合格": 1, "不合格": 2}
             try:
                 ret = WmsInventoryStock.objects.using('wms').filter(quality_status=status_map.get(status, 1)).values(
                     'material_no').annotate(
@@ -870,7 +874,6 @@ class MaterialPlanManagement(ModelViewSet):
         return Response('新建成功')
 
 
-
 class MateriaTypeNameToAccording(APIView):
     # materia_type_name_to_according
     """根据物料类型和编码找到存在的仓库表"""
@@ -904,7 +907,6 @@ class MateriaTypeNameToAccording(APIView):
 
 class SamplingRules(APIView):
 
-
     def get(self, request, *args, **kwargs):
         params = request.query_params
         material_no = params.get("material_no")
@@ -921,3 +923,94 @@ class SamplingRules(APIView):
         return Response({"result": {"material_no": material_no,
                                     "material_name": material_name,
                                     "sampling_rate": instance.sampling_rate}})
+
+
+class BarcodeQualityViewSet(ModelViewSet):
+    queryset = BarcodeQuality.objects.filter()
+    serializer_class = BarcodeQualitySerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = (BarcodeQualityFilter)
+    permission_classes = (IsAuthenticated,)
+    pagination_class = SinglePageNumberPagination
+
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+        material_type = params.get("material_type")
+        material_no = params.get("material_no")
+        lot_no = params.get("lot_no")
+        page = params.get("page", 1)
+        page_size = params.get("page_size", 10)
+        mes_set = self.queryset.values('lot_no', 'quality_status')
+        quality_dict = {_.get("lot_no"): _.get('quality_status') for _ in mes_set}
+        wms_set = WmsInventoryStock.objects.using('wms').raw(WmsInventoryStock.quality_sql(material_type, material_no, lot_no))
+        p = Paginator(wms_set, page_size)
+        s = WmsStockSerializer(p.page(page), many=True, context={"quality_dict": quality_dict})
+        data = s.data
+
+        return Response({"results": data, "count": p.count})
+
+    def create(self, request, *args, **kwargs):
+        data = dict(request.data)
+        lot_no = data.pop("lot_no", None)
+        obj, flag = self.queryset.update_or_create(defaults=data, lot_no=lot_no)
+        if flag:
+            return Response("补充条码状态成功")
+        else:
+            return Response("更新条码状态成功")
+
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export',
+            url_name='export')
+    def export(self, request):
+        """备品备件导入模板"""
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '物料条码信息数据导出'
+        response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建工作簿
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        ws = xlwt.Workbook(encoding='utf-8')
+
+        # 添加第一页数据表
+        w = ws.add_sheet('物料条码信息')  # 新建sheet（sheet的名称为"sheet1"）
+        # for j in [1, 4, 5, 7]:
+        #     first_col = w.col(j)
+        #     first_col.width = 256 * 20
+        # 写入表头
+        w.write(0, 0, u'该数据仅供参考')
+        title_list = [u'No', u'物料类型', u'物料编码', u'物料名称', u'条码', u'托盘号', u'库存数', u'单位重量(kg)', u'总重量', u'品质状态']
+        for title in title_list:
+            w.write(1, title_list.index(title), title)
+        temp_write_list = []
+        count = 1
+        mes_set = self.queryset.values('lot_no', 'quality_status')
+        quality_dict = {_.get("lot_no"): _.get('quality_status') for _ in mes_set}
+        wms_set = WmsInventoryStock.objects.using('wms').raw(WmsInventoryStock.quality_sql())
+        s = WmsStockSerializer(wms_set, many=True, context={"quality_dict": quality_dict})
+        for q in s.data:
+            total_weight = q.get('total_weight')
+            qty = q.get('qty')
+            if total_weight and qty:
+                unit_weight = float(total_weight) / float(qty)
+            else:
+                unit_weight = 0
+            line_list = [count, q.get('material_type'), q.get('material_no'), q.get('material_name'),
+                         q.get('barcode'), q.get('pallet_no'), qty, round(unit_weight, 3),
+                         total_weight, q.get('quality') if q.get('quality') else None]
+            temp_write_list.append(line_list)
+            count += 1
+        n = 2  # 行数
+        for y in temp_write_list:
+            m = 0  # 列数
+            for x in y:
+                w.write(n, m, x)
+                m += 1
+            n += 1
+        output = BytesIO()
+        ws.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response

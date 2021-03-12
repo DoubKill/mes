@@ -19,7 +19,8 @@ from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB
+    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
+    BarcodeQuality
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -978,3 +979,23 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialOutPlan
         fields = '__all__'
+
+
+class BarcodeQualitySerializer(BaseModelSerializer):
+
+    class Meta:
+        model = BarcodeQuality
+        fields = '__all__'
+
+
+class WmsStockSerializer(BaseModelSerializer):
+    quality= serializers.SerializerMethodField(read_only=True)
+
+    def get_quality(self, obj):
+        quality_dict = self.context.get("quality_dict")
+        return quality_dict.get(obj.lot_no) if quality_dict.get(obj.lot_no) else None
+
+    class Meta:
+        model = WmsInventoryStock
+        exclude = ('sn', 'in_storage_time', 'quality_status')
+

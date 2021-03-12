@@ -167,7 +167,22 @@ class WmsInventoryStock(models.Model):
                     """.format(material_type_filter, material_no_filter)
         return sql
 
-
+    @classmethod
+    def quality_sql(cls, material_type=None, material_no=None, lot_no=None):
+        material_type_filter = """AND material.MaterialGroupName LIKE '%%{0}%%'""" \
+            .format(material_type) if material_type else ''
+        material_no_filter = """AND stock.MaterialCode LIKE '%%{material_no}%%'""" \
+            .format(material_no=material_no) if material_no else ''
+        lot_no_filter = """AND stock.TrackingNumber LIKE '%%{lot_no}%%'""" \
+            .format(lot_no=lot_no) if lot_no else ''
+        sql = """
+                            SELECT *, material.MaterialGroupName AS material_type 
+                            FROM zhada_wms_zhongc.dbo.t_inventory_stock stock,
+                              zhada_wms_zhongc.dbo.t_inventory_material material
+                                WHERE stock.MaterialCode = material.MaterialCode
+                                {0} {1} {2}
+                            """.format(material_type_filter, material_no_filter, lot_no_filter)
+        return sql
 
 
 class WmsInventoryMaterial(models.Model):
@@ -463,7 +478,7 @@ class MixGumOutInventoryLog(models.Model):
     def order_type(self):
         return "出库"
 
-    #TODO 这里可以搞几个map用来做映射
+    # TODO 这里可以搞几个map用来做映射
     def inout_reason(self):
         return self.inout_num_type
 
@@ -476,7 +491,6 @@ class MixGumOutInventoryLog(models.Model):
     class Meta:
         db_table = 'v_ASRS_TO_MES_RE_MESVIEW'
         managed = False
-
 
 
 class MixGumInInventoryLog(models.Model):
@@ -609,8 +623,6 @@ class MaterialInventoryLog(AbstractEntity):
     start_time = models.DateTimeField(verbose_name='发起时间', blank=True, null=True, help_text='发起时间')
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
 
-
-
     class Meta:
         db_table = 'material_inventory_log'
         verbose_name_plural = verbose_name = '出入库履历'
@@ -620,8 +632,9 @@ class MaterialInHistoryOther(models.Model):
     id = models.BigIntegerField(primary_key=True, db_column='Id')
     order_no = models.CharField(max_length=64, db_column='TaskNumber')
     initiator = models.CharField(max_length=64, db_column='LastUserId')
-    start_time = models.DateTimeField(verbose_name='发起时间', help_text='发起时间', blank=True, null=True, db_column='CreaterTime')
-    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间',  blank=True, null=True, db_column='LastTime')
+    start_time = models.DateTimeField(verbose_name='发起时间', help_text='发起时间', blank=True, null=True,
+                                      db_column='CreaterTime')
+    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='LastTime')
 
     class Meta:
         db_table = 't_stock_in_task'
@@ -641,7 +654,8 @@ class MaterialInHistory(models.Model):
     inout_type = models.IntegerField(db_column='TaskType')
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     material_name = models.CharField(max_length=64, db_column='MaterialName')
-    task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="mih", db_column="StockInTaskEntityId")
+    task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="mih",
+                             db_column="StockInTaskEntityId")
 
     class Meta:
         db_table = 't_stock_in_task_upper'
@@ -675,8 +689,28 @@ class MaterialOutHistory(models.Model):
     inout_type = models.IntegerField(db_column='TaskType')
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     material_name = models.CharField(max_length=64, db_column='MaterialName')
-    task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="moh", db_column="StockOutTaskEntityId")
+    task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="moh",
+                             db_column="StockOutTaskEntityId")
 
     class Meta:
         db_table = 't_stock_out_task'
         managed = False
+
+
+class BarcodeQuality(models.Model):
+    # material = models.OneToOneField(Material, related_name="barcode_quality", on_delete=models.CASCADE, null=True)
+    # material_no = models.CharField(max_length=64, help_text="wms物料编码")
+    # material_name = models.CharField(max_length=64, help_text="wms物料名称")
+    # material_type = models.CharField(max_length=64, help_text="wms物料类型")
+    lot_no = models.CharField(max_length=64, help_text="wms条码", primary_key=True)
+    # container_no = models.CharField(max_length=64, help_text="托盘号")
+    # qty = models.IntegerField()
+    # total_weight = models.DecimalField(max_digits=5, decimal_places=3)
+    quality_status = models.CharField(max_length=64, help_text="品质")
+
+    # location = models.CharField(max_length=64, help_text="货位地址")
+
+
+    class Meta:
+        db_table = "barcode_quality"
+        verbose_name_plural = verbose_name = '物料条码质量维护'
