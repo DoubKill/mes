@@ -990,10 +990,19 @@ class BarcodeQualitySerializer(BaseModelSerializer):
 
 class WmsStockSerializer(BaseModelSerializer):
     quality= serializers.SerializerMethodField(read_only=True)
+    unit_weight = serializers.SerializerMethodField(read_only=True)
 
     def get_quality(self, obj):
         quality_dict = self.context.get("quality_dict")
         return quality_dict.get(obj.lot_no) if quality_dict.get(obj.lot_no) else None
+
+    def get_unit_weight(self, obj):
+        try:
+            unit_weight = str(round(obj.total_weight / obj.qty, 2))
+        except:
+            return str(0.00)
+        return unit_weight
+
 
     class Meta:
         model = WmsInventoryStock
