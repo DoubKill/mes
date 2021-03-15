@@ -13,16 +13,14 @@ from basics.views import CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
-    MaterialAttributeFilter, WeighBatchingFilter
+    MaterialAttributeFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
-    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, WeighBatchingSerializer, \
-    WeighBatchingChangeUsedTypeSerializer, WeighBatchingCreateSerializer, \
-    WeighBatchingRetrieveSerializer, WeighBatchingUpdateSerializer, ProductBatchingDetailMaterialSerializer, \
-    WeighCntTypeSerializer
+    ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
+    ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighBatching, WeighCntType
+    ProductBatchingDetail, MaterialSupplier, WeighCntType
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -199,7 +197,8 @@ class ProductBatchingViewSet(ModelViewSet):
         delete_flag=False, batching_type=2).select_related(
         "factory", "site", "dev_type", "stage", "product_info"
     ).prefetch_related(
-        Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))
+        Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False)),
+        Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False))
     ).order_by('-created_date')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -214,8 +213,6 @@ class ProductBatchingViewSet(ModelViewSet):
                                    'used_type')
             return Response({'results': data})
         else:
-            if self.request.query_params.get('weight_batching'):  # 拉取还没有新建小料配方的标准配方
-                queryset = queryset.filter(weighbatching__isnull=True)
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
@@ -279,26 +276,26 @@ class RecipeNoticeAPiView(APIView):
         return Response('发送成功', status=status.HTTP_200_OK)
 
 
-@method_decorator([api_recorder], name="dispatch")
-class WeighBatchingViewSet(ModelViewSet):
-    """小料称量配方标准"""
-    queryset = WeighBatching.objects.filter(delete_flag=False).order_by('-created_date')
-    serializer_class = WeighBatchingSerializer
-    permission_classes = (IsAuthenticated,)
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = WeighBatchingFilter
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return WeighBatchingSerializer
-        elif self.action == 'create':
-            return WeighBatchingCreateSerializer
-        elif self.action == 'retrieve':
-            return WeighBatchingRetrieveSerializer
-        elif self.action == 'partial_update':
-            return WeighBatchingChangeUsedTypeSerializer
-        else:
-            return WeighBatchingUpdateSerializer
+# @method_decorator([api_recorder], name="dispatch")
+# class WeighBatchingViewSet(ModelViewSet):
+#     """小料称量配方标准"""
+#     queryset = WeighBatching.objects.filter(delete_flag=False).order_by('-created_date')
+#     serializer_class = WeighBatchingSerializer
+#     permission_classes = (IsAuthenticated,)
+#     filter_backends = (DjangoFilterBackend,)
+#     filter_class = WeighBatchingFilter
+#
+#     def get_serializer_class(self):
+#         if self.action == 'list':
+#             return WeighBatchingSerializer
+#         elif self.action == 'create':
+#             return WeighBatchingCreateSerializer
+#         elif self.action == 'retrieve':
+#             return WeighBatchingRetrieveSerializer
+#         elif self.action == 'partial_update':
+#             return WeighBatchingChangeUsedTypeSerializer
+#         else:
+#             return WeighBatchingUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")

@@ -20,25 +20,24 @@ def product_classes_plan_save_handler(sender, **kwargs):
             ).update(delete_flag=True)
     else:
         try:
-            if product_classes_plan.product_batching.weighbatching:  # 如果计划关联胶料配方有小料配方
-                for cnt_type in product_classes_plan.product_batching.weighbatching.weight_types.all():
-                    batching_classes_plan = BatchingClassesPlan.objects.filter(
+            for cnt_type in product_classes_plan.product_batching.weight_cnt_types.all():
+                batching_classes_plan = BatchingClassesPlan.objects.filter(
+                    work_schedule_plan=product_classes_plan.work_schedule_plan,
+                    weigh_cnt_type=cnt_type,
+                    delete_flag=False).first()
+                created = False
+                if not batching_classes_plan:
+                    batching_classes_plan = BatchingClassesPlan.objects.create(
                         work_schedule_plan=product_classes_plan.work_schedule_plan,
                         weigh_cnt_type=cnt_type,
-                        delete_flag=False).first()
-                    created = False
-                    if not batching_classes_plan:
-                        batching_classes_plan = BatchingClassesPlan.objects.create(
-                            work_schedule_plan=product_classes_plan.work_schedule_plan,
-                            weigh_cnt_type=cnt_type,
-                            plan_batching_uid=uuid.uuid1().hex)
-                        created = True
-                    plan_package_from_product_classes_plan = batching_classes_plan \
-                        .plan_package_from_product_classes_plan()
-                    if not created:
-                        if plan_package_from_product_classes_plan != batching_classes_plan.plan_package:
-                            batching_classes_plan.package_changed = True
-                    batching_classes_plan.plan_package = plan_package_from_product_classes_plan
-                    batching_classes_plan.save()
+                        plan_batching_uid=uuid.uuid1().hex)
+                    created = True
+                plan_package_from_product_classes_plan = batching_classes_plan \
+                    .plan_package_from_product_classes_plan()
+                if not created:
+                    if plan_package_from_product_classes_plan != batching_classes_plan.plan_package:
+                        batching_classes_plan.package_changed = True
+                batching_classes_plan.plan_package = plan_package_from_product_classes_plan
+                batching_classes_plan.save()
         except ObjectDoesNotExist as e:
             pass

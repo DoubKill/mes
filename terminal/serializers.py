@@ -188,7 +188,7 @@ class WeightPackageRetrieveLogSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weight_details.values('material__material_no', 'standard_weight')
+            weight_details.values('material__material_no', 'standard_weight', 'weigh_cnt_type__package_cnt')
 
     class Meta:
         model = WeightPackageLog
@@ -201,7 +201,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weight_details.values('material__material_no', 'standard_weight')
+            weight_details.values('material__material_no', 'standard_weight', 'weigh_cnt_type__package_cnt')
 
     def validate(self, attr):
         begin_trains = attr['begin_trains']
@@ -220,10 +220,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
         attr['production_group'] = batching_classes_plan.work_schedule_plan.group.global_name
         attr['dev_type'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name
         attr['product_no'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no
-        weigh_type_dict = {1: '硫磺包' + str(batching_classes_plan.weigh_cnt_type.tag),
-                           2: '细料包' + str(batching_classes_plan.weigh_cnt_type.tag)}
-        attr['material_no'] = attr['product_no'] + weigh_type_dict[batching_classes_plan.weigh_cnt_type.weigh_type]
-        attr['material_name'] = attr['product_no'] + weigh_type_dict[batching_classes_plan.weigh_cnt_type.weigh_type]
+        attr['material_no'] = attr['material_name'] = batching_classes_plan.weigh_cnt_type.name
         attr['bra_code'] = generate_bra_code(batching_classes_plan.id,
                                              attr['equip_no'],
                                              attr['production_factory_date'],
@@ -248,7 +245,7 @@ class WeightPackageUpdateLogSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weight_details.values('material__material_no', 'standard_weight')
+            weight_details.values('material__material_no', 'standard_weight', 'weigh_cnt_type__package_cnt')
 
     def update(self, instance, validated_data):
         instance.times += 1
@@ -295,6 +292,7 @@ class LoadMaterialLogListSerializer(serializers.ModelSerializer):
     trains = serializers.ReadOnlyField(source='feed_log.trains')
     production_factory_date = serializers.ReadOnlyField(source='feed_log.production_factory_date')
     production_classes = serializers.ReadOnlyField(source='feed_log.production_classes')
+    equip_no = serializers.ReadOnlyField(source='feed_log.equip_no')
 
     def get_mixing_finished(self, obj):
         product_no = obj.feed_log.product_no
