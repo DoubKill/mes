@@ -144,6 +144,17 @@ class ProductBatching(AbstractEntity):
     def __str__(self):
         return self.stage_product_batch_no
 
+    def save(self, *args, **kwargs):
+        batching_detail_weight = self.batching_details.filter(
+            delete_flag=False).aggregate(total_weight=Sum('actual_weight'))['total_weight']
+        weight_detail_weight = WeighBatchingDetail.objects.filter(
+            delete_flag=False,
+            weigh_cnt_type__product_batching=self).aggregate(total_weight=Sum('standard_weight'))['total_weight']
+        batching_detail_weight = batching_detail_weight if batching_detail_weight else 0
+        weight_detail_weight = weight_detail_weight if weight_detail_weight else 0
+        self.batching_weight = batching_detail_weight + weight_detail_weight
+        super(ProductBatching, self).save(*args, **kwargs)
+
     @property
     def batching_material_nos(self):
         # 配方物料详情（料包）

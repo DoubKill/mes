@@ -20,7 +20,7 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighCntType
+    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -198,7 +198,8 @@ class ProductBatchingViewSet(ModelViewSet):
         "factory", "site", "dev_type", "stage", "product_info"
     ).prefetch_related(
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False)),
-        Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False))
+        Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
+        Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(delete_flag=False)),
     ).order_by('-created_date')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)

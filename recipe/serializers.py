@@ -1,7 +1,6 @@
 from datetime import datetime
 import logging
 
-from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -126,6 +125,19 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
         extra_kwargs = {'material': {'validators': []}}
 
 
+class ProductBatchingDetailRetrieveSerializer(ProductBatchingDetailSerializer):
+
+    class Meta:
+        model = ProductBatchingDetail
+        exclude = ('product_batching',)
+        extra_kwargs = {'material': {'validators': []},
+                        'id': {
+                            'read_only': False,
+                            'allow_null': True,
+                            'required': False}
+                        }
+
+
 class ProductBatchingListSerializer(BaseModelSerializer):
     product_no = serializers.CharField(source='product_info.product_no', read_only=True)
     product_name = serializers.CharField(source='product_info.product_name', read_only=True)
@@ -205,28 +217,18 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             validated_data['stage_product_batch_no'] = '{}-{}-{}-{}'.format(site.global_name, stage.global_name,
                                                                             product_info.product_no, versions)
         instance = super().create(validated_data)
-        batching_weight = manual_material_weight = auto_material_weight = 0
         if batching_details:
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
-                auto_flag = detail.get('auto_flag')
-                actual_weight = detail.get('actual_weight', 0)
                 material = detail.get('material')
+                detail.pop('id', None)
                 if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
                 elif material.material_type.global_name == '油料':
                     detail['type'] = 3
-                if auto_flag == 1:
-                    auto_material_weight += actual_weight
-                elif auto_flag == 2:
-                    manual_material_weight += actual_weight
-                batching_weight += actual_weight
                 detail['product_batching'] = instance
                 batching_detail_list[i] = ProductBatchingDetail(**detail)
             ProductBatchingDetail.objects.bulk_create(batching_detail_list)
-        instance.batching_weight = batching_weight
-        instance.manual_material_weight = manual_material_weight
-        instance.auto_material_weight = auto_material_weight
         instance.save()
         if weight_cnt_types:
             # 新建小料包
@@ -240,7 +242,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                     for j, weight_detail in enumerate(weight_details):
                         weight_detail["weigh_cnt_type"] = cnt_type_instance
                         weight_cnt_types_detail_list[j] = WeighBatchingDetail(**weight_detail)
-                        WeighBatchingDetail.objects.bulk_create(weight_cnt_types_detail_list)
+                    WeighBatchingDetail.objects.bulk_create(weight_cnt_types_detail_list)
         try:
             material_type = GlobalCode.objects.filter(global_type__type_name='原材料类别',
                                                       global_name=instance.stage.global_name).first()
@@ -272,8 +274,8 @@ class WeighCntTypeDetailRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WeighBatchingDetail
-        fields = '__all__'
-        extra_kwargs = {'id': {'read_only': False}}
+        exclude = ('weigh_cnt_type', )
+        extra_kwargs = {'id': {'read_only': False, 'allow_null': True, 'required': False}}
 
 
 class WeighCntTypeRetrieveSerializer(serializers.ModelSerializer):
@@ -281,29 +283,30 @@ class WeighCntTypeRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WeighCntType
-        fields = '__all__'
-        extra_kwargs = {'id': {'read_only': False}}
+        exclude = ('product_batching', )
+        extra_kwargs = {'id': {'read_only': False, 'allow_null': True, 'required': False}}
 
 
 class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
-    batching_details = ProductBatchingDetailSerializer(many=True, required=False,
-                                                       help_text="""  带id则表示更新某条数据删除将delete_flag改为true即可，否则代表新加一条数据
-                                                       [
-                                                       {"id": 1,
-                                                       "sn": 序号, 
-                                                       "material":原材料id, 
-                                                       "actual_weight":重量, 
-                                                       "error_range":误差值,
-                                                       "delete_flag": false
-                                                       },
-                                                       {
-                                                       "sn": 序号, 
-                                                       "material":原材料id, 
-                                                       "actual_weight":重量, 
-                                                       "error_range":误差值,
-                                                       },
-                                                       ]""")
-    weight_cnt_types = WeighCntTypeRetrieveSerializer(many=True, required=False,help_text="""
+    batching_details = ProductBatchingDetailRetrieveSerializer(many=True, required=False,
+                                                               help_text=""" 带id则表示更新某条数据删除
+                                                               将delete_flag改为true即可，否则代表新加一条数据
+                                                               [
+                                                               {"id": 1,
+                                                               "sn": 序号, 
+                                                               "material":原材料id, 
+                                                               "actual_weight":重量, 
+                                                               "error_range":误差值,
+                                                               "delete_flag": false
+                                                               },
+                                                               {
+                                                               "sn": 序号, 
+                                                               "material":原材料id, 
+                                                               "actual_weight":重量, 
+                                                               "error_range":误差值,
+                                                               },
+                                                               ]""")
+    weight_cnt_types = WeighCntTypeRetrieveSerializer(many=True, required=False, help_text="""
     [
         {   
             "id": id
@@ -330,6 +333,9 @@ class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
 
 
 class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
+    batching_detail_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
+    cnt_type_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
+    weight_detail_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
 
     @atomic()
     def update(self, instance, validated_data):
@@ -337,6 +343,12 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             raise serializers.ValidationError('操作无效！')
         batching_details = validated_data.pop('batching_details', None)
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
+        batching_detail_ids = validated_data.pop('batching_detail_ids', [])
+        cnt_type_ids = validated_data.pop('cnt_type_ids', [])
+        weight_detail_ids = validated_data.pop('weight_detail_ids', [])
+        ProductBatchingDetail.objects.filter(id__in=batching_detail_ids).update(delete_flag=True)
+        WeighCntType.objects.filter(id__in=cnt_type_ids).update(delete_flag=True)
+        WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).update(delete_flag=True)
         instance = super().update(instance, validated_data)
         if batching_details is not None:
             for detail in batching_details:
@@ -351,14 +363,11 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                     batching_detail_instance = ProductBatchingDetail.objects.filter(id=batching_detail_id).first()
                     if not batching_detail_instance:
                         raise serializers.ValidationError('object does not exit!')
-                    ProductBatchingDetail.objects.filter(id=batching_detail_id).update(**material)
+                    ProductBatchingDetail.objects.filter(id=batching_detail_id).update(**detail)
                 else:
                     # 更新
                     detail['product_batching'] = instance
                     ProductBatchingDetail.objects.create(**detail)
-            batching_weight = ProductBatchingDetail.objects.aggregate(total_weight=Sum('actual_weight'))['total_weight']
-            instance.batching_weight = batching_weight if batching_weight else 0
-            instance.save()
         if weight_cnt_types is not None:
             for weight_cnt_type in weight_cnt_types:
                 weight_details = weight_cnt_type.pop('weight_details', None)
@@ -376,25 +385,23 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                 if weight_details:
                     # 更新小料包详情
                     for weight_detail in weight_details:
-                        if cnt_type_instance.delete_flag:
-                            cnt_type_instance.weight_details.filter().update(delete_flag=True)
+                        weight_detail_id = weight_detail.pop('id', None)
+                        if weight_detail_id:
+                            # 有id则更新
+                            detail = WeighBatchingDetail.objects.filter(id=weight_detail_id).first()
+                            if not detail:
+                                raise serializers.ValidationError('object does not exit!')
+                            WeighBatchingDetail.objects.filter(id=weight_detail_id).update(**weight_detail)
                         else:
-                            weight_detail_id = weight_detail.pop('id', None)
-                            if weight_detail_id:
-                                # 有id则更新
-                                detail = WeighBatchingDetail.objects.filter(id=weight_detail_id).first()
-                                if not detail:
-                                    raise serializers.ValidationError('object does not exit!')
-                                WeighBatchingDetail.objects.filter(id=weight_detail_id).update(**weight_detail)
-                            else:
-                                # 否则新建
-                                weight_detail["weigh_cnt_type"] = cnt_type_instance
-                                WeighBatchingDetail.objects.create(**weight_detail)
+                            # 否则新建
+                            weight_detail["weigh_cnt_type"] = cnt_type_instance
+                            WeighBatchingDetail.objects.create(**weight_detail)
         return instance
 
     class Meta:
         model = ProductBatching
-        fields = ('id', 'batching_details', 'dev_type', 'production_time_interval', 'weight_cnt_types')
+        fields = ('id', 'batching_details', 'dev_type', 'production_time_interval', 'weight_cnt_types',
+                  'batching_detail_ids', 'cnt_type_ids', 'weight_detail_ids')
 
 
 class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):

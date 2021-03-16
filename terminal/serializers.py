@@ -1,3 +1,5 @@
+import random
+
 import requests
 from django.db.models import Q, Sum
 from rest_framework import serializers
@@ -14,13 +16,17 @@ import logging
 logger = logging.getLogger('api_log')
 
 
-def generate_bra_code(plan_id, equip_no, factory_date, classes, begin_trains, end_trains, update=False):
-    # 后端生成，工厂编码E101 + 称量机台号 + 小料计划的工厂日期8位补零 + 班次1 - 3 + 开始车次+结束车次。
+def generate_bra_code(equip_no, factory_date, classes):
+    # 后端生成，工厂编码E101 + 称量机台号 + 小料计划的工厂日期8位 + 班次1 - 3 + 四位随机数。
     # 重复打印条码规则不变，重新生成会比较麻烦，根据修改的工厂时间班次来生成，序列号改成字母。从A~Z
+    random_str = ['z', 'y', 'x', 'w', 'v', 'u', 't', 's', 'r',
+                  'q', 'p', 'o', 'n', 'm', 'l', 'k', 'j', 'i',
+                  'h', 'g', 'f', 'e', 'd', 'c', 'b', 'a',
+                  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
     classes_dict = {'早班': '1', '中班': '2', '夜班': '3'}
-    return 'E101{}{}{}{}{}{}{}'.format(plan_id, equip_no, ''.join(str(factory_date).split('-')),
-                                       classes_dict[classes], begin_trains, end_trains,
-                                       'R' if update else '')
+    return 'E101{}{}{}{}'.format(equip_no, ''.join(str(factory_date).split('-')),
+                                 classes_dict[classes],
+                                 ''.join(random.sample(random_str, 4)))
 
 
 class LoadMaterialLogSerializer(BaseModelSerializer):
@@ -97,9 +103,9 @@ class EquipOperationLogSerializer(BaseModelSerializer):
 
 
 class BatchingClassesEquipPlanSerializer(BaseModelSerializer):
-    dev_type_name = serializers.CharField(source='batching_class_plan.weigh_cnt_type.weigh_batching'
+    dev_type_name = serializers.CharField(source='batching_class_plan.weigh_cnt_type'
                                                  '.product_batching.dev_type.category_name', read_only=True)
-    product_no = serializers.CharField(source='batching_class_plan.weigh_cnt_type.weigh_batching.'
+    product_no = serializers.CharField(source='batching_class_plan.weigh_cnt_type.'
                                               'product_batching.stage_product_batch_no',
                                        read_only=True)
     product_factory_date = serializers.CharField(source='batching_class_plan.work_schedule_plan.plan_schedule.day_time',
@@ -108,6 +114,7 @@ class BatchingClassesEquipPlanSerializer(BaseModelSerializer):
     classes = serializers.CharField(source='batching_class_plan.work_schedule_plan.classes.global_name', read_only=True)
     finished_trains = serializers.SerializerMethodField(read_only=True)
     plan_batching_uid = serializers.ReadOnlyField(source='batching_class_plan.plan_batching_uid')
+    name = serializers.ReadOnlyField(source='batching_class_plan.weigh_cnt_type.name')
 
     @staticmethod
     def get_finished_trains(obj):
@@ -218,15 +225,16 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
         attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
         attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
         attr['production_group'] = batching_classes_plan.work_schedule_plan.group.global_name
-        attr['dev_type'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name
-        attr['product_no'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no
+        attr['dev_type'] = batching_classes_plan.weigh_cnt_type.product_batching.dev_type.category_name
+        attr['product_no'] = batching_classes_plan.weigh_cnt_type.product_batching.stage_product_batch_no
         attr['material_no'] = attr['material_name'] = batching_classes_plan.weigh_cnt_type.name
-        attr['bra_code'] = generate_bra_code(batching_classes_plan.id,
-                                             attr['equip_no'],
-                                             attr['production_factory_date'],
-                                             attr['production_classes'],
-                                             attr['begin_trains'],
-                                             attr['end_trains'])
+        while 1:
+            bra_code = generate_bra_code(attr['equip_no'],
+                                         attr['production_factory_date'],
+                                         attr['production_classes'])
+            if not WeightPackageLog.objects.filter(bra_code=bra_code).exists():
+                break
+        attr['bra_code'] = bra_code
         return attr
 
     class Meta:
@@ -268,14 +276,13 @@ class WeightPackagePartialUpdateLogSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         instance = super().update(instance, validated_data)
-        batching_classes = BatchingClassesPlan.objects.filter(plan_batching_uid=instance.plan_batching_uid).first()
-        instance.bra_code = generate_bra_code(batching_classes.id,
-                                              instance.equip_no,
-                                              instance.production_factory_date,
-                                              instance.production_classes,
-                                              instance.begin_trains,
-                                              instance.end_trains,
-                                              update=True)
+        while 1:
+            bra_code = generate_bra_code(instance.equip_no,
+                                         instance.production_factory_date,
+                                         instance.production_classes)
+            if not WeightPackageLog.objects.filter(bra_code=bra_code).exists():
+                break
+        instance.bra_code = bra_code
         instance.save()
         return instance
 

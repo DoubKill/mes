@@ -20,7 +20,7 @@ def product_classes_plan_save_handler(sender, **kwargs):
             ).update(delete_flag=True)
     else:
         try:
-            for cnt_type in product_classes_plan.product_batching.weight_cnt_types.all():
+            for cnt_type in product_classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
                 batching_classes_plan = BatchingClassesPlan.objects.filter(
                     work_schedule_plan=product_classes_plan.work_schedule_plan,
                     weigh_cnt_type=cnt_type,
