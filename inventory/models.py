@@ -141,6 +141,7 @@ class WmsInventoryStock(models.Model):
     container_no = models.CharField(max_length=32, db_column="LadenToolNumber")
     in_storage_time = models.DateTimeField(db_column='CreaterTime')
     lot_no = models.CharField(max_length=64, db_column='TrackingNumber')
+    supplier_name = models.CharField(max_length=64, db_column='SupplierName')
 
     def unit_weight(self):
         return self.total_weight / self.qty
@@ -672,7 +673,7 @@ class MaterialOutHistoryOther(models.Model):
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', blank=True, null=True, db_column='LastTime')
 
     class Meta:
-        db_table = 't_stock_out_task_down'
+        db_table = 't_stock_out_task'
         managed = False
 
 
@@ -689,11 +690,11 @@ class MaterialOutHistory(models.Model):
     inout_type = models.IntegerField(db_column='TaskType')
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     material_name = models.CharField(max_length=64, db_column='MaterialName')
-    task = models.ForeignKey("MaterialInHistoryOther", on_delete=models.CASCADE, related_name="moh",
+    task = models.ForeignKey("MaterialOutHistoryOther", on_delete=models.CASCADE, related_name="moh",
                              db_column="StockOutTaskEntityId")
 
     class Meta:
-        db_table = 't_stock_out_task'
+        db_table = 't_stock_out_task_down'
         managed = False
 
 
