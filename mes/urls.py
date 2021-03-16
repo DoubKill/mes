@@ -26,7 +26,7 @@ from rest_framework.documentation import include_docs_urls
 # 修改后
 # 配置swgger
 from plan.views import IndexView
-# from system.views import index
+from system.views import index
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -63,5 +63,5 @@ if settings.DEBUG:
         path('docs/', include_docs_urls(title="Mes系统文档", description="Mes系统文档")),
         path('api-auth/', include('rest_framework.urls')),
         path('api/v1/docs/', include('docs.urls')),
-        # path('', index, name='index')
+        path('', index, name='index')
     ]

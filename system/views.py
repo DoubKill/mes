@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.db.transaction import atomic
-# from django.shortcuts import render
+from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
@@ -271,6 +271,6 @@ class MaterialReceive(CreateAPIView):
             return Response('mes拥有当前原材料', status=status.HTTP_201_CREATED)
 
 
-# def index(request):
-#     request.META["CSRF_COOKIE_USED"] = True
-#     return render(request, 'index.html')
+def index(request):
+    request.META["CSRF_COOKIE_USED"] = True
+    return render(request, 'index.html')
