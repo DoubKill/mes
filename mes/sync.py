@@ -37,7 +37,6 @@ class BaseInterface(object):
             headers = {
                 "Content-Type": "application/json; charset=UTF-8",
                 # "Authorization": kwargs['context']
-
             }
             res = requests.post(self.endpoint + self.Backend.path, headers=headers, json=kwargs)
         except Exception as err:
@@ -67,6 +66,15 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
     equip = serializers.CharField(source='equip.equip_no', default=None)
     used_time = serializers.SerializerMethodField()
     batching_details = ProductBatchingDetailSerializer(many=True)
+    weight_details = serializers.SerializerMethodField()
+
+    def get_weight_details(self, obj):
+        weight_details = []
+        for weight_cnt_type in obj.weight_cnt_types.filter(delete_flag=False):
+            weight_details.append({'material': weight_cnt_type.name,
+                                   'actual_weight': float(weight_cnt_type.total_weight),
+                                   })
+        return weight_details
 
     @staticmethod
     def get_created_date(obj):
@@ -84,7 +92,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
         fields = ('created_date', 'factory', 'site', 'product_info',
                   'dev_type', 'stage', 'equip', 'used_time', 'precept', 'stage_product_batch_no',
                   'versions', 'used_type', 'batching_weight', 'manual_material_weight',
-                  'auto_material_weight', 'production_time_interval', 'batching_details')
+                  'auto_material_weight', 'production_time_interval', 'batching_details', 'weight_details')
 
 
 class ProductObsoleteInterface(serializers.ModelSerializer, BaseInterface):

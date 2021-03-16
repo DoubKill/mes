@@ -263,8 +263,9 @@ class WeighCntType(models.Model):
 
     @property
     def total_weight(self):
-        return self.weight_details.filter(
+        total_weight = self.weight_details.filter(
             delete_flag=False).aggregate(total_weight=Sum('standard_weight'))['total_weight']
+        return total_weight if total_weight else 0
 
     class Meta:
         db_table = 'weigh_cnt_type'

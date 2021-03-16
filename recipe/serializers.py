@@ -229,7 +229,6 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 detail['product_batching'] = instance
                 batching_detail_list[i] = ProductBatchingDetail(**detail)
             ProductBatchingDetail.objects.bulk_create(batching_detail_list)
-        instance.save()
         if weight_cnt_types:
             # 新建小料包
             for weight_cnt_type in weight_cnt_types:
@@ -254,6 +253,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             )
         except Exception as e:
             logger.error(e)
+        instance.save()
         return instance
 
     class Meta:
@@ -396,6 +396,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             # 否则新建
                             weight_detail["weigh_cnt_type"] = cnt_type_instance
                             WeighBatchingDetail.objects.create(**weight_detail)
+        instance.save()
         return instance
 
     class Meta:

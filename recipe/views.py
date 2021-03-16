@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelViewSet
 
 from basics.views import CommonDeleteMixin
+from mes import settings
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
@@ -274,7 +275,7 @@ class RecipeNoticeAPiView(APIView):
             interface.request()
         except Exception as e:
             raise ValidationError(e)
-        return Response('发送成功', status=status.HTTP_200_OK)
+        return Response(data={'auxiliary_url': settings.AUXILIARY_URL}, status=status.HTTP_200_OK)
 
 
 # @method_decorator([api_recorder], name="dispatch")
