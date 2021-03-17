@@ -72,8 +72,8 @@ router.register(r'inventory-log-out', InventoryLogOutViewSet)
 router.register(r'barcode-quality', BarcodeQualityViewSet)
 
 urlpatterns = [
-    path('material_trace/', MaterialTraceView.as_view()),
-    path('product_trace/', ProductTraceView.as_view()),
+    path('material-trace/', MaterialTraceView.as_view()),
+    path('product-trace/', ProductTraceView.as_view()),
     path('material_count/', MaterialCount.as_view()),
     path('outwork_feedback/', OutWorkFeedBack.as_view()),
     path('dispatch-log/', DispatchLogView.as_view()),  # 发货历史记录

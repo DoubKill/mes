@@ -645,6 +645,8 @@ class MaterialInHistoryOther(models.Model):
 class MaterialInHistory(models.Model):
     """原材料入库记录"""
     id = models.BigIntegerField(primary_key=True, db_column='Id')
+    batch_no = models.CharField(max_length=64, db_column="BatchNo")
+    supplier = models.CharField(max_length=255, db_column="ContactCompanyName")
     order_no = models.CharField(max_length=64, db_column='TaskId')
     pallet_no = models.CharField(max_length=64, db_column='LadenToolNumber')
     location = models.CharField(max_length=64, db_column='SpaceId', help_text="货位地址")
@@ -680,6 +682,8 @@ class MaterialOutHistoryOther(models.Model):
 class MaterialOutHistory(models.Model):
     """原材料出库记录"""
     id = models.BigIntegerField(primary_key=True, db_column='Id')
+    batch_no = models.CharField(max_length=64, db_column="BatchNo")
+    supplier = models.CharField(max_length=255, db_column="ContactCompanyName")
     order_no = models.CharField(max_length=64, db_column='TaskId')
     pallet_no = models.CharField(max_length=64, db_column='LadenToolNumber')
     location = models.CharField(max_length=64, db_column='SpaceId', help_text="货位地址")

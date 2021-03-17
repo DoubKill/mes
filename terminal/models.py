@@ -32,6 +32,7 @@ class TerminalLocation(AbstractEntity):
 
 
 class FeedingMaterialLog(models.Model):
+    """群控中的模型"""
     STATUS_CHOICE = (
         (1, '正常'),
         (2, '异常')
@@ -60,6 +61,7 @@ class FeedingMaterialLog(models.Model):
 
 
 class LoadMaterialLog(models.Model):
+    """群控中的模型"""
     STATUS_CHOICE = (
         (1, '正常'),
         (2, '异常')

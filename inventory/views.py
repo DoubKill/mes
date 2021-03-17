@@ -8,6 +8,7 @@ import xlwt
 from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.db.transaction import atomic
+from django.forms import model_to_dict
 from django.http import HttpResponse
 
 from django.utils.decorators import method_decorator
@@ -21,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import GlobalCode
+from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
     MaterialPlanManagementFilter, BarcodeQualityFilter
@@ -49,6 +50,7 @@ from mes.paginations import SinglePageNumberPagination
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
+from terminal.models import LoadMaterialLog, WeightBatchingLog
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -84,23 +86,26 @@ class MaterialInventoryView(GenericViewSet,
         page = params.get("page", 1)
         page_size = params.get("page_size", 10)
         material_type = params.get("material_type")
+        material_no = params.get("material_no")
+        filter_str = ""
         if material_type:
-            sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
-                           sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
-                           max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                           max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
-                           Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
-                                from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                            where tim.MaterialGroupName='{material_type}'
-                            group by tis.MaterialCode, tis.StockDetailState;"""
-        else:
-            sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
-                                       sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
-                                       max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
-                                       Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
-                                            from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                                        group by tis.MaterialCode, tis.StockDetailState;"""
+            if filter_str:
+                filter_str += f" and tim.MaterialGroupName like '%%{material_type}%%'"
+            else:
+                filter_str += f" where tim.MaterialGroupName like '%%{material_type}%%'"
+        if material_no:
+            if filter_str:
+                filter_str += f" and tis.MaterialCode like '%%{material_no}%%'"
+            else:
+                filter_str += f" where tis.MaterialCode like '%%{material_no}%%'"
+        sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
+                       sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
+                       max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
+                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
+                       Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
+                            from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
+                        {filter_str}
+                        group by tis.MaterialCode, tis.StockDetailState;"""
         try:
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
@@ -1059,8 +1064,60 @@ class BarcodeQualityViewSet(ModelViewSet):
 class MaterialTraceView(APIView):
 
     def get(self, request):
-
-        pass
+        lot_no = request.query_params.get("lot_no")
+        if not lot_no:
+            raise ValidationError("请输入条码进行查询")
+        rep = {}
+        # 采样
+        rep["material_sample"] = None
+        # 入库
+        material_in = MaterialInHistory.objects.using('wms').filter(lot_no=lot_no).\
+            values("lot_no", "material_no", "material_name", "location", "pallet_no",
+                   "task__initiator", "supplier", "batch_no", "task__fin_time").last()
+        temp_time = material_in.pop("task__fin_time", datetime.datetime.now())
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=temp_time,
+            end_time__gte=temp_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+            "classes",
+            "plan_schedule"
+        ).order_by("id").last()
+        current_class = work_schedule_plan.classes.global_name
+        material_in["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        material_in["classes_name"] = current_class
+        rep["material_in"] = material_in
+        # 出库
+        material_out = MaterialOutHistory.objects.using('wms').filter(lot_no=lot_no).\
+            values("lot_no", "material_no", "material_name", "location", "pallet_no",
+                   "task__initiator", "supplier", "batch_no", "task__fin_time").last()
+        temp_time = material_out.pop("task__fin_time", datetime.datetime.now())
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=temp_time,
+            end_time__gte=temp_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+            "classes",
+            "plan_schedule"
+        ).order_by("id").last()
+        current_class = work_schedule_plan.classes.global_name
+        material_out["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        material_out["classes_name"] = current_class
+        rep["material_out"] = material_out
+        # 称量投入
+        weight_log = WeightBatchingLog.objects.filter(bra_code=lot_no).\
+            values("bra_code", "material_no", "equip_no", "tank_no", "created_user__username", "created_date", "batch_classes").last()
+        temp_time = weight_log.pop("created_date", datetime.datetime.now())
+        weight_log["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        weight_log["classes_name"] = weight_log.pop("batch_classes", "早班")
+        rep["material_weight"] = weight_log
+        # 密炼投入
+        load_material = LoadMaterialLog.objects.using("SFJ").filter(bra_code=lot_no)\
+            .values("material_no", "bra_code", "weight_time", "feed_log__equip_no",
+                    "feed_log__batch_group", "feed_log__batch_classes").last()
+        temp_time = load_material.pop("weight_time", datetime.datetime.now())
+        load_material["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        load_material["classes_name"] = load_material.pop("feed_log__batch_classes", "早班")
+        rep["material_load"] = load_material
+        return Response(rep)
 
 
 class ProductTraceView(APIView):
