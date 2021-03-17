@@ -5,6 +5,7 @@ from django.db.models import Q, Sum
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
+from inventory.models import WmsInventoryStock
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -44,16 +45,27 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
 
     def validate(self, attrs):
         bra_code = attrs['bra_code']
-        # 条码来源有三种，子系统、收皮条码，称量打包条码
-        mat_supplier_collect = MaterialSupplierCollect.objects.filter(bra_code=bra_code,
-                                                                      delete_flag=False,
-                                                                      material__isnull=False).first()
+        # 条码来源有三种，wms子系统、收皮条码，称量打包条码
+        try:
+            wms_stock = WmsInventoryStock.objects.using('wms').filter(lot_no=bra_code).first()
+        except Exception:
+            if settings.DEBUG:
+                wms_stock = None
+            else:
+                raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
         pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
         weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
         material_no = material_name = None
-        if mat_supplier_collect:
-            material_no = mat_supplier_collect.material.material_no
-            material_name = mat_supplier_collect.material.material_name
+        if wms_stock:
+            msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock.material_no).first()
+            if msc:
+                # 如果有别称
+                material_no = msc.material.material_no
+                material_name = msc.material.material_name
+            else:
+                # 否则按照wms的物料编码
+                material_no = wms_stock.material_no
+                material_name = wms_stock.material_name
         if pallet_feedback:
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
@@ -140,11 +152,15 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         batching_classes_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=attr['plan_batching_uid']).first()
         if not batching_classes_plan:
             raise serializers.ValidationError('参数错误')
-        mat_supplier_collect = MaterialSupplierCollect.objects.filter(bra_code=attr['bra_code'],
-                                                                      delete_flag=False,
-                                                                      material__isnull=False).first()
-        if not mat_supplier_collect:
-            raise serializers.ValidationError('未找到该条形码信息！')
+        try:
+            wms_stock = WmsInventoryStock.objects.using('wms').filter(lot_no=attr['bra_code']).first()
+        except Exception:
+            if settings.DEBUG:
+                wms_stock = None
+            else:
+                raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
+        if not wms_stock:
+            raise serializers.ValidationError('该条码信息不存在！')
         attr['trains'] = batching_classes_plan.plan_package
         attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
         attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
@@ -152,10 +168,10 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         attr['dev_type'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name
         attr['product_no'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no
         # attr['batch_time'] = datetime.datetime.now()
-        if mat_supplier_collect.material_no not in batching_classes_plan.weigh_cnt_type.weighting_material_nos:
+        if wms_stock.material_no not in batching_classes_plan.weigh_cnt_type.weighting_material_nos:
             attr['status'] = 2
-        attr['material_name'] = mat_supplier_collect.material.material_name
-        attr['material_no'] = mat_supplier_collect.material.material_no
+        attr['material_name'] = wms_stock.material_name
+        attr['material_no'] = wms_stock.material_no
         return attr
 
     class Meta:
