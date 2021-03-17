@@ -121,6 +121,96 @@ def synthesize_to_material_deal_result(mdr_lot_no):
         mdr_obj = MaterialDealResult.objects.create(**mdr_dict)
 
 
+# 不在调用序列化的方法了 序列化里的方法是给web端用的 直接改的话会影响到web前端的展示 这里复制一下 修改一点直接给打印机用
+def get_mtr_list(obj):
+    mtr_list_return = {}
+    # 找到每个车次检测次数最多的那一条
+    table_head_count = {}
+    mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
+    for mto_obj in mto_set:
+        if not mto_obj:
+            continue
+        mtr_list_return[mto_obj.actual_trains] = []
+        # 先弄出表头
+        table_head = mto_obj.order_results.all().values('test_indicator_name',
+                                                        'data_point_name').annotate().distinct()
+        for table_head_dict in table_head:
+            if table_head_dict['test_indicator_name'] not in table_head_count.keys():
+                table_head_count[table_head_dict['test_indicator_name']] = []
+            table_head_count[table_head_dict['test_indicator_name']].append(table_head_dict['data_point_name'])
+            table_head_count[table_head_dict['test_indicator_name']] = list(
+                set(table_head_count[table_head_dict['test_indicator_name']]))
+        # 根据test_indicator_name分组找到啊test_times最大的
+        mtr_list = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate(
+            max_test_times=Max('test_times')).values('test_indicator_name', 'data_point_name',
+                                                     'max_test_times',
+                                                     )
+        mtr_max_list = []
+        for mtr_max_obj in mtr_list:
+            # 根据分组找到数据
+            mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
+                                                        test_indicator_name=mtr_max_obj['test_indicator_name'],
+                                                        data_point_name=mtr_max_obj['data_point_name'],
+                                                        test_times=mtr_max_obj['max_test_times']).last()
+            if mtr_obj.level == 1:
+                result = '一等品'
+            else:
+                result = '三等品'
+            # 判断加减
+            data_point_name = mtr_obj.data_point_name  # 数据点名称
+            test_method_name = mtr_obj.test_method_name  # 试验方法名称
+            test_indicator_name = mtr_obj.test_indicator_name  # 检测指标名称
+            product_no = mtr_obj.material_test_order.product_no  # 胶料编码
+
+            # 根据material-test-orders接口逻辑找到data_point_indicator
+            material_test_method = MaterialTestMethod.objects.filter(
+                material__material_no=product_no,
+                test_method__name=test_method_name,
+                test_method__test_type__test_indicator__name=test_indicator_name,
+                data_point__name=data_point_name,
+                data_point__test_type__test_indicator__name=test_indicator_name).first()
+            add_subtract = None  # 页面的加减
+            limit = None
+            if material_test_method:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    material_test_method=material_test_method,
+                    data_point__name=data_point_name,
+                    data_point__test_type__test_indicator__name=test_indicator_name, level=1).first()
+                if indicator:  # 判断value与上下限的比较
+                    limit = f"{indicator.lower_limit}-{indicator.upper_limit}"
+                    table_head_count[test_indicator_name].remove(data_point_name)
+                    table_head_count[test_indicator_name].append(f'{data_point_name}({limit})')
+                    table_head_count[test_indicator_name] = list(set(table_head_count[test_indicator_name]))
+                    if mtr_obj.value > indicator.upper_limit:
+                        add_subtract = '+'
+                    elif mtr_obj.value < indicator.lower_limit:
+                        add_subtract = '-'
+
+
+            mtr_max_list.append(
+                {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                 'value': mtr_obj.value,
+                 'result': result,
+                 'max_test_times': mtr_obj.level,
+                 'add_subtract': add_subtract})
+
+        for mtr_dict in mtr_max_list:
+            mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
+            mtr_list_return[mto_obj.actual_trains].append(mtr_dict)
+
+    table_head_top = {}
+    for i in sorted(table_head_count.items(), key=lambda x: len(x[1]), reverse=False):
+        table_head_top[i[0]] = i[-1]
+    mtr_list_return['table_head'] = table_head_top
+    for value in mtr_list_return.values():  # 将每个数据点排序
+        if isinstance(value, list):
+            value.sort(key=lambda x: x['data_point_name'], reverse=False)
+        else:
+            for i in value.values():
+                i.sort(reverse=False)
+    return mtr_list_return
+
+
 def receive_deal_result(lot_no):
     """将快检信息综合管理接口(就是打印的卡片信息)封装成一个类，需要的时候就调用一下"""
     mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
@@ -156,7 +246,17 @@ def receive_deal_result(lot_no):
         # deal_time
         results['deal_time'] = mdrls.get_deal_time(mdr_obj)
         # mtr_list
-        results['mtr_list'] = mdrls.get_mtr_list(mdr_obj)
+        m_list = get_mtr_list(mdr_obj)  # 这里不用序列化的方法了 因为要加合格区间 在原本的序列化里加了 会影响web页面的 所以重写一个
+        trains = []
+        for i in m_list:
+            if i != 'table_head':
+                trains.append({'train': i, 'content': m_list[i]})
+        indicator = []
+        for j in m_list['table_head']:
+            indicator.append({'point': j, 'point_head': m_list['table_head'][j]})
+        mtr_list = {'trains': trains, 'table_head': indicator}
+        results['mtr_list'] = mtr_list
+
         # actual_trains
         results['actual_trains'] = mdrls.get_actual_trains(mdr_obj)
         # operation_user
