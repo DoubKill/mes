@@ -211,10 +211,8 @@ class Version(models.Model):
 
 
 class MaterialSupplierCollect(AbstractEntity):
-    bra_code = models.CharField(max_length=64, help_text='子系统条形码')
     material_name = models.CharField(max_length=64, help_text='子系统物料名称')
     material_no = models.CharField(max_length=64, help_text='子系统物料编码')
-    batch_no = models.CharField(max_length=64, help_text='批次号', null=True)
     child_system = models.ForeignKey(GlobalCode, help_text='子系统', on_delete=models.CASCADE, blank=True, null=True)
     material = models.ForeignKey(Material, help_text='原材料', null=True,
                                  on_delete=models.CASCADE, related_name='supplier_materials')

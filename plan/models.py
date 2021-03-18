@@ -168,7 +168,7 @@ class BatchingClassesPlan(AbstractEntity):
         plan_sum_trains = ProductClassesPlan.objects.filter(
             delete_flag=False,
             work_schedule_plan=self.work_schedule_plan,
-            product_batching=self.weigh_cnt_type.weigh_batching.product_batching
+            product_batching=self.weigh_cnt_type.product_batching
         ).aggregate(plan_sum_trains=Sum('plan_trains')).get('plan_sum_trains')
         return (plan_sum_trains if plan_sum_trains else 0) * self.weigh_cnt_type.package_cnt
 
