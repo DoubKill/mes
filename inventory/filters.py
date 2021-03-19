@@ -2,7 +2,7 @@ import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality
 
 from inventory.models import DeliveryPlan
 
@@ -160,3 +160,14 @@ class InventoryFilterBackend(DjangoFilterBackend):
 
         kwargs = self.get_filterset_kwargs(request, queryset, view)
         return filterset_class(**kwargs)
+
+
+class BarcodeQualityFilter(django_filters.rest_framework.FilterSet):
+    material_type = django_filters.CharFilter(field_name='material_type')
+    material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', lookup_expr='icontains')
+    barcode = django_filters.CharFilter(field_name='barcode', lookup_expr='icontains')
+
+    class Meta:
+        model = BarcodeQuality
+        fields = ['material_type', 'material_no', 'material_name', 'barcode']

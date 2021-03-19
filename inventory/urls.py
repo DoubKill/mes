@@ -10,7 +10,8 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules
+    DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules, \
+    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView
 
 router = DefaultRouter()
 
@@ -67,7 +68,12 @@ router.register(r'terminal-dispatch-plan', TerminalDispatchViewSet)
 # 出库看板
 router.register(r'inventory-log-out', InventoryLogOutViewSet)
 
+# 物料条码质量维护
+router.register(r'barcode-quality', BarcodeQualityViewSet)
+
 urlpatterns = [
+    path('material-trace/', MaterialTraceView.as_view()),
+    path('product-trace/', ProductTraceView.as_view()),
     path('material_count/', MaterialCount.as_view()),
     path('outwork_feedback/', OutWorkFeedBack.as_view()),
     path('dispatch-log/', DispatchLogView.as_view()),  # 发货历史记录

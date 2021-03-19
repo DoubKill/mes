@@ -19,7 +19,8 @@ from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB
+    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
+    BarcodeQuality
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -978,3 +979,56 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialOutPlan
         fields = '__all__'
+
+
+class BarcodeQualitySerializer(BaseModelSerializer):
+
+    class Meta:
+        model = BarcodeQuality
+        fields = '__all__'
+
+
+class WmsStockSerializer(BaseModelSerializer):
+    quality= serializers.SerializerMethodField(read_only=True)
+    unit_weight = serializers.SerializerMethodField(read_only=True)
+
+    def get_quality(self, obj):
+        quality_dict = self.context.get("quality_dict")
+        return quality_dict.get(obj.lot_no) if quality_dict.get(obj.lot_no) else None
+
+    def get_unit_weight(self, obj):
+        try:
+            unit_weight = str(round(obj.total_weight / obj.qty, 2))
+        except:
+            return str(0.00)
+        return unit_weight
+
+
+    class Meta:
+        model = WmsInventoryStock
+        exclude = ('sn', 'in_storage_time', 'quality_status')
+
+
+class InOutCommonSerializer(serializers.Serializer):
+    """库存库表均不统一,只读序列化器"""
+    id = serializers.IntegerField(read_only=True)
+    order_no = serializers.CharField(max_length=64, read_only=True)
+    pallet_no = serializers.CharField(max_length=64, read_only=True)
+    location = serializers.CharField(max_length=64, read_only=True)
+    qty = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    weight = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    unit = serializers.CharField(read_only=True, max_length=50)
+    lot_no = serializers.CharField(max_length=64, read_only=True)
+    inout_type = serializers.IntegerField(read_only=True)
+    material_no = serializers.CharField(max_length=64, read_only=True)
+    material_name = serializers.CharField(max_length=64, read_only=True)
+    initiator = serializers.CharField(source='task.initiator', read_only=True)
+    start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
+    fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
+    order_type = serializers.SerializerMethodField()
+
+    def get_order_type(self, obj):
+        if obj.inout_type == 1:
+            return "入库"
+        else:
+            return "出库"
