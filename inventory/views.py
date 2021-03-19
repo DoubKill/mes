@@ -47,6 +47,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
+from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
+from production.models import PalletFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
@@ -1085,7 +1087,7 @@ class MaterialTraceView(APIView):
         current_class = work_schedule_plan.classes.global_name
         material_in["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
         material_in["classes_name"] = current_class
-        rep["material_in"] = material_in
+        rep["material_in"] = [material_in]
         # 出库
         material_out = MaterialOutHistory.objects.using('wms').filter(lot_no=lot_no).\
             values("lot_no", "material_no", "material_name", "location", "pallet_no",
@@ -1101,14 +1103,14 @@ class MaterialTraceView(APIView):
         current_class = work_schedule_plan.classes.global_name
         material_out["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
         material_out["classes_name"] = current_class
-        rep["material_out"] = material_out
+        rep["material_out"] = [material_out]
         # 称量投入
         weight_log = WeightBatchingLog.objects.filter(bra_code=lot_no).\
             values("bra_code", "material_no", "equip_no", "tank_no", "created_user__username", "created_date", "batch_classes").last()
         temp_time = weight_log.pop("created_date", datetime.datetime.now())
         weight_log["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
         weight_log["classes_name"] = weight_log.pop("batch_classes", "早班")
-        rep["material_weight"] = weight_log
+        rep["material_weight"] = [weight_log]
         # 密炼投入
         load_material = LoadMaterialLog.objects.using("SFJ").filter(bra_code=lot_no)\
             .values("material_no", "bra_code", "weight_time", "feed_log__equip_no",
@@ -1116,12 +1118,43 @@ class MaterialTraceView(APIView):
         temp_time = load_material.pop("weight_time", datetime.datetime.now())
         load_material["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
         load_material["classes_name"] = load_material.pop("feed_log__batch_classes", "早班")
-        rep["material_load"] = load_material
+        rep["material_load"] = [load_material]
         return Response(rep)
 
 
 class ProductTraceView(APIView):
+    inventory = {
+        "终炼胶库": ('lb', []),
+        "混炼胶库": ("bz", []),
+    }
 
     def get(self, request):
+        lot_no = request.query_params.get("lot_no")
+        if not lot_no:
+            raise ValidationError("请输入条码进行查询")
+        rep = {}
+        product_trace = PalletFeedbacks.objects.filter(lot_no=lot_no).values()
+        product_no = product_trace.last().get("product_no")
+        if "FM" in product_no:
+            condition = "终炼胶库"
+        else:
+            condition = "混炼胶库"
+        # 收皮产出追溯
 
-        pass
+        rep["pallet_feed"] = product_trace
+        if not product_trace:
+            raise ValidationError("查不到该条码对应胶料")
+        plan_no = product_trace.last().get("plan_classes_uid")
+        plan = ProductClassesPlan.objects.get(plan_classes_uid=plan_no)
+        product = plan.product_batching
+        product_info = model_to_dict(product)
+        rep["product_info"] = [product_info]
+        plan_info = model_to_dict(plan)
+        rep["plan_info"] = [plan_info]
+        batch_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_no).values()
+        rep["batch_plan"] = batch_plan
+        product_in = MixGumInInventoryLog.objects.using("bz").filter(lot_no=lot_no).values()
+        rep["product_in"] = product_in
+        dispatch_log = DispatchLog.objects.filter(lot_no=lot_no).values()
+        rep["dispatch_log"] = dispatch_log
+        return Response(rep)
