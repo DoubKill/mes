@@ -3,7 +3,7 @@ from django.contrib import admin
 # Register your models here.
 
 
-from terminal.models import Terminal, TerminalLocation, Version, WeightTankStatus, MaterialSupplierCollect, WeightBatchingLog
+from terminal.models import Terminal, TerminalLocation, Version, WeightTankStatus, WeightBatchingLog
 
 
 @admin.register(Terminal)
@@ -27,10 +27,4 @@ class WeightTankStatusAdmin(admin.ModelAdmin):
                     'material_no', 'status', 'open_flag', 'equip_no']
 
 
-@admin.register(MaterialSupplierCollect)
-class MaterialSupplierCollectAdmin(admin.ModelAdmin):
-    list_display = ['bra_code', 'material_name', 'material_no', 'batch_no']
-
-
 admin.site.register(WeightBatchingLog)
-
