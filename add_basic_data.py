@@ -14,7 +14,7 @@ django.setup()
 
 from basics.models import GlobalCode, GlobalCodeType, WorkSchedule, ClassesDetail, EquipCategoryAttribute, PlanSchedule, \
     Equip, WorkSchedulePlan
-from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, WeighBatching, WeighCntType, \
+from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, WeighCntType, \
     WeighBatchingDetail
 from system.models import SystemConfig, ChildSystemInfo
 from quality.models import DealSuggestion, TestIndicator, TestType, DataPoint, TestMethod, MaterialTestMethod, \
@@ -1292,13 +1292,10 @@ def add_product_batching():
                 actual_weight=random.randrange(5, 300),
                 auto_flag=1
             )
-        wb = WeighBatching.objects.create(
-            product_batching=pb,
-            used_type=random.choice([i for i in range(1, 7)]),
-        )
+
         for i in range(2):
             wct = WeighCntType.objects.create(
-                weigh_batching=wb,
+                product_batching=pb,
                 weigh_type=i + 1,
                 package_cnt=random.randint(1, 5)
             )
@@ -1351,7 +1348,8 @@ def add_equip_current_status():
     e_set = Equip.objects.all()
     status_list = ['停机', '故障', '维修开始', '维修结束', '空转', '运行中']
     for e_obj in e_set:
-        e=EquipCurrentStatus.objects.create(equip=e_obj, status=choice(status_list), user='mes')
+        EquipCurrentStatus.objects.create(equip=e_obj, status=choice(status_list), user='mes')
+
 
 if __name__ == '__main__':
     add_global_codes()

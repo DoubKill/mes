@@ -480,15 +480,15 @@ class BatchingClassesPlanSerializer(serializers.ModelSerializer):
     day_time = serializers.ReadOnlyField(source='work_schedule_plan.plan_schedule.day_time', default='')
     classes_name = serializers.ReadOnlyField(source='work_schedule_plan.classes.global_name', default='')
     category_name = serializers.ReadOnlyField(
-        source='weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name', default='')
+        source='weigh_cnt_type.product_batching.dev_type.category_name', default='')
     stage_product_batch_no = serializers.ReadOnlyField(
-        source='weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no', default='')
+        source='weigh_cnt_type.product_batching.stage_product_batch_no', default='')
     send_user = serializers.ReadOnlyField(source='send_user.username', default='')
-    weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.used_type')
+    weigh_batching_used_type = serializers.ReadOnlyField(source='weigh_cnt_type.product_batching.used_type')
     weigh_type = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_type')
     package_type = serializers.ReadOnlyField(source='weigh_cnt_type.package_type')
     undistributed_package = serializers.ReadOnlyField()
-    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.weigh_batching.weight_batch_no')
+    weight_batch_no = serializers.ReadOnlyField(source='weigh_cnt_type.name')
 
     class Meta:
         model = BatchingClassesPlan
