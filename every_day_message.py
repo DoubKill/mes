@@ -42,10 +42,12 @@ for _ in ret_set:
     equip_list.append(_.get('equip_no'))
     plan_list.append(_.get('plan_sum'))
     actual_list.append(_.get('actual_sum'))
+plan_all = sum(plan_list)
+actual_all = sum(actual_list)
 mk_str = f"统计时间: {factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}\n - 计划车数/实际车数"
 for temp in ret_set:
     mk_str += f"""\n - {temp.get('equip_no')}:\t{temp.get('plan_sum')}/{temp.get('actual_sum')}"""
-mk_str += "\n"
+mk_str += f"\n - 日计划量/生产量: {plan_all}/{actual_all} \n"
 now_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 # data = "\n - Z01:\t100/99\n - Z02:\t100/99\n - Z03:\t100/99\n - Z04:\t100/99\n - Z05:\t100/99\n\n"
 from pyecharts.charts import Bar
@@ -77,12 +79,13 @@ bar.render(path="index.html")
 # with open(r"D:\index.gif", 'rb') as f:
 #     base64_data = base64.b64encode(f.read())
 #     s = base64_data.decode()
-
+text = f"# 密炼机台产量统计(车)\n\n{mk_str} > [[数据可视化]](http://10.4.10.54/data/)\n\n**发布时间:{now_time}** [[mes]](http://10.4.10.54/)"
+print(text)
 message = {
     "msgtype": "markdown",
     "markdown": {
         "title": "每日通知",
-        "text": f"# 密炼机台产量统计(车)\n\n{mk_str}> [[数据可视化]](http://10.4.10.54/data/)\n\n**发布时间:{now_time}** [[mes]](http://10.4.10.54/) \n"
+        "text": text
     },
     "at": {
     "atMobiles": [],

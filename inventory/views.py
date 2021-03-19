@@ -2,9 +2,14 @@ import datetime
 import json
 import logging
 import random
+from io import BytesIO
 
+import xlwt
+from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.db.transaction import atomic
+from django.forms import model_to_dict
+from django.http import HttpResponse
 
 from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
@@ -17,20 +22,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import GlobalCode
+from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter
+    MaterialPlanManagementFilter, BarcodeQualityFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
+    MaterialInHistory
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
     InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
-    MaterialPlanManagementSerializer
+    MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -44,6 +50,7 @@ from mes.paginations import SinglePageNumberPagination
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
+from terminal.models import LoadMaterialLog, WeightBatchingLog
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -79,23 +86,26 @@ class MaterialInventoryView(GenericViewSet,
         page = params.get("page", 1)
         page_size = params.get("page_size", 10)
         material_type = params.get("material_type")
+        material_no = params.get("material_no")
+        filter_str = ""
         if material_type:
-            sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
-                           sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
-                           max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                           max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
-                           Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
-                                from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                            where tim.MaterialGroupName='{material_type}'
-                            group by tis.MaterialCode, tis.StockDetailState;"""
-        else:
-            sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
-                                       sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
-                                       max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
-                                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
-                                       Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
-                                            from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
-                                        group by tis.MaterialCode, tis.StockDetailState;"""
+            if filter_str:
+                filter_str += f" and tim.MaterialGroupName like '%%{material_type}%%'"
+            else:
+                filter_str += f" where tim.MaterialGroupName like '%%{material_type}%%'"
+        if material_no:
+            if filter_str:
+                filter_str += f" and tis.MaterialCode like '%%{material_no}%%'"
+            else:
+                filter_str += f" where tis.MaterialCode like '%%{material_no}%%'"
+        sql = f"""select sum(tis.Quantity) qty, max(tis.MaterialName) material_name,
+                       sum(tis.WeightOfActual) weight,tis.MaterialCode material_no,
+                       max(tis.ProductionAddress) address, sum(tis.WeightOfActual)/sum(tis.Quantity) unit_weight,
+                       max(tis.WeightUnit) unit, max(tim.MaterialGroupName) material_type,
+                       Row_Number() OVER (order by tis.MaterialCode) sn, tis.StockDetailState status
+                            from t_inventory_stock tis left join t_inventory_material tim on tim.MaterialCode=tis.MaterialCode
+                        {filter_str}
+                        group by tis.MaterialCode, tis.StockDetailState;"""
         try:
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
@@ -146,6 +156,7 @@ class ProductInventory(GenericViewSet,
         page = params.get("page", 1)
         page_size = params.get("page_size", 10)
         stage = params.get("stage")
+        material_no = params.get("material_no")
         try:
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
@@ -158,14 +169,21 @@ class ProductInventory(GenericViewSet,
                 raise ValidationError("page/page_size值异常")
         stage_list = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True,
                                                global_type__type_name="胶料段次").values_list("global_name", flat=True)
+        filter_str = ""
         if stage:
             if stage not in stage_list:
                 raise ValidationError("胶料段次异常请修正后重试")
-            sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
-                FROM v_ASRS_STORE_MESVIEW where 物料编码 like '%{stage}%' group by 物料编码"""
-        else:
-            sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
-                FROM v_ASRS_STORE_MESVIEW group by 物料编码"""
+            if filter_str:
+                filter_str += f" AND 物料编码 like '%{stage}%'"
+            else:
+                filter_str += f" where 物料编码 like '%{stage}%'"
+        if material_no:
+            if filter_str:
+                filter_str += f" AND 物料编码 like '%{material_no}%'"
+            else:
+                filter_str += f" where 物料编码 like '%{material_no}%'"
+        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
+            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码"""
         sql_all = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW"""
         sql_fm = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW where 物料编码 like '%FM%'"""
         sc = SqlClient(sql=sql)
@@ -210,7 +228,7 @@ class OutWorkFeedBack(APIView):
         #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
         #         }
         if data:
-            lot_no = data.get("lot_no", "99999999") # 给一个无法查到的lot_no
+            lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
             try:
                 label = receive_deal_result(lot_no)
                 if label:
@@ -302,6 +320,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         '帘布库': [BzFinalMixingRubberInventoryLB, BzFinalMixingRubberLBInventorySerializer],
         '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer],
         '混炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
+        '炭黑库':  [WmsInventoryStock, WmsInventoryStockSerializer],
     }
     permission_classes = (permissions.IsAuthenticated,)
 
@@ -319,11 +338,12 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             yield self.request.query_params.get(query, None)
 
     def get_queryset(self):
+        warehouse_name = self.request.query_params.get('warehouse_name', None)
+        quality_status = self.request.query_params.get('quality_status', None)
         # 终炼胶，帘布库区分 货位地址开头1-4终炼胶   5-6帘布库
         model = self.divide_tool(self.MODEL)
         queryset = None
         material_type, container_no, material_no, order_no, location, tunnel = self.get_query_params()
-        quality_status = self.request.query_params.get('quality_status', None)
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
@@ -360,7 +380,10 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(location__istartswith=tunnel)
             return queryset
         if model == WmsInventoryStock:
-            queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
+            if warehouse_name == "原材料库":
+                queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
+            else:
+                queryset = model.objects.using('cb').raw(WmsInventoryStock.get_sql(material_type, material_no))
         return queryset
 
     def get_serializer_class(self):
@@ -386,10 +409,6 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
         order_no = self.request.query_params.get("order_no")
-        if start_time:
-            filter_dict.update(start_time__gte=start_time)
-        if end_time:
-            filter_dict.update(start_time__lte=end_time)
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -397,6 +416,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         if order_no:
             filter_dict.update(order_no__icontains=order_no)
         if store_name == "混炼胶库":
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
             if order_type == "出库":
                 if self.request.query_params.get("type") == "正常出库":
                     actual_type = "生产出库"
@@ -414,19 +437,37 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
+        elif store_name == "原材料库":
+            if start_time:
+                filter_dict.update(task__start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(task__start_time__lte=end_time)
+            if order_type == "出库":
+                return MaterialOutHistory.objects.using('wms').filter(**filter_dict)
+            else:
+                return MaterialInHistory.objects.using('wms').filter(**filter_dict)
+        elif store_name == "炭黑库":
+            if start_time:
+                filter_dict.update(task__start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(task__start_time__lte=end_time)
+            if order_type == "出库":
+                return MaterialOutHistory.objects.using('cb').filter(**filter_dict)
+            else:
+                return MaterialInHistory.objects.using('cb').filter(**filter_dict)
+
         else:
             return InventoryLog.objects.filter(**filter_dict).order_by('-start_time')
 
-    # def get_serializer_class(self):
-    #     store_name = self.request.query_params.get("store_name", "混炼胶库")
-    #     order_type = self.request.query_params.get("order_type", "出库")
-    #     if store_name == "混炼胶库":
-    #         if order_type == "出库":
-    #             return MixGumOutInventoryLogSerializer
-    #         else:
-    #             return MixGumInInventoryLogSerializer
-    #     else:
-    #         return InventoryLogSerializer
+    def get_serializer_class(self):
+        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        order_type = self.request.query_params.get("order_type", "出库")
+        serializer_dispatch = {
+            "混炼胶库": InventoryLogSerializer,
+            "原材料库": InOutCommonSerializer,
+            "炭黑库": InOutCommonSerializer,
+        }
+        return serializer_dispatch.get(store_name, InventoryLogSerializer)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -464,7 +505,7 @@ class MaterialCount(APIView):
             except:
                 raise ValidationError("帘布库连接失败")
         elif store_name == "原材料库":
-            status_map = {"合格":1, "不合格":2}
+            status_map = {"合格": 1, "不合格": 2}
             try:
                 ret = WmsInventoryStock.objects.using('wms').filter(quality_status=status_map.get(status, 1)).values(
                     'material_no').annotate(
@@ -870,7 +911,6 @@ class MaterialPlanManagement(ModelViewSet):
         return Response('新建成功')
 
 
-
 class MateriaTypeNameToAccording(APIView):
     # materia_type_name_to_according
     """根据物料类型和编码找到存在的仓库表"""
@@ -904,7 +944,6 @@ class MateriaTypeNameToAccording(APIView):
 
 class SamplingRules(APIView):
 
-
     def get(self, request, *args, **kwargs):
         params = request.query_params
         material_no = params.get("material_no")
@@ -921,3 +960,168 @@ class SamplingRules(APIView):
         return Response({"result": {"material_no": material_no,
                                     "material_name": material_name,
                                     "sampling_rate": instance.sampling_rate}})
+
+
+class BarcodeQualityViewSet(ModelViewSet):
+    queryset = BarcodeQuality.objects.filter()
+    serializer_class = BarcodeQualitySerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = (BarcodeQualityFilter)
+    permission_classes = (IsAuthenticated,)
+    pagination_class = SinglePageNumberPagination
+
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+        material_type = params.get("material_type")
+        material_no = params.get("material_no")
+        lot_no = params.get("lot_no")
+        page = params.get("page", 1)
+        page_size = params.get("page_size", 10)
+        mes_set = self.queryset.values('lot_no', 'quality_status')
+        quality_dict = {_.get("lot_no"): _.get('quality_status') for _ in mes_set}
+        try:
+            wms_set = WmsInventoryStock.objects.using('wms').raw(WmsInventoryStock.quality_sql(material_type, material_no, lot_no))
+            p = Paginator(wms_set, page_size)
+            s = WmsStockSerializer(p.page(page), many=True, context={"quality_dict": quality_dict})
+            data = s.data
+            return Response({"results": data, "count": p.count})
+        except AttributeError:
+            raise ValidationError("网络拥堵，数据还未返回")
+        except TypeError:
+            raise ValidationError("网络拥堵，数据还未返回")
+
+
+    def create(self, request, *args, **kwargs):
+        data = dict(request.data)
+        lot_no = data.pop("lot_no", None)
+        obj, flag = self.queryset.update_or_create(defaults=data, lot_no=lot_no)
+        if flag:
+            return Response("补充条码状态成功")
+        else:
+            return Response("更新条码状态成功")
+
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export',
+            url_name='export')
+    def export(self, request):
+        """备品备件导入模板"""
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '物料条码信息数据导出'
+        response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建工作簿
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        ws = xlwt.Workbook(encoding='utf-8')
+
+        # 添加第一页数据表
+        w = ws.add_sheet('物料条码信息')  # 新建sheet（sheet的名称为"sheet1"）
+        # for j in [1, 4, 5, 7]:
+        #     first_col = w.col(j)
+        #     first_col.width = 256 * 20
+        # 写入表头
+        w.write(0, 0, u'该数据仅供参考')
+        title_list = [u'No', u'物料类型', u'物料编码', u'物料名称', u'条码', u'托盘号', u'库存数', u'单位重量(kg)', u'总重量', u'品质状态']
+        for title in title_list:
+            w.write(1, title_list.index(title), title)
+        temp_write_list = []
+        count = 1
+        mes_set = self.queryset.values('lot_no', 'quality_status')
+        quality_dict = {_.get("lot_no"): _.get('quality_status') for _ in mes_set}
+        try:
+            wms_set = WmsInventoryStock.objects.using('wms').raw(WmsInventoryStock.quality_sql())
+        except:
+            raise ValidationError("网络拥堵，请稍后重试")
+        s = WmsStockSerializer(wms_set, many=True, context={"quality_dict": quality_dict})
+        for q in s.data:
+            total_weight = q.get('total_weight')
+            qty = q.get('qty')
+            if total_weight and qty:
+                unit_weight = float(total_weight) / float(qty)
+            else:
+                unit_weight = 0
+            line_list = [count, q.get('material_type'), q.get('material_no'), q.get('material_name'),
+                         q.get('lot_no'), q.get('container_no'), qty, round(unit_weight, 3),
+                         total_weight, q.get('quality') if q.get('quality') else None]
+            temp_write_list.append(line_list)
+            count += 1
+        n = 2  # 行数
+        for y in temp_write_list:
+            m = 0  # 列数
+            for x in y:
+                w.write(n, m, x)
+                m += 1
+            n += 1
+        output = BytesIO()
+        ws.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+
+class MaterialTraceView(APIView):
+
+    def get(self, request):
+        lot_no = request.query_params.get("lot_no")
+        if not lot_no:
+            raise ValidationError("请输入条码进行查询")
+        rep = {}
+        # 采样
+        rep["material_sample"] = None
+        # 入库
+        material_in = MaterialInHistory.objects.using('wms').filter(lot_no=lot_no).\
+            values("lot_no", "material_no", "material_name", "location", "pallet_no",
+                   "task__initiator", "supplier", "batch_no", "task__fin_time").last()
+        temp_time = material_in.pop("task__fin_time", datetime.datetime.now())
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=temp_time,
+            end_time__gte=temp_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+            "classes",
+            "plan_schedule"
+        ).order_by("id").last()
+        current_class = work_schedule_plan.classes.global_name
+        material_in["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        material_in["classes_name"] = current_class
+        rep["material_in"] = material_in
+        # 出库
+        material_out = MaterialOutHistory.objects.using('wms').filter(lot_no=lot_no).\
+            values("lot_no", "material_no", "material_name", "location", "pallet_no",
+                   "task__initiator", "supplier", "batch_no", "task__fin_time").last()
+        temp_time = material_out.pop("task__fin_time", datetime.datetime.now())
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=temp_time,
+            end_time__gte=temp_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+            "classes",
+            "plan_schedule"
+        ).order_by("id").last()
+        current_class = work_schedule_plan.classes.global_name
+        material_out["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        material_out["classes_name"] = current_class
+        rep["material_out"] = material_out
+        # 称量投入
+        weight_log = WeightBatchingLog.objects.filter(bra_code=lot_no).\
+            values("bra_code", "material_no", "equip_no", "tank_no", "created_user__username", "created_date", "batch_classes").last()
+        temp_time = weight_log.pop("created_date", datetime.datetime.now())
+        weight_log["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        weight_log["classes_name"] = weight_log.pop("batch_classes", "早班")
+        rep["material_weight"] = weight_log
+        # 密炼投入
+        load_material = LoadMaterialLog.objects.using("SFJ").filter(bra_code=lot_no)\
+            .values("material_no", "bra_code", "weight_time", "feed_log__equip_no",
+                    "feed_log__batch_group", "feed_log__batch_classes").last()
+        temp_time = load_material.pop("weight_time", datetime.datetime.now())
+        load_material["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+        load_material["classes_name"] = load_material.pop("feed_log__batch_classes", "早班")
+        rep["material_load"] = load_material
+        return Response(rep)
+
+
+class ProductTraceView(APIView):
+
+    def get(self, request):
+
+        pass
