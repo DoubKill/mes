@@ -47,7 +47,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         bra_code = attrs['bra_code']
         # 条码来源有三种，wms子系统、收皮条码，称量打包条码
         try:
-            wms_stock = WmsInventoryStock.objects.using('wms').filter(lot_no=bra_code).first()
+            wms_stock = WmsInventoryStock.objects.using('wms').filter(
+                lot_no=bra_code).values('material_no', 'material_name')
         except Exception:
             if settings.DEBUG:
                 wms_stock = None
@@ -57,15 +58,15 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
         material_no = material_name = None
         if wms_stock:
-            msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock.material_no).first()
+            msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock[0]['material_no']).first()
             if msc:
                 # 如果有别称
                 material_no = msc.material.material_no
                 material_name = msc.material.material_name
             else:
                 # 否则按照wms的物料编码
-                material_no = wms_stock.material_no
-                material_name = wms_stock.material_name
+                material_no = wms_stock[0]['material_no']
+                material_name = wms_stock[0]['material_name']
         if pallet_feedback:
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
@@ -153,7 +154,8 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         if not batching_classes_plan:
             raise serializers.ValidationError('参数错误')
         try:
-            wms_stock = WmsInventoryStock.objects.using('wms').filter(lot_no=attr['bra_code']).first()
+            wms_stock = WmsInventoryStock.objects.using('wms').filter(
+                lot_no=attr['bra_code']).values('material_no', 'material_name')
         except Exception:
             if settings.DEBUG:
                 wms_stock = None
@@ -161,6 +163,15 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                 raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
         if not wms_stock:
             raise serializers.ValidationError('该条码信息不存在！')
+        msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock[0]['material_no']).first()
+        if msc:
+            # 如果有别称
+            material_no = msc.material.material_no
+            material_name = msc.material.material_name
+        else:
+            # 否则按照wms的物料编码
+            material_no = wms_stock[0]['material_no']
+            material_name = wms_stock[0]['material_name']
         attr['trains'] = batching_classes_plan.plan_package
         attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
         attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
@@ -170,8 +181,8 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         # attr['batch_time'] = datetime.datetime.now()
         if wms_stock.material_no not in batching_classes_plan.weigh_cnt_type.weighting_material_nos:
             attr['status'] = 2
-        attr['material_name'] = wms_stock.material_name
-        attr['material_no'] = wms_stock.material_no
+        attr['material_name'] = material_name
+        attr['material_no'] = material_no
         return attr
 
     class Meta:
