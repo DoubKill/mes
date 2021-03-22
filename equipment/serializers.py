@@ -49,6 +49,16 @@ class EquipCurrentStatusSerializer(BaseModelSerializer):
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True, help_text='设备名称')
     equip_type = serializers.CharField(source='equip.category.equip_type.global_name', read_only=True, help_text='设备类型')
     process = serializers.CharField(source='equip.category.process.global_name', read_only=True, help_text='工序')
+    maintain_list = serializers.SerializerMethodField(read_only=True, help_text='部位维修列表')
+
+    def get_maintain_list(self, obj):
+        equip_part_set = obj.equip.equip_part_equip.all()
+        part_list = []
+        for equip_part_obj in equip_part_set:
+            maintain_order_set = equip_part_obj.equip_maintenance_order_part.filter(status=3).all()
+            if maintain_order_set:
+                part_list.append(equip_part_obj.name)
+        return set(part_list)
 
     class Meta:
         model = EquipCurrentStatus
@@ -110,6 +120,13 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
         if 'status' in validated_data:
             if validated_data['status'] == 3:  # 开始维修
                 validated_data['begin_time'] = datetime.now()
+                instance.equip_part.equip.equip_current_status_equip.status = '维修开始'
+                instance.equip_part.equip.equip_current_status_equip.save()
+            if validated_data['status'] == 4:  # 结束维修
+                validated_data['end_time'] = datetime.now()
+            if validated_data['status'] == 5:  # 确认完成
+                validated_data['affirm_time'] = datetime.now()
+                validated_data['affirm_user'] = self.context["request"].user
             if validated_data['status'] == 7:  # 退回,重建一张维修单，将之前的维修单状态改为关闭
                 validated_data['status'] = 6
                 EquipMaintenanceOrder.objects.create(
@@ -131,7 +148,17 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
         else:
             validated_data['maintenance_user'] = self.context["request"].user
             validated_data['assign_user'] = self.context["request"].user
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+        if 'status' in validated_data and validated_data['status'] == 4:  # 维修单维修结束之后判断这个设备的所有维修单 没有开始维修的维修单 就把这个设备改为维修结束
+            equip = instance.equip_part.equip
+            part_set = equip.equip_part_equip.all()
+            for part_obj in part_set:
+                main_set = part_obj.equip_maintenance_order_part.filter(status=3).all()
+                if not main_set:
+                    equip.equip_current_status_equip.status = '维修结束'
+                    equip.equip_current_status_equip.save()
+                    continue
+        return instance
 
     class Meta:
         fields = (
