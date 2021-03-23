@@ -622,6 +622,9 @@ class LevelResultSerializer(BaseModelSerializer):
 
 class LabelPrintSerializer(serializers.ModelSerializer):
     """标签打印"""
+    label_type = serializers.IntegerField(required=False)
+    lot_no = serializers.CharField(required=False)
+    data = serializers.CharField(required=False)
 
     class Meta:
         model = LabelPrint

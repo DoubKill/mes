@@ -186,9 +186,10 @@ def get_mtr_list(obj):
                     elif mtr_obj.value < indicator.lower_limit:
                         add_subtract = '-'
 
-
             mtr_max_list.append(
-                {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
+                {'test_indicator_name': mtr_obj.test_indicator_name,
+                 'data_point_name': f'{mtr_obj.data_point_name}({limit})' if limit else mtr_obj.data_point_name,
+                 # 'data_point_name': mtr_obj.data_point_name,
                  'value': mtr_obj.value,
                  'result': result,
                  'max_test_times': mtr_obj.level,
@@ -247,6 +248,7 @@ def receive_deal_result(lot_no):
         results['deal_time'] = mdrls.get_deal_time(mdr_obj)
         # mtr_list
         m_list = get_mtr_list(mdr_obj)  # 这里不用序列化的方法了 因为要加合格区间 在原本的序列化里加了 会影响web页面的 所以重写一个
+        # m_list = mdrls.get_mtr_list(mdr_obj)
         trains = []
         for i in m_list:
             if i != 'table_head':
