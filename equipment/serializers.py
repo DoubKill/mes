@@ -132,7 +132,8 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
             if validated_data['status'] == 4:  # 结束维修
                 validated_data['end_time'] = datetime.now()
             if validated_data['status'] == 5:  # 确认完成
-                validated_data['affirm_time'] = datetime.now()
+                if instance.down_flag:
+                    validated_data['affirm_time'] = datetime.now()
                 validated_data['affirm_user'] = self.context["request"].user
             if validated_data['status'] == 7:  # 退回,重建一张维修单，将之前的维修单状态改为关闭
                 validated_data['status'] = 6
@@ -238,9 +239,12 @@ class EquipMaintenanceOrderLogSerializer(BaseModelSerializer):
             return None
 
     def get_stop_time(self, obj):
-        try:
-            return obj.affirm_time - obj.down_time
-        except:
+        if obj.down_flag:
+            try:
+                return obj.affirm_time - obj.down_time
+            except:
+                return None
+        else:
             return None
 
     class Meta:
