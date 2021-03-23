@@ -89,6 +89,13 @@ class EquipMaintenanceOrderSerializer(BaseModelSerializer):
     affirm_username = serializers.CharField(source='affirm_user.username', read_only=True)
     assign_username = serializers.CharField(source='assign_user.username', read_only=True)
     maintenance_username = serializers.CharField(source='maintenance_user.username', read_only=True)
+    take_time = serializers.SerializerMethodField(read_only=True, help_text='维修时间')
+
+    def get_take_time(self, obj):
+        try:
+            return obj.end_time - obj.begin_time
+        except:
+            return None
 
     class Meta:
         model = EquipMaintenanceOrder
@@ -149,15 +156,18 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
             validated_data['maintenance_user'] = self.context["request"].user
             validated_data['assign_user'] = self.context["request"].user
         instance = super().update(instance, validated_data)
-        if 'status' in validated_data and validated_data['status'] == 4:  # 维修单维修结束之后判断这个设备的所有维修单 没有开始维修的维修单 就把这个设备改为维修结束
+        if 'status' in validated_data and validated_data[
+            'status'] == 4:  # 维修单维修结束之后判断这个设备的所有维修单 没有开始维修的维修单 就把这个设备改为维修结束
             equip = instance.equip_part.equip
             part_set = equip.equip_part_equip.all()
+            part_list = []
             for part_obj in part_set:
                 main_set = part_obj.equip_maintenance_order_part.filter(status=3).all()
-                if not main_set:
-                    equip.equip_current_status_equip.status = '维修结束'
-                    equip.equip_current_status_equip.save()
-                    continue
+                if main_set:
+                    part_list.append(main_set)
+            if not part_list:
+                equip.equip_current_status_equip.status = '维修结束'
+                equip.equip_current_status_equip.save()
         return instance
 
     class Meta:
