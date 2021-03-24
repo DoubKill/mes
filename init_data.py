@@ -385,6 +385,11 @@ permission_data = [
 
     {'id': 297, 'code': 'hl_dashboard', 'name': '混炼胶出库看板', 'parent_id': None},
     {'id': 298, 'code': 'view_hl_dashboard', 'name': '查看', 'parent_id': 297},
+
+    {'id': 299, 'code': 'barcodequality', 'name': '临时条码质量维护', 'parent_id': None},
+    {'id': 300, 'code': 'view_barcodequality', 'name': '查看临时条码质量', 'parent_id': 299},
+    {'id': 301, 'code': 'add_barcodequality', 'name': '维护临时条码质量', 'parent_id': 299},
+    {'id': 302, 'code': 'export_barcodequality', 'name': '导出临时条码质量维护', 'parent_id': 299},
 ]
 
 
