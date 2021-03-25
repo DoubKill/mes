@@ -179,7 +179,7 @@ def get_mtr_list(obj):
                 if indicator:  # 判断value与上下限的比较
                     limit = f"{indicator.lower_limit}-{indicator.upper_limit}"
                     table_head_count[test_indicator_name].remove(data_point_name)
-                    table_head_count[test_indicator_name].append(f'{data_point_name}({limit}')
+                    table_head_count[test_indicator_name].append(f'{data_point_name}[{limit}')
                     table_head_count[test_indicator_name] = list(set(table_head_count[test_indicator_name]))
                     if mtr_obj.value > indicator.upper_limit:
                         add_subtract = '+'
@@ -258,7 +258,7 @@ def receive_deal_result(lot_no):
         for j in m_list['table_head']:
             point_head = []
             for m in m_list['table_head'][j]:
-                s = m.rsplit('(', 1)
+                s = m.rsplit('[', 1)
                 if len(s) > 1:
                     limit = s[1].split('-')
                     point_head.append({"point": s[0], "upper_limit": limit[1], "lower_limit": limit[0]})
