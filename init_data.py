@@ -6,8 +6,6 @@ import os
 import django
 import shutil
 
-
-
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
@@ -385,6 +383,63 @@ permission_data = [
 
     {'id': 297, 'code': 'hl_dashboard', 'name': '混炼胶出库看板', 'parent_id': None},
     {'id': 298, 'code': 'view_hl_dashboard', 'name': '查看', 'parent_id': 297},
+
+    {'id': 299, 'code': 'equip_part', 'name': '设备部位定义', 'parent_id': None},
+    {'id': 300, 'code': 'view_equip_part', 'name': '查看', 'parent_id': 299},
+    {'id': 301, 'code': 'add_equip_part', 'name': '增加', 'parent_id': 299},
+    {'id': 302, 'code': 'change_equip_part', 'name': '编辑', 'parent_id': 299},
+    {'id': 303, 'code': 'delete_equip_part', 'name': '删除', 'parent_id': 299},
+
+    {'id': 304, 'code': 'equip_down_type', 'name': '停机类型定义', 'parent_id': None},
+    {'id': 305, 'code': 'view_equip_down_type', 'name': '查看', 'parent_id': 304},
+    {'id': 306, 'code': 'add_equip_down_type', 'name': '增加', 'parent_id': 304},
+    {'id': 307, 'code': 'delete_equip_down_type', 'name': '删除', 'parent_id': 304},
+
+    {'id': 308, 'code': 'equip_down_reason', 'name': '停机原因定义', 'parent_id': None},
+    {'id': 309, 'code': 'add_equip_down_reason', 'name': '增加', 'parent_id': 308},
+    {'id': 310, 'code': 'view_equip_down_reason', 'name': '查看', 'parent_id': 308},
+    {'id': 311, 'code': 'change_equip_down_reason', 'name': '编辑', 'parent_id': 308},
+    {'id': 312, 'code': 'delete_equip_down_reason', 'name': '删除', 'parent_id': 308},
+
+    {'id': 313, 'code': 'equip_current_status', 'name': '设备维修申请页面', 'parent_id': None},
+    {'id': 314, 'code': 'view_equip_current_status', 'name': '查看', 'parent_id': 313},
+    {'id': 315, 'code': 'maintenance_request_equip_current_status ', 'name': '维修申请', 'parent_id': 313},
+    {'id': 316, 'code': 'affirm_equip_current_status', 'name': '确认启动', 'parent_id': 313},
+
+    {'id': 317, 'code': 'equip_maintenance_order', 'name': '设备维修单管理', 'parent_id': None},
+    {'id': 318, 'code': 'view_equip_maintenance_order', 'name': '查看', 'parent_id': 317},
+    {'id': 319, 'code': 'change_equip_maintenance_order', 'name': '编辑', 'parent_id': 317},
+    {'id': 320, 'code': 'add_equip_maintenance_order', 'name': '增加', 'parent_id': 317},
+    {'id': 321, 'code': 'designate_equip_maintenance_order', 'name': '指派', 'parent_id': 317},
+    {'id': 322, 'code': 'order_receiving_equip_maintenance_order', 'name': '接单', 'parent_id': 317},
+    {'id': 323, 'code': 'chargeback_equip_maintenance_order', 'name': '退单', 'parent_id': 317},
+    {'id': 324, 'code': 'close_equip_maintenance_order', 'name': '关闭', 'parent_id': 317},
+
+    {'id': 325, 'code': 'equip_status', 'name': '设备运行现况', 'parent_id': None},
+    {'id': 326, 'code': 'view_equip_status', 'name': '查看', 'parent_id': 325},
+
+    {'id': 327, 'code': 'equip_maintenance_order_log', 'name': '设备维修履历', 'parent_id': None},
+    {'id': 328,'code': 'view_equip_maintenance_order_log', 'name': '查看', 'parent_id': 327},
+
+    {'id': 329, 'code': 'property_type_node', 'name': '资产类型节点', 'parent_id': None},
+    {'id': 330, 'code': 'view_property_type_node', 'name': '查看', 'parent_id': 329},
+    {'id': 331, 'code': 'add_property_type_node', 'name': '增加', 'parent_id': 329},
+    {'id': 332, 'code': 'delete_property_type_node', 'name': '删除', 'parent_id': 329},
+
+    {'id': 333, 'code': 'property', 'name': '资产', 'parent_id': None},
+    {'id': 334, 'code': 'view_property', 'name': '查看', 'parent_id': 333},
+    {'id': 335, 'code': 'add_property', 'name': '增加', 'parent_id': 333},
+    {'id': 336, 'code': 'change_property', 'name': '编辑', 'parent_id': 333},
+    {'id': 337, 'code': 'delete_property', 'name': '删除', 'parent_id': 333},
+    {'id': 338, 'code': 'import_property', 'name': '导入', 'parent_id': 333},
+    {'id': 339, 'code': 'download_property', 'name': '模板下载', 'parent_id': 333},
+
+    {'id': 340, 'code': 'platform_config', 'name': '通知配置', 'parent_id': None},
+    {'id': 341, 'code': 'add_platform_config', 'name': '增加', 'parent_id': 340},
+    {'id': 342, 'code': 'delete_platform_config', 'name': '删除', 'parent_id': 340},
+    {'id': 343, 'code': 'change_platform_config', 'name': '编辑', 'parent_id': 340},
+    {'id': 344, 'code': 'view_platform_config', 'name': '查看', 'parent_id': 340},
+
 ]
 
 
@@ -398,7 +453,7 @@ def main():
     print('开始迁移数据库')
     apps = ('system', 'basics', 'plan', 'production',
             'recipe', 'quality', 'inventory', 'spareparts',
-            'terminal','equipment')
+            'terminal', 'equipment')
 
     for app in apps:
         try:
