@@ -339,7 +339,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
 
     @atomic()
     def update(self, instance, validated_data):
-        if instance.used_type not in (1, 4):
+        if instance.used_type not in (1, 4):  # 新建、启用状态的配方才可修改
             raise serializers.ValidationError('操作无效！')
         batching_details = validated_data.pop('batching_details', None)
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
@@ -396,6 +396,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             # 否则新建
                             weight_detail["weigh_cnt_type"] = cnt_type_instance
                             WeighBatchingDetail.objects.create(**weight_detail)
+        instance.used_type = 1
         instance.save()
         return instance
 
