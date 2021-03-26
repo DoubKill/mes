@@ -10,7 +10,8 @@ from rest_framework.routers import DefaultRouter
 from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchProductBatchingVIew, \
     LoadMaterialLogViewSet, EquipOperationLogView, BatchingClassesEquipPlanView, FeedingLogViewSet, \
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
-    WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, MaterialSupplierCollectViewSet
+    WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, MaterialSupplierCollectViewSet, \
+    ProductExchange
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -32,4 +33,5 @@ urlpatterns = [
     path('bar-code-tank/', BarCodeTank.as_view()),
     path('batch-charge-log-list/', BatchChargeLogListViewSet.as_view()),  # 密炼投入履历
     path('weight-batching-log-list/', WeightBatchingLogListViewSet.as_view()),  # 药品投入统计
+    path('product-exchange/', ProductExchange.as_view())
 ]
