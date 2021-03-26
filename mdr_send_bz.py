@@ -58,11 +58,10 @@ def send_bz():
                     logger.error(f"发送失败{res}")
             except Exception as e:
                 logger.error(f"调北自接口发生异常：{e}")
-                pass
         else:  # 两个库都没有
             mdr_obj.update_store_test_flag = 3
             mdr_obj.save()
-            logger.error("没有发送，库存和线边库里都没有")
+            logger.error(f"没有发送，库存和线边库里都没有lot_no:{mdr_obj.lot_no}")
 
 
 if __name__ == '__main__':
