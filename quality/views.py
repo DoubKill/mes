@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from django.db import connection
 from django.utils import timezone
@@ -525,6 +526,8 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             data = serializer.data
         else:
             data = {}
+        if data:
+            data["data"] = json.loads(data.get("data"))
         return Response(data)
 
     @atomic()

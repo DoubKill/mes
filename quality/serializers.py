@@ -572,6 +572,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             for mtr_dict in mtr_max_list:
                 mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
                 mtr_list_return[mto_obj.actual_trains].append(mtr_dict)
+
         table_head_top = {}
         for i in sorted(table_head_count.items(), key=lambda x: len(x[1]), reverse=False):
             table_head_top[i[0]] = i[-1]
