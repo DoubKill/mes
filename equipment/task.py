@@ -12,6 +12,7 @@ from equipment.models import PropertyTypeNode, Property
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
 from socket import timeout
+from django.db.transaction import atomic
 
 import requests
 import time
@@ -63,6 +64,7 @@ def property_template():
     return response
 
 
+@atomic()
 def property_import(file):
     """导入资产"""
     cur_sheet = get_cur_sheet(file)
@@ -87,14 +89,24 @@ def property_import(file):
                 use_date = datetime.datetime.strftime(use_date_1, '%Y-%m-%d')
             except Exception as e:
                 raise ValidationError('时间格式不对')
-            try:
-                Property.objects.create(property_no=i[1], src_no=i[2], financial_no=i[3], equip_type=i[4],
-                                        equip_no=i[5],
-                                        equip_name=i[6], made_in=i[7], capacity=i[8], price=i[9], status=status,
-                                        property_type_node=ptn_obj, leave_factory_no=i[12],
-                                        leave_factory_date=leave_factory_date, use_date=use_date)
-            except Exception as e:
-                raise ValidationError('导入失败，请检查文件格式')
+            p_obj = Property.objects.filter(property_no=i[1]).first
+            if p_obj:
+                Property.objects.filter(property_no=i[1]).update(src_no=i[2], financial_no=i[3], equip_type=i[4],
+                                                                 equip_no=i[5],
+                                                                 equip_name=i[6], made_in=i[7], capacity=i[8],
+                                                                 price=i[9], status=status,
+                                                                 property_type_node=ptn_obj, leave_factory_no=i[12],
+                                                                 leave_factory_date=leave_factory_date,
+                                                                 use_date=use_date)
+            else:
+                try:
+                    Property.objects.create(property_no=i[1], src_no=i[2], financial_no=i[3], equip_type=i[4],
+                                            equip_no=i[5],
+                                            equip_name=i[6], made_in=i[7], capacity=i[8], price=i[9], status=status,
+                                            property_type_node=ptn_obj, leave_factory_no=i[12],
+                                            leave_factory_date=leave_factory_date, use_date=use_date)
+                except Exception as e:
+                    raise ValidationError('导入失败，文件格式不正确')
     return True
 
 
