@@ -122,11 +122,14 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     batching_type = serializers.IntegerField(source='product_batching.batching_type', default=None)
 
     def get_status(self, obj):
-        plan_status = PlanStatus.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
-        if plan_status:
-            return plan_status.status
-        else:
-            return None
+        status = "等待"
+        try:
+            plan_status = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
+            if plan_status:
+                status = plan_status.status
+        except:
+            status = "network error"
+        return status
 
     class Meta:
         model = ProductClassesPlan
