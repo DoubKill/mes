@@ -335,15 +335,15 @@ class PersonalStatisticsView(APIView):
             base_filter = {"maintenance_user": request.user}
         for k, v in time_dispatch.items():
             filter_dict = {
-                "begin_time__isnull": False,
-                "end_time__isnull": False,
+                # "begin_time__isnull": False,
+                # "end_time__isnull": False,
             }
             filter_dict.update(**v)
             queryset = EquipMaintenanceOrder.objects.filter(**base_filter, **filter_dict).\
-                aggregate(min_time=Min((F('end_time')-F('begin_time'))/100000),
-                          max_time=Max((F('end_time')-F('begin_time'))/100000),
-                          all_time=Sum((F('end_time')-F('begin_time'))/100000))
-            ret.update(**{k:dict(queryset)})
+                aggregate(min_time=Min((F('end_time')-F('begin_time'))/1000000),
+                          max_time=Max((F('end_time')-F('begin_time'))/1000000),
+                          all_time=Sum((F('end_time')-F('begin_time'))/1000000))
+            ret.update(**{k: dict(queryset)})
         return Response(ret)
 
 
