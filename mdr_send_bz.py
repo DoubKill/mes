@@ -12,7 +12,7 @@ from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialDealResult
 import logging
 
-logger = logging.getLogger('send_log.log')
+logger = logging.getLogger('send.log')
 
 """定时任务，将胶料处理结果发送给北自"""
 
@@ -24,7 +24,8 @@ def send_bz():
     for max_dict in max_list:
         mdr_obj = MaterialDealResult.objects.filter(lot_no=max_dict['lot_no'], test_time=max_dict['max_test']).exclude(
             update_store_test_flag=1).first()
-
+        if not mdr_obj:
+            continue
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
         bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(
             Q(container_no=pfb_obj.pallet_no) | Q(lot_no=mdr_obj.lot_no)).last()
