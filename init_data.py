@@ -442,9 +442,9 @@ permission_data = [
     {'id': 344, 'code': 'view_platform_config', 'name': '查看', 'parent_id': 340},
 
     {'id': 345, 'code': 'barcodequality', 'name': '临时条码质量维护', 'parent_id': None},
-    {'id': 346, 'code': 'view_barcodequality', 'name': '查看临时条码质量', 'parent_id': 299},
-    {'id': 347, 'code': 'add_barcodequality', 'name': '维护临时条码质量', 'parent_id': 299},
-    {'id': 348, 'code': 'export_barcodequality', 'name': '导出临时条码质量维护', 'parent_id': 299},
+    {'id': 346, 'code': 'view_barcodequality', 'name': '查看临时条码质量', 'parent_id': 345},
+    {'id': 347, 'code': 'add_barcodequality', 'name': '维护临时条码质量', 'parent_id': 345},
+    {'id': 348, 'code': 'export_barcodequality', 'name': '导出临时条码质量维护', 'parent_id': 345},
 ]
 
 
