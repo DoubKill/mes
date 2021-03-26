@@ -62,24 +62,33 @@ class BatchProductionInfoView(APIView):
     def get(self, request):
         mac_address = self.request.query_params.get('mac_address')
         classes = self.request.query_params.get('classes')
-        if not all([mac_address, classes]):
+        if not mac_address:
             raise ValidationError('参数缺失')
         terminal_location = TerminalLocation.objects.filter(terminal__no=mac_address).first()
         if not terminal_location:
             raise ValidationError('该终端位置点不存在')
         equip_no = terminal_location.equip.equip_no
+
+        # 获取当前时间的工厂日期
         now = datetime.datetime.now()
-        work_schedule_plan = WorkSchedulePlan.objects.filter(
-            classes__global_name=classes,
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
             start_time__lte=now,
             end_time__gte=now,
-            plan_schedule__work_schedule__work_procedure__global_name='密炼')
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if current_work_schedule_plan:
+            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+        else:
+            date_now = str(now.date())
+
         plan_actual_data = []  # 计划对比实际数据
         current_product_data = {}  # 当前生产数据
         classes_plans = ProductClassesPlan.objects.filter(
-            work_schedule_plan__in=work_schedule_plan,
+            work_schedule_plan__plan_schedule__day_time=date_now,
             equip__equip_no=equip_no,
             delete_flag=False)
+        if classes:
+            classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
             last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
                                                                            feed_end_time__isnull=False).last()
@@ -93,7 +102,9 @@ class BatchProductionInfoView(APIView):
                     'plan_trains': plan.plan_trains,
                     'actual_trains': actual_trains,
                     'plan_classes_uid': plan.plan_classes_uid,
-                    'status': plan.status}
+                    'status': plan.status,
+                    'classes': plan.work_schedule_plan.classes.global_name
+                }
             )
             if plan.status == '运行中':
                 max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
@@ -489,13 +500,17 @@ class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
             return self.queryset.filter(child_system__isnull=False)
 
 
-class ForceFeedStock(APIView):
-    def post(self, request):
-        feedstock = self.request.query_params.get('plan_classes_uid')
-        if not feedstock:
-            raise ValidationError('缺失参数')
-        try:
-            pass
-        except Exception:
-            return response(success=False)
+@method_decorator([api_recorder], name="dispatch")
+class ProductExchange(APIView):
+    # 规格切换
+    def get(self, request):
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        if plan_classes_uid:
+            plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+            if plan:
+                ProductClassesPlan.objects.filter(equip=plan.equip,
+                                                  work_schedule_plan=plan.work_schedule_plan,
+                                                  status='运行中').update(status='完成')
+                plan.status = '运行中'
+                plan.save()
         return response(success=True)
