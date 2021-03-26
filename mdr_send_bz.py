@@ -12,7 +12,7 @@ from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialDealResult
 import logging
 
-logger = logging.getLogger('send_log')
+logger = logging.getLogger('send_log.log')
 
 """定时任务，将胶料处理结果发送给北自"""
 
@@ -46,11 +46,11 @@ def send_bz():
                 item.append(item_dict)
                 # 向北自发送数据
                 logger.error("向北自发送数据")
-                res = update_wms_kjjg(msg_id=msg_ids, items=item)
+                res = update_wms_kjjg(items=item)
                 if not res:  # res为空代表成功
                     mdr_obj.update_store_test_flag = 1
                     mdr_obj.save()
-                    logger.error("向北自发送数据,发送成功")
+                    logger.info("向北自发送数据,发送成功")
                 else:
                     mdr_obj.update_store_test_flag = 2
                     mdr_obj.save()
