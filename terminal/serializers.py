@@ -251,6 +251,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
             raise serializers.ValidationError('参数错误')
         attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
         attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
+        attr['batch_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
         attr['production_group'] = batching_classes_plan.work_schedule_plan.group.global_name
         attr['dev_type'] = batching_classes_plan.weigh_cnt_type.product_batching.dev_type.category_name
         attr['product_no'] = batching_classes_plan.weigh_cnt_type.product_batching.stage_product_batch_no
@@ -271,7 +272,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
                   'production_factory_date', 'production_classes', 'production_group', 'created_date',
                   'material_details')
         read_only_fields = ('production_factory_date', 'production_classes', 'dev_type', 'product_no',
-                            'production_group', 'created_date', 'material_details', 'bra_code')
+                            'production_group', 'created_date', 'material_details', 'bra_code', 'batch_classes')
 
 
 class WeightPackageUpdateLogSerializer(BaseModelSerializer):
