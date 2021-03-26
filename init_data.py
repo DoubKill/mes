@@ -384,6 +384,7 @@ permission_data = [
     {'id': 297, 'code': 'hl_dashboard', 'name': '混炼胶出库看板', 'parent_id': None},
     {'id': 298, 'code': 'view_hl_dashboard', 'name': '查看', 'parent_id': 297},
 
+
     {'id': 299, 'code': 'equip_part', 'name': '设备部位定义', 'parent_id': None},
     {'id': 300, 'code': 'view_equip_part', 'name': '查看', 'parent_id': 299},
     {'id': 301, 'code': 'add_equip_part', 'name': '增加', 'parent_id': 299},
@@ -440,6 +441,10 @@ permission_data = [
     {'id': 343, 'code': 'change_platform_config', 'name': '编辑', 'parent_id': 340},
     {'id': 344, 'code': 'view_platform_config', 'name': '查看', 'parent_id': 340},
 
+    {'id': 345, 'code': 'barcodequality', 'name': '临时条码质量维护', 'parent_id': None},
+    {'id': 346, 'code': 'view_barcodequality', 'name': '查看临时条码质量', 'parent_id': 299},
+    {'id': 347, 'code': 'add_barcodequality', 'name': '维护临时条码质量', 'parent_id': 299},
+    {'id': 348, 'code': 'export_barcodequality', 'name': '导出临时条码质量维护', 'parent_id': 299},
 ]
 
 

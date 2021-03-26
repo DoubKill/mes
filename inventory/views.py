@@ -52,7 +52,7 @@ from production.models import PalletFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
-from terminal.models import LoadMaterialLog, WeightBatchingLog
+from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -1076,34 +1076,40 @@ class MaterialTraceView(APIView):
         material_in = MaterialInHistory.objects.using('wms').filter(lot_no=lot_no).\
             values("lot_no", "material_no", "material_name", "location", "pallet_no",
                    "task__initiator", "supplier", "batch_no", "task__fin_time").last()
-        temp_time = material_in.pop("task__fin_time", datetime.datetime.now())
-        work_schedule_plan = WorkSchedulePlan.objects.filter(
-            start_time__lte=temp_time,
-            end_time__gte=temp_time,
-            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
-            "classes",
-            "plan_schedule"
-        ).order_by("id").last()
-        current_class = work_schedule_plan.classes.global_name
-        material_in["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
-        material_in["classes_name"] = current_class
-        rep["material_in"] = [material_in]
+        if material_in:
+            temp_time = material_in.pop("task__fin_time", datetime.datetime.now())
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=temp_time,
+                end_time__gte=temp_time,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+                "classes",
+                "plan_schedule"
+            ).order_by("id").last()
+            current_class = work_schedule_plan.classes.global_name
+            material_in["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+            material_in["classes_name"] = current_class
+            rep["material_in"] = [material_in]
+        else:
+            rep["material_in"] = []
         # 出库
         material_out = MaterialOutHistory.objects.using('wms').filter(lot_no=lot_no).\
             values("lot_no", "material_no", "material_name", "location", "pallet_no",
                    "task__initiator", "supplier", "batch_no", "task__fin_time").last()
-        temp_time = material_out.pop("task__fin_time", datetime.datetime.now())
-        work_schedule_plan = WorkSchedulePlan.objects.filter(
-            start_time__lte=temp_time,
-            end_time__gte=temp_time,
-            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
-            "classes",
-            "plan_schedule"
-        ).order_by("id").last()
-        current_class = work_schedule_plan.classes.global_name
-        material_out["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
-        material_out["classes_name"] = current_class
-        rep["material_out"] = [material_out]
+        if material_out:
+            temp_time = material_out.pop("task__fin_time", datetime.datetime.now())
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=temp_time,
+                end_time__gte=temp_time,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+                "classes",
+                "plan_schedule"
+            ).order_by("id").last()
+            current_class = work_schedule_plan.classes.global_name
+            material_out["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+            material_out["classes_name"] = current_class
+            rep["material_out"] = [material_out]
+        else:
+            rep["material_out"] = []
         # 称量投入
         weight_log = WeightBatchingLog.objects.filter(bra_code=lot_no).\
             values("bra_code", "material_no", "equip_no", "tank_no", "created_user__username", "created_date", "batch_classes").last()
@@ -1129,32 +1135,106 @@ class ProductTraceView(APIView):
     }
 
     def get(self, request):
+        #  11个条目
         lot_no = request.query_params.get("lot_no")
         if not lot_no:
             raise ValidationError("请输入条码进行查询")
-        rep = {}
+        rep = {"material_in": [], "material_out": []}
         product_trace = PalletFeedbacks.objects.filter(lot_no=lot_no).values()
-        product_no = product_trace.last().get("product_no")
+        if not product_trace:
+            raise ValidationError("无法查询到该追踪码对应的胶料数据")
+        pallet_feed = product_trace.last()
+        plan_no = pallet_feed.get("plan_classes_uid")
+        product_no = pallet_feed.get("product_no")
+        begin_trains = pallet_feed.get("begin_trains")
+        end_trains = pallet_feed.get("end_trains")
+        trains_list = [x for x in range(begin_trains, end_trains+1)]
+        lml_set = LoadMaterialLog.objects.using("SFJ").filter(feed_log__trains__in=trains_list,
+                                            feed_log__plan_classes_uid=plan_no).distinct()
+        bra_code_list = list(lml_set.values_list("bra_code", flat=True))
+        # 密炼投入
+        material_load = lml_set.values("bra_code", "material_no", "feed_log__equip_no", "weight_time", "feed_log__batch_group", "feed_log__batch_classes")
+        rep["material_load"] = list(material_load)
+        # 料包产出
+        weight_package = WeightPackageLog.objects.filter(bra_code__in=bra_code_list). \
+            values("bra_code", "material_no", "equip_no", "batch_group", "created_date", "batch_classes")
+        rep["weight_package"] = list(weight_package)
+        # 称量投入
+        weight_load =  WeightBatchingLog.objects.filter(bra_code__in=bra_code_list).\
+            values("bra_code", "material_no", "equip_no", "tank_no", "batch_group", "created_date", "batch_classes")
+        rep["weight_load"] = list(weight_load)
         if "FM" in product_no:
-            condition = "终炼胶库"
+            db_rubber = "bz"
         else:
-            condition = "混炼胶库"
+            # db = "lb
+            db_rubber = "bz"
         # 收皮产出追溯
-
-        rep["pallet_feed"] = product_trace
+        rep["pallet_feed"] = list(product_trace)
         if not product_trace:
             raise ValidationError("查不到该条码对应胶料")
-        plan_no = product_trace.last().get("plan_classes_uid")
         plan = ProductClassesPlan.objects.get(plan_classes_uid=plan_no)
         product = plan.product_batching
+
+        # 配方创建
         product_info = model_to_dict(product)
+        temp_time = product_info.get("created_date", datetime.datetime.now())
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=temp_time,
+            end_time__gte=temp_time,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+            "classes",
+            "plan_schedule"
+        ).order_by("id").last()
+        current_class = work_schedule_plan.classes.global_name
+        product_info["classes_name"] = current_class
+        product_info["created_date"] = temp_time
         rep["product_info"] = [product_info]
-        plan_info = model_to_dict(plan)
-        rep["plan_info"] = [plan_info]
-        batch_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_no).values()
-        rep["batch_plan"] = batch_plan
-        product_in = MixGumInInventoryLog.objects.using("bz").filter(lot_no=lot_no).values()
-        rep["product_in"] = product_in
+        # 配料详情
+        product_details = product.batching_details.all().values("product_batching__stage_product_batch_no", "material__material_no", "actual_weight")
+        rep["product_details"] = list(product_details)
+        # 胶料计划
+        plan_info = ProductClassesPlan.objects.filter(plan_classes_uid=plan_no).values("plan_classes_uid",
+                    "equip__equip_no", "product_batching__stage_product_batch_no", "plan_trains", "created_date",
+                    "last_updated_date", "work_schedule_plan__classes__global_name")
+        rep["plan_info"] = list(plan_info)
+        # 小料计划
+        batch_plan = BatchingClassesPlan.objects.filter(weigh_cnt_type__product_batching=product,
+                                                        work_schedule_plan=plan.work_schedule_plan).\
+            values("plan_batching_uid", "weigh_cnt_type__product_batching__equip__equip_no",
+                   "created_date", "last_updated_date", "work_schedule_plan__classes__global_name")
+        rep["batch_plan"] = list(batch_plan)
+        # 收皮入库
+        product_in = MixGumInInventoryLog.objects.using(db_rubber).filter(lot_no=lot_no).values()
+        temp = product_in.last()
+        if temp:
+            temp_time = product_info.get("start_time", datetime.datetime.now())
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=temp_time,
+                end_time__gte=temp_time,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+                "classes",
+                "plan_schedule"
+            ).order_by("id").last()
+            current_class = work_schedule_plan.classes.global_name
+            temp["classes_name"] = current_class
+            rep["product_in"] = [temp]
+        else:
+            rep["product_in"] = []
+        # 胶片发货
         dispatch_log = DispatchLog.objects.filter(lot_no=lot_no).values()
-        rep["dispatch_log"] = dispatch_log
+        temp = dispatch_log.last()
+        if temp:
+            temp_time = product_info.get("order_created_time", datetime.datetime.now())
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=temp_time,
+                end_time__gte=temp_time,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+                "classes",
+                "plan_schedule"
+            ).order_by("id").last()
+            current_class = work_schedule_plan.classes.global_name
+            temp["classes_name"] = current_class
+            rep["dispatch_log"] = [temp]
+        else:
+            rep["dispatch_log"] = []
         return Response(rep)

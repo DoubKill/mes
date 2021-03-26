@@ -544,7 +544,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
         MaterialDealResult.objects.filter(lot_no=instance.lot_no).update(print_time=datetime.datetime.now())
-        return Response(serializer.data)
+        return Response("打印完成")
 
 
 @method_decorator([api_recorder], name="dispatch")
