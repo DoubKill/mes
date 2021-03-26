@@ -629,7 +629,7 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
     def get_unit_weight(self, object):
         try:
-            unit_weight = object.total_weight / object.qty
+            unit_weight = round(object.total_weight / object.qty,3)
         except:
             unit_weight = "数据异常"
         return unit_weight
