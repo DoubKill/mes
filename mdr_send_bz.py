@@ -12,7 +12,7 @@ from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialDealResult
 import logging
 
-logger = logging.getLogger('send.log')
+logger = logging.getLogger('send_log')
 
 """定时任务，将胶料处理结果发送给北自"""
 
