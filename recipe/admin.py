@@ -4,6 +4,7 @@ from django.contrib import admin
 
 
 from recipe.models import ProductBatching, ProductInfo, Material, ProductBatchingDetail, MaterialAttribute, \
-    MaterialSupplier, WeighBatching, WeighCntType
+    MaterialSupplier, WeighCntType
 
-admin.site.register([ProductBatching, ProductInfo, Material, ProductBatchingDetail, MaterialAttribute, MaterialSupplier, WeighBatching,WeighCntType])
+admin.site.register([ProductBatching, ProductInfo, Material, ProductBatchingDetail,
+                     MaterialAttribute, MaterialSupplier, WeighCntType])

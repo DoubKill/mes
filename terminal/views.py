@@ -17,8 +17,7 @@ from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from recipe.models import ProductBatchingDetail
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
-    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter, \
-    LoadMaterialLogFilter
+    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
@@ -63,24 +62,33 @@ class BatchProductionInfoView(APIView):
     def get(self, request):
         mac_address = self.request.query_params.get('mac_address')
         classes = self.request.query_params.get('classes')
-        if not all([mac_address, classes]):
+        if not mac_address:
             raise ValidationError('参数缺失')
         terminal_location = TerminalLocation.objects.filter(terminal__no=mac_address).first()
         if not terminal_location:
             raise ValidationError('该终端位置点不存在')
         equip_no = terminal_location.equip.equip_no
+
+        # 获取当前时间的工厂日期
         now = datetime.datetime.now()
-        work_schedule_plan = WorkSchedulePlan.objects.filter(
-            classes__global_name=classes,
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
             start_time__lte=now,
             end_time__gte=now,
-            plan_schedule__work_schedule__work_procedure__global_name='密炼')
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if current_work_schedule_plan:
+            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+        else:
+            date_now = str(now.date())
+
         plan_actual_data = []  # 计划对比实际数据
         current_product_data = {}  # 当前生产数据
         classes_plans = ProductClassesPlan.objects.filter(
-            work_schedule_plan__in=work_schedule_plan,
+            work_schedule_plan__plan_schedule__day_time=date_now,
             equip__equip_no=equip_no,
             delete_flag=False)
+        if classes:
+            classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
             last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
                                                                            feed_end_time__isnull=False).last()
@@ -94,7 +102,9 @@ class BatchProductionInfoView(APIView):
                     'plan_trains': plan.plan_trains,
                     'actual_trains': actual_trains,
                     'plan_classes_uid': plan.plan_classes_uid,
-                    'status': plan.status}
+                    'status': plan.status,
+                    'classes': plan.work_schedule_plan.classes.global_name
+                }
             )
             if plan.status == '运行中':
                 max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
@@ -125,44 +135,26 @@ class BatchProductBatchingVIew(APIView):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         plan_batching_uid = self.request.query_params.get('plan_batching_uid')
         if plan_classes_uid:
-            ret = []
-            material_ids = []
+            # 生产计划配方详情
             classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
             if not classes_plan:
                 raise ValidationError('该计划不存在')
-            if hasattr(classes_plan.product_batching, 'weighbatching'):
-                stage_product_batch_no = classes_plan.product_batching.stage_product_batch_no
-                weight_batching = classes_plan.product_batching.weighbatching
-                weight_cnt_types = weight_batching.weight_types.all()
-                for item in weight_cnt_types:
-                    if item.weight_details.filter():
-                        cnt_type_mat_ids = item.weight_details.values_list('material_id', flat=True)
-                        material_ids.extend(cnt_type_mat_ids)
-                        if item.weigh_type == 1:
-                            ret.append({
-                                'material__material_name': stage_product_batch_no + '硫磺包' + str(item.tag),
-                                'actual_weight': item.total_weight
-                            })
-                        else:
-                            ret.append({
-                                'material__material_name': stage_product_batch_no + '细料包' + str(item.tag),
-                                'actual_weight': item.total_weight
-                            })
-                ret.extend(ProductBatchingDetail.objects.exclude(material_id__in=material_ids).filter(
-                    product_batching=classes_plan.product_batching, delete_flag=False
-                    ).values('material__material_name', 'actual_weight'))
-            else:
-                ret = ProductBatchingDetail.objects.filter(
-                    product_batching=classes_plan.product_batching,
-                    delete_flag=False
-                ).values('material__material_name',  'actual_weight')
+            ret = list(ProductBatchingDetail.objects.filter(
+                product_batching=classes_plan.product_batching,
+                delete_flag=False
+            ).values('material__material_name', 'actual_weight'))
+            for weight_cnt_type in classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
+                ret.append({
+                    'material__material_name': weight_cnt_type.name,
+                    'actual_weight': weight_cnt_type.total_weight
+                })
         else:
+            # 配料计划详情
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if not batching_class_plan:
                 raise ValidationError('配料计划uid不存在')
-            ret = batching_class_plan.weigh_cnt_type.weight_details.values('material__material_no',
-                                                                            'material__material_name',
-                                                                            'standard_weight')
+            ret = batching_class_plan.weigh_cnt_type.weight_details.filter(
+                delete_flag=False).values('material__material_no', 'material__material_name', 'standard_weight')
         return Response(ret)
 
 
@@ -174,11 +166,29 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gener
     create:
         新增投料履历
     """
-    queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_classes = LoadMaterialLogFilter
+    queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
+
+    def get_queryset(self):
+        queryset = self.queryset
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        production_factory_date = self.request.query_params.get('production_factory_date')
+        equip_no = self.request.query_params.get('equip_no')
+        production_classes = self.request.query_params.get('production_classes')
+        material_no = self.request.query_params.get('material_no')
+        if plan_classes_uid:
+            queryset = queryset.filter(feed_log__plan_classes_uid=plan_classes_uid)
+        if production_factory_date:
+            queryset = queryset.filter(feed_log__production_factory_date=production_factory_date)
+        if equip_no:
+            queryset = queryset.filter(feed_log__equip_no=equip_no)
+        if production_classes:
+            queryset = queryset.filter(feed_log__production_classes=production_classes)
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
+        return queryset
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -381,11 +391,25 @@ class BatchChargeLogListViewSet(ListAPIView):
     serializer_class = LoadMaterialLogListSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
-    filter_class = LoadMaterialLogFilter
 
     def get_queryset(self):
-        queryset = LoadMaterialLog.objects.using('SFJ').all()
+        queryset = LoadMaterialLog.objects.using('SFJ').all().order_by('-id')
         mixing_finished = self.request.query_params.get('mixing_finished', None)
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        production_factory_date = self.request.query_params.get('production_factory_date')
+        equip_no = self.request.query_params.get('equip_no')
+        production_classes = self.request.query_params.get('production_classes')
+        material_no = self.request.query_params.get('material_no')
+        if plan_classes_uid:
+            queryset = queryset.filter(feed_log__plan_classes_uid=plan_classes_uid)
+        if production_factory_date:
+            queryset = queryset.filter(feed_log__production_factory_date=production_factory_date)
+        if equip_no:
+            queryset = queryset.filter(feed_log__equip_no=equip_no)
+        if production_classes:
+            queryset = queryset.filter(feed_log__production_classes=production_classes)
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
         if mixing_finished:
             if mixing_finished == "终炼":
                 queryset = queryset.filter(feed_log__product_no__icontains="FM").all()
@@ -476,13 +500,17 @@ class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
             return self.queryset.filter(child_system__isnull=False)
 
 
-class ForceFeedStock(APIView):
-    def post(self, request):
-        feedstock = self.request.query_params.get('plan_classes_uid')
-        if not feedstock:
-            raise ValidationError('缺失参数')
-        try:
-            pass
-        except Exception:
-            return response(success=False)
+@method_decorator([api_recorder], name="dispatch")
+class ProductExchange(APIView):
+    # 规格切换
+    def get(self, request):
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        if plan_classes_uid:
+            plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+            if plan:
+                ProductClassesPlan.objects.filter(equip=plan.equip,
+                                                  work_schedule_plan=plan.work_schedule_plan,
+                                                  status='运行中').update(status='完成')
+                plan.status = '运行中'
+                plan.save()
         return response(success=True)

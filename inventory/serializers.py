@@ -19,7 +19,8 @@ from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan
+    DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
+    BarcodeQuality
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB
@@ -67,24 +68,31 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        try:
-            inventory = BzFinalMixingRubberInventory.objects.using('bz').get(location=location)
-        except:
-            raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
-        if inventory.location_status not in ["有货货位"]:
-            raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
+        # try:
+        #     inventory = BzFRuinalMixingbberInventory.objects.using('bz').get(location=location)
+        # except:
+        #     raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
+        # if inventory.location_status not in ["有货货位"]:
+        #     raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
         if location:
             if not location[0] in STATION_LOCATION_MAP[station]:
                 raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        else:
-            material_no = validated_data.get("material_no")
-            location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
-            for location in location_set:
-                if not location[0] in STATION_LOCATION_MAP[station]:
-                    raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+
+            temp_location = BzFinalMixingRubberInventory.objects.using('bz').filter(location=location).last()
+            if not temp_location:
+                raise serializers.ValidationError(f"无{location}货架")
+            else:
+                if temp_location.location_status != "有货货位":
+                    raise serializers.ValidationError(f"{location}货架为异常货架，请操作wms")
+        # else:
+        #     material_no = validated_data.get("material_no")
+        #     location_set = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no=material_no).values_list("location", flat=True)
+        #     for location in location_set:
+        #         if not location[0] in STATION_LOCATION_MAP[station]:
+        #             raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+        order_no = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")[2:-1]
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
         status = validated_data['status']
@@ -658,7 +666,7 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     """终炼胶|帘布库共用序列化器"""
 
     class Meta:
-        model = BzFinalMixingRubberInventory
+        model = BzFinalMixingRubberInventoryLB
         fields = "__all__"
 
 
@@ -971,3 +979,56 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialOutPlan
         fields = '__all__'
+
+
+class BarcodeQualitySerializer(BaseModelSerializer):
+
+    class Meta:
+        model = BarcodeQuality
+        fields = '__all__'
+
+
+class WmsStockSerializer(BaseModelSerializer):
+    quality= serializers.SerializerMethodField(read_only=True)
+    unit_weight = serializers.SerializerMethodField(read_only=True)
+
+    def get_quality(self, obj):
+        quality_dict = self.context.get("quality_dict")
+        return quality_dict.get(obj.lot_no) if quality_dict.get(obj.lot_no) else None
+
+    def get_unit_weight(self, obj):
+        try:
+            unit_weight = str(round(obj.total_weight / obj.qty, 2))
+        except:
+            return str(0.00)
+        return unit_weight
+
+
+    class Meta:
+        model = WmsInventoryStock
+        exclude = ('sn', 'in_storage_time', 'quality_status')
+
+
+class InOutCommonSerializer(serializers.Serializer):
+    """库存库表均不统一,只读序列化器"""
+    id = serializers.IntegerField(read_only=True)
+    order_no = serializers.CharField(max_length=64, read_only=True)
+    pallet_no = serializers.CharField(max_length=64, read_only=True)
+    location = serializers.CharField(max_length=64, read_only=True)
+    qty = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    weight = serializers.DecimalField(max_digits=18, decimal_places=2, read_only=True)
+    unit = serializers.CharField(read_only=True, max_length=50)
+    lot_no = serializers.CharField(max_length=64, read_only=True)
+    inout_type = serializers.IntegerField(read_only=True)
+    material_no = serializers.CharField(max_length=64, read_only=True)
+    material_name = serializers.CharField(max_length=64, read_only=True)
+    initiator = serializers.CharField(source='task.initiator', read_only=True)
+    start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
+    fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
+    order_type = serializers.SerializerMethodField()
+
+    def get_order_type(self, obj):
+        if obj.inout_type == 1:
+            return "入库"
+        else:
+            return "出库"

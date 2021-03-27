@@ -6,6 +6,7 @@ import pymssql
 from DBUtils.PooledDB import PooledDB
 from rest_framework import status, mixins
 from rest_framework.generics import CreateAPIView
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 
@@ -77,6 +78,14 @@ class UserFunctions(object):
             codes = [item.split('_')[0] for item in queryset.values_list('code', flat=True)]
             permissions[perm.code] = codes
         return permissions
+
+    def model_permission(self, model_name):
+        """
+        获取用户关于具体一个model的权限
+        :param model_name:
+        :return:
+        """
+        return self.get_all_permissions()
 
 
 User.__bases__ += (UserFunctions,)
@@ -177,3 +186,39 @@ class TerminalCreateAPIView(CreateAPIView):
                 message=list(serializer.errors.values())[0][0])  # 只返回一条错误信息
         self.perform_create(serializer)
         return response(success=True)
+
+
+class MesPermisson(BasePermission):
+
+    def method_map(self, method):
+        mapper = {
+            "get": "view",
+            "post": "add",
+            "put": "change",
+            "delete": "delete",
+            "patch": "change"
+        }
+        return mapper.get(method)
+
+
+    def has_permission(self, request, view):
+        try:
+            model_name = view.queryset.model.__name__.lower()
+        except Exception as e:
+            print(e)
+            return True
+        method = request.Method.lower()
+        operation = self.method_map(method)
+        permissions = request.user.permissions_list
+        permissions = [x.lower() for x in permissions]
+        """
+        Return `True` if permission is granted, `False` otherwise.
+        """
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        """
+        Return `True` if permission is granted, `False` otherwise.
+        """
+        return True
+
