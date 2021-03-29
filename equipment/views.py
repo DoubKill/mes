@@ -1,3 +1,4 @@
+import copy
 import datetime as dt
 
 from django.db.models import F, Min, Max, Sum
@@ -366,7 +367,7 @@ class EquipErrorDayStatisticsView(APIView):
         time_list = [0 for _ in class_list]
         percent_list = [0 for _ in class_list]
         class_list.append(str(factory_date))
-        ret = {x: {"class_name": class_list, "error_time": time_list, "error_percent": percent_list} for x in equip_list}
+        ret = {x: {"class_name": class_list, "error_time": copy.deepcopy(time_list), "error_percent": copy.deepcopy(percent_list)} for x in equip_list}
         data_set = temp_set.values('equip_part__equip__equip_no', 'class_name').\
             annotate(all_time=Sum((F('end_time')-F('begin_time'))/(1000000*60))).values('equip_part__equip__equip_no', 'class_name', 'all_time')
         for temp in data_set:
@@ -374,8 +375,8 @@ class EquipErrorDayStatisticsView(APIView):
             data_index = equip_data["class_name"].index(temp.get('class_name'))
             equip_data["error_time"][data_index] = temp.get('all_time')
             equip_data["error_percent"][data_index] = round(temp.get('all_time')/(12*60), 4)
-        for k, v in ret.items():
-            v["error_time"].append(sum(v["error_time"]))
-            v["error_percent"].append(sum(v["error_percent"])/2)
+        for k in ret.keys():
+            ret[k]["error_time"].append(sum(ret[k]["error_time"]))
+            ret[k]["error_percent"].append(sum(ret[k]["error_percent"])/2)
         return Response(ret)
 
