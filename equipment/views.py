@@ -359,7 +359,8 @@ class EquipErrorDayStatisticsView(APIView):
             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         if not work_schedule_plan:
             raise ValidationError(f'{now}无排班，请补充排班信息')
-        factory_date = work_schedule_plan.plan_schedule.day_time
+        day_time = work_schedule_plan.plan_schedule.day_time
+        factory_date = request.query_params.get("day_time", day_time)
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date)
         # 动态生成表头字段
         equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
@@ -380,3 +381,21 @@ class EquipErrorDayStatisticsView(APIView):
             ret[k]["error_percent"].append(sum(ret[k]["error_percent"])/2)
         return Response(ret)
 
+
+class EquipErrorWeekStatisticsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        now = datetime.now()
+        month = now.month
+        year = now.year
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+        equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
+        ret = {e: {} for e in equip_list}
+        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name').\
+            annotate(all_time=Sum((F('end_time')-F('begin_time'))/(1000000*60))).\
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time')
+        for temp in data_set:
+            ret[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in ret.items():
+            ret[k]["sum"] = sum(v.values())
+        return Response(ret)
