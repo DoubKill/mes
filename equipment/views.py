@@ -362,12 +362,13 @@ class EquipErrorDayStatisticsView(APIView):
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date)
         # 动态生成表头字段
         equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
-        class_list = list(GlobalCode.objects.filter(global_type__type_name='班次', use_flag=False).values_list('global_name', flat=True))
-        time_list = [1 for _ in class_list]
-        percent_list = [2 for _ in class_list]
+        class_list = list(GlobalCode.objects.filter(global_type__type_name='班次', use_flag=True).values_list('global_name', flat=True))
+        time_list = [0 for _ in class_list]
+        percent_list = [0 for _ in class_list]
         class_list.append(str(factory_date))
         ret = {x: {"class_name": class_list, "error_time": time_list, "error_percent": percent_list} for x in equip_list}
-        data_set = temp_set.values('equip_part__equip__equip_no', 'class_name').annotate(all_time=Sum((F('end_time')-F('begin_time'))/(1000000*60))).values()
+        data_set = temp_set.values('equip_part__equip__equip_no', 'class_name').\
+            annotate(all_time=Sum((F('end_time')-F('begin_time'))/(1000000*60))).values('equip_part__equip__equip_no', 'class_name', 'all_time')
         for temp in data_set:
             equip_data = ret[temp.get('equip_part__equip__equip_no')]
             data_index = equip_data["class_name"].index(temp.get('class_name'))
