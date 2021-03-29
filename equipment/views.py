@@ -23,7 +23,7 @@ from rest_framework.decorators import action
 
 from rest_framework.viewsets import ModelViewSet
 
-from basics.models import Equip
+from basics.models import Equip, GlobalCode
 from equipment.serializers import EquipRealtimeSerializer
 from mes.paginations import SinglePageNumberPagination
 from plan.uuidfield import UUidTools
@@ -346,4 +346,35 @@ class PersonalStatisticsView(APIView):
             ret.update(**{k: dict(queryset)})
         return Response(ret)
 
+
+class EquipErrorDayStatisticsView(APIView):
+
+
+    def get(self, request, *args, **kwargs):
+        now = datetime.now()
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if not work_schedule_plan:
+            raise ValidationError(f'{now}无排班，请补充排班信息')
+        factory_date = work_schedule_plan.plan_schedule.day_time
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date)
+        # 动态生成表头字段
+        equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
+        class_list = list(GlobalCode.objects.filter(global_type__type_name='班次', use_flag=False).values_list('global_name', flat=True))
+        time_list = [1 for _ in class_list]
+        percent_list = [2 for _ in class_list]
+        class_list.append(str(factory_date))
+        ret = {x: {"class_name": class_list, "error_time": time_list, "error_percent": percent_list} for x in equip_list}
+        data_set = temp_set.values('equip_part__equip__equip_no', 'class_name').annotate(all_time=Sum((F('end_time')-F('begin_time'))/(1000000*60))).values()
+        for temp in data_set:
+            equip_data = ret[temp.get('equip_part__equip__equip_no')]
+            data_index = equip_data["class_name"].index(temp.get('class_name'))
+            equip_data["error_time"][data_index] = temp.get('all_time')
+            equip_data["error_percent"][data_index] = round(temp.get('all_time')/(12*60), 4)
+        for k, v in ret.items():
+            v["error_time"].append(sum(v["error_time"]))
+            v["error_percent"].append(sum(v["error_percent"])/2)
+        return Response(ret)
 

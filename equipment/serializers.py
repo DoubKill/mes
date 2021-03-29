@@ -192,8 +192,11 @@ class EquipMaintenanceCreateOrderSerializer(BaseModelSerializer):
             plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         if work_schedule_plan:
             factory_date = work_schedule_plan.plan_schedule.day_time
+            class_name = work_schedule_plan.classes.global_name
         else:
             factory_date = now.date()
+            class_name = "早班"
+        validated_data["class_name"] = class_name
         validated_data['order_uid'] = UUidTools.uuid1_hex('WXD')
         validated_data['factory_date'] = factory_date
         down_flag = validated_data.get('down_flag', None)
