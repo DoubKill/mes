@@ -260,8 +260,16 @@ class ProductBatchingMaterialListView(ListAPIView):
     queryset = Material.objects.filter(delete_flag=False)
 
     def list(self, request, *args, **kwargs):
+        m_type = self.request.query_params.get('type', '1')  # 1胶料  2原材料
         batching_no = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
-        material_data = self.queryset.filter(material_no__in=batching_no).values('id', 'material_no')
+        if m_type == '1':
+            material_data = self.queryset.filter(
+                material_no__in=batching_no).values('id', 'material_no', 'material_name')
+        elif m_type == '2':
+            material_data = self.queryset.exclude(
+                material_no__in=batching_no).values('id', 'material_no', 'material_name')
+        else:
+            raise ValidationError('参数错误')
         return Response(material_data)
 
 
