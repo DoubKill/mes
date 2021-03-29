@@ -44,7 +44,8 @@ urlpatterns = [
     path('personal_repair_statistics/', PersonalStatisticsView.as_view()),
     path('equip-maintenance-order/other/<pk>/', EquipMaintenanceOrderOtherView.as_view()),
     path('day-error-statistics/', EquipErrorDayStatisticsView.as_view()),
-    path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view()),
+    path('month-error-statistics/', EquipErrorMonthStatisticsView.as_view()),
+    path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view())
 ]
 
 

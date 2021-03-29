@@ -365,6 +365,7 @@ class EquipErrorDayStatisticsView(APIView):
         # 动态生成表头字段
         equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
         class_list = list(GlobalCode.objects.filter(global_type__type_name='班次', use_flag=True).values_list('global_name', flat=True))
+        class_count = len(class_list)
         time_list = [0 for _ in class_list]
         percent_list = [0 for _ in class_list]
         class_list.append(str(factory_date))
@@ -372,17 +373,23 @@ class EquipErrorDayStatisticsView(APIView):
         data_set = temp_set.values('equip_part__equip__equip_no', 'class_name').\
             annotate(all_time=Sum((F('end_time')-F('begin_time'))/(1000000*60))).values('equip_part__equip__equip_no', 'class_name', 'all_time')
         for temp in data_set:
+            # class_dict.update(**{temp.get('class_name'): {
+            #     "error_time": temp.get("all_time"),
+            #     "error_percent": round(temp.get('all_time')/(12*60), 4)},
+            #     "equip": temp.get('equip_part__equip__equip_no')
+            # })
+            # ret.append(class_dict)
             equip_data = ret[temp.get('equip_part__equip__equip_no')]
             data_index = equip_data["class_name"].index(temp.get('class_name'))
             equip_data["error_time"][data_index] = temp.get('all_time')
             equip_data["error_percent"][data_index] = round(temp.get('all_time')/(12*60), 4)
         for k in ret.keys():
             ret[k]["error_time"].append(sum(ret[k]["error_time"]))
-            ret[k]["error_percent"].append(sum(ret[k]["error_percent"])/2)
+            ret[k]["error_percent"].append(sum(ret[k]["error_percent"])/class_count)
         return Response(ret)
 
 
-class EquipErrorWeekStatisticsView(APIView):
+class EquipErrorMonthStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
         now = datetime.now()
@@ -398,4 +405,25 @@ class EquipErrorWeekStatisticsView(APIView):
             ret[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
         for k, v in ret.items():
             ret[k]["sum"] = sum(v.values())
+        return Response(ret)
+
+
+class EquipErrorWeekStatisticsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        factory_date = datetime.now().today()
+        monday = factory_date - dt.timedelta(days=factory_date.weekday())
+        sunday = factory_date + dt.timedelta(days=6-factory_date.weekday())
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday)
+        # 各个机台数据
+        equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
+        data = {e: {} for e in equip_list}
+        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
+            annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time')
+        for temp in data_set:
+            data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in data.items():
+            data[k]["sum"] = sum(v.values())
+        ret = {"equips": data}
         return Response(ret)
