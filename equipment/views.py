@@ -352,7 +352,11 @@ class EquipErrorDayStatisticsView(APIView):
 
 
     def get(self, request, *args, **kwargs):
-        now = datetime.now()
+        day_time = request.query_params.get('day_time', '2021-03-03')
+        try:
+            now = datetime.strptime(day_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
         work_schedule_plan = WorkSchedulePlan.objects.filter(
             start_time__lte=now,
             end_time__gte=now,
@@ -392,7 +396,11 @@ class EquipErrorDayStatisticsView(APIView):
 class EquipErrorMonthStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
-        now = datetime.now()
+        month_time = request.query_params.get('day_time', '2021-03')
+        try:
+            now = datetime.strptime(month_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
         month = now.month
         year = now.year
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
@@ -411,7 +419,11 @@ class EquipErrorMonthStatisticsView(APIView):
 class EquipErrorWeekStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
-        factory_date = datetime.now().today()
+        day_time = request.query_params.get('day_time', '2021-03-03')
+        try:
+            factory_date = datetime.strptime(day_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
         monday = factory_date - dt.timedelta(days=factory_date.weekday())
         sunday = factory_date + dt.timedelta(days=6-factory_date.weekday())
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday)
