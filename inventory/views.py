@@ -613,7 +613,7 @@ class DispatchPlanViewSet(ModelViewSet):
         else:
             raise ValidationError('只有执行中和新建才可以关闭！')
 
-
+@method_decorator([api_recorder], name="dispatch")
 class DispatchLocationViewSet(ModelViewSet):
     """目的地"""
     queryset = DispatchLocation.objects.filter(delete_flag=False)
@@ -653,7 +653,7 @@ class DispatchLogView(ListAPIView):
     filter_class = DispatchLogFilter
     permission_classes = (IsAuthenticated,)
 
-
+@method_decorator([api_recorder], name="dispatch")
 class InventoryLogOutViewSet(ModelViewSet):
     """混炼胶库出库履历视图"""
     queryset = InventoryLog.objects.filter(order_type='出库').order_by('-fin_time')
@@ -712,7 +712,7 @@ class InventoryLogOutViewSet(ModelViewSet):
             raise ValidationError('参数不全')
         return queryset
 
-
+@method_decorator([api_recorder], name="dispatch")
 class MaterialInventoryAPIView(APIView):
 
     def get(self, request):
@@ -912,7 +912,7 @@ class MaterialPlanManagement(ModelViewSet):
             raise ValidationError('参数错误')
         return Response('新建成功')
 
-
+@method_decorator([api_recorder], name="dispatch")
 class MateriaTypeNameToAccording(APIView):
     # materia_type_name_to_according
     """根据物料类型和编码找到存在的仓库表"""
@@ -943,7 +943,7 @@ class MateriaTypeNameToAccording(APIView):
                 according_list.append(warehouse_name_according[warehouse_name].__name__)
         return Response(according_list)
 
-
+@method_decorator([api_recorder], name="dispatch")
 class SamplingRules(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -963,7 +963,7 @@ class SamplingRules(APIView):
                                     "material_name": material_name,
                                     "sampling_rate": instance.sampling_rate}})
 
-
+@method_decorator([api_recorder], name="dispatch")
 class BarcodeQualityViewSet(ModelViewSet):
     queryset = BarcodeQuality.objects.filter()
     serializer_class = BarcodeQualitySerializer
@@ -1062,7 +1062,7 @@ class BarcodeQualityViewSet(ModelViewSet):
         response.write(output.getvalue())
         return response
 
-
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTraceView(APIView):
 
     def get(self, request):
@@ -1127,7 +1127,7 @@ class MaterialTraceView(APIView):
         rep["material_load"] = [load_material]
         return Response(rep)
 
-
+@method_decorator([api_recorder], name="dispatch")
 class ProductTraceView(APIView):
     inventory = {
         "终炼胶库": ('lb', []),

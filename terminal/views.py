@@ -488,7 +488,7 @@ class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
             # 没有绑定原材料则认为是子系统的数据
             return self.queryset.filter(child_system__isnull=False)
 
-
+@method_decorator([api_recorder], name="dispatch")
 class ForceFeedStock(APIView):
     def post(self, request):
         feedstock = self.request.query_params.get('plan_classes_uid')

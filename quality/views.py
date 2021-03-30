@@ -734,6 +734,7 @@ class ProductDayDetail(APIView):
         return Response(ruturn_pass)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PrintMaterialDealResult(APIView):
     """不合格品打印功能"""
 
@@ -1116,6 +1117,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         return Response(serializer_data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
 
     def get(self, request, *args, **kwargs):
