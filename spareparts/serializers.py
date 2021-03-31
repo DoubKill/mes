@@ -1,17 +1,13 @@
 import datetime
-from datetime import timedelta
 
 from rest_framework import serializers
 from django.db.transaction import atomic
 
-from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
-from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedule, Equip, SysbaseEquipLevel, \
-    WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute, Location
+from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from plan.uuidfield import UUidTools
-from recipe.models import MaterialAttribute
 from spareparts.models import SpareInventory, SpareLocationBinding, SpareInventoryLog, SpareLocation, SpareType, Spare
-from django.db.models import Avg, Max, Min, Count, Sum  # 引入函数
+from django.db.models import Sum  # 引入函数
 
 
 class MaterialLocationBindingSerializer(BaseModelSerializer):
@@ -169,7 +165,11 @@ class SpareLocationSerializer(BaseModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.global_name')
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.location_no(validated_data['name'])
+        while 1:
+            no = UUidTools.location_no(validated_data['name'])
+            if not SpareLocation.objects.filter(no=no).exists():
+                break
+        validated_data['no'] = no
         type = validated_data.get('type', None)
         if not type:
             validated_data['type'] = GlobalCode.objects.filter(global_name='备品备件地面').first()

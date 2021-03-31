@@ -6,18 +6,18 @@
 import datetime
 import os
 import random
+import uuid
 
 from django.db.models import Max
 import django
 
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
-
 
 from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMethod, MaterialDataPointIndicator
-from plan.uuidfield import UUidTools
 
 
 def main():
@@ -62,16 +62,16 @@ def main():
                     operation_user='admin',
                     begin_trains=st - 1,
                     end_trains=st,
-                    pallet_no=UUidTools.uuid1_hex(pcp.equip.equip_no),
+                    pallet_no=uuid.uuid1(),
                     classes=pcp.work_schedule_plan.classes.global_name,
                     product_time=datetime.datetime.now(),
                     factory_date=pcp.work_schedule_plan.plan_schedule.day_time,
-                    lot_no=UUidTools.uuid1_hex(None),
+                    lot_no=uuid.uuid1(),
                 )
                 for train in [st - 1, st]:
                     mto = MaterialTestOrder.objects.create(
                         lot_no=pf.lot_no,
-                        material_test_order_uid=UUidTools.uuid1_hex(pcp.equip.equip_no),
+                        material_test_order_uid=uuid.uuid1(),
                         actual_trains=train,
                         product_no=pcp.product_batching.stage_product_batch_no,
                         plan_classes_uid=pcp.plan_classes_uid,
