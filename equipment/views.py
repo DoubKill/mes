@@ -1,4 +1,5 @@
 import datetime as dt
+import uuid
 
 from django.db.models import F, Min, Max, Sum
 from django.utils.decorators import method_decorator
@@ -9,7 +10,6 @@ from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter
-from equipment.models import PlatformConfig
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.derorators import api_recorder
@@ -26,7 +26,6 @@ from rest_framework.viewsets import ModelViewSet
 from basics.models import Equip
 from equipment.serializers import EquipRealtimeSerializer
 from mes.paginations import SinglePageNumberPagination
-from plan.uuidfield import UUidTools
 
 
 class EquipRealtimeViewSet(ModelViewSet):
@@ -124,7 +123,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
             if data['down_flag']:
                 instance.status = '停机'
                 instance.save()
-            EquipMaintenanceOrder.objects.create(order_uid=UUidTools.location_no('WX'),
+            EquipMaintenanceOrder.objects.create(order_uid=uuid.uuid1(),
                                                  first_down_reason=data['first_down_reason'],
                                                  first_down_type=data['first_down_type'],
                                                  order_src=1,

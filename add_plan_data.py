@@ -5,16 +5,12 @@
 
 import datetime
 import os
-
-from plan.uuidfield import UUidTools
-
-
 import random
 import django
+import uuid
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
-
 
 from plan.models import ProductDayPlan, ProductClassesPlan
 from recipe.models import ProductBatching
@@ -42,7 +38,7 @@ def main():
                     plan_trains=random.randint(20, 50),
                     unit='车',
                     work_schedule_plan=wsp,
-                    plan_classes_uid=UUidTools.uuid1_hex(pdp.equip.equip_no),
+                    plan_classes_uid=uuid.uuid1(),
                     equip=pdp.equip,
                     product_batching=pdp.product_batching,
                     status=random.choice(['已保存', '等待', '已下达', '运行中', '待停止'])

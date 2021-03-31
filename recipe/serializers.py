@@ -6,10 +6,10 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
+import uuid
 from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
-from plan.uuidfield import UUidTools
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -66,7 +66,7 @@ class MaterialSupplierSerializer(BaseModelSerializer):
     material_name = serializers.CharField(source='material.material_name', read_only=True)
 
     def create(self, validated_data):
-        validated_data['supplier_no'] = UUidTools.uuid1_hex('CD')
+        validated_data['supplier_no'] = uuid.uuid1()
         return super(MaterialSupplierSerializer, self).create(validated_data)
 
     class Meta:
