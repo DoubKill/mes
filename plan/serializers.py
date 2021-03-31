@@ -72,7 +72,11 @@ class ProductDayPlanSerializer(BaseModelSerializer):
                                                                  plan_schedule=instance.plan_schedule).first()
             if not work_schedule_plan:
                 raise serializers.ValidationError('暂无该班次排班数据')
-            detail['plan_classes_uid'] = UUidTools.uuid1_hex(instance.equip.equip_no)
+            while 1:
+                plan_classes_uid = UUidTools.uuid1_hex(instance.equip.equip_no)
+                if not ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).exists():
+                    break
+            detail['plan_classes_uid'] = plan_classes_uid
             detail['product_day_plan'] = instance
             detail['work_schedule_plan'] = work_schedule_plan
             pcp_obj = ProductClassesPlan.objects.create(**detail, created_user=self.context['request'].user)
