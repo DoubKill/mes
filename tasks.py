@@ -91,7 +91,6 @@ def update_wms_kjjg(items=[{
         msg_count = str(len(data_json["items"]))
         data_json["msgId"] = msg_id
         data_json["msgConut"] = msg_count
-        print(data_json)
         return msg_id, out_type, msg_count, user, json.dumps(data_json, ensure_ascii=False)
 #         return "1", "物料快检", "1", "GJ_001", json.dumps({
 #         "msgId": "1",                       #  任务包号       string
@@ -110,7 +109,7 @@ def update_wms_kjjg(items=[{
 # , ensure_ascii=False)
     sender = KJJGUploader()
     ret = sender.request(*get_base_data())
-    print(ret)
+    return ret
 
 if __name__ == '__main__':
     update_wms_kjjg()
