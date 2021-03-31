@@ -1,4 +1,5 @@
 import time
+import uuid
 from datetime import datetime, timedelta
 from django.db.models import Q, F
 from django.db.models import Count
@@ -14,7 +15,6 @@ from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
-from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
@@ -29,7 +29,7 @@ class TestIndicatorSerializer(BaseModelSerializer):
                                                                                message='该指标名称已存在！')])
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.uuid1_hex('TD')
+        validated_data['no'] = uuid.uuid1()
         return super().create(validated_data)
 
     class Meta:
@@ -44,7 +44,7 @@ class TestMethodSerializer(BaseModelSerializer):
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.uuid1_hex('TM')
+        validated_data['no'] = uuid.uuid1()
         return super(TestMethodSerializer, self).create(validated_data)
 
     class Meta:
@@ -58,7 +58,7 @@ class TestTypeSerializer(BaseModelSerializer):
     test_indicator_name = serializers.CharField(source='test_indicator.name', read_only=True)
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.uuid1_hex('TP')
+        validated_data['no'] = uuid.uuid1()
         return super().create(validated_data)
 
     class Meta:
@@ -71,7 +71,7 @@ class DataPointSerializer(BaseModelSerializer):
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.uuid1_hex('TM')
+        validated_data['no'] = uuid.uuid1()
         return super().create(validated_data)
 
     class Meta:
@@ -124,7 +124,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
             instance = test_order
             created = False
         else:
-            validated_data['material_test_order_uid'] = UUidTools.uuid1_hex('KJ')
+            validated_data['material_test_order_uid'] = uuid.uuid1()
             instance = super().create(validated_data)
             created = True
 
@@ -187,11 +187,11 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
     @atomic()
     def create(self, validated_data):
         order_ids = validated_data.pop('order_ids')
-        validated_data['unqualified_deal_order_uid'] = UUidTools.uuid1_hex('UDO')
+        validated_data['unqualified_deal_order_uid'] = uuid.uuid1()
         instance = super().create(validated_data)
         for order_id in order_ids:
             detail = {"unqualified_deal_order": instance,
-                      "unqualified_deal_order_detail_uid": UUidTools.uuid1_hex('UDOD'),
+                      "unqualified_deal_order_detail_uid": uuid.uuid1(),
                       "material_test_order": order_id}
             UnqualifiedDealOrderDetail.objects.create(**detail)
         return instance

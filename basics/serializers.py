@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from rest_framework import serializers
@@ -8,7 +9,6 @@ from basics.models import GlobalCodeType, GlobalCode, ClassesDetail, WorkSchedul
     WorkSchedulePlan, PlanSchedule, EquipCategoryAttribute, Location
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from plan.uuidfield import UUidTools
 
 
 class GlobalCodeTypeSerializer(BaseModelSerializer):
@@ -242,7 +242,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
     def create(self, validated_data):
         day_time = validated_data['day_time']
         work_schedule_plan = validated_data.pop('work_schedule_plan', None)
-        validated_data['plan_schedule_no'] = UUidTools.uuid1_hex(None)
+        validated_data['plan_schedule_no'] = uuid.uuid1()
         instance = super().create(validated_data)
         work_schedule_plan_list = []
         morning_class = ClassesDetail.objects.filter(work_schedule=instance.work_schedule,
@@ -268,7 +268,7 @@ class PlanScheduleSerializer(BaseModelSerializer):
             plan['start_time'] = str(start_day_time) + ' ' + str(class_detail.start_time)
             plan['end_time'] = str(end_day_time) + ' ' + str(class_detail.end_time)
             plan['plan_schedule'] = instance
-            plan['work_schedule_plan_no'] = UUidTools.uuid1_hex(None)
+            plan['work_schedule_plan_no'] = uuid.uuid1(),
             work_schedule_plan_list.append(WorkSchedulePlan(**plan))
         WorkSchedulePlan.objects.bulk_create(work_schedule_plan_list)
         return instance
@@ -279,9 +279,9 @@ class LocationSerializer(BaseModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.global_name')
 
     def create(self, validated_data):
-        validated_data['no'] = UUidTools.uuid1_hex('LT')
-        type = validated_data.get('type', None)
-        if not type:
+        validated_data['no'] = uuid.uuid1(),
+        location_type = validated_data.get('type', None)
+        if not location_type:
             validated_data['type'] = GlobalCode.objects.filter(global_name='备品备件地面').first()
         return super().create(validated_data)
 
