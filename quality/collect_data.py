@@ -1,6 +1,7 @@
 
 import os
 import sys
+import uuid
 from datetime import datetime
 
 import django
@@ -11,7 +12,6 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMethod, MaterialDataPointIndicator
 from basics.models import WorkSchedulePlan
@@ -154,7 +154,7 @@ def main():
                     if not test_order:
                         test_order = MaterialTestOrder.objects.create(
                             lot_no=lot_no,
-                            material_test_order_uid=UUidTools.uuid1_hex('KJ'),
+                            material_test_order_uid=uuid.uuid1(),
                             actual_trains=i,
                             product_no=product_no,
                             plan_classes_uid=pallet.plan_classes_uid,
