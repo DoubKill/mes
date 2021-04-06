@@ -912,6 +912,7 @@ class MaterialPlanManagement(ModelViewSet):
             raise ValidationError('参数错误')
         return Response('新建成功')
 
+
 @method_decorator([api_recorder], name="dispatch")
 class MateriaTypeNameToAccording(APIView):
     # materia_type_name_to_according
@@ -942,6 +943,7 @@ class MateriaTypeNameToAccording(APIView):
             if warehouse_name_according[warehouse_name].objects.filter(**materia_no_filte).exists():
                 according_list.append(warehouse_name_according[warehouse_name].__name__)
         return Response(according_list)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class SamplingRules(APIView):

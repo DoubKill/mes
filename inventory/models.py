@@ -310,10 +310,12 @@ class MaterialOutPlan(AbstractEntity):
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="material_out_plan")
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
-    need_qty = models.PositiveIntegerField(verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
+    need_qty = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求数量', help_text='需求数量', blank=True, null=True)
     need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True,
                                       null=True)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
+    material_name = models.CharField(max_length=64, verbose_name='物料名称', help_text='物料名称', blank=True, null=True)
+    batch_no = models.CharField(max_length=64, verbose_name='批次号', help_text='批次号', blank=True, null=True)
     inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)

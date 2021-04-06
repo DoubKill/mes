@@ -31,10 +31,6 @@ class ProductDataEmulator():
         pass
 
 
-def gen_uuid():
-    return str(uuid.uuid1())
-
-
 def run():
     # TrainsFeedbacks.objects.all().delete()
     # PalletFeedbacks.objects.all().delete()

@@ -5,7 +5,7 @@ from django.db.models import Q, Sum
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from inventory.models import WmsInventoryStock
+from inventory.models import MaterialOutHistory
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -47,7 +47,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         bra_code = attrs['bra_code']
         # 条码来源有三种，wms子系统、收皮条码，称量打包条码
         try:
-            wms_stock = WmsInventoryStock.objects.using('wms').filter(
+            wms_stock = MaterialOutHistory.objects.using('wms').filter(
                 lot_no=bra_code).values('material_no', 'material_name')
         except Exception:
             if settings.DEBUG:
@@ -154,7 +154,7 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         if not batching_classes_plan:
             raise serializers.ValidationError('参数错误')
         try:
-            wms_stock = WmsInventoryStock.objects.using('wms').filter(
+            wms_stock = MaterialOutHistory.objects.using('wms').filter(
                 lot_no=attr['bra_code']).values('material_no', 'material_name')
         except Exception:
             if settings.DEBUG:
@@ -251,6 +251,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
             raise serializers.ValidationError('参数错误')
         attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
         attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
+        attr['batch_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
         attr['production_group'] = batching_classes_plan.work_schedule_plan.group.global_name
         attr['dev_type'] = batching_classes_plan.weigh_cnt_type.product_batching.dev_type.category_name
         attr['product_no'] = batching_classes_plan.weigh_cnt_type.product_batching.stage_product_batch_no
@@ -271,7 +272,7 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
                   'production_factory_date', 'production_classes', 'production_group', 'created_date',
                   'material_details')
         read_only_fields = ('production_factory_date', 'production_classes', 'dev_type', 'product_no',
-                            'production_group', 'created_date', 'material_details', 'bra_code')
+                            'production_group', 'created_date', 'material_details', 'bra_code', 'batch_classes')
 
 
 class WeightPackageUpdateLogSerializer(BaseModelSerializer):

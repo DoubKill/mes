@@ -486,7 +486,6 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num, 'DJJG': djjg,
                          'STATIONID': location, 'SENDDATE': created_time}
-
                 bz_out_type = "生产出库"
             else:
                 dict1 = {}
@@ -953,21 +952,34 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
         out_type = validated_data.get('inventory_type')
         status = validated_data.get('status')
         inventory_reason = validated_data.get('inventory_reason')
+        body_dict = {
+            "指定出库": {
+                "taskNumber": instance.order_no,
+                "entranceCode": "出库口1",   # 待wms给出
+                "allocationInventoryDetails": [{
+                    "taskDetailNumber": instance.order_no + "w1",
+                    "materialCode": instance.material_no,
+                    "materialName": instance.material_name,
+                    "batchNo": instance.batch_no,
+                    "spaceCode": instance.location,
+                    "quantity": instance.need_qty
+                        }]
+                },
+            "正常出库": {
+                "taskNumber": instance.order_no,
+                "entranceCode": "出库口2",
+                "allocationInventoryDetails": [{
+                    "taskDetailNumber": instance.order_no + "w2",
+                    "materialCode": instance.material_no,
+                    "materialName": instance.material_name,
+                    "weightOfActual ": instance.need_weight
+                }]
+            }
+        }
 
-        if out_type == "正常出库" or out_type == "指定出库":
-            msg_id = validated_data['order_no']
-            str_user = self.context['request'].user.username
-            material_no = validated_data['material_no']
-            pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
-            pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
-            pici = pallet.bath_no if pallet else "1"  # 批次号
-            num = instance.need_qty
-            msg_count = "1"
-            location = instance.location if instance.location else ""
-            # 发起时间
-            time = validated_data.get('created_date', datetime.datetime.now())
-            created_time = time.strftime('%Y%m%d %H:%M:%S')
-            WORKID = msg_id
+        body = body_dict[out_type]
+            # 原材料wms接口url
+
             # 北自接口类型区分
             # 出库类型  一等品 = 生产出库   三等品 = 快检异常出库
 

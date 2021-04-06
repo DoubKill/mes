@@ -1,5 +1,6 @@
 import datetime
 import json
+import uuid
 
 from django.db import connection
 from django.utils import timezone
@@ -20,12 +21,11 @@ from rest_framework_extensions.cache.decorators import cache_response
 
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
+import uuid
 from mes import settings
 from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
-from plan.models import ProductClassesPlan
-from plan.uuidfield import UUidTools
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
@@ -1166,7 +1166,7 @@ class ImportAndExportView(APIView):
                         created = False
                     else:
                         validated_data = {}
-                        validated_data['material_test_order_uid'] = UUidTools.uuid1_hex('KJ')
+                        validated_data['material_test_order_uid'] = uuid.uuid1()
                         validated_data['actual_trains'] = i[6]
                         validated_data['lot_no'] = pfb_obj.lot_no
                         validated_data['product_no'] = i[0].strip()

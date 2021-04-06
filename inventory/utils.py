@@ -139,3 +139,8 @@ class OUTWORKUploaderLB(BaseUploader):
         #     if item['flag'] != '01':  # 01代表成功
         #         ret.append(item['msg'])
         return items
+
+
+def wms_out(url, body, method="POST"):
+    ret = requests.request(method, url, data=body)
+    return ret.json()

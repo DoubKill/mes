@@ -1,3 +1,5 @@
+import uuid
+
 from basics.models import Equip
 
 from datetime import datetime
@@ -12,7 +14,6 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     PropertyTypeNode, Property, PlatformConfig
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from plan.uuidfield import UUidTools
 
 
 class EquipRealtimeSerializer(BaseModelSerializer):
@@ -132,13 +133,12 @@ class EquipMaintenanceOrderUpdateSerializer(BaseModelSerializer):
             if validated_data['status'] == 4:  # 结束维修
                 validated_data['end_time'] = datetime.now()
             if validated_data['status'] == 5:  # 确认完成
-                if instance.down_flag:
-                    validated_data['affirm_time'] = datetime.now()
+                validated_data['affirm_time'] = datetime.now()
                 validated_data['affirm_user'] = self.context["request"].user
             if validated_data['status'] == 7:  # 退回,重建一张维修单，将之前的维修单状态改为关闭
                 validated_data['status'] = 6
                 EquipMaintenanceOrder.objects.create(
-                    order_uid=UUidTools.uuid1_hex('WXD'),
+                    order_uid=uuid.uuid1(),
                     factory_date=instance.factory_date,
                     equip_part=instance.equip_part,
                     first_down_reason=instance.first_down_reason,
@@ -197,7 +197,7 @@ class EquipMaintenanceCreateOrderSerializer(BaseModelSerializer):
             factory_date = now.date()
             class_name = "早班"
         validated_data["class_name"] = class_name
-        validated_data['order_uid'] = UUidTools.uuid1_hex('WXD')
+        validated_data['order_uid'] = uuid.uuid1()
         validated_data['factory_date'] = factory_date
         down_flag = validated_data.get('down_flag', None)
         if down_flag:
