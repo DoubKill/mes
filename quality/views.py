@@ -32,12 +32,13 @@ from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, DataPointRawFilter, \
-    TestMethodRawFilter, MaterialTestMethodRawFilter, MaterialDataPointIndicatorRawFilter, MaterialTestOrderRawFilter
+    TestMethodRawFilter, MaterialTestMethodRawFilter, MaterialDataPointIndicatorRawFilter, MaterialTestOrderRawFilter, \
+    UnqualifiedMaterialDealResultFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     TestTypeRaw, TestIndicatorRaw, DataPointRaw, TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, \
-    LevelResultRaw, MaterialTestOrderRaw
+    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
@@ -48,7 +49,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialDealResultListSerializer1, TestIndicatorRawSerializer, DataPointRawSerializer, TestMethodRawSerializer, \
     MaterialTestMethodRawSerializer, MaterialDataPointIndicatorRawSerializer, LevelResultRawSerializer, \
     TestTypeRawSerializer, MaterialTestOrderRawSerializer, MaterialTestResultRawListSerializer, \
-    MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer
+    MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer, \
+    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching
@@ -1359,7 +1361,7 @@ class MaterialTestIndicatorMethodsRaw(APIView):
         lot_no = self.request.query_params.get('lot_no')
         stock = WmsInventoryStock.objects.using('wms').filter(lot_no=lot_no).values('material_no')
         if not stock:
-            raise ValidationError('该条码信息不存在')
+            raise ValidationError('该物料条码信息不存在！')
         material_no = stock[0]['material_no']
         supplier = MaterialSupplierCollect.objects.filter(material_no=material_no).first()
         if supplier:
@@ -1367,7 +1369,7 @@ class MaterialTestIndicatorMethodsRaw(APIView):
         try:
             material = Material.objects.get(material_no=material_no)
         except Exception:
-            raise ValidationError('该物料信息不存在，请检查是否建立物料别称！')
+            raise ValidationError('该物料信息不存在，请建立物料对应关系！')
         ret = {}
         test_indicator_names = TestIndicatorRaw.objects.values_list('name', flat=True)
         test_methods = TestMethodRaw.objects.all()
@@ -1487,3 +1489,18 @@ class MaterialTestOrderRawViewSet(mixins.CreateModelMixin,
                 raise ValidationError(s.errors)
             s.save()
         return Response('新建成功')
+
+
+class UnqualifiedMaterialDealResultViewSet(mixins.ListModelMixin,
+                                           mixins.UpdateModelMixin,
+                                           GenericViewSet):
+    queryset = UnqualifiedMaterialDealResult.objects.filter().prefetch_related('material_test_order_raw')
+    filter_backends = (DjangoFilterBackend,)
+    permission_classes = (IsAuthenticated,)
+    filter_class = UnqualifiedMaterialDealResultFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return UnqualifiedMaterialDealResultListSerializer
+        else:
+            return UnqualifiedMaterialDealResultUpdateSerializer

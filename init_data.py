@@ -495,13 +495,14 @@ permission_data = [
 
     {'id': 386, 'code': 'raw_unqualified_material', 'name': '原料不合格品处理', 'parent_id': None},
     {'id': 387, 'code': 'view_raw_unqualified_material', 'name': '查看', 'parent_id': 386},
-    {'id': 388, 'code': 'change_raw_unqualified_material', 'name': '修改', 'parent_id': 386},
+    {'id': 388, 'code': 'deal_raw_unqualified_material', 'name': '处理', 'parent_id': 386},
+    {'id': 389, 'code': 'submit_raw_unqualified_material', 'name': '确认/驳回', 'parent_id': 386},
 
-    {'id': 389, 'code': 'material_retrospect', 'name': '原材料条码追朔', 'parent_id': None},
-    {'id': 390, 'code': 'view_material_retrospect', 'name': '查看', 'parent_id': 389},
+    {'id': 390, 'code': 'material_retrospect', 'name': '原材料条码追朔', 'parent_id': None},
+    {'id': 391, 'code': 'view_material_retrospect', 'name': '查看', 'parent_id': 390},
 
-    {'id': 391, 'code': 'product_retrospect', 'name': '胶片条码追朔', 'parent_id': None},
-    {'id': 392, 'code': 'view_product_retrospect', 'name': '查看', 'parent_id': 391},
+    {'id': 392, 'code': 'product_retrospect', 'name': '胶片条码追朔', 'parent_id': None},
+    {'id': 393, 'code': 'view_product_retrospect', 'name': '查看', 'parent_id': 392},
 ]
 
 

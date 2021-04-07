@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 from basics.models import GlobalCode
 from recipe.models import Material
-from system.models import AbstractEntity
+from system.models import AbstractEntity, User
 
 
 class TestIndicator(AbstractEntity):
@@ -455,10 +455,10 @@ class LevelResultRaw(AbstractEntity):
 class MaterialTestOrderRaw(AbstractEntity):
     lot_no = models.CharField(max_length=64, help_text='条形码')
     material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE)
-    batch_no = models.CharField(max_length=64, help_text='批次号')
+    batch_no = models.CharField(max_length=64, help_text='批次号', blank=True, null=True)
     storage_date = models.DateField(help_text='入库日期')
     is_qualified = models.BooleanField(help_text='是否合格', default=True)
-    supplier_name = models.CharField(max_length=64, help_text='厂家信息')
+    supplier_name = models.CharField(max_length=64, help_text='厂家信息', blank=True, null=True)
 
     class Meta:
         db_table = 'material_test_order_raw'
@@ -483,3 +483,27 @@ class MaterialTestResultRaw(AbstractEntity):
     class Meta:
         db_table = 'material_test_result_raw'
         verbose_name_plural = verbose_name = '检测结果'
+
+
+class UnqualifiedMaterialDealResult(models.Model):
+    STATUS_CHOICE = (
+        (1, '待处理'),
+        (2, '待确认'),
+        (3, '已处理'),
+        (4, '驳回'),
+    )
+    material_test_order_raw = models.OneToOneField(MaterialTestOrderRaw, on_delete=models.CASCADE,
+                                                   related_name='deal_result')
+    unqualified_reason = models.CharField(max_length=256, help_text='不合格原因', blank=True, null=True)
+    status = models.PositiveIntegerField(help_text='状态', default=1, choices=STATUS_CHOICE)
+    release_result = models.CharField(max_length=64, help_text='放行处理', blank=True, null=True)
+    unqualified_result = models.CharField(max_length=64, help_text='不合格处理', blank=True, null=True)
+    deal_user = models.ForeignKey(User, help_text='处理人', blank=True, null=True, on_delete=models.CASCADE,
+                                  related_name='deal_user_result')
+    confirm_user = models.ForeignKey(User, help_text='确认人', blank=True, null=True, on_delete=models.CASCADE,
+                                     related_name='confirm_user_result')
+    is_delivery = models.BooleanField(help_text='是否出库', default=False)
+
+    class Meta:
+        db_table = 'unqualified_material_deal_result'
+        verbose_name_plural = verbose_name = '不合格处理结果'

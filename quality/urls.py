@@ -17,7 +17,7 @@ from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicator
     UnqualifiedDealOrderViewSet, UnqualifiedOrderTrains, ImportAndExportView, TestTypeRawViewSet, DataPointRawViewSet, \
     TestMethodRawViewSet, MaterialTestMethodRawViewSet, MaterialDataPointIndicatorRawViewSet, LevelResultRawViewSet, \
     TestIndicatorRawViewSet, MaterialTestIndicatorMethodsRaw, MaterialInventoryView, MaterialTestOrderRawViewSet, \
-    TestIndicatorDataPointRawListView
+    TestIndicatorDataPointRawListView, UnqualifiedMaterialDealResultViewSet
 
 router = DefaultRouter()
 
@@ -39,6 +39,8 @@ router.register('mat-data-point-indicators-raw', MaterialDataPointIndicatorRawVi
 router.register('level-result-raw', LevelResultRawViewSet)
 # 原料检测单
 router.register('material-test-orders-raw', MaterialTestOrderRawViewSet)
+# 原料不合格处理
+router.register('unqualified-material-deal-result', UnqualifiedMaterialDealResultViewSet)
 
 
 """胶料"""

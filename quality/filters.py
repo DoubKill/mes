@@ -2,7 +2,8 @@ import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, DataPointRaw, \
-    TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, MaterialTestOrderRaw
+    TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, MaterialTestOrderRaw, \
+    UnqualifiedMaterialDealResult
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -140,3 +141,17 @@ class MaterialTestOrderRawFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MaterialTestOrderRaw
         fields = ('storage_date', 'is_qualified', 'lot_no', 'storage_date')
+
+
+class UnqualifiedMaterialDealResultFilter(django_filters.rest_framework.FilterSet):
+    storage_date = django_filters.DateFilter(field_name='material_test_order_raw__storage_date')
+    lot_no = django_filters.CharFilter(field_name='material_test_order_raw__lot_no', lookup_expr='icontains',
+                                       help_text='批次号')
+    material_no = django_filters.CharFilter(field_name='material_test_order_raw__material__material_no',
+                                            lookup_expr='icontains', help_text='物料编号')
+    material_name = django_filters.CharFilter(field_name='material_test_order_raw__material__material_name',
+                                              lookup_expr='icontains', help_text='物料名称')
+
+    class Meta:
+        model = UnqualifiedMaterialDealResult
+        fields = ('storage_date', 'lot_no', 'material_no', 'material_name')

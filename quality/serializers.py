@@ -21,7 +21,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, \
     UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
-    MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw
+    MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
+    UnqualifiedMaterialDealResult
 from recipe.models import MaterialAttribute
 
 
@@ -1449,3 +1450,28 @@ class MaterialTestOrderRawUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = MaterialTestOrderRaw
         fields = '__all__'
+
+
+class UnqualifiedMaterialDealResultListSerializer(serializers.ModelSerializer):
+    material_test_order_raw = MaterialTestOrderRawListSerializer()
+    deal_username = serializers.ReadOnlyField(source='deal_user.username', default='')
+    confirm_username = serializers.ReadOnlyField(source='confirm_user.username', default='')
+
+    class Meta:
+        model = UnqualifiedMaterialDealResult
+        fields = '__all__'
+
+
+class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer):
+    def update(self, instance, validated_data):
+        status = validated_data.get('status')
+        if status:
+            if status == 2:
+                validated_data['deal_user'] = self.context['request'].user
+            if status == 3:
+                validated_data['confirm_user'] = self.context['request'].user
+        return super(UnqualifiedMaterialDealResultUpdateSerializer, self).update(instance, validated_data)
+
+    class Meta:
+        model = UnqualifiedMaterialDealResult
+        fields = ('status', 'release_result', 'unqualified_result', 'is_delivery')
