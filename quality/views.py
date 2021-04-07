@@ -1173,7 +1173,8 @@ class ImportAndExportView(APIView):
                                                              product_no=i[0].strip(), begin_trains__lte=i[6],
                                                              end_trains__gte=i[6]).first()
                     if not pfb_obj:
-                        raise ValidationError('托盘产出反馈不存在,,请检查Excel表格或者使用复制功能')
+                        continue
+                        # raise ValidationError('托盘产出反馈不存在,,请检查Excel表格或者使用复制功能')
                     test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
                                                                   actual_trains=i[6]).first()
                     if test_order:
