@@ -1,7 +1,5 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from equipment.views import EquipRealtimeViewSet
-from equipment.views import EquipDownTypeViewSet, EquipDownReasonViewSet
 
 from equipment.views import *
 
@@ -45,7 +43,8 @@ urlpatterns = [
     path('equip-maintenance-order/other/<pk>/', EquipMaintenanceOrderOtherView.as_view()),
     path('day-error-statistics/', EquipErrorDayStatisticsView.as_view()),
     path('month-error-statistics/', EquipErrorMonthStatisticsView.as_view()),
-    path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view())
+    path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view()),
+    path('month-error-sort/', MonthErrorSortView.as_view()),
 ]
 
 

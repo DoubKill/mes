@@ -33,7 +33,7 @@ class WarehouseMaterialType(AbstractEntity):
 class MaterialInventory(AbstractEntity):
     """库存信息|线边库"""
     material = models.ForeignKey(Material, verbose_name='物料id', help_text='物料id', on_delete=models.CASCADE,
-                                 related_name="material_inventory_m")
+                                 related_name="material_inventory_m", null=True)
     container_no = models.CharField(max_length=64, verbose_name='托盘号/容器号', help_text='托盘号/容器号')
     site = models.ForeignKey(GlobalCode, verbose_name='产地', help_text='产地', on_delete=models.CASCADE,
                              related_name="material_inventory_s")
@@ -220,9 +220,9 @@ class DeliveryPlan(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
                                    related_name='dispatch_mix_deliverys')
-    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单",
                                       related_name='equip_mix_deliverys')
 
     class Meta:
@@ -254,9 +254,9 @@ class DeliveryPlanLB(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
                                    related_name='dispatch_lb_deliverys')
-    dispatch = models.ManyToManyField("DispatchPlan", verbose_name="发货单", help_text="发货单", blank=True, null=True,
+    dispatch = models.ManyToManyField("DispatchPlan", verbose_name="发货单", help_text="发货单",
                                       related_name='equip_lb_deliverys')
 
     class Meta:
@@ -288,9 +288,9 @@ class DeliveryPlanFinal(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
                                    related_name='dispatch_final_deliverys')
-    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单",
                                       related_name='equip_final_deliverys')
 
     class Meta:
@@ -324,9 +324,9 @@ class MaterialOutPlan(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True, null=True,
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
                                    related_name='material_out_equip')
-    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True, null=True,
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单",
                                       related_name='material_out_dispatch')
 
     class Meta:
@@ -545,6 +545,7 @@ class InventoryLog(AbstractEntity):
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', null=True, blank=True)
     qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
     weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
                                  max_digits=8)
@@ -616,15 +617,16 @@ class MaterialInventoryLog(AbstractEntity):
     order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型')
     # classes = models.CharField(max_length=64, verbose_name='班次', help_text='班次')
     # equip_no = models.CharField(max_length=64, verbose_name='机台号', help_text='机台号')
-    io_location = models.CharField(max_length=64, verbose_name='出入库口', help_text='出入库口')
-    dst_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
+    station = models.CharField(max_length=64, verbose_name='出入库口', help_text='出入库口')
+    dst_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地', null=True, blank=True)
     inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
-    inout_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+    inventory_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
     initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
                                  help_text='发起人')
     start_time = models.DateTimeField(verbose_name='发起时间', blank=True, null=True, help_text='发起时间')
     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
+    detail = models.CharField(max_length=255, verbose_name='任务详情', help_text='任务详情', blank=True)
 
     class Meta:
         db_table = 'material_inventory_log'

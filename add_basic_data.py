@@ -1300,7 +1300,7 @@ def add_product_batching():
                 package_cnt=random.randint(1, 5)
             )
             for j in range(2):
-                detail_id = random.choice(list(wct.weigh_batching.product_batching.batching_details.values_list(
+                detail_id = random.choice(list(wct.product_batching.batching_details.values_list(
                     'id', flat=True)))
                 try:
                     WeighBatchingDetail.objects.create(

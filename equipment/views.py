@@ -393,7 +393,7 @@ class EquipErrorDayStatisticsView(APIView):
             equip_data["error_percent"][data_index] = round(temp.get('all_time') / (12 * 60), 4)
         for k in ret.keys():
             ret[k]["error_time"].append(sum(ret[k]["error_time"]))
-            ret[k]["error_percent"].append(sum(ret[k]["error_percent"]) / class_count)
+            ret[k]["error_percent"].append(round(sum(ret[k]["error_percent"]) / class_count, 4))
         return Response(ret)
 
 
@@ -401,7 +401,7 @@ class EquipErrorDayStatisticsView(APIView):
 class EquipErrorMonthStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
-        month_time = request.query_params.get('day_time', '2021-03')
+        month_time = request.query_params.get('day_time', '2021-03-03')
         try:
             now = datetime.strptime(month_time, "%Y-%m-%d")
         except:
@@ -409,15 +409,19 @@ class EquipErrorMonthStatisticsView(APIView):
         month = now.month
         year = now.year
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+        title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
         equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
-        ret = {e: {} for e in equip_list}
+        data = {e: {} for e in equip_list}
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
             annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
-            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time')
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('equip_part__equip__equip_no')
         for temp in data_set:
-            ret[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
-        for k, v in ret.items():
-            ret[k]["sum"] = sum(v.values())
+            data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in data.items():
+            data[k]["sum"] = sum(v.values())
+        print(data)
+        ret = {"equips": data,
+               "title": title_set}
         return Response(ret)
 
 
@@ -434,14 +438,47 @@ class EquipErrorWeekStatisticsView(APIView):
         sunday = factory_date + dt.timedelta(days=6 - factory_date.weekday())
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday)
         # 各个机台数据
+        title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
         equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
         data = {e: {} for e in equip_list}
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
             annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
-            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time')
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('equip_part__equip__equip_no')
         for temp in data_set:
             data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
-        ret = {"equips": data}
+        print(data)
+        # sorted(data.items(), key=lambda x)
+        ret = {"equips": data,
+               "title_set": title_set}
+        return Response(ret)
+
+
+class MonthErrorSortView(APIView):
+
+    def get(self, request):
+        month_time = request.query_params.get('day_time', '2021-03')
+        try:
+            now = datetime.strptime(month_time, "%Y-%m")
+        except:
+            raise ValidationError("时间格式错误")
+        month = now.month
+        year = now.year
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+
+        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
+            annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('all_time')
+        equip_list = [x.get('equip_part__equip__equip_no') for x in data_set]
+        data = {e: {} for e in equip_list}
+        for temp in data_set:
+            data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in data.items():
+            data[k]["sum"] = sum(v.values())
+        ret = []
+        for k, v in data.items():
+            new_data = {k: sorted(v.items(), key=lambda x:x[1], reverse=True)}
+            ret.append(new_data)
+
         return Response(ret)
