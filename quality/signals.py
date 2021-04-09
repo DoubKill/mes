@@ -65,7 +65,7 @@ def material_rest_order_raw_post_save(sender, instance=None,
                 reason += '{}：{}+{}；'.format(result.data_point.name,
                                               indicator.upper_limit,
                                               result.value-indicator.upper_limit)
-            elif result.value > indicator.lower_limit:
+            elif result.value < indicator.lower_limit:
                 reason += '{}：{}-{}；'.format(result.data_point.name,
                                               indicator.lower_limit,
                                               indicator.lower_limit-result.value)
