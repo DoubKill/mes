@@ -46,7 +46,6 @@ def send_bz():
                              "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
                 item.append(item_dict)
                 # 向北自发送数据
-                logger.error("向北自发送数据")
                 res = update_wms_kjjg(items=item)
                 if not res:  # res为空代表成功
                     mdr_obj.update_store_test_flag = 1
@@ -65,7 +64,9 @@ def send_bz():
 
 
 if __name__ == '__main__':
-    try:
-        send_bz()
-    except Exception as e:
-        logger.error(e)
+    # try:
+    #     send_bz()
+    # except Exception as e:
+    #     logger.error(e)
+    ret = update_wms_kjjg([{'WORKID': '202103260008', 'MID': 'YL010205025', 'PICI': 'CJJ210202022437i45', 'RFID': '20110263', 'DJJG': '一等品', 'SENDDATE': '20210329 13:41:40'}])
+    print(ret)

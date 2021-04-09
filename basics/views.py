@@ -254,7 +254,8 @@ class PlanScheduleViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = PlanSchedule.objects.filter(
         delete_flag=False).select_related('work_schedule').prefetch_related('work_schedule_plan__classes',
-                                                                            'work_schedule_plan__group').order_by("day_time")
+                                                                            'work_schedule_plan__group').order_by(
+        "day_time")
     serializer_class = PlanScheduleSerializer
     filter_fields = ('day_time',)
     filter_backends = (DjangoFilterBackend,)
@@ -340,6 +341,7 @@ class LocationViewSet(ModelViewSet):
         return l_set
 
 
+@method_decorator([api_recorder], name="dispatch")
 class CurrentClassView(APIView):
 
     def get(self, request):

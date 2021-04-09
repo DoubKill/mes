@@ -1,3 +1,4 @@
+import copy
 import datetime as dt
 import uuid
 
@@ -23,11 +24,12 @@ from rest_framework.decorators import action
 
 from rest_framework.viewsets import ModelViewSet
 
-from basics.models import Equip
+from basics.models import Equip, GlobalCode
 from equipment.serializers import EquipRealtimeSerializer
 from mes.paginations import SinglePageNumberPagination
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipRealtimeViewSet(ModelViewSet):
     queryset = Equip.objects.filter(delete_flag=False). \
         select_related('category__equip_type__global_name'). \
@@ -315,9 +317,10 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
         return Response(serializer.data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PersonalStatisticsView(APIView):
-
     permission_classes = (IsAuthenticated,)
+
     def get(self, request, *args, **kwargs):
         all_flag = request.query_params.get("all")
         today = datetime.now().date()
@@ -334,15 +337,148 @@ class PersonalStatisticsView(APIView):
             base_filter = {"maintenance_user": request.user}
         for k, v in time_dispatch.items():
             filter_dict = {
-                "begin_time__isnull": False,
-                "end_time__isnull": False,
+                # "begin_time__isnull": False,
+                # "end_time__isnull": False,
             }
             filter_dict.update(**v)
-            queryset = EquipMaintenanceOrder.objects.filter(**base_filter, **filter_dict).\
-                aggregate(min_time=Min((F('end_time')-F('begin_time'))/100000),
-                          max_time=Max((F('end_time')-F('begin_time'))/100000),
-                          all_time=Sum((F('end_time')-F('begin_time'))/100000))
-            ret.update(**{k:dict(queryset)})
+            queryset = EquipMaintenanceOrder.objects.filter(**base_filter, **filter_dict). \
+                aggregate(min_time=Min((F('end_time') - F('begin_time')) / 1000000),
+                          max_time=Max((F('end_time') - F('begin_time')) / 1000000),
+                          all_time=Sum((F('end_time') - F('begin_time')) / 1000000))
+            ret.update(**{k: dict(queryset)})
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
+class EquipErrorDayStatisticsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        day_time = request.query_params.get('day_time', '2021-03-03')
+        try:
+            now = datetime.strptime(day_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
+        work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        if not work_schedule_plan:
+            raise ValidationError(f'{now}无排班，请补充排班信息')
+        day_time = work_schedule_plan.plan_schedule.day_time
+        factory_date = request.query_params.get("day_time", day_time)
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date)
+        # 动态生成表头字段
+        equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
+        class_list = list(
+            GlobalCode.objects.filter(global_type__type_name='班次', use_flag=True).values_list('global_name', flat=True))
+        class_count = len(class_list)
+        time_list = [0 for _ in class_list]
+        percent_list = [0 for _ in class_list]
+        class_list.append(str(factory_date))
+        ret = {x: {"class_name": class_list, "error_time": copy.deepcopy(time_list),
+                   "error_percent": copy.deepcopy(percent_list)} for x in equip_list}
+        data_set = temp_set.values('equip_part__equip__equip_no', 'class_name'). \
+            annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))).values(
+            'equip_part__equip__equip_no', 'class_name', 'all_time')
+        for temp in data_set:
+            # class_dict.update(**{temp.get('class_name'): {
+            #     "error_time": temp.get("all_time"),
+            #     "error_percent": round(temp.get('all_time')/(12*60), 4)},
+            #     "equip": temp.get('equip_part__equip__equip_no')
+            # })
+            # ret.append(class_dict)
+            equip_data = ret[temp.get('equip_part__equip__equip_no')]
+            data_index = equip_data["class_name"].index(temp.get('class_name'))
+            equip_data["error_time"][data_index] = temp.get('all_time')
+            equip_data["error_percent"][data_index] = round(temp.get('all_time') / (12 * 60), 4)
+        for k in ret.keys():
+            ret[k]["error_time"].append(sum(ret[k]["error_time"]))
+            ret[k]["error_percent"].append(round(sum(ret[k]["error_percent"]) / class_count, 4))
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipErrorMonthStatisticsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        month_time = request.query_params.get('day_time', '2021-03-03')
+        try:
+            now = datetime.strptime(month_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
+        month = now.month
+        year = now.year
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+        title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
+        equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
+        data = {e: {} for e in equip_list}
+        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
+            annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('equip_part__equip__equip_no')
+        for temp in data_set:
+            data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in data.items():
+            data[k]["sum"] = sum(v.values())
+        print(data)
+        ret = {"equips": data,
+               "title": title_set}
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipErrorWeekStatisticsView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        day_time = request.query_params.get('day_time', '2021-03-03')
+        try:
+            factory_date = datetime.strptime(day_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
+        monday = factory_date - dt.timedelta(days=factory_date.weekday())
+        sunday = factory_date + dt.timedelta(days=6 - factory_date.weekday())
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday)
+        # 各个机台数据
+        title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
+        equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
+        data = {e: {} for e in equip_list}
+        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
+            annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('equip_part__equip__equip_no')
+        for temp in data_set:
+            data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in data.items():
+            data[k]["sum"] = sum(v.values())
+        print(data)
+        # sorted(data.items(), key=lambda x)
+        ret = {"equips": data,
+               "title_set": title_set}
+        return Response(ret)
+
+
+class MonthErrorSortView(APIView):
+
+    def get(self, request):
+        month_time = request.query_params.get('day_time', '2021-03-03')
+        try:
+            now = datetime.strptime(month_time, "%Y-%m-%d")
+        except:
+            raise ValidationError("时间格式错误")
+        month = now.month
+        year = now.year
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+
+        data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
+            annotate(all_time=Sum((F('end_time') - F('begin_time')) / (1000000 * 60))). \
+            values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('all_time')
+        equip_list = [x.get('equip_part__equip__equip_no') for x in data_set]
+        data = {e: {} for e in equip_list}
+        for temp in data_set:
+            data[temp.get('equip_part__equip__equip_no')].update(**{temp.get('equip_part__name'): temp.get('all_time')})
+        for k, v in data.items():
+            data[k]["sum"] = sum(v.values())
+        ret = []
+        for k, v in data.items():
+            new_data = {k: sorted(v.items(), key=lambda x:x[1], reverse=True)}
+            ret.append(new_data)
+
+        return Response(ret)

@@ -105,21 +105,21 @@ def run():
                     start_time = end_time
                     bath_no += 1
                     PalletFeedbacks.objects.create(**pallet_data)
-                for x in range(5):
-                    equip_status_data = {
-                        "plan_classes_uid": class_plan.plan_classes_uid,
-                        "equip_no": equip_no,
-                        "temperature": random.randint(300, 700),
-                        "rpm": random.randint(500, 2000),
-                        "energy": random.randint(50, 500),
-                        "power": random.randint(50, 500),
-                        "pressure": random.randint(80, 360),
-                        "status": "running",
-                        "current_trains": m,
-                        "product_time": end_time + datetime.timedelta(seconds=1),
-                    }
-                    EquipStatus.objects.create(**equip_status_data)
-                    # t.sleep(1)
+                # for x in range(5):
+                #     equip_status_data = {
+                #         "plan_classes_uid": class_plan.plan_classes_uid,
+                #         "equip_no": equip_no,
+                #         "temperature": random.randint(300, 700),
+                #         "rpm": random.randint(500, 2000),
+                #         "energy": random.randint(50, 500),
+                #         "power": random.randint(50, 500),
+                #         "pressure": random.randint(80, 360),
+                #         "status": "running",
+                #         "current_trains": m,
+                #         "product_time": end_time + datetime.timedelta(seconds=1),
+                #     }
+                #     EquipStatus.objects.create(**equip_status_data)
+                #     # t.sleep(1)
 
 
 if __name__ == '__main__':

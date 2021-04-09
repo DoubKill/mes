@@ -106,6 +106,7 @@ class EquipMaintenanceOrder(AbstractEntity):
     note_time = models.DateTimeField(help_text='写原因时间', verbose_name='写原因时间', null=True)
     return_flag = models.BooleanField(help_text='是否退单', verbose_name='是否退单', default=False)
     relevance_order_uid = models.CharField(max_length=64, help_text='关联单号', verbose_name='关联单号', null=True)
+    class_name = models.CharField(max_length=64, help_text='班次', verbose_name='班次', default='早班')
 
     class Meta:
         db_table = 'equip_maintenance_order'

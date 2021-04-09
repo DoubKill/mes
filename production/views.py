@@ -789,7 +789,14 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
     def list(self, request, *args, **kwargs):
         params = request.query_params
         equip_no = params.get("equip_no", None)
+        trains = params.get("trains")
         queryset = self.filter_queryset(self.get_queryset())
+        if trains:
+            try:
+                train_range = trains.split(",")
+            except:
+                raise ValidationError("trains参数错误,参考: trains=5,10")
+            queryset = queryset.filter(actual_trains__range=train_range)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -1069,16 +1076,16 @@ class WeekdayProductStatisticsView(APIView):
             if unit != "day" or query_type != "week" or value != "lastweek":
                 raise ValidationError("暂不支持该粒度查询，敬请期待")
         temp = datetime.date.today().isoweekday()
-        # monday = datetime.date.today() - datetime.timedelta(days=(6+temp))
-        # sunday = datetime.date.today() - datetime.timedelta(temp)
+        monday = datetime.date.today() - datetime.timedelta(days=(6+temp))
+        sunday = datetime.date.today() - datetime.timedelta(temp)
         # 相对简单的查询 存在脏数据会导致结果误差 另一种方案是先根据uid分类取最终值的id，再统计相对麻烦  后续补充
-        # temp_list = list(TrainsFeedbacks.objects.filter(factory_date__gte=monday, factory_date__lte=sunday).values("equip_no", "factory_date").\
-        #     annotate(all_trains=Count("equip_no")).order_by("factory_date").values("equip_no", "factory_date" ,"all_trains"))
+        temp_list = list(TrainsFeedbacks.objects.filter(factory_date__gte=monday, factory_date__lte=sunday).values("equip_no", "factory_date").\
+            annotate(all_trains=Count("equip_no")).order_by("factory_date").values("equip_no", "factory_date" ,"all_trains"))
         # __week=4查当周  3，2，1 上周 上上周， 上上上周
-        temp_list = list(
-            TrainsFeedbacks.objects.filter(factory_date__week=3).values("equip_no", "factory_date"). \
-                annotate(all_weight=Sum("actual_weight")).order_by("factory_date").values("equip_no", "factory_date",
-                                                                                          "all_weight"))
+        # temp_list = list(
+        #     TrainsFeedbacks.objects.filter(factory_date__week=3).values("equip_no", "factory_date"). \
+        #         annotate(all_weight=Sum("actual_weight")).order_by("factory_date").values("equip_no", "factory_date",
+        #                                                                                   "all_weight"))
         ret = {"Z%02d" % x: [] for x in range(1, 16)}
         day_week_map = {1: "周一", 2: "周二", 3: "周三", 4: "周四", 5: "周五", 6: "周六", 7: "周日"}
         for data in temp_list:
