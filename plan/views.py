@@ -28,7 +28,7 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Ba
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
     ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
-    IssueBatchingClassesPlanSerializer, BatchingClassesEquipPlanSerializer
+    IssueBatchingClassesPlanSerializer, BatchingClassesEquipPlanSerializer, PlantImportSerializer
 from production.models import PlanStatus, TrainsFeedbacks
 from recipe.models import ProductBatching, ProductBatchingDetail, Material
 from system.serializers import PlanReceiveSerializer
@@ -479,3 +479,10 @@ class IssueBatchingClassesPlanView(UpdateAPIView):
 
     def perform_update(self, serializer):
         serializer.save(send_user=self.request.user)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PlantImportView(CreateAPIView):
+    serializer_class = PlantImportSerializer
+    queryset = ProductClassesPlan.objects.all()
+    permission_classes = (IsAuthenticated,)

@@ -5,7 +5,8 @@ from plan.views import ProductDayPlanViewSet, \
     MaterialDemandedAPIView, ProductDayPlanManyCreate, \
     ProductDayPlanAPiView, MaterialDemandedView, ProductClassesPlanManyCreate, ProductClassesPlanList, PlanReceive, \
     ProductBatchingReceive, ProductBatchingDetailReceive, ProductDayPlanReceive, ProductClassesPlanReceive, \
-    MaterialReceive, BatchingClassesPlanView, IssueBatchingClassesPlanView, BatchingClassesEquipPlanViewSet
+    MaterialReceive, BatchingClassesPlanView, IssueBatchingClassesPlanView, BatchingClassesEquipPlanViewSet, \
+    PlantImportView
 
 router = DefaultRouter()
 
@@ -34,5 +35,6 @@ urlpatterns = [
     path('product-day-plan-receive/', ProductDayPlanReceive.as_view()),  # 胶料日计划同步
     path('product-classes-plan-receive/', ProductClassesPlanReceive.as_view()),  # 胶料日班次计划同步
     path('material-receive/', MaterialReceive.as_view()),  # 原材料同步
-    path('issue-batching-classes-plan/<int:pk>/', IssueBatchingClassesPlanView.as_view())
+    path('issue-batching-classes-plan/<int:pk>/', IssueBatchingClassesPlanView.as_view()),
+    path('plan-import/', PlantImportView.as_view()),  # 计划导入
 ]
