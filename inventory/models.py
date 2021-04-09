@@ -142,6 +142,9 @@ class WmsInventoryStock(models.Model):
     in_storage_time = models.DateTimeField(db_column='CreaterTime')
     lot_no = models.CharField(max_length=64, db_column='TrackingNumber')
     supplier_name = models.CharField(max_length=64, db_column='SupplierName')
+    tunnel = models.CharField(max_length=32, db_column="tunnelId")  # 巷道
+    # shelf = models.CharField(max_length=32, db_column="shelfId", help_text="列号")  # 列号
+    # layer = models.CharField(max_length=32, db_column="layerId", help_text="层号")  # 层号
 
     def unit_weight(self):
         return self.total_weight / self.qty
@@ -154,18 +157,29 @@ class WmsInventoryStock(models.Model):
         managed = False
 
     @classmethod
-    def get_sql(cls, material_type=None, material_no=None):
-        material_type_filter = """AND material.MaterialGroupName LIKE '%%{0}%%'""" \
-            .format(material_type) if material_type else ''
+    def get_sql(cls, material_type=None, material_no=None, container_no=None, order_no=None, location=None, tunnel=None, quality_status=None):
+        material_type_filter = """AND material.MaterialGroupName LIKE '%%{material_type}%%'""" \
+            .format(material_type=material_type) if material_type else ''
         material_no_filter = """AND stock.MaterialCode LIKE '%%{material_no}%%'""" \
             .format(material_no=material_no) if material_no else ''
+        container_no_filter = """AND stock.LadenToolNumber LIKE '%%{container_no}%%'""" \
+            .format(container_no=container_no) if container_no else ''
+        order_no_filter = """AND stock.BatchNo LIKE '%%{order_no}%%'""" \
+            .format(order_no=order_no) if order_no else ''
+        location_filter = """AND stock.SpaceId LIKE '%%{location}%%'""" \
+            .format(location=location) if location else ''
+        tunnel_filter = """AND stock.tunnelId = '{tunnel}'""" \
+            .format(tunnel=tunnel) if tunnel else ''
+        quality_filter = """AND stock.StockDetailState = '{quality_status}'""" \
+            .format(quality_status=quality_status) if quality_status else ''
         sql = """
                     SELECT *, material.MaterialGroupName AS material_type 
                     FROM zhada_wms_zhongc.dbo.t_inventory_stock stock,
                       zhada_wms_zhongc.dbo.t_inventory_material material
                         WHERE stock.MaterialCode = material.MaterialCode
-                        {0} {1}
-                    """.format(material_type_filter, material_no_filter)
+                        {0} {1} {2} {3} {4} {5} {6}
+                    """.format(material_type_filter, material_no_filter, container_no_filter,
+                               order_no_filter, location_filter, tunnel_filter, quality_filter)
         return sql
 
     @classmethod
@@ -220,9 +234,9 @@ class DeliveryPlan(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True,
                                    related_name='dispatch_mix_deliverys')
-    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单",
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='equip_mix_deliverys')
 
     class Meta:
@@ -254,9 +268,9 @@ class DeliveryPlanLB(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True,
                                    related_name='dispatch_lb_deliverys')
-    dispatch = models.ManyToManyField("DispatchPlan", verbose_name="发货单", help_text="发货单",
+    dispatch = models.ManyToManyField("DispatchPlan", verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='equip_lb_deliverys')
 
     class Meta:
@@ -288,9 +302,9 @@ class DeliveryPlanFinal(AbstractEntity):
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True,
                                    related_name='dispatch_final_deliverys')
-    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单",
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='equip_final_deliverys')
 
     class Meta:
@@ -322,11 +336,12 @@ class MaterialOutPlan(AbstractEntity):
     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='订单状态', help_text='订单状态', choices=ORDER_TYPE_CHOICE, default=4)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
-    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
+    station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口')
+    station_no = models.CharField(max_length=64, verbose_name='出库口编码', help_text='出库口编码')
     finish_time = models.DateTimeField(verbose_name='完成时间', blank=True, null=True)
-    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备",
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True,
                                    related_name='material_out_equip')
-    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单",
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='material_out_dispatch')
 
     class Meta:

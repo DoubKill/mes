@@ -297,7 +297,7 @@ class MaterialDealStatusListView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class DealTypeView(APIView):
-
+    # 创建处理类型
     def post(self, request):
         data = request.data
         gct = GlobalCodeType.objects.filter(type_name="处理类型").first()
@@ -1221,3 +1221,15 @@ class ImportAndExportView(APIView):
                     item['test_group'] = i[5].strip() + '班'
                     MaterialTestResult.objects.create(**item)
         return Response('导入成功')
+
+
+class BarCodePreview(APIView):
+    # 条码追溯中的条码预览接口
+    def get(self, request):
+        lot_no = request.query_params.get("lot_no")
+        # try:
+        instance = MaterialDealResult.objects.get(lot_no=lot_no)
+        serializer =  MaterialDealResultListSerializer(instance)
+        return Response(serializer.data)
+        # except Exception as e:
+        #     raise ValidationError(f"该条码无快检结果:{e}")

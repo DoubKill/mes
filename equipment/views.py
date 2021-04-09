@@ -458,9 +458,9 @@ class EquipErrorWeekStatisticsView(APIView):
 class MonthErrorSortView(APIView):
 
     def get(self, request):
-        month_time = request.query_params.get('day_time', '2021-03')
+        month_time = request.query_params.get('day_time', '2021-03-03')
         try:
-            now = datetime.strptime(month_time, "%Y-%m")
+            now = datetime.strptime(month_time, "%Y-%m-%d")
         except:
             raise ValidationError("时间格式错误")
         month = now.month

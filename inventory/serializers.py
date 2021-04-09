@@ -682,8 +682,8 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
         return unit_weight
 
     def get_quality_status(self, object):
-        status_map = {1: "合格", 2: "不合格"}
-        return status_map.get(object.quality_status, "不合格")
+        status_map = {1: "合格品", 2: "不合格品"}
+        return status_map.get(object.quality_status, "不合格品")
 
     class Meta:
         model = WmsInventoryStock
@@ -905,9 +905,8 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
     no = serializers.CharField(source="warehouse_info.no", read_only=True)
     name = serializers.CharField(source="warehouse_info.name", read_only=True)
     actual = serializers.SerializerMethodField(read_only=True)
-    order_no = serializers.CharField(required=False)
-    quality_status = serializers.CharField(required=False)
     destination = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.CharField(required=False)
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -951,27 +950,37 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
         status = validated_data.get('status')
+        # 该代码用于处理页面上上编辑订单状态与需求量
+        if out_type not in ["指定出库", "正常出库"]:
+            if status == 5:
+                instance.status = status
+                instance.save()
+                return instance
+            else:
+                need_weight = validated_data['need_weight']
+                instance.need_weight = need_weight
+                instance.save()
+                return instance
         inventory_reason = validated_data.get('inventory_reason')
         body_dict = {
             "指定出库": {
                 "taskNumber": instance.order_no,
-                "entranceCode": instance.station,
+                "entranceCode": instance.station_no,
                 "allocationInventoryDetails": [{
                     "taskDetailNumber": instance.order_no + "w1",
                     "materialCode": instance.material_no,
-                    "materialName": instance.material_name,
-                    "batchNo": instance.batch_no,
+                    "materialName": instance.material_name if instance.material_name else "",
+                    # "batchNo": instance.batch_no,
                     "spaceCode": instance.location,
                     "quantity": instance.need_qty
                         }]
                 },
             "正常出库": {
                 "taskNumber": instance.order_no,
-                "entranceCode": instance.station,
+                "entranceCode": instance.station_no,
                 "allocationInventoryDetails": [{
-                    "taskDetailNumber": instance.order_no + "w2",
                     "materialCode": instance.material_no,
-                    "materialName": instance.material_name,
+                    "materialName": instance.material_name if instance.material_name else "",
                     "weightOfActual ": instance.need_weight
                 }]
             }
@@ -991,18 +1000,6 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
         order_type = validated_data['inventory_type']
         created_user = self.context['request'].user
         created_date = datetime.datetime.now()
-
-        # 该代码用于处理页面上上编辑订单状态与需求量
-        if out_type not in ["指定出库", "正常出库"]:
-            if status == 5:
-                instance.status = status
-                instance.save()
-                return instance
-            else:
-                need_qty = validated_data['need_qty']
-                instance.need_qty = need_qty
-                instance.save()
-                return instance
         # 用于出库计划状态变更
         if rep_dict.get("state") == 1:
             instance.status = 2
@@ -1038,6 +1035,17 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialOutPlan
         fields = '__all__'
+        extra_kwargs = {
+            'order_no': {
+                'required': False
+            },
+            'station': {
+                'required': False
+            },
+            'station_no': {
+                'required': False
+            },
+        }
 
 
 class BarcodeQualitySerializer(BaseModelSerializer):

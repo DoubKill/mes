@@ -384,8 +384,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(location__istartswith=tunnel)
             return queryset
         if model == WmsInventoryStock:
+            quality_status = {"合格品":1, "不合格品": 2, None: 1, "": 1}[quality_status]
             if warehouse_name == "原材料库":
-                queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no))
+                queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel, quality_status))
             else:
                 queryset = model.objects.using('cb').raw(WmsInventoryStock.get_sql(material_type, material_no))
         return queryset
@@ -513,7 +514,7 @@ class MaterialCount(APIView):
             try:
                 ret = WmsInventoryStock.objects.using('wms').filter(quality_status=status_map.get(status, 1)).values(
                     'material_no').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+                    all_weight=Sum('total_weight')).values('material_no', 'all_weight')
             except:
                 raise ValidationError("原材料库连接失败")
         else:
@@ -905,10 +906,12 @@ class MaterialPlanManagement(ModelViewSet):
             url_name='stations')
     def get(self, request, *args, **kwargs):
         url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
-        ret = requests.get(url)
-        data = ret.json()
-        rep = {"results": [{"station_no": x.get("entranceCode"),
-                            "station": x.get("name")} for x in data.get("datas", {})]}
+        # ret = requests.get(url)
+        # data = ret.json()
+        # rep = [{"station_no": x.get("entranceCode"),
+        #                     "station": x.get("name")} for x in data.get("datas", {})]
+        rep= [{"station_no": "out1",
+                            "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):

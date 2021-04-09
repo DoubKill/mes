@@ -789,7 +789,14 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
     def list(self, request, *args, **kwargs):
         params = request.query_params
         equip_no = params.get("equip_no", None)
+        trains = params.get("trains")
         queryset = self.filter_queryset(self.get_queryset())
+        if trains:
+            try:
+                train_range = trains.split(",")
+            except:
+                raise ValidationError("trains参数错误,参考: trains=5,10")
+            queryset = queryset.filter(actual_trains__range=train_range)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

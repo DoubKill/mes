@@ -7,14 +7,7 @@ name:
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from quality.views import TestIndicatorViewSet, TestMethodViewSet, TestIndicatorDataPointListView, \
-    MaterialTestOrderViewSet, TestTypeViewSet, DataPointViewSet, MaterialTestMethodViewSet, \
-    MaterialDataPointIndicatorViewSet, ProductBatchingMaterialListView, MaterialDealResultViewSet, \
-    DealSuggestionViewSet, MaterialDealStatusListView, DealTypeView, PalletFeedbacksTestListView, \
-    MaterialTestIndicatorMethods, LevelResultViewSet, ProductDayStatistics, LabelPrintViewSet, DealSuggestionView, \
-    MaterialTestResultHistoryView, ProductDayDetail, BatchMonthStatisticsView, PrintMaterialDealResult, \
-    BatchDayStatisticsView, BatchProductNoDayStatisticsView, BatchProductNoMonthStatisticsView, \
-    UnqualifiedDealOrderViewSet, UnqualifiedOrderTrains, ImportAndExportView
+from quality.views import *
 
 router = DefaultRouter()
 router.register('material-test-orders', MaterialTestOrderViewSet)
@@ -60,7 +53,7 @@ urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
     path('result-status/', MaterialDealStatusListView.as_view()),  # 不合格状态筛选
-    path('deal-type/', DealTypeView.as_view()),
+    path('deal-type/', DealTypeView.as_view()),  # 创建处理类型
     # path('material_valid_time/', MaterialDealResultUpdateValidTime.as_view()),  # 快检信息综合管理修改有效时间
     path('mat-test-indicator-methods/', MaterialTestIndicatorMethods.as_view()),
     path('product_day_statistics/', ProductDayStatistics.as_view()),  # 胶料日合格率统计
@@ -70,5 +63,6 @@ urlpatterns = [
     path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
     path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
     path('import-material-test-orders/', ImportAndExportView.as_view()),  # 快检数据导入
+    path('barcode-preview/', BarCodePreview.as_view()), # 条码追溯中的条码预览接口
     path('', include(router.urls)),
 ]

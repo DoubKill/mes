@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     'spareparts.apps.SparepartsConfig',
     'terminal.apps.TerminalConfig',
     'equipment.apps.EquipmentConfig',
-    'django_celery_results',
+    'django_celery_results',  # python manage.py migrate django_celery_results
 ]
 
 MIDDLEWARE = [

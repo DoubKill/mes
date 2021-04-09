@@ -284,7 +284,7 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
             used_type=used_type1
         ).first()
         if not pb_obj:
-            raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
+            raise serializers.ValidationError('配方|胶料配料标准{}不存在'.format(product_batching1))
         attrs['product_batching'] = pb_obj
         attrs['material'] = material
         return attrs
@@ -333,7 +333,7 @@ class ProductDayPlansySerializer(BaseModelSerializer):
         if not pb_obj:
             pb_obj = ProductBatching.objects.filter(stage_product_batch_no=product_batching1, batching_type=1).last()
         if not pb_obj:
-            raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching1))
+            raise serializers.ValidationError('日计划|胶料配料标准{}不存在'.format(product_batching1))
         attrs['product_batching'] = pb_obj
         attrs['equip'] = equip
         attrs['plan_schedule'] = plan_schedule
@@ -391,7 +391,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                                                                      batching_type=1,
                                                                      equip=equip).first()
         if not pb_obj:
-            raise serializers.ValidationError('胶料配料标准{}不存在'.format(product_batching_no))
+            raise serializers.ValidationError('日班次计划|胶料配料标准{}不存在'.format(product_batching_no))
         attrs['product_batching'] = pb_obj
         attrs['equip'] = equip
         attrs['work_schedule_plan'] = work_schedule_plan
