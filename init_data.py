@@ -109,34 +109,34 @@ permission_data = [
     {'id': 75, 'code': 'product_inventory', 'name': '混炼胶库存', 'parent_id': None},
     {'id': 76, 'code': 'view_product_inventory', 'name': '查看', 'parent_id': 75},
 
-    {'id': 78, 'code': 'test_indicator', 'name': '试验指标管理', 'parent_id': None},
+    {'id': 78, 'code': 'test_indicator', 'name': '胶料试验指标管理', 'parent_id': None},
     {'id': 79, 'code': 'view_test_indicator', 'name': '查看', 'parent_id': 78},
     {'id': 80, 'code': 'add_test_indicator', 'name': '新增', 'parent_id': 78},
     {'id': 81, 'code': 'change_test_indicator', 'name': '修改', 'parent_id': 78},
 
-    {'id': 82, 'code': 'test_type', 'name': '试验类型管理', 'parent_id': None},
+    {'id': 82, 'code': 'test_type', 'name': '胶料试验类型管理', 'parent_id': None},
     {'id': 83, 'code': 'view_test_type', 'name': '查看', 'parent_id': 82},
     {'id': 84, 'code': 'add_test_type', 'name': '新增', 'parent_id': 82},
     {'id': 85, 'code': 'change_test_type', 'name': '修改', 'parent_id': 82},
     {'id': 86, 'code': 'pointAdd_test_type', 'name': '新增类型数据点', 'parent_id': 82},
     {'id': 87, 'code': 'pointChange_test_type', 'name': '修改类型数据点', 'parent_id': 82},
 
-    {'id': 88, 'code': 'test_method', 'name': '试验方法管理', 'parent_id': None},
+    {'id': 88, 'code': 'test_method', 'name': '胶料试验方法管理', 'parent_id': None},
     {'id': 89, 'code': 'view_test_method', 'name': '查看', 'parent_id': 88},
     {'id': 90, 'code': 'add_test_method', 'name': '新增', 'parent_id': 88},
     {'id': 91, 'code': 'change_test_method', 'name': '修改', 'parent_id': 88},
 
-    {'id': 92, 'code': 'level', 'name': '等级管理', 'parent_id': None},
+    {'id': 92, 'code': 'level', 'name': '胶料等级管理', 'parent_id': None},
     {'id': 93, 'code': 'view_level', 'name': '查看', 'parent_id': 92},
     {'id': 94, 'code': 'add_level', 'name': '新增', 'parent_id': 92},
     {'id': 95, 'code': 'delete_level', 'name': '删除', 'parent_id': 92},
 
-    {'id': 96, 'code': 'evaluating', 'name': '判断基准录入', 'parent_id': None},
+    {'id': 96, 'code': 'evaluating', 'name': '胶料判断基准录入', 'parent_id': None},
     {'id': 97, 'code': 'view_evaluating', 'name': '查看', 'parent_id': 96},
     {'id': 98, 'code': 'add_evaluating', 'name': '新增', 'parent_id': 96},
     {'id': 99, 'code': 'change_evaluating', 'name': '修改', 'parent_id': 96},
 
-    {'id': 100, 'code': 'month_passing_rate', 'name': '月合格率统计', 'parent_id': None},
+    {'id': 100, 'code': 'month_passing_rate', 'name': '胶料月合格率统计', 'parent_id': None},
     {'id': 101, 'code': 'view_month_passing_rate', 'name': '查看', 'parent_id': 100},
 
     {'id': 102, 'code': 'product_month_passing_rate', 'name': '胶料月合格率统计', 'parent_id': None},
@@ -145,24 +145,24 @@ permission_data = [
     {'id': 104, 'code': 'product_daily_passing_rate', 'name': '胶料日合格率统计', 'parent_id': None},
     {'id': 105, 'code': 'view_product_daily_passing_rate', 'name': '查看', 'parent_id': 104},
 
-    {'id': 106, 'code': 'non-conformity_product', 'name': '不合格品处理', 'parent_id': None},
+    {'id': 106, 'code': 'non-conformity_product', 'name': '胶料不合格品处理', 'parent_id': None},
     {'id': 107, 'code': 'view_non-conformity_product', 'name': '查看', 'parent_id': 106},
     {'id': 108, 'code': 'change_non-conformity_product', 'name': '修改', 'parent_id': 106},
 
-    {'id': 109, 'code': 'deal_suggestion', 'name': '处理意见管理', 'parent_id': None},
+    {'id': 109, 'code': 'deal_suggestion', 'name': '胶料处理意见管理', 'parent_id': None},
     {'id': 110, 'code': 'view_deal_suggestion', 'name': '查看', 'parent_id': 109},
     {'id': 111, 'code': 'add_deal_suggestion', 'name': '新增', 'parent_id': 109},
     {'id': 112, 'code': 'change_deal_suggestion', 'name': '修改', 'parent_id': 109},
 
-    {'id': 113, 'code': 'test_result', 'name': '检测数据录入', 'parent_id': None},
+    {'id': 113, 'code': 'test_result', 'name': '胶料检测数据录入', 'parent_id': None},
     {'id': 114, 'code': 'view_test_result', 'name': '查看', 'parent_id': 113},
     {'id': 115, 'code': 'add_test_result', 'name': '新增', 'parent_id': 113},
 
-    {'id': 116, 'code': 'result_info', 'name': '快检结果详细信息', 'parent_id': None},
+    {'id': 116, 'code': 'result_info', 'name': '胶料快检结果详细信息', 'parent_id': None},
     {'id': 117, 'code': 'view_result_info', 'name': '查看', 'parent_id': 116},
     {'id': 163, 'code': 'export_result_info', 'name': '导出', 'parent_id': 116},
 
-    {'id': 118, 'code': 'deal_result', 'name': '快检信息综合管理', 'parent_id': None},
+    {'id': 118, 'code': 'deal_result', 'name': '胶料快检信息综合管理', 'parent_id': None},
     {'id': 119, 'code': 'view_deal_result', 'name': '查看', 'parent_id': 118},
     {'id': 162, 'code': 'print_deal_result', 'name': '打印', 'parent_id': 118},
 
@@ -420,7 +420,7 @@ permission_data = [
     {'id': 326, 'code': 'view_equip_status', 'name': '查看', 'parent_id': 325},
 
     {'id': 327, 'code': 'equip_maintenance_order_log', 'name': '设备维修履历', 'parent_id': None},
-    {'id': 328,'code': 'view_equip_maintenance_order_log', 'name': '查看', 'parent_id': 327},
+    {'id': 328, 'code': 'view_equip_maintenance_order_log', 'name': '查看', 'parent_id': 327},
 
     {'id': 329, 'code': 'property_type_node', 'name': '资产类型节点', 'parent_id': None},
     {'id': 330, 'code': 'view_property_type_node', 'name': '查看', 'parent_id': 329},
@@ -445,6 +445,64 @@ permission_data = [
     {'id': 346, 'code': 'view_barcodequality', 'name': '查看临时条码质量', 'parent_id': 345},
     {'id': 347, 'code': 'add_barcodequality', 'name': '维护临时条码质量', 'parent_id': 345},
     {'id': 348, 'code': 'export_barcodequality', 'name': '导出临时条码质量维护', 'parent_id': 345},
+
+    {'id': 349, 'code': 'material_map', 'name': 'mes与子系统物料信息映射', 'parent_id': None},
+    {'id': 350, 'code': 'view_material_map', 'name': '查看', 'parent_id': 349},
+    {'id': 351, 'code': 'add_material_map', 'name': '新增', 'parent_id': 349},
+
+    {'id': 352, 'code': 'bar_code', 'name': '条码变更', 'parent_id': None},
+    {'id': 353, 'code': 'view_bar_code', 'name': '查看', 'parent_id': 352},
+    {'id': 354, 'code': 'rebuild_bar_code', 'name': '重新生成', 'parent_id': 352},
+
+    {'id': 355, 'code': 'material_temp_input', 'name': '原材料临时快检结果录入', 'parent_id': None},
+    {'id': 356, 'code': 'view_material_temp_input', 'name': '查看', 'parent_id': 355},
+    {'id': 357, 'code': 'add_material_temp_input', 'name': '录入', 'parent_id': 355},
+
+    {'id': 358, 'code': 'raw_test_indicator', 'name': '原料试验指标管理', 'parent_id': None},
+    {'id': 359, 'code': 'view_raw_test_indicator', 'name': '查看', 'parent_id': 358},
+    {'id': 360, 'code': 'add_raw_test_indicator', 'name': '新增别称', 'parent_id': 358},
+    {'id': 361, 'code': 'change_raw_test_indicator', 'name': '修改', 'parent_id': 358},
+
+    {'id': 362, 'code': 'raw_test_type', 'name': '原料试验类型管理', 'parent_id': None},
+    {'id': 363, 'code': 'view_raw_test_type', 'name': '查看', 'parent_id': 362},
+    {'id': 364, 'code': 'add_raw_test_type', 'name': '新增', 'parent_id': 362},
+    {'id': 365, 'code': 'change_raw_test_type', 'name': '修改', 'parent_id': 362},
+    {'id': 366, 'code': 'pointAdd_raw_test_type', 'name': '新增类型数据点', 'parent_id': 362},
+    {'id': 367, 'code': 'pointChange_raw_test_type', 'name': '修改类型数据点', 'parent_id': 362},
+
+    {'id': 368, 'code': 'raw_test_method', 'name': '原料试验方法管理', 'parent_id': None},
+    {'id': 369, 'code': 'view_raw_test_method', 'name': '查看', 'parent_id': 368},
+    {'id': 370, 'code': 'add_raw_test_method', 'name': '新增', 'parent_id': 368},
+    {'id': 371, 'code': 'change_raw_test_method', 'name': '修改', 'parent_id': 368},
+
+    {'id': 372, 'code': 'raw_level', 'name': '原料等级管理', 'parent_id': None},
+    {'id': 373, 'code': 'view_raw_level', 'name': '查看', 'parent_id': 372},
+    {'id': 374, 'code': 'add_raw_level', 'name': '新增', 'parent_id': 372},
+    {'id': 375, 'code': 'delete_raw_level', 'name': '删除', 'parent_id': 372},
+
+    {'id': 376, 'code': 'raw_evaluating', 'name': '原料判断基准录入', 'parent_id': None},
+    {'id': 377, 'code': 'view_raw_evaluating', 'name': '查看', 'parent_id': 376},
+    {'id': 378, 'code': 'add_raw_evaluating', 'name': '新增', 'parent_id': 376},
+    {'id': 379, 'code': 'change_raw_evaluating', 'name': '修改', 'parent_id': 376},
+
+    {'id': 380, 'code': 'raw_test_result', 'name': '原料检测数据录入', 'parent_id': None},
+    {'id': 381, 'code': 'view_raw_test_result', 'name': '查看', 'parent_id': 380},
+    {'id': 382, 'code': 'add_raw_test_result', 'name': '新增', 'parent_id': 380},
+
+    {'id': 383, 'code': 'raw_result_info', 'name': '原料快检结果详细信息', 'parent_id': None},
+    {'id': 384, 'code': 'view_raw_result_info', 'name': '查看', 'parent_id': 383},
+    {'id': 385, 'code': 'change_raw_result_info', 'name': '修改', 'parent_id': 383},
+
+    {'id': 386, 'code': 'raw_unqualified_material', 'name': '原料不合格品处理', 'parent_id': None},
+    {'id': 387, 'code': 'view_raw_unqualified_material', 'name': '查看', 'parent_id': 386},
+    {'id': 388, 'code': 'deal_raw_unqualified_material', 'name': '处理', 'parent_id': 386},
+    {'id': 389, 'code': 'submit_raw_unqualified_material', 'name': '确认/驳回', 'parent_id': 386},
+
+    {'id': 390, 'code': 'material_retrospect', 'name': '原材料条码追朔', 'parent_id': None},
+    {'id': 391, 'code': 'view_material_retrospect', 'name': '查看', 'parent_id': 390},
+
+    {'id': 392, 'code': 'product_retrospect', 'name': '胶片条码追朔', 'parent_id': None},
+    {'id': 393, 'code': 'view_product_retrospect', 'name': '查看', 'parent_id': 392},
 ]
 
 

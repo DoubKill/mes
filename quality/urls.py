@@ -10,9 +10,32 @@ from rest_framework.routers import DefaultRouter
 from quality.views import *
 
 router = DefaultRouter()
-router.register('material-test-orders', MaterialTestOrderViewSet)
-router.register('test-indicators', TestIndicatorViewSet)
 
+
+"""原料"""
+# 试验指标
+router.register('test-indicators-raw', TestIndicatorRawViewSet)
+# 试验类型
+router.register('test-types-raw', TestTypeRawViewSet)
+# 试验类型数据点
+router.register('data-points-raw', DataPointRawViewSet)
+# 试验方法
+router.register('test-methods-raw', TestMethodRawViewSet)
+# 物料试验方法
+router.register('mat-test-methods-raw', MaterialTestMethodRawViewSet)
+# 物料数据指标
+router.register('mat-data-point-indicators-raw', MaterialDataPointIndicatorRawViewSet)
+# 等级和结果
+router.register('level-result-raw', LevelResultRawViewSet)
+# 原料检测单
+router.register('material-test-orders-raw', MaterialTestOrderRawViewSet)
+# 原料不合格处理
+router.register('unqualified-material-deal-result', UnqualifiedMaterialDealResultViewSet)
+
+
+"""胶料"""
+# 试验指标
+router.register('test-indicators', TestIndicatorViewSet)
 # 试验类型
 router.register('test-types', TestTypeViewSet)
 # 试验类型数据点
@@ -23,6 +46,8 @@ router.register('test-methods', TestMethodViewSet)
 router.register('mat-test-methods', MaterialTestMethodViewSet)
 # 物料数据库指标
 router.register('mat-data-point-indicators', MaterialDataPointIndicatorViewSet)
+# 检测单
+router.register('material-test-orders', MaterialTestOrderViewSet)
 # 不合格处理意见
 router.register('deal-suggestion', DealSuggestionViewSet)
 # 不合格处理
@@ -64,5 +89,8 @@ urlpatterns = [
     path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
     path('import-material-test-orders/', ImportAndExportView.as_view()),  # 快检数据导入
     path('barcode-preview/', BarCodePreview.as_view()), # 条码追溯中的条码预览接口
+    path('mat-test-indicator-methods-raw/', MaterialTestIndicatorMethodsRaw.as_view()),
+    path('material-inventory/', MaterialInventoryView.as_view()),  # 原料入库信息
+    path('test-indicator-data-points-raw/', TestIndicatorDataPointRawListView.as_view()),
     path('', include(router.urls)),
 ]

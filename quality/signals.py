@@ -9,7 +9,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from quality.deal_result import synthesize_to_material_deal_result
-from quality.models import MaterialTestResult
+from quality.models import MaterialTestResult, MaterialTestOrderRaw, UnqualifiedMaterialDealResult, \
+    MaterialTestResultRaw, MaterialDataPointIndicatorRaw, MaterialTestMethodRaw
 import logging
 
 logger = logging.getLogger('send_log')
@@ -37,3 +38,43 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
     except Exception as e:
         logger.error(f"{synthesize_to_material_deal_result.__doc__}|{e}")
         pass
+
+
+@receiver(post_save, sender=MaterialTestOrderRaw)
+def material_rest_order_raw_post_save(sender, instance=None,
+                                      created=False, update_fields=None, **kwargs):
+    if not instance.is_qualified:
+        max_result_ids = list(instance.order_results_raw.values(
+            'test_method', 'data_point').annotate(max_id=Max('id')).values_list('max_id', flat=True))
+        reason = ''
+        for result in MaterialTestResultRaw.objects.filter(id__in=max_result_ids, level__gt=1):
+            material_test_method = MaterialTestMethodRaw.objects.filter(
+                material=instance.material,
+                test_method=result.test_method).first()
+            if material_test_method:
+                indicator = MaterialDataPointIndicatorRaw.objects.filter(
+                    material_test_method=material_test_method,
+                    data_point=result.data_point,
+                    level=1
+                ).first()
+            else:
+                indicator = None
+            if not indicator:
+                reason += '{}缺少评判标准；'.format(result.data_point.name)
+            elif result.value > indicator.upper_limit:
+                reason += '{}：{}+{}；'.format(result.data_point.name,
+                                              indicator.upper_limit,
+                                              result.value-indicator.upper_limit)
+            elif result.value < indicator.lower_limit:
+                reason += '{}：{}-{}；'.format(result.data_point.name,
+                                              indicator.lower_limit,
+                                              indicator.lower_limit-result.value)
+        if not hasattr(instance, 'deal_result'):
+            UnqualifiedMaterialDealResult.objects.create(
+                material_test_order_raw=instance,
+                unqualified_reason=reason)
+        else:
+            UnqualifiedMaterialDealResult.objects.filter(
+                material_test_order_raw=instance).update(unqualified_reason=reason)
+    else:
+        UnqualifiedMaterialDealResult.objects.filter(material_test_order_raw=instance).delete()
