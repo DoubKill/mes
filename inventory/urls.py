@@ -11,7 +11,7 @@ from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
     DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules, \
-    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView
+    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack
 
 router = DefaultRouter()
 
@@ -75,7 +75,8 @@ urlpatterns = [
     path('material-trace/', MaterialTraceView.as_view()),
     path('product-trace/', ProductTraceView.as_view()),
     path('material_count/', MaterialCount.as_view()),
-    path('outwork_feedback/', OutWorkFeedBack.as_view()),
+    path('outwork_feedback/', OutWorkFeedBack.as_view()),      # 混炼终炼出库反馈接口
+    path('material_out_back/', MaterialOutBack.as_view()),     # 原材料出库反馈
     path('dispatch-log/', DispatchLogView.as_view()),  # 发货历史记录
     path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('materia_type_name_to_according/', MateriaTypeNameToAccording.as_view()),  # 根据物料类型和编码找到存在的仓库表

@@ -54,6 +54,8 @@ class MaterialPlanManagementFilter(django_filters.rest_framework.FilterSet):
     status = django_filters.CharFilter(field_name="status", help_text='订单状态')
     material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码', lookup_expr='icontains')
     name = django_filters.CharFilter(field_name="warehouse_info__name", help_text='仓库名称')
+    station = django_filters.CharFilter(field_name="station", help_text='出库口')
+    station_no = django_filters.CharFilter(field_name="station_no", help_text='出库口')
 
     class Meta:
         model = MaterialOutPlan

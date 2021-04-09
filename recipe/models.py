@@ -30,7 +30,9 @@ class MaterialAttribute(AbstractEntity):
                                     on_delete=models.CASCADE, related_name='material_attr', null=True, blank=True)
     safety_inventory = models.PositiveIntegerField(help_text='安全库存标准', verbose_name='安全库存标准')
     period_of_validity = models.PositiveIntegerField(help_text='有效期', verbose_name='有效期')
-    validity_unit = models.CharField('有效期单位', help_text='有效期单位', max_length=8, default="天")
+    validity_unit = models.CharField(verbose_name='有效期单位', help_text='有效期单位', max_length=8, default="天")
+    ratio = models.DecimalField(max_digits=8, decimal_places=2, default=100.00, verbose_name='抽检比例', help_text='抽检比例')
+    send_flag = models.BooleanField(default=False, verbose_name='抽检比例是否已发送标志', help_text='抽检比例是否已发送标志')
 
     class Meta:
         db_table = 'material_attribute'

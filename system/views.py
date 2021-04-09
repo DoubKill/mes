@@ -233,6 +233,7 @@ class GroupPermissions(APIView):
         return Response(data={'result': ret})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PlanReceive(CreateAPIView):
     """接受上辅机计划数据接口"""
     # permission_classes = ()
@@ -250,6 +251,7 @@ class PlanReceive(CreateAPIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialReceive(CreateAPIView):
     """接受上辅机原材料数据接口"""
     # permission_classes = ()
@@ -271,6 +273,7 @@ class MaterialReceive(CreateAPIView):
             return Response('mes拥有当前原材料', status=status.HTTP_201_CREATED)
 
 
+@method_decorator([api_recorder], name="dispatch")
 def index(request):
     request.META["CSRF_COOKIE_USED"] = True
     return render(request, 'index.html')

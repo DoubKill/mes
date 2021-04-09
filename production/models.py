@@ -109,13 +109,13 @@ class PalletFeedbacks(AbstractEntity):
 class EquipStatus(AbstractEntity):
     """机台状况反馈"""
     plan_classes_uid = models.CharField(help_text='班次计划唯一码', verbose_name='班次计划唯一码', max_length=64, blank=True, null=True)
-    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True, null=True)
     temperature = models.DecimalField(decimal_places=2, max_digits=8, help_text='温度', verbose_name='温度')
     rpm = models.DecimalField(decimal_places=2, max_digits=8, help_text='转速', verbose_name='转速')
     energy = models.DecimalField(decimal_places=2, max_digits=8, help_text='能量', verbose_name='能量')
     power = models.DecimalField(decimal_places=2, max_digits=8, help_text='功率', verbose_name='功率')
     pressure = models.DecimalField(decimal_places=2, max_digits=8, help_text='压力', verbose_name='压力')
-    status = models.CharField(max_length=64, help_text='状态', verbose_name='状态', blank=True)
+    status = models.CharField(max_length=64, help_text='状态', verbose_name='状态', blank=True, null=True)
     current_trains = models.IntegerField(help_text='当前车次', verbose_name='当前车次')
     product_time = models.DateTimeField(help_text='工作站生产报表时间/存盘时间',
                                         verbose_name='工作站生产报表时间/存盘时间', null=True)

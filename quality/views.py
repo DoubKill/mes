@@ -316,7 +316,7 @@ class MaterialDealStatusListView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class DealTypeView(APIView):
-
+    # 创建处理类型
     def post(self, request):
         data = request.data
         gct = GlobalCodeType.objects.filter(type_name="处理类型").first()
@@ -753,6 +753,7 @@ class ProductDayDetail(APIView):
         return Response(ruturn_pass)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PrintMaterialDealResult(APIView):
     """不合格品打印功能"""
 
@@ -1135,6 +1136,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
         return Response(serializer_data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -1153,9 +1155,9 @@ class ImportAndExportView(APIView):
             for j in ['比重', '硬度', 'ML(1+4)', 'MH', 'TC10', 'TC50', 'TC90', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
                 # 本来这里的Ml(1+4)就是门尼  M300、扯断强度、伸长率属于物性  焦烧就是焦烧 钢拔就是钢拔 MH、TC10、TC50、TC90属于流变
                 if i[by_dict[j]]:
-                    m_obj = Material.objects.filter(material_name=i[0].strip()).first()
-                    if not m_obj:
-                        raise ValidationError(f'{i[0]}胶料信息不存在,请检查Excel表格或者使用复制功能')
+                    # m_obj = Material.objects.filter(material_name=i[0].strip()).first()
+                    # if not m_obj:
+                    #     raise ValidationError(f'{i[0]}胶料信息不存在,请检查Excel表格或者使用复制功能')
                     dp_obj = DataPoint.objects.filter(name__contains=j).first()
                     if not dp_obj:
                         raise ValidationError(f'{j}数据点信息不存在,请检查Excel表格或者使用复制功能')
@@ -1239,6 +1241,18 @@ class ImportAndExportView(APIView):
                     item['test_group'] = i[5].strip() + '班'
                     MaterialTestResult.objects.create(**item)
         return Response('导入成功')
+
+@method_decorator([api_recorder], name="dispatch")
+class BarCodePreview(APIView):
+    # 条码追溯中的条码预览接口
+    def get(self, request):
+        lot_no = request.query_params.get("lot_no")
+        # try:
+        instance = MaterialDealResult.objects.get(lot_no=lot_no)
+        serializer =  MaterialDealResultListSerializer(instance)
+        return Response(serializer.data)
+        # except Exception as e:
+        #     raise ValidationError(f"该条码无快检结果:{e}")
 
 
 """

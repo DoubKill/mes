@@ -510,6 +510,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         mtr_list_return = {}
         # 找到每个车次检测次数最多的那一条
         table_head_count = {}
+        # deal_result   后续若有修改  调用deal_result
         mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
         for mto_obj in mto_set:
             if not mto_obj:
