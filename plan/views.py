@@ -21,6 +21,7 @@ from basics.views import CommonDeleteMixin
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter, BatchingClassesPlanFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
@@ -485,4 +486,4 @@ class IssueBatchingClassesPlanView(UpdateAPIView):
 class PlantImportView(CreateAPIView):
     serializer_class = PlantImportSerializer
     queryset = ProductClassesPlan.objects.all()
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'add': 'add_productdayplan'}))

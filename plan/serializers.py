@@ -540,7 +540,6 @@ class PlantImportSerializer(BaseModelSerializer):
         while 1:
             try:
                 equip_no = current_sheet.cell(0, i * 4 + 1).value
-                print(equip_no)
             except IndexError:
                 break
             tmp_class = None
@@ -591,6 +590,17 @@ class PlantImportSerializer(BaseModelSerializer):
                 if not ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).exists():
                     break
             item['plan_classes_uid'] = plan_classes_uid
+            pdp_obj = ProductDayPlan.objects.filter(equip_id=item['equip'],
+                                                    product_batching_id=item['product_batching'],
+                                                    plan_schedule=item['work_schedule_plan'].plan_schedule,
+                                                    delete_flag=False).first()
+            if pdp_obj:
+                item['product_day_plan_id'] = pdp_obj.id
+            else:
+                item['product_day_plan_id'] = ProductDayPlan.objects.create(
+                    equip=item['equip'],
+                    product_batching=item['product_batching'],
+                    plan_schedule=item['work_schedule_plan'].plan_schedule).id
             ProductClassesPlan.objects.create(**item)
         return validated_data
 

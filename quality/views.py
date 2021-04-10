@@ -27,6 +27,7 @@ from mes import settings
 from mes.common_code import CommonDeleteMixin
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
+from mes.permissions import PermissionClass
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
@@ -1265,6 +1266,10 @@ class TestIndicatorRawViewSet(ModelViewSet):
     """试验指标列表"""
     queryset = TestIndicatorRaw.objects.filter(delete_flag=False)
     serializer_class = TestIndicatorRawSerializer
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'view_raw_test_indicator',
+                                                            'change': 'change_raw_test_indicator',
+                                                            'delete': 'delete_raw_test_indicator'}))
 
     def list(self, request, *args, **kwargs):
         data = self.queryset.values('id', 'name')
@@ -1278,6 +1283,9 @@ class TestTypeRawViewSet(ModelViewSet):
     serializer_class = TestTypeRawSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('test_indicator',)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'add_raw_test_type',
+                                                            'change': 'change_raw_test_type'}))
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -1295,6 +1303,9 @@ class DataPointRawViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = DataPointRawFilter
     pagination_class = None
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'pointChange_raw_test_type',
+                                                            'change': 'pointChange_raw_test_type'}))
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -1311,6 +1322,9 @@ class TestMethodRawViewSet(ModelViewSet):
     serializer_class = TestMethodRawSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = TestMethodRawFilter
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'add_raw_test_method',
+                                                            'change': 'change_raw_test_method'}))
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -1326,8 +1340,10 @@ class MaterialTestMethodRawViewSet(ModelViewSet):
     queryset = MaterialTestMethodRaw.objects.filter(delete_flag=False)
     serializer_class = MaterialTestMethodRawSerializer
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated,)
     filter_class = MaterialTestMethodRawFilter
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'add_raw_evaluating',
+                                                            'change': 'change_raw_evaluating'}))
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1336,7 +1352,9 @@ class MaterialDataPointIndicatorRawViewSet(ModelViewSet):
     queryset = MaterialDataPointIndicatorRaw.objects.filter(delete_flag=False)
     serializer_class = MaterialDataPointIndicatorRawSerializer
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'change_raw_evaluating',
+                                                            'change': 'change_raw_evaluating'}))
     filter_class = MaterialDataPointIndicatorRawFilter
     pagination_class = None
 
@@ -1347,7 +1365,11 @@ class LevelResultRawViewSet(ModelViewSet):
     queryset = LevelResultRaw.objects.filter(delete_flag=False)
     serializer_class = LevelResultRawSerializer
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated,)
+
+    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
+                                                            'add': 'add_raw_level',
+                                                            'change': 'change_raw_level',
+                                                            'delete': 'delete_raw_level'}))
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -1370,6 +1392,7 @@ class LevelResultRawViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class MaterialTestIndicatorMethodsRaw(APIView):
     """获取原材料指标试验方法, 参数：?lot_no=批次号"""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         lot_no = self.request.query_params.get('lot_no')
@@ -1426,6 +1449,7 @@ class MaterialTestIndicatorMethodsRaw(APIView):
 class TestIndicatorDataPointRawListView(ListAPIView):
     """获取试验指标及其所有的试验方法数据点"""
     queryset = TestIndicatorRaw.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticated, )
 
     def list(self, request, *args, **kwargs):
         ret = []
@@ -1447,6 +1471,7 @@ class TestIndicatorDataPointRawListView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class MaterialInventoryView(APIView):
     """根据日期、物料编码、物料名称、条码、批次号获取原材料入库信息， 参数: ?storage_date=&material_no=&material_name=&lot_no=&"""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         storage_date = self.request.query_params.get('storage_date')
@@ -1481,7 +1506,9 @@ class MaterialTestOrderRawViewSet(mixins.CreateModelMixin,
         delete_flag=False).prefetch_related(
         'order_results_raw')
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_raw_result_info',
+                                                            'add': 'add_raw_test_result',
+                                                            'change': 'change_raw_result_info'}))
     filter_class = MaterialTestOrderRawFilter
 
     def get_serializer_class(self):
@@ -1510,7 +1537,9 @@ class UnqualifiedMaterialDealResultViewSet(mixins.ListModelMixin,
                                            GenericViewSet):
     queryset = UnqualifiedMaterialDealResult.objects.filter().prefetch_related('material_test_order_raw')
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_raw_unqualified_material',
+                                                            'change': ['deal_raw_unqualified_material',
+                                                                       'submit_raw_unqualified_material']}))
     filter_class = UnqualifiedMaterialDealResultFilter
 
     def get_serializer_class(self):
