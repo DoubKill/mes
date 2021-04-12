@@ -300,6 +300,7 @@ class SpareTypeViewSet(ModelViewSet):
 
         return super().create(request, *args, **kwargs)
 
+
 @method_decorator([api_recorder], name="dispatch")
 class SpareViewSet(ModelViewSet):
     """备品备件信息"""
@@ -372,6 +373,7 @@ class SpareLocationViewSet(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SpareInventoryImportExportAPIView(APIView):
     """备品备件入库信息导入导出"""
 

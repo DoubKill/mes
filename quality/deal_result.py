@@ -17,14 +17,12 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     logger.error("1、先找到这个胶料所有指标")
     mto_set_all = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('product_no', flat=True)
     mto_product_no_list = list(mto_set_all)
-    mtm_set = MaterialTestMethod.objects.filter(material__material_name__in=mto_product_no_list).all()
-    name_list = []
-    for mtm_obj in mtm_set:
-        name = mtm_obj.test_method.test_type.test_indicator.name
-        name_list.append(name)
-
+    name_list = list(
+        MaterialTestMethod.objects.filter(material__material_name__in=mto_product_no_list).all().values_list(
+            'test_method__test_type__test_indicator__name', flat=True))
     # 2、 判断是否所有车次都有
-    logger.error("2、 判断是否所有车次都有")
+
+    logger.error("2、判断是否所有车次都有")
     actual_trains_list = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).values_list('actual_trains', flat=True)
     train_liat = list(actual_trains_list)
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).first()
@@ -33,71 +31,71 @@ def synthesize_to_material_deal_result(mdr_lot_no):
             return
 
     # 3、判断快检这边是不是所有的指标都有
+
     logger.error("3、判断快检这边是不是所有的指标都有")
-    mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no).all()
-    for mto_obj in mto_set:
-        test_indicator_name_list = []
-        mtr_dpn_list = mto_obj.order_results.all().values('test_indicator_name').annotate(
-            max_test_time=Max('test_times'))
-        for mtr_dpn_dict in mtr_dpn_list:
-            test_indicator_name_list.append(mtr_dpn_dict['test_indicator_name'])
-        test_indicator_name_list = list(set(test_indicator_name_list))
-        for name in name_list:
-            if name not in test_indicator_name_list:  # 必须胶料所有的指标快检这边都有 没有就return
-                return
+    # mto_set = MaterialTestOrder.objects.filter(lot_no=mdr_lot_no)
+    mto_set = MaterialTestResult.objects.filter(material_test_order__lot_no=mdr_lot_no)
+    mtr_set = mto_set.values_list(
+        'test_indicator_name', flat=True)
+    if set(mtr_set) != set(name_list):
+        return
 
     # 4、分析流程
     logger.error("4、分析流程")
     mdr_dict = {}
     mdr_dict['lot_no'] = mdr_lot_no
-    level_list = []
-    for mto_obj in mto_set:
-        mrt_list = mto_obj.order_results.all().values('data_point_name').annotate(max_test_time=Max('test_times'))
-        for mrt_dict in mrt_list:
-            mrt_dict_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                             data_point_name=mrt_dict['data_point_name'],
-                                                             test_times=mrt_dict['max_test_time']).last()
-            level_list.append(mrt_dict_obj)
+
+    mrt_list = mto_set.values('data_point_name').annotate(new_id=Max("id")).values_list('new_id', flat=True)
+
+    level_list = list(
+        MaterialTestResult.objects.filter(id__in=mrt_list).values('mes_result', 'result', 'data_point_indicator',
+                                                                  'level',
+                                                                  'material_test_order__actual_trains',
+                                                                  'value', 'data_point_indicator__lower_limit',
+                                                                  'data_point_indicator__upper_limit'))
+
     max_mtr = level_list[0]
     # 找到检测次数最多的几条 每一条的等级进行比较选出做大的
     reason = ''
     exist_data_point_indicator = True  # 是否超出区间范围
     quality_sign = True  # 快检判定何三等品
     for mtr_obj in level_list:
-        if not mtr_obj.mes_result:  # mes没有数据
-            if not mtr_obj.result:  # 快检也没有数据
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判定区间，\n'
+        if not mtr_obj.get('mes_result'):  # mes没有数据
+            if not mtr_obj.get('result'):  # 快检也没有数据
+                reason = reason + f'{mtr_obj.get("material_test_order__actual_trains")}车{mtr_obj.get("data_point_name")}指标{mtr_obj.get("value")}不在一等品判定区间，\n'
                 exist_data_point_indicator = False
-            elif mtr_obj.result not in ['一等品', '合格', None, '']:
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
+            elif mtr_obj.get('result') not in ['一等品', '合格', None, '']:
+                reason = reason + f'{mtr_obj.get("material_test_order__actual_trains")}车{mtr_obj.get("data_point_name")}指标{mtr_obj.get("value")}在快检判为{mtr_obj.get("result")}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result in ['一等品', '合格']:
-            if mtr_obj.result not in ['一等品', '合格', None, '']:
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在快检判为{mtr_obj.result}，\n'
+        elif mtr_obj.get('mes_result') in ['一等品', '合格']:
+            if mtr_obj.get('result') not in ['一等品', '合格', None, '']:
+                reason = reason + f'{mtr_obj.get("material_test_order__actual_trains")}车{mtr_obj.get("data_point_name")}指标{mtr_obj.get("value")}在快检判为{mtr_obj.get("result")}，\n'
                 quality_sign = False
 
-        elif mtr_obj.mes_result not in ['一等品', '合格']:
-            if mtr_obj.data_point_indicator:
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}在[{mtr_obj.data_point_indicator.lower_limit}:{mtr_obj.data_point_indicator.upper_limit}]，\n'
+        elif mtr_obj.get('mes_result') not in ['一等品', '合格']:
+            if mtr_obj.get('data_point_indicator'):
+                reason = reason + f'{mtr_obj.get("material_test_order__actual_trains")}车{mtr_obj.get("data_point_name")}指标{mtr_obj.get("value")}在[{mtr_obj.get("data_point_indicator__lower_limit")}:{mtr_obj.get("data_point_indicator__upper_limit")}]，\n'
+                # pass
             else:
-                reason = reason + f'{mtr_obj.material_test_order.actual_trains}车{mtr_obj.data_point_name}指标{mtr_obj.value}不在一等品判断区间内，\n'
+                reason = reason + f'{mtr_obj.get("material_test_order__actual_trains")}车{mtr_obj.get("data_point_name")}指标{mtr_obj.get("value")}不在一等品判断区间内，\n'
                 exist_data_point_indicator = False
-        if not max_mtr.data_point_indicator:
+        if not max_mtr.get('data_point_indicator'):
             max_mtr = mtr_obj
             continue
-        if not mtr_obj.data_point_indicator:
+        if not mtr_obj.get('data_point_indicator'):
             continue
-        if mtr_obj.level > max_mtr.level:
+        if mtr_obj.get('level') != 1:
             max_mtr = mtr_obj
+            break
 
     mdr_dict['reason'] = reason
     mdr_dict['status'] = '待处理'
 
     if exist_data_point_indicator:
         if quality_sign:
-            mdr_dict['level'] = max_mtr.level
-            if max_mtr.mes_result in ['合格', '一等品']:
+            mdr_dict['level'] = max_mtr.get('level')
+            if max_mtr.get('mes_result') in ['合格', '一等品']:
                 mdr_dict['deal_result'] = '一等品'
             else:
                 mdr_dict['deal_result'] = '三等品'
@@ -111,6 +109,8 @@ def synthesize_to_material_deal_result(mdr_lot_no):
     pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_lot_no).last()
     mdr_dict['production_factory_date'] = pfb_obj.begin_time
 
+    # 5、新增数据
+    logger.error("5、新增数据")
     iir_mdr_obj = MaterialDealResult.objects.filter(lot_no=mdr_lot_no).order_by('test_time').last()
     if iir_mdr_obj:
         mdr_dict['test_time'] = iir_mdr_obj.test_time + 1

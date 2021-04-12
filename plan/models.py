@@ -41,7 +41,7 @@ class ProductClassesPlan(AbstractEntity):
     work_schedule_plan = models.ForeignKey(WorkSchedulePlan, on_delete=models.CASCADE, help_text='班次id',
                                            verbose_name='排班详情id', related_name='cd_product_classes_plan')
     plan_classes_uid = models.CharField(verbose_name='班次计划唯一码', help_text='班次计划唯一码',
-                                        max_length=64)
+                                        max_length=64, unique=True)
     note = models.CharField(max_length=64, help_text='备注', blank=True, null=True)
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台id', verbose_name='机台id',
                               related_name='equip_product_classes_plan', null=True, blank=True)

@@ -13,6 +13,9 @@ from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, Pla
 
 class EquipStatusSerializer(BaseModelSerializer):
     """机台状况反馈"""
+    plan_classes_uid = serializers.CharField(allow_null=True, allow_blank=True)
+    equip_no = serializers.CharField(allow_null=True, allow_blank=True)
+    status = serializers.CharField(allow_null=True, allow_blank=True)
 
     class Meta:
         model = EquipStatus

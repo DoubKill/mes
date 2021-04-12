@@ -1,7 +1,9 @@
 import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
-    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder
+    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, DataPointRaw, \
+    TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, MaterialTestOrderRaw, \
+    UnqualifiedMaterialDealResult
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -88,3 +90,68 @@ class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = UnqualifiedDealOrder
         fields = ('st', 'et')
+
+
+class DataPointRawFilter(django_filters.rest_framework.FilterSet):
+    test_indicator_id = django_filters.NumberFilter(field_name='test_type__test_indicator_id', help_text='试验指标id')
+    test_type_id = django_filters.NumberFilter(field_name='test_type_id', help_text='试验类型id')
+
+    class Meta:
+        model = DataPointRaw
+        fields = ('test_indicator_id', 'test_indicator_id')
+
+
+class TestMethodRawFilter(django_filters.rest_framework.FilterSet):
+    test_indicator_id = django_filters.NumberFilter(field_name='test_type__test_indicator_id', help_text='试验指标id')
+
+    class Meta:
+        model = TestMethodRaw
+        fields = ('test_indicator_id', 'test_type_id')
+
+
+class MaterialTestMethodRawFilter(django_filters.rest_framework.FilterSet):
+    material_no = django_filters.CharFilter(field_name="material__material_no", lookup_expr='icontains',
+                                            help_text='胶料编码')
+    test_type_id = django_filters.NumberFilter(field_name='test_method__test_type_id',
+                                               help_text='试验类型id')
+    test_indicator_id = django_filters.NumberFilter(field_name='test_method__test_type__test_indicator_id',
+                                                    help_text='试验指标id')
+
+    class Meta:
+        model = MaterialTestMethodRaw
+        fields = ('material_no', 'test_indicator_id', 'test_type_id')
+
+
+class MaterialDataPointIndicatorRawFilter(django_filters.rest_framework.FilterSet):
+    material_test_method_id = django_filters.CharFilter(field_name='material_test_method_id',
+                                                        help_text='物料试验方法id')
+
+    class Meta:
+        model = MaterialDataPointIndicatorRaw
+        fields = ('material_test_method_id',)
+
+
+class MaterialTestOrderRawFilter(django_filters.rest_framework.FilterSet):
+    lot_no = django_filters.CharFilter(field_name='lot_no', lookup_expr='icontains', help_text='批次号')
+    material_no = django_filters.CharFilter(field_name='material__material_no',
+                                            lookup_expr='icontains', help_text='物料编号')
+    material_name = django_filters.CharFilter(field_name='material__material_name',
+                                              lookup_expr='icontains', help_text='物料名称')
+
+    class Meta:
+        model = MaterialTestOrderRaw
+        fields = ('storage_date', 'is_qualified', 'lot_no', 'storage_date')
+
+
+class UnqualifiedMaterialDealResultFilter(django_filters.rest_framework.FilterSet):
+    storage_date = django_filters.DateFilter(field_name='material_test_order_raw__storage_date')
+    lot_no = django_filters.CharFilter(field_name='material_test_order_raw__lot_no', lookup_expr='icontains',
+                                       help_text='批次号')
+    material_no = django_filters.CharFilter(field_name='material_test_order_raw__material__material_no',
+                                            lookup_expr='icontains', help_text='物料编号')
+    material_name = django_filters.CharFilter(field_name='material_test_order_raw__material__material_name',
+                                              lookup_expr='icontains', help_text='物料名称')
+
+    class Meta:
+        model = UnqualifiedMaterialDealResult
+        fields = ('storage_date', 'lot_no', 'material_no', 'material_name')

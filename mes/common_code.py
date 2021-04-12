@@ -87,6 +87,14 @@ class UserFunctions(object):
         """
         return self.get_all_permissions()
 
+    @property
+    def raw_permissions(self):
+        permissions = []
+        for group in self.group_extensions.all():
+            group_permissions = list(group.permissions.values_list('code', flat=True))
+            permissions.extend(group_permissions)
+        return permissions
+
 
 User.__bases__ += (UserFunctions,)
 
