@@ -103,8 +103,8 @@ def PermissionClass(permission_required=None):
                     "['view', 'change', 'delete', 'add'] 中选择".format(self.__class__.__name__)
                 )
             permission_dict = dict()
-            permission_dict['OPTION'] = permission_required['view'] \
-                if isinstance(permission_required['view'], list) else [permission_required['view']]
+            # permission_dict['OPTION'] = permission_required['view'] \
+            #     if isinstance(permission_required['view'], list) else [permission_required['view']]
             if 'view' in permission_required:
                 permission_dict['GET'] = permission_required['view'] \
                     if isinstance(permission_required['view'], list) else [permission_required['view']]
@@ -130,7 +130,7 @@ def PermissionClass(permission_required=None):
                 return True
             if request.user.is_superuser:
                 return True
-            permission = PermissonsDispatch(request.user)(dispatch="all")
+            permission = request.user.raw_permissions
             # 判断是否有权限
             if not set(permission_dict.get(request.method, "")) & set(permission):
                 return False

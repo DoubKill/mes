@@ -396,6 +396,10 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             # 否则新建
                             weight_detail["weigh_cnt_type"] = cnt_type_instance
                             WeighBatchingDetail.objects.create(**weight_detail)
+        for cnt_type_instance in instance.weight_cnt_types.filter(delete_flag=False):
+            if not cnt_type_instance.weight_details.filter(delete_flag=False).exists():
+                cnt_type_instance.delete_flag = True
+                cnt_type_instance.save()
         instance.used_type = 1
         instance.save()
         return instance

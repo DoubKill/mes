@@ -16,7 +16,7 @@ def product_classes_plan_save_handler(sender, **kwargs):
                 product_batching=product_classes_plan.product_batching).exists():
             BatchingClassesPlan.objects.filter(
                 work_schedule_plan=product_classes_plan.work_schedule_plan,
-                weigh_cnt_type__weigh_batching__product_batching=product_classes_plan.product_batching
+                weigh_cnt_type__product_batching=product_classes_plan.product_batching
             ).update(delete_flag=True)
     else:
         try:
