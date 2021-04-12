@@ -222,7 +222,9 @@ class WeightPackageRetrieveLogSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weight_details.values('material__material_no', 'standard_weight', 'weigh_cnt_type__package_cnt')
+            weight_details.filter(delete_flag=False).values('material__material_no',
+                                                            'standard_weight',
+                                                            'weigh_cnt_type__package_cnt')
 
     class Meta:
         model = WeightPackageLog
@@ -235,7 +237,9 @@ class WeightPackageLogCreateSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weight_details.values('material__material_no', 'standard_weight', 'weigh_cnt_type__package_cnt')
+            weight_details.filter(delete_flag=False).values('material__material_no',
+                                                            'standard_weight',
+                                                            'weigh_cnt_type__package_cnt')
 
     def validate(self, attr):
         begin_trains = attr['begin_trains']
