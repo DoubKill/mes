@@ -90,12 +90,12 @@ class GroupUserSerializer(BaseModelSerializer):
 
 class GroupExtensionSerializer(BaseModelSerializer):
     """角色组扩展序列化器"""
-    group_users = UserUpdateSerializer(read_only=True, many=True)
+    # group_users = UserUpdateSerializer(read_only=True, many=True)
 
     class Meta:
         model = GroupExtension
-        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        exclude = ('permissions', )
 
     def to_representation(self, instance):
         return super().to_representation(instance)
