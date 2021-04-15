@@ -518,9 +518,15 @@ class EquipStatusBatch(APIView):
 
     @atomic
     def post(self, request):
-        serializer = EquipStatusSerializer(data=request.data, many=True, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        data_list = request.data
+        instance_list = []
+        for x in data_list:
+            x.pop("created_username")
+            x.pop("delete_user")
+            x.pop("last_updated_user")
+            x.pop("created_user")
+            instance_list.append(EquipStatus(**x))
+        EquipStatus.objects.bulk_create(instance_list)
         return Response("sync success", status=201)
 
 

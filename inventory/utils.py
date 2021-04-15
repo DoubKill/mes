@@ -138,6 +138,7 @@ class OUTWORKUploaderLB(BaseUploader):
         # for item in items:
         #     if item['flag'] != '01':  # 01代表成功
         #         ret.append(item['msg'])
+        print("ret", items)
         return items
 
 

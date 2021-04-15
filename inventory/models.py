@@ -102,6 +102,7 @@ class BzFinalMixingRubberInventoryLB(models.Model):
     qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='数量')
     total_weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='重量')
     quality_status = models.CharField(max_length=20, db_column='品质状态')
+    quality_level = models.CharField(max_length=6, db_column='品质等级')
     memo = models.CharField(max_length=250, db_column='车号')
     lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
@@ -201,6 +202,7 @@ class WmsInventoryStock(models.Model):
 
 
 class WmsInventoryMaterial(models.Model):
+    # 原材料库分类表
     id = models.PositiveIntegerField(db_column='id', primary_key=True)
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     material_type = models.CharField(max_length=64, db_column='MaterialGroupName')
@@ -582,37 +584,37 @@ class InventoryLog(AbstractEntity):
         verbose_name_plural = verbose_name = '出入库履历'
 
 
-class RubberInventoryLog(AbstractEntity):
-    """出入库履历"""
-    warehouse_no = models.CharField(max_length=64, verbose_name='仓库编号', help_text='仓库编号')
-    warehouse_name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
-    order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
-    pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
-    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
-    qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
-    weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
-                                 max_digits=8)
-    material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
-    quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
-    lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
-    order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型')
-    classes = models.CharField(max_length=64, verbose_name='班次', help_text='班次')
-    equip_no = models.CharField(max_length=64, verbose_name='机台号', help_text='机台号')
-    io_location = models.CharField(max_length=64, verbose_name='出入库口', help_text='出入库口')
-    dst_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
-    inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
-    inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
-    inventory_type = models.CharField(max_length=64, verbose_name='BZ出入库类型', help_text='BZ出入库数类型')  # 生产出库/快检异常出库
-    unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
-    initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
-                                 help_text='发起人')
-    factory_date = models.DateTimeField('工厂日期', blank=True, null=True, help_text='工厂日期')
-    start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
-    fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
-
-    class Meta:
-        db_table = 'rubber_inventory_log'
-        verbose_name_plural = verbose_name = '出入库履历'
+# class RubberInventoryLog(AbstractEntity):
+#     """出入库履历"""
+#     warehouse_no = models.CharField(max_length=64, verbose_name='仓库编号', help_text='仓库编号')
+#     warehouse_name = models.CharField(max_length=64, verbose_name='仓库名称', help_text='仓库名称')
+#     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
+#     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号')
+#     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址')
+#     qty = models.PositiveIntegerField(verbose_name='数量', help_text='数量', blank=True, null=True)
+#     weight = models.DecimalField(verbose_name='重量', help_text='重量', blank=True, null=True, decimal_places=2,
+#                                  max_digits=8)
+#     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码')
+#     quality_status = models.CharField(max_length=8, verbose_name='品质状态', help_text='品质状态')
+#     lot_no = models.CharField(max_length=64, verbose_name='lot_no', help_text='lot_no')
+#     order_type = models.CharField(max_length=8, verbose_name='订单类型', help_text='订单类型')
+#     classes = models.CharField(max_length=64, verbose_name='班次', help_text='班次')
+#     equip_no = models.CharField(max_length=64, verbose_name='机台号', help_text='机台号')
+#     io_location = models.CharField(max_length=64, verbose_name='出入库口', help_text='出入库口')
+#     dst_location = models.CharField(max_length=64, verbose_name='目的地', help_text='目的地')
+#     inout_reason = models.CharField(max_length=64, verbose_name='出入库原因', help_text='出入库原因')
+#     inout_num_type = models.CharField(max_length=64, verbose_name='出入库数类型', help_text='出入库数类型')
+#     inventory_type = models.CharField(max_length=64, verbose_name='BZ出入库类型', help_text='BZ出入库数类型')  # 生产出库/快检异常出库
+#     unit = models.CharField(max_length=64, verbose_name='单位', help_text='单位')
+#     initiator = models.CharField(max_length=64, blank=True, null=True, verbose_name='发起人',
+#                                  help_text='发起人')
+#     factory_date = models.DateTimeField('工厂日期', blank=True, null=True, help_text='工厂日期')
+#     start_time = models.DateTimeField('发起时间', blank=True, null=True, help_text='发起时间')
+#     fin_time = models.DateTimeField(verbose_name='完成时间', help_text='完成时间', auto_now_add=True)
+#
+#     class Meta:
+#         db_table = 'rubber_inventory_log'
+#         verbose_name_plural = verbose_name = '出入库履历'
 
 
 class MaterialInventoryLog(AbstractEntity):
