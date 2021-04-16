@@ -617,6 +617,9 @@ class InventoryLog(AbstractEntity):
 #         verbose_name_plural = verbose_name = '出入库履历'
 
 
+#TODO
+############原材料|炭黑共用抽象表########################################################################################################
+
 class MaterialInventoryLog(AbstractEntity):
     """出入库履历"""
     warehouse_no = models.CharField(max_length=64, verbose_name='仓库编号', help_text='仓库编号')
