@@ -3,6 +3,8 @@ from datetime import datetime
 from django.db.transaction import atomic
 from rest_framework import serializers
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
+
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -10,6 +12,7 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Pr
     BatchingClassesPlan, BatchingClassesEquipPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
+from quality.utils import get_cur_sheet
 from recipe.models import ProductBatching, ProductInfo, ProductBatchingDetail, Material
 import copy
 
@@ -126,19 +129,18 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     batching_type = serializers.IntegerField(source='product_batching.batching_type', default=None)
 
     def get_status(self, obj):
-        status = "等待"
         try:
-            plan_status = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
-            if plan_status:
-                status = plan_status.status
+            plan_status = PlanStatus.objects.using("SFJ").filter(
+                plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last().status
+            return plan_status
         except:
-            status = "network error"
-        return status
+            return obj.status
 
     class Meta:
         model = ProductClassesPlan
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
     @atomic()
     def create(self, validated_data):
@@ -416,6 +418,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
                   'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag', 'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
 
 class MaterialsySerializer(BaseModelSerializer):
@@ -518,3 +521,89 @@ class IssueBatchingClassesPlanSerializer(serializers.ModelSerializer):
         instance.package_changed = False
         instance.send_time = timezone.now()
         return super().update(instance, validated_data)
+
+
+class PlantImportSerializer(BaseModelSerializer):
+    excel_file = serializers.FileField(write_only=True)
+
+    def validate(self, attrs):
+        excel_file = attrs.pop('excel_file')
+        current_sheet = get_cur_sheet(excel_file)
+        file_name = excel_file.name.strip()
+        try:
+            factory_date = file_name[:10]
+            datetime.strptime(factory_date, "%Y-%m-%d")
+        except Exception:
+            raise ValidationError('文件名错误，请以日期格式开头！')
+        i = 0
+        classes_plan_list = []
+        while 1:
+            try:
+                equip_no = current_sheet.cell(0, i * 4 + 1).value
+            except IndexError:
+                break
+            tmp_class = None
+            for rowNum in range(2, current_sheet.nrows):
+                value = current_sheet.row_values(rowNum)[i*4+1:(i + 1) * 4+1]
+                classes = current_sheet.cell(rowNum, 0).value
+                if classes:
+                    tmp_class = classes
+                else:
+                    classes = tmp_class
+                try:
+                    product_no = value[0].strip()
+                    plan_trains = int(value[1])
+                    note = value[3].strip()
+                except Exception:
+                    continue
+                product_batching = ProductBatching.objects.filter(used_type=4,
+                                                                  stage_product_batch_no=product_no,
+                                                                  batching_type=2
+                                                                  ).first()
+                work_schedule_plan = WorkSchedulePlan.objects.filter(classes__global_name=classes,
+                                                                     plan_schedule__day_time=factory_date
+                                                                     ).first()
+                equip = Equip.objects.filter(equip_no=equip_no).first()
+                if not all([product_batching, work_schedule_plan, equip]) or \
+                        product_batching.dev_type != equip.category:
+                    continue
+                classes_plan_data = {
+                    "sn": 0,
+                    "plan_trains": plan_trains,
+                    "unit": "车",
+                    "work_schedule_plan": work_schedule_plan,
+                    "note": note,
+                    "equip": equip,
+                    "product_batching": product_batching,
+                    "status": "已保存"}
+                classes_plan_list.append(classes_plan_data)
+            i += 1
+        attrs['classes_plan_list'] = classes_plan_list
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        classes_plan_list = validated_data['classes_plan_list']
+        for item in classes_plan_list:
+            while 1:
+                plan_classes_uid = UUidTools.uuid1_hex(item['equip'].equip_no)
+                if not ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).exists():
+                    break
+            item['plan_classes_uid'] = plan_classes_uid
+            pdp_obj = ProductDayPlan.objects.filter(equip_id=item['equip'],
+                                                    product_batching_id=item['product_batching'],
+                                                    plan_schedule=item['work_schedule_plan'].plan_schedule,
+                                                    delete_flag=False).first()
+            if pdp_obj:
+                item['product_day_plan_id'] = pdp_obj.id
+            else:
+                item['product_day_plan_id'] = ProductDayPlan.objects.create(
+                    equip=item['equip'],
+                    product_batching=item['product_batching'],
+                    plan_schedule=item['work_schedule_plan'].plan_schedule).id
+            ProductClassesPlan.objects.create(**item)
+        return validated_data
+
+    class Meta:
+        model = ProductClassesPlan
+        fields = ('excel_file', )

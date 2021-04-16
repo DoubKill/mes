@@ -273,7 +273,6 @@ class MaterialReceive(CreateAPIView):
             return Response('mes拥有当前原材料', status=status.HTTP_201_CREATED)
 
 
-@method_decorator([api_recorder], name="dispatch")
 def index(request):
     request.META["CSRF_COOKIE_USED"] = True
     return render(request, 'index.html')
