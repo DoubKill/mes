@@ -738,3 +738,96 @@ class BarcodeQuality(models.Model):
     class Meta:
         db_table = "barcode_quality"
         verbose_name_plural = verbose_name = '物料条码质量维护'
+
+
+# by afeng
+class FinalGumOutInventoryLog(models.Model):
+    """终炼胶库出库履历视图"""
+    order_no = models.CharField(max_length=100, db_column='BILLID', primary_key=True, help_text='出库单号')
+    pallet_no = models.CharField(max_length=50, db_column='PALLETID', help_text='托盘号')
+    location = models.CharField(max_length=50, db_column='CID', help_text="货位地址")
+    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='CarNum', help_text='数量')
+    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='Weight', help_text='已发重量')
+    quality_status = models.CharField(db_column='MStatus', max_length=6, help_text='品质状态')
+    lot_no = models.CharField(max_length=100, db_column='Lot_no', null=True, blank=True)
+    inout_num_type = models.CharField(max_length=50, db_column='OutType', help_text='出入库数类型')
+    initiator = models.CharField(max_length=50, db_column='OutUser', help_text='发起人')
+    material_no = models.CharField(max_length=100, db_column='MID', help_text='物料编码')
+    start_time = models.DateTimeField(db_column='DEALTIME', help_text='发起时间')
+
+    def warehouse_no(self):
+        return "终炼胶库"
+
+    # def inout_num_type(self):
+    #     if self.out_num_type == "快检出库":
+    #         return "指定出库"
+    #     else:
+    #         return "正常出库"
+
+    def warehouse_name(self):
+        return "终炼胶库"
+
+    def material_name(self):
+        return self.material_no
+
+    def unit(self):
+        return "kg"
+
+    def order_type(self):
+        return "出库"
+
+    # TODO 这里可以搞几个map用来做映射
+    def inout_reason(self):
+        return self.inout_num_type
+
+    def inventory_type(self):
+        return self.inout_num_type
+
+    def fin_time(self):
+        return None
+
+    class Meta:
+        db_table = 'final_gum_out_inventory_log'
+        managed = False
+
+
+class FinalGumInInventoryLog(models.Model):
+    """终炼胶库入库履历视图"""
+    order_no = models.CharField(max_length=50, db_column='BILLID', primary_key=True)
+    pallet_no = models.CharField(max_length=50, db_column='PALLETID')
+    location = models.CharField(max_length=50, db_column='CID', help_text="货位地址")
+    qty = models.DecimalField(max_digits=15, decimal_places=3, db_column='Num')
+    weight = models.DecimalField(max_digits=15, decimal_places=3, db_column='SWeight')
+    quality_status = models.CharField(db_column='MStatus', max_length=50)
+    lot_no = models.CharField(max_length=200, db_column='LotNo', null=True, blank=True)
+    inout_num_type = models.CharField(max_length=20, db_column='IOCLASSNAME')
+    material_no = models.CharField(max_length=50, db_column='MID')
+    material_name = models.CharField(max_length=50, db_column='MATNAME')
+    start_time = models.DateTimeField(db_column='LTIME')
+    project_no = models.CharField(db_column='PROJECTNO', max_length=50, null=True, blank=True)
+    class_id = models.BigIntegerField(db_column="IOCLASS_ID", null=True, blank=True)
+
+    def warehouse_no(self):
+        return "终炼胶库"
+
+    def warehouse_name(self):
+        return "终炼胶库"
+
+    def unit(self):
+        return "kg"
+
+    def order_type(self):
+        return "入库"
+
+    def inventory_type(self):
+        return self.inout_num_type
+
+    def inout_reason(self):
+        return self.inout_num_type
+
+    def fin_time(self):
+        return None
+
+    class Meta:
+        db_table = 'final_gum_in_inventory_log'
+        managed = False
