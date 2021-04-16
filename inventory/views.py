@@ -26,18 +26,19 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter, BarcodeQualityFilter
+    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
-    MaterialInHistory, MaterialInventoryLog
+    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
     InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
-    MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer
+    MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer, \
+    CarbonPlanManagementSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -54,7 +55,7 @@ from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
-from .conf import wms_ip, wms_port
+from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -450,6 +451,50 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
+        elif store_name == "终炼胶库":
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
+            if order_type == "出库":
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                temp_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M").order_by('-start_time'))
+                # 目前先只查北自出入库履历
+                # filter_dict.pop("inout_num_type", None)
+                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
+                #                                              **filter_dict).order_by('-start_time'))
+                return temp_set
+            else:
+                return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M")
+        elif store_name == "帘布库":
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
+            if order_type == "出库":
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                temp_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M").order_by('-start_time'))
+                # 目前先只查北自出入库履历
+                # filter_dict.pop("inout_num_type", None)
+                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
+                #                                              **filter_dict).order_by('-start_time'))
+                return temp_set
+            else:
+                return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M")
         elif store_name == "原材料库":
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
@@ -915,7 +960,7 @@ class MaterialPlanManagement(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
             url_name='stations')
     def get(self, request, *args, **kwargs):
-        url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
+        url = f"{cb_ip}:{cb_port}/entrance/GetOutEntranceInfo"
         # ret = requests.get(url)
         # data = ret.json()
         # rep = [{"station_no": x.get("entranceCode"),
@@ -933,6 +978,42 @@ class MaterialPlanManagement(ModelViewSet):
             s.save()
         elif isinstance(data, dict):
             s = MaterialPlanManagementSerializer(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+@method_decorator([api_recorder], name="dispatch")
+class CarbonPlanManagement(ModelViewSet):
+    queryset = CarbonOutPlan.objects.filter().order_by("-created_date")
+    serializer_class = CarbonPlanManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = CarbonPlanManagementFilter
+    permission_classes = (IsAuthenticated,)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
+            url_name='stations')
+    def get(self, request, *args, **kwargs):
+        url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
+        # ret = requests.get(url)
+        # data = ret.json()
+        # rep = [{"station_no": x.get("entranceCode"),
+        #                     "station": x.get("name")} for x in data.get("datas", {})]
+        rep = [{"station_no": "out1",
+                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        return Response(rep)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = CarbonPlanManagementSerializer(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = CarbonPlanManagementSerializer(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()

@@ -33,6 +33,9 @@ router.register(r'final-plan-management', views.PutPlanManagementFianl)
 # 原材料库出库管理
 router.register(r'material-plan-management', views.MaterialPlanManagement)
 
+# 炭黑库出库管理
+router.register(r'carbon-plan-management', views.CarbonPlanManagement)
+
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
 

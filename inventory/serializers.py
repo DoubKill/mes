@@ -16,7 +16,7 @@ from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
-from .conf import wms_ip, wms_port
+from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
@@ -1022,6 +1022,153 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
         url_dict = {
             "指定出库": f"http://{wms_ip}:{wms_port}/MESApi/AllocateSpaceDelivery",
             "正常出库": f"http://{wms_ip}:{wms_port}/MESApi/AllocateWeightDelivery"
+        }
+        body = body_dict[out_type]
+        url = url_dict[out_type]
+        try:
+            rep_dict =  wms_out(url, body)
+        except:
+            raise serializers.ValidationError("原材料wms调用失败，请联系wms维护人员")
+        warehouse_info = validated_data['warehouse_info']
+        order_no = validated_data['order_no']
+        order_type = validated_data['inventory_type']
+        created_user = self.context['request'].user
+        created_date = datetime.datetime.now()
+        # 用于出库计划状态变更
+        if rep_dict.get("state") == 1:
+            instance.status = 2
+            instance.last_updated_date = datetime.datetime.now()
+            instance.save()
+            status = instance.status
+            DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                              order_no=order_no,
+                                              order_type=order_type,
+                                              status=status,
+                                              created_user=created_user,
+                                              created_date=created_date
+                                              )
+            return instance
+        else:
+            instance.status = 3
+            DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                              order_no=order_no,
+                                              order_type=order_type,
+                                              status=3,
+                                              created_user=created_user,
+                                              created_date=created_date
+                                              )
+            instance.save()
+            raise serializers.ValidationError(f"原材料{out_type}失败，详情: {rep_dict.get('msg')}")
+
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["created_user"] = instance.created_user.username
+        return ret
+
+    class Meta:
+        model = MaterialOutPlan
+        fields = '__all__'
+        extra_kwargs = {
+            'order_no': {
+                'required': False
+            },
+            'station': {
+                'required': False
+            },
+            'station_no': {
+                'required': False
+            },
+        }
+
+
+class CarbonPlanManagementSerializer(serializers.ModelSerializer):
+    no = serializers.CharField(source="warehouse_info.no", read_only=True)
+    name = serializers.CharField(source="warehouse_info.name", read_only=True)
+    actual = serializers.SerializerMethodField(read_only=True)
+    destination = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.CharField(required=False)
+
+    def get_actual(self, object):
+        order_no = object.order_no
+        actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
+                                                                          actual_weight=Sum('weight'))
+        actual_qty = actual['actual_qty']
+        actual_weight = actual['actual_weight']
+        # 无法合计
+        # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
+        items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
+        return items
+
+    def get_destination(self, object):
+        equip_list = list(object.equip.all().values_list("equip_no", flat=True))
+        dispatch_list = list(object.dispatch.all().values_list("dispatch_location__name", flat=True))
+        destination = ",".join(set(equip_list + dispatch_list))
+        return destination
+
+    @atomic()
+    def create(self, validated_data):
+        location = validated_data.get("location")
+        station = validated_data.get("station")
+        if not station:
+            raise serializers.ValidationError(f"请选择出库口")
+        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        validated_data["order_no"] = order_no
+        warehouse_info = validated_data['warehouse_info']
+        status = validated_data['status']
+        created_user = self.context['request'].user
+        validated_data["created_user"] = created_user
+        order_type = validated_data.get('order_type', '出库')  # 订单类型
+        validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
+        DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                          order_no=order_no,
+                                          order_type=order_type,
+                                          status=status,
+                                          created_user=created_user,
+                                          )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        out_type = validated_data.get('inventory_type')
+        status = validated_data.get('status')
+        # 该代码用于处理页面上上编辑订单状态与需求量
+        if out_type not in ["指定出库", "正常出库"]:
+            if status == 5:
+                instance.status = status
+                instance.save()
+                return instance
+            else:
+                need_weight = validated_data['need_weight']
+                instance.need_weight = need_weight
+                instance.save()
+                return instance
+        inventory_reason = validated_data.get('inventory_reason')
+        body_dict = {
+            "指定出库": {
+                "taskNumber": instance.order_no,
+                "entranceCode": instance.station_no,
+                "allocationInventoryDetails": [{
+                    "taskDetailNumber": instance.order_no + "cb1",
+                    "materialCode": instance.material_no,
+                    "materialName": instance.material_name if instance.material_name else "",
+                    # "batchNo": instance.batch_no,
+                    "spaceCode": instance.location,
+                    "quantity": instance.need_qty
+                        }]
+                },
+            "正常出库": {
+                "taskNumber": instance.order_no,
+                "entranceCode": instance.station_no,
+                "allocationInventoryDetails": [{
+                    "materialCode": instance.material_no,
+                    "materialName": instance.material_name if instance.material_name else "",
+                    "weightOfActual ": instance.need_weight
+                }]
+            }
+        }
+        url_dict = {
+            "指定出库": f"http://{cb_ip}:{cb_port}/MESApi/AllocateSpaceDelivery",
+            "正常出库": f"http://{cb_ip}:{cb_port}/MESApi/AllocateWeightDelivery"
         }
         body = body_dict[out_type]
         url = url_dict[out_type]
