@@ -117,7 +117,7 @@ def update_wms_kjjg(items=[{
 # , ensure_ascii=False)
     #TODO
     container = items[0]["RFID"]
-    container_no_list = BzFinalMixingRubberInventoryLB.objects.all().values_list("container_no", flat=True)
+    container_no_list = BzFinalMixingRubberInventoryLB.objects.using("lb").all().values_list("container_no", flat=True)
     if container in container_no_list:
         ware = "终炼"
     else:
@@ -127,11 +127,4 @@ def update_wms_kjjg(items=[{
     return ret
 
 if __name__ == '__main__':
-    update_wms_kjjg([{
-            "WORKID": "111111",                            #  任务id                  string
-            "MID": "C-FM-F978-03",                  # 物料编号                string
-            "PICI": "2021041020043868Z11",                             # 批次号/计划号        string
-            "RFID": "20111635",                            # RFID托盘号            string
-            "DJJG": "一等品",                                  # 品质等级               string
-            "SENDDATE": "20200513 09:22:22"    # 下发时间                string
-        }])
+    update_wms_kjjg([{'WORKID': '202104160001', 'MID': 'C-FM-F978-03', 'PICI': '2021041020043868Z11', 'RFID': '20111635', 'DJJG': '三等品', 'SENDDATE': '20210416 09:41:40'}])
