@@ -129,19 +129,18 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     batching_type = serializers.IntegerField(source='product_batching.batching_type', default=None)
 
     def get_status(self, obj):
-        status = "等待"
         try:
-            plan_status = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
-            if plan_status:
-                status = plan_status.status
+            plan_status = PlanStatus.objects.using("SFJ").filter(
+                plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last().status
+            return plan_status
         except:
-            status = "network error"
-        return status
+            return obj.status
 
     class Meta:
         model = ProductClassesPlan
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
     @atomic()
     def create(self, validated_data):
@@ -419,6 +418,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
                   'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag', 'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
 
 class MaterialsySerializer(BaseModelSerializer):

@@ -64,9 +64,7 @@ def send_bz():
 
 
 if __name__ == '__main__':
-    # try:
-    #     send_bz()
-    # except Exception as e:
-    #     logger.error(e)
-    ret = update_wms_kjjg([{'WORKID': '202103260008', 'MID': 'YL010205025', 'PICI': 'CJJ210202022437i45', 'RFID': '20110263', 'DJJG': '一等品', 'SENDDATE': '20210329 13:41:40'}])
-    print(ret)
+    try:
+        send_bz()
+    except Exception as e:
+        logger.error(e)

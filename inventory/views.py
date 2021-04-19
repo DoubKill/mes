@@ -26,18 +26,19 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter, BarcodeQualityFilter
+    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
-    MaterialInHistory, MaterialInventoryLog
+    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
     InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
-    MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer
+    MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer, \
+    CarbonPlanManagementSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -54,7 +55,7 @@ from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
-from .conf import wms_ip, wms_port
+from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -320,7 +321,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     MODEL, SERIALIZER = 0, 1
     INVENTORY_MODEL_BY_NAME = {
         '线边库': [XBMaterialInventory, XBKMaterialInventorySerializer],
-        '终炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
+        '终炼胶库': [BzFinalMixingRubberInventoryLB, BzFinalMixingRubberLBInventorySerializer],
         '帘布库': [BzFinalMixingRubberInventoryLB, BzFinalMixingRubberLBInventorySerializer],
         '原材料库': [WmsInventoryStock, WmsInventoryStockSerializer],
         '混炼胶库': [BzFinalMixingRubberInventory, BzFinalMixingRubberInventorySerializer],
@@ -364,8 +365,14 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
             queryset = model.objects.using('lb').all()
-            if quality_status:
-                queryset = queryset.filter(quality_status=quality_status)
+            if warehouse_name == "帘布库":
+                queryset = queryset.exclude(material_no__icontains="M")
+                if quality_status:
+                    queryset = queryset.filter(quality_level=quality_status)
+            else:
+                queryset = queryset.filter(material_no__icontains="M")
+                if quality_status:
+                    queryset = queryset.filter(quality_status=quality_status)
         if queryset:
             if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory,
                                                BzFinalMixingRubberInventoryLB]:
@@ -384,9 +391,11 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(location__istartswith=tunnel)
             return queryset
         if model == WmsInventoryStock:
-            quality_status = {"合格品":1, "不合格品": 2, None: 1, "": 1}[quality_status]
+            quality_status = {"合格品": 1, "不合格品": 2, None: 1, "": 1}[quality_status]
             if warehouse_name == "原材料库":
-                queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel, quality_status))
+                queryset = model.objects.using('wms').raw(
+                    WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel,
+                                              quality_status))
             else:
                 queryset = model.objects.using('cb').raw(WmsInventoryStock.get_sql(material_type, material_no))
         return queryset
@@ -442,6 +451,50 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 return temp_set
             else:
                 return MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
+        elif store_name == "终炼胶库":
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
+            if order_type == "出库":
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                temp_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M").order_by('-start_time'))
+                # 目前先只查北自出入库履历
+                # filter_dict.pop("inout_num_type", None)
+                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
+                #                                              **filter_dict).order_by('-start_time'))
+                return temp_set
+            else:
+                return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M")
+        elif store_name == "帘布库":
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
+            if order_type == "出库":
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                temp_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M").order_by('-start_time'))
+                # 目前先只查北自出入库履历
+                # filter_dict.pop("inout_num_type", None)
+                # temp_set += list(InventoryLog.objects.filter(warehouse_name=store_name, inventory_type=actual_type,
+                #                                              **filter_dict).order_by('-start_time'))
+                return temp_set
+            else:
+                return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M")
         elif store_name == "原材料库":
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
@@ -488,23 +541,25 @@ class MaterialCount(APIView):
         if status:
             filter_dict.update(quality_level=status)
         if store_name == "终炼胶库":
-            # TODO 暂时这么写
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M").values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
-            except:
-                raise ValidationError("终炼胶库连接失败")
+            except Exception as e:
+                raise ValidationError(f"终炼胶库连接失败: {e}")
         elif store_name == "混炼胶库":
             try:
                 ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
-            except:
-                raise ValidationError("混炼胶库连接失败")
+            except Exception as e:
+                raise ValidationError(f"混炼胶库连接失败:{e}")
         elif store_name == "帘布库":
             try:
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).values(
+                filter_dict.pop("quality_level", None)
+                if status:
+                    filter_dict["quality_status"] = status
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M").values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except:
@@ -905,13 +960,13 @@ class MaterialPlanManagement(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
             url_name='stations')
     def get(self, request, *args, **kwargs):
-        url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
+        url = f"{cb_ip}:{cb_port}/entrance/GetOutEntranceInfo"
         # ret = requests.get(url)
         # data = ret.json()
         # rep = [{"station_no": x.get("entranceCode"),
         #                     "station": x.get("name")} for x in data.get("datas", {})]
-        rep= [{"station_no": "out1",
-                            "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        rep = [{"station_no": "out1",
+                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):
@@ -923,6 +978,42 @@ class MaterialPlanManagement(ModelViewSet):
             s.save()
         elif isinstance(data, dict):
             s = MaterialPlanManagementSerializer(data=data, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        else:
+            raise ValidationError('参数错误')
+        return Response('新建成功')
+
+@method_decorator([api_recorder], name="dispatch")
+class CarbonPlanManagement(ModelViewSet):
+    queryset = CarbonOutPlan.objects.filter().order_by("-created_date")
+    serializer_class = CarbonPlanManagementSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = CarbonPlanManagementFilter
+    permission_classes = (IsAuthenticated,)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
+            url_name='stations')
+    def get(self, request, *args, **kwargs):
+        url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
+        # ret = requests.get(url)
+        # data = ret.json()
+        # rep = [{"station_no": x.get("entranceCode"),
+        #                     "station": x.get("name")} for x in data.get("datas", {})]
+        rep = [{"station_no": "out1",
+                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        return Response(rep)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if isinstance(data, list):
+            s = CarbonPlanManagementSerializer(data=data, context={'request': request}, many=True)
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        elif isinstance(data, dict):
+            s = CarbonPlanManagementSerializer(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
@@ -1360,3 +1451,141 @@ class MaterialOutBack(APIView):
                 order.finish_time = datetime.datetime.now()
                 order.save()
         return Response(result)
+
+
+class InventoryStaticsView(APIView):
+
+    # def single_mix_inventory(self, product_type, model=BzFinalMixingRubberInventory):
+    #     temp_set = model.objects.filter(material_no__icontains=product_type)
+    #     data = {}
+    #     for section in self.sections:
+    #         data.update(**{section: temp_set.filter(material_no__icontains=section).aggregate(weight=Sum('total_weight')/1000)})
+    #     return data
+    #
+    # def single_edge_inventory(self, product_type, model=MaterialInventory, filter_key="material"):
+    #     temp_set = model.objects.filter(material__material_no__icontains=product_type)
+    #     data = {}
+    #     for section in self.sections:
+    #         data.update(**{
+    #             section: temp_set.filter(material__material_no__icontains=section).aggregate(weight=Sum('total_weight') / 1000)})
+    #     return data
+    def my_sum(self, x, y):
+        if not x:
+            x = 0
+        if not y:
+            y = 0
+        return x + y
+
+    def my_cut(self, x, y):
+        if not x:
+            x = 0
+        if not y:
+            y = 0
+        return x - y
+
+
+    def single(self, model, data, titles, filter_key="material__material_no__icontains", db="default"):
+        temp_set = model.objects.using(db).filter(**{filter_key: self.product_type})
+        for section in titles:
+            temp = temp_set.filter(**{filter_key: section}).aggregate(
+                weight=Sum('total_weight') / 1000, qty=Sum("qty"))
+            data.update(**{section: temp})
+        return data
+
+    def get_sections(self):
+        main_titles = []
+        edge_titles = []
+        product_set = set(BzFinalMixingRubberInventory.objects.filter(material_no__icontains=self.product_type).using('bz').values('material_no').annotate().values_list('material_no', flat=True))
+        for x in product_set:
+            try:
+                t = x.split('-')[1]
+            except:
+                pass
+            else:
+                main_titles.append(t)
+        edge_set = set(MaterialInventory.objects.filter(material__material_no=self.product_type).values('material__material_no').annotate().values_list('material__material_no', flat=True))
+        for x in edge_set:
+            try:
+                t = x.split('-')[1]
+            except:
+                pass
+            else:
+                edge_titles.append(t)
+        return list(edge_titles), list(main_titles)
+
+    def get(self, request):
+        product_type = request.query_params.get("name")
+        edge_data = {}
+        main_data = {}
+        inventory_data = {"subject": {}, "edge": {}, "error": None,  "fm_all": None, "ufm_all": None}
+        if product_type:
+            self.product_type = product_type  # 当前胶料种类
+            edge_titles, main_titles =  self.get_sections()
+            inventory_data["edge"] = self.single(MaterialInventory, edge_data, edge_titles, filter_key="material__material_no__icontains")
+            inventory_data["subject"] = self.single(BzFinalMixingRubberInventory, main_data, main_titles, filter_key="material_no__icontains", db="bz")
+            # ret["subject"] = self.single(model=BzFinalMixingRubberInventoryLB, filter_key="material") # 终炼胶库暂未启用
+            if "RFM" in main_titles and "FM" in main_titles:
+                fm1_weight = inventory_data["subject"].get("FM", {}).get("weight")
+                rfm1_weight = inventory_data["subject"].get("RFM", {}).get("weight")
+                fm1_qty = inventory_data["subject"].get("FM", {}).get("qty")
+                rfm1_qty = inventory_data["subject"].get("RFM", {}).get("qty")
+                inventory_data["subject"]["FM"]["weight"] = self.my_cut(fm1_weight, rfm1_weight)
+                inventory_data["subject"]["FM"]["qty"] = self.my_cut(fm1_qty, rfm1_qty)
+            if "RFM" in main_titles and "FM" in main_titles:
+                fm2_weight = inventory_data["edge"].get("FM", {}).get("weight")
+                rfm2_weight = inventory_data["edge"].get("RFM", {}).get("weight")
+                fm2_qty = inventory_data["edge"].get("FM", {}).get("qty")
+                rfm2_qty = inventory_data["edge"].get("RFM", {}).get("qty")
+                inventory_data["edge"]["FM"]["weight"] = self.my_cut(fm2_weight, rfm2_weight)
+                inventory_data["edge"]["FM"]["qty"] = self.my_cut(fm2_qty, rfm2_qty)
+
+        else:
+            raise ValidationError("请传入胶料种类")
+        edge_error = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type).filter(material__material_no__icontains="FM",
+                                                      quality_status="三等品").aggregate(weight=Sum("total_weight")/1000).get(
+            "weight", 0)
+        edge_error = edge_error if edge_error else 0
+
+        inventory_error = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type).filter(material_no__icontains="FM",
+                                                                      quality_level="三等品").aggregate(
+            weight=Sum("total_weight")/1000).get("weight", 0)
+        inventory_error = inventory_error if inventory_error else 0
+
+        fm_mi = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type,).filter(material__material_no__icontains="FM",
+                                                  quality_status__in=["一等品", "三等品"]).aggregate(
+            weight=Sum("total_weight")/1000).get("weight", 0)
+        fm_mi = fm_mi if fm_mi else 0
+
+        fm_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type,).filter(material_no__icontains="FM",
+                      quality_level__in=["一等品", "三等品"]).aggregate(weight=Sum("total_weight")/1000).get("weight", 0)
+        fm_bz = fm_bz if fm_bz else 0
+        fm_all =  fm_mi + fm_bz
+
+        product_mi = MaterialInventory.objects.filter(quality_status__in=["一等品", "三等品"], material__material_no__icontains=self.product_type).aggregate(
+            weight=Sum("total_weight")/1000).get("weight", 0)
+        product_mi = product_mi if product_mi else 0
+
+        product_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(quality_level__in=["一等品", "三等品"], material_no__icontains=self.product_type,).aggregate(
+            weight=Sum("total_weight")/1000).get("weight", 0)
+        product_bz = product_bz if product_bz else 0
+        product_all =  product_mi + product_bz
+
+        ufm_all = product_all - fm_all
+        inventory_data["error"] = edge_error + inventory_error
+        inventory_data["ufm_all"] = ufm_all
+        inventory_data["fm_all"] = fm_all
+        inventory_data["edge_titles"] = edge_titles
+        inventory_data["main_titles"] = main_titles
+        return Response(inventory_data)
+
+        # product_set = set(
+        #     BzFinalMixingRubberInventory.objects.values('material_no').annotate().values_list('material_no'))
+        # product_types = []
+        # for x in product_set:
+        #     try:
+        #         product_type = x.split('-')[2]
+        #     except:
+        #         pass
+        #     else:
+        #         product_types.append(product_type)
+        # product_types = set(product_types)

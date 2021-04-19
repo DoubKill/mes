@@ -300,6 +300,18 @@ DATABASES = {
             'MARS_Connection': True,
         },
     },
+    'cb': {
+            'ENGINE': 'sql_server.pyodbc',
+            'NAME': 'zhada_wms_zhongc',
+            'HOST': '10.4.24.25',
+            'PORT': '1433',
+            'USER': 'sa',
+            'PASSWORD': 'Admin123$',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'MARS_Connection': True,
+            },
+    },
     "lb": {  # 帘布库|终炼胶库缩写
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'ASRS_ZC_AJ_4',
