@@ -11,7 +11,7 @@ from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
     DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules, \
-    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack
+    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack, InventoryStaticsView
 
 router = DefaultRouter()
 
@@ -32,6 +32,9 @@ router.register(r'final-plan-management', views.PutPlanManagementFianl)
 
 # 原材料库出库管理
 router.register(r'material-plan-management', views.MaterialPlanManagement)
+
+# 炭黑库出库管理
+router.register(r'carbon-plan-management', views.CarbonPlanManagement)
 
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
@@ -81,5 +84,6 @@ urlpatterns = [
     path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('materia_type_name_to_according/', MateriaTypeNameToAccording.as_view()),  # 根据物料类型和编码找到存在的仓库表
     path('sampling-rules/', SamplingRules.as_view()),
+    path('product-station-statics/', InventoryStaticsView.as_view()),
     path('', include(router.urls)),
 ]

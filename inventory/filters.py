@@ -2,7 +2,7 @@ import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan
 
 from inventory.models import DeliveryPlan
 
@@ -59,6 +59,21 @@ class MaterialPlanManagementFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = MaterialOutPlan
+        fields = ('st', 'et', 'status', 'material_no', 'name')
+
+
+class CarbonPlanManagementFilter(django_filters.rest_framework.FilterSet):
+    """帘布库出库计划过滤器"""
+    st = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="gte")
+    et = django_filters.DateTimeFilter(field_name="created_date", help_text='创建时间', lookup_expr="lte")
+    status = django_filters.CharFilter(field_name="status", help_text='订单状态')
+    material_no = django_filters.CharFilter(field_name="material_no", help_text='物料编码', lookup_expr='icontains')
+    name = django_filters.CharFilter(field_name="warehouse_info__name", help_text='仓库名称')
+    station = django_filters.CharFilter(field_name="station", help_text='出库口')
+    station_no = django_filters.CharFilter(field_name="station_no", help_text='出库口')
+
+    class Meta:
+        model = CarbonOutPlan
         fields = ('st', 'et', 'status', 'material_no', 'name')
 
 
