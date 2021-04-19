@@ -1082,11 +1082,14 @@ class WeekdayProductStatisticsView(APIView):
             if unit != "day" or query_type != "week" or value != "lastweek":
                 raise ValidationError("暂不支持该粒度查询，敬请期待")
         temp = datetime.date.today().isoweekday()
-        monday = datetime.date.today() - datetime.timedelta(days=(6+temp))
+        monday = datetime.date.today() - datetime.timedelta(days=(6 + temp))
         sunday = datetime.date.today() - datetime.timedelta(temp)
         # 相对简单的查询 存在脏数据会导致结果误差 另一种方案是先根据uid分类取最终值的id，再统计相对麻烦  后续补充
-        temp_list = list(TrainsFeedbacks.objects.filter(factory_date__gte=monday, factory_date__lte=sunday).values("equip_no", "factory_date").\
-            annotate(all_trains=Count("equip_no")).order_by("factory_date").values("equip_no", "factory_date" ,"all_trains"))
+        temp_list = list(TrainsFeedbacks.objects.filter(factory_date__gte=monday, factory_date__lte=sunday).
+                         values("equip_no", "factory_date"). \
+                         annotate(all_weight=Sum("actual_weight")).order_by("factory_date").values("equip_no",
+                                                                                                   "factory_date",
+                                                                                                   "all_weight"))
         # __week=4查当周  3，2，1 上周 上上周， 上上上周
         # temp_list = list(
         #     TrainsFeedbacks.objects.filter(factory_date__week=3).values("equip_no", "factory_date"). \
@@ -1099,7 +1102,7 @@ class WeekdayProductStatisticsView(APIView):
                 index = data["factory_date"].isoweekday()
             except:
                 continue
-            ret[data["equip_no"]].append({day_week_map[index]: str(data["all_weight"]/1000)})
+            ret[data["equip_no"]].append({day_week_map[index]: str(data["all_weight"] / 1000)})
         return Response(ret)
 
 
@@ -1122,7 +1125,8 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
-                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
+                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"] / 1000)} for _ in
+                                    middle_list]}
                 elif unit == "month":
                     middle_list = list(temp_set.annotate(month=TruncMonth('factory_date')).values("month")
                                        .annotate(all_weight=Sum("actual_weight") / 1000).order_by("factory_date")
@@ -1136,7 +1140,8 @@ class ProductionStatisticsView(APIView):
                 if unit == "day":
                     middle_list = list(temp_set.values("factory_date").annotate(all_weight=Sum("actual_weight"))
                                        .order_by("factory_date").values("factory_date", "all_weight"))
-                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"]/1000)} for _ in middle_list]}
+                    ret = {my_key: [{_["factory_date"].strftime('%Y-%m-%d'): str(_["all_weight"] / 1000)} for _ in
+                                    middle_list]}
         except Exception as e:
             raise ValidationError(f"参数错误，请检查是否符合接口标准: {e}")
         if not ret:
