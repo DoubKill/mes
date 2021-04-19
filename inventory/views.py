@@ -1525,17 +1525,17 @@ class InventoryStaticsView(APIView):
             inventory_data["subject"] = self.single(BzFinalMixingRubberInventory, main_data, main_titles, filter_key="material_no__icontains", db="bz")
             # ret["subject"] = self.single(model=BzFinalMixingRubberInventoryLB, filter_key="material") # 终炼胶库暂未启用
             if "RFM" in main_titles and "FM" in main_titles:
-                fm1_weight = inventory_data["subject"]["FM"].get("weight")
-                rfm1_weight = inventory_data["subject"]["RFM"].get("weight")
-                fm1_qty = inventory_data["subject"]["FM"].get("qty")
-                rfm1_qty = inventory_data["subject"]["RFM"].get("qty")
+                fm1_weight = inventory_data["subject"].get("FM", {}).get("weight")
+                rfm1_weight = inventory_data["subject"].get("RFM", {}).get("weight")
+                fm1_qty = inventory_data["subject"].get("FM", {}).get("qty")
+                rfm1_qty = inventory_data["subject"].get("RFM", {}).get("qty")
                 inventory_data["subject"]["FM"]["weight"] = self.my_cut(fm1_weight, rfm1_weight)
                 inventory_data["subject"]["FM"]["qty"] = self.my_cut(fm1_qty, rfm1_qty)
             if "RFM" in main_titles and "FM" in main_titles:
-                fm2_weight = inventory_data["edge"]["FM"].get("weight")
-                rfm2_weight = inventory_data["edge"]["RFM"].get("weight")
-                fm2_qty = inventory_data["edge"]["FM"].get("qty")
-                rfm2_qty = inventory_data["edge"]["RFM"].get("qty")
+                fm2_weight = inventory_data["edge"].get("FM", {}).get("weight")
+                rfm2_weight = inventory_data["edge"].get("RFM", {}).get("weight")
+                fm2_qty = inventory_data["edge"].get("FM", {}).get("qty")
+                rfm2_qty = inventory_data["edge"].get("RFM", {}).get("qty")
                 inventory_data["edge"]["FM"]["weight"] = self.my_cut(fm2_weight, rfm2_weight)
                 inventory_data["edge"]["FM"]["qty"] = self.my_cut(fm2_qty, rfm2_qty)
 

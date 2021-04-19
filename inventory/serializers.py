@@ -20,7 +20,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
-    BarcodeQuality
+    BarcodeQuality, CarbonOutPlan
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1119,7 +1119,7 @@ class CarbonPlanManagementSerializer(serializers.ModelSerializer):
         created_user = self.context['request'].user
         validated_data["created_user"] = created_user
         order_type = validated_data.get('order_type', '出库')  # 订单类型
-        validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
+        validated_data["inventory_reason"] = validated_data.pop('quality_status', "合格品")  # 出入库原因
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
                                           order_type=order_type,
@@ -1214,7 +1214,7 @@ class CarbonPlanManagementSerializer(serializers.ModelSerializer):
         return ret
 
     class Meta:
-        model = MaterialOutPlan
+        model = CarbonOutPlan
         fields = '__all__'
         extra_kwargs = {
             'order_no': {
