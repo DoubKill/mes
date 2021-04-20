@@ -239,7 +239,7 @@ class OutWorkFeedBack(APIView):
                 if label:
                     LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
             except AttributeError:
-                pass
+                logger.error(f"条码错误")
             except Exception as e:
                 logger.error(f"未知错误{e}")
             data = dict(data)
