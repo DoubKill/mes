@@ -259,10 +259,22 @@ class OutWorkFeedBack(APIView):
                 else:
                     all_qty = int(data.get("qty"))
                 dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
+
+                # 这部分最开始做的时候没有设计好，也没有考虑全，目前只能按照一个库一个库去匹配这种方式去判断订单是否正确
                 if dp_obj:
                     need_qty = dp_obj.need_qty
                 else:
-                    return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
+                    dp_obj = DeliveryPlanFinal.objects.filter(order_no=order_no).first()
+                    if dp_obj:
+                        need_qty = dp_obj.need_qty
+                    else:
+                        dp_obj = DeliveryPlanLB.objects.filter(order_no=order_no).first()
+                        if dp_obj:
+                            need_qty = dp_obj.need_qty
+                        else:
+                            return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
+
+
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()

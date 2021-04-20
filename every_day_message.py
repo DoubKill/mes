@@ -98,10 +98,10 @@ def product_day_message():
 
 
 def equip_errors():
-    text = f"""# 设备故障统计\n\n
-                [[设备故障日报表]](http://10.4.10.54/#/phone/fault-day-statistics)\n\n
-                [[设备故障周报表]](http://10.4.10.54/#/phone/fault-week-statistics)\n\n
-                [[设备故障、月报表]](http://10.4.10.54/#/phone/fault-month-statistics)\n\n
+    text = f"""# 设备故障统计\n
+               > [[设备故障日报表]](http://10.4.10.54/#/phone/fault-day-statistics)\n
+               > [[设备故障周报表]](http://10.4.10.54/#/phone/fault-week-statistics)\n
+               > [[设备故障、月报表]](http://10.4.10.54/#/phone/fault-month-statistics)\n
             """
     message = {
         "msgtype": "markdown",
