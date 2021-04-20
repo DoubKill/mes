@@ -252,6 +252,8 @@ class OutWorkFeedBack(APIView):
                 data["inout_num_type"] = data.get("inventory_type")
             order_no = data.get('order_no')
             if order_no:
+                if InventoryLog.objects.filter(order_no=order_no, pallet_no=data.get("pallet_no")).exists():
+                    return Response({"99": "FALSE", "message": "该托盘已反馈"})
                 temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
                 all_qty = temp.get("all_qty")
                 if all_qty:
@@ -378,7 +380,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # else:
             queryset = model.objects.using('lb').all()
             if warehouse_name == "帘布库":
-                queryset = queryset.exclude(store_name="帘布库")
+                queryset = queryset.filter(store_name="帘布库")
                 if quality_status:
                     queryset = queryset.filter(quality_level=quality_status)
             else:
@@ -580,8 +582,16 @@ class MaterialCount(APIView):
             status_map = {"合格": 1, "不合格": 2}
             try:
                 ret = WmsInventoryStock.objects.using('wms').filter(quality_status=status_map.get(status, 1)).values(
-                    'material_no').annotate(
-                    all_weight=Sum('total_weight')).values('material_no', 'all_weight')
+                    'material_no', 'material_name').annotate(
+                    all_weight=Sum('total_weight')).values('material_no', 'material_name', 'all_weight')
+            except:
+                raise ValidationError("原材料库连接失败")
+        elif store_name == "炭黑库":
+            status_map = {"合格": 1, "不合格": 2}
+            try:
+                ret = WmsInventoryStock.objects.using('cb').filter(quality_status=status_map.get(status, 1)).values(
+                    'material_no', 'material_name').annotate(
+                    all_weight=Sum('total_weight')).values('material_no', 'material_name', 'all_weight')
             except:
                 raise ValidationError("原材料库连接失败")
         else:
