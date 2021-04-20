@@ -238,8 +238,8 @@ class OutWorkFeedBack(APIView):
                 label = receive_deal_result(lot_no)
                 if label:
                     LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
-            except AttributeError:
-                pass
+            except AttributeError as a:
+                logger.error(f"条码错误{a}")
             except Exception as e:
                 logger.error(f"未知错误{e}")
             data = dict(data)
@@ -259,10 +259,22 @@ class OutWorkFeedBack(APIView):
                 else:
                     all_qty = int(data.get("qty"))
                 dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
+
+                # 这部分最开始做的时候没有设计好，也没有考虑全，目前只能按照一个库一个库去匹配这种方式去判断订单是否正确
                 if dp_obj:
                     need_qty = dp_obj.need_qty
                 else:
-                    return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
+                    dp_obj = DeliveryPlanFinal.objects.filter(order_no=order_no).first()
+                    if dp_obj:
+                        need_qty = dp_obj.need_qty
+                    else:
+                        dp_obj = DeliveryPlanLB.objects.filter(order_no=order_no).first()
+                        if dp_obj:
+                            need_qty = dp_obj.need_qty
+                        else:
+                            return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
+
+
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
@@ -560,8 +572,8 @@ class MaterialCount(APIView):
                 if status:
                     filter_dict["quality_status"] = status
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M").values(
-                    'material_no').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+                    'material_no', 'material_name').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty', 'material_name')
             except:
                 raise ValidationError("帘布库连接失败")
         elif store_name == "原材料库":
