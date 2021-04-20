@@ -30,7 +30,7 @@ from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanM
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
-    MaterialInHistory, MaterialInventoryLog
+    MaterialInHistory, MaterialInventoryLog, FinalGumOutInventoryLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -54,7 +54,7 @@ from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint
 from recipe.models import Material, MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
-from .conf import wms_ip, wms_port
+from .conf import wms_ip, wms_port, IS_BZ_USING
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
@@ -384,9 +384,11 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(location__istartswith=tunnel)
             return queryset
         if model == WmsInventoryStock:
-            quality_status = {"合格品":1, "不合格品": 2, None: 1, "": 1}[quality_status]
+            quality_status = {"合格品": 1, "不合格品": 2, None: 1, "": 1}[quality_status]
             if warehouse_name == "原材料库":
-                queryset = model.objects.using('wms').raw(WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel, quality_status))
+                queryset = model.objects.using('wms').raw(
+                    WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel,
+                                              quality_status))
             else:
                 queryset = model.objects.using('cb').raw(WmsInventoryStock.get_sql(material_type, material_no))
         return queryset
@@ -910,8 +912,8 @@ class MaterialPlanManagement(ModelViewSet):
         # data = ret.json()
         # rep = [{"station_no": x.get("entranceCode"),
         #                     "station": x.get("name")} for x in data.get("datas", {})]
-        rep= [{"station_no": "out1",
-                            "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        rep = [{"station_no": "out1",
+                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):
@@ -1360,3 +1362,246 @@ class MaterialOutBack(APIView):
                 order.finish_time = datetime.datetime.now()
                 order.save()
         return Response(result)
+
+
+# 出库大屏
+# 分为混炼胶和终炼胶出库大屏
+# 混炼胶出库大屏一共份三个接口
+class DeliveryPlanNow(APIView):
+    """混炼胶 当前在出库口的胶料信息"""
+
+    def get(self, request):
+        dp_last_obj = DeliveryPlan.objects.filter(status=2).all().last()
+        if dp_last_obj:
+            try:
+                location_name = dp_last_obj.dispatch.all().filter(
+                    order_no=dp_last_obj.order_no).last().dispatch_location.name
+            except:
+                location_name = None
+            try:
+                if IS_BZ_USING:
+                    mix_gum_out_obj = MixGumOutInventoryLog.objects.using('bz').filter(
+                        order_no=dp_last_obj.order_no).last()
+                else:
+                    mix_gum_out_obj = MixGumOutInventoryLog.objects.filter(order_no=dp_last_obj.order_no).last()
+            except:
+                raise ValidationError('连接北自数据库超时')
+            if mix_gum_out_obj:
+                lot_no = mix_gum_out_obj.lot_no
+            else:
+                lot_no = None
+            result = {'order_no': dp_last_obj.order_no,
+                      'material_no': dp_last_obj.material_no,
+                      'location_name': location_name,
+                      'lot_no': lot_no}
+
+        else:
+            result = None
+        return Response({"result": result})
+
+
+class DeliveryPlanToday(APIView):
+    """混炼胶  今日的总出库量"""
+
+    def get(self, request):
+        # 计划数量
+        delivery_plan_qty = DeliveryPlan.objects.filter(finish_time__date=datetime.datetime.today()).values(
+            'material_no').annotate(plan_qty=Sum('need_qty'))
+        # 计划出库的order_no列表
+        delivery_plan_order_no_list = DeliveryPlan.objects.filter(
+            finish_time__date=datetime.datetime.today()).values_list('order_no', flat=False)
+        # 计划出库的material_no列表
+        delivery_plan_material_no_list = DeliveryPlan.objects.filter(
+            finish_time__date=datetime.datetime.today()).values_list('material_no', flat=False)
+        try:
+
+            if IS_BZ_USING:
+                # 出库数量
+                mix_gum_out_qty = MixGumOutInventoryLog.objects.using('bz').filter(
+                    order_no__in=delivery_plan_order_no_list).values(
+                    'material_no').annotate(out_qty=Sum('qty'))
+                # 库存余量
+                bz_inventory_qty = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                    material_no__in=delivery_plan_material_no_list).values(
+                    'material_no').annotate(inventory_qty=Sum('qty'))
+            else:
+                mix_gum_out_qty = MixGumOutInventoryLog.objects.filter(order_no__in=delivery_plan_order_no_list).values(
+                    'material_no').annotate(out_qty=Sum('qty'))
+
+                bz_inventory_qty = BzFinalMixingRubberInventory.objects.filter(
+                    material_no__in=delivery_plan_material_no_list).values(
+                    'material_no').annotate(inventory_qty=Sum('qty'))
+            # print(delivery_plan_qty, mix_gum_out_qty, bz_inventory_qty)
+        except:
+            raise ValidationError('连接北自数据库超时')
+        for delivery_plan in delivery_plan_qty:
+            delivery_plan['out_qty'] = None
+            delivery_plan['inventory_qty'] = None
+            for mix_gum_out in mix_gum_out_qty:
+                if delivery_plan['material_no'] == mix_gum_out['material_no']:
+                    delivery_plan['out_qty'] = mix_gum_out['out_qty']
+            for bz_inventory in bz_inventory_qty:
+                if delivery_plan['material_no'] == bz_inventory['material_no']:
+                    delivery_plan['inventory_qty'] = bz_inventory['inventory_qty']
+        return Response({'result': delivery_plan_qty})
+
+
+class MixGumOutInventoryLogAPIView(APIView):
+    """混炼胶  倒叙显示最近几条出库信息"""
+
+    def get(self, request):
+        try:
+            if IS_BZ_USING:
+                mix_gum_out_data = MixGumOutInventoryLog.objects.using('bz').filter(
+                    start_time__date=datetime.datetime.today()).order_by(
+                    '-start_time').values(
+                    'order_no',
+                    'start_time',
+                    'location', 'pallet_no',
+                    'lot_no', 'material_no',
+                    'qty', 'weight',
+                    'quality_status')
+
+            else:
+                mix_gum_out_data = MixGumOutInventoryLog.objects.filter(
+                    start_time__date=datetime.datetime.today()).order_by('-start_time').values(
+                    'order_no',
+                    'start_time',
+                    'location', 'pallet_no',
+                    'lot_no', 'material_no',
+                    'qty', 'weight',
+                    'quality_status')
+
+            for mix_gum_out_obj in mix_gum_out_data:
+                dp_last_obj = DeliveryPlan.objects.filter(order_no=mix_gum_out_obj['order_no']).all().last()
+                location_name = None
+                if dp_last_obj:
+                    try:
+                        location_name = dp_last_obj.dispatch.all().filter(
+                            order_no=dp_last_obj.order_no).last().dispatch_location.name
+                    except:
+                        location_name = None
+                mix_gum_out_obj['location_name'] = location_name
+                mix_gum_out_obj['start_time'] = mix_gum_out_obj['start_time'].strftime('%Y-%m-%d %H:%M:%S')
+        except:
+            raise ValidationError('连接北自数据库超时')
+        return Response({'result': mix_gum_out_data})
+
+
+# 终炼胶出库大屏一共份三个接口
+class DeliveryPlanFinalNow(APIView):
+    """终炼胶 当前在出库口的胶料信息"""
+
+    def get(self, request):
+        dp_last_obj = DeliveryPlanFinal.objects.filter(status=2).all().last()
+        if dp_last_obj:
+            try:
+                location_name = dp_last_obj.dispatch.all().filter(
+                    order_no=dp_last_obj.order_no).last().dispatch_location.name
+            except:
+                location_name = None
+            try:
+                if IS_BZ_USING:
+                    final_gum_out_obj = FinalGumOutInventoryLog.objects.using('bz').filter(
+                        order_no=dp_last_obj.order_no).last()
+                else:
+                    final_gum_out_obj = FinalGumOutInventoryLog.objects.filter(order_no=dp_last_obj.order_no).last()
+            except:
+                raise ValidationError('连接北自数据库超时')
+            if final_gum_out_obj:
+                lot_no = final_gum_out_obj.lot_no
+            else:
+                lot_no = None
+            result = {'order_no': dp_last_obj.order_no,
+                      'material_no': dp_last_obj.material_no,
+                      'location_name': location_name,
+                      'lot_no': lot_no}
+
+        else:
+            result = None
+        return Response({"result": result})
+
+
+class DeliveryPlanFinalToday(APIView):
+    """终炼胶  今日的总出库量"""
+
+    def get(self, request):
+        # 计划数量
+        delivery_plan_qty = DeliveryPlanFinal.objects.filter(finish_time__date=datetime.datetime.today()).values(
+            'material_no').annotate(plan_qty=Sum('need_qty'))
+        # 计划出库的order_no列表
+        delivery_plan_order_no_list = DeliveryPlanFinal.objects.filter(
+            finish_time__date=datetime.datetime.today()).values_list('order_no', flat=False)
+        # 计划出库的material_no列表
+        delivery_plan_material_no_list = DeliveryPlanFinal.objects.filter(
+            finish_time__date=datetime.datetime.today()).values_list('material_no', flat=False)
+        try:
+            if IS_BZ_USING:
+                # 出库数量
+                mix_gum_out_qty = FinalGumOutInventoryLog.objects.using('bz').filter(
+                    order_no__in=delivery_plan_order_no_list).values(
+                    'material_no').annotate(out_qty=Sum('qty'))
+                # 库存余量
+                bz_inventory_qty = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                    material_no__in=delivery_plan_material_no_list).values(
+                    'material_no').annotate(inventory_qty=Sum('qty'))
+            else:
+                mix_gum_out_qty = FinalGumOutInventoryLog.objects.filter(
+                    order_no__in=delivery_plan_order_no_list).values(
+                    'material_no').annotate(out_qty=Sum('qty'))
+                bz_inventory_qty = BzFinalMixingRubberInventory.objects.filter(
+                    material_no__in=delivery_plan_material_no_list).values(
+                    'material_no').annotate(inventory_qty=Sum('qty'))
+            # print(delivery_plan_qty, mix_gum_out_qty, bz_inventory_qty)
+        except:
+            raise ValidationError('连接北自数据库超时')
+        for delivery_plan in delivery_plan_qty:
+            delivery_plan['out_qty'] = None
+            delivery_plan['inventory_qty'] = None
+            for mix_gum_out in mix_gum_out_qty:
+                if delivery_plan['material_no'] == mix_gum_out['material_no']:
+                    delivery_plan['out_qty'] = mix_gum_out['out_qty']
+            for bz_inventory in bz_inventory_qty:
+                if delivery_plan['material_no'] == bz_inventory['material_no']:
+                    delivery_plan['inventory_qty'] = bz_inventory['inventory_qty']
+        return Response({'result': delivery_plan_qty})
+
+
+class FinalGumOutInventoryLogAPIView(APIView):
+    """终炼胶  倒叙显示最近几条出库信息"""
+
+    def get(self, request):
+        try:
+            if IS_BZ_USING:
+                final_gum_out_data = FinalGumOutInventoryLog.objects.using('bz').filter(
+                    start_time__date=datetime.datetime.today()).order_by(
+                    '-start_time').values(
+                    'order_no',
+                    'start_time',
+                    'location', 'pallet_no',
+                    'lot_no', 'material_no',
+                    'qty', 'weight',
+                    'quality_status')
+            else:
+                final_gum_out_data = FinalGumOutInventoryLog.objects.filter(
+                    start_time__date=datetime.datetime.today()).order_by('-start_time').values(
+                    'order_no',
+                    'start_time',
+                    'location', 'pallet_no',
+                    'lot_no', 'material_no',
+                    'qty', 'weight',
+                    'quality_status')
+            for mix_gum_out_obj in final_gum_out_data:
+                dp_last_obj = DeliveryPlanFinal.objects.filter(order_no=mix_gum_out_obj['order_no']).all().last()
+                location_name = None
+                if dp_last_obj:
+                    try:
+                        location_name = dp_last_obj.dispatch.all().filter(
+                            order_no=dp_last_obj.order_no).last().dispatch_location.name
+                    except:
+                        location_name = None
+                mix_gum_out_obj['location_name'] = location_name
+                mix_gum_out_obj['start_time'] = mix_gum_out_obj['start_time'].strftime('%Y-%m-%d %H:%M:%S')
+        except:
+            raise ValidationError('连接北自数据库超时')
+        return Response({'result': final_gum_out_data})
