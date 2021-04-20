@@ -106,6 +106,7 @@ class BzFinalMixingRubberInventoryLB(models.Model):
     memo = models.CharField(max_length=250, db_column='车号')
     lot_no = models.CharField(max_length=200, db_column='追溯号')
     material_no = models.CharField(max_length=50, db_column='物料编码')
+    material_name = models.CharField(max_length=50, db_column='MATNAME')
     in_storage_time = models.DateTimeField(db_column='入库时间')
     location_status = models.CharField(max_length=20, db_column='货位状态')
 
@@ -262,6 +263,7 @@ class DeliveryPlanLB(AbstractEntity):
     need_weight = models.DecimalField(max_digits=8, decimal_places=3, verbose_name='需求重量', help_text='需求重量', blank=True,
                                       null=True)
     material_no = models.CharField(max_length=64, verbose_name='物料编码', help_text='物料编码', blank=True, null=True)
+    material_name = models.CharField(max_length=64, verbose_name='物料名称', help_text='物料名称', blank=True, null=True)
     inventory_type = models.CharField(max_length=32, verbose_name='出入库类型', help_text='出入库类型', blank=True, null=True)
     order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
     inventory_reason = models.CharField(max_length=128, verbose_name='出入库原因', help_text='出入库原因', blank=True, null=True)

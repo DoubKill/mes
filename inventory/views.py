@@ -572,8 +572,8 @@ class MaterialCount(APIView):
                 if status:
                     filter_dict["quality_status"] = status
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M").values(
-                    'material_no').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+                    'material_no', 'material_name').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty', 'material_name')
             except:
                 raise ValidationError("帘布库连接失败")
         elif store_name == "原材料库":

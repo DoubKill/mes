@@ -127,4 +127,4 @@ def update_wms_kjjg(items=[{
     return ret
 
 if __name__ == '__main__':
-    update_wms_kjjg([{'WORKID': '202104160001', 'MID': 'C-FM-F978-03', 'PICI': '2021041020043868Z11', 'RFID': '20111635', 'DJJG': '三等品', 'SENDDATE': '20210416 09:41:40'}])
+    update_wms_kjjg([{'WORKID': '202104160003', 'MID': 'C-FM-Y792-02', 'PICI': '20215818112458i35', 'RFID': '20115409', 'DJJG': '一等品', 'SENDDATE': '20210416 09:41:40'}])
