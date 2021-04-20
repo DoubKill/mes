@@ -270,6 +270,8 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         validated_data["created_user"] = created_user
         order_type = validated_data.get('order_type', '出库')  # 订单类型
         validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
+        if not validated_data.get("material_name"):
+            validated_data["material_name"] = validated_data.get("material_no")
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
                                           order_type=order_type,
@@ -304,7 +306,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
             pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
-            pici = pallet.bath_no if pallet else "1"  # 批次号
+            pici = pallet.bath_no if pallet else ""  # 批次号
             num = instance.need_qty
             msg_count = "1"
             station = instance.station if instance.station else ""
@@ -657,6 +659,12 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     """终炼胶|帘布库共用序列化器"""
+    material_type = serializers.SerializerMethodField(read_only=True)
+    unit = serializers.SerializerMethodField(read_only=True)
+    unit_weight = serializers.SerializerMethodField(read_only=True)
+    product_info = serializers.SerializerMethodField(read_only=True)
+    equip_no = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.SerializerMethodField(read_only=True)
 
     def get_material_type(self, object):
         try:
@@ -697,6 +705,15 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
         except:
             equip_no = ""
         return equip_no
+
+    def get_quality_status(self, obj):
+        temp = obj.quality_level
+        if "M" in obj.material_no:
+            return temp
+        else:
+            return {"一等品": "合格品",
+                    "三等品": "不合格品"}[temp]
+
 
     class Meta:
         model = BzFinalMixingRubberInventoryLB

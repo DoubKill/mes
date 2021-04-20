@@ -378,11 +378,11 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # else:
             queryset = model.objects.using('lb').all()
             if warehouse_name == "帘布库":
-                queryset = queryset.exclude(material_no__icontains="M")
+                queryset = queryset.exclude(store_name="帘布库")
                 if quality_status:
                     queryset = queryset.filter(quality_level=quality_status)
             else:
-                queryset = queryset.filter(material_no__icontains="M")
+                queryset = queryset.filter(store_name="炼胶库")
                 if quality_status:
                     queryset = queryset.filter(quality_status=quality_status)
         if queryset:
@@ -554,7 +554,7 @@ class MaterialCount(APIView):
             filter_dict.update(quality_level=status)
         if store_name == "终炼胶库":
             try:
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(material_no__icontains="M").values(
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(store_name="炼胶库").values(
                     'material_no').annotate(
                     all_qty=Sum('qty')).values('material_no', 'all_qty')
             except Exception as e:
@@ -571,9 +571,9 @@ class MaterialCount(APIView):
                 filter_dict.pop("quality_level", None)
                 if status:
                     filter_dict["quality_status"] = status
-                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).exclude(material_no__icontains="M").values(
-                    'material_no').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+                ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(store_name="帘布库").values(
+                    'material_no', 'material_name').annotate(
+                    all_qty=Sum('qty')).values('material_no', 'all_qty', 'material_name')
             except:
                 raise ValidationError("帘布库连接失败")
         elif store_name == "原材料库":

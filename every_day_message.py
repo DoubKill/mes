@@ -20,7 +20,6 @@ from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks
 
 
-
 def product_day_message():
     # 日产量数据统计并转换成钉钉通知数据
     end_date = datetime.datetime.now().date()
@@ -29,13 +28,13 @@ def product_day_message():
     time_str_end = " 07:59:59"
 
     plan_set = ProductClassesPlan.objects.filter(
-            work_schedule_plan__plan_schedule__day_time=factory_date,
-            delete_flag=False)
+        work_schedule_plan__plan_schedule__day_time=factory_date,
+        delete_flag=False)
     plan_data = plan_set.values('equip__equip_no').annotate(plan_num=Sum('plan_trains'))
     plan_uid = plan_set.values_list("plan_classes_uid", flat=True)
-    max_ids = TrainsFeedbacks.objects.filter(plan_classes_uid__in=plan_uid)\
+    max_ids = TrainsFeedbacks.objects.filter(plan_classes_uid__in=plan_uid) \
         .values('plan_classes_uid').annotate(max_id=Max('id')).values_list('max_id', flat=True)
-    temp_set = TrainsFeedbacks.objects.filter(id__in=max_ids).values("equip_no").\
+    temp_set = TrainsFeedbacks.objects.filter(id__in=max_ids).values("equip_no"). \
         annotate(plan_sum=Sum('plan_trains'), actual_sum=Sum('actual_trains')).order_by("equip_no")
     ret_set = temp_set.values("equip_no", "plan_sum", "actual_sum")
     equip_list = []
@@ -63,15 +62,16 @@ def product_day_message():
 
     bar = (
         Bar()
-        # .set_colors(colors="#FFDEAD")
-        # 添加X轴数据
-        .add_xaxis(equip_list)
-        # 添加Y轴数据,系列的名称
-        .add_yaxis('计划车数', plan_list, color="#FF6600")
-        .add_yaxis('实际车数', actual_list, color="#87CEFA")
-        # 添加标题
+            # .set_colors(colors="#FFDEAD")
+            # 添加X轴数据
+            .add_xaxis(equip_list)
+            # 添加Y轴数据,系列的名称
+            .add_yaxis('计划车数', plan_list, color="#FF6600")
+            .add_yaxis('实际车数', actual_list, color="#87CEFA")
+            # 添加标题
 
-        .set_global_opts(title_opts=opts.TitleOpts(title="各机台生产情况", subtitle=f"{factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}"))
+            .set_global_opts(title_opts=opts.TitleOpts(title="各机台生产情况",
+                                                       subtitle=f"{factory_date.strftime('%Y-%m-%d') + time_str_start} -> {end_date.strftime('%Y-%m-%d') + time_str_end}"))
     )
     bar.render(path="index.html")
     # # 输出保存为图片
@@ -90,19 +90,15 @@ def product_day_message():
             "text": text
         },
         "at": {
-        "atMobiles": [],
-        "isAtAll": True
+            "atMobiles": [],
+            "isAtAll": True
         }
     }
     return message
 
 
 def equip_errors():
-    text = f"""# 设备故障统计\n
-               > [[设备故障日报表]](http://10.4.10.54/#/phone/fault-day-statistics)\n
-               > [[设备故障周报表]](http://10.4.10.54/#/phone/fault-week-statistics)\n
-               > [[设备故障、月报表]](http://10.4.10.54/#/phone/fault-month-statistics)\n
-            """
+    text = f"# 设备故障统计\n\n > [[设备故障日报表]](http://10.4.10.54/#/phone/fault-day-statistics)\n\n > [[设备故障周报表]](http://10.4.10.54/#/phone/fault-week-statistics)\n\n > [[设备故障、月报表]](http://10.4.10.54/#/phone/fault-month-statistics)"
     message = {
         "msgtype": "markdown",
         "markdown": {
