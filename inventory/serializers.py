@@ -306,7 +306,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             material_no = validated_data['material_no']
             pallet_no = validated_data.get('pallet_no', "20120001")  # 托盘号
             pallet = PalletFeedbacks.objects.filter(pallet_no=pallet_no).last()
-            pici = pallet.bath_no if pallet else ""  # 批次号
+            pici = pallet.bath_no if pallet else "1"  # 批次号
             num = instance.need_qty
             msg_count = "1"
             station = instance.station if instance.station else ""
