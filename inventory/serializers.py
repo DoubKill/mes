@@ -1044,8 +1044,8 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
         url = url_dict[out_type]
         try:
             rep_dict =  wms_out(url, body)
-        except:
-            raise serializers.ValidationError("原材料wms调用失败，请联系wms维护人员")
+        except Exception as e:
+            raise serializers.ValidationError(f"原材料wms调用失败，请联系wms维护人员: {e}")
         warehouse_info = validated_data['warehouse_info']
         order_no = validated_data['order_no']
         order_type = validated_data['inventory_type']

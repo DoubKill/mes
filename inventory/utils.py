@@ -143,5 +143,8 @@ class OUTWORKUploaderLB(BaseUploader):
 
 
 def wms_out(url, body, method="POST"):
-    ret = requests.request(method, url, data=body)
+    header = {
+        "Content-Type": "application/json"
+    }
+    ret = requests.request(method, url, json=body, headers=header)
     return ret.json()
