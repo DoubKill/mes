@@ -562,11 +562,24 @@ class EquipOverview(APIView):
         data_set = temp_set.values('equip_part__name'). \
             annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
             values('equip_part__name', 'all_time')
-        part_data = [{"value": x.get('all_time'), "name": x.get("equip_part__name")} for x, y in data_set.items()]
+        part_data = [{"value": x.get('all_time'), "name": x.get("equip_part__name")} for x in data_set]
         rep["seriesData"] = part_data
 
-        #
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date).annotate().\
-            order_by('equip_part__equip__equip_no')
-        data_set = None
-        return Response("")
+        # 设备日累计故障时间
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date).values(
+            'equip_part__equip__equip_no').annotate(all_time=OSum((F('end_time') - F('begin_time')))).order_by(
+            'equip_part__equip__equip_no')
+        day_data = [{"name": x.get('equip_part__equip__equip_no'), "value": x.get("all_time")} for x in temp_set]
+        rep["data"] = day_data
+
+
+        # 维修单，单日数据滚动
+        temp_set = list(EquipMaintenanceOrder.objects.filter(factory_date=factory_date).order_by(
+            'equip_part__equip__equip_no'))
+        day_detail = [[temp_set.index(x), x.order_uid,
+                       x.equip_part.equip.equip_no + "/" + x.equip_part__name,
+                       x.get_status_display(), x.maintenance_user, x.created_date] for x in temp_set]
+        sheet = {"header": ["序号", "单号", "设备部位", "状态", "操作人", "申请时间"],
+                 "data": day_detail}
+        rep["config"] = sheet
+        return Response(rep)

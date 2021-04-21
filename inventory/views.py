@@ -982,13 +982,11 @@ class MaterialPlanManagement(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
             url_name='stations')
     def get(self, request, *args, **kwargs):
-        url = f"{cb_ip}:{cb_port}/entrance/GetOutEntranceInfo"
-        # ret = requests.get(url)
-        # data = ret.json()
-        # rep = [{"station_no": x.get("entranceCode"),
-        #                     "station": x.get("name")} for x in data.get("datas", {})]
-        rep = [{"station_no": "out1",
-                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        url = f"http://{cb_ip}:{cb_port}/entrance/GetOutEntranceInfo"
+        ret = requests.get(url)
+        data = ret.json()
+        rep = [{"station_no": x.get("entranceCode"),
+                            "station": x.get("name")} for x in data.get("datas", {})]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):
@@ -1019,12 +1017,10 @@ class CarbonPlanManagement(ModelViewSet):
             url_name='stations')
     def get(self, request, *args, **kwargs):
         url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
-        # ret = requests.get(url)
-        # data = ret.json()
-        # rep = [{"station_no": x.get("entranceCode"),
-        #                     "station": x.get("name")} for x in data.get("datas", {})]
-        rep = [{"station_no": "out1",
-                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        ret = requests.get(url)
+        data = ret.json()
+        rep = [{"station_no": x.get("entranceCode"),
+                            "station": x.get("name")} for x in data.get("datas", {})]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):
