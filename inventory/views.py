@@ -381,12 +381,13 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = model.objects.using('lb').all()
             if warehouse_name == "帘布库":
                 queryset = queryset.filter(store_name="帘布库")
+                status_dict = {"合格品": "一等品", "不合格品": "三等品", "一等品": "一等品", "三等品": "三等品"}
                 if quality_status:
-                    queryset = queryset.filter(quality_level=quality_status)
+                    queryset = queryset.filter(quality_level=status_dict.get(quality_status, "一等品"))
             else:
                 queryset = queryset.filter(store_name="炼胶库")
                 if quality_status:
-                    queryset = queryset.filter(quality_status=quality_status)
+                    queryset = queryset.filter(quality_level=quality_status)
         if queryset:
             if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory,
                                                BzFinalMixingRubberInventoryLB]:
@@ -536,6 +537,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         order_type = self.request.query_params.get("order_type", "出库")
         serializer_dispatch = {
             "混炼胶库": InventoryLogSerializer,
+            "终炼胶库": InventoryLogSerializer,
             "原材料库": InOutCommonSerializer,
             "炭黑库": InOutCommonSerializer,
         }
@@ -982,13 +984,11 @@ class MaterialPlanManagement(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
             url_name='stations')
     def get(self, request, *args, **kwargs):
-        url = f"{cb_ip}:{cb_port}/entrance/GetOutEntranceInfo"
-        # ret = requests.get(url)
-        # data = ret.json()
-        # rep = [{"station_no": x.get("entranceCode"),
-        #                     "station": x.get("name")} for x in data.get("datas", {})]
-        rep = [{"station_no": "out1",
-                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        url = f"http://{cb_ip}:{cb_port}/entrance/GetOutEntranceInfo"
+        ret = requests.get(url)
+        data = ret.json()
+        rep = [{"station_no": x.get("entranceCode"),
+                            "station": x.get("name")} for x in data.get("datas", {})]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):
@@ -1019,12 +1019,10 @@ class CarbonPlanManagement(ModelViewSet):
             url_name='stations')
     def get(self, request, *args, **kwargs):
         url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
-        # ret = requests.get(url)
-        # data = ret.json()
-        # rep = [{"station_no": x.get("entranceCode"),
-        #                     "station": x.get("name")} for x in data.get("datas", {})]
-        rep = [{"station_no": "out1",
-                "station": "出库1"}, {"station_no": "out2", "station": "出库2"}]
+        ret = requests.get(url)
+        data = ret.json()
+        rep = [{"station_no": x.get("entranceCode"),
+                            "station": x.get("name")} for x in data.get("datas", {})]
         return Response(rep)
 
     def create(self, request, *args, **kwargs):
