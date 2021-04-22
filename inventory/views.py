@@ -381,12 +381,13 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             queryset = model.objects.using('lb').all()
             if warehouse_name == "帘布库":
                 queryset = queryset.filter(store_name="帘布库")
+                status_dict = {"合格品": "一等品", "不合格品": "三等品", "一等品": "一等品", "三等品": "三等品"}
                 if quality_status:
-                    queryset = queryset.filter(quality_level=quality_status)
+                    queryset = queryset.filter(quality_level=status_dict.get(quality_status, "一等品"))
             else:
                 queryset = queryset.filter(store_name="炼胶库")
                 if quality_status:
-                    queryset = queryset.filter(quality_status=quality_status)
+                    queryset = queryset.filter(quality_level=quality_status)
         if queryset:
             if material_type and model not in [BzFinalMixingRubberInventory, XBMaterialInventory,
                                                BzFinalMixingRubberInventoryLB]:
