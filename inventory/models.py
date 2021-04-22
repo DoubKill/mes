@@ -544,8 +544,6 @@ class MixGumOutInventoryLog(models.Model):
     def inventory_type(self):
         return self.inout_num_type
 
-    def fin_time(self):
-        return None
 
     class Meta:
         db_table = 'v_ASRS_TO_MES_RE_MESVIEW'
