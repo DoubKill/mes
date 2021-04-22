@@ -781,10 +781,7 @@ class InventoryLogSerializer(serializers.ModelSerializer):
             }
 
     def get_fin_time(self, obj):
-        if obj.fin_time:
-            return obj.fin_time
-        else:
-            return (obj.start_time + datetime.timedelta(minutes=3)).strftime('%Y-%m-%d %H:%M:%S')
+        return (obj.start_time + datetime.timedelta(minutes=3)).strftime('%Y-%m-%d %H:%M:%S')
 
 
 class MixGumOutInventoryLogSerializer(serializers.ModelSerializer):
