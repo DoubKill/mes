@@ -537,6 +537,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         order_type = self.request.query_params.get("order_type", "出库")
         serializer_dispatch = {
             "混炼胶库": InventoryLogSerializer,
+            "终炼胶库": InventoryLogSerializer,
             "原材料库": InOutCommonSerializer,
             "炭黑库": InOutCommonSerializer,
         }

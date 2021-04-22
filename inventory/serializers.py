@@ -744,6 +744,7 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
 class InventoryLogSerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
     inout_num_type = serializers.SerializerMethodField(read_only=True)
+    fin_time = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = InventoryLog
@@ -778,6 +779,12 @@ class InventoryLogSerializer(serializers.ModelSerializer):
                 "classes": "",
                 "memo": "",
             }
+
+    def get_fin_time(self, obj):
+        if obj.fin_time:
+            return obj.fin_time
+        else:
+            return (obj.start_time + datetime.timedelta(minutes=3)).strftime('%Y-%m-%d %H:%M:%S')
 
 
 class MixGumOutInventoryLogSerializer(serializers.ModelSerializer):
