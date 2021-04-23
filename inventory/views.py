@@ -565,14 +565,14 @@ class MaterialCount(APIView):
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
                     store_name="炼胶库").values(
                     'material_no').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+                    all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
                 raise ValidationError(f"终炼胶库连接失败: {e}")
         elif store_name == "混炼胶库":
             try:
                 ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
                     'material_no').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty')
+                    all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
                 raise ValidationError(f"混炼胶库连接失败:{e}")
         elif store_name == "帘布库":
@@ -583,7 +583,7 @@ class MaterialCount(APIView):
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
                     store_name="帘布库").values(
                     'material_no', 'material_name').annotate(
-                    all_qty=Sum('qty')).values('material_no', 'all_qty', 'material_name')
+                    all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'material_name', 'all_weight')
             except:
                 raise ValidationError("帘布库连接失败")
         elif store_name == "原材料库":
