@@ -16,11 +16,11 @@ from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import STATION_LOCATION_MAP
 from recipe.models import MaterialAttribute
-from .conf import wms_ip, wms_port
+from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
-    BarcodeQuality
+    BarcodeQuality, CarbonOutPlan
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -114,13 +114,13 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
         status = validated_data.get('status')
-        inventory_reason = validated_data.get('inventory_reason')
-        if (inventory_reason == '一等品'):
+        inventory_reason = instance.inventory_reason
+        if inventory_reason in ['一等品', '合格品']:
             djjg = "一等品"
-        elif (inventory_reason == '三等品'):
+        elif inventory_reason in ['三等品', '不合格品']:
             djjg = "三等品"
         else:
-            djjg = "三等品"
+            djjg = "一等品"
         if out_type == "正常出库" or out_type == "指定出库":
             msg_id = validated_data['order_no']
             user = self.context['request'].user
@@ -250,24 +250,18 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        try:
-            inventory = BzFinalMixingRubberInventory.objects.using('bz').get(location=location)
-        except:
-            raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
-        if inventory.location_status not in ["有货货位"]:
-            raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
         if location:
-            if not location[0] in STATION_LOCATION_MAP[station]:
-                raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        else:
-            material_no = validated_data.get("material_no")
-            location_set = BzFinalMixingRubberInventory.objects.filter(material_no=material_no).values_list("location",
-                                                                                                            flat=True)
-            for location in location_set:
-                if not location[0] in STATION_LOCATION_MAP[station]:
-                    raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+            # if not location[0] in STATION_LOCATION_MAP[station]:
+            #     raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+
+            temp_location = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location=location).last()
+            if not temp_location:
+                raise serializers.ValidationError(f"无{location}货架")
+            else:
+                if temp_location.location_status != "有货货位":
+                    raise serializers.ValidationError(f"{location}货架为异常货架，请操作wms")
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
@@ -276,6 +270,8 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
         validated_data["created_user"] = created_user
         order_type = validated_data.get('order_type', '出库')  # 订单类型
         validated_data["inventory_reason"] = validated_data.pop('quality_status')  # 出入库原因
+        if not validated_data.get("material_name"):
+            validated_data["material_name"] = validated_data.get("material_no")
         DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
                                           order_no=order_no,
                                           order_type=order_type,
@@ -287,11 +283,13 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
         status = validated_data.get('status')
-        inventory_reason = validated_data.get('inventory_reason')
-        if "不" in inventory_reason:
-            djjg = "不合格品"
+        inventory_reason = instance.inventory_reason
+        if inventory_reason in ['一等品', '合格品']:
+            djjg = "一等品"
+        elif inventory_reason in ['三等品', '不合格品']:
+            djjg = "三等品"
         else:
-            djjg = "合格品"
+            djjg = "一等品"
         if out_type not in ["正常出库", "指定出库"]:
             if status == 5:
                 instance.status = status
@@ -318,11 +316,11 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
             WORKID = msg_id
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
-                         'STATIONID': station, 'SENDDATE': created_time}
+                         'STATIONID': station, 'SENDDATE': created_time, 'STOREDEF_ID': 4}
                 bz_out_type = "快检出库"
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num, 'DJJG': djjg,
-                         'STATIONID': station, 'SENDDATE': created_time}
+                         'STATIONID': station, 'SENDDATE': created_time, 'STOREDEF_ID': 4}
 
                 bz_out_type = "生产出库"
             else:
@@ -340,6 +338,7 @@ class PutPlanManagementSerializerLB(serializers.ModelSerializer):
                 "items": items
             }
             json_data = json.dumps(json_data, ensure_ascii=False)
+            print(json_data)
             sender = OUTWORKUploaderLB(end_type=out_type)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
@@ -423,24 +422,18 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        try:
-            inventory = BzFinalMixingRubberInventory.objects.using('bz').get(location=location)
-        except:
-            raise serializers.ValidationError("未查到此货位信息，请刷新后重试")
-        if inventory.location_status not in ["有货货位"]:
-            raise serializers.ValidationError(f"{location} 货位异常，请使用wms进行处理")
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
         if location:
-            if not location[0] in STATION_LOCATION_MAP[station]:
-                raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        else:
-            material_no = validated_data.get("material_no")
-            location_set = BzFinalMixingRubberInventory.objects.filter(material_no=material_no).values_list("location",
-                                                                                                            flat=True)
-            for location in location_set:
-                if not location[0] in STATION_LOCATION_MAP[station]:
-                    raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+            # if not location[0] in STATION_LOCATION_MAP[station]:
+            #     raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
+
+            temp_location = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(location=location).last()
+            if not temp_location:
+                raise serializers.ValidationError(f"无{location}货架")
+            else:
+                if temp_location.location_status != "有货货位":
+                    raise serializers.ValidationError(f"{location}货架为异常货架，请操作wms")
         order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
@@ -460,11 +453,13 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         out_type = validated_data.get('inventory_type')
         status = validated_data.get('status')
-        inventory_reason = validated_data.get('inventory_reason')
-        if "不" in inventory_reason:
-            djjg = "不合格品"
+        inventory_reason = instance.inventory_reason
+        if inventory_reason in ['一等品', '合格品']:
+            djjg = "一等品"
+        elif inventory_reason in ['三等品', '不合格品']:
+            djjg = "三等品"
         else:
-            djjg = "合格品"
+            djjg = "一等品"
         if out_type not in ["正常出库", "指定出库"]:
             if status == 5:
                 instance.status = status
@@ -491,11 +486,11 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
             WORKID = msg_id
             if out_type == "指定出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'RFID': pallet_no,
-                         'STATIONID': station, 'SENDDATE': created_time}
+                         'STATIONID': station, 'SENDDATE': created_time, 'STOREDEF_ID': 1}
                 bz_out_type = "快检出库"
             elif out_type == "正常出库":
                 dict1 = {'WORKID': WORKID, 'MID': material_no, 'PICI': pici, 'NUM': num, 'DJJG': djjg,
-                         'STATIONID': station, 'SENDDATE': created_time}
+                         'STATIONID': station, 'SENDDATE': created_time, 'STOREDEF_ID': 1}
                 bz_out_type = "生产出库"
             else:
                 dict1 = {}
@@ -512,6 +507,7 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
                 "items": items
             }
             json_data = json.dumps(json_data, ensure_ascii=False)
+            print(json_data)
             sender = OUTWORKUploaderLB(end_type=out_type)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
@@ -663,6 +659,61 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
 
 class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
     """终炼胶|帘布库共用序列化器"""
+    material_type = serializers.SerializerMethodField(read_only=True)
+    unit = serializers.SerializerMethodField(read_only=True)
+    unit_weight = serializers.SerializerMethodField(read_only=True)
+    product_info = serializers.SerializerMethodField(read_only=True)
+    equip_no = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.SerializerMethodField(read_only=True)
+
+    def get_material_type(self, object):
+        try:
+            mt = object.material_no.split("-")[1]
+        except:
+            mt = object.material_no
+        return mt
+
+    def get_unit(self, object):
+        return 'kg'
+
+    def get_unit_weight(self, object):
+        try:
+            unit_weight = round(object.total_weight / object.qty,3)
+        except:
+            unit_weight = "数据异常"
+        return unit_weight
+
+
+    def get_product_info(self, obj):
+        lot_no = obj.lot_no
+        pf = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
+        product_time = ""
+        if pf:
+            try:
+                product_time = pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+            except:
+                product_time = ""
+        return {
+            "equip_no": pf.equip_no if pf else "",
+            "classes": pf.classes if pf else "",
+            "product_time": product_time
+        }
+
+    def get_equip_no(self, obj):
+        try:
+            equip_no = obj.bill_id[-3:]
+        except:
+            equip_no = ""
+        return equip_no
+
+    def get_quality_status(self, obj):
+        temp = obj.quality_level
+        if "M" in obj.material_no:
+            return temp
+        else:
+            return {"一等品": "合格品",
+                    "三等品": "不合格品"}[temp]
+
 
     class Meta:
         model = BzFinalMixingRubberInventoryLB
@@ -693,6 +744,7 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
 class InventoryLogSerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
     inout_num_type = serializers.SerializerMethodField(read_only=True)
+    fin_time = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = InventoryLog
@@ -727,6 +779,9 @@ class InventoryLogSerializer(serializers.ModelSerializer):
                 "classes": "",
                 "memo": "",
             }
+
+    def get_fin_time(self, obj):
+        return (obj.start_time + datetime.timedelta(minutes=3)).strftime('%Y-%m-%d %H:%M:%S')
 
 
 class MixGumOutInventoryLogSerializer(serializers.ModelSerializer):
@@ -993,6 +1048,153 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
         url = url_dict[out_type]
         try:
             rep_dict =  wms_out(url, body)
+        except Exception as e:
+            raise serializers.ValidationError(f"原材料wms调用失败，请联系wms维护人员: {e}")
+        warehouse_info = validated_data['warehouse_info']
+        order_no = validated_data['order_no']
+        order_type = validated_data['inventory_type']
+        created_user = self.context['request'].user
+        created_date = datetime.datetime.now()
+        # 用于出库计划状态变更
+        if rep_dict.get("state") == 1:
+            instance.status = 2
+            instance.last_updated_date = datetime.datetime.now()
+            instance.save()
+            status = instance.status
+            DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                              order_no=order_no,
+                                              order_type=order_type,
+                                              status=status,
+                                              created_user=created_user,
+                                              created_date=created_date
+                                              )
+            return instance
+        else:
+            instance.status = 3
+            DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                              order_no=order_no,
+                                              order_type=order_type,
+                                              status=3,
+                                              created_user=created_user,
+                                              created_date=created_date
+                                              )
+            instance.save()
+            raise serializers.ValidationError(f"原材料{out_type}失败，详情: {rep_dict.get('msg')}")
+
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret["created_user"] = instance.created_user.username
+        return ret
+
+    class Meta:
+        model = MaterialOutPlan
+        fields = '__all__'
+        extra_kwargs = {
+            'order_no': {
+                'required': False
+            },
+            'station': {
+                'required': False
+            },
+            'station_no': {
+                'required': False
+            },
+        }
+
+
+class CarbonPlanManagementSerializer(serializers.ModelSerializer):
+    no = serializers.CharField(source="warehouse_info.no", read_only=True)
+    name = serializers.CharField(source="warehouse_info.name", read_only=True)
+    actual = serializers.SerializerMethodField(read_only=True)
+    destination = serializers.SerializerMethodField(read_only=True)
+    quality_status = serializers.CharField(required=False)
+
+    def get_actual(self, object):
+        order_no = object.order_no
+        actual = InventoryLog.objects.filter(order_no=order_no).aggregate(actual_qty=Sum('qty'),
+                                                                          actual_weight=Sum('weight'))
+        actual_qty = actual['actual_qty']
+        actual_weight = actual['actual_weight']
+        # 无法合计
+        # actual_wegit = InventoryLog.objects.values('wegit').annotate(actual_wegit=Sum('wegit')).filter(order_no=order_no)
+        items = {'actual_qty': actual_qty, 'actual_wegit': actual_weight}
+        return items
+
+    def get_destination(self, object):
+        equip_list = list(object.equip.all().values_list("equip_no", flat=True))
+        dispatch_list = list(object.dispatch.all().values_list("dispatch_location__name", flat=True))
+        destination = ",".join(set(equip_list + dispatch_list))
+        return destination
+
+    @atomic()
+    def create(self, validated_data):
+        location = validated_data.get("location")
+        station = validated_data.get("station")
+        if not station:
+            raise serializers.ValidationError(f"请选择出库口")
+        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        validated_data["order_no"] = order_no
+        warehouse_info = validated_data['warehouse_info']
+        status = validated_data['status']
+        created_user = self.context['request'].user
+        validated_data["created_user"] = created_user
+        order_type = validated_data.get('order_type', '出库')  # 订单类型
+        validated_data["inventory_reason"] = validated_data.pop('quality_status', "合格品")  # 出入库原因
+        DeliveryPlanStatus.objects.create(warehouse_info=warehouse_info,
+                                          order_no=order_no,
+                                          order_type=order_type,
+                                          status=status,
+                                          created_user=created_user,
+                                          )
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        out_type = validated_data.get('inventory_type')
+        status = validated_data.get('status')
+        # 该代码用于处理页面上上编辑订单状态与需求量
+        if out_type not in ["指定出库", "正常出库"]:
+            if status == 5:
+                instance.status = status
+                instance.save()
+                return instance
+            else:
+                need_weight = validated_data['need_weight']
+                instance.need_weight = need_weight
+                instance.save()
+                return instance
+        inventory_reason = validated_data.get('inventory_reason')
+        body_dict = {
+            "指定出库": {
+                "taskNumber": instance.order_no,
+                "entranceCode": instance.station_no,
+                "allocationInventoryDetails": [{
+                    "taskDetailNumber": instance.order_no + "cb1",
+                    "materialCode": instance.material_no,
+                    "materialName": instance.material_name if instance.material_name else "",
+                    # "batchNo": instance.batch_no,
+                    "spaceCode": instance.location,
+                    "quantity": instance.need_qty
+                        }]
+                },
+            "正常出库": {
+                "taskNumber": instance.order_no,
+                "entranceCode": instance.station_no,
+                "allocationInventoryDetails": [{
+                    "materialCode": instance.material_no,
+                    "materialName": instance.material_name if instance.material_name else "",
+                    "weightOfActual ": instance.need_weight
+                }]
+            }
+        }
+        url_dict = {
+            "指定出库": f"http://{cb_ip}:{cb_port}/MESApi/AllocateSpaceDelivery",
+            "正常出库": f"http://{cb_ip}:{cb_port}/MESApi/AllocateWeightDelivery"
+        }
+        body = body_dict[out_type]
+        url = url_dict[out_type]
+        try:
+            rep_dict =  wms_out(url, body)
         except:
             raise serializers.ValidationError("原材料wms调用失败，请联系wms维护人员")
         warehouse_info = validated_data['warehouse_info']
@@ -1033,7 +1235,7 @@ class MaterialPlanManagementSerializer(serializers.ModelSerializer):
         return ret
 
     class Meta:
-        model = MaterialOutPlan
+        model = CarbonOutPlan
         fields = '__all__'
         extra_kwargs = {
             'order_no': {

@@ -15,10 +15,17 @@ django.setup()
 
 from inventory.utils import BaseUploader
 from mes.common_code import order_no
-
+from inventory.models import BzFinalMixingRubberInventoryLB
 
 class KJJGUploader(BaseUploader):
-    endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"
+    dict_filter = {'混炼': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG",
+                   '终炼': "http://10.4.23.101:1020/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"}
+
+    def __init__(self, ware):
+        self.end_type = ware
+        self.endpoint = self.dict_filter[self.end_type]
+    # endpoint = "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"  # 混炼胶库
+    # endpoint = "http://10.4.23.101:1020/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"  # 终炼胶库
 
     def gen_payload(self, msg_id, r_type, msg_count, str_user, str_json):
         xml_data = """<?xml version="1.0" encoding="utf-8"?>
@@ -108,9 +115,16 @@ def update_wms_kjjg(items=[{
 #         }]
 #     }
 # , ensure_ascii=False)
-    sender = KJJGUploader()
+    #TODO
+    container = items[0]["RFID"]
+    container_no_list = BzFinalMixingRubberInventoryLB.objects.using("lb").all().values_list("container_no", flat=True)
+    if container in container_no_list:
+        ware = "终炼"
+    else:
+        ware = "混炼"
+    sender = KJJGUploader(ware)
     ret = sender.request(*get_base_data())
     return ret
 
 if __name__ == '__main__':
-    update_wms_kjjg()
+    update_wms_kjjg([{'WORKID': '202104160003', 'MID': 'C-FM-Y792-02', 'PICI': '20215818112458i35', 'RFID': '20115409', 'DJJG': '一等品', 'SENDDATE': '20210416 09:41:40'}])

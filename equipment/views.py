@@ -326,6 +326,7 @@ class OSum(Sum):
             SecondsToInterval(Sum(IntervalToSeconds(expression), filter=self.filter))
         )
 
+
 class OMax(Max):
     def as_oracle(self, compiler, connection):
         # if self.output_field.get_internal_type() == 'DurationField':
@@ -356,9 +357,10 @@ class PersonalStatisticsView(APIView):
         monday = today - dt.timedelta(days=today.weekday())
         sunday = today + dt.timedelta(days=6 - today.weekday())
         time_dispatch = {
-            "日": {"factory_date": today},
-            "月": {"factory_date__month": datetime.now().month, "factory_date__year": datetime.now().year},
-            "周": {"factory_date__range": (monday, sunday)},
+            "日": {"factory_date": today, "down_flag": True},
+            "月": {"factory_date__month": datetime.now().month, "factory_date__year": datetime.now().year,
+                  "down_flag": True},
+            "周": {"factory_date__range": (monday, sunday), "down_flag": True},
         }
         base_filter = {}
         ret = {}
@@ -398,7 +400,7 @@ class EquipErrorDayStatisticsView(APIView):
             raise ValidationError(f'{now}无排班，请补充排班信息')
         day_time = work_schedule_plan.plan_schedule.day_time
         factory_date = request.query_params.get("day_time", day_time)
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date)
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date, down_flag=True)
         # 动态生成表头字段
         equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True)))
         class_list = list(
@@ -441,9 +443,10 @@ class EquipErrorMonthStatisticsView(APIView):
             raise ValidationError("时间格式错误")
         month = now.month
         year = now.year
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
+                                                        down_flag=True)
         title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
-        equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
+        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
         data = {e: {} for e in equip_list}
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
             annotate(all_time=OSum(F('end_time') - F('begin_time'))). \
@@ -455,7 +458,8 @@ class EquipErrorMonthStatisticsView(APIView):
         data_set = list(data_set)
         for temp in data_set:
             data[temp.get('equip_part__equip__equip_no')].update(**{
-                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get('all_time') else 0})
+                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get(
+                    'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
         print(data)
@@ -475,10 +479,11 @@ class EquipErrorWeekStatisticsView(APIView):
             raise ValidationError("时间格式错误")
         monday = factory_date - dt.timedelta(days=factory_date.weekday())
         sunday = factory_date + dt.timedelta(days=6 - factory_date.weekday())
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday)
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday,
+                                                        down_flag=True)
         # 各个机台数据
         title_set = set(temp_set.values("equip_part__name").annotate().values_list("equip_part__name", flat=True))
-        equip_list = temp_set.values_list('equip_part__equip__equip_no', flat=True)
+        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
         data = {e: {} for e in equip_list}
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
             annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
@@ -486,7 +491,8 @@ class EquipErrorWeekStatisticsView(APIView):
             'equip_part__equip__equip_no')
         for temp in data_set:
             data[temp.get('equip_part__equip__equip_no')].update(**{
-                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get('all_time') else 0})
+                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get(
+                    'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
         print(data)
@@ -496,6 +502,7 @@ class EquipErrorWeekStatisticsView(APIView):
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MonthErrorSortView(APIView):
 
     def get(self, request):
@@ -506,7 +513,8 @@ class MonthErrorSortView(APIView):
             raise ValidationError("时间格式错误")
         month = now.month
         year = now.year
-        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month)
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
+                                                        down_flag=True)
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
             annotate(all_time=Sum((F('end_time') - F('begin_time')))). \
             values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('all_time')
@@ -514,7 +522,8 @@ class MonthErrorSortView(APIView):
         data = {e: {} for e in equip_list}
         for temp in data_set:
             data[temp.get('equip_part__equip__equip_no')].update(**{
-                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get('all_time') else 0})
+                temp.get('equip_part__name'): round(temp.get('all_time').total_seconds() / 60, 2) if temp.get(
+                    'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
         ret = []
@@ -523,3 +532,56 @@ class MonthErrorSortView(APIView):
             ret.append(new_data)
 
         return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipOverview(APIView):
+
+    def get(self, request):
+        rep = {"cdata": {}}
+        # day_time = datetime.today()
+        # factory_date = datetime.strptime(day_time, "%Y-%m-%d")
+        factory_date = datetime.today()
+        monday = factory_date - dt.timedelta(days=factory_date.weekday())
+        sunday = factory_date + dt.timedelta(days=6 - factory_date.weekday())
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday,
+                                                        down_flag=True).order_by('equip_part__equip__equip_no')
+        # 各个机台周停机数据
+        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
+        data_set = temp_set.values('equip_part__equip__equip_no'). \
+            annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
+            values('equip_part__equip__equip_no', 'all_time').order_by(
+            'equip_part__equip__equip_no')
+        data_list = [round(x.get('all_time').total_seconds() / 60, 2) if x.get("all_time") else 0 for x in data_set]
+        rep["cdata"]["category"] = equip_list
+        rep["cdata"]["lineData"] = data_list
+
+        # 各设备部位月故障统计
+        year = factory_date.year
+        month = factory_date.month
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
+                                                        down_flag=True)
+        data_set = temp_set.values('equip_part__name'). \
+            annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
+            values('equip_part__name', 'all_time')
+        part_data = [{"value": x.get('all_time'), "name": x.get("equip_part__name")} for x in data_set]
+        rep["seriesData"] = part_data
+
+        # 设备日累计故障时间
+        temp_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date).values(
+            'equip_part__equip__equip_no').annotate(all_time=OSum((F('end_time') - F('begin_time')))).order_by(
+            'equip_part__equip__equip_no')
+        day_data = [{"name": x.get('equip_part__equip__equip_no'), "value": x.get("all_time")} for x in temp_set]
+        rep["data"] = day_data
+
+
+        # 维修单，单日数据滚动
+        temp_set = list(EquipMaintenanceOrder.objects.filter(factory_date=factory_date).order_by(
+            'equip_part__equip__equip_no'))
+        day_detail = [[temp_set.index(x), x.order_uid,
+                       x.equip_part.equip.equip_no + "/" + x.equip_part.name,
+                       x.get_status_display(), x.maintenance_user.username, x.created_date] for x in temp_set]
+        sheet = {"header": ["序号", "单号", "设备部位", "状态", "操作人", "申请时间"],
+                 "data": day_detail}
+        rep["config"] = sheet
+        return Response(rep)

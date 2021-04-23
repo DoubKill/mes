@@ -141,7 +141,8 @@ class BatchProductBatchingVIew(APIView):
                 raise ValidationError('该计划不存在')
             ret = list(ProductBatchingDetail.objects.filter(
                 product_batching=classes_plan.product_batching,
-                delete_flag=False
+                delete_flag=False,
+                type=1
             ).values('material__material_name', 'actual_weight'))
             for weight_cnt_type in classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
                 ret.append({

@@ -45,6 +45,7 @@ urlpatterns = [
     path('month-error-statistics/', EquipErrorMonthStatisticsView.as_view()),
     path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view()),
     path('month-error-sort/', MonthErrorSortView.as_view()),
+    path('overview/', EquipOverview.as_view())
 ]
 
 

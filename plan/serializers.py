@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from django.db.transaction import atomic
@@ -129,19 +130,18 @@ class ProductClassesPlanManyCreateSerializer(BaseModelSerializer):
     batching_type = serializers.IntegerField(source='product_batching.batching_type', default=None)
 
     def get_status(self, obj):
-        status = "等待"
         try:
-            plan_status = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
-            if plan_status:
-                status = plan_status.status
+            plan_status = PlanStatus.objects.using("SFJ").filter(
+                plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last().status
+            return plan_status
         except:
-            status = "network error"
-        return status
+            return obj.status
 
     class Meta:
         model = ProductClassesPlan
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
     @atomic()
     def create(self, validated_data):
@@ -419,6 +419,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
                   'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
                   'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag', 'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
 
 class MaterialsySerializer(BaseModelSerializer):
@@ -535,49 +536,73 @@ class PlantImportSerializer(BaseModelSerializer):
             datetime.strptime(factory_date, "%Y-%m-%d")
         except Exception:
             raise ValidationError('文件名错误，请以日期格式开头！')
-        i = 0
         classes_plan_list = []
-        while 1:
-            try:
-                equip_no = current_sheet.cell(0, i * 4 + 1).value
-            except IndexError:
-                break
-            tmp_class = None
-            for rowNum in range(2, current_sheet.nrows):
-                value = current_sheet.row_values(rowNum)[i*4+1:(i + 1) * 4+1]
-                classes = current_sheet.cell(rowNum, 0).value
-                if classes:
-                    tmp_class = classes
-                else:
-                    classes = tmp_class
+        for j in range(2):
+            i = 0
+            while 1:
+                raw_index = j * 25 + 1
+                col_index = i * 4 + 1
+                if col_index >= 33:
+                    break
                 try:
-                    product_no = value[0].strip()
-                    plan_trains = int(value[1])
-                    note = value[3].strip()
+                    equip_data = current_sheet.cell(raw_index, col_index).value.strip()
+                    if not equip_data:
+                        break
+                    ret = re.search(r'Z\d+', equip_data)
+                    equip_no = ret.group()
+                    if len(equip_no) < 3:
+                        equip_no = 'Z' + '0{}'.format(equip_no[-1])
+                except IndexError:
+                    break
                 except Exception:
-                    continue
-                product_batching = ProductBatching.objects.filter(used_type=4,
-                                                                  stage_product_batch_no=product_no,
-                                                                  batching_type=2
-                                                                  ).first()
-                work_schedule_plan = WorkSchedulePlan.objects.filter(classes__global_name=classes,
-                                                                     plan_schedule__day_time=factory_date
-                                                                     ).first()
-                equip = Equip.objects.filter(equip_no=equip_no).first()
-                if not all([product_batching, work_schedule_plan, equip]) or \
-                        product_batching.dev_type != equip.category:
-                    continue
-                classes_plan_data = {
-                    "sn": 0,
-                    "plan_trains": plan_trains,
-                    "unit": "车",
-                    "work_schedule_plan": work_schedule_plan,
-                    "note": note,
-                    "equip": equip,
-                    "product_batching": product_batching,
-                    "status": "已保存"}
-                classes_plan_list.append(classes_plan_data)
-            i += 1
+                    raise serializers.ValidationError('机台格式错误')
+                tmp_class = None
+                for rowNum in range(j * 25 + 3, 25 * (j + 1)):
+                    value = current_sheet.row_values(rowNum)[i * 4 + 1:(i + 1) * 4 + 1]
+                    classes = current_sheet.cell(rowNum, 0).value
+                    if classes:
+                        tmp_class = classes
+                    else:
+                        classes = tmp_class
+                    product_no = value[0].strip()
+                    plan_trains = value[1]
+                    note = value[3].strip()
+                    if not all([classes, product_no, plan_trains]):
+                        continue
+                    try:
+                        plan_trains = int(plan_trains)
+                    except ValueError:
+                        raise serializers.ValidationError('机台：{}， 胶料规格:{}，车次信息错误，请修改后重试！'.format(equip_no, value[0]))
+                    except Exception:
+                        raise
+                    product_batching = ProductBatching.objects.filter(used_type=4,
+                                                                      stage_product_batch_no=product_no,
+                                                                      batching_type=2
+                                                                      ).first()
+                    work_schedule_plan = WorkSchedulePlan.objects.filter(classes__global_name=classes,
+                                                                         plan_schedule__day_time=factory_date
+                                                                         ).first()
+                    equip = Equip.objects.filter(equip_no=equip_no).first()
+                    if not equip:
+                        raise serializers.ValidationError('机台：{}未找到，请修改后重试！'.format(equip_no))
+                    if not product_batching:
+                        raise serializers.ValidationError('机台：{}，胶料规格:{}未找到，请修改后重试！'.format(equip_no, value[0]))
+                    if not work_schedule_plan:
+                        raise serializers.ValidationError('{}日期未找到{}排班数据未找到，请修改后重试！'.format(factory_date, classes))
+                    if product_batching.dev_type != equip.category:
+                        raise serializers.ValidationError('机台{}所属机型与胶料规格{}机型不一致，请修改后重试！'.format(equip_no, product_no))
+                    classes_plan_data = {
+                        "sn": 0,
+                        "plan_trains": plan_trains,
+                        "unit": "车",
+                        "work_schedule_plan": work_schedule_plan,
+                        "note": note,
+                        "equip": equip,
+                        "product_batching": product_batching,
+                        "status": "已保存"}
+                    classes_plan_list.append(classes_plan_data)
+                i += 1
+            j += 1
         attrs['classes_plan_list'] = classes_plan_list
         return attrs
 

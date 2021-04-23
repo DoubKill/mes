@@ -188,7 +188,7 @@ class MaterialDemandedView(APIView):
             for i in ret_json.get("datas"):
                 material_inventory_dict[i['materialCode']] = i
         except Exception as e:
-            return Response("请求库存失败", status=400)
+            pass
         try:
             page = int(params.get("page", 1))
             page_size = int(params.get("page_size", 10))

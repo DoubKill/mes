@@ -12,7 +12,8 @@ from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
 from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
     DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules, \
     BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack, DeliveryPlanNow, DeliveryPlanToday, \
-    MixGumOutInventoryLogAPIView, DeliveryPlanFinalNow, DeliveryPlanFinalToday, FinalGumOutInventoryLogAPIView
+    MixGumOutInventoryLogAPIView, DeliveryPlanFinalNow, DeliveryPlanFinalToday, FinalGumOutInventoryLogAPIView,\
+    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack, InventoryStaticsView
 
 router = DefaultRouter()
 
@@ -33,6 +34,9 @@ router.register(r'final-plan-management', views.PutPlanManagementFianl)
 
 # 原材料库出库管理
 router.register(r'material-plan-management', views.MaterialPlanManagement)
+
+# 炭黑库出库管理
+router.register(r'carbon-plan-management', views.CarbonPlanManagement)
 
 # 过期胶料管理
 router.register('overdue-material-management', OverdueMaterialManagement)
@@ -92,5 +96,6 @@ urlpatterns = [
     path('delivery-plan-final-today/', DeliveryPlanFinalToday.as_view()),  # 终炼胶  今日的总出库量
     path('final-gum-out-list/', FinalGumOutInventoryLogAPIView.as_view()),  # 终炼胶  倒叙显示最近几条出库信息
 
+    path('product-station-statics/', InventoryStaticsView.as_view()),
     path('', include(router.urls)),
 ]

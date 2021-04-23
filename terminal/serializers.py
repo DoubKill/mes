@@ -285,7 +285,9 @@ class WeightPackageUpdateLogSerializer(BaseModelSerializer):
     @staticmethod
     def get_material_details(obj):
         return BatchingClassesPlan.objects.get(plan_batching_uid=obj.plan_batching_uid).weigh_cnt_type. \
-            weight_details.values('material__material_no', 'standard_weight', 'weigh_cnt_type__package_cnt')
+            weight_details.filter(delete_flag=False).values('material__material_no',
+                                                            'standard_weight',
+                                                            'weigh_cnt_type__package_cnt')
 
     def update(self, instance, validated_data):
         instance.times += 1
