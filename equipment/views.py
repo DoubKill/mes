@@ -502,6 +502,7 @@ class EquipErrorWeekStatisticsView(APIView):
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MonthErrorSortView(APIView):
 
     def get(self, request):
@@ -533,6 +534,7 @@ class MonthErrorSortView(APIView):
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipOverview(APIView):
 
     def get(self, request):
