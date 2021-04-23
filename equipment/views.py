@@ -574,7 +574,6 @@ class EquipOverview(APIView):
         day_data = [{"name": x.get('equip_part__equip__equip_no'), "value": x.get("all_time")} for x in temp_set]
         rep["data"] = day_data
 
-
         # 维修单，单日数据滚动
         temp_set = list(EquipMaintenanceOrder.objects.filter(factory_date=factory_date).order_by(
             'equip_part__equip__equip_no'))
@@ -584,4 +583,9 @@ class EquipOverview(APIView):
         sheet = {"header": ["序号", "单号", "设备部位", "状态", "操作人", "申请时间"],
                  "data": day_detail}
         rep["config"] = sheet
+
+        temp_set = EquipCurrentStatus.objects.values("equip__equip_no",
+                                                     "equip__category__equip_type__global_name").annotate(
+            status=Max('status')).values("equip__category__equip_type__global_name", "equip__equip_no", "status")
+
         return Response(rep)

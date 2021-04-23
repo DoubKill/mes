@@ -7,7 +7,7 @@ class User(AbstractUser):
     num = models.CharField(max_length=20, help_text='工号', verbose_name='工号', unique=True)
     is_leave = models.BooleanField(help_text='是否离职', verbose_name='是否离职', default=False)
     section = models.ForeignKey("Section", blank=True, null=True, help_text='部门', verbose_name='部门',
-                                on_delete=models.CASCADE)
+                                on_delete=models.CASCADE, related_name="section_users")
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
     delete_date = models.DateTimeField(blank=True, null=True,
@@ -24,7 +24,9 @@ class User(AbstractUser):
                                     help_text='删除人', verbose_name='删除人', on_delete=models.CASCADE,
                                     related_query_name='d_%(app_label)s_%(class)ss')
     group_extensions = models.ManyToManyField('GroupExtension', help_text='角色', related_name='group_users',)
-    # phone_number = models.CharField(max_length=11, help_text='手机号', verbose_name='手机号', blank=True, null=True)
+    phone_number = models.CharField(max_length=11, help_text='手机号', verbose_name='手机号', blank=True, null=True)
+    workshop = models.CharField(max_length=32, help_text='车间', verbose_name='车间', blank=True, null=True)
+    technology = models.CharField(max_length=32, help_text='技术资格', verbose_name='技术资格', blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.username)

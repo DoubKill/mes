@@ -163,6 +163,21 @@ class SectionViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'name', 'section_id')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class LoginView(ObtainJSONWebToken):
