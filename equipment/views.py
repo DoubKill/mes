@@ -547,7 +547,7 @@ class EquipOverview(APIView):
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday,
                                                         down_flag=True).order_by('equip_part__equip__equip_no')
         # 各个机台周停机数据
-        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
+        equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True))).sort()
         data_set = temp_set.values('equip_part__equip__equip_no'). \
             annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
             values('equip_part__equip__equip_no', 'all_time').order_by(
@@ -586,7 +586,10 @@ class EquipOverview(APIView):
 
         temp_set = EquipCurrentStatus.objects.values("equip__equip_no",
                                                      "equip__category__equip_type__global_name").annotate(
-            status=Max('status')).values("equip__category__equip_type__global_name", "equip__equip_no", "status")
+            status=Max('status')).values("equip__category__equip_type__global_name", "equip__equip_no",
+                                         "status").order_by("equip__equip_no")
+
+        # 设备现况
         rep["current"] = {"mix": [], "weigh": [], "check": [], "others": []}
         for temp in temp_set:
             if temp.get("equip__category__equip_type__global_name") == "密炼设备":
