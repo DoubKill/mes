@@ -578,8 +578,8 @@ class EquipOverview(APIView):
         temp_set = list(EquipMaintenanceOrder.objects.filter(factory_date=factory_date).order_by(
             'equip_part__equip__equip_no'))
         day_detail = [[temp_set.index(x), x.order_uid,
-                       x.equip_part.equip.equip_no + "/" + x.equip_part__name,
-                       x.get_status_display(), x.maintenance_user, x.created_date.strftime('%Y%m%d %H:%M:%S')] for x in temp_set]
+                       x.equip_part.equip.equip_no + "/" + x.equip_part.name,
+                       x.get_status_display(), x.maintenance_user.username, x.created_date] for x in temp_set]
         sheet = {"header": ["序号", "单号", "设备部位", "状态", "操作人", "申请时间"],
                  "data": day_detail}
         rep["config"] = sheet
