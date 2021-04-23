@@ -579,7 +579,7 @@ class EquipOverview(APIView):
             'equip_part__equip__equip_no'))
         day_detail = [[temp_set.index(x), x.order_uid,
                        x.equip_part.equip.equip_no + "/" + x.equip_part__name,
-                       x.get_status_display(), x.maintenance_user, x.created_date] for x in temp_set]
+                       x.get_status_display(), x.maintenance_user, x.created_date.strftime('%Y%m%d %H:%M:%S')] for x in temp_set]
         sheet = {"header": ["序号", "单号", "设备部位", "状态", "操作人", "申请时间"],
                  "data": day_detail}
         rep["config"] = sheet
@@ -587,5 +587,14 @@ class EquipOverview(APIView):
         temp_set = EquipCurrentStatus.objects.values("equip__equip_no",
                                                      "equip__category__equip_type__global_name").annotate(
             status=Max('status')).values("equip__category__equip_type__global_name", "equip__equip_no", "status")
-
+        rep["current"] = {"mix": [], "weigh": [], "check": [], "others": []}
+        for temp in temp_set:
+            if temp.get("equip__category__equip_type__global_name") == "密炼设备":
+                rep["current"]["mix"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
+            elif temp.get("equip__category__equip_type__global_name") == "称量设备":
+                rep["current"]["weigh"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
+            elif temp.get("equip__category__equip_type__global_name") == "检测设备":
+                rep["current"]["check"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
+            else:
+                rep["current"]["others"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
         return Response(rep)
