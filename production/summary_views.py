@@ -1,5 +1,5 @@
-from django.db import connection, Error
-from django.db.models import Q, Max, Sum, Count
+from django.db import connection
+from django.db.models import Q, Max, Sum, Count, F, DecimalField
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
@@ -454,9 +454,11 @@ class IndexOverview(APIView):
 
         # 日计划量
         plan_data = ProductClassesPlan.objects.filter(
-            work_schedule_plan__plan_schedule__day_time=factory_date
+            work_schedule_plan__plan_schedule__day_time=factory_date,
+            delete_flag=False
         ).aggregate(total_trains=Sum('plan_trains'),
-                    total_weight=Sum('weight')/1000)
+                    total_weight=Sum(F('plan_trains') * F('product_batching__batching_weight'),
+                                     output_field=DecimalField())/1000)
 
         # 日总产量
         # actual_weight = TrainsFeedbacks.objects.filter(
