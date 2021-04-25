@@ -113,7 +113,6 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
     order_results = MaterialTestResultSerializer(many=True, required=True)
     actual_trains = serializers.IntegerField(min_value=0)
 
-    @atomic()
     def create(self, validated_data):
         order_results = validated_data.pop('order_results', None)
         test_order = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],

@@ -1,6 +1,5 @@
 import datetime
 import json
-import uuid
 
 from django.db import connection
 from django.utils import timezone
@@ -224,7 +223,6 @@ class MaterialTestOrderViewSet(mixins.CreateModelMixin,
         else:
             return MaterialTestOrderListSerializer
 
-    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):

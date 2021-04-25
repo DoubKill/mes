@@ -700,6 +700,8 @@ class IndexEquipProductionAnalyze(IndexOverview):
                 actual_query_params['factory_date'] = yesterday.date()
 
         if st and et:
+            if et > factory_date:
+                raise ValidationError('结束日期不得大于当前工厂日期！')
             plan_query_params = {'work_schedule_plan__plan_schedule__day_time__gte': st,
                                  'work_schedule_plan__plan_schedule__day_time__lte': et}
             actual_query_params = {'factory_date__gte': st, 'factory_date__lte': et}
@@ -762,10 +764,14 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
                 begin_time = None
                 extra_where_str = ''
         elif st and et:
+            if et > factory_date:
+                raise ValidationError('结束日期不得大于当前工厂日期！')
             # et工厂结束时间
             et_end_time = str(
                 (datetime.datetime.strptime(et, '%Y-%m-%d') + datetime.timedelta(days=1)).date()
             ) + " 08:00:00"
+            if et == factory_date:
+                et_end_time = time_now
             end_time = """To_date('{}', 'yyyy-mm-dd hh24-mi-ss')""".format(et_end_time)
             begin_time = st + " 08:00:00"  # st工厂日期开始时间
             extra_where_str = " and to_char(emo.FACTORY_DATE, 'yyyy-mm-dd')>='{}' and to_char(emo.FACTORY_DATE, 'yyyy-mm-dd')<='{}'".format(st, et)
