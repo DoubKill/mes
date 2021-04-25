@@ -476,29 +476,23 @@ class IndexOverview(APIView):
             final_gum_data = FinalGumInInventoryLog.objects.using('lb').filter(
                 start_time__date=factory_date).aggregate(
                 total_trains=Count('qty'),
-                total_weight=Sum('weight')/1000
-            )
-            final_gum_qyt = final_gum_data['qty'] if final_gum_data['qty'] else 0
-            final_gum_weight = final_gum_data['weight'] if final_gum_data['weight'] else 0
-        except Error:
-            final_gum_qyt = final_gum_weight = 0
-        except Exception:
-            raise
-        try:
+                total_weight=Sum('weight')/1000)
+            final_gum_qyt = final_gum_data['total_trains'] if final_gum_data['total_trains'] else 0
+            final_gum_weight = final_gum_data['total_weight'] if final_gum_data['total_weight'] else 0
+
             mix_gum_data = MixGumInInventoryLog.objects.using('bz').filter(
                 start_time__date=factory_date).aggregate(
                 total_trains=Count('qty'),
-                total_weight=Sum('weight')/1000
-            )
-            mix_gum_qyt = mix_gum_data['qty'] if mix_gum_data['qty'] else 0
-            mix_gum_weight = mix_gum_data['weight'] if mix_gum_data['weight'] else 0
-        except Error:
-            mix_gum_qyt = mix_gum_weight = 0
+                total_weight=Sum('weight') / 1000)
+            mix_gum_qyt = mix_gum_data['total_trains'] if mix_gum_data['total_trains'] else 0
+            mix_gum_weight = mix_gum_data['total_weight'] if mix_gum_data['total_weight'] else 0
         except Exception:
-            raise
-        inbound_data = {'total_trains': final_gum_qyt + mix_gum_qyt,
+            final_gum_qyt = final_gum_weight = 0
+            mix_gum_qyt = mix_gum_weight = 0
+        inbound_data = {
+                        'total_trains': final_gum_qyt + mix_gum_qyt,
                         'total_weight': final_gum_weight + mix_gum_weight
-                        }
+        }
 
         # 日出库量
         outbound_data = InventoryLog.objects.filter(
@@ -525,7 +519,7 @@ class IndexOverview(APIView):
 
         ret['plan_data'] = plan_data
         ret['actual_data'] = actual_data
-        ret['qualified_rate'] = qualified_rate
+        ret['qualified_rate'] = '{}%'.format(qualified_rate)
         ret['outbound_data'] = outbound_data
         ret['dispatch_data'] = dispatch_data
         ret['inbound_data'] = inbound_data
