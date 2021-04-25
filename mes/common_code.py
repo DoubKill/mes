@@ -4,6 +4,7 @@ import time
 
 import pymssql
 from DBUtils.PooledDB import PooledDB
+from django.db.models import Min, Max, Sum
 from rest_framework import status, mixins
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import BasePermission
@@ -230,3 +231,33 @@ class MesPermisson(BasePermission):
         """
         return True
 
+
+class OSum(Sum):
+
+    def as_oracle(self, compiler, connection):
+        # if self.output_field.get_internal_type() == 'DurationField':
+        expression = self.get_source_expressions()[0]
+        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
+        return compiler.compile(
+            SecondsToInterval(Sum(IntervalToSeconds(expression), filter=self.filter))
+        )
+
+
+class OMax(Max):
+    def as_oracle(self, compiler, connection):
+        # if self.output_field.get_internal_type() == 'DurationField':
+        expression = self.get_source_expressions()[0]
+        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
+        return compiler.compile(
+            SecondsToInterval(Max(IntervalToSeconds(expression), filter=self.filter))
+        )
+
+
+class OMin(Min):
+    def as_oracle(self, compiler, connection):
+        # if self.output_field.get_internal_type() == 'DurationField':
+        expression = self.get_source_expressions()[0]
+        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
+        return compiler.compile(
+            SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
+        )

@@ -13,6 +13,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter
 from equipment.serializers import *
 from equipment.task import property_template, property_import
+from mes.common_code import OMin, OMax, OSum
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -86,7 +87,7 @@ class EquipDownReasonViewSet(ModelViewSet):
             return super().list(request, *args, **kwargs)
 
 
-# @method_decorator([api_recorder], name="dispatch")
+@method_decorator([api_recorder], name="dispatch")
 class EquipCurrentStatusList(APIView):
     """设备现况汇总"""
 
@@ -317,34 +318,6 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
         return Response(serializer.data)
 
 
-class OSum(Sum):
-    def as_oracle(self, compiler, connection):
-        # if self.output_field.get_internal_type() == 'DurationField':
-        expression = self.get_source_expressions()[0]
-        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
-        return compiler.compile(
-            SecondsToInterval(Sum(IntervalToSeconds(expression), filter=self.filter))
-        )
-
-
-class OMax(Max):
-    def as_oracle(self, compiler, connection):
-        # if self.output_field.get_internal_type() == 'DurationField':
-        expression = self.get_source_expressions()[0]
-        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
-        return compiler.compile(
-            SecondsToInterval(Max(IntervalToSeconds(expression), filter=self.filter))
-        )
-
-
-class OMin(Min):
-    def as_oracle(self, compiler, connection):
-        # if self.output_field.get_internal_type() == 'DurationField':
-        expression = self.get_source_expressions()[0]
-        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
-        return compiler.compile(
-            SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
-        )
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -516,7 +489,7 @@ class MonthErrorSortView(APIView):
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
                                                         down_flag=True)
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
-            annotate(all_time=Sum((F('end_time') - F('begin_time')))). \
+            annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
             values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('all_time')
         equip_list = [x.get('equip_part__equip__equip_no') for x in data_set]
         data = {e: {} for e in equip_list}
