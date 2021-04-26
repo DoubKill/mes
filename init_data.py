@@ -503,6 +503,37 @@ permission_data = [
 
     {'id': 392, 'code': 'product_retrospect', 'name': '胶片条码追朔', 'parent_id': None},
     {'id': 393, 'code': 'view_product_retrospect', 'name': '查看', 'parent_id': 392},
+
+    {'id': 394, 'code': 'material_outbound_plan', 'name': '原材料出库计划', 'parent_id': None},
+    {'id': 395, 'code': 'view_material_outbound_plan', 'name': '查看', 'parent_id': 394},
+    {'id': 396, 'code': 'norman_material_outbound_plan', 'name': '正常出库', 'parent_id': 394},
+    {'id': 397, 'code': 'assign_material_outbound_plan', 'name': '指定出库', 'parent_id': 394},
+    {'id': 398, 'code': 'manual_material_outbound_plan', 'name': '人工出库', 'parent_id': 394},
+    {'id': 399, 'code': 'close_material_outbound_plan', 'name': '关闭', 'parent_id': 394},
+    {'id': 400, 'code': 'change_material_outbound_plan', 'name': '编辑', 'parent_id': 394},
+
+    {'id': 401, 'code': 'carbon_outbound_plan', 'name': '炭黑出库计划', 'parent_id': None},
+    {'id': 402, 'code': 'view_carbon_outbound_plan', 'name': '查看', 'parent_id': 401},
+    {'id': 403, 'code': 'norman_carbon_outbound_plan', 'name': '正常出库', 'parent_id': 401},
+    {'id': 404, 'code': 'assign_carbon_outbound_plan', 'name': '指定出库', 'parent_id': 401},
+    {'id': 405, 'code': 'manual_carbon_outbound_plan', 'name': '人工出库', 'parent_id': 401},
+    {'id': 406, 'code': 'close_carbon_outbound_plan', 'name': '关闭', 'parent_id': 401},
+    {'id': 407, 'code': 'change_carbon_outbound_plan', 'name': '编辑', 'parent_id': 401},
+
+    {'id': 408, 'code': 'equip_daily_summary', 'name': '设备别故障日统计', 'parent_id': None},
+    {'id': 409, 'code': 'view_equip_daily_summary', 'name': '查看', 'parent_id': 408},
+
+    {'id': 410, 'code': 'equip_weekly_summary', 'name': '设备别故障周统计', 'parent_id': None},
+    {'id': 411, 'code': 'view_equip_weekly_summary', 'name': '查看', 'parent_id': 410},
+
+    {'id': 412, 'code': 'equip_monthly_summary', 'name': '设备别故障月统计', 'parent_id': None},
+    {'id': 413, 'code': 'view_equip_monthly_summary', 'name': '查看', 'parent_id': 412},
+
+    {'id': 414, 'code': 'department', 'name': '部门管理', 'parent_id': None},
+    {'id': 415, 'code': 'view_department', 'name': '查看', 'parent_id': 414},
+    {'id': 416, 'code': 'add_department', 'name': '新增', 'parent_id': 414},
+    {'id': 417, 'code': 'delete_department', 'name': '停用', 'parent_id': 414},
+    {'id': 418, 'code': 'change_department', 'name': '编辑', 'parent_id': 414},
 ]
 
 

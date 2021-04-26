@@ -437,12 +437,22 @@ class IndexOverview(APIView):
             end_time__gte=now,
             plan_schedule__work_schedule__work_procedure__global_name='密炼'
         ).first()
+        date_now = str(now.date())
         if current_work_schedule_plan:
             date_now = str(current_work_schedule_plan.plan_schedule.day_time)
-            begin_time = str(current_work_schedule_plan.start_time)
-            end_time = str(current_work_schedule_plan.end_time)
+            st = current_work_schedule_plan.plan_schedule.work_schedule_plan.filter(
+                classes__global_name='早班').first()
+            et = current_work_schedule_plan.plan_schedule.work_schedule_plan.filter(
+                classes__global_name='夜班').first()
+            if st:
+                begin_time = str(st.start_time)
+            else:
+                begin_time = date_now + '00:00:01'
+            if et:
+                end_time = str(et.end_time)
+            else:
+                end_time = date_now + '23:59:59'
         else:
-            date_now = str(now.date())
             begin_time = date_now + '00:00:01'
             end_time = date_now + '23:59:59'
 
@@ -745,21 +755,16 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             category__equip_type__global_name='密炼设备').order_by('equip_no')]
 
         time_now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        end_time = "To_date('{}', 'yyyy-mm-dd hh24-mi-ss')".format(time_now)
-
+        end_time = time_now
         st_case_str = "emo.DOWN_TIME"
+        extra_where_str = ''
         if dimension:
             if dimension == '1':  # 今天
-                date = factory_date
                 begin_time = factory_begin_time
-                extra_where_str = " and to_char(emo.FACTORY_DATE, 'yyyy-mm-dd')='{}'".format(date)
             elif dimension == '2':  # 昨天
                 yesterday = datetime.datetime.strptime(factory_date, '%Y-%m-%d') - datetime.timedelta(days=1)
-                date = str(yesterday.date())
-                yesterday_begin_time = "{} 08:00:00".format(date)
-                end_time = "To_date('{}', 'yyyy-mm-dd hh24-mi-ss')".format(factory_begin_time)
-                begin_time = yesterday_begin_time
-                extra_where_str = " and to_char(emo.FACTORY_DATE, 'yyyy-mm-dd')='{}'".format(date)
+                begin_time = "{} 08:00:00".format(str(yesterday.date()))
+                end_time = factory_begin_time
             else:  # 所有
                 begin_time = None
                 extra_where_str = ''
@@ -767,14 +772,12 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
             if et > factory_date:
                 raise ValidationError('结束日期不得大于当前工厂日期！')
             # et工厂结束时间
-            et_end_time = str(
+            end_time = str(
                 (datetime.datetime.strptime(et, '%Y-%m-%d') + datetime.timedelta(days=1)).date()
             ) + " 08:00:00"
             if et == factory_date:
-                et_end_time = time_now
-            end_time = """To_date('{}', 'yyyy-mm-dd hh24-mi-ss')""".format(et_end_time)
+                end_time = time_now
             begin_time = st + " 08:00:00"  # st工厂日期开始时间
-            extra_where_str = " and to_char(emo.FACTORY_DATE, 'yyyy-mm-dd')>='{}' and to_char(emo.FACTORY_DATE, 'yyyy-mm-dd')<='{}'".format(st, et)
         else:
             raise ValidationError('参数错误')
         if begin_time:
@@ -787,6 +790,12 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
                         end
                         )
                         """.format(begin_time, begin_time)
+            extra_where_str = """and (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')<='{}' and emo.END_TIME is null)
+                            or (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')>'{}'
+                                   and (to_char(emo.END_TIME, 'yyyy-mm-dd hh24-mi-ss') >'{}'))
+                            or (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')<'{}'
+                                   and (to_char(emo.END_TIME, 'yyyy-mm-dd hh24-mi-ss') >'{}'))
+                                   """.format(end_time, begin_time, begin_time, begin_time, begin_time)
 
         sql = """
         select
@@ -798,14 +807,14 @@ class IndexEquipMaintenanceAnalyze(IndexOverview):
                 select
                        equip_no,
                        {} as st,
-                       (CASE WHEN emo.end_time is null THEN {}
+                       (CASE WHEN emo.end_time is null THEN To_date('{}', 'yyyy-mm-dd hh24-mi-ss')
+                        when emo.END_TIME > To_date('{}', 'yyyy-mm-dd hh24-mi-ss') then To_date('{}', 'yyyy-mm-dd hh24-mi-ss')
                          ELSE emo.end_time END) as et
                 from EQUIP_MAINTENANCE_ORDER emo
                 inner join EQUIP_PART ep on emo.equip_part_id = ep.id
                 inner join EQUIP e on ep.equip_id = e.id
                 where emo.DOWN_FLAG=1 {}) tmp
-        group by equip_no;""".format(st_case_str, end_time, extra_where_str)
-
+        group by equip_no;""".format(st_case_str, end_time, end_time, end_time, extra_where_str)
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
