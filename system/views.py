@@ -36,7 +36,8 @@ class UserViewSet(ModelViewSet):
     destroy:
         账号停用和启用
     """
-    queryset = User.objects.filter(delete_flag=False).order_by('num').prefetch_related('group_extensions')
+    queryset = User.objects.filter(delete_flag=False,
+                                   is_superuser=False).order_by('num').prefetch_related('group_extensions')
     serializer_class = UserSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
