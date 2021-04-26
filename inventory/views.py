@@ -1928,11 +1928,11 @@ class ProductDetailsView(APIView):
         filters = dict()
         other_filters = dict()
         if material_type:
-            filters.update(material_type__icontains=material_type)
+            filters.update(material_no__icontains=material_type)
             other_filters.update(material__material_no__icontains=material_no)
         if material_no:
             filters.update(material_no__icontains=material_no)
-            other_filters.update(material__material_type__icontains=material_type)
+            other_filters.update(material__material_no__icontains=material_type)
         mix_set = BzFinalMixingRubberInventory.objects.using('bz').filter(**filters)
         final_set = BzFinalMixingRubberInventory.objects.using('lb').filter(store_name='炼胶库').filter(**filters)
         mix_data = mix_set.values("material_no").annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
