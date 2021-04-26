@@ -73,6 +73,10 @@ class BzFinalMixingRubberInventory(models.Model):
     in_storage_time = models.DateTimeField(db_column='入库时间')
     location_status = models.CharField(max_length=20, db_column='货位状态')
 
+    @property
+    def material_name(self):
+        return self.material_no
+
     def material_type(self):
         try:
             mt = self.material_no.split("-")[1]

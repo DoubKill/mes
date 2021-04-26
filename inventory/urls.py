@@ -9,11 +9,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
-from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules, \
-    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack, DeliveryPlanNow, DeliveryPlanToday, \
-    MixGumOutInventoryLogAPIView, DeliveryPlanFinalNow, DeliveryPlanFinalToday, FinalGumOutInventoryLogAPIView,\
-    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack, InventoryStaticsView
+from .views import *
 
 router = DefaultRouter()
 
@@ -96,6 +92,8 @@ urlpatterns = [
     path('delivery-plan-final-today/', DeliveryPlanFinalToday.as_view()),  # 终炼胶  今日的总出库量
     path('final-gum-out-list/', FinalGumOutInventoryLogAPIView.as_view()),  # 终炼胶  倒叙显示最近几条出库信息
 
-    path('product-station-statics/', InventoryStaticsView.as_view()),
+    path('product-station-statics/', InventoryStaticsView.as_view()),  # 胶种库存分段统计
+    path('product-details/', ProductDetailsView.as_view()),            # 胶料车间库存明细
+
     path('', include(router.urls)),
 ]
