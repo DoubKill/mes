@@ -1026,7 +1026,7 @@ class CarbonPlanManagement(ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='stations',
             url_name='stations')
     def get(self, request, *args, **kwargs):
-        url = f"{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
+        url = f"http://{wms_ip}:{wms_port}/entrance/GetOutEntranceInfo"
         ret = requests.get(url)
         data = ret.json()
         rep = [{"station_no": x.get("entranceCode"),
