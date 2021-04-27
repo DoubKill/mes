@@ -26,6 +26,7 @@ from mes.common_code import OSum
 from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
@@ -1350,6 +1351,7 @@ class EquipInfoReal(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class RuntimeRecordView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_production_record'}))
 
     def get(self, request, *args, **kwargs):
         params = request.query_params

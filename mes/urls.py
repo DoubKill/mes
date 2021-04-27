@@ -25,7 +25,9 @@ from rest_framework.documentation import include_docs_urls
 
 # 修改后
 # 配置swgger
-from plan.views import IndexView
+# from plan.views import IndexView
+from production.summary_views import IndexOverview, IndexProductionAnalyze, IndexEquipProductionAnalyze, \
+    IndexEquipMaintenanceAnalyze
 from system.views import index
 
 schema_view = get_schema_view(
@@ -54,7 +56,11 @@ urlpatterns = [
     path('api/v1/terminal/', include('terminal.urls')),
     path('api/v1/equipment/', include('equipment.urls')),
     path('favicon.ico', RedirectView.as_view(url='static/m.ico')),
-    path('api/v1/index/', IndexView.as_view()),  # 首页展示
+    # path('api/v1/index/', IndexView.as_view()),  # 首页展示
+    path('api/v1/index/overview/', IndexOverview.as_view()),  # 首页-今日概况
+    path('api/v1/index/production-ayalyze/', IndexProductionAnalyze.as_view()),  # 首页-产量分析/合格率分析
+    path('api/v1/index/equip-production-ayalyze/', IndexEquipProductionAnalyze.as_view()),  # 首页-机台产量分析
+    path('api/v1/index/equip-maintenance-ayalyze/', IndexEquipMaintenanceAnalyze.as_view()),  # 首页-机台停机时间分析
 ]
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
