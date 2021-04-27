@@ -534,6 +534,16 @@ permission_data = [
     {'id': 416, 'code': 'add_department', 'name': '新增', 'parent_id': 414},
     {'id': 417, 'code': 'delete_department', 'name': '停用', 'parent_id': 414},
     {'id': 418, 'code': 'change_department', 'name': '编辑', 'parent_id': 414},
+
+    {'id': 419, 'code': 'production_record', 'name': '生产运行记录', 'parent_id': None},
+    {'id': 420, 'code': 'view_production_record', 'name': '查看', 'parent_id': 419},
+
+    {'id': 421, 'code': 'product_stock_detail', 'name': '胶料库存明细', 'parent_id': None},
+    {'id': 422, 'code': 'view_product_stock_detail', 'name': '查看', 'parent_id': 421},
+
+    {'id': 423, 'code': 'workshop_stock_detail', 'name': '车间库存明细', 'parent_id': None},
+    {'id': 424, 'code': 'view_workshop_stock_detail', 'name': '查看', 'parent_id': 423},
+
 ]
 
 

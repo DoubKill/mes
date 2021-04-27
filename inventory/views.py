@@ -50,6 +50,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks
 from quality.deal_result import receive_deal_result
@@ -1725,6 +1726,8 @@ class FinalGumOutInventoryLogAPIView(APIView):
 
 class InventoryStaticsView(APIView):
 
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_stock_detail'}))
+
     # def single_mix_inventory(self, product_type, model=BzFinalMixingRubberInventory):
     #     temp_set = model.objects.filter(material_no__icontains=product_type)
     #     data = {}
@@ -1901,6 +1904,8 @@ class InventoryStaticsView(APIView):
 
 
 class ProductDetailsView(APIView):
+
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_workshop_stock_detail'}))
 
     def deal(self, datas):
         for x in datas:
