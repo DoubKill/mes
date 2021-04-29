@@ -174,7 +174,7 @@ class SectionViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name', 'section_id')
+            data = queryset.values('id', 'name', 'section_id', 'delete_flag')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
