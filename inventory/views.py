@@ -271,10 +271,10 @@ class OutWorkFeedBack(APIView):
                             return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
                 station = dp_obj.station
                 station_dict = {
-                    "混炼一层前端": 3,
-                    "混炼一层后端": 4,
-                    "混炼二层前端": 5,
-                    "混炼二层后端": 6,
+                    "一层前端": 3,
+                    "一层后端": 4,
+                    "二层前端": 5,
+                    "二层后端": 6,
                     "炼胶#出库口#1": 7,
                     "炼胶#出库口#2": 8,
                     "炼胶#出库口#3": 9,
@@ -283,7 +283,7 @@ class OutWorkFeedBack(APIView):
                 try:
                     label = receive_deal_result(lot_no)
                     if label:
-                        LabelPrint.objects.create(label_type=station_dict[station], lot_no=lot_no, status=0, data=label)
+                        LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label)
                 except AttributeError as a:
                     logger.error(f"条码错误{a}")
                 except Exception as e:
