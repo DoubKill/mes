@@ -393,7 +393,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': str(last_test_result.test_factory_date),
                        'test_class': test_order_data.production_class,
-                       'test_user': None}
+                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
         product_time = instance.production_factory_date
         material_detail = MaterialAttribute.objects.filter(material__material_no=pallet_data.product_no).first()
         if material_detail:
@@ -940,7 +940,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date,
                        'test_class': test_order_data.production_class,
-                       'test_user': None}
+                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
         return ret
 
     class Meta:
