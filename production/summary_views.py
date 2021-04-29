@@ -631,20 +631,20 @@ class IndexProductionAnalyze(APIView):
         test_date_qualify_group_dict = {}
         for item in test_date_qualify_group:
             factory_date = str(item['production_factory_date'])
-            if item['is_qualified']:
-                test_date_qualify_group_dict[factory_date] = round(
-                    item['count'] / test_date_group_dict[factory_date]['count'] * 100, 2)
+            if item['is_qualified']:  # 合格
                 test_date_qualify_group_dict[factory_date] = {
                     'rate': round(item['count'] / test_date_group_dict[factory_date]['count'] * 100, 2),
                     'total': test_date_group_dict[factory_date]['count'],
                     'qualified_count': item['count']
                 }
-                continue
-            test_date_qualify_group_dict[factory_date] = {
-                'rate': 0,
-                'total': test_date_group_dict[factory_date]['count'],
-                'qualified_count': 0
-            }
+            else:
+                if factory_date in test_date_qualify_group_dict:
+                    continue
+                test_date_qualify_group_dict[factory_date] = {
+                    'rate': 0,
+                    'total': test_date_group_dict[factory_date]['count'],
+                    'qualified_count': 0
+                }
 
         plan_actual_data = {}
         qualified_rate_data = {}
