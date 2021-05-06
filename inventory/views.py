@@ -237,14 +237,6 @@ class OutWorkFeedBack(APIView):
         #         }
         if data:
             lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
-            try:
-                label = receive_deal_result(lot_no)
-                if label:
-                    LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=label)
-            except AttributeError as a:
-                logger.error(f"条码错误{a}")
-            except Exception as e:
-                logger.error(f"未知错误{e}")
             data = dict(data)
             data.pop("status", None)
             if data.get("inventory_type") == "生产出库":
@@ -278,6 +270,25 @@ class OutWorkFeedBack(APIView):
                             need_qty = dp_obj.need_qty
                         else:
                             return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
+                station = dp_obj.station
+                station_dict = {
+                    "一层前端": 3,
+                    "一层后端": 4,
+                    "二层前端": 5,
+                    "二层后端": 6,
+                    "炼胶#出库口#1": 7,
+                    "炼胶#出库口#2": 8,
+                    "炼胶#出库口#3": 9,
+                    "帘布#出库口#0": 10
+                }
+                try:
+                    label = receive_deal_result(lot_no)
+                    if label:
+                        LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label)
+                except AttributeError as a:
+                    logger.error(f"条码错误{a}")
+                except Exception as e:
+                    logger.error(f"未知错误{e}")
 
                 if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
                     dp_obj.status = 1
@@ -1933,11 +1944,11 @@ class ProductDetailsView(APIView):
         filters = dict()
         other_filters = dict()
         if material_type:
-            filters.update(material_type__icontains=material_type)
+            filters.update(material_no__icontains=material_type)
             other_filters.update(material__material_no__icontains=material_no)
         if material_no:
             filters.update(material_no__icontains=material_no)
-            other_filters.update(material__material_type__icontains=material_type)
+            other_filters.update(material__material_no__icontains=material_type)
         mix_set = BzFinalMixingRubberInventory.objects.using('bz').filter(**filters)
         final_set = BzFinalMixingRubberInventory.objects.using('lb').filter(store_name='炼胶库').filter(**filters)
         mix_data = mix_set.values("material_no").annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(

@@ -538,7 +538,20 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
-        instance = self.get_queryset().filter(label_type=2, status=0).order_by('id').first()
+        station_dict = {
+                    "收皮": 1,
+                    "快检": 2,
+                    "一层前端": 3,
+                    "一层后端": 4,
+                    "二层前端": 5,
+                    "二层后端": 6,
+                    "炼胶#出库口#1": 7,
+                    "炼胶#出库口#2": 8,
+                    "炼胶#出库口#3": 9,
+                    "帘布#出库口#0": 10
+                }
+        station = request.query_params.get("station")
+        instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
         if instance:
             serializer = self.get_serializer(instance)
             data = serializer.data
