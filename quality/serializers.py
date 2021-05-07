@@ -370,247 +370,81 @@ class DealResultDealSerializer(BaseModelSerializer):
 
 
 class MaterialDealResultListSerializer(BaseModelSerializer):
-    day_time = serializers.SerializerMethodField(read_only=True, help_text='工厂时间')
-    classes_group = serializers.SerializerMethodField(read_only=True, help_text='生产班次/班组')
-    equip_no = serializers.SerializerMethodField(read_only=True, help_text='生产机台')
-    product_no = serializers.SerializerMethodField(read_only=True, help_text='胶料编码')
-    actual_weight = serializers.SerializerMethodField(read_only=True, help_text='收皮重量')
-    residual_weight = serializers.SerializerMethodField(read_only=True, help_text='余量')
-    test = serializers.SerializerMethodField(read_only=True)
     suggestion_desc = serializers.CharField(source='deal_opinion.suggestion_desc', read_only=True)
     mtr_list = serializers.SerializerMethodField(read_only=True, )
-    actual_trains = serializers.SerializerMethodField(read_only=True, )
-    operation_user = serializers.SerializerMethodField(read_only=True, help_text='收皮员')
-    deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
-    deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
-    deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
-    valid_time = serializers.SerializerMethodField(read_only=True, help_text="有效时间")
+    deal_suggestion = serializers.CharField(read_only=True, help_text='处理意见', default=None)
+    deal_user = serializers.CharField(read_only=True, help_text='处理人', default=None)
+    deal_time = serializers.DateTimeField(read_only=True, help_text='处理时间', default=None)
 
-    def get_valid_time(self, obj):
-        product_no = self.product_no
-        product_time = obj.production_factory_date
-        material_detail = MaterialAttribute.objects.filter(material__material_no=product_no).first()
-        if not material_detail:
-            return None
-        unit = material_detail.validity_unit
-        if unit in ["天", "days", "day"]:
-            param = {"days": material_detail.period_of_validity}
-        elif unit in ["小时", "hours", "hour"]:
-            param = {"hours": material_detail.period_of_validity}
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no).first()
+        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
+        ret['day_time'] = str(test_order_data.production_factory_date)  # 工厂日期
+        ret['product_no'] = pallet_data.product_no  # 胶料编码
+        ret['equip_no'] = pallet_data.equip_no  # 设备编号
+        ret['residual_weight'] = None  # 余量
+        ret['actual_weight'] = pallet_data.actual_weight  # 收皮重量
+        ret['operation_user'] = pallet_data.operation_user  # 操作员
+        ret['actual_trains'] = '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
+        ret['classes_group'] = test_order_data.production_class + '/' + test_order_data.production_group  # 班次班组
+        last_test_result = test_results.last()
+        ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
+                       'test_factory_date': str(last_test_result.test_factory_date),
+                       'test_class': test_order_data.production_class,
+                       'pallet_no': pallet_data.pallet_no,
+                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+        product_time = instance.production_factory_date
+        material_detail = MaterialAttribute.objects.filter(material__material_no=pallet_data.product_no).first()
+        if material_detail:
+            unit = material_detail.validity_unit
+            if unit in ["天", "days", "day"]:
+                param = {"days": material_detail.period_of_validity}
+            elif unit in ["小时", "hours", "hour"]:
+                param = {"hours": material_detail.period_of_validity}
+            else:
+                param = {"days": material_detail.period_of_validity}
+            expire_time = product_time + timedelta(**param)
+            ret['valid_time'] = expire_time  # 有效期
         else:
-            param = {"days": material_detail.period_of_validity}
-        expire_time = product_time + timedelta(**param)
-        return expire_time.strftime("%Y-%m-%d %H:%M:%S")
-
-    def get_deal_suggestion(self, obj):
-        if obj.status == "已处理":
-            return obj.deal_suggestion
-        return None
-
-    def get_deal_user(self, obj):
-        if obj.status == "已处理":
-            return obj.deal_user
-        return None
-
-    def get_deal_time(self, obj):
-        if obj.status == "已处理":
-            return obj.deal_time.strftime("%Y-%m-%d %H:%M:%S")
-        return None
-
-    def get_day_time(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        self.__setattr__("pfb_obj", pfb_obj)
-        if not pfb_obj:
-            return None
-        pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
-        if pcp_obj:
-            return pcp_obj.work_schedule_plan.plan_schedule.day_time
-        else:
-            return None
-
-    def get_classes_group(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
-        if pcp_obj:
-            return f"{pfb_obj.classes}/{pcp_obj.work_schedule_plan.group.global_name}"
-        else:
-            return f"{pfb_obj.classes}/None"
-
-    def get_equip_no(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        return pfb_obj.equip_no
-
-    def get_product_no(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        self.__setattr__("product_no", pfb_obj.product_no)
-        return pfb_obj.product_no
-
-    def get_actual_weight(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        return pfb_obj.actual_weight
-
-    def get_residual_weight(self, obj):
-        return None
-
-    def get_test(self, obj):
-        mtr_list = []
-        # 找到每个车次检测次数最多的那一条
-        mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
-        for mto_obj in mto_set:
-            mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj).order_by('test_times').last()
-            if not mtr_obj:
-                continue
-            mtr_list.append(mtr_obj)
-        # 找到level等级最大的那一条
-        if len(mtr_list) == 0:
-            return None
-        max_mtr = mtr_list[0]
-        for mtr_obj in mtr_list:
-            # if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
-            #     continue
-            if mtr_obj.level > max_mtr.level:
-                max_mtr = mtr_obj
-        if max_mtr.test_times == 1:
-            test_status = '正常'
-        elif max_mtr.test_times > 1:
-            test_status = '复检'
-        else:
-            test_status = None  # 检测状态
-        test_factory_date = max_mtr.test_factory_date.strftime('%Y-%m-%d %H:%M:%S')  # 检测时间
-        test_class = max_mtr.test_class  # 检测班次
-        try:
-            test_user = max_mtr.created_user.username  # 检测员
-        except:
-            test_user = None
-        test_note = max_mtr.material_test_order.note  # 备注
-        result = max_mtr.result  # 检测结果,改了
-        pfb_obj = self.pfb_obj
-        if pfb_obj:  # 托盘号
-            pallet_no = pfb_obj.pallet_no
-        else:
-            pallet_no = None
-        return {'test_status': test_status, 'test_factory_date': test_factory_date, 'test_class': test_class,
-                'test_user': test_user,
-                'test_note': test_note, 'result': result, "pallet_no": pallet_no}
+            ret['valid_time'] = None
+        return ret
 
     def get_mtr_list(self, obj):
-        mtr_list_return = {}
-        # 找到每个车次检测次数最多的那一条
-        table_head_count = {}
-        # deal_result   后续若有修改  调用deal_result
-        mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
-        for mto_obj in mto_set:
-            if not mto_obj:
-                continue
-            mtr_list_return[mto_obj.actual_trains] = []
-            # 先弄出表头
-            table_head = mto_obj.order_results.all().values('test_indicator_name',
-                                                            'data_point_name').annotate().distinct()
-            for table_head_dict in table_head:
-                if table_head_dict['test_indicator_name'] not in table_head_count.keys():
-                    table_head_count[table_head_dict['test_indicator_name']] = []
-                table_head_count[table_head_dict['test_indicator_name']].append(table_head_dict['data_point_name'])
-                table_head_count[table_head_dict['test_indicator_name']] = list(
-                    set(table_head_count[table_head_dict['test_indicator_name']]))
-            # 根据test_indicator_name分组找到啊test_times最大的
-            mtr_list = mto_obj.order_results.all().values('test_indicator_name', 'data_point_name').annotate(
-                max_test_times=Max('test_times')).values('test_indicator_name', 'data_point_name',
-                                                         'max_test_times',
-                                                         )
-            mtr_max_list = []
-            for mtr_max_obj in mtr_list:
-                # 根据分组找到数据
-                mtr_obj = MaterialTestResult.objects.filter(material_test_order=mto_obj,
-                                                            test_indicator_name=mtr_max_obj['test_indicator_name'],
-                                                            data_point_name=mtr_max_obj['data_point_name'],
-                                                            test_times=mtr_max_obj['max_test_times']).last()
-                if mtr_obj.level == 1:
-                    result = '一等品'
-                else:
-                    result = '三等品'
-                # 判断加减
-                data_point_name = mtr_obj.data_point_name  # 数据点名称
-                test_method_name = mtr_obj.test_method_name  # 试验方法名称
-                test_indicator_name = mtr_obj.test_indicator_name  # 检测指标名称
-                product_no = mtr_obj.material_test_order.product_no  # 胶料编码
-                # 根据material-test-orders接口逻辑找到data_point_indicator
-                material_test_method = MaterialTestMethod.objects.filter(
-                    material__material_no=product_no,
-                    test_method__name=test_method_name,
-                    test_method__test_type__test_indicator__name=test_indicator_name,
-                    data_point__name=data_point_name,
-                    data_point__test_type__test_indicator__name=test_indicator_name).first()
-                add_subtract = None  # 页面的加减
-                if material_test_method:
-                    indicator = MaterialDataPointIndicator.objects.filter(
-                        material_test_method=material_test_method,
-                        data_point__name=data_point_name,
-                        data_point__test_type__test_indicator__name=test_indicator_name, level=1).first()
-                    if indicator:  # 判断value与上下限的比较
-                        if mtr_obj.value > indicator.upper_limit:
-                            add_subtract = '+'
-                        elif mtr_obj.value < indicator.lower_limit:
-                            add_subtract = '-'
-
-                mtr_max_list.append(
-                    {'test_indicator_name': mtr_obj.test_indicator_name, 'data_point_name': mtr_obj.data_point_name,
-                     'value': mtr_obj.value,
-                     'result': result,
-                     'max_test_times': mtr_obj.level,
-                     'add_subtract': add_subtract})
-
-            for mtr_dict in mtr_max_list:
-                mtr_dict['status'] = f"{mtr_dict['max_test_times']}:{mtr_dict['result']}"
-                mtr_list_return[mto_obj.actual_trains].append(mtr_dict)
-
+        ret = {}
         table_head_top = {}
-        for i in sorted(table_head_count.items(), key=lambda x: len(x[1]), reverse=False):
-            table_head_top[i[0]] = i[-1]
-        mtr_list_return['table_head'] = table_head_top
-        for value in mtr_list_return.values():  # 将每个数据点排序
-            if isinstance(value, list):
-                value.sort(key=lambda x: x['data_point_name'], reverse=False)
-            else:
-                for i in value.values():
-                    i.sort(reverse=False)
-        return mtr_list_return
 
-    def get_actual_trains(self, obj):
-        at_list = []
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1):
-            at_list.append(str(i))
-        at_str = "/".join(at_list)
-        return at_str
-
-    def get_operation_user(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        return pfb_obj.operation_user
+        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no)
+        for test_order in test_orders:
+            ret[test_order.actual_trains] = []
+            max_result_ids = list(test_order.order_results.values(
+                'test_indicator_name', 'test_method_name', 'data_point_name'
+            ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids)
+            for test_result in test_results:
+                ret[test_order.actual_trains].append(
+                    {
+                        'add_subtract': '',
+                        'data_point_name': test_result.data_point_name,
+                        'max_test_times': test_result.test_times,
+                        'result': '一等品' if test_result.level == 1 else '三等品',
+                        'test_indicator_name': test_result.test_indicator_name,
+                        'value': test_result.value,
+                        'status': '1:一等品' if test_order.is_qualified else '3:三等品'
+                    }
+                )
+                test_indicator_name = test_result.test_indicator_name
+                if test_indicator_name in table_head_top:
+                    table_head_top[test_indicator_name].add(test_result.data_point_name)
+                else:
+                    table_head_top[test_indicator_name] = {test_result.data_point_name}
+        ret['table_head'] = table_head_top
+        return ret
 
     class Meta:
         model = MaterialDealResult
-        fields = (
-            'id', 'day_time', 'lot_no', 'classes_group', 'equip_no', 'product_no', 'actual_weight', 'residual_weight',
-            'production_factory_date', 'valid_time', 'test', 'print_time', 'deal_user', 'deal_time', 'suggestion_desc',
-            'mtr_list', 'actual_trains', 'operation_user', 'deal_result', 'deal_suggestion')
+        fields = '__all__'
 
 
 class LevelResultSerializer(BaseModelSerializer):
@@ -1091,116 +925,24 @@ class BatchProductNoClassZhPassSerializer(serializers.ModelSerializer):
 
 
 class MaterialDealResultListSerializer1(serializers.ModelSerializer):
-    day_time = serializers.SerializerMethodField(read_only=True, help_text='工厂时间')
-    classes_group = serializers.SerializerMethodField(read_only=True, help_text='生产班次/班组')
-    equip_no = serializers.SerializerMethodField(read_only=True, help_text='生产机台')
-    product_no = serializers.SerializerMethodField(read_only=True, help_text='胶料编码')
-    actual_weight = serializers.SerializerMethodField(read_only=True, help_text='收皮重量')
-    residual_weight = serializers.SerializerMethodField(read_only=True, help_text='余量')
-    test = serializers.SerializerMethodField(read_only=True, )
 
-    # deal_suggestion = serializers.SerializerMethodField(read_only=True, help_text='处理意见')
-    # deal_user = serializers.SerializerMethodField(read_only=True, help_text='处理人')
-    # deal_time = serializers.SerializerMethodField(read_only=True, help_text='处理时间')
-
-    # def get_deal_suggestion(self, obj):
-    #     if obj.status == "已处理":
-    #         return obj.deal_suggestion
-    #     return None
-    #
-    # def get_deal_user(self, obj):
-    #     if obj.status == "已处理":
-    #         return obj.deal_user
-    #     return None
-    #
-    # def get_deal_time(self, obj):
-    #     if obj.status == "已处理":
-    #         return obj.deal_time.strftime("%Y-%m-%d %H:%M:%S")
-    #     return None
-
-    def get_day_time(self, obj):
-        mto_obj = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).first()
-        self.__setattr__("mto_obj", mto_obj)
-        if not mto_obj:
-            return None
-        return mto_obj.production_factory_date
-        # pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
-        # if pcp_obj:
-        #     return pcp_obj.work_schedule_plan.plan_schedule.day_time
-        # else:
-        #     return None
-
-    def get_classes_group(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        mto_obj = self.mto_obj
-        if not mto_obj:
-            return None
-        else:
-            return f"{mto_obj.production_class}/{mto_obj.production_group}"
-        # pcp_obj = ProductClassesPlan.objects.filter(plan_classes_uid=pfb_obj.plan_classes_uid).first()
-        # if pcp_obj:
-        #     return f"{pfb_obj.classes}/{pcp_obj.work_schedule_plan.group.global_name}"
-        # else:
-        #     return f"{pfb_obj.classes}/None"
-
-    def get_equip_no(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        mto_obj = self.mto_obj
-        if not mto_obj:
-            return None
-        return mto_obj.production_equip_no
-
-    def get_product_no(self, obj):
-        # pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        mto_obj = self.mto_obj
-        if not mto_obj:
-            return None
-        self.__setattr__("product_no", mto_obj.product_no)
-        return mto_obj.product_no
-
-    def get_actual_weight(self, obj):
-        pfb_obj = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
-        # pfb_obj = self.pfb_obj
-        if not pfb_obj:
-            return None
-        return pfb_obj.actual_weight
-
-    def get_residual_weight(self, obj):
-        return None
-
-    def get_test(self, obj):
-        mtr_list = []
-        # 找到每个车次检测次数最多的那一条
-        # mto_set = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).all()
-        # for mto_obj in mto_set:
-        mtr_obj = MaterialTestResult.objects.filter(material_test_order__lot_no=obj.lot_no).order_by(
-            'test_times').last()
-        # if not mtr_obj:
-        #     continue
-        # mtr_list.append(mtr_obj)
-        # 找到level等级最大的那一条
-        # if len(mtr_list) == 0:
-        #     return None
-        # max_mtr = mtr_list[0]
-        # for mtr_obj in mtr_list:
-        #     # if not mtr_obj.data_point_indicator or not max_mtr.data_point_indicator:  # 数据不在上下限范围内，这个得前端做好约束
-        #     #     continue
-        #     if mtr_obj.level > max_mtr.level:
-        #         max_mtr = mtr_obj
-        if mtr_obj.test_times == 1:
-            test_status = '正常'
-        elif mtr_obj.test_times > 1:
-            test_status = '复检'
-        else:
-            test_status = None  # 检测状态
-        test_factory_date = mtr_obj.test_factory_date.strftime('%Y-%m-%d %H:%M:%S')  # 检测时间
-        test_class = mtr_obj.test_class  # 检测班次
-        try:
-            test_user = mtr_obj.created_user.username  # 检测员
-        except:
-            test_user = None
-        return {'test_status': test_status, 'test_factory_date': test_factory_date, 'test_class': test_class,
-                'test_user': test_user, }
+    def to_representation(self, instance):
+        ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no).first()
+        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
+        ret['day_time'] = str(test_order_data.production_factory_date)
+        ret['product_no'] = pallet_data.product_no
+        ret['equip_no'] = pallet_data.equip_no
+        ret['residual_weight'] = None
+        ret['actual_weight'] = pallet_data.actual_weight
+        ret['classes_group'] = test_order_data.production_class + '/' + test_order_data.production_group
+        last_test_result = test_results.last()
+        ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
+                       'test_factory_date': last_test_result.test_factory_date,
+                       'test_class': test_order_data.production_class,
+                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+        return ret
 
     class Meta:
         model = MaterialDealResult
