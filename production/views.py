@@ -8,7 +8,7 @@ import time
 import requests
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from django.db.models import Max, Sum, Count, Min
+from django.db.models import Max, Sum, Count, Min, F
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -21,9 +21,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from basics.models import PlanSchedule, Equip, GlobalCode, WorkSchedulePlan
+from equipment.models import EquipMaintenanceOrder
+from mes.common_code import OSum
 from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
+from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
@@ -1344,3 +1347,65 @@ class EquipInfoReal(APIView):
             tfb_set["fault_time"] = str(total_time)
             resluts.append(tfb_set)
         return Response({'resluts': resluts})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RuntimeRecordView(APIView):
+    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_production_record'}))
+
+    def get(self, request, *args, **kwargs):
+        params = request.query_params
+        classes = params.get("classes")
+        factory_date = params.get("date", datetime.date.today())
+        if classes in ["早班", "夜班"]:
+            filters = {"classes": classes}
+        else:
+            filters = {}
+        queryset = TrainsFeedbacks.objects.filter(factory_date=factory_date).filter(**filters)
+        id_list = queryset.values('plan_classes_uid').annotate(max_id=Max('id')).values_list("max_id", flat=True)
+        queryset = queryset.filter(id__in=id_list)
+        data = queryset.values("equip_no", "product_no").annotate(plan_trains=Sum('plan_trains'),
+                                                                  actual_trains=Sum('actual_trains'),
+                                                                  begin_time=Min('begin_time'),
+                                                                  end_time=Max('end_time')).values(
+            "equip_no", "product_no", "plan_trains", "actual_trains", "begin_time", "end_time").order_by('equip_no')
+
+        # 计算获取设备停机时间
+        equip_set = EquipMaintenanceOrder.objects.filter(factory_date=factory_date, down_flag=True).values(
+            "equip_part__equip__equip_no").annotate(stop_time=OSum((F('end_time') - F('begin_time')))).values(
+            "equip_part__equip__equip_no", "stop_time")
+        equip_data = {x.get("equip_part__equip__equip_no"): x.get("stop_time") for x in equip_set}
+        equip_no_list = Equip.objects.filter(category__equip_type__global_name="密炼设备").values_list("equip_no",
+                                                                                                   flat=True)
+        equip_trains = {_: [0] for _ in equip_no_list}
+
+        # 获取计划表里的计划车次
+        if filters:
+            plan_filter = {"work_schedule_plan__classes__global_name": classes}
+        else:
+            plan_filter = {}
+        plan_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=factory_date,
+                                                     work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
+                                                     delete_flag=False, **plan_filter).values('equip__equip_no',
+                                                                                              'product_batching__stage_product_batch_no').annotate(
+            plan_trains=Sum('plan_trains')).values('equip__equip_no',
+                                                   'product_batching__stage_product_batch_no', 'plan_trains')
+        plan_data = {_.get('equip__equip_no') + _.get('product_batching__stage_product_batch_no'): _.get('plan_trains')
+                     for _ in plan_set}
+        results = []
+        for _ in data:
+            equip_trains[_.get("equip_no")][0] += _.get("actual_trains")
+            temp_dict = {"equip_no": _.get("equip_no"),
+                         "product_no": _.get("product_no"),
+                         "plan_trains": plan_data.get(_.get("equip_no") + _.get("product_no")),
+                         "actual_trains": _.get("actual_trains"),
+                         "achieve_rate": round(
+                             _.get("actual_trains") / plan_data.get(_.get("equip_no") + _.get("product_no")), 4),
+                         "put_user": "unknown",
+                         "product_time": (_.get("end_time") - _.get("begin_time")).total_seconds(),
+                         "trains_sum": equip_trains.get(_.get("equip_no")),
+                         "start_rate": (24 * 60 * 60 - equip_data.get(_.get("equip_no"))) / 60 if equip_data.get(
+                             _.get("equip_no")) else 1.0
+                         }
+            results.append(temp_dict)
+        return Response({"results": results})

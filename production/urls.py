@@ -78,4 +78,7 @@ urlpatterns = [
     path('equip-output-real/', DayCapacityView.as_view()),  # 单日产能
     path('plan-info-real/', PlanInfoReal.as_view()),  # 密炼状态信息
     path('equip-info-real/', EquipInfoReal.as_view()),  # 设备状态信息
+
+    path('runtime-record/', RuntimeRecordView.as_view()),  # 生产运行记录
+
 ]

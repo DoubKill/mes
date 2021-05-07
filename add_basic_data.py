@@ -1261,7 +1261,7 @@ def add_tanks():
 
 
 def add_product_batching():
-    for product_info in ProductInfo.objects.all():
+    for product_info in ProductInfo.objects.all()[:50]:
         pb = ProductBatching.objects.create(
             site_id=GlobalCode.objects.get(global_name='C').id,
             product_info=product_info,
@@ -1295,6 +1295,7 @@ def add_product_batching():
 
         for i in range(2):
             wct = WeighCntType.objects.create(
+                name=pb.stage_product_batch_no + '-' + pb.dev_type.category_name + '硫磺包{}'.format(i+1),
                 product_batching=pb,
                 weigh_type=i + 1,
                 package_cnt=random.randint(1, 5)

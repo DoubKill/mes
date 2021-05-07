@@ -1,5 +1,5 @@
 from django.db import connection
-from django.db.models import Q, Max
+from django.db.models import Q, Max, Sum, Count, F, DecimalField
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.exceptions import ValidationError
@@ -7,13 +7,19 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.views import APIView
 
-from basics.models import WorkSchedulePlan
+from basics.models import WorkSchedulePlan, Equip
+from inventory.models import InventoryLog, DispatchLog, FinalGumInInventoryLog, MixGumInInventoryLog
+from mes import settings
+from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
+from plan.models import ProductClassesPlan
 from production.filters import CollectTrainsFeedbacksFilter
 from production.models import TrainsFeedbacks
 from production.serializers import CollectTrainsFeedbacksSerializer
 import datetime
 from rest_framework.response import Response
+
+from quality.models import MaterialTestOrder
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -416,3 +422,409 @@ class CutTimeCollect(APIView):
         return_list.append(
             {'sum_time': sum_time, 'max_time': max_time, 'min_time': min_time, 'avg_time': avg_time})
         return Response({'count': counts, 'results': return_list})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IndexOverview(APIView):
+    """首页-今日概况"""
+
+    @staticmethod
+    def get_current_factory_date():
+        # 获取当前时间的工厂日期，开始、结束时间
+        now = datetime.datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        date_now = str(now.date())
+        if current_work_schedule_plan:
+            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+            st = current_work_schedule_plan.plan_schedule.work_schedule_plan.filter(
+                classes__global_name='早班').first()
+            et = current_work_schedule_plan.plan_schedule.work_schedule_plan.filter(
+                classes__global_name='夜班').first()
+            if st:
+                begin_time = str(st.start_time)
+            else:
+                begin_time = date_now + '00:00:01'
+            if et:
+                end_time = str(et.end_time)
+            else:
+                end_time = date_now + '23:59:59'
+        else:
+            begin_time = date_now + '00:00:01'
+            end_time = date_now + '23:59:59'
+
+        return date_now, begin_time, end_time
+
+    def get(self, request):
+        ret = {}
+        factory_date, _, _ = self.get_current_factory_date()
+
+        # 日计划量
+        plan_data = ProductClassesPlan.objects.filter(
+            work_schedule_plan__plan_schedule__day_time=factory_date,
+            delete_flag=False
+        ).aggregate(total_trains=Sum('plan_trains'),
+                    total_weight=Sum(F('plan_trains') * F('product_batching__batching_weight'),
+                                     output_field=DecimalField())/1000)
+
+        # 日总产量
+        # actual_weight = TrainsFeedbacks.objects.filter(
+        #     factory_date=factory_date
+        # ).aggregate(total_weight=Sum('actual_weight'))['total_weight']
+        # actual_trains = TrainsFeedbacks.objects.filter(
+        #     factory_date=factory_date
+        # ).values('plan_classes_uid').annotate(max_trains=Max('actual_trains')).values_list('max_trains', flat=True)
+        # actual_data = {'total_trains': sum(actual_trains), 'total_weight': actual_weight}
+        actual_data = TrainsFeedbacks.objects.filter(
+            factory_date=factory_date
+        ).aggregate(total_trains=Count('id'),
+                    total_weight=Sum('actual_weight')/1000)
+
+        # 日入库量
+        try:
+            final_gum_data = FinalGumInInventoryLog.objects.using('lb').filter(
+                start_time__date=factory_date).aggregate(
+                total_trains=Count('qty'),
+                total_weight=Sum('weight')/1000)
+            final_gum_qyt = final_gum_data['total_trains'] if final_gum_data['total_trains'] else 0
+            final_gum_weight = final_gum_data['total_weight'] if final_gum_data['total_weight'] else 0
+
+            mix_gum_data = MixGumInInventoryLog.objects.using('bz').filter(
+                start_time__date=factory_date).aggregate(
+                total_trains=Count('qty'),
+                total_weight=Sum('weight') / 1000)
+            mix_gum_qyt = mix_gum_data['total_trains'] if mix_gum_data['total_trains'] else 0
+            mix_gum_weight = mix_gum_data['total_weight'] if mix_gum_data['total_weight'] else 0
+        except Exception:
+            final_gum_qyt = final_gum_weight = 0
+            mix_gum_qyt = mix_gum_weight = 0
+        inbound_data = {
+                        'total_trains': final_gum_qyt + mix_gum_qyt,
+                        'total_weight': final_gum_weight + mix_gum_weight
+        }
+
+        # 日出库量
+        outbound_data = InventoryLog.objects.filter(
+            fin_time__date=factory_date
+        ).aggregate(total_trains=Sum('qty'),
+                    total_weight=Sum('weight')/1000)
+
+        # 日发货量
+        dispatch_data = DispatchLog.objects.filter(
+            order_created_time=factory_date
+        ).aggregate(total_trains=Sum('qty'),
+                    total_weight=Sum('weight')/1000)
+
+        # 日合格率
+        qualified_count = MaterialTestOrder.objects.filter(production_factory_date=factory_date,
+                                                            is_qualified=True).count()
+        total_test_count = MaterialTestOrder.objects.filter(production_factory_date=factory_date).count()
+        try:
+            qualified_rate = round(qualified_count / total_test_count * 100, 2)
+        except ZeroDivisionError:
+            qualified_rate = 0
+        except Exception:
+            raise
+
+        ret['plan_data'] = plan_data
+        ret['actual_data'] = actual_data
+        ret['qualified_rate'] = '{}%'.format(qualified_rate)
+        ret['outbound_data'] = outbound_data
+        ret['dispatch_data'] = dispatch_data
+        ret['inbound_data'] = inbound_data
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IndexProductionAnalyze(APIView):
+    """首页-产量分析/合格率分析，参数?dimension=xxx   1:周；2:月"""
+
+    def get(self, request):
+        dimension = self.request.query_params.get('dimension', '1')
+        if dimension == '1':  # 周
+            date_range = get_weekdays(7)
+        else:  # 月
+            date_range = get_weekdays(datetime.datetime.now().day)
+        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.oracle':
+            actual_extra_where_str = " where to_char(tf.factory_date, 'yyyy-mm-dd')>='{}' and to_char(tf.factory_date, 'yyyy-mm-dd')<='{}'".format(date_range[0], date_range[-1])
+            plan_extra_where_str = " and to_char(ps.day_time, 'yyyy-mm-dd')>='{}' and to_char(ps.day_time, 'yyyy-mm-dd')<='{}'".format(date_range[0], date_range[-1])
+        else:
+            actual_extra_where_str = " where tf.factory_date>='{}' and tf.factory_date<='{}'".format(date_range[0], date_range[-1])
+            plan_extra_where_str = " and ps.day_time>='{}' and ps.day_time<='{}'".format(date_range[0], date_range[-1])
+        cursor = connection.cursor()
+
+        plan_sql = """
+                    select
+                   day_time,
+                   stage_name,
+                   sum(plan_trains) as total_plan_trains
+            from(
+                select
+                       ps.day_time,
+                       (CASE
+                        WHEN gc.global_name='FM' THEN '加硫'
+                        ELSE '无硫' END) as stage_name,
+                       sum(pcp.plan_trains) as plan_trains
+                from
+                    product_classes_plan pcp
+                    inner join work_schedule_plan wsp on pcp.work_schedule_plan_id = wsp.id
+                    inner join plan_schedule ps on wsp.plan_schedule_id = ps.id
+                    inner join equip e on pcp.equip_id = e.id
+                    inner join product_batching pb on pcp.product_batching_id = pb.id
+                    inner join global_code gc on pb.stage_id = gc.id
+                where pcp.delete_flag=0 {}
+                group by ps.day_time, gc.global_name) tmp
+            group by day_time, stage_name order by day_time;""".format(plan_extra_where_str)
+        cursor.execute(plan_sql)
+        plan_data = cursor.fetchall()
+
+        actual_sql = """
+                    select
+                   factory_date,
+                   stage_name,
+                   sum(actual_trains) as total_acctual_trains
+            from(
+                select
+                       tf.factory_date,
+                       (CASE
+                        WHEN gc.GLOBAL_NAME='FM' THEN '加硫'
+                        ELSE '无硫' END) as stage_name,
+                       count(tf.id) as actual_trains
+                from
+                    trains_feedbacks tf
+                inner join product_classes_plan pcp on tf.plan_classes_uid=pcp.plan_classes_uid
+                inner join product_batching pb on pb.ID=pcp.product_batching_id
+                inner join global_code gc on gc.ID=pb.stage_id
+                {}
+                group by tf.factory_date, gc.global_name order by tf.factory_date) tmp
+            group by factory_date, stage_name order by factory_date;""".format(actual_extra_where_str)
+
+        cursor.execute(actual_sql)
+        actual_data = cursor.fetchall()
+
+        plan_data_dict = {}
+        for item in plan_data:
+            plan_date = item[0].strftime("%Y-%m-%d")
+            if plan_date in plan_data_dict:
+                plan_data_dict[plan_date][item[1]] = int(item[2])
+            else:
+                plan_data_dict[plan_date] = {item[1]: int(item[2])}
+        actual_data_dict = {}
+        for item in actual_data:
+            actual_date = item[0].strftime("%Y-%m-%d")
+            if actual_date in actual_data_dict:
+                actual_data_dict[actual_date][item[1]] = int(item[2])
+            else:
+                actual_data_dict[actual_date] = {item[1]: int(item[2])}
+
+        # 日合格率
+        test_date_qualify_group = MaterialTestOrder.objects.filter(
+            production_factory_date__in=date_range
+        ).values('is_qualified', 'production_factory_date').annotate(count=Count('id'))
+        test_date_group = MaterialTestOrder.objects.filter(
+            production_factory_date__in=date_range
+        ).values('production_factory_date').annotate(count=Count('id'))
+        test_date_group_dict = {str(item['production_factory_date']): item for item in test_date_group}
+        test_date_qualify_group_dict = {}
+        for item in test_date_qualify_group:
+            factory_date = str(item['production_factory_date'])
+            if item['is_qualified']:  # 合格
+                test_date_qualify_group_dict[factory_date] = {
+                    'rate': round(item['count'] / test_date_group_dict[factory_date]['count'] * 100, 2),
+                    'total': test_date_group_dict[factory_date]['count'],
+                    'qualified_count': item['count']
+                }
+            else:
+                if factory_date in test_date_qualify_group_dict:
+                    continue
+                test_date_qualify_group_dict[factory_date] = {
+                    'rate': 0,
+                    'total': test_date_group_dict[factory_date]['count'],
+                    'qualified_count': 0
+                }
+
+        plan_actual_data = {}
+        qualified_rate_data = {}
+        for date in date_range:
+            qualified_rate_data[date] = {'rate': 0, 'total': 0, 'qualified_count': 0}
+            plan_actual_data[date] = {
+                                            'plan_trains': 0,
+                                            'actual_trains': 0,
+                                            'plan_add_sulfur_trains': 0,
+                                            'plan_without_sulfur_trains': 0,
+                                            'actual_add_sulfur_trains': 0,
+                                            'actual_without_sulfur_trains': 0,
+                                            'diff_trains': 0
+                                        }
+            if date in plan_data_dict:
+                if '无硫' in plan_data_dict[date]:
+                    without_sulfur_num = plan_data_dict[date]['无硫']
+                    plan_actual_data[date]['plan_without_sulfur_trains'] = without_sulfur_num
+                if '加硫' in plan_data_dict[date]:
+                    add_sulfur_num = plan_data_dict[date]['加硫']
+                    plan_actual_data[date]['plan_add_sulfur_trains'] = add_sulfur_num
+                plan_actual_data[date]['plan_trains'] = plan_actual_data[date]['plan_add_sulfur_trains'] + plan_actual_data[date]['plan_without_sulfur_trains']
+
+            if date in actual_data_dict:
+                if '无硫' in actual_data_dict[date]:
+                    without_sulfur_num = actual_data_dict[date]['无硫']
+                    plan_actual_data[date]['actual_without_sulfur_trains'] = without_sulfur_num
+                if '加硫' in actual_data_dict[date]:
+                    add_sulfur_num = actual_data_dict[date]['加硫']
+                    plan_actual_data[date]['actual_add_sulfur_trains'] = add_sulfur_num
+                plan_actual_data[date]['actual_trains'] = plan_actual_data[date]['actual_without_sulfur_trains'] + plan_actual_data[date]['actual_add_sulfur_trains']
+
+            plan_actual_data[date]['diff_trains'] = plan_actual_data[date]['plan_trains'] - \
+                                                        plan_actual_data[date]['actual_trains']
+
+            if date in test_date_qualify_group_dict:
+                qualified_rate_data[date] = test_date_qualify_group_dict[date]
+        return Response({'plan_actual_data': plan_actual_data,
+                         'qualified_rate_data': qualified_rate_data,
+                         'date_range': date_range})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IndexEquipProductionAnalyze(IndexOverview):
+    """首页-机台产量分析, 参数?dimension=1:今天；2:昨天&st=开始日期&et=结束日期"""
+
+    def get(self, request):
+        dimension = self.request.query_params.get('dimension')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+
+        factory_date, _, _ = self.get_current_factory_date()
+        plan_query_params = {}
+        actual_query_params = {}
+
+        if dimension:
+            if dimension == '1':  # 今天
+                plan_query_params['work_schedule_plan__plan_schedule__day_time'] = factory_date
+                actual_query_params['factory_date'] = factory_date
+            elif dimension == '2':  # 昨天
+                yesterday = datetime.datetime.strptime(factory_date, '%Y-%m-%d') - datetime.timedelta(days=1)
+                plan_query_params['work_schedule_plan__plan_schedule__day_time'] = yesterday.date()
+                actual_query_params['factory_date'] = yesterday.date()
+
+        if st and et:
+            if et > factory_date:
+                raise ValidationError('结束日期不得大于当前工厂日期！')
+            plan_query_params = {'work_schedule_plan__plan_schedule__day_time__gte': st,
+                                 'work_schedule_plan__plan_schedule__day_time__lte': et}
+            actual_query_params = {'factory_date__gte': st, 'factory_date__lte': et}
+
+        equip_data = [equip.equip_no for equip in Equip.objects.filter(
+            category__equip_type__global_name='密炼设备').order_by('equip_no')]
+
+        # 当日计划与实际数据
+        plan_data = ProductClassesPlan.objects.filter(**plan_query_params).filter(delete_flag=False).values(
+            'equip__equip_no').annotate(plan_trains=Sum('plan_trains'))
+        actual_data = TrainsFeedbacks.objects.filter(
+            **actual_query_params).values('equip_no').annotate(actual_trains=Count('id'))
+
+        plan_data_dict = {item['equip__equip_no']: item for item in plan_data}
+        actual_data_dict = {item['equip_no']: item for item in actual_data}
+
+        plan_actual_data = {}
+        for equip_no in equip_data:
+            plan_actual_data[equip_no] = {'plan_trains': 0, 'actual_trains': 0}
+            if equip_no in plan_data_dict:
+                plan_actual_data[equip_no]['plan_trains'] = plan_data_dict[equip_no]['plan_trains']
+            if equip_no in actual_data_dict:
+                plan_actual_data[equip_no]['actual_trains'] = actual_data_dict[equip_no]['actual_trains']
+            plan_actual_data[equip_no]['diff_trains'] = plan_actual_data[equip_no]['plan_trains'] - \
+                                                        plan_actual_data[equip_no]['actual_trains']
+        return Response({'plan_actual_data': plan_actual_data,
+                         'equip_data': equip_data})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IndexEquipMaintenanceAnalyze(IndexOverview):
+    """首页-机台停机时间分析,参数?dimension=1:今天；2:昨天&st=开始日期&et=结束日期"""
+
+    def get(self, request):
+        dimension = self.request.query_params.get('dimension')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        factory_date, factory_begin_time, _ = self.get_current_factory_date()
+
+        equip_data = [equip.equip_no for equip in Equip.objects.filter(
+            category__equip_type__global_name='密炼设备').order_by('equip_no')]
+
+        time_now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        end_time = time_now
+        st_case_str = "emo.DOWN_TIME"
+        extra_where_str = ''
+        if dimension:
+            if dimension == '1':  # 今天
+                begin_time = factory_begin_time
+            elif dimension == '2':  # 昨天
+                yesterday = datetime.datetime.strptime(factory_date, '%Y-%m-%d') - datetime.timedelta(days=1)
+                begin_time = "{} 08:00:00".format(str(yesterday.date()))
+                end_time = factory_begin_time
+            else:  # 所有
+                begin_time = None
+                extra_where_str = ''
+        elif st and et:
+            if et > factory_date:
+                raise ValidationError('结束日期不得大于当前工厂日期！')
+            # et工厂结束时间
+            end_time = str(
+                (datetime.datetime.strptime(et, '%Y-%m-%d') + datetime.timedelta(days=1)).date()
+            ) + " 08:00:00"
+            if et == factory_date:
+                end_time = time_now
+            begin_time = st + " 08:00:00"  # st工厂日期开始时间
+        else:
+            raise ValidationError('参数错误')
+        if begin_time:
+            st_case_str = """
+                        (
+                            case when emo.DOWN_TIME < to_date('{}', 'yyyy-mm-dd hh24-mi-ss')
+                        THEN
+                        to_date('{}', 'yyyy-mm-dd hh24-mi-ss')
+                        else emo.DOWN_TIME
+                        end
+                        )
+                        """.format(begin_time, begin_time)
+            extra_where_str = """and (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')<='{}' and emo.END_TIME is null)
+                            or (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')>'{}'
+                                   and (to_char(emo.END_TIME, 'yyyy-mm-dd hh24-mi-ss') >'{}'))
+                            or (to_char(emo.DOWN_TIME, 'yyyy-mm-dd hh24-mi-ss')<'{}'
+                                   and (to_char(emo.END_TIME, 'yyyy-mm-dd hh24-mi-ss') >'{}'))
+                                   """.format(end_time, begin_time, begin_time, begin_time, begin_time)
+
+        sql = """
+        select
+                equip_no,
+                sum(ceil((To_date(to_char(et,'yyyy-mm-dd hh24:mi:ss') , 'yyyy-mm-dd hh24-mi-ss')
+                             - To_date(to_char(st,'yyyy-mm-dd hh24:mi:ss'), 'yyyy-mm-dd hh24-mi-ss')
+                            ) * 24 * 60 ))
+            from (
+                select
+                       equip_no,
+                       {} as st,
+                       (CASE WHEN emo.end_time is null THEN To_date('{}', 'yyyy-mm-dd hh24-mi-ss')
+                        when emo.END_TIME > To_date('{}', 'yyyy-mm-dd hh24-mi-ss') then To_date('{}', 'yyyy-mm-dd hh24-mi-ss')
+                         ELSE emo.end_time END) as et
+                from EQUIP_MAINTENANCE_ORDER emo
+                inner join EQUIP_PART ep on emo.equip_part_id = ep.id
+                inner join EQUIP e on ep.equip_id = e.id
+                where emo.DOWN_FLAG=1 {}) tmp
+        group by equip_no;""".format(st_case_str, end_time, end_time, end_time, extra_where_str)
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        data_dict = {item[0]: int(item[1]) for item in data}
+
+        maintenance_data = {}
+        for equip_no in equip_data:
+            maintenance_data[equip_no] = {'minutes': 0}
+            if equip_no in data_dict:
+                maintenance_data[equip_no]['minutes'] += data_dict[equip_no]
+
+        return Response({'maintenance_data': maintenance_data,
+                         'equip_data': equip_data})

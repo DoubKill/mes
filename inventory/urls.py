@@ -9,9 +9,7 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
-from .views import MaterialCount, PutPlanManagement, OverdueMaterialManagement, OutWorkFeedBack, \
-    DispatchLogView, InventoryLogOutViewSet, MaterialInventoryAPIView, MateriaTypeNameToAccording, SamplingRules, \
-    BarcodeQualityViewSet, MaterialTraceView, ProductTraceView, MaterialOutBack, InventoryStaticsView
+from .views import *
 
 router = DefaultRouter()
 
@@ -78,12 +76,24 @@ urlpatterns = [
     path('material-trace/', MaterialTraceView.as_view()),
     path('product-trace/', ProductTraceView.as_view()),
     path('material_count/', MaterialCount.as_view()),
-    path('outwork_feedback/', OutWorkFeedBack.as_view()),      # 混炼终炼出库反馈接口
-    path('material_out_back/', MaterialOutBack.as_view()),     # 原材料出库反馈
+    path('outwork_feedback/', OutWorkFeedBack.as_view()),  # 混炼终炼出库反馈接口
+    path('material_out_back/', MaterialOutBack.as_view()),  # 原材料出库反馈
     path('dispatch-log/', DispatchLogView.as_view()),  # 发货历史记录
     path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('materia_type_name_to_according/', MateriaTypeNameToAccording.as_view()),  # 根据物料类型和编码找到存在的仓库表
     path('sampling-rules/', SamplingRules.as_view()),
-    path('product-station-statics/', InventoryStaticsView.as_view()),
+
+    # 出库大屏
+    path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
+    path('delivery-plan-today/', DeliveryPlanToday.as_view()),  # 混炼胶 今日的总出库量
+    path('mix-gum-out-list/', MixGumOutInventoryLogAPIView.as_view()),  # 混炼胶  倒叙显示最近几条出库信息
+
+    path('delivery-plan-final-now/', DeliveryPlanFinalNow.as_view()),  # 终炼胶 当前在出库口的胶料信息
+    path('delivery-plan-final-today/', DeliveryPlanFinalToday.as_view()),  # 终炼胶  今日的总出库量
+    path('final-gum-out-list/', FinalGumOutInventoryLogAPIView.as_view()),  # 终炼胶  倒叙显示最近几条出库信息
+
+    path('product-station-statics/', InventoryStaticsView.as_view()),  # 胶种库存分段统计
+    path('product-details/', ProductDetailsView.as_view()),            # 胶料车间库存明细
+
     path('', include(router.urls)),
 ]

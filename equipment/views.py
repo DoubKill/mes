@@ -13,6 +13,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter
 from equipment.serializers import *
 from equipment.task import property_template, property_import
+from mes.common_code import OMin, OMax, OSum
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -86,7 +87,7 @@ class EquipDownReasonViewSet(ModelViewSet):
             return super().list(request, *args, **kwargs)
 
 
-# @method_decorator([api_recorder], name="dispatch")
+@method_decorator([api_recorder], name="dispatch")
 class EquipCurrentStatusList(APIView):
     """设备现况汇总"""
 
@@ -317,34 +318,6 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
         return Response(serializer.data)
 
 
-class OSum(Sum):
-    def as_oracle(self, compiler, connection):
-        # if self.output_field.get_internal_type() == 'DurationField':
-        expression = self.get_source_expressions()[0]
-        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
-        return compiler.compile(
-            SecondsToInterval(Sum(IntervalToSeconds(expression), filter=self.filter))
-        )
-
-
-class OMax(Max):
-    def as_oracle(self, compiler, connection):
-        # if self.output_field.get_internal_type() == 'DurationField':
-        expression = self.get_source_expressions()[0]
-        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
-        return compiler.compile(
-            SecondsToInterval(Max(IntervalToSeconds(expression), filter=self.filter))
-        )
-
-
-class OMin(Min):
-    def as_oracle(self, compiler, connection):
-        # if self.output_field.get_internal_type() == 'DurationField':
-        expression = self.get_source_expressions()[0]
-        from django.db.backends.oracle.functions import IntervalToSeconds, SecondsToInterval
-        return compiler.compile(
-            SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
-        )
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -516,7 +489,7 @@ class MonthErrorSortView(APIView):
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__year=year, factory_date__month=month,
                                                         down_flag=True)
         data_set = temp_set.values('equip_part__equip__equip_no', 'equip_part__name'). \
-            annotate(all_time=Sum((F('end_time') - F('begin_time')))). \
+            annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
             values('equip_part__equip__equip_no', 'equip_part__name', 'all_time').order_by('all_time')
         equip_list = [x.get('equip_part__equip__equip_no') for x in data_set]
         data = {e: {} for e in equip_list}
@@ -547,7 +520,7 @@ class EquipOverview(APIView):
         temp_set = EquipMaintenanceOrder.objects.filter(factory_date__gte=monday, factory_date__lte=sunday,
                                                         down_flag=True).order_by('equip_part__equip__equip_no')
         # 各个机台周停机数据
-        equip_list = set(temp_set.values_list('equip_part__equip__equip_no', flat=True))
+        equip_list = list(set(temp_set.values_list('equip_part__equip__equip_no', flat=True))).sort()
         data_set = temp_set.values('equip_part__equip__equip_no'). \
             annotate(all_time=OSum((F('end_time') - F('begin_time')))). \
             values('equip_part__equip__equip_no', 'all_time').order_by(
@@ -574,14 +547,30 @@ class EquipOverview(APIView):
         day_data = [{"name": x.get('equip_part__equip__equip_no'), "value": x.get("all_time")} for x in temp_set]
         rep["data"] = day_data
 
-
         # 维修单，单日数据滚动
         temp_set = list(EquipMaintenanceOrder.objects.filter(factory_date=factory_date).order_by(
             'equip_part__equip__equip_no'))
         day_detail = [[temp_set.index(x), x.order_uid,
-                       x.equip_part.equip.equip_no + "/" + x.equip_part__name,
-                       x.get_status_display(), x.maintenance_user, x.created_date] for x in temp_set]
+                       x.equip_part.equip.equip_no + "/" + x.equip_part.name,
+                       x.get_status_display(), x.maintenance_user.username, x.created_date] for x in temp_set]
         sheet = {"header": ["序号", "单号", "设备部位", "状态", "操作人", "申请时间"],
                  "data": day_detail}
         rep["config"] = sheet
+
+        temp_set = EquipCurrentStatus.objects.values("equip__equip_no",
+                                                     "equip__category__equip_type__global_name").annotate(
+            status=Max('status')).values("equip__category__equip_type__global_name", "equip__equip_no",
+                                         "status").order_by("equip__equip_no")
+
+        # 设备现况
+        rep["current"] = {"mix": [], "weigh": [], "check": [], "others": []}
+        for temp in temp_set:
+            if temp.get("equip__category__equip_type__global_name") == "密炼设备":
+                rep["current"]["mix"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
+            elif temp.get("equip__category__equip_type__global_name") == "称量设备":
+                rep["current"]["weigh"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
+            elif temp.get("equip__category__equip_type__global_name") == "检测设备":
+                rep["current"]["check"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
+            else:
+                rep["current"]["others"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
         return Response(rep)
