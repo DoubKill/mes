@@ -1496,6 +1496,7 @@ class MaterialOutBack(APIView):
 # 出库大屏
 # 分为混炼胶和终炼胶出库大屏
 # 混炼胶出库大屏一共份三个接口
+@method_decorator([api_recorder], name="dispatch")
 class DeliveryPlanNow(APIView):
     """混炼胶 当前在出库口的胶料信息"""
 
@@ -1513,8 +1514,8 @@ class DeliveryPlanNow(APIView):
                         order_no=dp_last_obj.order_no).last()
                 else:
                     mix_gum_out_obj = MixGumOutInventoryLog.objects.filter(order_no=dp_last_obj.order_no).last()
-            except:
-                raise ValidationError('连接北自数据库超时')
+            except Exception as e:
+                raise ValidationError(f'连接北自数据库超时: {e}')
             if mix_gum_out_obj:
                 lot_no = mix_gum_out_obj.lot_no
             else:
@@ -1528,7 +1529,7 @@ class DeliveryPlanNow(APIView):
             result = None
         return Response({"result": result})
 
-
+@method_decorator([api_recorder], name="dispatch")
 class DeliveryPlanToday(APIView):
     """混炼胶  今日的总出库量"""
 
@@ -1537,11 +1538,10 @@ class DeliveryPlanToday(APIView):
         delivery_plan_qty = DeliveryPlan.objects.filter(finish_time__date=datetime.datetime.today()).values(
             'material_no').annotate(plan_qty=Sum('need_qty'))
         # 计划出库的order_no列表
-        delivery_plan_order_no_list = DeliveryPlan.objects.filter(
-            finish_time__date=datetime.datetime.today()).values_list('order_no', flat=False)
+        delivery_plan_set = DeliveryPlan.objects.filter(finish_time__date=datetime.datetime.today())
+        delivery_plan_order_no_list = list(delivery_plan_set.values_list('order_no', flat=True))
         # 计划出库的material_no列表
-        delivery_plan_material_no_list = DeliveryPlan.objects.filter(
-            finish_time__date=datetime.datetime.today()).values_list('material_no', flat=False)
+        delivery_plan_material_no_list = list(delivery_plan_set.values_list('material_no', flat=True))
         try:
 
             if IS_BZ_USING:
@@ -1561,7 +1561,7 @@ class DeliveryPlanToday(APIView):
                     material_no__in=delivery_plan_material_no_list).values(
                     'material_no').annotate(inventory_qty=Sum('qty'))
         except Exception as e:
-            raise ValidationError('连接北自数据库超时')
+            raise ValidationError(f'连接北自数据库超时: {e}')
         for delivery_plan in delivery_plan_qty:
             delivery_plan['out_qty'] = None
             delivery_plan['inventory_qty'] = None
@@ -1574,6 +1574,7 @@ class DeliveryPlanToday(APIView):
         return Response({'result': delivery_plan_qty})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MixGumOutInventoryLogAPIView(APIView):
     """混炼胶  倒叙显示最近几条出库信息"""
 
@@ -1617,6 +1618,7 @@ class MixGumOutInventoryLogAPIView(APIView):
 
 
 # 终炼胶出库大屏一共份三个接口
+@method_decorator([api_recorder], name="dispatch")
 class DeliveryPlanFinalNow(APIView):
     """终炼胶 当前在出库口的胶料信息"""
 
@@ -1630,12 +1632,12 @@ class DeliveryPlanFinalNow(APIView):
                 location_name = None
             try:
                 if IS_BZ_USING:
-                    final_gum_out_obj = FinalGumOutInventoryLog.objects.using('bz').filter(
+                    final_gum_out_obj = FinalGumOutInventoryLog.objects.using('lb').filter(
                         order_no=dp_last_obj.order_no).last()
                 else:
                     final_gum_out_obj = FinalGumOutInventoryLog.objects.filter(order_no=dp_last_obj.order_no).last()
-            except:
-                raise ValidationError('连接北自数据库超时')
+            except Exception as e:
+                raise ValidationError(f'连接北自数据库超时: {e}')
             if final_gum_out_obj:
                 lot_no = final_gum_out_obj.lot_no
             else:
@@ -1650,6 +1652,7 @@ class DeliveryPlanFinalNow(APIView):
         return Response({"result": result})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DeliveryPlanFinalToday(APIView):
     """终炼胶  今日的总出库量"""
 
@@ -1658,19 +1661,18 @@ class DeliveryPlanFinalToday(APIView):
         delivery_plan_qty = DeliveryPlanFinal.objects.filter(finish_time__date=datetime.datetime.today()).values(
             'material_no').annotate(plan_qty=Sum('need_qty'))
         # 计划出库的order_no列表
-        delivery_plan_order_no_list = DeliveryPlanFinal.objects.filter(
-            finish_time__date=datetime.datetime.today()).values_list('order_no', flat=False)
+        deliver_plan_set = DeliveryPlanFinal.objects.filter(finish_time__date=datetime.datetime.today())
+        delivery_plan_order_no_list = list(deliver_plan_set.values_list('order_no', flat=True))
         # 计划出库的material_no列表
-        delivery_plan_material_no_list = DeliveryPlanFinal.objects.filter(
-            finish_time__date=datetime.datetime.today()).values_list('material_no', flat=False)
+        delivery_plan_material_no_list = list(deliver_plan_set.values_list('material_no', flat=True))
         try:
             if IS_BZ_USING:
                 # 出库数量
-                mix_gum_out_qty = FinalGumOutInventoryLog.objects.using('bz').filter(
+                mix_gum_out_qty = FinalGumOutInventoryLog.objects.using('lb').filter(
                     order_no__in=delivery_plan_order_no_list).values(
                     'material_no').annotate(out_qty=Sum('qty'))
                 # 库存余量
-                bz_inventory_qty = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                bz_inventory_qty = BzFinalMixingRubberInventory.objects.using('lb').filter(
                     material_no__in=delivery_plan_material_no_list).values(
                     'material_no').annotate(inventory_qty=Sum('qty'))
             else:
@@ -1695,13 +1697,14 @@ class DeliveryPlanFinalToday(APIView):
         return Response({'result': delivery_plan_qty})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class FinalGumOutInventoryLogAPIView(APIView):
     """终炼胶  倒叙显示最近几条出库信息"""
 
     def get(self, request):
         try:
             if IS_BZ_USING:
-                final_gum_out_data = FinalGumOutInventoryLog.objects.using('bz').filter(
+                final_gum_out_data = FinalGumOutInventoryLog.objects.using('lb').filter(
                     start_time__date=datetime.datetime.today()).order_by(
                     '-start_time').values(
                     'order_no',
@@ -1730,11 +1733,12 @@ class FinalGumOutInventoryLogAPIView(APIView):
                         location_name = None
                 mix_gum_out_obj['location_name'] = location_name
                 mix_gum_out_obj['start_time'] = mix_gum_out_obj['start_time'].strftime('%Y-%m-%d %H:%M:%S')
-        except:
-            raise ValidationError('连接北自数据库超时')
+        except Exception as e:
+            raise ValidationError(f'连接北自数据库超时:{e}')
         return Response({'result': final_gum_out_data})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class InventoryStaticsView(APIView):
 
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_stock_detail'}))
@@ -1914,6 +1918,7 @@ class InventoryStaticsView(APIView):
         # product_types = set(product_types)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductDetailsView(APIView):
 
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_workshop_stock_detail'}))
