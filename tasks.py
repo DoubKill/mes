@@ -18,7 +18,7 @@ from mes.common_code import order_no
 from inventory.models import BzFinalMixingRubberInventoryLB
 
 class KJJGUploader(BaseUploader):
-    dict_filter = {'混炼': "http://10.4.23.101:1010/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG",
+    dict_filter = {'混炼': "http://10.4.23.101:1011/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG",
                    '终炼': "http://10.4.23.101:1020/Service1.asmx?op=TRANS_MES_TO_WMS_KJJG"}
 
     def __init__(self, ware):
