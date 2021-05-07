@@ -942,6 +942,12 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
                        'test_factory_date': last_test_result.test_factory_date,
                        'test_class': test_order_data.production_class,
                        'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+        if pallet_data.begin_trains and pallet_data.end_trains:
+            trains = [str(x) for x in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]
+            trains = ",".join(trains)
+        else:
+            trains = ""
+        ret["trains"] = trains
         return ret
 
     class Meta:
