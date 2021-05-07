@@ -415,7 +415,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret = {}
         table_head_top = {}
 
-        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no)
+        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).order_by('actual_trains')
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(

@@ -1,7 +1,7 @@
 import json
 
 from mes.common_code import DecimalEncoder
-from quality.models import MaterialDealResult
+from quality.models import MaterialDealResult, MaterialDataPointIndicator
 from quality.serializers import MaterialDealResultListSerializer
 import logging
 
@@ -19,19 +19,28 @@ def receive_deal_result(lot_no):
         for i in m_list:
             if i != 'table_head':
                 trains.append({'train': i, 'content': m_list[i]})
-        indicator = []
-
-        for j in m_list['table_head']:
+        indicators = []
+        for indicator_name, points in m_list['table_head'].items():
             point_head = []
-            for m in m_list['table_head'][j]:
-                s = m.rsplit('[', 1)
-                if len(s) > 1:
-                    limit = s[1].split('-')
-                    point_head.append({"point": s[0], "upper_limit": limit[1], "lower_limit": limit[0]})
+            for point in points:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    data_point__name=point,
+                    material_test_method__material__material_name=results['product_no'],
+                    level=1).first()
+                if indicator:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": indicator.upper_limit,
+                         "lower_limit": indicator.lower_limit}
+                    )
                 else:
-                    point_head.append({"point": s[0], "upper_limit": None, "lower_limit": None})
-            indicator.append({'point': j, 'point_head': point_head})
-        mtr_list = {'trains': trains, 'table_head': indicator}
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": None,
+                         "lower_limit": None}
+                    )
+            indicators.append({'point': indicator_name, 'point_head': point_head})
+        mtr_list = {'trains': trains, 'table_head': indicators}
         results['mtr_list'] = mtr_list
         results = json.dumps(results, cls=DecimalEncoder)
         return results
