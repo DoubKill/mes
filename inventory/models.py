@@ -833,7 +833,7 @@ class FinalGumOutInventoryLog(models.Model):
         return None
 
     class Meta:
-        db_table = 'final_gum_out_inventory_log'
+        db_table = 'v_ASRS_TO_MES_RE_MESVIEW'
         managed = False
 
 
@@ -875,5 +875,5 @@ class FinalGumInInventoryLog(models.Model):
         return None
 
     class Meta:
-        db_table = 'final_gum_in_inventory_log'
+        db_table = 'v_ASRS_LOG_IN_OPREATE_MESVIEW'
         managed = False

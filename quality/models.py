@@ -307,6 +307,8 @@ class LabelPrint(models.Model):
     lot_no = models.CharField(max_length=64, help_text="追踪条码", verbose_name="追踪条码")
     status = models.IntegerField(help_text='打印状态', choices=STATUS_CHOICE, verbose_name='打印状态')
     data = models.TextField(help_text="标签数据json集", verbose_name="标签数据json集")
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
 
     def __str__(self):
         return self.lot_no

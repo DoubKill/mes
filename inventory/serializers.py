@@ -159,6 +159,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
                 "items": items
             }
             json_data = json.dumps(json_data, ensure_ascii=False)
+            print(json_data)
             sender = OUTWORKUploader(end_type=out_type)
             result = sender.request(msg_id, out_type, msg_count, str_user, json_data)
             if result is not None:
