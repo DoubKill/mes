@@ -1,6 +1,8 @@
 import os
 import django
 
+from mes.conf import SEND_COUNT
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 from tasks import update_wms_kjjg
@@ -20,7 +22,7 @@ logger = logging.getLogger('send_log')
 def send_bz():
     # 5、向北自接口发送数据
     # 5.1、先判断库存和线边库里有没有数据
-    deal_results = MaterialDealResult.objects.exclude(update_store_test_flag=1)
+    deal_results = MaterialDealResult.objects.exclude(update_store_test_flag=1).filter(send_count__lt=SEND_COUNT)
     for mdr_obj in deal_results:
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
         bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(
@@ -49,12 +51,16 @@ def send_bz():
                     logger.info("向北自发送数据,发送成功")
                 else:
                     mdr_obj.update_store_test_flag = 2
+                    temp_count = mdr_obj.send_count + 1
+                    mdr_obj.send_count = temp_count
                     mdr_obj.save()
                     logger.error(f"发送失败{res}")
             except Exception as e:
                 logger.error(f"调北自接口发生异常：{e}")
         else:  # 两个库都没有
             mdr_obj.update_store_test_flag = 3
+            temp_count = mdr_obj.send_count + 1
+            mdr_obj.send_count = temp_count
             mdr_obj.save()
             logger.error(f"没有发送，库存和线边库里都没有lot_no:{mdr_obj.lot_no}")
 

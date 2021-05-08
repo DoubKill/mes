@@ -42,3 +42,6 @@ INVENTORY_MAP = {
         ("lb", "终炼胶库", "no2"): {},
         ("wms", "原材料库", "no3"): {},
     }
+
+
+SEND_COUNT = 30
