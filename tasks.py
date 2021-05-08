@@ -124,7 +124,8 @@ def update_wms_kjjg(items=[{
         ware = "混炼"
     sender = KJJGUploader(ware)
     ret = sender.request(*get_base_data())
+    print(ret)
     return ret
 
 if __name__ == '__main__':
-    update_wms_kjjg([{'WORKID': '202104160003', 'MID': 'C-FM-Y792-02', 'PICI': '20215818112458i35', 'RFID': '20115409', 'DJJG': '一等品', 'SENDDATE': '20210416 09:41:40'}])
+    update_wms_kjjg([{'WORKID': '202105070011', 'MID': 'C-1MB-K503-09', 'PICI': '2021021322073855Z05', 'RFID': '20121082', 'DJJG': '一等品', 'SENDDATE': '20210516 09:41:40'}])

@@ -23,9 +23,11 @@ class BaseUploader(object):
         pay_load = pay_load.encode('utf-8')
         resp = requests.post(self.endpoint, data=pay_load, headers=headers)
         if resp.status_code != 200:
-            raise Exception(resp.content)
+            print(resp.text)
+            raise Exception(resp.text)
         resp_xml = resp.text
         json_data = xmltodict.parse(resp_xml)
+        print(json_data)
         return self.gen_result(json_data)
 
     def gen_result(self, data):
