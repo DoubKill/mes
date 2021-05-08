@@ -44,4 +44,4 @@ INVENTORY_MAP = {
     }
 
 
-SEND_COUNT = 30
+SEND_COUNT = 3

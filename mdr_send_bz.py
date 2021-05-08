@@ -1,7 +1,6 @@
 import os
 import django
 
-from mes.conf import SEND_COUNT
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
@@ -12,6 +11,7 @@ from inventory.models import BzFinalMixingRubberInventory, MaterialInventory
 from mes.common_code import order_no
 from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialDealResult
+from mes.conf import SEND_COUNT
 import logging
 
 logger = logging.getLogger('send_log')
