@@ -13,7 +13,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from production.models import PalletFeedbacks
-from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMethod, MaterialDataPointIndicator
+from quality.models import MaterialTestOrder, MaterialTestResult, TestType
 from basics.models import WorkSchedulePlan
 
 import pymssql
@@ -22,7 +22,15 @@ logger = logging.getLogger('quality_log')
 
 data_bases = [
     {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.141", "user": "guozi", "password": "mes2020", "name": "NIDAS3"}
+    {"server": "10.4.23.141", "user": "guo", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.180", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    # {"server": "10.4.23.181", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    # {"server": "10.4.23.182", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    # {"server": "10.4.23.184", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.185", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.186", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.187", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
+    {"server": "10.4.23.199", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
 ]
 
 
@@ -43,7 +51,7 @@ def main():
             max_test_date = '2020-11-22 00:00:00'
         else:
             max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
-        logger.error('max_test_date: {}'.format(max_test_date))
+        logger.info('max_test_date: {}'.format(max_test_date))
         server = data_base['server']
         user = data_base['user']
         password = data_base['password']
@@ -106,21 +114,20 @@ def main():
                 equip_no = item[9].strip(' ')  # 设备编号
                 test_date = item[10]  # 试验日期
                 test_times = item[11]  # 试验次数
-                machine_name = item[12].strip(' ')  # 机器名称
                 try:
                     interval = int(item[13].strip(' '))
                 except Exception:
                     interval = 1
                 test_group = item[3].strip(' ')  # 试验班组
+                test_type_name = item[-1].strip(' ')  # 检测类型
 
                 # 根据机器名称找到指标点
-                if machine_name == '流变仪':
-                    indicator_name = '门尼'
-                elif machine_name == '门尼粘度':
-                    indicator_name = '流变'
-                else:
+                test_type = TestType.objects.filter(name=test_type_name).first()
+                if not test_type:
+                    logger.error('no test type:{}'.format(test_type_name))
                     continue
-                # print('生产班次：{}, 试验班组：{}'.format(production_class, test_group))
+                else:
+                    indicator_name = test_type.test_indicator.name
 
                 # 根据班组找班次（找到的不一定对）
                 schedule_plan = WorkSchedulePlan.objects.filter(

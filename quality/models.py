@@ -335,6 +335,7 @@ class UnqualifiedDealOrder(AbstractEntity):
     c_deal_user = models.CharField(max_length=64, help_text='检查部门处理人', blank=True, null=True)
     c_deal_date = models.DateField(help_text='检查日期', blank=True, null=True)
     desc = models.TextField(help_text='描述', blank=True, null=True)
+    deal_method = models.CharField(max_length=64, help_text='处理方式', null=True)
 
     class Meta:
         db_table = 'unqualified_deal_order'

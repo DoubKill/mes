@@ -21,7 +21,7 @@ from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMe
 
 
 def main():
-    for pcp in ProductClassesPlan.objects.filter(delete_flag=False, status__in=('已下达', '运行中')):
+    for pcp in ProductClassesPlan.objects.filter(delete_flag=False, status__in=('已保存', '已下达', '运行中')):
         max_train = TrainsFeedbacks.objects.filter(
             plan_classes_uid=pcp.plan_classes_uid).aggregate(max_train=Max('actual_trains'))['max_train']
         if not max_train:

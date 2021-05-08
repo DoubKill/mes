@@ -93,4 +93,6 @@ urlpatterns = [
     path('material-inventory/', MaterialInventoryView.as_view()),  # 原料入库信息
     path('test-indicator-data-points-raw/', TestIndicatorDataPointRawListView.as_view()),
     path('', include(router.urls)),
+    path('deal-mathod-history/', DealMethodHistoryView.as_view()),
+    path('datapoint-curve/', TestDataPointCurveView.as_view())
 ]
