@@ -1944,8 +1944,8 @@ class ProductDetailsView(APIView):
 
     def get(self, request):
         params = request.query_params
-        material_type = params.get("material_type")
-        material_no = params.get("material_no")
+        material_type = params.get("material_type", "")
+        material_no = params.get("material_no", "")
         filters = dict()
         other_filters = dict()
         if material_type:
