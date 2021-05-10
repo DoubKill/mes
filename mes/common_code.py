@@ -122,6 +122,13 @@ def get_weekdays(days):
     return date_list[::-1]
 
 
+def date_range(start, end):
+    """获取两个日期之间的所有日期"""
+    delta = end - start  # as timedelta
+    days = [(start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(delta.days + 1)]
+    return days
+
+
 class SqlClient(object):
     """默认是连接sqlserver的客户端"""
 
