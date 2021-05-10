@@ -211,6 +211,8 @@ class WmsInventoryMaterial(models.Model):
     id = models.PositiveIntegerField(db_column='id', primary_key=True)
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
     material_type = models.CharField(max_length=64, db_column='MaterialGroupName')
+    pdm_no = models.CharField(max_length=64, db_column='Pdm')
+    erp_material_no = models.CharField(max_length=64, db_column='ZCMaterialCode')
 
     class Meta:
         db_table = 't_inventory_material'

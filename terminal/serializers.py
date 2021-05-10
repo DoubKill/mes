@@ -5,7 +5,7 @@ from django.db.models import Q, Sum
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from inventory.models import MaterialOutHistory
+from inventory.models import MaterialOutHistory, WmsInventoryMaterial
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -14,6 +14,7 @@ from production.models import PalletFeedbacks
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
 import logging
+
 logger = logging.getLogger('api_log')
 
 
@@ -47,18 +48,22 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         bra_code = attrs['bra_code']
         # 条码来源有三种，wms子系统、收皮条码，称量打包条码
         try:
+            # 先查出库履历查到原材料物料编码
             wms_stock = MaterialOutHistory.objects.using('wms').filter(
                 lot_no=bra_code).values('material_no', 'material_name')
+            # 再查wms物料管理表查到erp物料编码
+            material_all_info = WmsInventoryMaterial.objects.using('wms').filter(
+                material_no=wms_stock[0]['material_no']).order_by('id').last()
         except Exception:
             if settings.DEBUG:
-                wms_stock = None
+                material_all_info = None
             else:
                 raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
         pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
         weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
         material_no = material_name = None
-        if wms_stock:
-            msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock[0]['material_no']).first()
+        if material_all_info:
+            msc = MaterialSupplierCollect.objects.filter(material_no=material_all_info.erp_material_no).first()
             if msc:
                 # 如果有别称
                 material_no = msc.material.material_no
