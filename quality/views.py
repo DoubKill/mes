@@ -58,7 +58,7 @@ from recipe.models import Material, ProductBatching, ZCMaterial
 import logging
 from django.db.models import Max, Sum, Avg
 
-logger = logging.getLogger('send_log')
+logger = logging.getLogger('api_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
