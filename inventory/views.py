@@ -284,7 +284,8 @@ class OutWorkFeedBack(APIView):
                 try:
                     label = receive_deal_result(lot_no)
                     if label:
-                        LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label)
+                        LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0,
+                                                  data=label)
                 except AttributeError as a:
                     logger.error(f"条码错误{a}")
                 except Exception as e:
@@ -1529,6 +1530,7 @@ class DeliveryPlanNow(APIView):
             result = None
         return Response({"result": result})
 
+
 @method_decorator([api_recorder], name="dispatch")
 class DeliveryPlanToday(APIView):
     """混炼胶  今日的总出库量"""
@@ -1740,7 +1742,6 @@ class FinalGumOutInventoryLogAPIView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class InventoryStaticsView(APIView):
-
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_stock_detail'}))
 
     # def single_mix_inventory(self, product_type, model=BzFinalMixingRubberInventory):
@@ -1920,7 +1921,6 @@ class InventoryStaticsView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductDetailsView(APIView):
-
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_workshop_stock_detail'}))
 
     def deal(self, datas):
@@ -1963,12 +1963,20 @@ class ProductDetailsView(APIView):
         self.data = {}
         self.deal(mix_data)
         self.deal(final_data)
-        other_data = MaterialInventory.objects.filter(**other_filters).annotate(num=Sum('qty'),
-                                         weight=Sum('total_weight')).values("material__material_no", 'num', 'weight')
+        other_data = MaterialInventory.objects.filter(**other_filters).values("material__material_no").annotate(
+            num=Sum('qty'), weight=Sum('total_weight')).values("material__material_no", 'num', 'weight')
         for x in other_data:
             material_no = x.get("material__material_no")
-            self.data[material_no]["other_qty"] = x.get("num")
-            self.data[material_no]["other_weight"] = x.get("weight")
+            if material_no.get(material_no):
+                self.data[material_no]["other_qty"] = x.get("num")
+                self.data[material_no]["other_weight"] = x.get("weight")
+            else:
+                self.data[material_no] = {}
+                self.data[material_no]["other_qty"] = x.get("num")
+                self.data[material_no]["other_weight"] = x.get("weight")
+                self.data[material_no]["qty"] = 0.0
+                self.data[material_no]["weight"] = 0.0
+
             if self.data[material_no]["all_qty"]:
                 self.data[material_no]["all_qty"] += x.get("num")
             else:

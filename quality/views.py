@@ -60,7 +60,7 @@ from django.db.models import Max, Sum
 
 from terminal.models import MaterialSupplierCollect
 
-logger = logging.getLogger('send_log')
+logger = logging.getLogger('api_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
