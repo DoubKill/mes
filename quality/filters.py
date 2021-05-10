@@ -24,7 +24,8 @@ class DataPointFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
-    day_time = django_filters.DateTimeFilter(field_name="production_factory_date", help_text='工厂日期')
+    st = django_filters.DateFilter(field_name="production_factory_date", help_text='开始工厂日期', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name="production_factory_date", help_text='结束工厂日期', lookup_expr='lte')
     equip_no = django_filters.CharFilter(field_name='production_equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='产出胶料编号')
     classes = django_filters.CharFilter(field_name="production_class", help_text='班次')
@@ -32,7 +33,7 @@ class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('day_time', 'equip_no', 'product_no', "classes", 'stage', 'is_qualified')
+        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'stage', 'is_qualified')
 
 
 class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):

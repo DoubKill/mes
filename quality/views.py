@@ -6,6 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.decorators import action
@@ -23,7 +24,7 @@ from basics.serializers import GlobalCodeSerializer
 from inventory.models import WmsInventoryStock
 import uuid
 from mes import settings
-from mes.common_code import CommonDeleteMixin
+from mes.common_code import CommonDeleteMixin, date_range
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -53,13 +54,11 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
-from recipe.models import Material, ProductBatching
+from recipe.models import Material, ProductBatching, ZCMaterial
 import logging
-from django.db.models import Max, Sum
+from django.db.models import Max, Sum, Avg
 
-from terminal.models import MaterialSupplierCollect
-
-logger = logging.getLogger('send_log')
+logger = logging.getLogger('api_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -258,13 +257,26 @@ class MaterialDataPointIndicatorViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductBatchingMaterialListView(ListAPIView):
-    """胶料原材料列表"""
+    """胶料原材料列表，（可根据生产信息过滤）"""
     queryset = Material.objects.filter(delete_flag=False)
 
     def list(self, request, *args, **kwargs):
         m_type = self.request.query_params.get('type', '1')  # 1胶料  2原材料
+        factory_date = self.request.query_params.get('factory_date')   # 工厂日期
+        equip_no = self.request.query_params.get('equip_no')  # 设备编号
+        classes = self.request.query_params.get('classes')  # 班次
+
         batching_no = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
         if m_type == '1':
+            kwargs = {}
+            if factory_date:
+                kwargs['factory_date'] = factory_date
+            if equip_no:
+                kwargs['equip_no'] = equip_no
+            if classes:
+                kwargs['classes'] = classes
+            if kwargs:
+                batching_no = TrainsFeedbacks.objects.filter(**kwargs).values_list('product_no', flat=True)
             material_data = self.queryset.filter(
                 material_no__in=batching_no).values('id', 'material_no', 'material_name')
         elif m_type == '2':
@@ -539,17 +551,17 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
 
     def list(self, request, *args, **kwargs):
         station_dict = {
-                    "收皮": 1,
-                    "快检": 2,
-                    "一层前端": 3,
-                    "一层后端": 4,
-                    "二层前端": 5,
-                    "二层后端": 6,
-                    "炼胶#出库口#1": 7,
-                    "炼胶#出库口#2": 8,
-                    "炼胶#出库口#3": 9,
-                    "帘布#出库口#0": 10
-                }
+            "收皮": 1,
+            "快检": 2,
+            "一层前端": 3,
+            "一层后端": 4,
+            "二层前端": 5,
+            "二层后端": 6,
+            "炼胶#出库口#1": 7,
+            "炼胶#出库口#2": 8,
+            "炼胶#出库口#3": 9,
+            "帘布#出库口#0": 10
+        }
         station = request.query_params.get("station")
         instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
         if instance:
@@ -783,9 +795,13 @@ class PrintMaterialDealResult(APIView):
         return print_mdr("results", mdr_set)
 
 
+# 1天
+CACHE_TIME_TIMEOUT = 60 * 60 * 24
+
+
 class AllMixin:
 
-    @cache_response(timeout=60 * 10, cache='default')
+    # @cache_response(timeout=60 * 10, cache='default')
     def list(self, request, *args, **kwargs):
         if 'all' in self.request.query_params:
             queryset = self.filter_queryset(self.get_queryset())
@@ -807,7 +823,7 @@ def get_statics_query_dates(query_params):
     return start_time, end_time
 
 
-@method_decorator([api_recorder], name="dispatch")
+@method_decorator([api_recorder, cache_page(timeout=60 * 60 * 24 * 30, cache='default')], name="dispatch")
 class BatchMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchMonth.objects.all()
     serializer_class = BatchMonthSerializer
@@ -840,7 +856,7 @@ def get_statics_query_date(query_params):
     return date
 
 
-@method_decorator([api_recorder], name="dispatch")
+@method_decorator([api_recorder, cache_page(timeout=CACHE_TIME_TIMEOUT, cache='default')], name="dispatch")
 class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchDay.objects.all()
     serializer_class = BatchDaySerializer
@@ -856,7 +872,7 @@ class BatchDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
         return batches
 
 
-@method_decorator([api_recorder], name="dispatch")
+@method_decorator([api_recorder, cache_page(timeout=CACHE_TIME_TIMEOUT, cache='default')], name="dispatch")
 class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoDaySerializer
@@ -876,7 +892,7 @@ class BatchProductNoDayStatisticsView(AllMixin, ReadOnlyModelViewSet):
             batch__batch_month__date__month=date.month).distinct()
 
 
-@method_decorator([api_recorder], name="dispatch")
+@method_decorator([api_recorder, cache_page(timeout=60 * 60 * 24 * 30, cache='default')], name="dispatch")
 class BatchProductNoMonthStatisticsView(AllMixin, ReadOnlyModelViewSet):
     queryset = BatchProductNo.objects.all()
     serializer_class = BatchProductNoMonthSerializer
@@ -1149,6 +1165,61 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class DealMethodHistoryView(APIView):
+
+    def get(self, request):
+        return Response(set(UnqualifiedDealOrder.objects.filter(
+            deal_method__isnull=False).values_list('deal_method', flat=True)))
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TestDataPointCurveView(APIView):
+    """胶料数据点检测值曲线"""
+
+    def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        product_no = self.request.query_params.get('product_no')
+        if not all([st, et, product_no]):
+            raise ValidationError('参数缺失')
+        try:
+            days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
+                              datetime.datetime.strptime(et, '%Y-%m-%d'))
+        except Exception:
+            raise ValidationError('参数错误')
+        ret = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
+                                                material_test_order__production_factory_date__lte=et,
+                                                material_test_order__product_no=product_no
+                                                ).values('material_test_order__production_factory_date',
+                                                         'data_point_name').annotate(avg_value=Avg('value'))
+
+        data_point_names = [item['data_point_name'] for item in ret]
+        y_axis = {
+            data_point_name: {
+                'name': data_point_name,
+                'type': 'line',
+                'data': [0] * len(days)}
+            for data_point_name in data_point_names
+        }
+        for item in ret:
+            factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
+            data_point_name = item['data_point_name']
+            avg_value = round(item['avg_value'], 2)
+            y_axis[data_point_name]['data'][days.index(factory_date)] = avg_value
+        indicators = {}
+        for data_point_name in data_point_names:
+            indicator = MaterialDataPointIndicator.objects.filter(
+                data_point__name=data_point_name,
+                material_test_method__material__material_name=product_no,
+                level=1).first()
+            if indicator:
+                indicators[data_point_name] = [indicator.lower_limit, indicator.upper_limit]
+        return Response(
+            {'x_axis': days, 'y_axis': y_axis.values(), 'indicators': indicators}
+        )
+
+
+@method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -1254,6 +1325,7 @@ class ImportAndExportView(APIView):
                     MaterialTestResult.objects.create(**item)
         return Response('导入成功')
 
+
 @method_decorator([api_recorder], name="dispatch")
 class BarCodePreview(APIView):
     # 条码追溯中的条码预览接口
@@ -1261,7 +1333,7 @@ class BarCodePreview(APIView):
         lot_no = request.query_params.get("lot_no")
         # try:
         instance = MaterialDealResult.objects.get(lot_no=lot_no)
-        serializer =  MaterialDealResultListSerializer(instance)
+        serializer = MaterialDealResultListSerializer(instance)
         return Response(serializer.data)
         # except Exception as e:
         #     raise ValidationError(f"该条码无快检结果:{e}")
@@ -1403,7 +1475,7 @@ class LevelResultRawViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class MaterialTestIndicatorMethodsRaw(APIView):
     """获取原材料指标试验方法, 参数：?lot_no=批次号"""
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         lot_no = self.request.query_params.get('lot_no')
@@ -1411,13 +1483,11 @@ class MaterialTestIndicatorMethodsRaw(APIView):
         if not stock:
             raise ValidationError('该物料条码信息不存在！')
         material_no = stock[0]['material_no']
-        supplier = MaterialSupplierCollect.objects.filter(material_no=material_no).first()
-        if supplier:
-            material_no = supplier.material.material_no
-        try:
-            material = Material.objects.get(material_no=material_no)
-        except Exception:
+        supplier = ZCMaterial.objects.filter(material_no=material_no, material__isnull=False).first()
+        if not supplier:
             raise ValidationError('该物料信息不存在，请建立物料对应关系！')
+        else:
+            material = supplier.material
         ret = {}
         test_indicator_names = TestIndicatorRaw.objects.values_list('name', flat=True)
         test_methods = TestMethodRaw.objects.all()
@@ -1460,7 +1530,7 @@ class MaterialTestIndicatorMethodsRaw(APIView):
 class TestIndicatorDataPointRawListView(ListAPIView):
     """获取试验指标及其所有的试验方法数据点"""
     queryset = TestIndicatorRaw.objects.filter(delete_flag=False)
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         ret = []
@@ -1482,7 +1552,7 @@ class TestIndicatorDataPointRawListView(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class MaterialInventoryView(APIView):
     """根据日期、物料编码、物料名称、条码、批次号获取原材料入库信息， 参数: ?storage_date=&material_no=&material_name=&lot_no=&"""
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         storage_date = self.request.query_params.get('storage_date')

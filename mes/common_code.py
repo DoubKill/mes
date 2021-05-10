@@ -3,9 +3,11 @@ import json
 import time
 
 import pymssql
+import requests
 from DBUtils.PooledDB import PooledDB
 from django.db.models import Min, Max, Sum
 from rest_framework import status, mixins
+from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
@@ -14,10 +16,11 @@ from rest_framework.reverse import reverse
 from datetime import date, timedelta, datetime
 
 from mes.conf import BZ_HOST, BZ_USR, BZ_PASSWORD
-from mes.permissions import PermissonsDispatch
-from system.models import User, Permissions
+from system.models import User, Permissions, ChildSystemInfo
 from rest_framework import status as rf_status
+import logging
 
+logger = logging.getLogger("send_log")
 
 # 启用-》禁用    禁用-》启用
 class CommonDeleteMixin(object):
@@ -117,6 +120,13 @@ def get_weekdays(days):
     for i in range(days):
         date_list.append((timedelta(days=-i) + datetime.now()).strftime("%Y-%m-%d"))
     return date_list[::-1]
+
+
+def date_range(start, end):
+    """获取两个日期之间的所有日期"""
+    delta = end - start  # as timedelta
+    days = [(start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(delta.days + 1)]
+    return days
 
 
 class SqlClient(object):
@@ -261,3 +271,54 @@ class OMin(Min):
         return compiler.compile(
             SecondsToInterval(Min(IntervalToSeconds(expression), filter=self.filter))
         )
+
+class WebService(object):
+    client = requests.request
+    url = "http://{}:9000/小料称量"
+
+    @classmethod
+    def issue(cls, data, category, method="post", equip_no=6, equip_name="收皮终端"):
+        headers = {
+            'Content-Type': 'text/xml; charset=utf-8',
+            'SOAPAction': 'http://tempuri.org/INXWebService/{}'
+        }
+
+        child_system = ChildSystemInfo.objects.filter(system_name=f"{equip_name}{equip_no}").first()
+        recv_ip = child_system.link_address
+        url = cls.url.format(recv_ip)
+        headers['SOAPAction'] = headers['SOAPAction'].format(category)
+        body = cls.trans_dict_to_xml(data, category)
+        rep = cls.client(method, url, headers=headers, data=body, timeout=5)
+        # print(rep.text)
+        if rep.status_code < 300:
+            return True, rep.text
+        elif rep.status_code == 500:
+            logger.error(rep.text)
+            return False, rep.text
+        else:
+            return False, rep.text
+
+    # dict数据转soap需求xml
+    @staticmethod
+    def trans_dict_to_xml(data, category):
+        """
+        将 dict 对象转换成微信支付交互所需的 XML 格式数据
+
+        :param data: dict 对象
+        :return: xml 格式数据
+        """
+
+        xml = []
+        for k in data.keys():
+            v = data.get(k)
+            if k == 'detail' and not v.startswith('<![CDATA['):
+                v = '<![CDATA[{}]]>'.format(v)
+            xml.append('<{key}>{value}</{key}>'.format(key=k, value=v))
+        res = """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"> <s:Body>
+                    <{} xmlns="http://tempuri.org/">
+                       {}
+                    </{}>
+                </s:Body>
+                </s:Envelope>""".format(category, ''.join(xml), category)
+        res = res.encode("utf-8")
+        return res

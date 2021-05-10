@@ -10,7 +10,7 @@ from rest_framework.routers import DefaultRouter
 from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchProductBatchingVIew, \
     LoadMaterialLogViewSet, EquipOperationLogView, BatchingClassesEquipPlanView, FeedingLogViewSet, \
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
-    WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, MaterialSupplierCollectViewSet, \
+    WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, \
     ProductExchange
 
 router = DefaultRouter()
@@ -19,7 +19,6 @@ router.register('feeding-log', FeedingLogViewSet)  # PDA投料履历
 router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
 router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信息
-router.register('material-supplier-collect', MaterialSupplierCollectViewSet)  # 子系统物料管理
 
 urlpatterns = [
     path('', include(router.urls)),

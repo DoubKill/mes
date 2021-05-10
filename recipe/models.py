@@ -285,3 +285,25 @@ class WeighBatchingDetail(models.Model):
     class Meta:
         db_table = 'weigh_batching_detail'
         verbose_name_plural = verbose_name = '小料称量配方明细'
+
+
+class ZCMaterial(AbstractEntity):
+    """中策原材料信息"""
+    ORIGIN_CHOICE = (
+        (1, 'ERP'),
+    )
+    origin = models.PositiveIntegerField(help_text='来源', default=1, choices=ORIGIN_CHOICE)
+    wlxxid = models.CharField(max_length=64, help_text='物料信息ID', verbose_name='物料信息ID', unique=True)
+    material_no = models.CharField(max_length=64, help_text='物料编号', verbose_name='物料编号')
+    material_name = models.CharField(max_length=200, help_text='物料名称', verbose_name='物料名称')
+    jybj = models.CharField(max_length=64, help_text='检验标记', verbose_name='检验标记', blank=True, null=True)
+    bgsj = models.DateTimeField(help_text='变更时间', verbose_name='变更时间', blank=True, null=True)
+    material = models.ForeignKey(Material, help_text='原材料', null=True,
+                                 on_delete=models.CASCADE, related_name='zc_materials')
+
+    def __str__(self):
+        return self.material_name
+
+    class Meta:
+        db_table = 'zc_material'
+        verbose_name_plural = verbose_name = '中策原材料信息'

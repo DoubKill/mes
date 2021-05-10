@@ -14,14 +14,14 @@ from mes import settings
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
-    MaterialAttributeFilter
+    MaterialAttributeFilter, ZCMaterialFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
     ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
-    ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer
+    ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ZCMaterialCreateSerializer, ZCMaterialSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail
+    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -317,3 +317,20 @@ class ProductBatchingDetailListView(ReadOnlyModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('product_batching',)
     pagination_class = None
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ZCMaterialViewSet(ModelViewSet):
+    """中策ERP系统物料"""
+    queryset = ZCMaterial.objects.filter(delete_flag=False)
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('material_id',)
+    filter_class = ZCMaterialFilter
+    pagination_class = None
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ZCMaterialCreateSerializer
+        else:
+            return ZCMaterialSerializer
