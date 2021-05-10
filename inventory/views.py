@@ -1976,7 +1976,9 @@ class ProductDetailsView(APIView):
                 self.data[material_no]["other_weight"] = x.get("weight")
                 self.data[material_no]["qty"] = 0.0
                 self.data[material_no]["weight"] = 0.0
-
+                self.data[material_no]["material_name"] = material_no
+                self.data[material_no]["material_no"] = material_no
+                self.data[material_no]["material_type"] = material_type
             if self.data[material_no].get("all_qty"):
                 self.data[material_no]["all_qty"] += x.get("num")
             else:
