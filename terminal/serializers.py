@@ -11,8 +11,9 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
+from recipe.models import ZCMaterial
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
-    WeightPackageLog, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
+    WeightPackageLog, FeedingMaterialLog, LoadMaterialLog
 import logging
 logger = logging.getLogger('api_log')
 
@@ -58,7 +59,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
         material_no = material_name = None
         if wms_stock:
-            msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock[0]['material_no']).first()
+            msc = ZCMaterial.objects.filter(material_no=wms_stock[0]['material_no'],
+                                            material__isnull=False).first()
             if msc:
                 # 如果有别称
                 material_no = msc.material.material_no
@@ -163,7 +165,8 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                 raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
         if not wms_stock:
             raise serializers.ValidationError('该条码信息不存在！')
-        msc = MaterialSupplierCollect.objects.filter(material_no=wms_stock[0]['material_no']).first()
+        msc = ZCMaterial.objects.filter(material_no=wms_stock[0]['material_no'],
+                                        material__isnull=False).first()
         if msc:
             # 如果有别称
             material_no = msc.material.material_no
@@ -363,12 +366,3 @@ class WeightBatchingLogListSerializer(BaseModelSerializer):
     class Meta:
         model = WeightBatchingLog
         fields = '__all__'
-
-
-class MaterialSupplierCollectSerializer(BaseModelSerializer):
-    child_system_name = serializers.CharField(source='child_system.global_name', read_only=True, default=None)
-
-    class Meta:
-        model = MaterialSupplierCollect
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS

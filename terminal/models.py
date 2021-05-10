@@ -208,15 +208,3 @@ class Version(models.Model):
 
     def __str__(self):
         return "{}----{}".format(self.get_type_display(), self.number)
-
-
-class MaterialSupplierCollect(AbstractEntity):
-    material_name = models.CharField(max_length=64, help_text='子系统物料名称')
-    material_no = models.CharField(max_length=64, help_text='子系统物料编码')
-    child_system = models.ForeignKey(GlobalCode, help_text='子系统', on_delete=models.CASCADE, blank=True, null=True)
-    material = models.ForeignKey(Material, help_text='原材料', null=True,
-                                 on_delete=models.CASCADE, related_name='supplier_materials')
-
-    class Meta:
-        db_table = 'material_supplier_collect'
-        verbose_name_plural = verbose_name = '物料条形码管理'

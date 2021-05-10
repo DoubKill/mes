@@ -11,7 +11,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType
+    MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 logger = logging.getLogger('api_log')
@@ -644,3 +644,22 @@ class WeighCntTypeSerializer(serializers.ModelSerializer):
         model = WeighCntType
         fields = ('id', 'weigh_type', 'package_cnt', 'weight_details', 'package_type')
         read_only_fields = ('weigh_type',)
+
+
+class ZCMaterialCreateSerializer(serializers.ModelSerializer):
+    zc_material_ids = serializers.ListField(help_text='中策erp物料id列表', write_only=True)
+
+    def create(self, validated_data):
+        zc_material_ids = validated_data.pop('zc_material_ids')
+        ZCMaterial.objects.filter(id__in=zc_material_ids).update(material=validated_data['material'])
+        return validated_data
+
+    class Meta:
+        model = ZCMaterial
+        fields = ('material', 'zc_material_ids')
+
+
+class ZCMaterialSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ZCMaterial
+        fields = '__all__'

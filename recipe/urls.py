@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ProductBatchingViewSet, MaterialAttributeViewSet, \
     ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet, \
-    WeighCntTypeViewSet, ProductBatchingDetailListView
+    WeighCntTypeViewSet, ProductBatchingDetailListView, ZCMaterialViewSet
 
 router = DefaultRouter()
 
@@ -21,6 +21,9 @@ router.register(r'product-infos', ProductInfoViewSet)
 router.register(r'product-batching', ProductBatchingViewSet)
 
 router.register(r'materials-supplier', MaterialSupplierViewSet)
+
+# 中策ERP原材料对应关系绑定
+router.register(r'zc-materials', ZCMaterialViewSet)
 
 # 小料配方
 # router.register(r'weigh-batching', WeighBatchingViewSet)

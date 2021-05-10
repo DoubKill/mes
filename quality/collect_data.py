@@ -13,17 +13,13 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from production.models import PalletFeedbacks
-from quality.models import MaterialTestOrder, MaterialTestResult, MaterialTestMethod, MaterialDataPointIndicator
+from quality.models import MaterialTestOrder, MaterialTestResult, TestType
 from basics.models import WorkSchedulePlan
+from quality.models import ZCKJConfig
 
 import pymssql
 import logging
 logger = logging.getLogger('quality_log')
-
-data_bases = [
-    {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.141", "user": "guozi", "password": "mes2020", "name": "NIDAS3"}
-]
 
 
 def get_min_max_id(server, user, password, database, test_date):
@@ -36,18 +32,18 @@ def get_min_max_id(server, user, password, database, test_date):
 
 
 def main():
-    for idx, data_base in enumerate(data_bases):
-        max_test_date = MaterialTestResult.objects.filter(origin=idx+1).aggregate(
+    for config in ZCKJConfig.objects.all():
+        max_test_date = MaterialTestResult.objects.filter(origin=config.id).aggregate(
             max_test_date=Max('test_factory_date'))['max_test_date']
         if not max_test_date:
             max_test_date = '2020-11-22 00:00:00'
         else:
             max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
-        logger.error('max_test_date: {}'.format(max_test_date))
-        server = data_base['server']
-        user = data_base['user']
-        password = data_base['password']
-        name = data_base['name']
+        logger.info('max_test_date: {}'.format(max_test_date))
+        server = config.server
+        user = config.user
+        password = config.password
+        name = config.name
         try:
             min_id, max_id = get_min_max_id(server, user, password, name, max_test_date)
         except Exception:
@@ -106,21 +102,20 @@ def main():
                 equip_no = item[9].strip(' ')  # 设备编号
                 test_date = item[10]  # 试验日期
                 test_times = item[11]  # 试验次数
-                machine_name = item[12].strip(' ')  # 机器名称
                 try:
                     interval = int(item[13].strip(' '))
                 except Exception:
                     interval = 1
                 test_group = item[3].strip(' ')  # 试验班组
+                test_type_name = item[-1].strip(' ')  # 检测类型
 
                 # 根据机器名称找到指标点
-                if machine_name == '流变仪':
-                    indicator_name = '门尼'
-                elif machine_name == '门尼粘度':
-                    indicator_name = '流变'
-                else:
+                test_type = TestType.objects.filter(name=test_type_name).first()
+                if not test_type:
+                    logger.error('no test type:{}'.format(test_type_name))
                     continue
-                # print('生产班次：{}, 试验班组：{}'.format(production_class, test_group))
+                else:
+                    indicator_name = test_type.test_indicator.name
 
                 # 根据班组找班次（找到的不一定对）
                 schedule_plan = WorkSchedulePlan.objects.filter(
@@ -192,7 +187,7 @@ def main():
                             test_times=test_times,
                             data_point_name=data_point_name,
                             test_indicator_name=indicator_name,
-                            origin=idx + 1).exists():
+                            origin=config.id).exists():
                         MaterialTestResult.objects.create(
                             material_test_order=test_order,
                             test_factory_date=test_date,
@@ -207,7 +202,7 @@ def main():
                             test_group=test_group,
                             level=1 if result == '合格' else 2,
                             test_class=production_class,
-                            origin=idx+1)
+                            origin=config.id)
             conn.close()
             min_id += 1000
 

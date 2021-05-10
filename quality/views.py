@@ -24,7 +24,7 @@ from basics.serializers import GlobalCodeSerializer
 from inventory.models import WmsInventoryStock
 import uuid
 from mes import settings
-from mes.common_code import CommonDeleteMixin
+from mes.common_code import CommonDeleteMixin, date_range
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -54,11 +54,9 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
-from recipe.models import Material, ProductBatching
+from recipe.models import Material, ProductBatching, ZCMaterial
 import logging
-from django.db.models import Max, Sum
-
-from terminal.models import MaterialSupplierCollect
+from django.db.models import Max, Sum, Avg
 
 logger = logging.getLogger('send_log')
 
@@ -259,13 +257,26 @@ class MaterialDataPointIndicatorViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductBatchingMaterialListView(ListAPIView):
-    """胶料原材料列表"""
+    """胶料原材料列表，（可根据生产信息过滤）"""
     queryset = Material.objects.filter(delete_flag=False)
 
     def list(self, request, *args, **kwargs):
         m_type = self.request.query_params.get('type', '1')  # 1胶料  2原材料
+        factory_date = self.request.query_params.get('factory_date')   # 工厂日期
+        equip_no = self.request.query_params.get('equip_no')  # 设备编号
+        classes = self.request.query_params.get('classes')  # 班次
+
         batching_no = set(ProductBatching.objects.values_list('stage_product_batch_no', flat=True))
         if m_type == '1':
+            kwargs = {}
+            if factory_date:
+                kwargs['factory_date'] = factory_date
+            if equip_no:
+                kwargs['equip_no'] = equip_no
+            if classes:
+                kwargs['classes'] = classes
+            if kwargs:
+                batching_no = TrainsFeedbacks.objects.filter(**kwargs).values_list('product_no', flat=True)
             material_data = self.queryset.filter(
                 material_no__in=batching_no).values('id', 'material_no', 'material_name')
         elif m_type == '2':
@@ -1154,6 +1165,61 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class DealMethodHistoryView(APIView):
+
+    def get(self, request):
+        return Response(set(UnqualifiedDealOrder.objects.filter(
+            deal_method__isnull=False).values_list('deal_method', flat=True)))
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TestDataPointCurveView(APIView):
+    """胶料数据点检测值曲线"""
+
+    def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        product_no = self.request.query_params.get('product_no')
+        if not all([st, et, product_no]):
+            raise ValidationError('参数缺失')
+        try:
+            days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
+                              datetime.datetime.strptime(et, '%Y-%m-%d'))
+        except Exception:
+            raise ValidationError('参数错误')
+        ret = MaterialTestResult.objects.filter(material_test_order__production_factory_date__gte=st,
+                                                material_test_order__production_factory_date__lte=et,
+                                                material_test_order__product_no=product_no
+                                                ).values('material_test_order__production_factory_date',
+                                                         'data_point_name').annotate(avg_value=Avg('value'))
+
+        data_point_names = [item['data_point_name'] for item in ret]
+        y_axis = {
+            data_point_name: {
+                'name': data_point_name,
+                'type': 'line',
+                'data': [0] * len(days)}
+            for data_point_name in data_point_names
+        }
+        for item in ret:
+            factory_date = item['material_test_order__production_factory_date'].strftime("%Y-%m-%d")
+            data_point_name = item['data_point_name']
+            avg_value = round(item['avg_value'], 2)
+            y_axis[data_point_name]['data'][days.index(factory_date)] = avg_value
+        indicators = {}
+        for data_point_name in data_point_names:
+            indicator = MaterialDataPointIndicator.objects.filter(
+                data_point__name=data_point_name,
+                material_test_method__material__material_name=product_no,
+                level=1).first()
+            if indicator:
+                indicators[data_point_name] = [indicator.lower_limit, indicator.upper_limit]
+        return Response(
+            {'x_axis': days, 'y_axis': y_axis.values(), 'indicators': indicators}
+        )
+
+
+@method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -1417,13 +1483,11 @@ class MaterialTestIndicatorMethodsRaw(APIView):
         if not stock:
             raise ValidationError('该物料条码信息不存在！')
         material_no = stock[0]['material_no']
-        supplier = MaterialSupplierCollect.objects.filter(material_no=material_no).first()
-        if supplier:
-            material_no = supplier.material.material_no
-        try:
-            material = Material.objects.get(material_no=material_no)
-        except Exception:
+        supplier = ZCMaterial.objects.filter(material_no=material_no, material__isnull=False).first()
+        if not supplier:
             raise ValidationError('该物料信息不存在，请建立物料对应关系！')
+        else:
+            material = supplier.material
         ret = {}
         test_indicator_names = TestIndicatorRaw.objects.values_list('name', flat=True)
         test_methods = TestMethodRaw.objects.all()

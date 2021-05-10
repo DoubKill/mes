@@ -19,12 +19,12 @@ from recipe.models import ProductBatchingDetail
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
-    WeightTankStatus, WeightPackageLog, Version, MaterialSupplierCollect, FeedingMaterialLog, LoadMaterialLog
+    WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
-    LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, MaterialSupplierCollectSerializer, \
+    LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, \
     WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer
 
 
@@ -481,26 +481,6 @@ class WeightBatchingLogListViewSet(ListAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class MaterialSupplierCollectViewSet(mixins.CreateModelMixin,
-                                     mixins.ListModelMixin,
-                                     mixins.UpdateModelMixin,
-                                     mixins.RetrieveModelMixin,
-                                     GenericViewSet):
-    queryset = MaterialSupplierCollect.objects.filter(delete_flag=False)
-    serializer_class = MaterialSupplierCollectSerializer
-    permission_classes = (IsAuthenticated,)
-    filter_backends = [DjangoFilterBackend]
-    filter_fields = ('material_id', )
-
-    def get_queryset(self):
-        if self.request.query_params.get('mes_system'):
-            # mes生成的条码
-            return self.queryset.filter(child_system__isnull=True)
-        else:
-            # 没有绑定原材料则认为是子系统的数据
-            return self.queryset.filter(child_system__isnull=False)
-
-@method_decorator([api_recorder], name="dispatch")
 class ForceFeedStock(APIView):
     def post(self, request):
         feedstock = self.request.query_params.get('plan_classes_uid')
@@ -510,6 +490,7 @@ class ForceFeedStock(APIView):
             pass
         except Exception:
             return response(success=False)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductExchange(APIView):

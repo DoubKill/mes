@@ -22,3 +22,4 @@ pyecharts-jupyter-installer==0.0.3
 snapshot-phantomjs==0.0.3
 django-celery-results==2.0.1
 celery==5.0.5
+suds-jurko==0.6
