@@ -6,6 +6,21 @@ from recipe.models import Material
 from system.models import AbstractEntity, User
 
 
+class ZCKJConfig(models.Model):
+    """中策诺甲快检数据库配置"""
+    server = models.CharField(max_length=64, help_text='快检电脑ip地址')
+    user = models.CharField(max_length=64, help_text='数据库用户名')
+    password = models.CharField(max_length=64, help_text='数据库用户密码')
+    name = models.CharField(max_length=64, help_text='数据库名称')
+
+    def __str__(self):
+        return self.server
+
+    class Meta:
+        db_table = 'zckj_config'
+        verbose_name_plural = verbose_name = '中策诺甲快检数据库配置'
+
+
 class TestIndicator(AbstractEntity):
     """检测指标"""
     no = models.CharField(max_length=64, help_text='指标编号', unique=True)

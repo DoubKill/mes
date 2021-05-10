@@ -15,23 +15,11 @@ django.setup()
 from production.models import PalletFeedbacks
 from quality.models import MaterialTestOrder, MaterialTestResult, TestType
 from basics.models import WorkSchedulePlan
+from quality.models import ZCKJConfig
 
 import pymssql
 import logging
 logger = logging.getLogger('quality_log')
-
-data_bases = [
-    {"server": "10.4.23.140", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.141", "user": "guo", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.180", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    # {"server": "10.4.23.181", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    # {"server": "10.4.23.182", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    # {"server": "10.4.23.184", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.185", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.186", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.187", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-    {"server": "10.4.23.199", "user": "guozi", "password": "mes2020", "name": "NIDAS3"},
-]
 
 
 def get_min_max_id(server, user, password, database, test_date):
@@ -44,18 +32,18 @@ def get_min_max_id(server, user, password, database, test_date):
 
 
 def main():
-    for idx, data_base in enumerate(data_bases):
-        max_test_date = MaterialTestResult.objects.filter(origin=idx+1).aggregate(
+    for config in ZCKJConfig.objects.all():
+        max_test_date = MaterialTestResult.objects.filter(origin=config.id).aggregate(
             max_test_date=Max('test_factory_date'))['max_test_date']
         if not max_test_date:
             max_test_date = '2020-11-22 00:00:00'
         else:
             max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
         logger.info('max_test_date: {}'.format(max_test_date))
-        server = data_base['server']
-        user = data_base['user']
-        password = data_base['password']
-        name = data_base['name']
+        server = config.server
+        user = config.user
+        password = config.password
+        name = config.name
         try:
             min_id, max_id = get_min_max_id(server, user, password, name, max_test_date)
         except Exception:
@@ -199,7 +187,7 @@ def main():
                             test_times=test_times,
                             data_point_name=data_point_name,
                             test_indicator_name=indicator_name,
-                            origin=idx + 1).exists():
+                            origin=config.id).exists():
                         MaterialTestResult.objects.create(
                             material_test_order=test_order,
                             test_factory_date=test_date,
@@ -214,7 +202,7 @@ def main():
                             test_group=test_group,
                             level=1 if result == '合格' else 2,
                             test_class=production_class,
-                            origin=idx+1)
+                            origin=config.id)
             conn.close()
             min_id += 1000
 
