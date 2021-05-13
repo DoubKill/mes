@@ -22,7 +22,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, \
     UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
     MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
-    UnqualifiedMaterialDealResult
+    UnqualifiedMaterialDealResult, MaterialExamineEquipmentType, MaterialExamineEquipment, MaterialExamineType, \
+    MaterialExamineRatingStandard, ExamineValueUnit
 from recipe.models import MaterialAttribute
 
 
@@ -1223,3 +1224,38 @@ class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer)
     class Meta:
         model = UnqualifiedMaterialDealResult
         fields = ('status', 'release_result', 'unqualified_result', 'is_delivery')
+
+
+"""新原材料快检"""
+class MaterialExamineEquipmentTypeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = MaterialExamineEquipmentType
+        fields = '__all__'
+
+
+class MaterialExamineEquipmentSerializer(serializers.ModelSerializer):
+    type_name = serializers.CharField(source="type.name", help_text="设备类型名称", read_only=True)
+
+    class Meta:
+        model = MaterialExamineEquipment
+        fields = '__all__'
+
+class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MaterialExamineRatingStandard
+        fields = '__all__'
+
+class MaterialExamineTypeSerializer(serializers.ModelSerializer):
+    unit_name = serializers.CharField(source='unit.name', read_only=True)
+    standards = MaterialExamineRatingStandardSerializer(MaterialExamineRatingStandard.objects.all(), many=True)
+    class Meta:
+        model = MaterialExamineType
+        fields = '__all__'
+        # depth = 2
+
+
+class ExamineValueUnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExamineValueUnit
+        fields = '__all__'

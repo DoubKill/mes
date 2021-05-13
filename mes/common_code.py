@@ -1,11 +1,14 @@
 import decimal
 import json
 import time
+from io import BytesIO
 
 import pymssql
 import requests
+import xlwt
 from DBUtils.PooledDB import PooledDB
 from django.db.models import Min, Max, Sum
+from django.http import HttpResponse
 from rest_framework import status, mixins
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView
@@ -322,3 +325,32 @@ class WebService(object):
                 </s:Envelope>""".format(category, ''.join(xml), category)
         res = res.encode("utf-8")
         return res
+
+
+def get_template_response(titles : list, filename="", description=""):
+    """
+    :param titles: 表头
+    :param filename: 模板名
+    :param description: 第一行的模板描述及备注
+    :return: 模板对象
+    """
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode('ISO-8859-1') + '.xls'
+    # 创建工作簿
+    style = xlwt.XFStyle()
+    style.alignment.wrap = 1
+    ws = xlwt.Workbook(encoding='utf-8')
+    # 添加第一页数据表
+    w = ws.add_sheet(filename)
+    target = 0
+    if description:
+        target += 1
+        w.write(0, 0, description)
+    for x in titles:
+        w.write(target, titles.index(x), x)
+    output = BytesIO()
+    ws.save(output)
+    # 重新定位到开始
+    output.seek(0)
+    response.write(output.getvalue())
+    return response

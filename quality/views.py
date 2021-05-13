@@ -1,7 +1,10 @@
 import datetime
 import json
 
+import xlwt
+from io import BytesIO
 from django.db import connection
+from django.http import HttpResponse
 from django.utils import timezone
 from datetime import timedelta
 from django.db.transaction import atomic
@@ -24,7 +27,7 @@ from basics.serializers import GlobalCodeSerializer
 from inventory.models import WmsInventoryStock
 import uuid
 from mes import settings
-from mes.common_code import CommonDeleteMixin, date_range
+from mes.common_code import CommonDeleteMixin, date_range, get_template_response
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -34,12 +37,13 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, DataPointRawFilter, \
     TestMethodRawFilter, MaterialTestMethodRawFilter, MaterialDataPointIndicatorRawFilter, MaterialTestOrderRawFilter, \
-    UnqualifiedMaterialDealResultFilter
+    UnqualifiedMaterialDealResultFilter, MaterialExamineEquipmentFilter, MaterialExamineTypeFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     TestTypeRaw, TestIndicatorRaw, DataPointRaw, TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, \
-    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult
+    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult, MaterialExamineEquipmentType, \
+    MaterialExamineEquipment, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
@@ -51,7 +55,9 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestMethodRawSerializer, MaterialDataPointIndicatorRawSerializer, LevelResultRawSerializer, \
     TestTypeRawSerializer, MaterialTestOrderRawSerializer, MaterialTestResultRawListSerializer, \
     MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer, \
-    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer
+    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer, \
+    MaterialExamineEquipmentTypeSerializer, MaterialExamineEquipmentSerializer, MaterialExamineTypeSerializer, \
+    MaterialExamineRatingStandardSerializer, ExamineValueUnitSerializer
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching, ZCMaterial
@@ -262,7 +268,7 @@ class ProductBatchingMaterialListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         m_type = self.request.query_params.get('type', '1')  # 1胶料  2原材料
-        factory_date = self.request.query_params.get('factory_date')   # 工厂日期
+        factory_date = self.request.query_params.get('factory_date')  # 工厂日期
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
         classes = self.request.query_params.get('classes')  # 班次
 
@@ -1628,3 +1634,124 @@ class UnqualifiedMaterialDealResultViewSet(mixins.ListModelMixin,
             return UnqualifiedMaterialDealResultListSerializer
         else:
             return UnqualifiedMaterialDealResultUpdateSerializer
+
+
+"""新原材料快检"""
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineEquipmentTypeViewSet(ModelViewSet):
+    queryset = MaterialExamineEquipmentType.objects.all()
+    serializer_class = MaterialExamineEquipmentTypeSerializer
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values("id", "name")
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineEquipmentViewSet(ModelViewSet):
+    queryset = MaterialExamineEquipment.objects.all()
+    serializer_class = MaterialExamineEquipmentSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialExamineEquipmentFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values("id", "name")
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineTypeViewSet(ModelViewSet):
+    queryset = MaterialExamineType.objects.all().select_related("unit").prefetch_related('standards')
+    serializer_class = MaterialExamineTypeSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialExamineTypeFilter
+    titles = ["比值类型", "检测类型", "边界值", "单位", "上限值", "下限值", "级别"]
+    description = "比值类型填 上下限, <=, >=, 外观确认"
+    permission_classes = ()
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):  # 检测类型列表
+            return ()
+        elif self.request.query_params.get('types'):  # 比值类型列表
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values("id", "name")
+            return Response({'results': data})
+        elif self.request.query_params.get('types'):
+            # qs = queryset.values_list('interval_type', flat=True).distinct()
+
+            qs = [{"id": x[0], "value": x[1]} for x in MaterialExamineType.INTERVAL_TYPES]
+            return Response({'results': qs})
+        else:
+            return super().list(request, *args, **kwargs)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export-template',
+            url_name='export-template')
+    def export_template(self, request):
+        """资产导入模板"""
+
+        filename = '原材料检测指标导入模板'
+        return get_template_response(self.titles, filename=filename, description=self.description)
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-data',
+            url_name='import-data')
+    def import_data(self, request):
+        file = request.FILES.get('file')
+        cur_sheet = get_cur_sheet(file)
+        data = get_sheet_data(cur_sheet, start_row=2)
+        interval_dict = {x[1]: x[0] for x in MaterialExamineType.INTERVAL_TYPES}
+        for x in data:
+            if x[3]:
+                unit, tag = ExamineValueUnit.objects.get_or_create(name=x[3])
+            else:
+                unit = None
+            temp = {
+                "interval_type": interval_dict[x[0]],
+                "limit_value": float(x[2]) if x[2] else None,
+                "unit": unit
+            }
+            instance = MaterialExamineType.objects.get_or_create(defaults=temp, **{"name": x[1]})[0]
+            if str(x[0]) == "上下限":
+                MaterialExamineRatingStandard.objects.create(examine_type=instance, upper_limit_value=float(x[4]),
+                                                             lower_limiting_value=float(x[5]), level=x[6])
+        return Response("导入成功")
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineRatingStandardViewSet(ModelViewSet):
+    queryset = MaterialExamineRatingStandard.objects.all()
+    serializer_class = MaterialExamineRatingStandardSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ExamineValueUnitViewSet(ModelViewSet):
+    queryset = ExamineValueUnit.objects.all()
+    serializer_class = ExamineValueUnitSerializer
+    pagination_class = SinglePageNumberPagination
