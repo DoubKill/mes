@@ -583,7 +583,7 @@ class MaterialSingleTypeExamineResult(models.Model):
                                                 blank=True)
     type = models.ForeignKey('MaterialExamineType', on_delete=models.SET_NULL, null=True, blank=True)
     mes_decide_qualified = models.NullBooleanField('mes判定是否合格')
-    value = models.FloatField()
+    value = models.FloatField(null=True)
     # other_system_decide_qualified = models.NullBooleanField('其他系统判定是否合格')
     equipment = models.ForeignKey(MaterialExamineEquipment, verbose_name='检测机台', on_delete=models.SET_NULL, null=True,
                                   blank=True)
