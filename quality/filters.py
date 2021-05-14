@@ -3,7 +3,7 @@ import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, DataPointRaw, \
     TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, MaterialTestOrderRaw, \
-    UnqualifiedMaterialDealResult
+    UnqualifiedMaterialDealResult, ExamineMaterial
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -155,3 +155,23 @@ class UnqualifiedMaterialDealResultFilter(django_filters.rest_framework.FilterSe
     class Meta:
         model = UnqualifiedMaterialDealResult
         fields = ('storage_date', 'lot_no', 'material_no', 'material_name')
+
+
+class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    sample_name = django_filters.CharFilter(field_name='sample_name', lookup_expr='icontains')
+    batch = django_filters.CharFilter(field_name='batch', lookup_expr='icontains')
+    supplier = django_filters.CharFilter(field_name='supplier__name', lookup_expr='icontains')
+    material_create_time_b = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='gte')
+    material_create_time_e = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
+    examine_date = django_filters.DateFilter(field_name='examine_results__examine_date')
+    transport_date = django_filters.DateFilter(field_name='examine_results__transport_date')
+
+    class Meta:
+        model = ExamineMaterial
+        fields = ('name', 'sample_name', 'batch',
+                  'supplier',
+                  'qualified',
+                  'material_create_time_b',
+                  'material_create_time_e',
+                  'examine_date')
