@@ -22,8 +22,9 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, \
     UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
     MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
+    ExamineMaterial, MaterialExamineResult, MaterialSingleTypeExamineResult, \
     UnqualifiedMaterialDealResult, MaterialExamineType, \
-    MaterialExamineRatingStandard, ExamineValueUnit, MaterialExamineResult, MaterialSingleTypeExamineResult
+    MaterialExamineRatingStandard, ExamineValueUnit
 from recipe.models import MaterialAttribute
 
 
@@ -1242,6 +1243,7 @@ class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer)
 #         fields = '__all__'
 
 
+
 class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialExamineRatingStandard
@@ -1264,7 +1266,7 @@ class ExamineValueUnitSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
+class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer):
     examine_name = serializers.CharField(source="type.name")
     equip_name = serializers.CharField(source="equipment.name")
 
@@ -1273,10 +1275,10 @@ class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class MaterialExamineResultSerializer(serializers.ModelSerializer):
+class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
     recorder_name = serializers.CharField(source='recorder.username', read_only=True)
     sampler_name = serializers.CharField(source='sampling_user.username', read_only=True)
-    single_examine_results = MaterialSingleTypeExamineResultSerializer(MaterialSingleTypeExamineResult.objects.all(),
+    single_examine_results = MaterialSingleTypeExamineResultMainSerializer(MaterialSingleTypeExamineResult.objects.all(),
                                                                        many=True, allow_null=True)
 
     def create(self, validated_data):
@@ -1290,3 +1292,52 @@ class MaterialExamineResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialExamineResult
         fields = '__all__'
+
+class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
+    type_name = serializers.ReadOnlyField(source='type.name')
+
+    class Meta:
+        model = MaterialSingleTypeExamineResult
+        fields = ['type_name', 'value']
+
+
+class MaterialExamineResultSerializer(serializers.ModelSerializer):
+    sampling_user = serializers.ReadOnlyField(source='sampling_user.username')
+    recorder = serializers.ReadOnlyField(source='recorder.username')
+    examine_results = MaterialSingleTypeExamineResultSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = MaterialExamineResult
+        fields = ['examine_date',
+                  'transport_date',
+                  'sampling_user',
+                  'recorder',
+                  'qualified',
+                  're_examine',
+                  'qualified',
+                  'newest_qualified',
+                  'create_time',
+                  'update_time',
+                  'examine_results']
+
+
+class ExamineMaterialSerializer(serializers.ModelSerializer):
+    supplier = serializers.ReadOnlyField(source='supplier.name')
+    examine_results = MaterialExamineResultSerializer(many=True, read_only=True)
+    examine_types = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExamineMaterial
+        fields = ['name',
+                  'sample_name',
+                  'batch',
+                  'supplier',
+                  'qualified',
+                  'create_time',
+                  'examine_results',
+                  'examine_types'
+                  ]
+
+    def get_examine_types(self, obj):
+        return MaterialExamineType.objects.filter(
+            materialsingletypeexamineresult__material_examine_result__material=obj).values_list('name', flat=True)

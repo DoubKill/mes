@@ -8,7 +8,7 @@ from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
@@ -34,14 +34,14 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, DataPointRawFilter, \
     TestMethodRawFilter, MaterialTestMethodRawFilter, MaterialDataPointIndicatorRawFilter, MaterialTestOrderRawFilter, \
-    UnqualifiedMaterialDealResultFilter, MaterialExamineTypeFilter
+    UnqualifiedMaterialDealResultFilter,  MaterialExamineTypeFilter, ExamineMaterialFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     TestTypeRaw, TestIndicatorRaw, DataPointRaw, TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, \
-    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult, MaterialExamineType, MaterialExamineRatingStandard, \
-    ExamineValueUnit, \
-    MaterialExamineResult, MaterialSingleTypeExamineResult
+    MaterialSingleTypeExamineResult, \
+    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult, MaterialExamineResult, MaterialExamineType, \
+    MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
@@ -51,11 +51,14 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
     MaterialDealResultListSerializer1, TestIndicatorRawSerializer, DataPointRawSerializer, TestMethodRawSerializer, \
     MaterialTestMethodRawSerializer, MaterialDataPointIndicatorRawSerializer, LevelResultRawSerializer, \
-    TestTypeRawSerializer, MaterialTestOrderRawSerializer, MaterialTestResultRawListSerializer, \
+    TestTypeRawSerializer, MaterialTestOrderRawSerializer, \
     MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer, \
-    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer, MaterialExamineTypeSerializer, \
-    MaterialExamineRatingStandardSerializer, ExamineValueUnitSerializer, MaterialExamineResultSerializer, \
-    MaterialSingleTypeExamineResultSerializer
+    MaterialExamineResultSerializer, \
+    MaterialSingleTypeExamineResultSerializer, \
+    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer, \
+    ExamineMaterialSerializer, MaterialExamineTypeSerializer, MaterialExamineRatingStandardSerializer, \
+    ExamineValueUnitSerializer, MaterialSingleTypeExamineResultMainSerializer, MaterialExamineResultMainSerializer
+from django.db.models import Q, Prefetch
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching, ZCMaterial
@@ -1764,10 +1767,22 @@ class ExamineValueUnitViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class MaterialExamineResultViewSet(ModelViewSet):
     queryset = MaterialExamineResult.objects.all().select_related("material", "recorder", "sampling_user").prefetch_related("single_examine_results")
-    serializer_class = MaterialExamineResultSerializer
+    serializer_class = MaterialExamineResultMainSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
 class MaterialSingleTypeExamineResultViewSet(ModelViewSet):
     queryset = MaterialSingleTypeExamineResult.objects.all()
-    serializer_class = MaterialSingleTypeExamineResultSerializer
+    serializer_class = MaterialSingleTypeExamineResultMainSerializer
+
+@method_decorator([api_recorder], name="dispatch")
+class ExamineMaterialViewSet(viewsets.ModelViewSet):
+    queryset = ExamineMaterial.objects \
+        .prefetch_related(Prefetch('examine_results',
+                                   queryset=MaterialExamineResult.objects.order_by('-examine_date', '-create_time'))) \
+        .distinct().order_by('-create_time')
+    serializer_class = ExamineMaterialSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ExamineMaterialFilter
+

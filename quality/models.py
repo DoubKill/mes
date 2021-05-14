@@ -608,7 +608,7 @@ class UnqualifiedMaterialProcessMode(models.Model):
 
 class MaterialExamineResult(models.Model):
     """检测结果"""
-    material = models.ForeignKey('ExamineMaterial', on_delete=models.PROTECT)
+    material = models.ForeignKey('ExamineMaterial', related_name='examine_results', on_delete=models.PROTECT)
     examine_date = models.DateField('检测日期', null=True, blank=True)
     transport_date = models.DateField('收货日期', null=True, blank=True)
     examine_types = models.ManyToManyField('MaterialExamineType', through=MaterialSingleTypeExamineResult)
@@ -622,6 +622,10 @@ class MaterialExamineResult(models.Model):
     class Meta:
         db_table = 'material_examine_result'
         verbose_name_plural = verbose_name = '检测结果'
+
+    def newest_qualified(self):
+        result = self.material.examine_results.order_by('-examine_date', '-create_time')[0]
+        return result.qualified if result else None
 
 
 class ExamineMaterial(models.Model):
