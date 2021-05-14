@@ -22,8 +22,9 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, \
     UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
     MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
-    UnqualifiedMaterialDealResult, ExamineMaterial, MaterialExamineResult, MaterialSingleTypeExamineResult, \
-    MaterialExamineType, UnqualifiedMaterialDealResult, MaterialExamineEquipmentType, MaterialExamineEquipment, MaterialExamineType, \
+    ExamineMaterial, MaterialExamineResult, MaterialSingleTypeExamineResult, \
+    UnqualifiedMaterialDealResult, MaterialExamineEquipmentType, MaterialExamineEquipment, \
+    MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit
 from recipe.models import MaterialAttribute
 
@@ -389,7 +390,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['residual_weight'] = None  # 余量
         ret['actual_weight'] = pallet_data.actual_weight  # 收皮重量
         ret['operation_user'] = pallet_data.operation_user  # 操作员
-        ret['actual_trains'] = '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
+        ret['actual_trains'] = '/'.join(
+            [str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
         ret['classes_group'] = test_order_data.production_class + '/' + test_order_data.production_group  # 班次班组
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
@@ -978,7 +980,7 @@ class TestIndicatorRawSerializer(BaseModelSerializer):
 
 class TestMethodRawSerializer(BaseModelSerializer):
     name = serializers.CharField(help_text='试验方法名称', validators=[UniqueValidator(queryset=TestMethodRaw.objects.all(),
-                                                                                     message='该试验方法名称已存在！')])
+                                                                                 message='该试验方法名称已存在！')])
     test_type_name = serializers.CharField(source='test_type.name', read_only=True)
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
@@ -1069,7 +1071,6 @@ class LevelResultRawSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultRawSerializer(BaseModelSerializer):
-
     class Meta:
         model = MaterialTestResultRaw
         fields = ('value', 'data_point', 'test_method')
@@ -1143,7 +1144,7 @@ class MaterialTestOrderRawSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestOrderRaw
-        exclude = ('is_qualified', )
+        exclude = ('is_qualified',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -1227,8 +1228,9 @@ class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer)
 
 
 """新原材料快检"""
-class MaterialExamineEquipmentTypeSerializer(serializers.ModelSerializer):
 
+
+class MaterialExamineEquipmentTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialExamineEquipmentType
         fields = '__all__'
@@ -1241,14 +1243,17 @@ class MaterialExamineEquipmentSerializer(serializers.ModelSerializer):
         model = MaterialExamineEquipment
         fields = '__all__'
 
+
 class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialExamineRatingStandard
         fields = '__all__'
 
+
 class MaterialExamineTypeSerializer(serializers.ModelSerializer):
     unit_name = serializers.CharField(source='unit.name', read_only=True)
     standards = MaterialExamineRatingStandardSerializer(MaterialExamineRatingStandard.objects.all(), many=True)
+
     class Meta:
         model = MaterialExamineType
         fields = '__all__'
@@ -1307,4 +1312,5 @@ class ExamineMaterialSerializer(serializers.ModelSerializer):
                   ]
 
     def get_examine_types(self, obj):
-        return MaterialExamineType.objects.filter(materialsingletypeexamineresult__material_examine_result__material=obj).values_list('name', flat=True)
+        return MaterialExamineType.objects.filter(
+            materialsingletypeexamineresult__material_examine_result__material=obj).values_list('name', flat=True)

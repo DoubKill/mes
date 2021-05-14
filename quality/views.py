@@ -55,7 +55,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     TestTypeRawSerializer, MaterialTestOrderRawSerializer, MaterialTestResultRawListSerializer, \
     MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer, \
     UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer, \
-    ExamineMaterialSerializer
+    ExamineMaterialSerializer, MaterialExamineTypeSerializer, MaterialExamineRatingStandardSerializer, \
+    ExamineValueUnitSerializer, MaterialExamineEquipmentTypeSerializer, MaterialExamineEquipmentSerializer
 from django.db.models import Q, Prefetch
 
 from django.db.models import Q
