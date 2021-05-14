@@ -88,6 +88,8 @@ router.register('material-unit', ExamineValueUnitViewSet)
 
 
 
+router.register('examine-material', ExamineMaterialViewSet)
+
 urlpatterns = [
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表
     path('test-indicator-data-points/', TestIndicatorDataPointListView.as_view()),  # 获取试验指标下所有的数据点
