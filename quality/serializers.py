@@ -1251,8 +1251,16 @@ class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
 
 
 class MaterialExamineTypeSerializer(serializers.ModelSerializer):
-    unit_name = serializers.CharField(source='unit.name', read_only=True)
+    unit_name = serializers.CharField(source='unit.name', required=False)
     standards = MaterialExamineRatingStandardSerializer(MaterialExamineRatingStandard.objects.all(), many=True)
+
+    @atomic()
+    def create(self, validated_data):
+        unit_name = validated_data.pop("unit_name")
+        if unit_name:
+            unit = ExamineValueUnit.objects.create(name=unit_name)
+            validated_data["unit"] = unit
+        return super().create(validated_data)
 
     class Meta:
         model = MaterialExamineType
@@ -1267,8 +1275,8 @@ class ExamineValueUnitSerializer(serializers.ModelSerializer):
 
 
 class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer):
-    examine_name = serializers.CharField(source="type.name")
-    equip_name = serializers.CharField(source="equipment.name")
+    examine_name = serializers.CharField(source="type.name", read_only=True)
+    equip_name = serializers.CharField(source="equipment.name", read_only=True)
 
     class Meta:
         model = MaterialSingleTypeExamineResult
@@ -1280,7 +1288,7 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
     sampler_name = serializers.CharField(source='sampling_user.username', read_only=True)
     single_examine_results = MaterialSingleTypeExamineResultMainSerializer(MaterialSingleTypeExamineResult.objects.all(),
                                                                        many=True, allow_null=True)
-
+    @atomic()
     def create(self, validated_data):
         node_data = validated_data.pop('single_examine_results', None)
         instance = super().create(validated_data)
