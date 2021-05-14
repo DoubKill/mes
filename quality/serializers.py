@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -14,17 +15,13 @@ from inventory.models import DeliveryPlan, DeliveryPlanStatus
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
-from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
-    TestIndicator, LabelPrint, UnqualifiedDealOrder, \
-    UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
-    MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
-    ExamineMaterial, MaterialExamineResult, MaterialSingleTypeExamineResult, \
-    UnqualifiedMaterialDealResult, MaterialExamineType, \
-    MaterialExamineRatingStandard, ExamineValueUnit
+    TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
+    MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
+    MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError
 from recipe.models import MaterialAttribute
 
 
@@ -88,6 +85,33 @@ class DataPointSerializer(BaseModelSerializer):
                 message="已存在相同数据点，请修改后重试！"
             )
         ]
+
+
+class DataPointStandardErrorSerializer(BaseModelSerializer):
+    value = serializers.CharField(write_only=True, help_text='范围，如（0， 5）', required=True)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['value'] = '[{},{}]'.format(ret['lower_value'], ret['upper_value'])
+        return ret
+
+    def validate(self, attrs):
+        value = attrs.pop('value', "")
+        ret = re.match(r"[（|(|\[]([\-|\+]?\d+(\.\d+)?)[,|，]([\-|\+]?\d+(\.\d+)?)[)|）|\]]", value)
+        if not ret:
+            raise serializers.ValidationError('指标范围值错误')
+        lower_value = float(ret.group(1))
+        upper_value = float(ret.group(3))
+        if lower_value > upper_value:
+            raise serializers.ValidationError('开始值不得大于结束值！')
+        attrs['lower_value'] = lower_value
+        attrs['upper_value'] = upper_value
+        return attrs
+
+    class Meta:
+        model = DataPointStandardError
+        fields = ('id', 'data_point', 'tracking_card', 'label', 'value', 'lower_value', 'upper_value')
+        read_only_fields = ('lower_value', 'upper_value')
 
 
 class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
@@ -426,15 +450,27 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
             test_results = MaterialTestResult.objects.filter(id__in=max_result_ids)
             for test_result in test_results:
+                if test_result.level == 1:
+                    result = '合格'
+                elif test_result.is_passed:
+                    result = 'pass'
+                else:
+                    result = '不合格'
+                if test_order.is_qualified:
+                    status = '1:一等品'
+                elif test_order.is_passed:
+                    status = 'PASS'
+                else:
+                    status = '3:三等品'
                 ret[test_order.actual_trains].append(
                     {
                         'add_subtract': '',
                         'data_point_name': test_result.data_point_name,
                         'max_test_times': test_result.test_times,
-                        'result': '一等品' if test_result.level == 1 else '三等品',
+                        'result': result,
                         'test_indicator_name': test_result.test_indicator_name,
                         'value': test_result.value,
-                        'status': '1:一等品' if test_order.is_qualified else '3:三等品'
+                        'status': status
                     }
                 )
                 test_indicator_name = test_result.test_indicator_name
@@ -958,274 +994,6 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         fields = "__all__"
 
 
-"""
-    原料检测序列化器
-"""
-
-
-class TestIndicatorRawSerializer(BaseModelSerializer):
-    name = serializers.CharField(help_text='指标名称',
-                                 validators=[UniqueValidator(queryset=TestIndicatorRaw.objects.all(),
-                                                             message='该指标名称已存在！')])
-
-    def create(self, validated_data):
-        validated_data['no'] = uuid.uuid1()
-        return super().create(validated_data)
-
-    class Meta:
-        model = TestIndicatorRaw
-        fields = ('name',)
-
-
-class TestMethodRawSerializer(BaseModelSerializer):
-    name = serializers.CharField(help_text='试验方法名称', validators=[UniqueValidator(queryset=TestMethodRaw.objects.all(),
-                                                                                 message='该试验方法名称已存在！')])
-    test_type_name = serializers.CharField(source='test_type.name', read_only=True)
-    test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
-
-    def create(self, validated_data):
-        validated_data['no'] = uuid.uuid1()
-        return super().create(validated_data)
-
-    class Meta:
-        model = TestMethodRaw
-        fields = ('id', 'name', 'test_type', 'test_type_name', 'test_indicator_name')
-
-
-class TestTypeRawSerializer(BaseModelSerializer):
-    name = serializers.CharField(help_text='试验类型名称', validators=[UniqueValidator(queryset=TestTypeRaw.objects.all(),
-                                                                                 message='该试验类型名称已存在！')])
-    test_indicator_name = serializers.CharField(source='test_indicator.name', read_only=True)
-
-    def create(self, validated_data):
-        validated_data['no'] = uuid.uuid1()
-        return super().create(validated_data)
-
-    class Meta:
-        model = TestTypeRaw
-        fields = ('id', 'name', 'test_indicator', 'test_indicator_name')
-
-
-class DataPointRawSerializer(BaseModelSerializer):
-    test_type_name = serializers.CharField(source='test_type.name', read_only=True)
-    test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
-
-    def create(self, validated_data):
-        validated_data['no'] = uuid.uuid1()
-        return super().create(validated_data)
-
-    class Meta:
-        model = DataPointRaw
-        fields = ('id', 'name', 'unit', 'test_type', 'test_type_name', 'test_indicator_name')
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.all(),
-                fields=('name', 'test_type'),
-                message="已存在相同数据点，请修改后重试！"
-            )
-        ]
-
-
-class MaterialDataPointIndicatorRawSerializer(BaseModelSerializer):
-    level = serializers.IntegerField(help_text='等级', min_value=0)
-    last_updated_username = serializers.CharField(source='last_updated_user.username', read_only=True, default=None)
-
-    class Meta:
-        model = MaterialDataPointIndicatorRaw
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class MaterialTestMethodRawSerializer(BaseModelSerializer):
-    data_points = serializers.SerializerMethodField(read_only=True)
-    material_no = serializers.CharField(source='material.material_no', read_only=True)
-    test_method_name = serializers.CharField(source='test_method.name', read_only=True)
-    test_type_name = serializers.CharField(source='test_method.test_type.name', read_only=True)
-    test_indicator_name = serializers.CharField(source='test_method.test_type.test_indicator.name', read_only=True)
-
-    @staticmethod
-    def get_data_points(obj):
-        return obj.data_point.values('id', 'name')
-
-    class Meta:
-        model = MaterialTestMethodRaw
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.all(),
-                fields=('material', 'test_method'),
-                message="该原材料已存在相同的试验方法，请修改后重试！"
-            )
-        ]
-
-
-class LevelResultRawSerializer(BaseModelSerializer):
-    """等级和结果"""
-
-    class Meta:
-        model = LevelResultRaw
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class MaterialTestResultRawSerializer(BaseModelSerializer):
-    class Meta:
-        model = MaterialTestResultRaw
-        fields = ('value', 'data_point', 'test_method')
-        extra_kwargs = {'value': {'required': False, 'allow_null': True}}
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class MaterialTestOrderRawSerializer(BaseModelSerializer):
-    order_results_raw = MaterialTestResultRawSerializer(many=True, required=True, help_text="""
-    [{"value": 111, "data_point": "数据点id"， "test_method": "试验方法id"}]
-    """)
-
-    @atomic()
-    def create(self, validated_data):
-        order_results = validated_data.pop('order_results_raw', None)
-        test_order = MaterialTestOrderRaw.objects.filter(lot_no=validated_data['lot_no'],
-                                                         material=validated_data['material']).first()
-        if test_order:
-            instance = test_order
-            created = False
-        else:
-            instance = super().create(validated_data)
-            created = True
-
-        material = validated_data['material']
-        for item in order_results:
-            if not item.get('value'):
-                continue
-            item['material_test_order'] = instance
-            if created:
-                item['test_times'] = 1
-            else:
-                last_test_result = MaterialTestResultRaw.objects.filter(
-                    material_test_order=instance,
-                    data_point=item['data_point'],
-                ).order_by('-test_times').first()
-                if last_test_result:
-                    item['test_times'] = last_test_result.test_times + 1
-                else:
-                    item['test_times'] = 1
-            material_test_method = MaterialTestMethodRaw.objects.filter(
-                material=material,
-                test_method=item['test_method']).first()
-            if material_test_method:
-                indicator = MaterialDataPointIndicatorRaw.objects.filter(
-                    material_test_method=material_test_method,
-                    data_point=item['data_point'],
-                    upper_limit__gte=item['value'],
-                    lower_limit__lte=item['value']).first()
-                if indicator:
-                    item['result'] = indicator.result
-                    item['data_point_indicator'] = indicator
-                    item['level'] = indicator.level
-                else:
-                    item['result'] = '三等品'
-                    item['level'] = 2
-            else:
-                item['result'] = '三等品'
-                item['level'] = 2
-            MaterialTestResultRaw.objects.create(**item)
-
-        max_result_ids = list(instance.order_results_raw.values(
-            'test_method', 'data_point').annotate(max_id=Max('id')).values_list('max_id', flat=True))
-        if max_result_ids:
-            if MaterialTestResultRaw.objects.filter(id__in=max_result_ids, level__gt=1).exists():
-                instance.is_qualified = False
-            else:
-                instance.is_qualified = True
-            instance.save()
-        return instance
-
-    class Meta:
-        model = MaterialTestOrderRaw
-        exclude = ('is_qualified',)
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class MaterialTestResultRawListSerializer(BaseModelSerializer):
-    upper_lower = serializers.SerializerMethodField(read_only=True)
-
-    def get_upper_lower(self, instance):
-        mdp_obj = MaterialDataPointIndicatorRaw.objects.filter(
-            material_test_method__material=instance.material_test_order.material,
-            material_test_method__test_method=instance.test_method,
-            data_point=instance.data_point,
-            level=1).first()
-        if not mdp_obj:
-            return None
-        else:
-            return "{}-{}".format(mdp_obj.lower_limit, mdp_obj.upper_limit)
-
-    class Meta:
-        model = MaterialTestResultRaw
-        fields = '__all__'
-
-
-class MaterialTestOrderRawListSerializer(BaseModelSerializer):
-    order_results_raw = MaterialTestResultRawListSerializer(many=True)
-    material_no = serializers.ReadOnlyField(source='material.material_no')
-    material_name = serializers.ReadOnlyField(source='material.material_name')
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        order_results = data['order_results_raw']
-        ret = {}
-        for item in order_results:
-            indicator = TestMethodRaw.objects.get(id=item['test_method']).test_type.test_indicator.name
-            data_point = DataPointRaw.objects.get(id=item['data_point']).name
-            if indicator not in ret:
-                ret[indicator] = {}
-                ret[indicator][data_point] = item
-            else:
-                if data_point not in ret[indicator]:
-                    ret[indicator][data_point] = item
-                else:
-                    if ret[indicator][data_point]['test_times'] < item['test_times']:
-                        ret[indicator][data_point] = item
-        data['order_results_raw'] = ret
-        return data
-
-    class Meta:
-        model = MaterialTestOrderRaw
-        fields = '__all__'
-
-
-class MaterialTestOrderRawUpdateSerializer(BaseModelSerializer):
-    class Meta:
-        model = MaterialTestOrderRaw
-        fields = '__all__'
-
-
-class UnqualifiedMaterialDealResultListSerializer(serializers.ModelSerializer):
-    material_test_order_raw = MaterialTestOrderRawListSerializer()
-    deal_username = serializers.ReadOnlyField(source='deal_user.username', default='')
-    confirm_username = serializers.ReadOnlyField(source='confirm_user.username', default='')
-
-    class Meta:
-        model = UnqualifiedMaterialDealResult
-        fields = '__all__'
-
-
-class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer):
-    def update(self, instance, validated_data):
-        status = validated_data.get('status')
-        if status:
-            if status == 2:
-                validated_data['deal_user'] = self.context['request'].user
-            if status == 3:
-                validated_data['confirm_user'] = self.context['request'].user
-        return super(UnqualifiedMaterialDealResultUpdateSerializer, self).update(instance, validated_data)
-
-    class Meta:
-        model = UnqualifiedMaterialDealResult
-        fields = ('status', 'release_result', 'unqualified_result', 'is_delivery')
-
-
 """新原材料快检"""
 
 
@@ -1241,7 +1009,6 @@ class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer)
 #     class Meta:
 #         model = MaterialExamineEquipment
 #         fields = '__all__'
-
 
 
 class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):

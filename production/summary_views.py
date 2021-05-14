@@ -529,12 +529,12 @@ class IndexOverview(APIView):
         except Exception:
             raise
 
-        ret['plan_data'] = plan_data
-        ret['actual_data'] = actual_data
+        ret['plan_data'] = {key: round(value, 2) if value else 0 for key, value in plan_data.items()}
+        ret['actual_data'] = {key: round(value, 2) if value else 0 for key, value in actual_data.items()}
         ret['qualified_rate'] = '{}%'.format(qualified_rate)
-        ret['outbound_data'] = outbound_data
-        ret['dispatch_data'] = dispatch_data
-        ret['inbound_data'] = inbound_data
+        ret['outbound_data'] = {key: round(value, 2) if value else 0 for key, value in outbound_data.items()}
+        ret['dispatch_data'] = {key: round(value, 2) if value else 0 for key, value in dispatch_data.items()}
+        ret['inbound_data'] = {key: round(value, 2) if value else 0 for key, value in inbound_data.items()}
         return Response(ret)
 
 
@@ -736,7 +736,8 @@ class IndexEquipProductionAnalyze(IndexOverview):
             if equip_no in actual_data_dict:
                 plan_actual_data[equip_no]['actual_trains'] = actual_data_dict[equip_no]['actual_trains']
             plan_actual_data[equip_no]['diff_trains'] = plan_actual_data[equip_no]['plan_trains'] - \
-                                                        plan_actual_data[equip_no]['actual_trains']
+                                                        plan_actual_data[equip_no]['actual_trains'] if \
+                plan_actual_data[equip_no]['plan_trains'] > plan_actual_data[equip_no]['actual_trains'] else 0
         return Response({'plan_actual_data': plan_actual_data,
                          'equip_data': equip_data})
 
