@@ -22,7 +22,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, \
     UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
     MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
-    UnqualifiedMaterialDealResult
+    UnqualifiedMaterialDealResult, ExamineMaterial, MaterialExamineResult, MaterialSingleTypeExamineResult, \
+    MaterialExamineType
 from recipe.models import MaterialAttribute
 
 
@@ -387,7 +388,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['residual_weight'] = None  # 余量
         ret['actual_weight'] = pallet_data.actual_weight  # 收皮重量
         ret['operation_user'] = pallet_data.operation_user  # 操作员
-        ret['actual_trains'] = '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
+        ret['actual_trains'] = '/'.join(
+            [str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
         ret['classes_group'] = test_order_data.production_class + '/' + test_order_data.production_group  # 班次班组
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
@@ -976,7 +978,7 @@ class TestIndicatorRawSerializer(BaseModelSerializer):
 
 class TestMethodRawSerializer(BaseModelSerializer):
     name = serializers.CharField(help_text='试验方法名称', validators=[UniqueValidator(queryset=TestMethodRaw.objects.all(),
-                                                                                     message='该试验方法名称已存在！')])
+                                                                                 message='该试验方法名称已存在！')])
     test_type_name = serializers.CharField(source='test_type.name', read_only=True)
     test_indicator_name = serializers.CharField(source='test_type.test_indicator.name', read_only=True)
 
@@ -1067,7 +1069,6 @@ class LevelResultRawSerializer(BaseModelSerializer):
 
 
 class MaterialTestResultRawSerializer(BaseModelSerializer):
-
     class Meta:
         model = MaterialTestResultRaw
         fields = ('value', 'data_point', 'test_method')
@@ -1141,7 +1142,7 @@ class MaterialTestOrderRawSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestOrderRaw
-        exclude = ('is_qualified', )
+        exclude = ('is_qualified',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -1194,7 +1195,6 @@ class MaterialTestOrderRawListSerializer(BaseModelSerializer):
 
 
 class MaterialTestOrderRawUpdateSerializer(BaseModelSerializer):
-
     class Meta:
         model = MaterialTestOrderRaw
         fields = '__all__'
@@ -1223,3 +1223,52 @@ class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer)
     class Meta:
         model = UnqualifiedMaterialDealResult
         fields = ('status', 'release_result', 'unqualified_result', 'is_delivery')
+
+
+class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
+    type_name = serializers.ReadOnlyField(source='type.name')
+
+    class Meta:
+        model = MaterialSingleTypeExamineResult
+        fields = ['type_name', 'value']
+
+
+class MaterialExamineResultSerializer(serializers.ModelSerializer):
+    sampling_user = serializers.ReadOnlyField(source='sampling_user.username')
+    recorder = serializers.ReadOnlyField(source='recorder.username')
+    examine_results = MaterialSingleTypeExamineResultSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = MaterialExamineResult
+        fields = ['examine_date',
+                  'transport_date',
+                  'sampling_user',
+                  'recorder',
+                  'qualified',
+                  're_examine',
+                  'qualified',
+                  'newest_qualified',
+                  'create_time',
+                  'update_time',
+                  'examine_results']
+
+
+class ExamineMaterialSerializer(serializers.ModelSerializer):
+    supplier = serializers.ReadOnlyField(source='supplier.name')
+    examine_results = MaterialExamineResultSerializer(many=True, read_only=True)
+    examine_types = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExamineMaterial
+        fields = ['name',
+                  'sample_name',
+                  'batch',
+                  'supplier',
+                  'qualified',
+                  'create_time',
+                  'examine_results',
+                  'examine_types'
+                  ]
+
+    def get_examine_types(self, obj):
+        return MaterialExamineType.objects.filter(materialsingletypeexamineresult__material_examine_result__material=obj).values_list('name', flat=True)
