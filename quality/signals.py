@@ -4,13 +4,15 @@ auther:
 datetime: 2020/9/29
 name:
 """
+import traceback
+
 from django.db.models import Max
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from production.models import PalletFeedbacks
-from quality.models import MaterialTestResult, MaterialTestOrderRaw, UnqualifiedMaterialDealResult, \
-    MaterialTestResultRaw, MaterialDataPointIndicatorRaw, MaterialTestMethodRaw, MaterialTestOrder, MaterialDealResult
+from quality.models import MaterialTestResult, MaterialTestOrder, MaterialDealResult, \
+    MaterialDataPointIndicator, DataPointStandardError
 import logging
 
 logger = logging.getLogger('send_log')
@@ -29,10 +31,56 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 'test_indicator_name', 'test_method_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
             if max_result_ids:
-                if MaterialTestResult.objects.filter(id__in=max_result_ids, level__gt=1).exists():
+                test_results = MaterialTestResult.objects.filter(id__in=max_result_ids)
+                if test_results.filter(level__gt=1).exists():
                     material_test_order.is_qualified = False
                 else:
                     material_test_order.is_qualified = True
+
+                # 判断该车次检测信息是否为pass(只需判断不合格数据点数量为1，且在pass范围内)
+                if test_results.filter(level__gt=1).count() == 1:
+                    test_result = test_results.filter(level__gt=1).first()
+                    data_point_name = test_result.data_point_name
+                    value = test_result.value
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        data_point__name=data_point_name,
+                        material_test_method__material__material_name=material_test_order.product_no,
+                        level=1).first()
+                    if indicator:
+                        # 误差范围都大于0
+                        e1 = DataPointStandardError.objects.filter(
+                            lower_value__gte=0, upper_value__gte=0
+                        ).filter(lower_value__lte=value-indicator.upper_limit,
+                                 upper_value__gte=value-indicator.upper_limit).first()
+                        # 误差范围都小于0
+                        e2 = DataPointStandardError.objects.filter(
+                            lower_value__lte=0, upper_value__lte=0
+                        ).filter(lower_value__lte=value-indicator.lower_limit,
+                                 upper_value__gte=value-indicator.lower_limit).first()
+                        # 误差范围开始值小于0，结束值大于0
+                        e3 = DataPointStandardError.objects.filter(
+                            lower_value__lte=0, upper_value__gte=0
+                        ).filter(lower_value__lte=value - indicator.lower_limit,
+                                 upper_value__gte=value - indicator.upper_limit).first()
+                        if e1:
+                            material_test_order.is_passed = True
+                            material_test_order.pass_suggestion = e1.label
+                        elif e2:
+                            material_test_order.is_passed = True
+                            material_test_order.pass_suggestion = e2.label
+                        elif e3:
+                            material_test_order.is_passed = True
+                            material_test_order.pass_suggestion = e3.label
+                        if e1 or e2 or e3:
+                            test_results.filter(level__gt=1).update(is_passed=True)
+                        else:
+                            test_results.filter(level__gt=1).update(is_passed=False)
+                            material_test_order.is_passed = False
+                            material_test_order.pass_suggestion = None
+                else:
+                    material_test_order.is_passed = False
+                    material_test_order.pass_suggestion = None
+                    test_results.filter(level__gt=1).update(is_passed=False)
                 material_test_order.save()
 
             lot_no = material_test_order.lot_no
@@ -53,7 +101,16 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
             # 判断托盘反馈车次都存在检测数据
             if not len(actual_trains_set) == len(test_trains_set) == len(common_trains_set):
                 return
-            level = 3 if test_orders.filter(is_qualified=False).exists() else 1
+            # level = 3 if test_orders.filter(is_qualified=False).exists() else 1
+            if not test_orders.filter(is_qualified=False).exists():
+                level = 1
+                deal_suggestion = '合格'
+            elif test_orders.filter(is_passed=True).count() == test_orders.filter(is_qualified=False).count() == 1:
+                level = 1
+                deal_suggestion = test_orders.filter(is_passed=True).first().pass_suggestion
+            else:
+                level = 3
+                deal_suggestion = '不合格'
             deal_result_dict = {
                 'level': level,
                 'test_result': '合格' if level == 1 else '不合格',
@@ -61,7 +118,7 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 'status': '待处理',
                 'deal_result': '一等品' if level == 1 else '三等品',
                 'production_factory_date': pfb_obj.end_time,
-                'deal_suggestion': '合格' if level == 1 else '不合格'
+                'deal_suggestion': deal_suggestion
             }
             instance = MaterialDealResult.objects.filter(lot_no=lot_no)
             if instance:
@@ -71,44 +128,4 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 deal_result_dict['lot_no'] = lot_no
                 MaterialDealResult.objects.create(**deal_result_dict)
     except Exception as e:
-        logger.error(e)
-
-
-@receiver(post_save, sender=MaterialTestOrderRaw)
-def material_rest_order_raw_post_save(sender, instance=None,
-                                      created=False, update_fields=None, **kwargs):
-    if not instance.is_qualified:
-        max_result_ids = list(instance.order_results_raw.values(
-            'test_method', 'data_point').annotate(max_id=Max('id')).values_list('max_id', flat=True))
-        reason = ''
-        for result in MaterialTestResultRaw.objects.filter(id__in=max_result_ids, level__gt=1):
-            material_test_method = MaterialTestMethodRaw.objects.filter(
-                material=instance.material,
-                test_method=result.test_method).first()
-            if material_test_method:
-                indicator = MaterialDataPointIndicatorRaw.objects.filter(
-                    material_test_method=material_test_method,
-                    data_point=result.data_point,
-                    level=1
-                ).first()
-            else:
-                indicator = None
-            if not indicator:
-                reason += '{}缺少评判标准；'.format(result.data_point.name)
-            elif result.value > indicator.upper_limit:
-                reason += '{}：{}+{}；'.format(result.data_point.name,
-                                              indicator.upper_limit,
-                                              result.value-indicator.upper_limit)
-            elif result.value < indicator.lower_limit:
-                reason += '{}：{}-{}；'.format(result.data_point.name,
-                                              indicator.lower_limit,
-                                              indicator.lower_limit-result.value)
-        if not hasattr(instance, 'deal_result'):
-            UnqualifiedMaterialDealResult.objects.create(
-                material_test_order_raw=instance,
-                unqualified_reason=reason)
-        else:
-            UnqualifiedMaterialDealResult.objects.filter(
-                material_test_order_raw=instance).update(unqualified_reason=reason)
-    else:
-        UnqualifiedMaterialDealResult.objects.filter(material_test_order_raw=instance).delete()
+        logger.error(traceback.format_exc())
