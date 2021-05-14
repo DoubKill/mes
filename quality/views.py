@@ -8,7 +8,7 @@ from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
@@ -34,12 +34,12 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, DataPointRawFilter, \
     TestMethodRawFilter, MaterialTestMethodRawFilter, MaterialDataPointIndicatorRawFilter, MaterialTestOrderRawFilter, \
-    UnqualifiedMaterialDealResultFilter
+    UnqualifiedMaterialDealResultFilter, ExamineMaterialFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     TestTypeRaw, TestIndicatorRaw, DataPointRaw, TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, \
-    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult
+    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult, ExamineMaterial, MaterialExamineResult
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
@@ -51,8 +51,9 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestMethodRawSerializer, MaterialDataPointIndicatorRawSerializer, LevelResultRawSerializer, \
     TestTypeRawSerializer, MaterialTestOrderRawSerializer, MaterialTestResultRawListSerializer, \
     MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer, \
-    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer
-from django.db.models import Q
+    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer, \
+    ExamineMaterialSerializer
+from django.db.models import Q, Prefetch
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching
 import logging
@@ -1564,3 +1565,15 @@ class UnqualifiedMaterialDealResultViewSet(mixins.ListModelMixin,
             return UnqualifiedMaterialDealResultListSerializer
         else:
             return UnqualifiedMaterialDealResultUpdateSerializer
+
+
+class ExamineMaterialViewSet(viewsets.ModelViewSet):
+    queryset = ExamineMaterial.objects \
+        .prefetch_related(Prefetch('examine_results',
+                                   queryset=MaterialExamineResult.objects.order_by('-examine_date', '-create_time'))) \
+        .distinct().order_by('-create_time')
+    serializer_class = ExamineMaterialSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ExamineMaterialFilter
+
