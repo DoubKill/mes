@@ -72,7 +72,21 @@ router.register('batch-product-no-month-statistics', BatchProductNoMonthStatisti
 # 不合格处置单
 router.register('unqualified-deal-orders', UnqualifiedDealOrderViewSet)
 # 快检信息综合管里详情
-router.register('pallet-feed-test', PalletFeedbacksTestListView),
+router.register('pallet-feed-test', PalletFeedbacksTestListView)
+
+"""# 原材料新"""
+# 原材料检测设备
+router.register('material-equipment', MaterialExamineEquipmentViewSet)
+# 原材料检测设备类型
+router.register('material-equipment-type', MaterialExamineEquipmentTypeViewSet)
+# 原材料检测类型
+router.register('material-examine-type', MaterialExamineTypeViewSet)
+# 原材料评级标准
+router.register('material-rate-standard', MaterialExamineRatingStandardViewSet)
+# 原材料指标单位管理
+router.register('material-unit', ExamineValueUnitViewSet)
+
+
 
 router.register('examine-material', ExamineMaterialViewSet)
 
@@ -95,4 +109,6 @@ urlpatterns = [
     path('material-inventory/', MaterialInventoryView.as_view()),  # 原料入库信息
     path('test-indicator-data-points-raw/', TestIndicatorDataPointRawListView.as_view()),
     path('', include(router.urls)),
+    path('deal-mathod-history/', DealMethodHistoryView.as_view()),
+    path('datapoint-curve/', TestDataPointCurveView.as_view())
 ]

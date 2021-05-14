@@ -3,7 +3,7 @@ import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, DataPointRaw, \
     TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, MaterialTestOrderRaw, \
-    UnqualifiedMaterialDealResult, ExamineMaterial
+    UnqualifiedMaterialDealResult, ExamineMaterial, MaterialExamineEquipment, MaterialExamineType
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -24,7 +24,8 @@ class DataPointFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
-    day_time = django_filters.DateTimeFilter(field_name="production_factory_date", help_text='工厂日期')
+    st = django_filters.DateFilter(field_name="production_factory_date", help_text='开始工厂日期', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name="production_factory_date", help_text='结束工厂日期', lookup_expr='lte')
     equip_no = django_filters.CharFilter(field_name='production_equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='产出胶料编号')
     classes = django_filters.CharFilter(field_name="production_class", help_text='班次')
@@ -32,7 +33,7 @@ class MaterialTestOrderFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = MaterialTestOrder
-        fields = ('day_time', 'equip_no', 'product_no', "classes", 'stage', 'is_qualified')
+        fields = ('st', 'et', 'equip_no', 'product_no', "classes", 'stage', 'is_qualified')
 
 
 class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):
@@ -155,6 +156,24 @@ class UnqualifiedMaterialDealResultFilter(django_filters.rest_framework.FilterSe
     class Meta:
         model = UnqualifiedMaterialDealResult
         fields = ('storage_date', 'lot_no', 'material_no', 'material_name')
+
+"""新原材料快检"""
+class MaterialExamineEquipmentFilter(django_filters.rest_framework.FilterSet):
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+    type_name = django_filters.CharFilter(field_name='type__name')
+
+    class Meta:
+        model = MaterialExamineEquipment
+        fields = ('name', 'type_name')
+
+
+class MaterialExamineTypeFilter(django_filters.rest_framework.FilterSet):
+    compare = django_filters.ChoiceFilter(field_name='interval_type', choices=MaterialExamineType.INTERVAL_TYPES)
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+
+    class Meta:
+        model = MaterialExamineType
+        fields = ('compare', 'name')
 
 
 class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):

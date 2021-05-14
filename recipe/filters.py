@@ -1,6 +1,6 @@
 import django_filters
 
-from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute
+from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, ZCMaterial
 
 
 class MaterialFilter(django_filters.rest_framework.FilterSet):
@@ -50,12 +50,11 @@ class MaterialAttributeFilter(django_filters.rest_framework.FilterSet):
         fields = ('material_no', 'material_type')
 
 
-# class WeighBatchingFilter(django_filters.rest_framework.FilterSet):
-#     used_type = django_filters.CharFilter(field_name='used_type')
-#     stage_id = django_filters.CharFilter(field_name='product_batching__stage_id')
-#     stage_product_batch_no = django_filters.CharFilter(field_name='product_batching__stage_product_batch_no', lookup_expr='icontains')
-#     product_batching = django_filters.CharFilter(field_name='product_batching')
-#
-#     class Meta:
-#         model = WeighBatching
-#         fields = ('used_type', 'stage_id', 'stage_product_batch_no', 'product_batching')
+class ZCMaterialFilter(django_filters.rest_framework.FilterSet):
+    material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料编码', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', help_text='原材料名称', lookup_expr='icontains')
+    material_id = django_filters.CharFilter(field_name='material_id', help_text='mes物料id')
+
+    class Meta:
+        model = ZCMaterial
+        fields = ('material_no', 'material_name', 'material_id')
