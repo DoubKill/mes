@@ -162,12 +162,36 @@ class EquipCategoryAttributeSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="process.global_no", read_only=True)
     equip_type_name = serializers.CharField(source="equip_type.global_name", read_only=True)
     category_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
-        queryset=EquipCategoryAttribute.objects.all(), message='该设备属性编号已存在')])
+        queryset=EquipCategoryAttribute.objects.all(), message='该设备属性编号已存在')], required=False)
+
+    def create(self, validated_data):
+        equip_type = validated_data.get("equip_type")
+        if not equip_type:
+            validated_data["equip_type"] = GlobalCode.objects.get(global_name="快检设备")
+        process = validated_data.get("process")
+        if not process:
+            validated_data["process"] = GlobalCode.objects.get(global_name="快检")
+        if not validated_data.get("category_no"):
+            validated_data["category_no"] = validated_data["category_name"]
+        try:
+            instance = super().create(validated_data)
+        except:
+            raise serializers.ValidationError("category_no重复")
+        else:
+            return instance
 
     class Meta:
         model = EquipCategoryAttribute
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {
+                        'equip_type': {
+                            'required': False},
+                        'process': {
+                            'required': False},
+                        'category_no': {
+                            'required': False},
+                        }
 
 
 class EquipSerializer(BaseModelSerializer):
@@ -178,14 +202,23 @@ class EquipSerializer(BaseModelSerializer):
     equip_process_no = serializers.CharField(source="category.process.global_no", read_only=True)
     equip_type = serializers.CharField(source="category.equip_type.global_name", read_only=True)
     equip_level_name = serializers.CharField(source="equip_level.global_name", read_only=True)
-    equip_no = serializers.CharField(max_length=64,
+    equip_no = serializers.CharField(max_length=64, required=False,
                                      validators=[UniqueValidator(
                                          queryset=Equip.objects.all(), message='该设备编号已存在')])
+
+    def create(self, validated_data):
+        if not validated_data.get("equip_no"):
+            validated_data["equip_no"] = validated_data["equip_name"]
+        return super().create(validated_data)
 
     class Meta:
         model = Equip
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {
+            'equip_no': {
+                'required': False},
+        }
 
 
 class EquipCreateAndUpdateSerializer(BaseModelSerializer):

@@ -3,7 +3,7 @@ import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, DataPointRaw, \
     TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, MaterialTestOrderRaw, \
-    UnqualifiedMaterialDealResult, MaterialExamineEquipment, MaterialExamineType
+    UnqualifiedMaterialDealResult, MaterialExamineResult, MaterialExamineType
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -158,15 +158,15 @@ class UnqualifiedMaterialDealResultFilter(django_filters.rest_framework.FilterSe
         fields = ('storage_date', 'lot_no', 'material_no', 'material_name')
 
 """新原材料快检"""
-class MaterialExamineEquipmentFilter(django_filters.rest_framework.FilterSet):
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    type_name = django_filters.CharFilter(field_name='type__name')
-
-    class Meta:
-        model = MaterialExamineEquipment
-        fields = ('name', 'type_name')
-
-
+# class MaterialExamineEquipmentFilter(django_filters.rest_framework.FilterSet):
+#     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+#     type_name = django_filters.CharFilter(field_name='type__name')
+#
+#     class Meta:
+#         model = MaterialExamineEquipment
+#         fields = ('name', 'type_name')
+#
+#
 class MaterialExamineTypeFilter(django_filters.rest_framework.FilterSet):
     compare = django_filters.ChoiceFilter(field_name='interval_type', choices=MaterialExamineType.INTERVAL_TYPES)
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
@@ -174,3 +174,10 @@ class MaterialExamineTypeFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = MaterialExamineType
         fields = ('compare', 'name')
+
+
+class MaterialExamineResultFilter(django_filters.rest_framework.FilterSet):
+
+    class Meta:
+        model = MaterialExamineResult
+        fields = "__all__"
