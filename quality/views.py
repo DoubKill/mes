@@ -1442,7 +1442,7 @@ class MaterialExamineTypeViewSet(ModelViewSet):
         """资产导入模板"""
 
         filename = '原材料检测指标导入模板'
-        return get_template_response(self.titles, filename=filename, description=self.description)
+        return get_template_response(self.titles, filename=filename, description="比值类型填: 上下限, <=, >=, 外观确认")
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-data',
             url_name='import-data')

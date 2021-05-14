@@ -1017,22 +1017,60 @@ class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class MaterialExamineRatingStandardNodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MaterialExamineRatingStandard
+        exclude = ('examine_type',)
+        validators = [UniqueTogetherValidator(queryset=MaterialExamineRatingStandard.objects.filter(),
+                                              fields=('examine_type', 'level'), message='examine_type,level组合唯一冲突'), ]
+
+
 class MaterialExamineTypeSerializer(serializers.ModelSerializer):
-    unit_name = serializers.CharField(source='unit.name', required=False)
-    standards = MaterialExamineRatingStandardSerializer(MaterialExamineRatingStandard.objects.all(), many=True)
+    unit_name = serializers.CharField(source='unit.name', read_only=True)
+    standards = MaterialExamineRatingStandardNodeSerializer(MaterialExamineRatingStandard.objects.all(), many=True,
+                                                            required=False, allow_null=True, validators=[
+            UniqueTogetherValidator(queryset=MaterialExamineRatingStandard.objects.filter(),
+                                    fields=('examine_type', 'level'), message='examine_type,level组合唯一冲突'), ])
+    unitname = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     @atomic()
     def create(self, validated_data):
-        unit_name = validated_data.pop("unit_name")
+        unit_name = validated_data.pop("unitname", None)
+        standards = validated_data.pop("standards", None)
         if unit_name:
-            unit = ExamineValueUnit.objects.create(name=unit_name)
+            unit, flag = ExamineValueUnit.objects.update_or_create(name=unit_name)
             validated_data["unit"] = unit
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        if standards:
+            for x in standards:
+                x.update(examine_type=instance)
+            MaterialExamineRatingStandard.objects.bulk_create([MaterialExamineRatingStandard(**x) for x in standards])
+        return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        unit_name = validated_data.pop("unitname", None)
+        standards = validated_data.pop("standards", None)
+        if unit_name:
+            new_unit_name = instance.unit.name
+            if unit_name != new_unit_name:
+                unit, flag = ExamineValueUnit.objects.update_or_create(name=unit_name)
+                validated_data["unit"] = unit
+        instance.standards.all().delete()
+        if standards:
+            for x in standards:
+                x.update(examine_type=instance)
+            MaterialExamineRatingStandard.objects.bulk_create(
+                [MaterialExamineRatingStandard(**x) for x in standards])
+        return super().update(instance, validated_data)
 
     class Meta:
         model = MaterialExamineType
         fields = '__all__'
         # depth = 2
+        # validators = [UniqueTogetherValidator(queryset=MaterialExamineRatingStandard.objects.filter(),
+        #                                       fields=('examine_type', 'level'), message='该数据已存在'),
+        #               ]
 
 
 class ExamineValueUnitSerializer(serializers.ModelSerializer):
@@ -1053,20 +1091,25 @@ class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer)
 class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
     recorder_name = serializers.CharField(source='recorder.username', read_only=True)
     sampler_name = serializers.CharField(source='sampling_user.username', read_only=True)
-    single_examine_results = MaterialSingleTypeExamineResultMainSerializer(MaterialSingleTypeExamineResult.objects.all(),
-                                                                       many=True, allow_null=True)
+    single_examine_results = MaterialSingleTypeExamineResultMainSerializer(
+        MaterialSingleTypeExamineResult.objects.all(),
+        many=True, allow_null=True)
+
     @atomic()
     def create(self, validated_data):
         node_data = validated_data.pop('single_examine_results', None)
         instance = super().create(validated_data)
         if node_data:
+            for x in node_data:
+                x.update(material_examine_result=instance)
             MaterialSingleTypeExamineResult.objects.bulk_create(
-                [MaterialSingleTypeExamineResult(**x.update(material_examine_result=instance)) for x in node_data])
+                [MaterialSingleTypeExamineResult(**x) for x in node_data])
         return instance
 
     class Meta:
         model = MaterialExamineResult
         fields = '__all__'
+
 
 class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.name')
