@@ -85,6 +85,10 @@ router.register('material-examine-type', MaterialExamineTypeViewSet)
 router.register('material-rate-standard', MaterialExamineRatingStandardViewSet)
 # 原材料指标单位管理
 router.register('material-unit', ExamineValueUnitViewSet)
+# 原材料检测结果管理
+router.register('material-examine-result', MaterialExamineResultViewSet)
+# 原材料检测单指标结果管理
+router.register('material-examine-single-result', MaterialSingleTypeExamineResultViewSet)
 
 
 

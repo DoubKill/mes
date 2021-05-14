@@ -23,8 +23,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     UnqualifiedDealOrderDetail, BatchYear, TestTypeRaw, TestIndicatorRaw, TestMethodRaw, DataPointRaw, \
     MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, LevelResultRaw, MaterialTestResultRaw, MaterialTestOrderRaw, \
     ExamineMaterial, MaterialExamineResult, MaterialSingleTypeExamineResult, \
-    UnqualifiedMaterialDealResult, MaterialExamineEquipmentType, MaterialExamineEquipment, \
-    MaterialExamineType, \
+    UnqualifiedMaterialDealResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit
 from recipe.models import MaterialAttribute
 
@@ -1230,18 +1229,19 @@ class UnqualifiedMaterialDealResultUpdateSerializer(serializers.ModelSerializer)
 """新原材料快检"""
 
 
-class MaterialExamineEquipmentTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MaterialExamineEquipmentType
-        fields = '__all__'
+# class MaterialExamineEquipmentTypeSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = MaterialExamineEquipmentType
+#         fields = '__all__'
+#
+#
+# class MaterialExamineEquipmentSerializer(serializers.ModelSerializer):
+#     type_name = serializers.CharField(source="type.name", help_text="设备类型名称", read_only=True)
+#
+#     class Meta:
+#         model = MaterialExamineEquipment
+#         fields = '__all__'
 
-
-class MaterialExamineEquipmentSerializer(serializers.ModelSerializer):
-    type_name = serializers.CharField(source="type.name", help_text="设备类型名称", read_only=True)
-
-    class Meta:
-        model = MaterialExamineEquipment
-        fields = '__all__'
 
 
 class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
@@ -1265,6 +1265,33 @@ class ExamineValueUnitSerializer(serializers.ModelSerializer):
         model = ExamineValueUnit
         fields = '__all__'
 
+
+class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer):
+    examine_name = serializers.CharField(source="type.name")
+    equip_name = serializers.CharField(source="equipment.name")
+
+    class Meta:
+        model = MaterialSingleTypeExamineResult
+        fields = '__all__'
+
+
+class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
+    recorder_name = serializers.CharField(source='recorder.username', read_only=True)
+    sampler_name = serializers.CharField(source='sampling_user.username', read_only=True)
+    single_examine_results = MaterialSingleTypeExamineResultMainSerializer(MaterialSingleTypeExamineResult.objects.all(),
+                                                                       many=True, allow_null=True)
+
+    def create(self, validated_data):
+        node_data = validated_data.pop('single_examine_results', None)
+        instance = super().create(validated_data)
+        if node_data:
+            MaterialSingleTypeExamineResult.objects.bulk_create(
+                [MaterialSingleTypeExamineResult(**x.update(material_examine_result=instance)) for x in node_data])
+        return instance
+
+    class Meta:
+        model = MaterialExamineResult
+        fields = '__all__'
 
 class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.name')

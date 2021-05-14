@@ -1,7 +1,7 @@
 from django.db import models
 
 # Create your models here.
-from basics.models import GlobalCode
+from basics.models import GlobalCode, EquipCategoryAttribute, Equip
 from recipe.models import Material
 from system.models import AbstractEntity, User
 
@@ -547,7 +547,7 @@ class ExamineMaterialSupplier(models.Model):
 
 class MaterialExamineEquipmentTypeRelation(models.Model):
     # 多对多关系表模型 设备类型与检测类型
-    equipment_type = models.ForeignKey('MaterialExamineEquipmentType', on_delete=models.CASCADE)
+    equipment_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE)
     examine_type = models.ForeignKey('MaterialExamineType', on_delete=models.CASCADE)
 
     class Meta:
@@ -556,36 +556,36 @@ class MaterialExamineEquipmentTypeRelation(models.Model):
         verbose_name_plural = verbose_name = '设备类型与检测类型关系表'
 
 
-class MaterialExamineEquipmentType(models.Model):
-    """原材料检测设备类型"""
-    name = models.CharField(max_length=200, unique=True)
-    examine_types = models.ManyToManyField('MaterialExamineType', through=MaterialExamineEquipmentTypeRelation,
-                                           related_name='equipment_types')
+# class MaterialExamineEquipmentType(models.Model):
+#     """原材料检测设备类型"""
+#     name = models.CharField(max_length=200, unique=True)
+#     examine_types = models.ManyToManyField('MaterialExamineType', through=MaterialExamineEquipmentTypeRelation,
+#                                            related_name='equipment_types')
+#
+#     class Meta:
+#         # db_table = 'material_examine_equipment_type'
+#         verbose_name_plural = verbose_name = '原材料检测设备类型'
 
-    class Meta:
-        # db_table = 'material_examine_equipment_type'
-        verbose_name_plural = verbose_name = '原材料检测设备类型'
 
-
-class MaterialExamineEquipment(models.Model):
-    """检测设备"""
-    type = models.ForeignKey(MaterialExamineEquipmentType, on_delete=models.CASCADE, related_name="equipments")
-    name = models.CharField(max_length=200, unique=True)
-
-    class Meta:
-        # db_table = 'material_examine_equipment_type'
-        verbose_name_plural = verbose_name = '原材料检测设备'
+# class MaterialExamineEquipment(models.Model):
+#     """检测设备"""
+#     type = models.ForeignKey(MaterialExamineEquipmentType, on_delete=models.CASCADE, related_name="equipments")
+#     name = models.CharField(max_length=200, unique=True)
+#
+#     class Meta:
+#         # db_table = 'material_examine_equipment_type'
+#         verbose_name_plural = verbose_name = '原材料检测设备'
 
 
 class MaterialSingleTypeExamineResult(models.Model):
     """单类型检测结果"""
-    material_examine_result = models.ForeignKey('MaterialExamineResult', related_name='examine_results',on_delete=models.SET_NULL, null=True,
-                                                blank=True)
+    material_examine_result = models.ForeignKey('MaterialExamineResult', on_delete=models.SET_NULL, null=True,
+                                                blank=True, related_name="single_examine_results")
     type = models.ForeignKey('MaterialExamineType', on_delete=models.SET_NULL, null=True, blank=True)
     mes_decide_qualified = models.NullBooleanField('mes判定是否合格')
     value = models.FloatField(null=True)
     # other_system_decide_qualified = models.NullBooleanField('其他系统判定是否合格')
-    equipment = models.ForeignKey(MaterialExamineEquipment, verbose_name='检测机台', on_delete=models.SET_NULL, null=True,
+    equipment = models.ForeignKey(Equip, verbose_name='检测机台', on_delete=models.SET_NULL, null=True,
                                   blank=True)
     create_time = models.DateTimeField(auto_now_add=True)
 
@@ -686,6 +686,8 @@ class MaterialExamineType(models.Model):
     name = models.CharField(max_length=200, unique=True, help_text="总灰分，挥发分，生胶门尼粘度ML100℃（1+4） 47-57")
     limit_value = models.FloatField('边界值', help_text='供大于等于和小于等于用', null=True, blank=True)
     unit = models.ForeignKey(ExamineValueUnit, on_delete=models.SET_NULL, null=True, blank=True)
+    equipment_types = models.ManyToManyField(EquipCategoryAttribute, through='MaterialExamineEquipmentTypeRelation',
+                                           related_name='material_examine_types', blank=True)
 
     class Meta:
         db_table = 'material_examine_type'
