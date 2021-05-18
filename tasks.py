@@ -14,7 +14,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from inventory.utils import BaseUploader
-from mes.common_code import order_no
+from mes.common_code import order_no, INWeighSystem, issue_recipe, issue_plan
 from inventory.models import BzFinalMixingRubberInventoryLB
 
 class KJJGUploader(BaseUploader):
@@ -127,5 +127,34 @@ def update_wms_kjjg(items=[{
     print(ret)
     return ret
 
+
+
 if __name__ == '__main__':
-    update_wms_kjjg([{'WORKID': '202105070011', 'MID': 'C-1MB-K503-09', 'PICI': '2021021322073855Z05', 'RFID': '20121082', 'DJJG': '一等品', 'SENDDATE': '20210516 09:41:40'}])
+    # update_wms_kjjg([{'WORKID': '202105070011', 'MID': 'C-1MB-K503-09', 'PICI': '2021021322073855Z05', 'RFID': '20121082', 'DJJG': '一等品', 'SENDDATE': '20210516 09:41:40'}])
+
+    # door_info = {
+    #     "开门信号1": "1",   # 称量系统 A料仓 1~11  例开A6号料仓门传"6"
+    #     "开门信号2": "2"    # 称量系统 B料仓 1~11  例开B6号料仓门传"6"
+    # }
+    # update_trains = {
+    #     "plan_no": "210517091223",  # 计划操作编号
+    #     "action": "1",               # 具体计划的操作方式
+    #     "num": 122                  # 需修改的车次
+    # }
+    # reload_data = {
+    #     "plan_no": "210517091223",  # 计划操作编号
+    #     "action": "1",  # 具体计划的操作方式
+    # }
+    # stop_data = {
+    #     "plan_no": "210517091223",  # 计划操作编号
+    #     "action": "1",  # 具体计划的操作方式
+    # }
+    # # 对接的是易控软件，传入的参数需为有序字典， 即在构建字典的顺序是，key值需按样例给出的顺序
+    # xlc01 = INWeighSystem("XLC01")
+    # xlc01.reload_plan(reload_data)
+    # xlc01.update_trains(update_trains)
+    # xlc01.door_info(door_info)
+    # xlc01.stop(stop_data)
+    # issue_recipe("C-1MB-C905-03", "F01")
+    issue_plan("2ec66cac9b6411eba3090050568ff1ef","F01")
+
