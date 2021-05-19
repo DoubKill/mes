@@ -106,7 +106,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     ordering_fields = ('id', 'product_time')
     filter_class = PalletFeedbacksFilter
 
-    @action(methods=['put'], detail=False, permission_classes=[], url_path='bind-rfid',
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='bind-rfid',
             url_name='bind-rfid')
     def bind_rfid(self, request):
         if request.data:
