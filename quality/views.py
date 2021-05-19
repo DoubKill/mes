@@ -8,7 +8,7 @@ from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
@@ -17,14 +17,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
-from rest_framework_extensions.cache.decorators import cache_response
 
-from basics.models import GlobalCodeType
-from basics.serializers import GlobalCodeSerializer
+from basics.filters import EquipCategoryFilter, EquipFilter
+from basics.models import GlobalCodeType, EquipCategoryAttribute, Equip
+from basics.serializers import GlobalCodeSerializer, EquipCategoryAttributeSerializer, EquipSerializer
 from inventory.models import WmsInventoryStock
 import uuid
 from mes import settings
-from mes.common_code import CommonDeleteMixin, date_range
+from mes.common_code import CommonDeleteMixin, date_range, get_template_response
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -32,14 +32,14 @@ from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
-    DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, DataPointRawFilter, \
-    TestMethodRawFilter, MaterialTestMethodRawFilter, MaterialDataPointIndicatorRawFilter, MaterialTestOrderRawFilter, \
-    UnqualifiedMaterialDealResultFilter
+    DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
+    ExamineMaterialFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
-    TestTypeRaw, TestIndicatorRaw, DataPointRaw, TestMethodRaw, MaterialTestMethodRaw, MaterialDataPointIndicatorRaw, \
-    LevelResultRaw, MaterialTestOrderRaw, UnqualifiedMaterialDealResult
+    MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
+    DataPointStandardError, MaterialSingleTypeExamineResult
+
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
     MaterialTestMethodSerializer, TestMethodSerializer, TestTypeSerializer, DataPointSerializer, \
@@ -47,18 +47,15 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     TestIndicatorSerializer, LabelPrintSerializer, BatchMonthSerializer, BatchDaySerializer, \
     BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
     UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
-    MaterialDealResultListSerializer1, TestIndicatorRawSerializer, DataPointRawSerializer, TestMethodRawSerializer, \
-    MaterialTestMethodRawSerializer, MaterialDataPointIndicatorRawSerializer, LevelResultRawSerializer, \
-    TestTypeRawSerializer, MaterialTestOrderRawSerializer, MaterialTestResultRawListSerializer, \
-    MaterialTestOrderRawListSerializer, MaterialTestOrderRawUpdateSerializer, \
-    UnqualifiedMaterialDealResultListSerializer, UnqualifiedMaterialDealResultUpdateSerializer
+    MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
+    MaterialExamineRatingStandardSerializer, ExamineValueUnitSerializer, MaterialSingleTypeExamineResultMainSerializer, \
+    MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer
+
+from django.db.models import Q, Prefetch
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching, ZCMaterial
-import logging
 from django.db.models import Max, Sum, Avg
-
-logger = logging.getLogger('api_log')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -103,6 +100,24 @@ class DataPointViewSet(ModelViewSet):
             data = queryset.values('id', 'name', 'unit')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DataPointStandardErrorViewSet(ModelViewSet):
+    """数据点误差(不合格pass指标管理)"""
+    queryset = DataPointStandardError.objects.filter(delete_flag=False)
+    serializer_class = DataPointStandardErrorSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('data_point_id', )
+    pagination_class = None
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DataPointLabelHistoryView(APIView):
+    """标记历史记录"""
+
+    def get(self, request):
+        return Response(set(DataPointStandardError.objects.values_list('label', flat=True)))
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -262,7 +277,7 @@ class ProductBatchingMaterialListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         m_type = self.request.query_params.get('type', '1')  # 1胶料  2原材料
-        factory_date = self.request.query_params.get('factory_date')   # 工厂日期
+        factory_date = self.request.query_params.get('factory_date')  # 工厂日期
         equip_no = self.request.query_params.get('equip_no')  # 设备编号
         classes = self.request.query_params.get('classes')  # 班次
 
@@ -1339,292 +1354,153 @@ class BarCodePreview(APIView):
         #     raise ValidationError(f"该条码无快检结果:{e}")
 
 
-"""
-    原料检测视图
-"""
+"""新原材料快检"""
 
 
 @method_decorator([api_recorder], name="dispatch")
-class TestIndicatorRawViewSet(ModelViewSet):
-    """试验指标列表"""
-    queryset = TestIndicatorRaw.objects.filter(delete_flag=False)
-    serializer_class = TestIndicatorRawSerializer
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'view_raw_test_indicator',
-                                                            'change': 'change_raw_test_indicator',
-                                                            'delete': 'delete_raw_test_indicator'}))
-
-    def list(self, request, *args, **kwargs):
-        data = self.queryset.values('id', 'name')
-        return Response(data)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class TestTypeRawViewSet(ModelViewSet):
-    """试验类型管理"""
-    queryset = TestTypeRaw.objects.filter(delete_flag=False)
-    serializer_class = TestTypeRawSerializer
+class MaterialExamineEquipmentTypeViewSet(ModelViewSet):
+    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False).select_related('equip_type', 'process')
+    serializer_class = EquipCategoryAttributeSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('test_indicator',)
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'add_raw_test_type',
-                                                            'change': 'change_raw_test_type'}))
+    filter_class = EquipCategoryFilter
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+    def get_permissions(self):
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name')
-            return Response({'results': data})
-        return super().list(self, request, *args, **kwargs)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class DataPointRawViewSet(ModelViewSet):
-    """试验类型数据点管理"""
-    queryset = DataPointRaw.objects.filter(delete_flag=False)
-    serializer_class = DataPointRawSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = DataPointRawFilter
-    pagination_class = None
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'pointChange_raw_test_type',
-                                                            'change': 'pointChange_raw_test_type'}))
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name', 'unit')
-            return Response({'results': data})
-        return super().list(self, request, *args, **kwargs)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class TestMethodRawViewSet(ModelViewSet):
-    """试验方法管理"""
-    queryset = TestMethodRaw.objects.filter(delete_flag=False)
-    serializer_class = TestMethodRawSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = TestMethodRawFilter
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'add_raw_test_method',
-                                                            'change': 'change_raw_test_method'}))
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name')
-            return Response({'results': data})
-        return super().list(self, request, *args, **kwargs)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialTestMethodRawViewSet(ModelViewSet):
-    """物料试验方法"""
-    queryset = MaterialTestMethodRaw.objects.filter(delete_flag=False)
-    serializer_class = MaterialTestMethodRawSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = MaterialTestMethodRawFilter
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'add_raw_evaluating',
-                                                            'change': 'change_raw_evaluating'}))
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialDataPointIndicatorRawViewSet(ModelViewSet):
-    """物料数据点评判指标"""
-    queryset = MaterialDataPointIndicatorRaw.objects.filter(delete_flag=False)
-    serializer_class = MaterialDataPointIndicatorRawSerializer
-    filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'change_raw_evaluating',
-                                                            'change': 'change_raw_evaluating'}))
-    filter_class = MaterialDataPointIndicatorRawFilter
-    pagination_class = None
-
-
-@method_decorator([api_recorder], name="dispatch")
-class LevelResultRawViewSet(ModelViewSet):
-    """等级和结果"""
-    queryset = LevelResultRaw.objects.filter(delete_flag=False)
-    serializer_class = LevelResultRawSerializer
-    filter_backends = (DjangoFilterBackend,)
-
-    permission_classes = (IsAuthenticated, PermissionClass({'view': '__all__',
-                                                            'add': 'add_raw_level',
-                                                            'change': 'change_raw_level',
-                                                            'delete': 'delete_raw_level'}))
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        mdp_set = MaterialDataPointIndicatorRaw.objects.filter(level=instance.level,
-                                                               result=instance.deal_result,
-                                                               delete_flag=False)
-        if mdp_set:
-            raise ValidationError('该等级已被使用，不能删除')
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        if self.request.query_params.get('all'):
-            data = queryset.values('id', 'deal_result', 'level')
-            return Response({'results': data})
-        return super().list(self, request, *args, **kwargs)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialTestIndicatorMethodsRaw(APIView):
-    """获取原材料指标试验方法, 参数：?lot_no=批次号"""
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request):
-        lot_no = self.request.query_params.get('lot_no')
-        stock = WmsInventoryStock.objects.using('wms').filter(lot_no=lot_no).values('material_no')
-        if not stock:
-            raise ValidationError('该物料条码信息不存在！')
-        material_no = stock[0]['material_no']
-        supplier = ZCMaterial.objects.filter(material_no=material_no, material__isnull=False).first()
-        if not supplier:
-            raise ValidationError('该物料信息不存在，请建立物料对应关系！')
+            return ()
         else:
-            material = supplier.material
-        ret = {}
-        test_indicator_names = TestIndicatorRaw.objects.values_list('name', flat=True)
-        test_methods = TestMethodRaw.objects.all()
-        for test_method in test_methods:
-            indicator_name = test_method.test_type.test_indicator.name
-            allowed = True
-            data_points = None
-            mat_test_method = MaterialTestMethodRaw.objects.filter(
-                material=material,
-                test_method=test_method).first()
-            if not mat_test_method:
-                allowed = False
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset().filter(equip_type__global_no="kj001"))
+        if self.request.query_params.get('all'):
+            queryset = queryset.filter(use_flag=True)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({'results': serializer.data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineEquipmentViewSet(ModelViewSet):
+    queryset = Equip.objects.filter(delete_flag=False).select_related('category__equip_type',
+                                                                      'category__process',
+                                                                      'equip_level').order_by('equip_no')
+    serializer_class = EquipSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset().filter(category__equip_type__global_no="kj001"))
+        if self.request.query_params.get('all'):
+            data = queryset.filter(use_flag=1).values('id', 'equip_no', 'equip_name', 'category',
+                                                      'category__category_name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineTypeViewSet(ModelViewSet):
+    queryset = MaterialExamineType.objects.all().select_related("unit").prefetch_related('standards')
+    serializer_class = MaterialExamineTypeSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialExamineTypeFilter
+    titles = ["比值类型", "检测类型", "边界值", "单位", "上限值", "下限值", "级别"]
+    description = "比值类型填 上下限, <=, >=, 外观确认"
+    permission_classes = ()
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):  # 检测类型列表
+            return ()
+        elif self.request.query_params.get('types'):  # 比值类型列表
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values("id", "name")
+            return Response({'results': data})
+        elif self.request.query_params.get('types'):
+            # qs = queryset.values_list('interval_type', flat=True).distinct()
+
+            qs = [{"id": x[0], "value": x[1]} for x in MaterialExamineType.INTERVAL_TYPES]
+            return Response({'results': qs})
+        else:
+            return super().list(request, *args, **kwargs)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export-template',
+            url_name='export-template')
+    def export_template(self, request):
+        """资产导入模板"""
+
+        filename = '原材料检测指标导入模板'
+        return get_template_response(self.titles, filename=filename, description="比值类型填: 上下限, <=, >=, 外观确认")
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-data',
+            url_name='import-data')
+    def import_data(self, request):
+        file = request.FILES.get('file')
+        cur_sheet = get_cur_sheet(file)
+        data = get_sheet_data(cur_sheet, start_row=2)
+        interval_dict = {x[1]: x[0] for x in MaterialExamineType.INTERVAL_TYPES}
+        for x in data:
+            if x[3]:
+                unit, tag = ExamineValueUnit.objects.get_or_create(name=x[3])
             else:
-                if not MaterialDataPointIndicatorRaw.objects.filter(material_test_method=mat_test_method).exists():
-                    allowed = False
-                else:
-                    data_points = mat_test_method.data_point.values('id', 'name', 'unit')
-            if indicator_name not in ret:
-                data = {
-                    'test_indicator': indicator_name,
-                    'methods': [
-                        {'id': test_method.id,
-                         'name': test_method.name,
-                         'allowed': allowed,
-                         'data_points': data_points}
-                    ]
-                }
-                ret[indicator_name] = data
-            else:
-                ret[indicator_name]['methods'].append(
-                    {'id': test_method.id, 'name': test_method.name, 'allowed': allowed, 'data_points': data_points})
-
-        for item in test_indicator_names:
-            if item not in ret:
-                ret[item] = {'test_indicator': item, 'methods': []}
-        return Response({"ret": ret.values(), "material_id": material.id})
+                unit = None
+            temp = {
+                "interval_type": interval_dict[x[0]],
+                "limit_value": float(x[2]) if x[2] else None,
+                "unit": unit
+            }
+            instance = MaterialExamineType.objects.get_or_create(defaults=temp, **{"name": x[1]})[0]
+            if str(x[0]) == "上下限":
+                MaterialExamineRatingStandard.objects.create(examine_type=instance, upper_limit_value=float(x[4]),
+                                                             lower_limiting_value=float(x[5]), level=x[6])
+        return Response("导入成功")
 
 
 @method_decorator([api_recorder], name="dispatch")
-class TestIndicatorDataPointRawListView(ListAPIView):
-    """获取试验指标及其所有的试验方法数据点"""
-    queryset = TestIndicatorRaw.objects.filter(delete_flag=False)
+class MaterialExamineRatingStandardViewSet(ModelViewSet):
+    queryset = MaterialExamineRatingStandard.objects.all()
+    serializer_class = MaterialExamineRatingStandardSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ExamineValueUnitViewSet(ModelViewSet):
+    queryset = ExamineValueUnit.objects.all()
+    serializer_class = ExamineValueUnitSerializer
+    pagination_class = SinglePageNumberPagination
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineResultViewSet(ModelViewSet):
+    queryset = MaterialExamineResult.objects.all().select_related("material", "recorder", "sampling_user").prefetch_related("single_examine_results")
+    serializer_class = MaterialExamineResultMainSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialSingleTypeExamineResultViewSet(ModelViewSet):
+    queryset = MaterialSingleTypeExamineResult.objects.all()
+    serializer_class = MaterialSingleTypeExamineResultMainSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ExamineMaterialViewSet(viewsets.ModelViewSet):
+    queryset = ExamineMaterial.objects \
+        .prefetch_related(Prefetch('examine_results',
+                                   queryset=MaterialExamineResult.objects.order_by('-examine_date', '-create_time'))) \
+        .distinct().order_by('-create_time')
+    serializer_class = ExamineMaterialSerializer
     permission_classes = (IsAuthenticated,)
-
-    def list(self, request, *args, **kwargs):
-        ret = []
-        for test_indicator in TestIndicatorRaw.objects.all():
-            data_indicator_detail = []
-            data_names = DataPointRaw.objects.filter(
-                test_type__test_indicator=test_indicator).order_by('name').values_list('name', flat=True)
-            for data_name in data_names:
-                if data_name not in data_indicator_detail:
-                    data_indicator_detail.append(data_name)
-            data = {'test_indicator_id': test_indicator.id,
-                    'test_indicator_name': test_indicator.name,
-                    'data_indicator_detail': data_indicator_detail
-                    }
-            ret.append(data)
-        return Response(ret)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialInventoryView(APIView):
-    """根据日期、物料编码、物料名称、条码、批次号获取原材料入库信息， 参数: ?storage_date=&material_no=&material_name=&lot_no=&"""
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request):
-        storage_date = self.request.query_params.get('storage_date')
-        material_no = self.request.query_params.get('material_no')
-        material_name = self.request.query_params.get('material_name')
-        batch_no = self.request.query_params.get('batch_no')
-        lot_no = self.request.query_params.get('lot_no')
-        query_params = {}
-        if storage_date:
-            query_params['in_storage_time__date'] = storage_date
-        if material_no:
-            query_params['material_no'] = material_no
-        if material_name:
-            query_params['material_name'] = storage_date
-        if batch_no:
-            query_params['batch_no'] = storage_date
-        if not lot_no:
-            raise ValidationError('请输入条码信息！')
-        query_params['lot_no'] = lot_no
-        data = WmsInventoryStock.objects.using('wms').filter(
-            **query_params).values('sn', 'material_name', 'material_no', 'lot_no',
-                                   'batch_no', 'in_storage_time', 'supplier_name')
-        return Response(data)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialTestOrderRawViewSet(mixins.CreateModelMixin,
-                                  mixins.ListModelMixin,
-                                  mixins.UpdateModelMixin,
-                                  GenericViewSet):
-    queryset = MaterialTestOrderRaw.objects.filter(
-        delete_flag=False).prefetch_related(
-        'order_results_raw')
     filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_raw_result_info',
-                                                            'add': 'add_raw_test_result',
-                                                            'change': 'change_raw_result_info'}))
-    filter_class = MaterialTestOrderRawFilter
+    filter_class = ExamineMaterialFilter
 
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return MaterialTestOrderRawSerializer
-        elif self.action in ('update', 'partial_update'):
-            return MaterialTestOrderRawUpdateSerializer
-        else:
-            return MaterialTestOrderRawListSerializer
-
-    @atomic()
-    def create(self, request, *args, **kwargs):
-        data = request.data
-        if not isinstance(data, list):
-            raise ValidationError('参数错误')
-        for item in data:
-            s = MaterialTestOrderRawSerializer(data=item, context={'request': request})
-            if not s.is_valid():
-                raise ValidationError(s.errors)
-            s.save()
-        return Response('新建成功')
-
-
-class UnqualifiedMaterialDealResultViewSet(mixins.ListModelMixin,
-                                           mixins.UpdateModelMixin,
-                                           GenericViewSet):
-    queryset = UnqualifiedMaterialDealResult.objects.filter().prefetch_related('material_test_order_raw')
-    filter_backends = (DjangoFilterBackend,)
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_raw_unqualified_material',
-                                                            'change': ['deal_raw_unqualified_material',
-                                                                       'submit_raw_unqualified_material']}))
-    filter_class = UnqualifiedMaterialDealResultFilter
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return UnqualifiedMaterialDealResultListSerializer
-        else:
-            return UnqualifiedMaterialDealResultUpdateSerializer

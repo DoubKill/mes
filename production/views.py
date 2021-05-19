@@ -14,6 +14,7 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
@@ -104,6 +105,23 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     ordering_fields = ('id', 'product_time')
     filter_class = PalletFeedbacksFilter
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='bind-rfid',
+            url_name='bind-rfid')
+    def bind_rfid(self, request):
+        if request.data:
+            data = dict(request.data)
+        else:
+            data = dict(request.query_params)
+        lot_no = data.pop("lot_no", None)
+        if not lot_no:
+            raise ValidationError("请传入lot_no")
+        instance, flag = PalletFeedbacks.objects.update_or_create(defaults=data, **{"lot_no": lot_no})
+        if flag:
+            message = "补充成功"
+        else:
+            message = "重新绑定成功"
+        return Response(message)
 
 
 @method_decorator([api_recorder], name="dispatch")

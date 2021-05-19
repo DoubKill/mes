@@ -1,7 +1,7 @@
 from django.db import models
 
 # Create your models here.
-from basics.models import GlobalCode
+from basics.models import GlobalCode, EquipCategoryAttribute, Equip
 from recipe.models import Material
 from system.models import AbstractEntity, User
 
@@ -62,6 +62,23 @@ class DataPoint(AbstractEntity):
         db_table = 'data_point'
         verbose_name_plural = verbose_name = '数据点'
         unique_together = ('name', 'test_type')
+
+
+class DataPointStandardError(AbstractEntity):
+    """数据点判断误差"""
+    data_point = models.ForeignKey(DataPoint, help_text='数据点', on_delete=models.CASCADE,
+                                   related_name='standard_errors')
+    lower_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='开始值')
+    upper_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='结束值')
+    tracking_card = models.CharField(max_length=64, help_text='追踪卡')
+    label = models.CharField(max_length=64, help_text='标志及处理')
+
+    def __str__(self):
+        return self.label
+
+    class Meta:
+        db_table = 'data_point_standard_error'
+        verbose_name_plural = verbose_name = '数据点误差'
 
 
 class TestMethod(AbstractEntity):
@@ -202,6 +219,8 @@ class MaterialTestOrder(AbstractEntity):
     production_factory_date = models.DateField(help_text='工厂日期')
     note = models.TextField(max_length=100, help_text='备注', blank=True, null=True)
     is_qualified = models.BooleanField(help_text='是否合格', default=True)
+    is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
+    pass_suggestion = models.CharField(max_length=64, help_text='pass意见', blank=True, null=True)
 
     class Meta:
         db_table = 'material_test_order'
@@ -232,6 +251,7 @@ class MaterialTestResult(AbstractEntity):
     machine_name = models.CharField(max_length=64, help_text='试验机台名称', blank=True, null=True)
     level = models.IntegerField(help_text='等级', blank=True, null=True)
     origin = models.IntegerField(help_text='数据来源', default=0)
+    is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
 
     class Meta:
         db_table = 'material_test_result'
@@ -374,163 +394,162 @@ class UnqualifiedDealOrderDetail(AbstractEntity):
 """
 
 
-class TestIndicatorRaw(AbstractEntity):
-    """检测指标"""
-    no = models.CharField(max_length=64, help_text='指标编号', unique=True)
-    name = models.CharField(max_length=64, help_text='指标名称', unique=True)
-
-    def __str__(self):
-        return self.name
+class ExamineMaterialSupplier(models.Model):
+    """检测原材料产地，供应商"""
+    name = models.CharField(max_length=200, unique=True)
 
     class Meta:
-        db_table = 'test_indicator_raw'
-        verbose_name_plural = verbose_name = '原料检测指标'
+        db_table = 'examine_material_supplier'
+        verbose_name_plural = verbose_name = '检测原材料产地，供应商'
 
 
-class TestTypeRaw(AbstractEntity):
-    """原料试验类型"""
-    no = models.CharField(max_length=64, help_text='类型编号', unique=True)
-    name = models.CharField(max_length=64, help_text='类型名称', unique=True)
-    test_indicator = models.ForeignKey(TestIndicatorRaw, help_text='检测指标',
-                                       on_delete=models.CASCADE, related_name='indicator_types_raw')
-
-    def __str__(self):
-        return self.name
+class MaterialExamineEquipmentTypeRelation(models.Model):
+    # 多对多关系表模型 设备类型与检测类型
+    equipment_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE)
+    examine_type = models.ForeignKey('MaterialExamineType', on_delete=models.CASCADE)
 
     class Meta:
-        db_table = 'test_type_raw'
-        verbose_name_plural = verbose_name = '原料试验类型'
+        unique_together = ('equipment_type', 'examine_type')
+        # db_table = 'material_examine_equipment_type_relation'
+        verbose_name_plural = verbose_name = '设备类型与检测类型关系表'
 
 
-class DataPointRaw(AbstractEntity):
-    """原料数据点"""
-    no = models.CharField(max_length=64, help_text='数据点编号', unique=True)
-    name = models.CharField(max_length=64, help_text='数据点名称')
-    unit = models.CharField(max_length=64, help_text='单位')
-    test_type = models.ForeignKey(TestTypeRaw, help_text='试验类型', on_delete=models.CASCADE,
-                                  related_name='type_points_raw')
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = 'data_point_raw'
-        verbose_name_plural = verbose_name = '原料数据点'
-        unique_together = ('name', 'test_type')
+# class MaterialExamineEquipmentType(models.Model):
+#     """原材料检测设备类型"""
+#     name = models.CharField(max_length=200, unique=True)
+#     examine_types = models.ManyToManyField('MaterialExamineType', through=MaterialExamineEquipmentTypeRelation,
+#                                            related_name='equipment_types')
+#
+#     class Meta:
+#         # db_table = 'material_examine_equipment_type'
+#         verbose_name_plural = verbose_name = '原材料检测设备类型'
 
 
-class TestMethodRaw(AbstractEntity):
-    """原料试验方法"""
-    no = models.CharField(max_length=64, help_text='试验方法编号', unique=True)
-    name = models.CharField(max_length=64, help_text='试验方法名称', unique=True)
-    test_type = models.ForeignKey(TestTypeRaw, help_text='试验类型', on_delete=models.CASCADE,
-                                  related_name='type_methods_raw')
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        db_table = 'test_method_raw'
-        verbose_name_plural = verbose_name = '原料试验方法'
+# class MaterialExamineEquipment(models.Model):
+#     """检测设备"""
+#     type = models.ForeignKey(MaterialExamineEquipmentType, on_delete=models.CASCADE, related_name="equipments")
+#     name = models.CharField(max_length=200, unique=True)
+#
+#     class Meta:
+#         # db_table = 'material_examine_equipment_type'
+#         verbose_name_plural = verbose_name = '原材料检测设备'
 
 
-class MaterialTestMethodRaw(AbstractEntity):
-    """原料物料试验方法"""
-    material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE, related_name='mat_methods_raw')
-    test_method = models.ForeignKey(TestMethodRaw, help_text='试验方法', on_delete=models.CASCADE)
-    data_point = models.ManyToManyField(DataPointRaw, help_text='数据点', related_name='point_methods_raw')
-
-    def __str__(self):
-        return self.test_method.name
+class MaterialSingleTypeExamineResult(models.Model):
+    """单类型检测结果"""
+    material_examine_result = models.ForeignKey('MaterialExamineResult', on_delete=models.SET_NULL, null=True,
+                                                blank=True, related_name="single_examine_results")
+    type = models.ForeignKey('MaterialExamineType', on_delete=models.SET_NULL, null=True, blank=True)
+    mes_decide_qualified = models.NullBooleanField('mes判定是否合格')
+    value = models.FloatField(null=True)
+    # other_system_decide_qualified = models.NullBooleanField('其他系统判定是否合格')
+    equipment = models.ForeignKey(Equip, verbose_name='检测机台', on_delete=models.SET_NULL, null=True,
+                                  blank=True)
+    create_time = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'material_test_methods_raw'
-        verbose_name_plural = verbose_name = '原料物料试验方法'
-        unique_together = ('material', 'test_method')
+        unique_together = ('material_examine_result', 'type')
+        # db_table = 'material_single_type_examine_result'
+        verbose_name_plural = verbose_name = '单类型检测结果'
 
 
-class MaterialDataPointIndicatorRaw(AbstractEntity):
-    """原料数据点评判指标"""
-    material_test_method = models.ForeignKey(MaterialTestMethodRaw, help_text='物料试验方法',
-                                             on_delete=models.CASCADE, related_name='mat_indicators_raw')
-    data_point = models.ForeignKey(DataPointRaw, help_text='数据点', on_delete=models.CASCADE,
-                                   related_name='point_indicators_raw')
-    level = models.PositiveIntegerField(help_text='等级')
-    result = models.CharField(max_length=64, help_text='结果')
-    upper_limit = models.DecimalField(help_text='上限', decimal_places=2, max_digits=8)
-    lower_limit = models.DecimalField(help_text='下限', decimal_places=2, max_digits=8)
-
-    def __str__(self):
-        return '{}-{}'.format(self.material_test_method, self.level)
+class UnqualifiedMaterialProcessMode(models.Model):
+    """不合格原材料处理方式"""
+    mode = models.CharField(max_length=200, unique=True)
+    create_user = models.ForeignKey(User, on_delete=models.CASCADE)
+    create_time = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'material_data_indicator_raw'
-        verbose_name_plural = verbose_name = '原料数据点评判指标'
+        # db_table = 'unqualified_material_process_mode'
+        verbose_name_plural = verbose_name = '不合格原材料处理方式'
 
 
-class LevelResultRaw(AbstractEntity):
-    """原料等级和结果"""
-    deal_result = models.CharField(max_length=64, help_text="检测结果")
-    level = models.PositiveIntegerField(help_text='等级')
-
-    class Meta:
-        unique_together = ('deal_result', 'level')
-        db_table = 'level_result_raw'
-        verbose_name_plural = verbose_name = '原料等级和结果'
-
-
-class MaterialTestOrderRaw(AbstractEntity):
-    lot_no = models.CharField(max_length=64, help_text='条形码')
-    material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE)
-    batch_no = models.CharField(max_length=64, help_text='批次号', blank=True, null=True)
-    storage_date = models.DateField(help_text='入库日期')
-    is_qualified = models.BooleanField(help_text='是否合格', default=True)
-    supplier_name = models.CharField(max_length=64, help_text='厂家信息', blank=True, null=True)
-
-    class Meta:
-        db_table = 'material_test_order_raw'
-        verbose_name_plural = verbose_name = '原料检测单'
-
-
-class MaterialTestResultRaw(AbstractEntity):
+class MaterialExamineResult(models.Model):
     """检测结果"""
-    material_test_order = models.ForeignKey(MaterialTestOrderRaw, help_text='物料检测单', on_delete=models.CASCADE,
-                                            related_name='order_results_raw')
-    data_point_indicator = models.ForeignKey(MaterialDataPointIndicatorRaw, help_text='数据评判指标id',
-                                             on_delete=models.CASCADE, null=True)
-    value = models.DecimalField(help_text='检测值', decimal_places=2, max_digits=8)
-    test_times = models.PositiveIntegerField(help_text='检验次数')
-    data_point = models.ForeignKey(DataPointRaw, help_text='数据点', on_delete=models.CASCADE,
-                                   related_name='result_points_raw')
-    test_method = models.ForeignKey(TestMethodRaw, help_text='试验方法', on_delete=models.CASCADE,
-                                    related_name='method_points_raw')
-    level = models.PositiveIntegerField(help_text='等级')
-    result = models.CharField(max_length=64, help_text='检测结果')
+    material = models.ForeignKey('ExamineMaterial', related_name='examine_results', on_delete=models.PROTECT)
+    examine_date = models.DateField('检测日期', null=True, blank=True)
+    transport_date = models.DateField('收货日期', null=True, blank=True)
+    examine_types = models.ManyToManyField('MaterialExamineType', through=MaterialSingleTypeExamineResult)
+    qualified = models.BooleanField('是否合格')
+    re_examine = models.BooleanField('是否为复测')
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
+    recorder = models.ForeignKey(User, verbose_name='记录人', on_delete=models.CASCADE,
+                                 related_name='record_material_examine_result')
+    sampling_user = models.ForeignKey(User, verbose_name='抽样人', on_delete=models.CASCADE,
+                                      related_name='sample_material_examine_result')
 
     class Meta:
-        db_table = 'material_test_result_raw'
+        db_table = 'material_examine_result'
         verbose_name_plural = verbose_name = '检测结果'
 
+    def newest_qualified(self):
+        result = self.material.examine_results.order_by('-examine_date', '-create_time')[0]
+        return result.qualified if result else None
 
-class UnqualifiedMaterialDealResult(models.Model):
-    STATUS_CHOICE = (
-        (1, '待处理'),
-        (2, '待确认'),
-        (3, '已处理'),
-        (4, '驳回'),
-    )
-    material_test_order_raw = models.OneToOneField(MaterialTestOrderRaw, on_delete=models.CASCADE,
-                                                   related_name='deal_result')
-    unqualified_reason = models.CharField(max_length=256, help_text='不合格原因', blank=True, null=True)
-    status = models.PositiveIntegerField(help_text='状态', default=1, choices=STATUS_CHOICE)
-    release_result = models.CharField(max_length=64, help_text='放行处理', blank=True, null=True)
-    unqualified_result = models.CharField(max_length=64, help_text='不合格处理', blank=True, null=True)
-    deal_user = models.ForeignKey(User, help_text='处理人', blank=True, null=True, on_delete=models.CASCADE,
-                                  related_name='deal_user_result')
-    confirm_user = models.ForeignKey(User, help_text='确认人', blank=True, null=True, on_delete=models.CASCADE,
-                                     related_name='confirm_user_result')
-    is_delivery = models.BooleanField(help_text='是否出库', default=False)
+
+class ExamineMaterial(models.Model):
+    """检测原材料"""
+    material_meta = models.ForeignKey(Material, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField('原材料名称', max_length=200, help_text='EU充油丁苯胶1723')
+    sample_name = models.CharField('样品名称', max_length=200, help_text='1723')
+    batch = models.CharField('批次', max_length=200, help_text='10316')
+    supplier = models.ForeignKey(ExamineMaterialSupplier, verbose_name='产地', on_delete=models.CASCADE)
+    qualified = models.BooleanField('是否合格')
+    process_mode = models.ForeignKey(UnqualifiedMaterialProcessMode, verbose_name='不合格处理方式', on_delete=models.SET_NULL,
+                                     null=True, blank=True)
+    process_mode_handle_user = models.ForeignKey(User, verbose_name='经办人', on_delete=models.SET_NULL, null=True,
+                                                 blank=True)
+    process_mode_time = models.DateTimeField(null=True, blank=True)
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = 'unqualified_material_deal_result'
-        verbose_name_plural = verbose_name = '不合格处理结果'
+        unique_together = ('supplier', 'name', 'batch')
+        db_table = 'examine_material'
+        verbose_name_plural = verbose_name = '检测原材料'
+
+
+class MaterialExamineRatingStandard(models.Model):
+    """评级标准
+       相同检测类型，区间不能重叠
+    """
+    examine_type = models.ForeignKey('MaterialExamineType', on_delete=models.CASCADE, related_name="standards")
+    upper_limit_value = models.FloatField()
+    lower_limiting_value = models.FloatField()
+    level = models.PositiveIntegerField()
+
+    class Meta:
+        # unique_together = ('examine_type', 'level')
+        db_table = 'material_examine_rating_standard'
+        verbose_name_plural = verbose_name = '评级标准'
+
+
+class ExamineValueUnit(models.Model):
+    """检测值单位"""
+    name = models.CharField(max_length=100, unique=True)
+
+    class Meta:
+        db_table = 'examine_value_unit'
+        verbose_name_plural = verbose_name = '检测值单位'
+
+
+class MaterialExamineType(models.Model):
+    """原材料检测类型"""
+    INTERVAL_TYPES = (
+        (1, '上下限'),  # 闭区间
+        (2, '<='),
+        (3, '>='),
+        (4, '外观确认')  # 离散值
+    )
+    interval_type = models.IntegerField(choices=INTERVAL_TYPES, help_text="比值类型?")
+    name = models.CharField(max_length=200, unique=True, help_text="总灰分，挥发分，生胶门尼粘度ML100℃（1+4）")
+    actual_name = models.CharField(max_length=200, unique=True, help_text="总灰分，挥发分，生胶门尼粘度ML100℃（1+4） 47-57")
+    limit_value = models.FloatField('边界值', help_text='供大于等于和小于等于用', null=True, blank=True)
+    unit = models.ForeignKey(ExamineValueUnit, on_delete=models.SET_NULL, null=True, blank=True)
+    equipment_types = models.ManyToManyField(EquipCategoryAttribute, through='MaterialExamineEquipmentTypeRelation',
+                                             related_name='material_examine_types', blank=True)
+
+    class Meta:
+        db_table = 'material_examine_type'
+        verbose_name_plural = verbose_name = '原材料检测类型'

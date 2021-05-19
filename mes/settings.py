@@ -321,6 +321,66 @@ if DEBUG:
                 'MARS_Connection': True,
             },
         },
+        "F01": {  # 细料称1
+            'ENGINE': 'sql_server.pyodbc',
+            'NAME': 'YK_XL',
+            'HOST': '192.168.1.144',
+            'PORT': '1433',
+            'USER': 'sa',
+            'PASSWORD': '123',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'MARS_Connection': True,
+            },
+        },
+        "F02": {  # 细料称2
+            'ENGINE': 'sql_server.pyodbc',
+            'NAME': 'YK_XL',
+            'HOST': '192.168.1.144',
+            'PORT': '1433',
+            'USER': 'sa',
+            'PASSWORD': '123',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'MARS_Connection': True,
+            },
+        },
+        "F03": {  # 细料称3
+            'ENGINE': 'sql_server.pyodbc',
+            'NAME': 'YK_XL',
+            'HOST': '192.168.1.144',
+            'PORT': '1433',
+            'USER': 'sa',
+            'PASSWORD': '123',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'MARS_Connection': True,
+            },
+        },
+        "S01": {  # 硫磺称1
+            'ENGINE': 'sql_server.pyodbc',
+            'NAME': 'YK_XL',
+            'HOST': '192.168.1.144',
+            'PORT': '1433',
+            'USER': 'sa',
+            'PASSWORD': '123',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'MARS_Connection': True,
+            },
+        },
+        "S02": {  # 硫磺称2
+            'ENGINE': 'sql_server.pyodbc',
+            'NAME': 'YK_XL',
+            'HOST': '192.168.1.144',
+            'PORT': '1433',
+            'USER': 'sa',
+            'PASSWORD': '123',
+            'OPTIONS': {
+                'driver': 'ODBC Driver 17 for SQL Server',
+                'MARS_Connection': True,
+            },
+        },
         'SFJ': {  # 上辅机群控地址
             'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
             'NAME': os.getenv('SFJ_DATABASE_NAME', 'sfj'),  # 数据库名称

@@ -1,4 +1,5 @@
 from django.db import models
+
 from system.models import AbstractEntity
 from django.utils.translation import ugettext_lazy as _
 
@@ -84,7 +85,7 @@ class EquipCategoryAttribute(AbstractEntity):
                                    help_text='设备类型', verbose_name='设备类型')
     category_no = models.CharField(max_length=64, help_text='机型编号', verbose_name='机型编号', unique=True)
     category_name = models.CharField(max_length=64, help_text='机型名称', verbose_name='机型名称')
-    volume = models.IntegerField(help_text='容积', verbose_name='容积')
+    volume = models.IntegerField(help_text='容积', verbose_name='容积', default=0)
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='设备说明', verbose_name='设备说明')
     process = models.ForeignKey('GlobalCode', models.CASCADE, related_name='equip_category_attribute_p',
@@ -108,13 +109,13 @@ class Equip(AbstractEntity):
                                related_name="equip_p")
     equip_no = models.CharField(max_length=64, help_text='设备编号', verbose_name='设备编号', unique=True)
     equip_name = models.CharField(max_length=64, help_text='设备名称', verbose_name='设备名称')
-    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='设备说明', verbose_name='设备说明')
-    count_flag = models.BooleanField(help_text='是否产量计数', verbose_name='是否产量计数')
+    count_flag = models.BooleanField(help_text='是否产量计数', verbose_name='是否产量计数', default=False)
 
     equip_level = models.ForeignKey('GlobalCode', models.CASCADE, related_name='equip_l',
-                                    help_text='层级', verbose_name='层级')
+                                    help_text='层级', verbose_name='层级', null=True)
 
     def __str__(self):
         return self.equip_name
