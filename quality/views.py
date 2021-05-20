@@ -1464,7 +1464,7 @@ class MaterialExamineTypeViewSet(viewsets.GenericViewSet,
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values("id", "name")
+            data = queryset.values("id", "name", 'interval_type')
             for item in data:
                 standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=item['id']).first()
                 if standard:

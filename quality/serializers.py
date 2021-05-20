@@ -1042,10 +1042,8 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
         unit_name = validated_data.pop("unitname", None)
         standards = validated_data.pop("standards", None)
         if unit_name:
-            new_unit_name = instance.unit.name
-            if unit_name != new_unit_name:
-                unit, flag = ExamineValueUnit.objects.update_or_create(name=unit_name)
-                validated_data["unit"] = unit
+            unit, _ = ExamineValueUnit.objects.get_or_create(name=unit_name)
+            validated_data["unit"] = unit
         instance.standards.all().delete()
         if standards:
             for x in standards:
@@ -1069,6 +1067,7 @@ class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer)
     equip_name = serializers.ReadOnlyField(source="equipment.equip_name")
     type_name = serializers.ReadOnlyField(source="type.name")
     qualified_range = serializers.SerializerMethodField()
+    interval_type = serializers.ReadOnlyField(source='type.interval_type')
 
     @staticmethod
     def get_qualified_range(obj):
@@ -1077,21 +1076,22 @@ class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer)
             return [standard.lower_limiting_value, standard.upper_limit_value]
         return []
 
-    def validate(self, attrs):
-        attrs['mes_decide_qualified'] = False
-        type_standard = MaterialExamineRatingStandard.objects.filter(examine_type=attrs['type'],
-                                                                     level=1).first()
-        if type_standard:
-            if type_standard.lower_limiting_value <= attrs['value'] <= type_standard.upper_limit_value:
-                attrs['mes_decide_qualified'] = True
-        return attrs
+    # def validate(self, attrs):
+    #     if 'mes_decide_qualified' not in attrs:
+    #         if attrs['value']:
+    #             attrs['mes_decide_qualified'] = None
+    #             type_standard = MaterialExamineRatingStandard.objects.filter(examine_type=attrs['type'],
+    #                                                                          level=1).first()
+    #             if type_standard:
+    #                 if type_standard.lower_limiting_value <= attrs['value'] <= type_standard.upper_limit_value:
+    #                     attrs['mes_decide_qualified'] = True
+    #                 else:
+    #                     attrs['mes_decide_qualified'] = False
+    #     return attrs
 
     class Meta:
         model = MaterialSingleTypeExamineResult
         exclude = ('material_examine_result', )
-        extra_kwargs = {
-            'mes_decide_qualified': {'read_only': True},
-        }
 
 
 class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
