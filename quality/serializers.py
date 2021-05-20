@@ -1022,6 +1022,10 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
     unit_name = serializers.CharField(source='unit.name', read_only=True)
     standards = MaterialExamineRatingStandardNodeSerializer(many=True, required=False)
     unitname = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
+                                                             message='该检测类型名称已存在')])
+    actual_name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
+                                                                    message='该检测类型名称已存在')])
 
     @atomic()
     def create(self, validated_data):
