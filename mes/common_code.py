@@ -20,6 +20,7 @@ from suds.client import Client
 from datetime import date, timedelta, datetime
 
 from mes.conf import BZ_HOST, BZ_USR, BZ_PASSWORD
+from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching
 from system.models import User, Permissions, ChildSystemInfo
@@ -363,16 +364,11 @@ def get_template_response(titles: list, filename="", description=""):
 
 
 class INWeighSystem(object):
-    equip_no_ip = {
-        "F01": "192.168.1.131",
-        "F02": "192.168.1.131",
-        "F03": "192.168.1.131",
-        "S01": "192.168.1.131",
-        "S02": "192.168.1.131",
-    }
+    equip_no_ip = {k: v.get("HOST", "10.4.23.79")  for k, v in DATABASES.items()}
 
     def __init__(self, equip_no: str):
-        self.weigh_system = Client(f"http://{self.equip_no_ip.get(equip_no, '192.168.1.131')}:9000/xlserver?wsdl")
+        url = f"http://{self.equip_no_ip.get(equip_no, '10.4.23.79')}:9000/xlserver?wsdl"
+        self.weigh_system = Client(url)
 
     def stop(self, data):
         """
@@ -421,6 +417,32 @@ class INWeighSystem(object):
         """
         reload_plan = self.weigh_system.service.reload_plan(*data.values())  # 重传计划/配方
         return reload_plan
+
+    def issue_plan(self, data):
+        """
+        mes上调用易控接口将计划下发到plc
+        :param data: issue_data = {
+                "plan_no": "99c4fd9e914f11eb88870050568ff1ef",
+                "recipe_no": "	C-FM-C590-06",
+                "num": 100,
+                "action": "1"
+                }
+        :return:
+        """
+        issue = self.weigh_system.service.plan_down(*data.values())  # 重传计划/配方
+        return issue
+
+    def add_plan(self, data):
+        """
+        数据库写入计划之后调用接口通知易控
+        :param data: plan_data = {
+                        "plan_no": "210517091223",  # 计划操作编号
+                        "action": "1",  # 具体计划的操作方式
+                    }
+        :return:
+        """
+        add = self.weigh_system.service.plan_add(*data.values())
+        return add
 
 
 class TankStatusSync(INWeighSystem):
@@ -507,7 +529,8 @@ def issue_plan(plan_no : str, equip_no : str, username: str="mes") -> str:
         "setno": plan.plan_package,
         "actno": 0,
         "order_by": 1,
-        "date_time": plan.work_schedule_plan.plan_schedule.day_time.strftime('%Y-%m-%d'),
+        # "date_time": plan.work_schedule_plan.plan_schedule.day_time.strftime('%Y-%m-%d'),
+        "date_time": datetime.now().strftime('%Y-%m-%d'),
         "addtime": time_now
     }
     instance, flag = Plan.objects.using(equip_no).get_or_create(defaults=default, **{
@@ -528,3 +551,7 @@ def sync_tank(equip_no):
             "code": x.get("barcode")
         }
         Bin.objects.using(equip_no).update_or_create(default=default, **{"bin": tank_no})
+
+
+def delete_plan(equip_no, plan_no):
+    Plan.objects.using(equip_no).filter(planid=plan_no).delete()
