@@ -241,6 +241,36 @@ class ProductBatchingDetail(AbstractEntity):
 #         verbose_name_plural = verbose_name = '小料称量配方标准'
 
 
+class SmallMaterialPackageSet(models.Model):
+    """同类小料包集"""
+    code = models.CharField(max_length=64, help_text='料包编码')
+    recipe = models.ForeignKey('SmallMaterialRecipePre', on_delete=models.CASCADE)
+    num = models.PositiveIntegerField(default=1)
+
+
+class SmallMaterialRecipePre(models.Model):
+    """小料配方基础数据，仿照万隆"""
+    name = models.CharField('配方名称', unique=True, max_length=200)
+    ver = models.IntegerField('配方版本', null=True, blank=True)
+    remark1 = models.CharField(max_length=50, blank=True, null=True)
+    weight = models.DecimalField(max_digits=6, help_text='原材料总重量，计算得出', decimal_places=3, blank=True, null=True)
+    error = models.DecimalField(max_digits=5, help_text='总误差，界面写入', decimal_places=3, blank=True, null=True)
+    time = models.CharField(max_length=19, help_text='修改时间', blank=True, null=True)
+    use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
+
+    class Meta:
+        unique_together = ('name', 'ver')
+
+
+class SMRecipeMaterial(models.Model):
+    """配方物料数据"""
+    recipe_pre = models.ForeignKey(SmallMaterialRecipePre, on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, verbose_name='原材料', on_delete=models.CASCADE)
+    weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
+    error = models.DecimalField(max_digits=4, decimal_places=3, blank=True, null=True)
+    time = models.CharField(max_length=19, blank=True, null=True)
+
+
 class WeighCntType(models.Model):
     """小料包"""
     WEIGH_TYPE_CHOICE = (
