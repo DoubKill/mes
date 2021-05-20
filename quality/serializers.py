@@ -1071,9 +1071,14 @@ class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer)
 
     @staticmethod
     def get_qualified_range(obj):
-        standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=obj.type).first()
-        if standard:
-            return [standard.lower_limiting_value, standard.upper_limit_value]
+        if obj.type.interval_type == 1:
+            standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=obj.type).first()
+            if standard:
+                return [standard.lower_limiting_value, standard.upper_limit_value]
+        elif obj.type.interval_type == 2:
+            return [None, obj.type.limit_value]
+        elif obj.type.interval_type == 3:
+            return [obj.type.limit_value, None]
         return []
 
     # def validate(self, attrs):
@@ -1119,8 +1124,9 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
         instance = super().create(validated_data)
         for x in node_data:
             x.update(material_examine_result=instance)
-        MaterialSingleTypeExamineResult.objects.bulk_create(
-            [MaterialSingleTypeExamineResult(**x) for x in node_data])
+            MaterialSingleTypeExamineResult.objects.create(**x)
+        # MaterialSingleTypeExamineResult.objects.bulk_create(
+        #     [MaterialSingleTypeExamineResult(**x) for x in node_data])
         if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
             instance.qualified = True
             instance.save()
@@ -1134,8 +1140,9 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
         instance.single_examine_results.all().delete()
         for x in node_data:
             x.update(material_examine_result=instance)
-        MaterialSingleTypeExamineResult.objects.bulk_create(
-            [MaterialSingleTypeExamineResult(**x) for x in node_data])
+            MaterialSingleTypeExamineResult.objects.create(**x)
+        # MaterialSingleTypeExamineResult.objects.bulk_create(
+        #     [MaterialSingleTypeExamineResult(**x) for x in node_data])
         if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
             instance.qualified = True
             instance.save()

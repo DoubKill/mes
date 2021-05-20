@@ -1464,11 +1464,16 @@ class MaterialExamineTypeViewSet(viewsets.GenericViewSet,
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values("id", "name", 'interval_type')
+            data = queryset.values("id", "name", 'interval_type', 'limit_value')
             for item in data:
-                standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=item['id']).first()
-                if standard:
-                    item['qualified_range'] = [standard.lower_limiting_value, standard.upper_limit_value]
+                if item['interval_type'] == 1:
+                    standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=item['id']).first()
+                    if standard:
+                        item['qualified_range'] = [standard.lower_limiting_value, standard.upper_limit_value]
+                elif item['interval_type'] == 2:
+                    item['qualified_range'] = [None, item['limit_value']]
+                elif item['interval_type'] == 3:
+                    item['qualified_range'] = [item['limit_value'], None]
             return Response({'results': data})
         elif self.request.query_params.get('types'):
             qs = [{"id": x[0], "value": x[1]} for x in MaterialExamineType.INTERVAL_TYPES]

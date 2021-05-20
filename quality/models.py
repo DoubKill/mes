@@ -519,7 +519,7 @@ class MaterialSingleTypeExamineResult(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('material_examine_result', 'type')
+        # unique_together = ('material_examine_result', 'type')
         db_table = 'material_single_type_examine_result'
         verbose_name_plural = verbose_name = '单类型检测结果'
 
