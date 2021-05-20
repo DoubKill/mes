@@ -211,13 +211,12 @@ class Version(models.Model):
         return "{}----{}".format(self.get_type_display(), self.number)
 
 
-
 class Bin(models.Model):
     """料仓物料信息表"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    bin = models.CharField(db_column='Bin', max_length=3, blank=True, null=True)  # Field name made lowercase.
-    name = models.CharField(max_length=50, blank=True, null=True)
-    code = models.CharField(max_length=50, blank=True, null=True)
+    bin = models.CharField(db_column='Bin', help_text='料仓位置' , max_length=3, blank=True, null=True)  # Field name made lowercase.
+    name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
+    code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
 
     class Meta:
         managed = False
@@ -227,35 +226,34 @@ class Bin(models.Model):
 class MaterialInfo(models.Model):
     """原材料信息表"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    name = models.CharField(max_length=50, blank=True, null=True)
-    code = models.CharField(max_length=50, blank=True, null=True)
-    time = models.CharField(max_length=19, blank=True, null=True)
-    remark = models.CharField(max_length=10, blank=True, null=True)
-    use_not = models.IntegerField(blank=True, null=True)
+    name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
+    code = models.CharField(max_length=50,  help_text='物料代码', blank=True, null=True)
+    time = models.CharField(max_length=19, help_text='更新时间', blank=True, null=True)
+    remark = models.CharField(max_length=10, help_text='备注', blank=True, null=True)
+    use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
 
     class Meta:
         managed = False
         db_table = 'material'
 
 
-
 class Plan(models.Model):
     """称量计划"""
-    id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    planid = models.CharField(max_length=14, blank=True, null=True)
-    recipe = models.CharField(max_length=50, blank=True, null=True)
-    recipe_id = models.CharField(max_length=10, blank=True, null=True)
-    recipe_ver = models.IntegerField(blank=True, null=True)
-    starttime = models.CharField(max_length=19, blank=True, null=True)
-    stoptime = models.CharField(max_length=19, blank=True, null=True)
-    grouptime = models.CharField(max_length=4, blank=True, null=True)
-    oper = models.CharField(max_length=8, blank=True, null=True)
-    state = models.CharField(max_length=4, blank=True, null=True)
-    setno = models.IntegerField(blank=True, null=True)
-    actno = models.IntegerField(blank=True, null=True)
-    order_by = models.IntegerField(blank=True, null=True)
-    date_time = models.CharField(max_length=10, blank=True, null=True)
-    addtime = models.CharField(max_length=19, blank=True, null=True)
+    id = models.BigAutoField(db_column='ID', help_text='自增字段',primary_key=True)  # Field name made lowercase.
+    planid = models.CharField(max_length=14, help_text='mes传唯一码', blank=True, null=True)
+    recipe = models.CharField(max_length=50, help_text='配方名称', blank=True, null=True)
+    recipe_id = models.CharField(max_length=10, help_text='配方id', blank=True, null=True)
+    recipe_ver = models.IntegerField(blank=True, help_text='配方版本',null=True)
+    starttime = models.CharField(max_length=19, help_text='起始时间，写入后会被上位机更新',blank=True, null=True)
+    stoptime = models.CharField(max_length=19, help_text='结束时间，不用写上位机更新',blank=True, null=True)
+    grouptime = models.CharField(max_length=4, help_text='班时：早班、中班、晚班', blank=True, null=True)
+    oper = models.CharField(max_length=8, help_text='操作员', blank=True, null=True)
+    state = models.CharField(max_length=4, help_text='完成、终止、等待、运行中', blank=True, null=True)
+    setno = models.IntegerField(blank=True, help_text='设定车次', null=True)
+    actno = models.IntegerField(blank=True, help_text='完成车次，写0', null=True)
+    order_by = models.IntegerField(blank=True, help_text='写1', null=True)
+    date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
+    addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
 
     class Meta:
         managed = False
@@ -265,39 +263,38 @@ class Plan(models.Model):
 class RecipeMaterial(models.Model):
     """配方物料数据"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    recipe_name = models.CharField(max_length=50, blank=True, null=True)
-    name = models.CharField(max_length=50, blank=True, null=True)
+    recipe_name = models.CharField(max_length=50, help_text='recipe_pre中配方名称', blank=True, null=True)
+    name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
     weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
     error = models.DecimalField(max_digits=4, decimal_places=3, blank=True, null=True)
     time = models.CharField(max_length=19, blank=True, null=True)
 
     class Meta:
         managed = False
-        db_table = 'recipe_material'
+        db_table = 'fgen'
 
 
 class RecipePre(models.Model):
     """配方基础数据(表头数据)"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    name = models.CharField(max_length=50, blank=True, null=True)
-    ver = models.IntegerField(blank=True, null=True)
+    name = models.CharField(max_length=50, help_text='配方名称，唯一', blank=True, null=True)
+    ver = models.IntegerField(blank=True, help_text='配方版本', null=True)
     remark1 = models.CharField(max_length=50, blank=True, null=True)
     remark2 = models.CharField(max_length=50, blank=True, null=True)
-    weight = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
-    error = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
-    time = models.CharField(max_length=19, blank=True, null=True)
-    use_not = models.IntegerField(blank=True, null=True)
+    weight = models.DecimalField(max_digits=6, help_text='原材料总重量，计算得出', decimal_places=3, blank=True, null=True)
+    error = models.DecimalField(max_digits=5, help_text='总误差，界面写入', decimal_places=3, blank=True, null=True)
+    time = models.CharField(max_length=19, help_text='修改时间', blank=True, null=True)
+    use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
 
     class Meta:
         managed = False
         db_table = 'recipe_pre'
 
 
-
 class ReportBasic(models.Model):
     """称量车次报表数据"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    planid = models.CharField(max_length=14, blank=True, null=True)
+    planid = models.CharField(max_length=14, help_text='mes写入计划唯一码', blank=True, null=True)
     starttime = models.CharField(max_length=19, blank=True, null=True)
     savetime = models.CharField(max_length=19, blank=True, null=True)
     grouptime = models.CharField(max_length=4, blank=True, null=True)
@@ -307,7 +304,7 @@ class ReportBasic(models.Model):
     actno = models.IntegerField(blank=True, null=True)
     set_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
     act_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
-    warning = models.IntegerField(blank=True, null=True)
+    warning = models.IntegerField(blank=True, help_text='检量是否报警，1：不合格，0：合格', null=True)
     set_error = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
     act_error = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
 
@@ -322,23 +319,22 @@ class ReportWeight(models.Model):
     planid = models.CharField(max_length=14, blank=True, null=True)
     recipe = models.CharField(max_length=50, blank=True, null=True)
     setno = models.IntegerField(blank=True, null=True)
-    车次 = models.IntegerField(blank=True, null=True)
+    车次 = models.IntegerField(blank=True, help_text='实际车次', null=True)
     recipe_ver = models.IntegerField(blank=True, null=True)
-    时间 = models.CharField(max_length=19, blank=True, null=True)
+    时间 = models.CharField(max_length=19, help_text='称量耗时', blank=True, null=True)
     grouptime = models.CharField(max_length=4, blank=True, null=True)
     material = models.CharField(max_length=50, blank=True, null=True)
     set_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
     set_error = models.DecimalField(max_digits=4, decimal_places=3, blank=True, null=True)
     act_weight = models.DecimalField(max_digits=5, decimal_places=3, blank=True, null=True)
     warning = models.IntegerField(blank=True, null=True)
-    back1 = models.CharField(max_length=10, blank=True, null=True)
+    back1 = models.CharField(max_length=10, help_text='没用', blank=True, null=True)
     act_error = models.DecimalField(max_digits=6, decimal_places=3, blank=True, null=True)
-    time = models.IntegerField(blank=True, null=True)
+    time = models.IntegerField(blank=True, help_text='没用', null=True)
 
     class Meta:
         managed = False
         db_table = 'report_weight'
-
 
 # class TempPlan(models.Model):
 #     id = models.BigIntegerField(db_column='ID')  # Field name made lowercase.

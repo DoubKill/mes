@@ -132,29 +132,41 @@ def update_wms_kjjg(items=[{
 if __name__ == '__main__':
     # update_wms_kjjg([{'WORKID': '202105070011', 'MID': 'C-1MB-K503-09', 'PICI': '2021021322073855Z05', 'RFID': '20121082', 'DJJG': '一等品', 'SENDDATE': '20210516 09:41:40'}])
 
-    # door_info = {
-    #     "开门信号1": "1",   # 称量系统 A料仓 1~11  例开A6号料仓门传"6"
-    #     "开门信号2": "2"    # 称量系统 B料仓 1~11  例开B6号料仓门传"6"
-    # }
-    # update_trains = {
-    #     "plan_no": "210517091223",  # 计划操作编号
-    #     "action": "1",               # 具体计划的操作方式
-    #     "num": 122                  # 需修改的车次
-    # }
-    # reload_data = {
-    #     "plan_no": "210517091223",  # 计划操作编号
-    #     "action": "1",  # 具体计划的操作方式
-    # }
-    # stop_data = {
-    #     "plan_no": "210517091223",  # 计划操作编号
-    #     "action": "1",  # 具体计划的操作方式
-    # }
+    door_info = {
+        "开门信号1": "0",   # 称量系统 A料仓 1~11  例开A6号料仓门传"6"
+        "开门信号2": "0"    # 称量系统 B料仓 1~11  例开B6号料仓门传"6"
+    }
+    update_trains = {
+        "plan_no": "210519110215",  # 计划操作编号
+        "action": "1",               # 具体计划的操作方式
+        "num": 30                  # 需修改的车次
+    }
+    reload_data = {
+        "plan_no": "210519110215",  # 计划操作编号
+        "action": "1",  # 具体计划的操作方式
+    }
+    stop_data = {
+        "plan_no": "210519110215",  # 计划操作编号
+        "action": "1",  # 具体计划的操作方式
+    }
+    add_data = {
+        "plan_no": "99c4fd9e914f11eb88870050568ff1ef",
+        "action": "1"
+    }
+    issue_data = {
+        "plan_no": "99c4fd9e914f11eb88870050568ff1ef",  # 计划编号
+        "recipe_no": "C-FM-C590-06(E580)",              # 配方编号需要带机型
+        "num": 100,                                     # 计划车次
+        "action": "1"
+    }
     # # 对接的是易控软件，传入的参数需为有序字典， 即在构建字典的顺序是，key值需按样例给出的顺序
-    # xlc01 = INWeighSystem("XLC01")
     # xlc01.reload_plan(reload_data)
     # xlc01.update_trains(update_trains)
-    # xlc01.door_info(door_info)
+    # print(xlc01.door_info(door_info))
     # xlc01.stop(stop_data)
-    # issue_recipe("C-1MB-C905-03", "F01")
-    issue_plan("2ec66cac9b6411eba3090050568ff1ef","F01")
+    # issue_recipe("C-1MB-C510-09", "S01")
+    issue_plan("99c4fd9e914f11eb88870050568ff1ef", "S01")
+    xlc01 = INWeighSystem("S01")
+    # print(xlc01.issue_plan(issue_data))  #慎用 会直接到plc
+    # print(xlc01.add_plan(add_data))
 
