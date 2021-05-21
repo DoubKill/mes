@@ -73,8 +73,8 @@ router.register(r'inventory-log-out', InventoryLogOutViewSet)
 router.register(r'barcode-quality', BarcodeQualityViewSet)
 
 urlpatterns = [
-    path('material-trace/', MaterialTraceView.as_view()),
-    path('product-trace/', ProductTraceView.as_view()),
+    path('material-trace/', MaterialTraceView.as_view()),  # 原材料条码追溯
+    path('product-trace/', ProductTraceView.as_view()),    # 胶料条码追溯
     path('material_count/', MaterialCount.as_view()),
     path('outwork_feedback/', OutWorkFeedBack.as_view()),  # 混炼终炼出库反馈接口
     path('material_out_back/', MaterialOutBack.as_view()),  # 原材料出库反馈

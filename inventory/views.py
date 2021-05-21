@@ -52,9 +52,9 @@ from rest_framework import permissions
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
-from production.models import PalletFeedbacks
+from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint
+from quality.models import LabelPrint, Train
 from recipe.models import Material, MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
 from .conf import wms_ip, wms_port, IS_BZ_USING
@@ -426,7 +426,9 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                     WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel,
                                               quality_status))
             else:
-                queryset = model.objects.using('cb').raw(WmsInventoryStock.get_sql(material_type, material_no))
+                queryset = model.objects.using('cb').raw(
+                    WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel,
+                                              quality_status))
         return queryset
 
     def get_serializer_class(self):
@@ -1271,9 +1273,12 @@ class MaterialTraceView(APIView):
         weight_log = WeightBatchingLog.objects.filter(bra_code=lot_no). \
             values("bra_code", "material_no", "equip_no", "tank_no", "created_user__username", "created_date",
                    "batch_classes").last()
-        temp_time = weight_log.pop("created_date", datetime.datetime.now())
-        weight_log["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
-        weight_log["classes_name"] = weight_log.pop("batch_classes", "早班")
+        if weight_log:
+            temp_time = weight_log.pop("created_date", datetime.datetime.now())
+            weight_log["time"] = temp_time.strftime('%Y-%m-%d %H:%M:%S')
+            weight_log["classes_name"] = weight_log.pop("batch_classes", "早班")
+        else:
+            weight_log = {}
         rep["material_weight"] = [weight_log]
         # 密炼投入
         load_material = LoadMaterialLog.objects.using("SFJ").filter(bra_code=lot_no) \
@@ -1366,7 +1371,13 @@ class ProductTraceView(APIView):
                                                                                        "plan_trains", "created_date",
                                                                                        "last_updated_date",
                                                                                        "work_schedule_plan__classes__global_name")
-        rep["plan_info"] = list(plan_info)
+        trains_temp =  TrainsFeedbacks.objects.fitler(plan_classes_uid=plan_no).order_by('id')
+        start_time = trains_temp.first().begin_time if trains_temp.first() else None
+        end_time = trains_temp.first().end_time if trains_temp.last() else None
+        plan_info = plan_info.last()
+        if plan_info:
+            plan_info.update(start_time=start_time, end_time=end_time)
+        rep["plan_info"] = [plan_info]
         # 小料计划
         batch_plan = BatchingClassesPlan.objects.filter(weigh_cnt_type__product_batching=product,
                                                         work_schedule_plan=plan.work_schedule_plan). \
