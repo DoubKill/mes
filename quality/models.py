@@ -501,12 +501,6 @@ class MaterialExamineResult(models.Model):
         db_table = 'material_examine_result'
         verbose_name_plural = verbose_name = '检测结果'
 
-    def save(self, *args, **kwargs):
-        material = self.material
-        material.qualified = self.qualified
-        material.save()
-        super().save(*args, **kwargs)
-
     def newest_qualified(self):
         result = self.material.examine_results.order_by('-examine_date', '-create_time')[0]
         return result.qualified if result else None

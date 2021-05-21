@@ -119,8 +119,10 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             # 判断该托盘所有test_order检测结果
 
-            # 1、只有一车为pass章的
-            if MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no, is_passed=True).count() == 1:
+            # 1、不合格车数以及pass章车数为1，则判定为PASS章
+            if MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no, is_passed=True).count() \
+                    == MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no, is_qualified=False).count() \
+                    == 1:
                 level = 1
                 test_result = 'PASS'
                 last_result_ids = list(MaterialTestResult.objects.filter(
