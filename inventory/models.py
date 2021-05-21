@@ -163,7 +163,7 @@ class WmsInventoryStock(models.Model):
         managed = False
 
     @classmethod
-    def get_sql(cls, material_type=None, material_no=None, container_no=None, order_no=None, location=None, tunnel=None, quality_status=None):
+    def get_sql(cls, material_type=None, material_no=None, container_no=None, order_no=None, location=None, tunnel=None, quality_status=None, lot_no=None):
         material_type_filter = """AND material.MaterialGroupName LIKE '%%{material_type}%%'""" \
             .format(material_type=material_type) if material_type else ''
         material_no_filter = """AND stock.MaterialCode LIKE '%%{material_no}%%'""" \
@@ -178,6 +178,8 @@ class WmsInventoryStock(models.Model):
             .format(tunnel=tunnel) if tunnel else ''
         quality_filter = """AND stock.StockDetailState = '{quality_status}'""" \
             .format(quality_status=quality_status) if quality_status else ''
+        lot_no_filter = """AND stock.TrackingNumber LIKE '%%{lot_no}%%'""" \
+            .format(lot_no=lot_no) if lot_no else ''
         sql = """
                     SELECT *, material.MaterialGroupName AS material_type 
                     FROM zhada_wms_zhongc.dbo.t_inventory_stock stock,
@@ -185,7 +187,7 @@ class WmsInventoryStock(models.Model):
                         WHERE stock.MaterialCode = material.MaterialCode
                         {0} {1} {2} {3} {4} {5} {6}
                     """.format(material_type_filter, material_no_filter, container_no_filter,
-                               order_no_filter, location_filter, tunnel_filter, quality_filter)
+                               order_no_filter, location_filter, tunnel_filter, quality_filter, lot_no_filter)
         return sql
 
     @classmethod

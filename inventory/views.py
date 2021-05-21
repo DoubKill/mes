@@ -367,7 +367,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             raise ValidationError(f'该仓库请移步{warehouse_name}专项页面查看')
 
     def get_query_params(self):
-        for query in ('material_type', 'container_no', 'material_no', "order_no", "location", 'tunnel'):
+        for query in ('material_type', 'container_no', 'material_no', "order_no", "location", 'tunnel', 'lot_no'):
             yield self.request.query_params.get(query, None)
 
     def get_queryset(self):
@@ -376,7 +376,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
         # 终炼胶，帘布库区分 货位地址开头1-4终炼胶   5-6帘布库
         model = self.divide_tool(self.MODEL)
         queryset = None
-        material_type, container_no, material_no, order_no, location, tunnel = self.get_query_params()
+        material_type, container_no, material_no, order_no, location, tunnel, lot_no = self.get_query_params()
         if model == XBMaterialInventory:
             queryset = model.objects.all()
         elif model == BzFinalMixingRubberInventory:
@@ -418,17 +418,19 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(location__icontains=location)
             if tunnel:
                 queryset = queryset.filter(location__istartswith=tunnel)
+            if lot_no:
+                queryset = queryset.filter(location__icontains=lot_no)
             return queryset
         if model == WmsInventoryStock:
             quality_status = {"合格品": 1, "不合格品": 2, None: 1, "": 1}[quality_status]
             if warehouse_name == "原材料库":
                 queryset = model.objects.using('wms').raw(
                     WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel,
-                                              quality_status))
+                                              quality_status, lot_no))
             else:
                 queryset = model.objects.using('cb').raw(
                     WmsInventoryStock.get_sql(material_type, material_no, container_no, order_no, location, tunnel,
-                                              quality_status))
+                                              quality_status, lot_no))
         return queryset
 
     def get_serializer_class(self):
@@ -454,12 +456,18 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
         order_no = self.request.query_params.get("order_no")
+        lot_no = self.request.query_params.get("lot_no")
+        pallet_no = self.request.query_params.get("pallet_no")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
             filter_dict.update(material_no__icontains=material_no)
         if order_no:
             filter_dict.update(order_no__icontains=order_no)
+        if lot_no:
+            filter_dict.update(lot_no__icontains=lot_no)
+        if pallet_no:
+            filter_dict.update(pallet_no__icontains=pallet_no)
         if store_name == "混炼胶库":
             if start_time:
                 filter_dict.update(start_time__gte=start_time)
