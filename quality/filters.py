@@ -77,10 +77,12 @@ class MaterialDealResulFilter(django_filters.rest_framework.FilterSet):
 
 class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
     suggestion_desc = django_filters.CharFilter(field_name='deal_suggestion', help_text='处理意见筛选')
+    lot_no = django_filters.CharFilter(field_name='lot_no', help_text='唯一追踪条码', lookup_expr="icontains")
+
 
     class Meta:
         model = MaterialDealResult
-        fields = ('suggestion_desc',)
+        fields = ('suggestion_desc', 'lot_no')
 
 
 class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
