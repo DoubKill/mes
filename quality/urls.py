@@ -56,22 +56,27 @@ router.register('unqualified-deal-orders', UnqualifiedDealOrderViewSet)
 router.register('pallet-feed-test', PalletFeedbacksTestListView)
 
 """# 原材料新"""
-# 原材料检测设备
-router.register('material-equipment', MaterialExamineEquipmentViewSet)
-# 原材料检测设备类型
-router.register('material-equipment-type', MaterialExamineEquipmentTypeViewSet)
-# 原材料检测类型
-router.register('material-examine-type', MaterialExamineTypeViewSet)
-# 原材料评级标准
-router.register('material-rate-standard', MaterialExamineRatingStandardViewSet)
+# 检测设备类型
+router.register('material-equip-types', MaterialEquipTypeViewSet)
+
+# 检测设备
+router.register('material-equips', MaterialEquipViewSet)
+
 # 原材料指标单位管理
 router.register('material-unit', ExamineValueUnitViewSet)
+
+# 原材料检测类型
+router.register('material-examine-type', MaterialExamineTypeViewSet)
+
 # 原材料检测结果管理
 router.register('material-examine-result', MaterialExamineResultViewSet)
-# 原材料检测单指标结果管理
-router.register('material-examine-single-result', MaterialSingleTypeExamineResultViewSet)
 
+# 原材料管理
 router.register('examine-material', ExamineMaterialViewSet)
+
+# 原材料不合格管理
+router.register('material-unqualified-process', UnqualifiedMaterialProcessModeViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -91,5 +96,7 @@ urlpatterns = [
     path('barcode-preview/', BarCodePreview.as_view()),  # 条码追溯中的条码预览接口
     path('deal-mathod-history/', DealMethodHistoryView.as_view()),
     path('datapoint-curve/', TestDataPointCurveView.as_view()),
-    path('data-point-label-history/', DataPointLabelHistoryView.as_view())
+    path('data-point-label-history/', DataPointLabelHistoryView.as_view()),
+    path('material-unqualified-types/', MaterialSingleTypeExamineResultView.as_view()),
+    path('material-examine-result-curve/', ExamineResultCurveView.as_view())
 ]

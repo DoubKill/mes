@@ -21,7 +21,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
-    MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError
+    MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
+    UnqualifiedMaterialProcessMode
 from recipe.models import MaterialAttribute
 
 
@@ -92,26 +93,34 @@ class DataPointStandardErrorSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        ret['value'] = '[{},{}]'.format(ret['lower_value'], ret['upper_value'])
+        ret['value'] = '{}{},{}{}'.format('(' if ret['lv_type'] == 2 else '[',
+                                          ret['lower_value'],
+                                          ret['upper_value'],
+                                          ')' if ret['uv_type'] == 2 else ']')
         return ret
 
     def validate(self, attrs):
         value = attrs.pop('value', "")
-        ret = re.match(r"[（|(|\[]([\-|\+]?\d+(\.\d+)?)[,|，]([\-|\+]?\d+(\.\d+)?)[)|）|\]]", value)
+        ret = re.match(r"([（|(|\[])([\-|\+]?\d+(\.\d+)?)[,|，]([\-|\+]?\d+(\.\d+)?)([)|）|\]])", value)
         if not ret:
             raise serializers.ValidationError('指标范围值错误')
-        lower_value = float(ret.group(1))
-        upper_value = float(ret.group(3))
+        lv_type = 2 if ret.group(1) in ('(', '（') else 1
+        uv_type = 2 if ret.group(6) in (')', '）') else 1
+        lower_value = float(ret.group(2))
+        upper_value = float(ret.group(4))
         if lower_value > upper_value:
             raise serializers.ValidationError('开始值不得大于结束值！')
+        attrs['lv_type'] = lv_type
+        attrs['uv_type'] = uv_type
         attrs['lower_value'] = lower_value
         attrs['upper_value'] = upper_value
         return attrs
 
     class Meta:
         model = DataPointStandardError
-        fields = ('id', 'data_point', 'tracking_card', 'label', 'value', 'lower_value', 'upper_value')
-        read_only_fields = ('lower_value', 'upper_value')
+        fields = ('id', 'data_point', 'tracking_card', 'label', 'value',
+                  'lower_value', 'upper_value', 'lv_type', 'uv_type')
+        read_only_fields = ('lower_value', 'upper_value', 'lv_type', 'uv_type')
 
 
 class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
@@ -1011,34 +1020,27 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
 #         fields = '__all__'
 
 
-class MaterialExamineRatingStandardSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MaterialExamineRatingStandard
-        fields = '__all__'
-
-
 class MaterialExamineRatingStandardNodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialExamineRatingStandard
         exclude = ('examine_type',)
-        validators = [UniqueTogetherValidator(queryset=MaterialExamineRatingStandard.objects.filter(),
-                                              fields=('examine_type', 'level'), message='examine_type,level组合唯一冲突'), ]
 
 
 class MaterialExamineTypeSerializer(serializers.ModelSerializer):
     unit_name = serializers.CharField(source='unit.name', read_only=True)
-    standards = MaterialExamineRatingStandardNodeSerializer(MaterialExamineRatingStandard.objects.all(), many=True,
-                                                            required=False, allow_null=True, validators=[
-            UniqueTogetherValidator(queryset=MaterialExamineRatingStandard.objects.filter(),
-                                    fields=('examine_type', 'level'), message='examine_type,level组合唯一冲突'), ])
+    standards = MaterialExamineRatingStandardNodeSerializer(many=True, required=False)
     unitname = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
+                                                             message='该检测类型名称已存在')])
+    actual_name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
+                                                                    message='该检测类型名称已存在')])
 
     @atomic()
     def create(self, validated_data):
         unit_name = validated_data.pop("unitname", None)
         standards = validated_data.pop("standards", None)
         if unit_name:
-            unit, flag = ExamineValueUnit.objects.update_or_create(name=unit_name)
+            unit, flag = ExamineValueUnit.objects.get_or_create(name=unit_name)
             validated_data["unit"] = unit
         instance = super().create(validated_data)
         if standards:
@@ -1052,10 +1054,8 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
         unit_name = validated_data.pop("unitname", None)
         standards = validated_data.pop("standards", None)
         if unit_name:
-            new_unit_name = instance.unit.name
-            if unit_name != new_unit_name:
-                unit, flag = ExamineValueUnit.objects.update_or_create(name=unit_name)
-                validated_data["unit"] = unit
+            unit, _ = ExamineValueUnit.objects.get_or_create(name=unit_name)
+            validated_data["unit"] = unit
         instance.standards.all().delete()
         if standards:
             for x in standards:
@@ -1067,10 +1067,6 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialExamineType
         fields = '__all__'
-        # depth = 2
-        # validators = [UniqueTogetherValidator(queryset=MaterialExamineRatingStandard.objects.filter(),
-        #                                       fields=('examine_type', 'level'), message='该数据已存在'),
-        #               ]
 
 
 class ExamineValueUnitSerializer(serializers.ModelSerializer):
@@ -1080,49 +1076,119 @@ class ExamineValueUnitSerializer(serializers.ModelSerializer):
 
 
 class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer):
-    examine_name = serializers.CharField(source="type.name", read_only=True)
-    equip_name = serializers.CharField(source="equipment.name", read_only=True)
+    equip_name = serializers.ReadOnlyField(source="equipment.equip_name")
+    type_name = serializers.ReadOnlyField(source="type.name")
+    qualified_range = serializers.SerializerMethodField()
+    interval_type = serializers.ReadOnlyField(source='type.interval_type')
+
+    @staticmethod
+    def get_qualified_range(obj):
+        if obj.type.interval_type == 1:
+            standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=obj.type).first()
+            if standard:
+                return [standard.lower_limiting_value, standard.upper_limit_value]
+        elif obj.type.interval_type == 2:
+            return [None, obj.type.limit_value]
+        elif obj.type.interval_type == 3:
+            return [obj.type.limit_value, None]
+        return []
+
+    # def validate(self, attrs):
+    #     if 'mes_decide_qualified' not in attrs:
+    #         if attrs['value']:
+    #             attrs['mes_decide_qualified'] = None
+    #             type_standard = MaterialExamineRatingStandard.objects.filter(examine_type=attrs['type'],
+    #                                                                          level=1).first()
+    #             if type_standard:
+    #                 if type_standard.lower_limiting_value <= attrs['value'] <= type_standard.upper_limit_value:
+    #                     attrs['mes_decide_qualified'] = True
+    #                 else:
+    #                     attrs['mes_decide_qualified'] = False
+    #     return attrs
 
     class Meta:
         model = MaterialSingleTypeExamineResult
-        fields = '__all__'
+        exclude = ('material_examine_result', )
 
 
 class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
-    recorder_name = serializers.CharField(source='recorder.username', read_only=True)
-    sampler_name = serializers.CharField(source='sampling_user.username', read_only=True)
+    name = serializers.ReadOnlyField(source='material.name')
+    sample_name = serializers.ReadOnlyField(source='material.sample_name')
+    batch = serializers.ReadOnlyField(source='material.batch')
+    supplier = serializers.ReadOnlyField(source='material.supplier')
+    recorder_username = serializers.ReadOnlyField(source='recorder.username')
+    sampling_username = serializers.ReadOnlyField(source='sampling_user.username')
+    sample_qualified = serializers.ReadOnlyField(source='material.qualified')
+    is_latest = serializers.SerializerMethodField()
     single_examine_results = MaterialSingleTypeExamineResultMainSerializer(
-        MaterialSingleTypeExamineResult.objects.all(),
-        many=True, allow_null=True)
+        many=True, required=False, help_text="""[{"type": 检测类型id, "value": 检测值, "equipment":检测机台id]""")
+
+    @staticmethod
+    def get_is_latest(obj):
+        """是否同批次最新检测"""
+        return MaterialExamineResult.objects.filter(material=obj.material).last().id == obj.id
 
     @atomic()
     def create(self, validated_data):
-        node_data = validated_data.pop('single_examine_results', None)
+        node_data = validated_data.pop('single_examine_results', [])
+        validated_data['qualified'] = False
+        validated_data['recorder'] = self.context['request'].user
         instance = super().create(validated_data)
-        if node_data:
-            for x in node_data:
-                x.update(material_examine_result=instance)
-            MaterialSingleTypeExamineResult.objects.bulk_create(
-                [MaterialSingleTypeExamineResult(**x) for x in node_data])
+        for x in node_data:
+            x.update(material_examine_result=instance)
+            MaterialSingleTypeExamineResult.objects.create(**x)
+        # MaterialSingleTypeExamineResult.objects.bulk_create(
+        #     [MaterialSingleTypeExamineResult(**x) for x in node_data])
+        if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
+            instance.qualified = True
+            instance.save()
+        material = instance.material
+        material.qualified = instance.qualified
+        material.save()
+        return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        node_data = validated_data.pop('single_examine_results', [])
+        validated_data['qualified'] = False
+        instance = super().update(instance, validated_data)
+        instance.single_examine_results.all().delete()
+        for x in node_data:
+            x.update(material_examine_result=instance)
+            MaterialSingleTypeExamineResult.objects.create(**x)
+        # MaterialSingleTypeExamineResult.objects.bulk_create(
+        #     [MaterialSingleTypeExamineResult(**x) for x in node_data])
+        if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
+            instance.qualified = True
+            instance.save()
+        last_test_result = MaterialExamineResult.objects.filter(material=instance.material).last()
+        material = instance.material
+        material.qualified = last_test_result.qualified
+        material.save()
         return instance
 
     class Meta:
         model = MaterialExamineResult
+        extra_kwargs = {
+            'qualified': {'read_only': True},
+            'recorder': {'read_only': True},
+        }
         fields = '__all__'
 
 
 class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.name')
+    interval_type = serializers.ReadOnlyField(source='type.interval_type')
 
     class Meta:
         model = MaterialSingleTypeExamineResult
-        fields = ['type_name', 'value']
+        fields = ['type_name', 'value', 'mes_decide_qualified', 'interval_type']
 
 
 class MaterialExamineResultSerializer(serializers.ModelSerializer):
     sampling_user = serializers.ReadOnlyField(source='sampling_user.username')
     recorder = serializers.ReadOnlyField(source='recorder.username')
-    examine_results = MaterialSingleTypeExamineResultSerializer(many=True, read_only=True)
+    single_examine_results = MaterialSingleTypeExamineResultSerializer(many=True, read_only=True)
 
     class Meta:
         model = MaterialExamineResult
@@ -1136,26 +1202,78 @@ class MaterialExamineResultSerializer(serializers.ModelSerializer):
                   'newest_qualified',
                   'create_time',
                   'update_time',
-                  'examine_results']
+                  'single_examine_results']
 
 
 class ExamineMaterialSerializer(serializers.ModelSerializer):
-    supplier = serializers.ReadOnlyField(source='supplier.name')
     examine_results = MaterialExamineResultSerializer(many=True, read_only=True)
     examine_types = serializers.SerializerMethodField()
 
+    @staticmethod
+    def get_examine_types(obj):
+        return set(MaterialSingleTypeExamineResult.objects.filter(
+            material_examine_result__material=obj).values_list('type__name', flat=True))
+
     class Meta:
         model = ExamineMaterial
-        fields = ['name',
+        fields = ('id',
+                  'name',
                   'sample_name',
                   'batch',
                   'supplier',
                   'qualified',
                   'create_time',
                   'examine_results',
-                  'examine_types'
-                  ]
+                  'examine_types')
 
-    def get_examine_types(self, obj):
-        return MaterialExamineType.objects.filter(
-            materialsingletypeexamineresult__material_examine_result__material=obj).values_list('name', flat=True)
+
+class ExamineMaterialCreateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ExamineMaterial
+        fields = '__all__'
+
+
+class MaterialEquipTypeSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = MaterialEquipType
+        exclude = ('examine_type', )
+
+
+class MaterialEquipTypeUpdateSerializer(serializers.ModelSerializer):
+
+    def update(self, instance, validated_data):
+        # 将之前关联的检测类型清除
+        instance.examine_type.clear()
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = MaterialEquipType
+        fields = ('id', 'examine_type', 'type_name')
+
+
+class MaterialEquipSerializer(serializers.ModelSerializer):
+    equip_type_name = serializers.ReadOnlyField(source='equip_type.type_name')
+    examine_type = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_examine_type(obj):
+        return obj.equip_type.examine_type.filter().values_list('id', flat=True)
+
+    class Meta:
+        model = MaterialEquip
+        fields = '__all__'
+
+
+class UnqualifiedMaterialProcessModeSerializer(serializers.ModelSerializer):
+
+    def create(self, validated_data):
+        validated_data['create_user'] = self.context['request'].user
+        instance, _ = UnqualifiedMaterialProcessMode.objects.update_or_create(
+            defaults={'material': validated_data['material']}, **validated_data)
+        return instance
+
+    class Meta:
+        model = UnqualifiedMaterialProcessMode
+        exclude = ('create_user', )

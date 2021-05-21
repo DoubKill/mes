@@ -324,7 +324,7 @@ if DEBUG:
         "F01": {  # 细料称1
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'YK_XL',
-            'HOST': '192.168.1.144',
+            'HOST': '10.4.23.81',
             'PORT': '1433',
             'USER': 'sa',
             'PASSWORD': '123',
@@ -336,7 +336,7 @@ if DEBUG:
         "F02": {  # 细料称2
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'YK_XL',
-            'HOST': '192.168.1.144',
+            'HOST': '10.4.23.82',
             'PORT': '1433',
             'USER': 'sa',
             'PASSWORD': '123',
@@ -348,7 +348,7 @@ if DEBUG:
         "F03": {  # 细料称3
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'YK_XL',
-            'HOST': '192.168.1.144',
+            'HOST': '10.4.23.83',
             'PORT': '1433',
             'USER': 'sa',
             'PASSWORD': '123',
@@ -360,7 +360,7 @@ if DEBUG:
         "S01": {  # 硫磺称1
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'YK_XL',
-            'HOST': '192.168.1.144',
+            'HOST': '10.4.23.79',
             'PORT': '1433',
             'USER': 'sa',
             'PASSWORD': '123',
@@ -372,7 +372,7 @@ if DEBUG:
         "S02": {  # 硫磺称2
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'YK_XL',
-            'HOST': '192.168.1.144',
+            'HOST': '10.4.23.80',
             'PORT': '1433',
             'USER': 'sa',
             'PASSWORD': '123',

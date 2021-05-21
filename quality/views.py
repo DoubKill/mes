@@ -2,6 +2,7 @@ import datetime
 import json
 
 from django.db import connection
+from django.forms import model_to_dict
 from django.utils import timezone
 from datetime import timedelta
 from django.db.transaction import atomic
@@ -18,10 +19,8 @@ from rest_framework.views import APIView
 
 from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelViewSet
 
-from basics.filters import EquipCategoryFilter, EquipFilter
-from basics.models import GlobalCodeType, EquipCategoryAttribute, Equip
-from basics.serializers import GlobalCodeSerializer, EquipCategoryAttributeSerializer, EquipSerializer
-from inventory.models import WmsInventoryStock
+from basics.models import GlobalCodeType
+from basics.serializers import GlobalCodeSerializer
 import uuid
 from mes import settings
 from mes.common_code import CommonDeleteMixin, date_range, get_template_response
@@ -33,12 +32,13 @@ from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
-    ExamineMaterialFilter
+    ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
-    DataPointStandardError, MaterialSingleTypeExamineResult
+    DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
+    UnqualifiedMaterialProcessMode
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -48,13 +48,14 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     BatchCommonSerializer, BatchProductNoDaySerializer, BatchProductNoMonthSerializer, \
     UnqualifiedDealOrderCreateSerializer, UnqualifiedDealOrderSerializer, UnqualifiedDealOrderUpdateSerializer, \
     MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
-    MaterialExamineRatingStandardSerializer, ExamineValueUnitSerializer, MaterialSingleTypeExamineResultMainSerializer, \
-    MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer
+    ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
+    MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
+    ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer
 
-from django.db.models import Q, Prefetch
+from django.db.models import Prefetch
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
-from recipe.models import Material, ProductBatching, ZCMaterial
+from recipe.models import Material, ProductBatching
 from django.db.models import Max, Sum, Avg
 
 
@@ -1358,55 +1359,92 @@ class BarCodePreview(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class MaterialExamineEquipmentTypeViewSet(ModelViewSet):
-    queryset = EquipCategoryAttribute.objects.filter(delete_flag=False).select_related('equip_type', 'process')
-    serializer_class = EquipCategoryAttributeSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = EquipCategoryFilter
+class ExamineValueUnitViewSet(viewsets.GenericViewSet,
+                              mixins.ListModelMixin,
+                              mixins.CreateModelMixin,
+                              mixins.RetrieveModelMixin):
+    """
+    list:
+        检测值单位列表
+    create:
+        新建检测值单位
+    """
+    queryset = ExamineValueUnit.objects.all()
+    serializer_class = ExamineValueUnitSerializer
+    pagination_class = SinglePageNumberPagination
 
-    def get_permissions(self):
-        if self.request.query_params.get('all'):
-            return ()
-        else:
-            return (IsAuthenticated(),)
+
+class MaterialEquipTypeViewSet(viewsets.GenericViewSet,
+                               mixins.ListModelMixin,
+                               mixins.CreateModelMixin,
+                               mixins.RetrieveModelMixin,
+                               mixins.UpdateModelMixin):
+    """
+    list:
+        检测设备类型列表
+    create:
+        创建检测设备类型
+    update:
+        修改检测设备类型
+    """
+    queryset = MaterialEquipType.objects.all()
+    serializer_class = MaterialEquipTypeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    pagination_class = None
+
+    def get_serializer_class(self):
+        if self.action == 'update':
+            return MaterialEquipTypeUpdateSerializer
+        return MaterialEquipTypeSerializer
+
+
+class MaterialEquipViewSet(viewsets.GenericViewSet,
+                           mixins.ListModelMixin,
+                           mixins.CreateModelMixin,
+                           mixins.RetrieveModelMixin,
+                           mixins.UpdateModelMixin):
+    """
+    list:
+        检测设备列表
+    create:
+        创建检测设备
+    update:
+        修改检测设备
+    """
+    queryset = MaterialEquip.objects.all()
+    serializer_class = MaterialEquipSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialEquipFilter
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset().filter(equip_type__global_no="kj001"))
-        if self.request.query_params.get('all'):
-            queryset = queryset.filter(use_flag=True)
-            serializer = self.get_serializer(queryset, many=True)
-            return Response({'results': serializer.data})
-        else:
-            return super().list(request, *args, **kwargs)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialExamineEquipmentViewSet(ModelViewSet):
-    queryset = Equip.objects.filter(delete_flag=False).select_related('category__equip_type',
-                                                                      'category__process',
-                                                                      'equip_level').order_by('equip_no')
-    serializer_class = EquipSerializer
-    filter_backends = (DjangoFilterBackend,)
-    filter_class = EquipFilter
-
-    def get_permissions(self):
-        if self.request.query_params.get('all'):
-            return ()
-        else:
-            return (IsAuthenticated(),)
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset().filter(category__equip_type__global_no="kj001"))
-        if self.request.query_params.get('all'):
-            data = queryset.filter(use_flag=1).values('id', 'equip_no', 'equip_name', 'category',
-                                                      'category__category_name')
+        queryset = self.filter_queryset(self.get_queryset())
+        examine_type_id = self.request.query_params.get('examine_type')
+        if examine_type_id:
+            try:
+                examine_type = MaterialExamineType.objects.get(id=examine_type_id)
+            except Exception:
+                raise ValidationError('参数错误')
+            data = queryset.filter(equip_type__examine_type=examine_type).values('id', 'equip_name')
             return Response({'results': data})
-        else:
-            return super().list(request, *args, **kwargs)
+        return super().list(request, *args, **kwargs)
 
 
 @method_decorator([api_recorder], name="dispatch")
-class MaterialExamineTypeViewSet(ModelViewSet):
+class MaterialExamineTypeViewSet(viewsets.GenericViewSet,
+                                 mixins.ListModelMixin,
+                                 mixins.CreateModelMixin,
+                                 mixins.RetrieveModelMixin,
+                                 mixins.UpdateModelMixin):
+    """
+    list:
+        原材料检测类型列表
+    create:
+        创建原材料检测类型
+    update:
+        修改原材料检测类型
+    """
     queryset = MaterialExamineType.objects.all().select_related("unit").prefetch_related('standards')
     serializer_class = MaterialExamineTypeSerializer
     filter_backends = (DjangoFilterBackend,)
@@ -1426,11 +1464,18 @@ class MaterialExamineTypeViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values("id", "name")
+            data = queryset.values("id", "name", 'interval_type', 'limit_value')
+            for item in data:
+                if item['interval_type'] == 1:
+                    standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=item['id']).first()
+                    if standard:
+                        item['qualified_range'] = [standard.lower_limiting_value, standard.upper_limit_value]
+                elif item['interval_type'] == 2:
+                    item['qualified_range'] = [None, item['limit_value']]
+                elif item['interval_type'] == 3:
+                    item['qualified_range'] = [item['limit_value'], None]
             return Response({'results': data})
         elif self.request.query_params.get('types'):
-            # qs = queryset.values_list('interval_type', flat=True).distinct()
-
             qs = [{"id": x[0], "value": x[1]} for x in MaterialExamineType.INTERVAL_TYPES]
             return Response({'results': qs})
         else:
@@ -1469,38 +1514,153 @@ class MaterialExamineTypeViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class MaterialExamineRatingStandardViewSet(ModelViewSet):
-    queryset = MaterialExamineRatingStandard.objects.all()
-    serializer_class = MaterialExamineRatingStandardSerializer
-
-
-@method_decorator([api_recorder], name="dispatch")
-class ExamineValueUnitViewSet(ModelViewSet):
-    queryset = ExamineValueUnit.objects.all()
-    serializer_class = ExamineValueUnitSerializer
-    pagination_class = SinglePageNumberPagination
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialExamineResultViewSet(ModelViewSet):
-    queryset = MaterialExamineResult.objects.all().select_related("material", "recorder", "sampling_user").prefetch_related("single_examine_results")
-    serializer_class = MaterialExamineResultMainSerializer
-
-
-@method_decorator([api_recorder], name="dispatch")
-class MaterialSingleTypeExamineResultViewSet(ModelViewSet):
-    queryset = MaterialSingleTypeExamineResult.objects.all()
-    serializer_class = MaterialSingleTypeExamineResultMainSerializer
-
-
-@method_decorator([api_recorder], name="dispatch")
-class ExamineMaterialViewSet(viewsets.ModelViewSet):
+class ExamineMaterialViewSet(viewsets.GenericViewSet,
+                             mixins.CreateModelMixin,
+                             mixins.ListModelMixin,
+                             mixins.RetrieveModelMixin):
+    """
+    list:
+        原材料列表
+    create:
+        创建原材料
+    """
     queryset = ExamineMaterial.objects \
         .prefetch_related(Prefetch('examine_results',
-                                   queryset=MaterialExamineResult.objects.order_by('-examine_date', '-create_time'))) \
-        .distinct().order_by('-create_time')
-    serializer_class = ExamineMaterialSerializer
+                                   queryset=MaterialExamineResult.objects.order_by(
+                                       '-examine_date', '-create_time'))
+                          ).distinct().order_by('-create_time')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ExamineMaterialFilter
 
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ExamineMaterialCreateSerializer
+        return ExamineMaterialSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values("id", "name", 'sample_name', 'batch', 'supplier')
+            return Response({'results': data})
+        return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialExamineResultViewSet(viewsets.GenericViewSet,
+                                   mixins.CreateModelMixin,
+                                   mixins.ListModelMixin,
+                                   mixins.RetrieveModelMixin,
+                                   mixins.UpdateModelMixin):
+    """
+    list:
+        原材料检测结果列表
+    create:
+        创建原材料检测结果
+    update:
+        修改原材料检测结果
+    """
+    queryset = MaterialExamineResult.objects.all().select_related(
+        "material", "recorder", "sampling_user").prefetch_related("single_examine_results").order_by('-id')
+    serializer_class = MaterialExamineResultMainSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialExamineResultFilter
+
+    def get_queryset(self):
+        type_id = self.request.query_params.get('type_id')
+        if type_id:
+            result_ids = MaterialSingleTypeExamineResult.objects.filter(
+                type_id=type_id).values_list('material_examine_result_id', flat=True)
+            return self.queryset.filter(id__in=result_ids)
+        return self.queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialSingleTypeExamineResultView(APIView):
+    """批次原材料不合格项，参数：material=原材料id"""
+    def get(self, request):
+        ret = {}
+        material_id = self.request.query_params.get('material')
+        if not material_id:
+            raise ValidationError('参数缺失！')
+        try:
+            material = ExamineMaterial.objects.get(id=material_id)
+        except Exception:
+            raise ValidationError('该原材料不存在！')
+        last_examine_result = MaterialExamineResult.objects.filter(material=material, qualified=False).last()
+        material_data = model_to_dict(material)
+        ret['material_data'] = material_data
+        if last_examine_result:
+            material_data['re_examine'] = last_examine_result.re_examine
+            material_data['recorder_username'] = last_examine_result.recorder.username
+            material_data['sampling_username'] = last_examine_result.sampling_user.username
+            material_data['examine_date'] = last_examine_result.examine_date
+            material_data['transport_date'] = last_examine_result.transport_date
+            ret['unqualified_type_data'] = last_examine_result.single_examine_results.filter(
+                mes_decide_qualified=False).values('value', 'type__name')
+        mode = UnqualifiedMaterialProcessMode.objects.filter(material=material).last()
+        if mode:
+            ret['mode'] = {'mode': mode.mode,
+                           'created_username': mode.create_user.username,
+                           'create_time': datetime.datetime.strftime(mode.create_time, '%Y-%m-%d %H:%M:%S')}
+        else:
+            ret['mode'] = {}
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class UnqualifiedMaterialProcessModeViewSet(viewsets.GenericViewSet,
+                                            mixins.CreateModelMixin,
+                                            mixins.ListModelMixin):
+    """
+    list:
+        批次原材料不合格项详情
+    create:
+        新建批次原材料不合格单
+    """
+    queryset = UnqualifiedMaterialProcessMode.objects.all()
+    serializer_class = UnqualifiedMaterialProcessModeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('material_id', )
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ExamineResultCurveView(APIView):
+    """原材料历史检测类型值记录"""
+
+    def get(self, request):
+        material_id = self.request.query_params.get('material')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        if not all([st, et, material_id]):
+            raise ValidationError('参数缺失')
+
+        if not material_id:
+            raise ValidationError('参数缺失！')
+        try:
+            days = date_range(datetime.datetime.strptime(st, '%Y-%m-%d'),
+                              datetime.datetime.strptime(et, '%Y-%m-%d'))
+            material = ExamineMaterial.objects.get(id=material_id)
+        except Exception:
+            raise ValidationError('参数错误！')
+        last_type_results = MaterialSingleTypeExamineResult.objects.filter(
+            material_examine_result__material=material,
+            material_examine_result__examine_date__in=days).values(
+            'material_examine_result__examine_date',
+            'type__name').annotate(max_id=Max('id')).values_list('max_id', flat=True)
+        examine_results = MaterialSingleTypeExamineResult.objects.filter(
+            id__in=last_type_results)
+        type_names = set(examine_results.values_list('type__name', flat=True))
+        y_axis = {
+            type_name: {
+                'name': type_name,
+                'type': 'line',
+                'data': [0] * len(days)}
+            for type_name in type_names
+        }
+        for item in examine_results:
+            date = datetime.datetime.strftime(item.material_examine_result.examine_date, '%Y-%m-%d')
+            y_axis[item.type.name]['data'][days.index(date)] = item.value
+        return Response({'x_axis': days, 'y_axis': y_axis.values()})
