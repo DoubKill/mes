@@ -31,34 +31,31 @@ def judge_standard_error_deal_suggestion(data_point_name, product_no, value):
         material_test_method__material__material_name=product_no,
         level=1).first()
     if indicator:
-        # 误差范围都大于0
-        e1 = DataPointStandardError.objects.filter(
-            lower_value__gte=0,
-            upper_value__gte=0,
-            data_point__name=data_point_name
-        ).filter(lower_value__lte=value - indicator.upper_limit,
-                 upper_value__gte=value - indicator.upper_limit).first()
-        # 误差范围都小于0
-        e2 = DataPointStandardError.objects.filter(
-            lower_value__lte=0,
-            upper_value__lte=0,
-            data_point__name=data_point_name
-        ).filter(lower_value__lte=value - indicator.lower_limit,
-                 upper_value__gte=value - indicator.lower_limit).first()
-        # 误差范围开始值小于0，结束值大于0
-        e3 = DataPointStandardError.objects.filter(
-            lower_value__lte=0,
-            upper_value__gte=0,
-            data_point__name=data_point_name
-        ).filter(lower_value__lte=value - indicator.lower_limit,
-                 upper_value__gte=value - indicator.upper_limit).first()
-        if e1 or e2 or e3:
-            deal_suggestion = getattr(e1, 'label', None) or \
-                              getattr(e2, 'label', None) or \
-                              getattr(e3, 'label', None)
-            return deal_suggestion
-        else:
-            return None
+        upper_limit = indicator.upper_limit
+        lower_limit = indicator.lower_limit
+        for error in DataPointStandardError.objects.filter(data_point__name=data_point_name).all():
+            lower_value = error.lower_value
+            upper_value = error.upper_value
+            lv_type = error.lv_type
+            uv_type = error.uv_type
+            if lower_value >= 0 and upper_value >= 0:
+                a = value >= upper_limit + lower_value if lv_type == 1 else value > upper_limit + lower_value
+                b = value <= upper_limit + upper_value if uv_type == 1 else value < upper_limit + upper_value
+                if a and b:
+                    return error.label
+            elif lower_value <= 0 and upper_value <= 0:
+                a = value >= lower_value + lower_limit if lv_type == 1 else value > lower_value + lower_limit
+                b = value <= upper_value + lower_limit if uv_type == 1 else value < upper_value + lower_limit
+                if a and b:
+                    return error.label
+            else:
+                a = value >= lower_value + lower_limit if lv_type == 1 else value > lower_value + lower_limit
+                b = value <= upper_value + upper_limit if uv_type == 1 else value < upper_value + upper_limit
+                if a and b:
+                    return error.label
+                return None
+        return None
+    return None
 
 
 @receiver(post_save, sender=MaterialTestResult)

@@ -66,10 +66,16 @@ class DataPoint(AbstractEntity):
 
 class DataPointStandardError(AbstractEntity):
     """数据点判断误差"""
+    TYPE_CHOICE = (
+        (1, '闭区间'),
+        (2, '开区间')
+    )
     data_point = models.ForeignKey(DataPoint, help_text='数据点', on_delete=models.CASCADE,
                                    related_name='standard_errors')
     lower_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='开始值')
+    lv_type = models.PositiveIntegerField(help_text='开始值开闭合类型', choices=TYPE_CHOICE)
     upper_value = models.DecimalField(decimal_places=2, max_digits=8, help_text='结束值')
+    uv_type = models.PositiveIntegerField(help_text='结束值开闭合类型', choices=TYPE_CHOICE)
     tracking_card = models.CharField(max_length=64, help_text='追踪卡')
     label = models.CharField(max_length=64, help_text='标志及处理')
 

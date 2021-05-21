@@ -93,26 +93,34 @@ class DataPointStandardErrorSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        ret['value'] = '[{},{}]'.format(ret['lower_value'], ret['upper_value'])
+        ret['value'] = '{}{},{}{}'.format('(' if ret['lv_type'] == 2 else '[',
+                                          ret['lower_value'],
+                                          ret['upper_value'],
+                                          ')' if ret['uv_type'] == 2 else ']')
         return ret
 
     def validate(self, attrs):
         value = attrs.pop('value', "")
-        ret = re.match(r"[（|(|\[]([\-|\+]?\d+(\.\d+)?)[,|，]([\-|\+]?\d+(\.\d+)?)[)|）|\]]", value)
+        ret = re.match(r"([（|(|\[])([\-|\+]?\d+(\.\d+)?)[,|，]([\-|\+]?\d+(\.\d+)?)([)|）|\]])", value)
         if not ret:
             raise serializers.ValidationError('指标范围值错误')
-        lower_value = float(ret.group(1))
-        upper_value = float(ret.group(3))
+        lv_type = 2 if ret.group(1) in ('(', '（') else 1
+        uv_type = 2 if ret.group(6) in (')', '）') else 1
+        lower_value = float(ret.group(2))
+        upper_value = float(ret.group(4))
         if lower_value > upper_value:
             raise serializers.ValidationError('开始值不得大于结束值！')
+        attrs['lv_type'] = lv_type
+        attrs['uv_type'] = uv_type
         attrs['lower_value'] = lower_value
         attrs['upper_value'] = upper_value
         return attrs
 
     class Meta:
         model = DataPointStandardError
-        fields = ('id', 'data_point', 'tracking_card', 'label', 'value', 'lower_value', 'upper_value')
-        read_only_fields = ('lower_value', 'upper_value')
+        fields = ('id', 'data_point', 'tracking_card', 'label', 'value',
+                  'lower_value', 'upper_value', 'lv_type', 'uv_type')
+        read_only_fields = ('lower_value', 'upper_value', 'lv_type', 'uv_type')
 
 
 class MaterialDataPointIndicatorSerializer(BaseModelSerializer):
