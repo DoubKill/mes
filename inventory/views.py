@@ -1371,7 +1371,7 @@ class ProductTraceView(APIView):
                                                                                        "plan_trains", "created_date",
                                                                                        "last_updated_date",
                                                                                        "work_schedule_plan__classes__global_name")
-        trains_temp =  TrainsFeedbacks.objects.objects.fitler(plan_classes_uid=plan_no).order_by('id')
+        trains_temp =  TrainsFeedbacks.objects.filter(plan_classes_uid=plan_no).order_by('id')
         start_time = trains_temp.first().begin_time if trains_temp.first() else None
         end_time = trains_temp.first().end_time if trains_temp.last() else None
         plan_info = plan_info.last()
