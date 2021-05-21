@@ -1178,10 +1178,11 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
 
 class MaterialSingleTypeExamineResultSerializer(serializers.ModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.name')
+    interval_type = serializers.ReadOnlyField(source='type.interval_type')
 
     class Meta:
         model = MaterialSingleTypeExamineResult
-        fields = ['type_name', 'value']
+        fields = ['type_name', 'value', 'mes_decide_qualified', 'interval_type']
 
 
 class MaterialExamineResultSerializer(serializers.ModelSerializer):
