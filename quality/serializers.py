@@ -1142,6 +1142,9 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
         if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
             instance.qualified = True
             instance.save()
+        material = instance.material
+        material.qualified = instance.qualified
+        material.save()
         return instance
 
     @atomic()
@@ -1158,6 +1161,10 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
         if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
             instance.qualified = True
             instance.save()
+        last_test_result = MaterialExamineResult.objects.filter(material=instance.material).last()
+        material = instance.material
+        material.qualified = last_test_result.qualified
+        material.save()
         return instance
 
     class Meta:
