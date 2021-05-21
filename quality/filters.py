@@ -2,7 +2,7 @@ import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
-    ExamineMaterial, MaterialExamineType, MaterialExamineResult
+    ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -93,15 +93,15 @@ class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
 
 
 """新原材料快检"""
-# class MaterialExamineEquipmentFilter(django_filters.rest_framework.FilterSet):
-#     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-#     type_name = django_filters.CharFilter(field_name='type__name')
-#
-#     class Meta:
-#         model = MaterialExamineEquipment
-#         fields = ('name', 'type_name')
-#
-#
+
+
+class MaterialEquipFilter(django_filters.rest_framework.FilterSet):
+    equip_name = django_filters.CharFilter(field_name='equip_name', lookup_expr='icontains')
+    equip_type_name = django_filters.CharFilter(field_name='equip_type__type_name', lookup_expr='icontains')
+
+    class Meta:
+        model = MaterialEquip
+        fields = ('equip_name', 'equip_type_name')
 
 
 class MaterialExamineTypeFilter(django_filters.rest_framework.FilterSet):
@@ -114,27 +114,42 @@ class MaterialExamineTypeFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialExamineResultFilter(django_filters.rest_framework.FilterSet):
+    material_name = django_filters.CharFilter(field_name='material__name',
+                                              help_text='原材料名称', lookup_expr='icontains')
+    sample_name = django_filters.CharFilter(field_name='material__sample_name',
+                                              help_text='样品名称', lookup_expr='icontains')
+    batch = django_filters.CharFilter(field_name='material__batch',
+                                      help_text='批次号', lookup_expr='icontains')
+    supplier_name = django_filters.CharFilter(field_name='material__supplier',
+                                              help_text='产地', lookup_expr='icontains')
+    recorder_username = django_filters.CharFilter(field_name='recorder__username',
+                                                  help_text='记录人', lookup_expr='icontains')
+    sampling_username = django_filters.CharFilter(field_name='sampling_user__username',
+                                                  help_text='抽样人', lookup_expr='icontains')
 
     class Meta:
         model = MaterialExamineResult
-        fields = "__all__"
+        fields = ('examine_date', 'transport_date', 're_examine', 'qualified',
+                  'material_name', 'sample_name', 'batch', 'supplier_name',
+                  'recorder_username', 'sampling_username')
 
 
 class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    sample_name = django_filters.CharFilter(field_name='sample_name', lookup_expr='icontains')
-    batch = django_filters.CharFilter(field_name='batch', lookup_expr='icontains')
-    supplier = django_filters.CharFilter(field_name='supplier__name', lookup_expr='icontains')
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains', help_text='原材料名称')
+    sample_name = django_filters.CharFilter(field_name='sample_name', lookup_expr='icontains', help_text='样品名称')
+    batch = django_filters.CharFilter(field_name='batch', lookup_expr='icontains', help_text='批次号')
+    supplier = django_filters.CharFilter(field_name='supplier', lookup_expr='icontains', help_text='供应商')
     material_create_time_b = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='gte')
     material_create_time_e = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
-    examine_date = django_filters.DateFilter(field_name='examine_results__examine_date')
-    transport_date = django_filters.DateFilter(field_name='examine_results__transport_date')
+    # examine_date = django_filters.DateFilter(field_name='examine_results__examine_date', help_text='检测日期')
+    # transport_date = django_filters.DateFilter(field_name='examine_results__transport_date', help_text='收货日期')
 
     class Meta:
         model = ExamineMaterial
-        fields = ('name', 'sample_name', 'batch',
+        fields = ('name',
+                  'sample_name',
+                  'batch',
                   'supplier',
                   'qualified',
                   'material_create_time_b',
-                  'material_create_time_e',
-                  'examine_date')
+                  'material_create_time_e')
