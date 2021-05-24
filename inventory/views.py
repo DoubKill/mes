@@ -419,7 +419,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             if tunnel:
                 queryset = queryset.filter(location__istartswith=tunnel)
             if lot_no:
-                queryset = queryset.filter(location__icontains=lot_no)
+                queryset = queryset.filter(lot_no__icontains=lot_no)
             return queryset
         if model == WmsInventoryStock:
             quality_status = {"合格品": 1, "不合格品": 2, None: 1, "": 1}[quality_status]
