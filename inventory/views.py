@@ -419,7 +419,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             if tunnel:
                 queryset = queryset.filter(location__istartswith=tunnel)
             if lot_no:
-                queryset = queryset.filter(location__icontains=lot_no)
+                queryset = queryset.filter(lot_no__icontains=lot_no)
             return queryset
         if model == WmsInventoryStock:
             quality_status = {"合格品": 1, "不合格品": 2, None: 1, "": 1}[quality_status]
@@ -1348,29 +1348,36 @@ class ProductTraceView(APIView):
         rep["pallet_feed"] = list(product_trace)
         if not product_trace:
             raise ValidationError("查不到该条码对应胶料")
-        plan = ProductClassesPlan.objects.get(plan_classes_uid=plan_no)
-        product = plan.product_batching
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_no).last()
+        if plan:
+            product = plan.product_batching
 
-        # 配方创建
-        product_info = model_to_dict(product)
-        temp_time = product_info.get("created_date", datetime.datetime.now())
-        work_schedule_plan = WorkSchedulePlan.objects.filter(
-            start_time__lte=temp_time,
-            end_time__gte=temp_time,
-            plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
-            "classes",
-            "plan_schedule"
-        ).order_by("id").last()
-        if work_schedule_plan:
-            current_class = work_schedule_plan.classes.global_name
-            product_info["classes_name"] = current_class
+            # 配方创建
+            product_info = model_to_dict(product)
+            temp_time = product_info.get("created_date", datetime.datetime.now())
+            work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=temp_time,
+                end_time__gte=temp_time,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼').select_related(
+                "classes",
+                "plan_schedule"
+            ).order_by("id").last()
+            if work_schedule_plan:
+                current_class = work_schedule_plan.classes.global_name
+                product_info["classes_name"] = current_class
+            else:
+                product_info["classes_name"] = "早班"
+            product_info["created_date"] = temp_time
         else:
-            product_info["classes_name"] = "早班"
-        product_info["created_date"] = temp_time
+            product = None
+            product_info = {}
         rep["product_info"] = [product_info]
         # 配料详情
-        product_details = product.batching_details.all().values("product_batching__stage_product_batch_no",
-                                                                "material__material_no", "actual_weight")
+        if product:
+            product_details = product.batching_details.all().values("product_batching__stage_product_batch_no",
+                                                                    "material__material_no", "actual_weight")
+        else:
+            product_details = []
         rep["product_details"] = list(product_details)
         # 胶料计划
         plan_info = ProductClassesPlan.objects.filter(plan_classes_uid=plan_no).values("plan_classes_uid",

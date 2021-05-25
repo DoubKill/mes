@@ -438,8 +438,8 @@ class MaterialExamineType(models.Model):
         (4, '外观确认')  # 离散值
     )
     interval_type = models.IntegerField(choices=INTERVAL_TYPES, help_text="比值类型?")
-    name = models.CharField(max_length=200, unique=True, help_text="总灰分，挥发分，生胶门尼粘度ML100℃（1+4）")
-    actual_name = models.CharField(max_length=200, unique=True, help_text="总灰分，挥发分，生胶门尼粘度ML100℃（1+4） 47-57")
+    name = models.CharField(max_length=200, unique=True, help_text="类型完整名称")
+    actual_name = models.CharField(max_length=200, help_text="类型名称")
     limit_value = models.FloatField(help_text='边界值', null=True, blank=True)
     unit = models.ForeignKey(ExamineValueUnit, on_delete=models.SET_NULL, null=True, blank=True)
 
