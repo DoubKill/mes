@@ -1032,8 +1032,8 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
     unitname = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
                                                              message='该检测类型名称已存在')])
-    actual_name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
-                                                                    message='该检测类型名称已存在')])
+    # actual_name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
+    #                                                                 message='该检测类型名称已存在111')])
 
     @atomic()
     def create(self, validated_data):
