@@ -68,7 +68,7 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             # 该test_order所有数据点最后检测result
             max_result_ids = list(material_test_order.order_results.values(
-                'test_indicator_name', 'test_method_name', 'data_point_name'
+                'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
 
             # 判断该test_order是否合格：根据最后数据点的检测值等级等级大于1判断
@@ -127,7 +127,7 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 test_result = 'PASS'
                 last_result_ids = list(MaterialTestResult.objects.filter(
                     material_test_order__lot_no=lot_no).values(
-                    'material_test_order', 'test_indicator_name', 'test_method_name', 'data_point_name'
+                    'material_test_order', 'test_indicator_name', 'data_point_name'
                 ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
                 # 取该托唯一一个pass章的数据点
                 passed_result = MaterialTestResult.objects.filter(

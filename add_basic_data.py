@@ -1007,8 +1007,8 @@ def add_equips():
 
     attr_ids = list(EquipCategoryAttribute.objects.filter(equip_type__global_name='称量设备').values_list('id', flat=True))
     data = [
-        ['XLC01', '细料秤1'], ['XLC02', '细料秤2'],
-        ['XLC03', '细料秤3'], ['XLC04', '细料秤4']]
+        ['F01', '细料秤1'], ['F02', '细料秤2'], ['F03', '细料秤3'],
+        ['S01', '硫磺秤1'], ['S02', '硫磺秤2']]
     for item in data:
         try:
             Equip.objects.create(
@@ -1270,7 +1270,7 @@ def add_product_batching():
                 global_name__in=['FM', 'HMB', 'NF', 'RE', 'RFM', 'RMB', '1MB', '2MB', '3MB']
             ).values_list('id', flat=True))),
             versions=random.choice(['01', '02', '03', '04', '05', '06', '07']),
-            used_type=random.choice([i for i in range(1, 7)]),
+            used_type=4,
             dev_type_id=random.choice(list(EquipCategoryAttribute.objects.filter(
                 equip_type__global_name='密炼设备').values_list('id', flat=True))))
         pb.stage_product_batch_no = '{}-{}-{}-{}'.format(pb.site.global_name,
