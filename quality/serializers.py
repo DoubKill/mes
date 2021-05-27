@@ -455,7 +455,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
-                'test_indicator_name', 'test_method_name', 'data_point_name'
+                'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
             test_results = MaterialTestResult.objects.filter(id__in=max_result_ids)
             for test_result in test_results:
