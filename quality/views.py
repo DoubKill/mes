@@ -1248,10 +1248,10 @@ class ImportAndExportView(APIView):
         file = request.FILES.get('file')
         cur_sheet = get_cur_sheet(file)
         data = get_sheet_data(cur_sheet, start_row=2)
-        by_dict = {'比重': 7, '硬度': 8, 'ML(1+4)': 9, 'MH': 10, 'TC10': 11, 'TC50': 12, 'TC90': 13, 'M300': 14,
+        by_dict = {'MH': 7, 'TC10': 8, 'TC50': 9, 'TC90': 10, '比重': 11, 'ML(1+4)': 12, '硬度': 13, 'M300': 14,
                    '扯断强度': 15, '伸长率': 16, '焦烧': 17, '钢拔': 18}
         for i in data:
-            for j in ['比重', '硬度', 'ML(1+4)', 'MH', 'TC10', 'TC50', 'TC90', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
+            for j in ['MH', 'TC10', 'TC50', 'TC90', '比重', 'ML(1+4)',  '硬度', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
                 # 本来这里的Ml(1+4)就是门尼  M300、扯断强度、伸长率属于物性  焦烧就是焦烧 钢拔就是钢拔 MH、TC10、TC50、TC90属于流变
                 if i[by_dict[j]]:
                     # m_obj = Material.objects.filter(material_name=i[0].strip()).first()

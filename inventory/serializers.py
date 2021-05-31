@@ -713,7 +713,7 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
             return temp
         else:
             return {"一等品": "合格品",
-                    "三等品": "不合格品"}[temp]
+                    "三等品": "不合格品"}.get(temp, temp)
 
 
     class Meta:

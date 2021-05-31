@@ -457,7 +457,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids)
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids).order_by('test_indicator_name',
+                                                                                             'data_point_name')
             for test_result in test_results:
                 if test_result.level == 1:
                     result = '合格'
