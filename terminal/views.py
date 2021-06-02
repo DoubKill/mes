@@ -1,11 +1,15 @@
 import datetime
 
 from django.db.models import Max
+from django.db.utils import ConnectionDoesNotExist
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins
+from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,13 +23,15 @@ from recipe.models import ProductBatchingDetail
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
-    WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog
+    WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
+    RecipeMaterial, ReportBasic, ReportWeight, Plan
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
     LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, \
-    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer
+    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer, \
+    MaterialInfoSerializer, BinSerializer, PlanSerializer, PlanUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -506,3 +512,322 @@ class ProductExchange(APIView):
                 plan.status = '运行中'
                 plan.save()
         return response(success=True)
+
+
+"""
+小料称量管理
+"""
+
+
+@method_decorator([api_recorder], name="dispatch")
+class XLMaterialVIewSet(GenericViewSet,
+                        CreateModelMixin,
+                        ListModelMixin):
+    """
+    list:
+        小料原材料列表，参数：equip_no=设备&name=原材料名称&code=原材料编号&use_not=是否使用(0使用，1不使用)
+    create:
+        新建小料原材料
+    """
+    queryset = MaterialInfo.objects.all()
+    serializer_class = MaterialInfoSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+    def list(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        name = self.request.query_params.get('name')
+        code = self.request.query_params.get('code')
+        use_not = self.request.query_params.get('use_not')
+        filter_kwargs = {}
+        if not equip_no:
+            raise ValidationError('参数缺失')
+        if name:
+            filter_kwargs['name__icontains'] = name
+        if code:
+            filter_kwargs['code__icontains'] = code
+        if use_not:
+            filter_kwargs['use_not'] = use_not
+        try:
+            ret = list(MaterialInfo.objects.using(equip_no).filter(**filter_kwargs).values())
+        except Exception:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class XLBinVIewSet(GenericViewSet, ListModelMixin):
+    """
+    list:
+        料仓列表，参数：equip_no=设备
+    update:
+        修改料仓原材料
+    """
+    queryset = Bin.objects.all()
+    serializer_class = BinSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+    def list(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        if not equip_no:
+            raise ValidationError('参数缺失')
+        try:
+            data = list(Bin.objects.using(equip_no).values())
+        except Exception:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        ret = {'A': [], 'B': []}
+        for item in data:
+            if item['name'] == '0':
+                item['name'] = None
+            if 'A' in item['bin']:
+                ret['A'].append(item)
+            else:
+                ret['B'].append(item)
+        return Response(ret)
+
+    @action(methods=['put'],
+            detail=False,
+            permission_classes=[IsAuthenticated],
+            url_path='save_bin',
+            url_name='save_bin')
+    def save_bin(self, request):
+        data = self.request.data.get('bin_data')
+        equip_no = self.request.data.get('equip_no')
+        queryset = Bin.objects.using(equip_no).all()
+        if not all([data, equip_no]):
+            raise ValidationError('参数不足')
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            filter_kwargs = {'id': item.get('id')}
+            try:
+                obj = get_object_or_404(queryset, **filter_kwargs)
+            except ConnectionDoesNotExist:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            except Exception:
+                raise
+            s = BinSerializer(instance=obj, data=item)
+            s.is_valid(raise_exception=True)
+            s.save()
+        return Response('更新成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RecipePreVIew(APIView):
+    """
+    小料配方列表，参数：equip_no=设备&name=配方名称&ver=版本&remark1=备注&use_not=是否使用(0使用，1不使用)&st=开始时间&et=结束时间
+    """
+
+    def get(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        name = self.request.query_params.get('name')
+        ver = self.request.query_params.get('ver')
+        remark1 = self.request.query_params.get('remark1')
+        use_not = self.request.query_params.get('use_not')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+
+        filter_kwargs = {}
+        if not equip_no:
+            raise ValidationError('参数缺失')
+        if name:
+            filter_kwargs['name__icontains'] = name
+        if ver:
+            filter_kwargs['ver__icontains'] = ver
+        if remark1:
+            filter_kwargs['remark1__icontains'] = remark1
+        if use_not:
+            filter_kwargs['use_not'] = use_not
+        if st:
+            filter_kwargs['time__gte'] = st
+        if et:
+            filter_kwargs['time__lte'] = et
+        try:
+            ret = list(RecipePre.objects.using(equip_no).filter(**filter_kwargs).values())
+        except Exception:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RecipeMaterialVIew(APIView):
+    """
+    小料配方详情，参数：equip_no=设备&recipe_name=配方名称
+    """
+
+    def get(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        recipe_name = self.request.query_params.get('recipe_name')
+
+        if not all([equip_no, recipe_name]):
+            raise ValidationError('参数缺失')
+        try:
+            ret = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_name).values())
+        except ConnectionDoesNotExist:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class XLPlanVIewSet(ModelViewSet):
+    """
+    list:
+        小料计划，参数：equip_no=设备
+    create:
+        新建小料计划
+    """
+    queryset = Plan.objects.all()
+    serializer_class = PlanSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+    def get_serializer_class(self):
+        if self.action in ('list', 'create'):
+            return PlanSerializer
+        else:
+            return PlanUpdateSerializer
+
+    def list(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        date_time = self.request.query_params.get('date_time')
+        grouptime = self.request.query_params.get('grouptime')
+        recipe = self.request.query_params.get('recipe_id')
+
+        filter_kwargs = {}
+        if not equip_no:
+            raise ValidationError('参数缺失')
+        if date_time:
+            filter_kwargs['date_time'] = date_time
+        if grouptime:
+            filter_kwargs['grouptime'] = grouptime
+        if recipe:
+            filter_kwargs['recipe_id'] = recipe
+        try:
+            ret = list(Plan.objects.using(equip_no).filter(**filter_kwargs).values())
+        except ConnectionDoesNotExist:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        return Response(ret)
+
+    def get_object(self):
+        """
+        Returns the object the view is displaying.
+
+        You may want to override this if you need to provide non-standard
+        queryset lookups.  Eg if objects are referenced using multiple
+        keyword arguments in the url conf.
+        """
+        equip_no = self.request.data.get('equip_no')
+        if not equip_no:
+            raise ValidationError('称量机台参数缺失！')
+        queryset = Plan.objects.using(equip_no).all()
+        # Perform the lookup filtering.
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+
+        assert lookup_url_kwarg in self.kwargs, (
+            'Expected view %s to be called with a URL keyword argument '
+            'named "%s". Fix your URL conf, or set the `.lookup_field` '
+            'attribute on the view correctly.' %
+            (self.__class__.__name__, lookup_url_kwarg)
+        )
+
+        filter_kwargs = {self.lookup_field: self.kwargs[lookup_url_kwarg]}
+        try:
+            obj = get_object_or_404(queryset, **filter_kwargs)
+        except ConnectionDoesNotExist:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        # May raise a permission denied
+        self.check_object_permissions(self.request, obj)
+
+        return obj
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ReportBasicView(APIView):
+    """
+    称量车次报表列表，参数：equip_no=设备&planid=计划uid&s_st=开始时间&s_et=结束时间&c_st=创建开始时间&c_et=创建结束时间&recipe=配方
+    """
+
+    def get(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        planid = self.request.query_params.get('planid')
+        s_st = self.request.query_params.get('s_st')
+        s_et = self.request.query_params.get('s_et')
+        c_st = self.request.query_params.get('c_st')
+        c_et = self.request.query_params.get('c_et')
+        recipe = self.request.query_params.get('recipe')
+
+        if not equip_no:
+            raise ValidationError('参数缺失')
+
+        filter_kwargs = {}
+        if not equip_no:
+            raise ValidationError('参数缺失')
+        if planid:
+            filter_kwargs['planid__icontains'] = planid
+        if s_st:
+            filter_kwargs['starttime__gte'] = s_st
+        if s_et:
+            filter_kwargs['starttime__lte'] = s_et
+        if c_st:
+            filter_kwargs['savetime__gte'] = c_st
+        if c_et:
+            filter_kwargs['savetime__lte'] = c_et
+        if recipe:
+            filter_kwargs['recipe__icontains'] = recipe
+        try:
+            ret = list(ReportBasic.objects.using(equip_no).filter(**filter_kwargs).values())
+        except ConnectionDoesNotExist:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ReportWeightView(APIView):
+    """
+    物料消耗报表，参数：equip_no=设备&planid=计划uid&recipe=配方&st=计划开始时间&et=计划结束时间
+    """
+
+    def get(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        planid = self.request.query_params.get('planid')
+        recipe = self.request.query_params.get('recipe')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+
+        if not equip_no:
+            raise ValidationError('参数缺失')
+
+        filter_kwargs = {}
+        if not equip_no:
+            raise ValidationError('参数缺失')
+        if planid:
+            filter_kwargs['planid__icontains'] = planid
+        if recipe:
+            filter_kwargs['recipe__icontains'] = recipe
+        if st or et:
+            plan_queryset = Plan.objects.using(equip_no).all()
+            if st:
+                plan_queryset = plan_queryset.filter(addtime__gte=st)
+            if et:
+                plan_queryset = plan_queryset.filter(addtime__lte=et)
+            try:
+                plan_ids = plan_queryset.values_list('id', flat=True)
+            except Exception:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            filter_kwargs['planid__in'] = list(plan_ids)
+        try:
+            ret = list(ReportWeight.objects.using(equip_no).filter(**filter_kwargs).values())
+        except ConnectionDoesNotExist:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        return Response(ret)
