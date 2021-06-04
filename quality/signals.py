@@ -12,8 +12,10 @@ from django.dispatch import receiver
 
 from production.models import PalletFeedbacks
 from quality.models import MaterialTestResult, MaterialTestOrder, MaterialDealResult, \
-    MaterialDataPointIndicator, DataPointStandardError
+    MaterialDataPointIndicator, DataPointStandardError, IgnoredProductInfo
 import logging
+
+from recipe.models import ProductBatching
 
 logger = logging.getLogger('quality_log')
 
@@ -81,13 +83,18 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             # 判断当前数据点检测值是否在合格区间，存在的话更新改test_result的is_passed字段为true和处理意见
             if instance.level > 1:
-                deal_suggestion = judge_standard_error_deal_suggestion(instance.data_point_name,
-                                                                       material_test_order.product_no,
-                                                                       instance.value)
-                if deal_suggestion:
-                    MaterialTestResult.objects.filter(
-                        id=instance.id).update(
-                        is_passed=True, pass_suggestion=deal_suggestion)
+                ignored_products = IgnoredProductInfo.objects.values_list('product_no', flat=True)
+                product_nos = set(ProductBatching.objects.filter(
+                    product_info__product_no__in=ignored_products).values_list('stage_product_batch_no', flat=True))
+                if material_test_order.product_no not in product_nos:
+                    # 不在失效胶种里面，则做pass判定
+                    deal_suggestion = judge_standard_error_deal_suggestion(instance.data_point_name,
+                                                                           material_test_order.product_no,
+                                                                           instance.value)
+                    if deal_suggestion:
+                        MaterialTestResult.objects.filter(
+                            id=instance.id).update(
+                            is_passed=True, pass_suggestion=deal_suggestion)
             else:
                 MaterialTestResult.objects.filter(id=instance.id).update(is_passed=False)
 

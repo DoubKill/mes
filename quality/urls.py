@@ -52,8 +52,13 @@ router.register('batch-product-no-month-statistics', BatchProductNoMonthStatisti
 
 # 不合格处置单
 router.register('unqualified-deal-orders', UnqualifiedDealOrderViewSet)
+
 # 快检信息综合管里详情
 router.register('pallet-feed-test', PalletFeedbacksTestListView)
+
+# 不做pass章的判定胶种
+router.register('ignored-product-info', IgnoredProductInfoViewSet)
+
 
 """# 原材料新"""
 # 检测设备类型
@@ -98,5 +103,6 @@ urlpatterns = [
     path('datapoint-curve/', TestDataPointCurveView.as_view()),
     path('data-point-label-history/', DataPointLabelHistoryView.as_view()),
     path('material-unqualified-types/', MaterialSingleTypeExamineResultView.as_view()),
-    path('material-examine-result-curve/', ExamineResultCurveView.as_view())
+    path('material-examine-result-curve/', ExamineResultCurveView.as_view()),
+    path('show-qualified-range/', ShowQualifiedRange.as_view()),  # 全局配置快检卡片打印显示合格区间
 ]
