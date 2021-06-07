@@ -124,8 +124,8 @@ class MaterialDataPointIndicator(AbstractEntity):
                                    related_name='point_indicators')
     level = models.PositiveIntegerField(help_text='等级')
     result = models.CharField(max_length=64, help_text='结果')
-    upper_limit = models.DecimalField(help_text='上限', decimal_places=2, max_digits=8)
-    lower_limit = models.DecimalField(help_text='下限', decimal_places=2, max_digits=8)
+    upper_limit = models.DecimalField(help_text='上限', decimal_places=3, max_digits=8)
+    lower_limit = models.DecimalField(help_text='下限', decimal_places=3, max_digits=8)
 
     def __str__(self):
         return '{}-{}'.format(self.material_test_method, self.level)
@@ -244,7 +244,7 @@ class MaterialTestResult(AbstractEntity):
     material_test_order = models.ForeignKey(MaterialTestOrder, help_text='物料检测单', on_delete=models.CASCADE,
                                             related_name='order_results')
     test_factory_date = models.DateTimeField(help_text='检测时间')
-    value = models.DecimalField(help_text='检测值', decimal_places=2, max_digits=8)
+    value = models.DecimalField(help_text='检测值', decimal_places=3, max_digits=8)
     test_class = models.CharField(max_length=64, help_text='检测班次', blank=True, null=True)
     test_group = models.CharField(max_length=64, help_text='检测班组', blank=True, null=True)
     test_times = models.PositiveIntegerField(help_text='检验次数')
