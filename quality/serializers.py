@@ -1131,6 +1131,64 @@ class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer)
         exclude = ('material_examine_result', )
 
 
+class MaterialExamineResultMainCreateSerializer(serializers.ModelSerializer):
+    material_name = serializers.CharField(write_only=True, help_text='物料名称')
+    material_sample_name = serializers.CharField(write_only=True, help_text='样品名称',
+                                                 allow_blank=True, allow_null=True)
+    material_batch = serializers.CharField(write_only=True, help_text='批次号')
+    material_supplier = serializers.CharField(write_only=True, help_text='产地',
+                                                 allow_blank=True, allow_null=True)
+    material_tmh = serializers.CharField(write_only=True, help_text='条码号')
+    material_wlxxid = serializers.CharField(write_only=True, help_text='物料信息id')
+    single_examine_results = MaterialSingleTypeExamineResultMainSerializer(
+        many=True, required=False, help_text="""[{"type": 检测类型id, "value": 检测值, "equipment":检测机台id]""")
+
+    def validate(self, attrs):
+        material_name = attrs.pop('material_name')
+        material_sample_name = attrs.pop('material_sample_name', None)
+        material_batch = attrs.pop('material_batch')
+        material_supplier = attrs.pop('material_supplier', None)
+        material_tmh = attrs.pop('material_tmh')
+        material_wlxxid = attrs.pop('material_wlxxid')
+        material = ExamineMaterial.objects.filter(batch=material_batch,
+                                                  wlxxid=material_wlxxid).first()
+        if not material:
+            material = ExamineMaterial.objects.create(batch=material_batch,
+                                                      name=material_name,
+                                                      sample_name=material_sample_name,
+                                                      supplier=material_supplier,
+                                                      tmh=material_tmh,
+                                                      wlxxid=material_wlxxid)
+        attrs['material'] = material
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        node_data = validated_data.pop('single_examine_results', [])
+        validated_data['qualified'] = False
+        validated_data['recorder'] = self.context['request'].user
+        instance = super().create(validated_data)
+        for x in node_data:
+            x.update(material_examine_result=instance)
+            MaterialSingleTypeExamineResult.objects.create(**x)
+        if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
+            instance.qualified = True
+            instance.save()
+        material = instance.material
+        material.qualified = instance.qualified
+        material.save()
+        return instance
+
+    class Meta:
+        model = MaterialExamineResult
+        extra_kwargs = {
+            'qualified': {'read_only': True},
+            'recorder': {'read_only': True},
+            'material': {'read_only': True},
+        }
+        fields = '__all__'
+
+
 class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField(source='material.name')
     sample_name = serializers.ReadOnlyField(source='material.sample_name')
@@ -1147,25 +1205,6 @@ class MaterialExamineResultMainSerializer(serializers.ModelSerializer):
     def get_is_latest(obj):
         """是否同批次最新检测"""
         return MaterialExamineResult.objects.filter(material=obj.material).last().id == obj.id
-
-    @atomic()
-    def create(self, validated_data):
-        node_data = validated_data.pop('single_examine_results', [])
-        validated_data['qualified'] = False
-        validated_data['recorder'] = self.context['request'].user
-        instance = super().create(validated_data)
-        for x in node_data:
-            x.update(material_examine_result=instance)
-            MaterialSingleTypeExamineResult.objects.create(**x)
-        # MaterialSingleTypeExamineResult.objects.bulk_create(
-        #     [MaterialSingleTypeExamineResult(**x) for x in node_data])
-        if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
-            instance.qualified = True
-            instance.save()
-        material = instance.material
-        material.qualified = instance.qualified
-        material.save()
-        return instance
 
     @atomic()
     def update(self, instance, validated_data):
