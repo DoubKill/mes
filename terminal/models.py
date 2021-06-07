@@ -211,6 +211,11 @@ class Version(models.Model):
         return "{}----{}".format(self.get_type_display(), self.number)
 
 
+"""
+小料称量系统模型
+"""
+
+
 class Bin(models.Model):
     """料仓物料信息表"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
@@ -271,7 +276,7 @@ class RecipeMaterial(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fgen'
+        db_table = 'recipe_material'
 
 
 class RecipePre(models.Model):

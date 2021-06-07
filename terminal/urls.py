@@ -11,7 +11,8 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     LoadMaterialLogViewSet, EquipOperationLogView, BatchingClassesEquipPlanView, FeedingLogViewSet, \
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
     WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, \
-    ProductExchange
+    ProductExchange, XLMaterialVIewSet, XLBinVIewSet, RecipePreVIew, RecipeMaterialVIew, ReportBasicView, \
+    ReportWeightView, XLPlanVIewSet
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -19,6 +20,12 @@ router.register('feeding-log', FeedingLogViewSet)  # PDA投料履历
 router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
 router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信息
+
+"""小料称量"""
+router.register('xl-material', XLMaterialVIewSet)  # 小料原材料
+router.register('xl-bin', XLBinVIewSet)  # 料仓
+router.register('xl-plan', XLPlanVIewSet)  # 小料计划
+
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -32,5 +39,11 @@ urlpatterns = [
     path('bar-code-tank/', BarCodeTank.as_view()),
     path('batch-charge-log-list/', BatchChargeLogListViewSet.as_view()),  # 密炼投入履历
     path('weight-batching-log-list/', WeightBatchingLogListViewSet.as_view()),  # 药品投入统计
-    path('product-exchange/', ProductExchange.as_view())
+    path('product-exchange/', ProductExchange.as_view()),
+
+    # 小料称量
+    path('xl-recipe/', RecipePreVIew.as_view()),  # 小料配方列表
+    path('xl-recipe-material/', RecipeMaterialVIew.as_view()),  # 小料配方原材料列表
+    path('xl-report-basic/', ReportBasicView.as_view()),  # 称量车次报表列表
+    path('xl-report-weight/', ReportWeightView.as_view()),  # 物料消耗报表
 ]

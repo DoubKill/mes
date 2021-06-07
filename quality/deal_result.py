@@ -1,7 +1,7 @@
 import json
 
 from mes.common_code import DecimalEncoder
-from quality.models import MaterialDealResult, MaterialDataPointIndicator
+from quality.models import MaterialDealResult, MaterialDataPointIndicator, QualifiedRangeDisplay
 from quality.serializers import MaterialDealResultListSerializer
 import logging
 
@@ -42,5 +42,6 @@ def receive_deal_result(lot_no):
             indicators.append({'point': indicator_name, 'point_head': point_head})
         mtr_list = {'trains': trains, 'table_head': indicators}
         results['mtr_list'] = mtr_list
+        results['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
         results = json.dumps(results, cls=DecimalEncoder)
         return results

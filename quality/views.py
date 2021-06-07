@@ -1,5 +1,6 @@
 import datetime
 import json
+import os
 
 from django.db import connection
 from django.forms import model_to_dict
@@ -38,7 +39,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode
+    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -50,7 +51,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
     ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
-    ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer
+    ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1353,6 +1354,39 @@ class BarCodePreview(APIView):
         return Response(serializer.data)
         # except Exception as e:
         #     raise ValidationError(f"该条码无快检结果:{e}")
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ShowQualifiedRange(APIView):
+
+    def get(self, request):
+        instance = QualifiedRangeDisplay.objects.first()
+        if instance:
+            return Response({'is_showed': instance.is_showed})
+        return Response({'is_showed': False})
+
+    def post(self, request):
+        is_showed = self.request.data.get('is_showed')
+        if not isinstance(is_showed, bool):
+            raise ValidationError('参数错误')
+        instance = QualifiedRangeDisplay.objects.first()
+        if not instance:
+            QualifiedRangeDisplay.objects.create(is_showed=is_showed)
+        else:
+            instance.is_showed = is_showed
+            instance.save()
+        return Response('设置成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IgnoredProductInfoViewSet(viewsets.GenericViewSet,
+                                mixins.ListModelMixin,
+                                mixins.CreateModelMixin,
+                                mixins.DestroyModelMixin):
+    """不做pass章的判定胶种"""
+    queryset = IgnoredProductInfo.objects.all()
+    serializer_class = IgnoredProductInfoSerializer
+    permission_classes = (IsAuthenticated,)
 
 
 """新原材料快检"""

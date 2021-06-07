@@ -360,6 +360,24 @@ class LabelPrint(models.Model):
         verbose_name_plural = verbose_name = '标签打印'
 
 
+class QualifiedRangeDisplay(models.Model):
+    """打印卡片显示合格区间配置"""
+    is_showed = models.BooleanField()
+
+    class Meta:
+        db_table = 'qualified_range_display'
+        verbose_name_plural = verbose_name = '合格区间显示'
+
+
+class IgnoredProductInfo(AbstractEntity):
+    """不做pass章的判定胶种"""
+    product_no = models.CharField(max_length=64, help_text='胶料编码', verbose_name='胶料编码', unique=True)
+
+    class Meta:
+        db_table = 'ignored_product_info'
+        verbose_name_plural = verbose_name = '不做pass章的判定胶种'
+
+
 class UnqualifiedDealOrder(AbstractEntity):
     """不合格处置单"""
     unqualified_deal_order_uid = models.CharField(max_length=64, help_text='唯一码')

@@ -1,7 +1,9 @@
 import random
+from datetime import datetime
 
 import requests
 from django.db.models import Q, Sum
+from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
@@ -13,8 +15,10 @@ from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClasses
 from production.models import PalletFeedbacks
 from recipe.models import ZCMaterial
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
-    WeightPackageLog, FeedingMaterialLog, LoadMaterialLog
+    WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan
 import logging
+
+from terminal.utils import INWeighSystem
 
 logger = logging.getLogger('api_log')
 
@@ -372,3 +376,129 @@ class WeightBatchingLogListSerializer(BaseModelSerializer):
     class Meta:
         model = WeightBatchingLog
         fields = '__all__'
+
+
+"""
+小料称量序列化器
+"""
+
+
+class MaterialInfoSerializer(serializers.ModelSerializer):
+    equip_no = serializers.CharField(write_only=True, help_text='称量机台')
+
+    def create(self, validated_data):
+        equip_no = validated_data.pop('equip_no')
+        validated_data['time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            instance = MaterialInfo.objects.using(equip_no).create(**validated_data)
+        except ConnectionDoesNotExist:
+            raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        return instance
+
+    class Meta:
+        model = MaterialInfo
+        fields = '__all__'
+        read_only_fields = ('time', 'remark')
+
+
+class BinSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Bin
+        fields = '__all__'
+
+
+class PlanSerializer(serializers.ModelSerializer):
+    equip_no = serializers.CharField(write_only=True, help_text='称量机台')
+
+    def create(self, validated_data):
+        equip_no = validated_data.pop('equip_no')
+        validated_data['planid'] = datetime.now().strftime('%Y%m%d%H%M%S')[2:]
+        validated_data['state'] = '等待'
+        validated_data['actno'] = 0
+        validated_data['order_by'] = 1
+        validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        validated_data['oper'] = self.context['request'].user.username
+        try:
+            instance = Plan.objects.using(equip_no).create(**validated_data)
+        except ConnectionDoesNotExist:
+            raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        return instance
+
+    class Meta:
+        model = Plan
+        read_only_fields = ('planid', 'state', 'actno', 'order_by', 'addtime', 'starttime', 'stoptime', 'oper')
+        fields = '__all__'
+
+
+class PlanUpdateSerializer(serializers.ModelSerializer):
+    action = serializers.IntegerField(help_text='动作 1：下达计划  2：计划重传  3：修改车次 4：计划停止', write_only=True)
+    equip_no = serializers.CharField(write_only=True, help_text='称量机台')
+
+    def update(self, instance, validated_data):
+        action = validated_data['action']
+        equip_no = validated_data['equip_no']
+        if settings.DEBUG:
+            if action == 1:
+                instance.state = '运行'
+                instance.save()
+            elif action == 2:
+                pass
+            elif action == 3:
+                setno = validated_data['setno']
+                actno = instance.actno if instance.actno else 0
+                if not setno:
+                    raise serializers.ValidationError('设定车次不可为空!')
+                if setno <= actno:
+                    raise serializers.ValidationError('设定车次不能小于完成车次!')
+                instance.setno = setno
+                instance.save()
+            elif action == 4:
+                instance.state = '终止'
+                instance.save()
+        else:
+            ins = INWeighSystem(equip_no)
+            if action == 1:
+                ins.issue_plan({
+                    "plan_no": instance.planid,
+                    "recipe_no": instance.recipe,
+                    "num": instance.setno,
+                    "action": "1"
+                    })
+            elif action == 2:
+                ins.reload_plan(
+                    {
+                        "plan_no": instance.planid,
+                        "action": "1",
+                    }
+                )
+            elif action == 3:
+                setno = validated_data['setno']
+                actno = instance.actno if instance.actno else 0
+                if not setno:
+                    raise serializers.ValidationError('设定车次不可为空!')
+                if setno <= actno:
+                    raise serializers.ValidationError('设定车次不能小于完成车次!')
+                ins.update_trains(
+                    {
+                        "plan_no": instance.planid,
+                        "action": "1",
+                        "num": instance.setno
+                    }
+                )
+            elif action == 4:
+                ins.stop({
+                            "plan_no": instance.planid,
+                            "action": "1"
+                        })
+            else:
+                raise serializers.ValidationError('action参数错误！')
+        return instance
+
+    class Meta:
+        model = Plan
+        fields = ('id', 'setno', 'action', 'equip_no')

@@ -22,7 +22,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode
+    UnqualifiedMaterialProcessMode, IgnoredProductInfo
 from recipe.models import MaterialAttribute
 
 
@@ -1002,6 +1002,25 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
     class Meta:
         model = MaterialDealResult
         fields = "__all__"
+
+
+class IgnoredProductInfoSerializer(BaseModelSerializer):
+    product_nos = serializers.ListField(write_only=True)
+
+    @atomic()
+    def create(self, validated_data):
+        product_nos = validated_data['product_nos']
+        for product_no in product_nos:
+            try:
+                IgnoredProductInfo.objects.create(product_no=product_no)
+            except Exception:
+                raise serializers.ValidationError('该胶料{}已存在，请勿重复添加！'.format(product_no))
+        return validated_data
+
+    class Meta:
+        model = IgnoredProductInfo
+        fields = "__all__"
+        read_only_fields = ('product_no', )
 
 
 """新原材料快检"""
