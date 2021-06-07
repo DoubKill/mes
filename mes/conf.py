@@ -5,6 +5,7 @@ datetime: 2020/7/27
 name: 
 """
 from inventory.models import MixGumInInventoryLog, MixGumOutInventoryLog
+from mes import settings
 
 COMMON_READ_ONLY_FIELDS = ('created_date', 'last_updated_date', 'delete_date',
                            'delete_flag', 'created_user', 'last_updated_user',
@@ -28,7 +29,10 @@ BZ_PASSWORD = "mes@_123"
 
 BZ_HOST = "10.4.23.101"
 
-WMS_CONF = dict(host='10.4.24.25', user='sa', database='zhada_wms_zhongc', password='Admin123$')
+if settings.DEBUG:
+    WMS_CONF = dict(host='124.160.19.254:61433', user='sa', database='zhada_wms_zhongcgz', password='qaz123<>?')
+else:
+    WMS_CONF = dict(host='10.4.24.25', user='sa', database='zhada_wms_zhongc', password='Admin123$')
 
 STATION_LOCATION_MAP = {
     "一层前端": ["3", "4"],

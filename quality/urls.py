@@ -105,4 +105,5 @@ urlpatterns = [
     path('material-unqualified-types/', MaterialSingleTypeExamineResultView.as_view()),
     path('material-examine-result-curve/', ExamineResultCurveView.as_view()),
     path('show-qualified-range/', ShowQualifiedRange.as_view()),  # 全局配置快检卡片打印显示合格区间
+    path('wms-material-search/', WMSMaterialSearchView.as_view())
 ]
