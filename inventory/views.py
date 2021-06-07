@@ -2015,3 +2015,121 @@ class ProductDetailsView(APIView):
                 self.data[material_no]["all_weight"] = x.get("weight")
         data = self.data.values()
         return Response({"results": data})
+
+
+class WmsInventoryStockView(APIView):
+    """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+
+    def get(self, request, *args, **kwargs):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        quality_status = self.request.query_params.get('quality_status')
+        entrance_name = self.request.query_params.get('entrance_name')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "and tis.MaterialName like '%{}%'".format(material_name)
+        if material_no:
+            extra_where_str += "and tis.MaterialCode like '%{}%'".format(material_no)
+        if quality_status:
+            extra_where_str += "and tis.StockDetailState={}".format(quality_status)
+        if entrance_name:
+            extra_where_str += "and tie.Name='{}'".format(entrance_name)
+        sql = """
+                    select
+               tis.StockDetailState,
+               tis.MaterialCode,
+               tis.MaterialName,
+               tis.BatchNo,
+               tis.SpaceId,
+               tis.Sn
+            from
+                t_inventory_stock tis
+            inner join t_inventory_entrance_tunnel tiet on tis.TunnelId=tiet.TunnelCode
+            inner join t_inventory_entrance tie on tie.id=tiet.EntranceEntityId
+            inner join t_inventory_space t on tis.SpaceId = t.SpaceNumber and t.Id not in (select
+                t_inventory_space.Id
+                from t_inventory_space,t_inventory_space_plan
+                where t_inventory_space.Id = t_inventory_space_plan.StorageSpaceEntityId)
+            where t.SpaceState=1 {}""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **WMS_CONF)
+        temp = sc.all()
+        count = len(temp)
+        temp = temp[st:et]
+        result = []
+        for item in temp:
+            result.append(
+                {'StockDetailState': item[0],
+                 'MaterialCode': item[1],
+                 'MaterialName': item[2],
+                 'BatchNo': item[3],
+                 'SpaceId': item[4],
+                 'Sn': item[5]
+                 })
+        sc.close()
+        return Response({'results': result, "count": count})
+
+
+class WmsInventoryWeightStockView(APIView):
+    """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+
+    def get(self, request, *args, **kwargs):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        quality_status = self.request.query_params.get('quality_status')
+        entrance_name = self.request.query_params.get('entrance_name')
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "and tis.MaterialName like '%{}%'".format(material_name)
+        if material_no:
+            extra_where_str += "and tis.MaterialCode like '%{}%'".format(material_no)
+        if quality_status:
+            extra_where_str += "and tis.StockDetailState={}".format(quality_status)
+        if entrance_name:
+            extra_where_str += "and tie.Name='{}'".format(entrance_name)
+        sql = """select
+               MaterialCode,
+               MaterialName,
+               sum(tis.WeightOfActual)
+            from
+                t_inventory_stock tis
+            inner join t_inventory_entrance_tunnel tiet on tis.TunnelId=tiet.TunnelCode
+            inner join t_inventory_entrance tie on tie.id=tiet.EntranceEntityId
+            inner join t_inventory_space t on tis.SpaceId = t.SpaceNumber and t.Id not in (select
+                t_inventory_space.Id
+                from t_inventory_space,t_inventory_space_plan
+                where t_inventory_space.Id = t_inventory_space_plan.StorageSpaceEntityId)
+            where t.SpaceState=1 {}
+            group by tis.MaterialCode, tis.MaterialName""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **WMS_CONF)
+        temp = sc.all()
+        count = len(temp)
+        result = []
+        for item in temp:
+            result.append(
+                {'MaterialCode': item[0],
+                 'MaterialName': item[1],
+                 'WeightOfActual': item[2],
+                 })
+        sc.close()
+        return Response({'results': result, "count": count})
+
+
+class InventoryEntranceView(APIView):
+    """获取所有出库口名称"""
+
+    def get(self, request):
+        sql = 'select name, code from t_inventory_entrance where Type=2;'
+        sc = SqlClient(sql=sql, **WMS_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {'name': item[0],
+                 'code': item[1],
+                 })
+        sc.close()
+        return Response(result)

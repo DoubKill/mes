@@ -1,6 +1,8 @@
 import datetime
 import json
+import os
 
+from suds.client import Client
 from django.db import connection
 from django.forms import model_to_dict
 from django.utils import timezone
@@ -38,7 +40,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode
+    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -50,7 +52,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
     ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
-    ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer
+    ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
+    MaterialExamineResultMainCreateSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1355,6 +1358,39 @@ class BarCodePreview(APIView):
         #     raise ValidationError(f"该条码无快检结果:{e}")
 
 
+@method_decorator([api_recorder], name="dispatch")
+class ShowQualifiedRange(APIView):
+
+    def get(self, request):
+        instance = QualifiedRangeDisplay.objects.first()
+        if instance:
+            return Response({'is_showed': instance.is_showed})
+        return Response({'is_showed': False})
+
+    def post(self, request):
+        is_showed = self.request.data.get('is_showed')
+        if not isinstance(is_showed, bool):
+            raise ValidationError('参数错误')
+        instance = QualifiedRangeDisplay.objects.first()
+        if not instance:
+            QualifiedRangeDisplay.objects.create(is_showed=is_showed)
+        else:
+            instance.is_showed = is_showed
+            instance.save()
+        return Response('设置成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IgnoredProductInfoViewSet(viewsets.GenericViewSet,
+                                mixins.ListModelMixin,
+                                mixins.CreateModelMixin,
+                                mixins.DestroyModelMixin):
+    """不做pass章的判定胶种"""
+    queryset = IgnoredProductInfo.objects.all()
+    serializer_class = IgnoredProductInfoSerializer
+    permission_classes = (IsAuthenticated,)
+
+
 """新原材料快检"""
 
 
@@ -1546,6 +1582,27 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
         return super().list(request, *args, **kwargs)
 
 
+class WMSMaterialSearchView(APIView):
+    """根据条码号搜索中策总厂wms物料信息，参数:?tmh=BHZ12105311651140001"""
+
+    def get(self, request):
+        tmh = self.request.query_params.get('tmh')
+        if not tmh:
+            raise ValidationError('请输入条码号')
+        url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
+        try:
+            client = Client(url)
+            json_data = {"tofac": "AJ1", "tmh": tmh}
+            data = client.service.FindZcdtmList(json.dumps(json_data))
+        except Exception:
+            raise ValidationError('网络异常！')
+        data = json.loads(data)
+        ret = data.get('Table')
+        if not ret:
+            raise ValidationError('未找到该条码对应物料信息！')
+        return Response(ret)
+
+
 @method_decorator([api_recorder], name="dispatch")
 class MaterialExamineResultViewSet(viewsets.GenericViewSet,
                                    mixins.CreateModelMixin,
@@ -1566,6 +1623,11 @@ class MaterialExamineResultViewSet(viewsets.GenericViewSet,
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = MaterialExamineResultFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return MaterialExamineResultMainCreateSerializer
+        return MaterialExamineResultMainSerializer
 
     def get_queryset(self):
         type_id = self.request.query_params.get('type_id')

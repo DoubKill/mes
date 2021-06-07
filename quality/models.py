@@ -360,6 +360,24 @@ class LabelPrint(models.Model):
         verbose_name_plural = verbose_name = '标签打印'
 
 
+class QualifiedRangeDisplay(models.Model):
+    """打印卡片显示合格区间配置"""
+    is_showed = models.BooleanField()
+
+    class Meta:
+        db_table = 'qualified_range_display'
+        verbose_name_plural = verbose_name = '合格区间显示'
+
+
+class IgnoredProductInfo(AbstractEntity):
+    """不做pass章的判定胶种"""
+    product_no = models.CharField(max_length=64, help_text='胶料编码', verbose_name='胶料编码', unique=True)
+
+    class Meta:
+        db_table = 'ignored_product_info'
+        verbose_name_plural = verbose_name = '不做pass章的判定胶种'
+
+
 class UnqualifiedDealOrder(AbstractEntity):
     """不合格处置单"""
     unqualified_deal_order_uid = models.CharField(max_length=64, help_text='唯一码')
@@ -465,11 +483,19 @@ class MaterialExamineRatingStandard(models.Model):
 
 class ExamineMaterial(models.Model):
     """检测原材料"""
+    STATUSES = (
+        (1, '检测状态未同步'),
+        (2, '检测状态已同步'),
+        (3, '同步失败'),
+    )
     material_meta = models.ForeignKey(Material, on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=200, help_text='原材料名称')
     sample_name = models.CharField(max_length=200, help_text='样品名称', null=True, blank=True)
     batch = models.CharField(max_length=200, help_text='批次号')
-    supplier = models.CharField(max_length=200, help_text='产地', )
+    supplier = models.CharField(max_length=200, help_text='产地', blank=True, null=True)
+    status = models.IntegerField(choices=STATUSES, default=1)
+    tmh = models.CharField(max_length=64, help_text='条码号， 总厂wms查询条件', blank=True, null=True)
+    wlxxid = models.CharField(max_length=64, help_text='物料信息ID, 对应吒达物料编码', blank=True, null=True)
     qualified = models.BooleanField(help_text='是否合格', default=False)
     process_mode_handle_user = models.ForeignKey(User, help_text='经办人', on_delete=models.SET_NULL,
                                                  null=True, blank=True)

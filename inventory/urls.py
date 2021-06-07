@@ -73,6 +73,7 @@ router.register(r'inventory-log-out', InventoryLogOutViewSet)
 router.register(r'barcode-quality', BarcodeQualityViewSet)
 
 urlpatterns = [
+    path('', include(router.urls)),
     path('material-trace/', MaterialTraceView.as_view()),  # 原材料条码追溯
     path('product-trace/', ProductTraceView.as_view()),    # 胶料条码追溯
     path('material_count/', MaterialCount.as_view()),
@@ -82,6 +83,9 @@ urlpatterns = [
     path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('materia_type_name_to_according/', MateriaTypeNameToAccording.as_view()),  # 根据物料类型和编码找到存在的仓库表
     path('sampling-rules/', SamplingRules.as_view()),
+    path('wms-stock/', WmsInventoryStockView.as_view()),  # 原材料货位列表
+    path('wms-weight-stock/', WmsInventoryWeightStockView.as_view()),  # 原材料重量库存
+    path('wms-entrance/', InventoryEntranceView.as_view()),  # 出库口列表
 
     # 出库大屏
     path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
@@ -94,6 +98,4 @@ urlpatterns = [
 
     path('product-station-statics/', InventoryStaticsView.as_view()),  # 胶种库存分段统计
     path('product-details/', ProductDetailsView.as_view()),            # 胶料车间库存明细
-
-    path('', include(router.urls)),
 ]
