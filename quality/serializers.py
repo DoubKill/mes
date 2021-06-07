@@ -312,6 +312,12 @@ class MaterialTestMethodSerializer(BaseModelSerializer):
     def get_data_points(obj):
         return obj.data_point.values('id', 'name')
 
+    def update(self, instance, validated_data):
+        data_point = validated_data.get('data_point', None)
+        if data_point:
+            instance.data_point.clear()
+        return super().update(instance, validated_data)
+
     class Meta:
         model = MaterialTestMethod
         fields = '__all__'
