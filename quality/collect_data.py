@@ -39,7 +39,7 @@ def main():
             max_test_date = '2020-11-22 00:00:00'
         else:
             max_test_date = datetime.strftime(max_test_date, "%Y-%m-%d %H:%M:%S")
-        logger.info('max_test_date: {}'.format(max_test_date))
+        logger.info('ip:{}， max_test_date: {}'.format(config.server, max_test_date))
         server = config.server
         user = config.user
         password = config.password
