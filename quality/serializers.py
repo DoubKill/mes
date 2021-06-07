@@ -306,6 +306,7 @@ class MaterialTestMethodSerializer(BaseModelSerializer):
     material_no = serializers.CharField(source='material.material_no', read_only=True)
     test_method_name = serializers.CharField(source='test_method.name', read_only=True)
     test_type_name = serializers.CharField(source='test_method.test_type.name', read_only=True)
+    test_type = serializers.IntegerField(source='test_method.test_type.id', read_only=True)
     test_indicator_name = serializers.CharField(source='test_method.test_type.test_indicator.name', read_only=True)
 
     @staticmethod
