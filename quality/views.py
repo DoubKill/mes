@@ -1251,21 +1251,21 @@ class ImportAndExportView(APIView):
         file = request.FILES.get('file')
         cur_sheet = get_cur_sheet(file)
         data = get_sheet_data(cur_sheet, start_row=2)
-        by_dict = {'MH': 7, 'TC10': 8, 'TC50': 9, 'TC90': 10, '比重': 11, 'ML(1+4)': 12, '硬度': 13, 'M300': 14,
-                   '扯断强度': 15, '伸长率': 16, '焦烧': 17, '钢拔': 18}
+        by_dict = {'MH': 7, 'ML': 8, 'TC10': 9, 'TC50': 10, 'TC90': 11, '比重': 12, 'ML(1+4)': 13, '硬度': 14, 'M300': 15,
+                   '扯断强度': 16, '伸长率': 17, '焦烧': 18, '钢拔': 19}
         for i in data:
-            for j in ['MH', 'TC10', 'TC50', 'TC90', '比重', 'ML(1+4)',  '硬度', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
+            for j in ['MH', 'ML', 'TC10', 'TC50', 'TC90', '比重', 'ML(1+4)',  '硬度', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
                 # 本来这里的Ml(1+4)就是门尼  M300、扯断强度、伸长率属于物性  焦烧就是焦烧 钢拔就是钢拔 MH、TC10、TC50、TC90属于流变
                 if i[by_dict[j]]:
                     # m_obj = Material.objects.filter(material_name=i[0].strip()).first()
                     # if not m_obj:
                     #     raise ValidationError(f'{i[0]}胶料信息不存在,请检查Excel表格或者使用复制功能')
-                    dp_obj = DataPoint.objects.filter(name__contains=j).first()
+                    dp_obj = DataPoint.objects.filter(name=j).first()
                     if not dp_obj:
                         raise ValidationError(f'{j}数据点信息不存在,请检查Excel表格或者使用复制功能')
                     # mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
                     mtm_obj = MaterialTestMethod.objects.filter(material__material_name=i[0].strip(),
-                                                                data_point__name__contains=j).first()
+                                                                data_point__name=j).first()
                     if not mtm_obj:
                         raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在,请检查Excel表格或者使用复制功能")
                     item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
