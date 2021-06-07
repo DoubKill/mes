@@ -544,6 +544,46 @@ permission_data = [
     {'id': 423, 'code': 'workshop_stock_detail', 'name': '车间库存明细', 'parent_id': None},
     {'id': 424, 'code': 'view_workshop_stock_detail', 'name': '查看', 'parent_id': 423},
 
+    {'id': 425, 'code': 'xl_material', 'name': '小料称量物料管理', 'parent_id': None},
+    {'id': 426, 'code': 'view_xl_material', 'name': '查看', 'parent_id': 425},
+    {'id': 427, 'code': 'add_xl_material', 'name': '新增', 'parent_id': 425},
+    # {'id': 428, 'code': 'change_xl_material', 'name': '修改', 'parent_id': 424},
+
+    {'id': 429, 'code': 'xl_bin', 'name': '小料称量料仓管理', 'parent_id': None},
+    {'id': 430, 'code': 'view_xl_bin', 'name': '查看', 'parent_id': 429},
+    # {'id': 431, 'code': 'add_xl_bin', 'name': '新增', 'parent_id': 429},
+    {'id': 432, 'code': 'change_xl_bin', 'name': '修改', 'parent_id': 429},
+    # {'id': 433, 'code': 'delete_xl_material', 'name': '删除', 'parent_id': 429},
+
+    {'id': 434, 'code': 'xl_recipe', 'name': '小料称量配方管理', 'parent_id': None},
+    {'id': 435, 'code': 'view_xl_recipe', 'name': '查看', 'parent_id': 434},
+    # {'id': 436, 'code': 'add_xl_recipe', 'name': '新增', 'parent_id': 434},
+    # {'id': 437, 'code': 'change_xl_recipe', 'name': '修改', 'parent_id': 434},
+    # {'id': 438, 'code': 'delete_xl_recipe', 'name': '删除', 'parent_id': 434},
+
+    {'id': 439, 'code': 'xl_plan', 'name': '小料称量计划管理', 'parent_id': None},
+    {'id': 440, 'code': 'view_xl_plan', 'name': '查看', 'parent_id': 439},
+    {'id': 441, 'code': 'add_xl_plan', 'name': '新增', 'parent_id': 439},
+    {'id': 442, 'code': 'change_xl_plan', 'name': '修改', 'parent_id': 439},
+    {'id': 443, 'code': 'delete_xl_plan', 'name': '删除', 'parent_id': 439},
+    {'id': 444, 'code': 'issue_xl_plan', 'name': '下达', 'parent_id': 439},
+    {'id': 445, 'code': 'reload_xl_plan', 'name': '重传', 'parent_id': 439},
+    {'id': 446, 'code': 'stop_xl_plan', 'name': '停止', 'parent_id': 439},
+
+    {'id': 447, 'code': 'xl_report_basic', 'name': '小料称量车次报表', 'parent_id': None},
+    {'id': 448, 'code': 'view_xl_report_basic', 'name': '查看', 'parent_id': 447},
+
+    {'id': 449, 'code': 'xl_report_weight', 'name': '小料称量物料消耗报表', 'parent_id': None},
+    {'id': 450, 'code': 'view_xl_report_weight', 'name': '查看', 'parent_id': 449},
+
+    {'id': 451, 'code': 'material_outbound_record', 'name': '原材料出库单据', 'parent_id': None},
+    {'id': 452, 'code': 'view_material_outbound_record', 'name': '查看', 'parent_id': 451},
+    {'id': 453, 'code': 'space_material_outbound_record', 'name': '指定库位出库', 'parent_id': 451},
+    {'id': 454, 'code': 'weight_material_outbound_record', 'name': '指定重量出库', 'parent_id': 451},
+
+    {'id': 455, 'code': 'material_outbound_task', 'name': '原材料出库任务', 'parent_id': None},
+    {'id': 456, 'code': 'view_material_outbound_task', 'name': '查看', 'parent_id': 455},
+
 ]
 
 
