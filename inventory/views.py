@@ -2030,31 +2030,39 @@ class WmsInventoryStockView(APIView):
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         extra_where_str = ""
+        if not entrance_name:
+            raise ValidationError('请选择出库口！')
         if material_name:
-            extra_where_str += "and tis.MaterialName like '%{}%'".format(material_name)
+            extra_where_str += "and c.Name like '%{}%'".format(material_name)
         if material_no:
-            extra_where_str += "and tis.MaterialCode like '%{}%'".format(material_no)
+            extra_where_str += "and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
-            extra_where_str += "and tis.StockDetailState={}".format(quality_status)
-        if entrance_name:
-            extra_where_str += "and tie.Name='{}'".format(entrance_name)
-        sql = """
-                    select
-               tis.StockDetailState,
-               tis.MaterialCode,
-               tis.MaterialName,
-               tis.BatchNo,
-               tis.SpaceId,
-               tis.Sn
-            from
-                t_inventory_stock tis
-            inner join t_inventory_entrance_tunnel tiet on tis.TunnelId=tiet.TunnelCode
-            inner join t_inventory_entrance tie on tie.id=tiet.EntranceEntityId
-            inner join t_inventory_space t on tis.SpaceId = t.SpaceNumber and t.Id not in (select
-                t_inventory_space.Id
-                from t_inventory_space,t_inventory_space_plan
-                where t_inventory_space.Id = t_inventory_space_plan.StorageSpaceEntityId)
-            where t.SpaceState=1 {}""".format(extra_where_str)
+            extra_where_str += "and a.StockDetailState={}".format(quality_status)
+        sql = """SELECT
+                 a.StockDetailState,
+                 c.MaterialCode,
+                 c.Name AS MaterialName,
+                 a.BatchNo,
+                 a.SpaceId,
+                 a.Sn
+                FROM
+                 dbo.t_inventory_stock AS a
+                 INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
+                 INNER JOIN t_inventory_material c ON c.MaterialCode= a.MaterialCode
+                 INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId 
+                WHERE
+                 NOT EXISTS ( 
+                     SELECT 
+                            tp.TrackingNumber 
+                     FROM t_inventory_space_plan tp 
+                     WHERE tp.TrackingNumber = a.TrackingNumber ) 
+                 AND d.State= 1 
+                 AND b.SpaceState= 1 
+                 AND a.TunnelId IN ( 
+                     SELECT 
+                            ab.TunnelCode 
+                     FROM t_inventory_entrance_tunnel ab INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId 
+                     WHERE ac.name= '{}' ) {}""".format(entrance_name, extra_where_str)
         sc = SqlClient(sql=sql, **WMS_CONF)
         temp = sc.all()
         count = len(temp)
@@ -2082,28 +2090,38 @@ class WmsInventoryWeightStockView(APIView):
         quality_status = self.request.query_params.get('quality_status')
         entrance_name = self.request.query_params.get('entrance_name')
         extra_where_str = ""
+        if not entrance_name:
+            raise ValidationError('请选择出库口！')
         if material_name:
-            extra_where_str += "and tis.MaterialName like '%{}%'".format(material_name)
+            extra_where_str += "and c.MaterialName like '%{}%'".format(material_name)
         if material_no:
-            extra_where_str += "and tis.MaterialCode like '%{}%'".format(material_no)
+            extra_where_str += "and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
-            extra_where_str += "and tis.StockDetailState={}".format(quality_status)
-        if entrance_name:
-            extra_where_str += "and tie.Name='{}'".format(entrance_name)
-        sql = """select
-               MaterialCode,
-               MaterialName,
-               sum(tis.WeightOfActual)
-            from
-                t_inventory_stock tis
-            inner join t_inventory_entrance_tunnel tiet on tis.TunnelId=tiet.TunnelCode
-            inner join t_inventory_entrance tie on tie.id=tiet.EntranceEntityId
-            inner join t_inventory_space t on tis.SpaceId = t.SpaceNumber and t.Id not in (select
-                t_inventory_space.Id
-                from t_inventory_space,t_inventory_space_plan
-                where t_inventory_space.Id = t_inventory_space_plan.StorageSpaceEntityId)
-            where t.SpaceState=1 {}
-            group by tis.MaterialCode, tis.MaterialName""".format(extra_where_str)
+            extra_where_str += "and a.StockDetailState={}".format(quality_status)
+
+        sql = """SELECT
+                 c.MaterialCode,
+                 c.Name AS MaterialName,
+                 SUM ( a.WeightOfActual ) AS WeightOfActual
+                FROM
+                 dbo.t_inventory_stock AS a
+                 INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
+                 INNER JOIN t_inventory_material c ON c.MaterialCode= a.MaterialCode
+                 INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId 
+                WHERE
+                 NOT EXISTS ( SELECT tp.TrackingNumber FROM t_inventory_space_plan tp WHERE tp.TrackingNumber = a.TrackingNumber ) 
+                 AND d.State= 1 
+                 AND b.SpaceState= 1 
+                 AND a.TunnelId IN (
+                     SELECT
+                            ab.TunnelCode
+                     FROM t_inventory_entrance_tunnel ab
+                         INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId
+                     WHERE ac.name= '{}' )
+                 {}
+                GROUP BY
+                 c.MaterialCode,
+                 c.Name;""".format(entrance_name, extra_where_str)
         sc = SqlClient(sql=sql, **WMS_CONF)
         temp = sc.all()
         count = len(temp)
@@ -2122,7 +2140,7 @@ class InventoryEntranceView(APIView):
     """获取所有出库口名称"""
 
     def get(self, request):
-        sql = 'select name, code from t_inventory_entrance where Type=2;'
+        sql = 'select name, EntranceCode from t_inventory_entrance where Type=2;'
         sc = SqlClient(sql=sql, **WMS_CONF)
         temp = sc.all()
         result = []
