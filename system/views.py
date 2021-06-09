@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework_jwt.views import ObtainJSONWebToken
 
+from mes.conf import WMS_URL
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
@@ -207,7 +208,8 @@ class LoginView(ObtainJSONWebToken):
             return Response({"permissions": user.permissions_list,
                              "username": user.username,
                              'id': user.id,
-                             "token": token})
+                             "token": token,
+                             'wms_url': WMS_URL})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 

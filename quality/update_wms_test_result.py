@@ -23,7 +23,7 @@ logger = logging.getLogger('quality_log')
 
 
 def main():
-    materials = ExamineMaterial.objects.exclude(status=2)
+    materials = ExamineMaterial.objects.filter(status=1)
     url = WMS_URL + '/MESApi/UpdateTestingResult'
     for m in materials:
         data = {
