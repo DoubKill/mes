@@ -31,8 +31,10 @@ BZ_HOST = "10.4.23.101"
 
 if settings.DEBUG:
     WMS_CONF = dict(host='124.160.19.254:61433', user='sa', database='zhada_wms_zhongcgz', password='qaz123<>?')
+    WMS_URL = "http://124.160.19.254:60001"
 else:
     WMS_CONF = dict(host='10.4.24.25', user='sa', database='zhada_wms_zhongc', password='Admin123$')
+    WMS_URL = "http://10.4.24.25:8168"
 
 STATION_LOCATION_MAP = {
     "一层前端": ["3", "4"],
