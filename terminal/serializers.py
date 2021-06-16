@@ -20,7 +20,7 @@ import logging
 
 from terminal.utils import INWeighSystem
 
-logger = logging.getLogger('api_log')
+logger = logging.getLogger('send_log')
 
 
 def generate_bra_code(equip_no, factory_date, classes):

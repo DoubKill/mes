@@ -83,9 +83,16 @@ urlpatterns = [
     path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('materia_type_name_to_according/', MateriaTypeNameToAccording.as_view()),  # 根据物料类型和编码找到存在的仓库表
     path('sampling-rules/', SamplingRules.as_view()),
+
+    # 原材料出库
     path('wms-stock/', WmsInventoryStockView.as_view()),  # 原材料货位列表
     path('wms-weight-stock/', WmsInventoryWeightStockView.as_view()),  # 原材料重量库存
     path('wms-entrance/', InventoryEntranceView.as_view()),  # 出库口列表
+
+    # 炭黑出库
+    path('th-stock/', THInventoryStockView.as_view()),  # 炭黑货位列表
+    path('th-weight-stock/', THInventoryWeightStockView.as_view()),  # 炭黑重量库存
+    path('th-entrance/', THInventoryEntranceView.as_view()),  # 炭黑出库口列表
 
     # 出库大屏
     path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
