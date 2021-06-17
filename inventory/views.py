@@ -44,7 +44,7 @@ from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes.common_code import SqlClient
-from mes.conf import WMS_CONF
+from mes.conf import WMS_CONF, TH_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
@@ -2017,8 +2017,12 @@ class ProductDetailsView(APIView):
         return Response({"results": data})
 
 
+"""原材料库出库接口"""
+
+
 class WmsInventoryStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+    DATABASE_CONF = WMS_CONF
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -2063,7 +2067,7 @@ class WmsInventoryStockView(APIView):
                             ab.TunnelCode 
                      FROM t_inventory_entrance_tunnel ab INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId 
                      WHERE ac.name= '{}' ) {}""".format(entrance_name, extra_where_str)
-        sc = SqlClient(sql=sql, **WMS_CONF)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         count = len(temp)
         temp = temp[st:et]
@@ -2083,6 +2087,7 @@ class WmsInventoryStockView(APIView):
 
 class WmsInventoryWeightStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+    DATABASE_CONF = WMS_CONF
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -2122,7 +2127,7 @@ class WmsInventoryWeightStockView(APIView):
                 GROUP BY
                  c.MaterialCode,
                  c.Name;""".format(entrance_name, extra_where_str)
-        sc = SqlClient(sql=sql, **WMS_CONF)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         count = len(temp)
         result = []
@@ -2138,10 +2143,11 @@ class WmsInventoryWeightStockView(APIView):
 
 class InventoryEntranceView(APIView):
     """获取所有出库口名称"""
+    DATABASE_CONF = WMS_CONF
 
     def get(self, request):
         sql = 'select name, EntranceCode from t_inventory_entrance where Type=2;'
-        sc = SqlClient(sql=sql, **WMS_CONF)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
         for item in temp:
@@ -2151,3 +2157,18 @@ class InventoryEntranceView(APIView):
                  })
         sc.close()
         return Response(result)
+
+
+class THInventoryStockView(WmsInventoryStockView):
+    """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+    DATABASE_CONF = TH_CONF
+
+
+class THInventoryWeightStockView(WmsInventoryWeightStockView):
+    """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+    DATABASE_CONF = TH_CONF
+
+
+class THInventoryEntranceView(InventoryEntranceView):
+    """获取所有炭黑出库口名称"""
+    DATABASE_CONF = TH_CONF
