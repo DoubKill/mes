@@ -557,7 +557,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
     """
     queryset = LabelPrint.objects.all()
     serializer_class = LabelPrintSerializer
-    permission_classes = (IsAuthenticated, )
+    # permission_classes = (IsAuthenticated, )
 
     def create(self, request, *args, **kwargs):
         lot_no_list = request.data.get('lot_no')
