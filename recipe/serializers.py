@@ -14,7 +14,6 @@ from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchin
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
-logger = logging.getLogger('api_log')
 sync_logger = logging.getLogger('sync_log')
 
 
@@ -252,7 +251,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 created_user=self.context['request'].user
             )
         except Exception as e:
-            logger.error(e)
+            pass
         instance.save()
         return instance
 
