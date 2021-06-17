@@ -158,13 +158,13 @@ class ProductBatching(AbstractEntity):
         super(ProductBatching, self).save(*args, **kwargs)
 
     @property
-    def batching_material_nos(self):
+    def batching_material_names(self):
         # 配方物料详情（料包）
-        material_nos = set((self.batching_details.filter(
-            delete_flag=False).values_list('material__material_no', flat=True)))
+        material_names = set((self.batching_details.filter(
+            delete_flag=False).values_list('material__material_name', flat=True)))
         for weight_cnt_type in self.weight_cnt_types.filter(delete_flag=False):
-            material_nos.add(weight_cnt_type.name)
-        return material_nos
+            material_names.add(weight_cnt_type.name)
+        return material_names
 
     class Meta:
         db_table = 'product_batching'
