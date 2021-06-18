@@ -93,7 +93,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
-        if material_no not in classes_plan.product_batching.batching_material_names:
+        if material_name not in classes_plan.product_batching.batching_material_names:
             attrs['status'] = 2
         else:
             attrs['status'] = 1
@@ -108,7 +108,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('条码信息下发错误：{}'.format(resp.text))
         except Exception:
             logger.error('群控服务器错误！')
-        if material_no not in classes_plan.product_batching.batching_material_names:
+        if material_name not in classes_plan.product_batching.batching_material_names:
             raise serializers.ValidationError('条码错误，该物料不在生产配方中！')
         return attrs
 
