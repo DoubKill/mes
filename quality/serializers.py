@@ -17,6 +17,7 @@ from inventory.models import DeliveryPlan, DeliveryPlanStatus
 from mes.base_serializer import BaseModelSerializer
 
 from mes.conf import COMMON_READ_ONLY_FIELDS
+from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
@@ -24,7 +25,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue
+    UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
+    ProductReportValue
 from recipe.models import MaterialAttribute
 
 
@@ -1032,6 +1034,119 @@ class IgnoredProductInfoSerializer(BaseModelSerializer):
         read_only_fields = ('product_no',)
 
 
+class ProductReportEquipSerializer(BaseModelSerializer):
+    data_point_name = serializers.ReadOnlyField(source='data_point.name')
+    test_type_name = serializers.ReadOnlyField(source='data_point.test_type.name')
+    test_type = serializers.ReadOnlyField(source='data_point.test_type.id')
+
+    class Meta:
+        model = ProductReportEquip
+        fields = "__all__"
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class ProductReportValueViewSerializer(serializers.ModelSerializer):
+    test_type = serializers.PrimaryKeyRelatedField(queryset=TestType.objects.all(), write_only=True)
+    data_point = serializers.PrimaryKeyRelatedField(queryset=DataPoint.objects.all(), write_only=True)
+    product_no = serializers.CharField(help_text='胶料编码', write_only=True)
+    actual_trains = serializers.IntegerField(help_text='车次', write_only=True)
+    production_class = serializers.CharField(max_length=64, help_text='生产班次名', write_only=True)
+    equip_no = serializers.CharField(max_length=64, help_text='机台', write_only=True)
+    production_factory_date = serializers.DateField(help_text='工厂日期', write_only=True)
+
+    @atomic()
+    def create(self, validated_data):
+        equip_no = validated_data['equip_no']
+        product_no = validated_data['product_no']
+        production_class = validated_data['production_class']
+        factory_date = validated_data['production_factory_date']
+        actual_trains = validated_data['actual_trains']
+        test_indicator_name = validated_data['test_type'].test_indicator.name
+        data_point_name = validated_data['data_point'].name
+        pallet = PalletFeedbacks.objects.filter(
+            equip_no=equip_no,
+            product_no=product_no,
+            classes=production_class,
+            factory_date=factory_date,
+            begin_trains__lte=actual_trains,
+            end_trains__gte=actual_trains
+        ).first()
+        if not pallet:
+            raise serializers.ValidationError('未找到胶料{}第【{}】车收皮信息！'.format(product_no, actual_trains))
+        lot_no = pallet.lot_no
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet.plan_classes_uid).first()
+        if not plan:
+            return validated_data
+        test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                      actual_trains=actual_trains).first()
+        if test_order:
+            instance = test_order
+            created = False
+        else:
+            instance = MaterialTestOrder.objects.create(
+                lot_no=lot_no,
+                material_test_order_uid=uuid.uuid1(),
+                actual_trains=actual_trains,
+                product_no=product_no,
+                plan_classes_uid=pallet.plan_classes_uid,
+                production_class=production_class,
+                production_group=plan.work_schedule_plan.group.global_name,
+                production_equip_no=equip_no,
+                production_factory_date=factory_date,
+            )
+            created = True
+
+        result_data = dict()
+        result_data['material_test_order'] = instance
+        result_data['test_factory_date'] = datetime.now()
+        if created:
+            result_data['test_times'] = 1
+        else:
+            last_test_result = MaterialTestResult.objects.filter(
+                material_test_order=instance,
+                test_indicator_name=test_indicator_name,
+                data_point_name=data_point_name,
+            ).order_by('-test_times').first()
+            if last_test_result:
+                result_data['test_times'] = last_test_result.test_times + 1
+            else:
+                result_data['test_times'] = 1
+        material_test_method = MaterialTestMethod.objects.filter(
+            material__material_no=product_no,
+            test_method__test_type=validated_data['test_type'],
+            data_point=validated_data['data_point']).first()
+        if material_test_method:
+            indicator = MaterialDataPointIndicator.objects.filter(
+                material_test_method=material_test_method,
+                data_point=validated_data['data_point'],
+                upper_limit__gte=validated_data['value'],
+                lower_limit__lte=validated_data['value']).first()
+            if indicator:
+                result_data['mes_result'] = indicator.result
+                result_data['data_point_indicator'] = indicator
+                result_data['level'] = indicator.level
+            else:
+                result_data['mes_result'] = '三等品'
+                result_data['level'] = 2
+        else:
+            raise serializers.ValidationError('未找到胶料{}【{}】试验方法，请录入后重试！'.format(product_no,
+                                                                                validated_data['test_type'].name))
+        result_data['created_user'] = self.context['request'].user
+        result_data['test_class'] = validated_data['production_class']
+        result_data['value'] = validated_data['value']
+        result_data['data_point_name'] = data_point_name
+        result_data['test_method_name'] = material_test_method.test_method.name
+        result_data['test_indicator_name'] = test_indicator_name
+        MaterialTestResult.objects.create(**result_data)
+        ProductReportValue.objects.filter(id=validated_data['id']).update(is_binding=True)
+        return validated_data
+
+    class Meta:
+        model = ProductReportValue
+        exclude = ('ip', 'created_date', 'is_binding')
+        extra_kwargs = {'id': {'read_only': False}}
+
+
 """新原材料快检"""
 
 
@@ -1348,6 +1463,7 @@ class UnqualifiedMaterialProcessModeSerializer(serializers.ModelSerializer):
 
 class MaterialReportEquipSerializer(BaseModelSerializer):
     type_name = serializers.ReadOnlyField(source='type.name')
+
     class Meta:
         model = MaterialReportEquip
         fields = '__all__'

@@ -2,7 +2,8 @@ import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
-    ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, MaterialReportValue
+    ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, \
+    MaterialReportValue, ProductReportEquip, ProductReportValue
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -171,4 +172,20 @@ class MaterialReportValueFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = MaterialReportValue
+        fields = ('created_date',)
+
+
+class ProductReportEquipFilter(django_filters.rest_framework.FilterSet):
+    no = django_filters.CharFilter(field_name='no', lookup_expr='icontains', help_text='设备编号')
+
+    class Meta:
+        model = ProductReportEquip
+        fields = ('no',)
+
+
+class ProductReportValueFilter(django_filters.rest_framework.FilterSet):
+    created_date = django_filters.CharFilter(field_name='created_date__date', help_text='上报日期')
+
+    class Meta:
+        model = ProductReportValue
         fields = ('created_date',)
