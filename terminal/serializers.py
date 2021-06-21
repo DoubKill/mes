@@ -20,7 +20,7 @@ import logging
 
 from terminal.utils import INWeighSystem
 
-logger = logging.getLogger('api_log')
+logger = logging.getLogger('send_log')
 
 
 def generate_bra_code(equip_no, factory_date, classes):
@@ -50,35 +50,27 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
     bra_code = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
-        bra_code = attrs['bra_code']
         # 条码来源有三种，wms子系统、收皮条码，称量打包条码
+        bra_code = attrs['bra_code']
         try:
-            # 先查出库履历查到原材料物料编码
+            # 查原材料出库履历查到原材料物料编码
             wms_stock = MaterialOutHistory.objects.using('wms').filter(
                 lot_no=bra_code).values('material_no', 'material_name')
-            # 再查wms物料管理表查到erp物料编码
-            material_all_info = WmsInventoryMaterial.objects.using('wms').filter(
-                material_no=wms_stock[0]['material_no']).order_by('id').last()
         except Exception:
-            if settings.DEBUG:
-                material_all_info = None
-                wms_stock = None
-            else:
-                raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
+            raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
+
         pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
         weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
         material_no = material_name = None
-        if material_all_info:
-            msc = ZCMaterial.objects.filter(material_no=material_all_info.erp_material_no,
+
+        if wms_stock:
+            msc = ZCMaterial.objects.filter(wlxxid=wms_stock[0]['material_no'],
                                             material__isnull=False).first()
             if msc:
-                # 如果有别称
                 material_no = msc.material.material_no
                 material_name = msc.material.material_name
             else:
-                # 否则按照wms的物料编码
-                material_no = wms_stock[0]['material_no']
-                material_name = wms_stock[0]['material_name']
+                raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
         if pallet_feedback:
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
@@ -93,7 +85,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
-        if material_no not in classes_plan.product_batching.batching_material_nos:
+        if material_name not in classes_plan.product_batching.batching_material_names:
             attrs['status'] = 2
         else:
             attrs['status'] = 1
@@ -108,7 +100,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 logger.error('条码信息下发错误：{}'.format(resp.text))
         except Exception:
             logger.error('群控服务器错误！')
-        if material_no not in classes_plan.product_batching.batching_material_nos:
+        if material_name not in classes_plan.product_batching.batching_material_names:
             raise serializers.ValidationError('条码错误，该物料不在生产配方中！')
         return attrs
 

@@ -584,6 +584,31 @@ permission_data = [
     {'id': 455, 'code': 'material_outbound_task', 'name': '原材料出库任务', 'parent_id': None},
     {'id': 456, 'code': 'view_material_outbound_task', 'name': '查看', 'parent_id': 455},
 
+    {'id': 457, 'code': 'material_daily_summary', 'name': '原材料出库日报', 'parent_id': None},
+    {'id': 458, 'code': 'view_material_daily_summary', 'name': '查看', 'parent_id': 457},
+
+    {'id': 459, 'code': 'material_monthly_summary', 'name': '原材料出库月报', 'parent_id': None},
+    {'id': 460, 'code': 'view_material_monthly_summary', 'name': '查看', 'parent_id': 459},
+
+    {'id': 461, 'code': 'material_yearly_summary', 'name': '原材料出库年报', 'parent_id': None},
+    {'id': 462, 'code': 'view_material_yearly_summary', 'name': '查看', 'parent_id': 461},
+
+    {'id': 463, 'code': 'th_outbound_record', 'name': '炭黑库出库单据', 'parent_id': None},
+    {'id': 464, 'code': 'view_th_outbound_record', 'name': '查看', 'parent_id': 463},
+    {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
+    {'id': 466, 'code': 'weight_th_outbound_record', 'name': '指定重量出库', 'parent_id': 463},
+
+    {'id': 467, 'code': 'th_outbound_task', 'name': '炭黑库出库任务', 'parent_id': None},
+    {'id': 468, 'code': 'view_th_outbound_task', 'name': '查看', 'parent_id': 467},
+
+    {'id': 469, 'code': 'th_daily_summary', 'name': '炭黑库出库日报', 'parent_id': None},
+    {'id': 470, 'code': 'view_th_daily_summary', 'name': '查看', 'parent_id': 469},
+
+    {'id': 471, 'code': 'material_th_summary', 'name': '炭黑库出库月报', 'parent_id': None},
+    {'id': 472, 'code': 'view_th_monthly_summary', 'name': '查看', 'parent_id': 471},
+
+    {'id': 473, 'code': 'th_yearly_summary', 'name': '炭黑库出库年报', 'parent_id': None},
+    {'id': 474, 'code': 'view_th_yearly_summary', 'name': '查看', 'parent_id': 473},
 ]
 
 

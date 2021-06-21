@@ -377,10 +377,11 @@ class MaterialDealResultUpdateValidTime(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class PalletFeedbacksTestListView(ModelViewSet):
     # 快检信息综合管里
-    queryset = MaterialDealResult.objects.filter(delete_flag=False)
+    queryset = MaterialDealResult.objects.filter(delete_flag=False).order_by('lot_no')
     serializer_class = MaterialDealResultListSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = PalletFeedbacksTestFilter
+    permission_classes = (IsAuthenticated, )
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -420,7 +421,7 @@ class PalletFeedbacksTestListView(ModelViewSet):
             filter_dict['print_time__isnull'] = False
         elif is_print == "未打印":
             filter_dict['print_time__isnull'] = True
-        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测')
+        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测').order_by('lot_no')
         return pfb_queryset
 
 
@@ -558,8 +559,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
     """
     queryset = LabelPrint.objects.all()
     serializer_class = LabelPrintSerializer
-    permission_classes = ()
-    authentication_classes = ()
+    # permission_classes = (IsAuthenticated, )
 
     def create(self, request, *args, **kwargs):
         lot_no_list = request.data.get('lot_no')
@@ -567,7 +567,9 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             raise ValidationError('数据格式错误！')
         for lot_no in lot_no_list:
             data = receive_deal_result(lot_no)
-            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=data)
+            data = json.loads(data)
+            data['test']['test_user'] = self.request.user.username
+            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=json.dumps(data))
         return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
