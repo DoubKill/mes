@@ -35,13 +35,14 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
-    MaterialReportValueFilter
+    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue
+    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
+    ProductReportEquip, ProductReportValue
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -55,7 +56,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
-    MaterialReportValueCreateSerializer
+    MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1390,6 +1391,60 @@ class IgnoredProductInfoViewSet(viewsets.GenericViewSet,
     queryset = IgnoredProductInfo.objects.all()
     serializer_class = IgnoredProductInfoSerializer
     permission_classes = (IsAuthenticated,)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductReportEquipViewSet(mixins.CreateModelMixin,
+                                mixins.UpdateModelMixin,
+                                mixins.ListModelMixin,
+                                viewsets.GenericViewSet):
+    """胶料上报设备管理"""
+    queryset = ProductReportEquip.objects.all()
+    serializer_class = ProductReportEquipSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductReportEquipFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductReportValueViewSet(mixins.CreateModelMixin,
+                                mixins.ListModelMixin,
+                                viewsets.GenericViewSet):
+    """胶料设备数据上报"""
+    permission_classes = (IsAuthenticated,)
+    queryset = ProductReportValue.objects.filter(is_binding=False)
+    serializer_class = ProductReportValueViewSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductReportValueFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        value_data = queryset.values('id', 'ip', 'value', 'created_date')
+        equip_data = ProductReportEquip.objects.values('ip', 'data_point__test_type', 'no',
+                                                       'data_point', 'data_point__name')
+        equip_data_dict = {item['ip']: item for item in equip_data}
+        ret = []
+        for item in value_data:
+            item['created_date'] = datetime.datetime.strftime(item['created_date'], '%Y-%m-%d %H:%M:%S')
+            if item['ip'] in equip_data_dict:
+                item['data_point_name'] = equip_data_dict[item['ip']]['data_point__name']
+                item['test_type'] = equip_data_dict[item['ip']]['data_point__test_type']
+                item['data_point'] = equip_data_dict[item['ip']]['data_point']
+                item['report_equip_no'] = equip_data_dict[item['ip']]['no']
+            ret.append(item)
+        return Response(ret)
+
+    @atomic()
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            s = ProductReportValueViewSerializer(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功！')
 
 
 """新原材料快检"""

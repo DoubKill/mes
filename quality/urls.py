@@ -58,6 +58,13 @@ router.register('pallet-feed-test', PalletFeedbacksTestListView)
 # 不做pass章的判定胶种
 router.register('ignored-product-info', IgnoredProductInfoViewSet)
 
+# 胶料上报设备管理
+router.register('product-report-equip', ProductReportEquipViewSet)
+
+# 胶料上报值管理
+router.register('product-report-value', ProductReportValueViewSet)
+
+
 """# 原材料新"""
 # 检测设备类型
 router.register('material-equip-types', MaterialEquipTypeViewSet)

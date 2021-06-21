@@ -609,6 +609,25 @@ permission_data = [
 
     {'id': 473, 'code': 'th_yearly_summary', 'name': '炭黑库出库年报', 'parent_id': None},
     {'id': 474, 'code': 'view_th_yearly_summary', 'name': '查看', 'parent_id': 473},
+
+    {'id': 475, 'code': 'material_report_equip', 'name': '原材料上报设备管理', 'parent_id': None},
+    {'id': 476, 'code': 'view_material_report_equip', 'name': '查看', 'parent_id': 475},
+    {'id': 477, 'code': 'add_material_report_equip', 'name': '新增', 'parent_id': 475},
+    {'id': 478, 'code': 'change_material_report_equip', 'name': '修改', 'parent_id': 475},
+
+    {'id': 479, 'code': 'material_report_value', 'name': '原材料上报值管理', 'parent_id': None},
+    {'id': 480, 'code': 'view_material_report_value', 'name': '查看', 'parent_id': 479},
+    {'id': 481, 'code': 'add_material_report_value', 'name': '新增', 'parent_id': 479},
+
+    {'id': 482, 'code': 'product_report_equip', 'name': '胶料上报设备管理', 'parent_id': None},
+    {'id': 483, 'code': 'view_product_report_equip', 'name': '查看', 'parent_id': 482},
+    {'id': 484, 'code': 'add_product_report_equip', 'name': '新增', 'parent_id': 482},
+    {'id': 485, 'code': 'change_product_report_equip', 'name': '修改', 'parent_id': 482},
+
+    {'id': 486, 'code': 'product_report_value', 'name': '胶料上报值管理', 'parent_id': None},
+    {'id': 487, 'code': 'view_product_report_value', 'name': '查看', 'parent_id': 486},
+    {'id': 488, 'code': 'add_product_report_value', 'name': '新增', 'parent_id': 486},
+
 ]
 
 
