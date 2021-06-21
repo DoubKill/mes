@@ -1,3 +1,4 @@
+import logging
 import re
 import time
 import uuid
@@ -7,6 +8,7 @@ from django.db.models import Count
 from django.db.models import FloatField
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.response import Response
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from django.db.models import Max
@@ -22,7 +24,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, IgnoredProductInfo
+    UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue
 from recipe.models import MaterialAttribute
 
 
@@ -1027,7 +1029,7 @@ class IgnoredProductInfoSerializer(BaseModelSerializer):
     class Meta:
         model = IgnoredProductInfo
         fields = "__all__"
-        read_only_fields = ('product_no', )
+        read_only_fields = ('product_no',)
 
 
 """新原材料快检"""
@@ -1059,6 +1061,7 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
     unitname = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
                                                              message='该检测类型名称已存在')])
+
     # actual_name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
     #                                                                 message='该检测类型名称已存在111')])
 
@@ -1135,7 +1138,7 @@ class MaterialSingleTypeExamineResultMainSerializer(serializers.ModelSerializer)
 
     class Meta:
         model = MaterialSingleTypeExamineResult
-        exclude = ('material_examine_result', )
+        exclude = ('material_examine_result',)
 
 
 class MaterialExamineResultMainCreateSerializer(serializers.ModelSerializer):
@@ -1144,7 +1147,7 @@ class MaterialExamineResultMainCreateSerializer(serializers.ModelSerializer):
                                                  allow_blank=True, allow_null=True)
     material_batch = serializers.CharField(write_only=True, help_text='批次号')
     material_supplier = serializers.CharField(write_only=True, help_text='产地',
-                                                 allow_blank=True, allow_null=True)
+                                              allow_blank=True, allow_null=True)
     material_tmh = serializers.CharField(write_only=True, help_text='条码号')
     material_wlxxid = serializers.CharField(write_only=True, help_text='物料信息id')
     single_examine_results = MaterialSingleTypeExamineResultMainSerializer(
@@ -1294,17 +1297,15 @@ class ExamineMaterialSerializer(serializers.ModelSerializer):
 
 
 class ExamineMaterialCreateSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = ExamineMaterial
         fields = '__all__'
 
 
 class MaterialEquipTypeSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = MaterialEquipType
-        exclude = ('examine_type', )
+        exclude = ('examine_type',)
 
 
 class MaterialEquipTypeUpdateSerializer(serializers.ModelSerializer):
@@ -1342,4 +1343,82 @@ class UnqualifiedMaterialProcessModeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UnqualifiedMaterialProcessMode
-        exclude = ('create_user', )
+        exclude = ('create_user',)
+
+
+class MaterialReportEquipSerializer(BaseModelSerializer):
+    type_name = serializers.ReadOnlyField(source='type.name')
+    class Meta:
+        model = MaterialReportEquip
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialReportValueSerializer(BaseModelSerializer):
+    created_date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+
+    class Meta:
+        model = MaterialReportValue
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
+    material_name = serializers.CharField(write_only=True, help_text='物料名称')
+    material_sample_name = serializers.CharField(write_only=True, help_text='样品名称',
+                                                 allow_blank=True, allow_null=True)
+    material_batch = serializers.CharField(write_only=True, help_text='批次号')
+    material_supplier = serializers.CharField(write_only=True, help_text='产地',
+                                              allow_blank=True, allow_null=True)
+    material_tmh = serializers.CharField(write_only=True, help_text='条码号')
+    material_wlxxid = serializers.CharField(write_only=True, help_text='物料信息id')
+    single_examine_results = MaterialSingleTypeExamineResultMainSerializer(
+        many=True, required=False, help_text="""[{"type": 检测类型id, "value": 检测值]""")
+
+    def validate(self, attrs):
+        material_name = attrs.pop('material_name')
+        material_sample_name = attrs.pop('material_sample_name', None)
+        material_batch = attrs.pop('material_batch')
+        material_supplier = attrs.pop('material_supplier', None)
+        material_tmh = attrs.pop('material_tmh')
+        material_wlxxid = attrs.pop('material_wlxxid')
+        material = ExamineMaterial.objects.filter(batch=material_batch,
+                                                  wlxxid=material_wlxxid).first()
+        if not material:
+            material = ExamineMaterial.objects.create(batch=material_batch,
+                                                      name=material_name,
+                                                      sample_name=material_sample_name,
+                                                      supplier=material_supplier,
+                                                      tmh=material_tmh,
+                                                      wlxxid=material_wlxxid)
+        attrs['material'] = material
+        return attrs
+
+    @atomic()
+    def create(self, validated_data):
+        validated_data['qualified'] = False
+        validated_data['recorder'] = self.context['request'].user
+        instance = super().create(validated_data)
+        MaterialSingleTypeExamineResult.objects.create(material_examine_result_id=instance.id,
+                                                       type_id=self.initial_data['type'],
+                                                       mes_decide_qualified=self.initial_data['qualified'],
+                                                       value=self.initial_data['value'])
+        if not instance.single_examine_results.filter(mes_decide_qualified=False).exists():
+            instance.qualified = True
+            instance.save()
+        material = instance.material
+        material.qualified = instance.qualified
+        material.save()
+        obj = MaterialReportValue.objects.get(ip=self.initial_data['ip'])
+        obj.is_binding = True
+        obj.save()
+        return instance
+
+    class Meta:
+        model = MaterialExamineResult
+        extra_kwargs = {
+            'qualified': {'read_only': True},
+            'recorder': {'read_only': True},
+            'material': {'read_only': True},
+        }
+        fields = '__all__'

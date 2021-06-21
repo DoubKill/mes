@@ -560,3 +560,26 @@ class UnqualifiedMaterialProcessMode(models.Model):
     class Meta:
         db_table = 'unqualified_material_process_mode'
         verbose_name_plural = verbose_name = '不合格原材料处理方式'
+
+
+class MaterialReportEquip(AbstractEntity):
+    """原材料快检上报设备"""
+    no = models.CharField(max_length=64, help_text='设备编号')
+    ip = models.CharField(max_length=64, help_text='IP', unique=True)
+    type = models.ForeignKey(MaterialExamineType, on_delete=models.CASCADE, help_text='检测类型')
+
+    class Meta:
+        db_table = 'material_report_equip'
+        verbose_name_plural = verbose_name = '原材料快检上报设备'
+
+
+class MaterialReportValue(models.Model):
+    """原材料快检上报值"""
+    ip = models.CharField(max_length=64, help_text='上报设备IP')
+    created_date = models.DateTimeField(verbose_name='数据上报时间')
+    value = models.FloatField(help_text='检测值')
+    is_binding = models.BooleanField(help_text='是否绑定', default=False)
+
+    class Meta:
+        db_table = 'material_report_value'
+        verbose_name_plural = verbose_name = '原材料快检上报值'

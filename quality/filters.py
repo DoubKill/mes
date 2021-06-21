@@ -2,7 +2,7 @@ import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
-    ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip
+    ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, MaterialReportValue
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -79,7 +79,6 @@ class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
     suggestion_desc = django_filters.CharFilter(field_name='deal_suggestion', help_text='处理意见筛选')
     lot_no = django_filters.CharFilter(field_name='lot_no', help_text='唯一追踪条码', lookup_expr="icontains")
 
-
     class Meta:
         model = MaterialDealResult
         fields = ('suggestion_desc', 'lot_no')
@@ -119,7 +118,7 @@ class MaterialExamineResultFilter(django_filters.rest_framework.FilterSet):
     material_name = django_filters.CharFilter(field_name='material__name',
                                               help_text='原材料名称', lookup_expr='icontains')
     sample_name = django_filters.CharFilter(field_name='material__sample_name',
-                                              help_text='样品名称', lookup_expr='icontains')
+                                            help_text='样品名称', lookup_expr='icontains')
     batch = django_filters.CharFilter(field_name='material__batch',
                                       help_text='批次号', lookup_expr='icontains')
     supplier_name = django_filters.CharFilter(field_name='material__supplier',
@@ -143,6 +142,7 @@ class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):
     supplier = django_filters.CharFilter(field_name='supplier', lookup_expr='icontains', help_text='供应商')
     material_create_time_b = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='gte')
     material_create_time_e = django_filters.DateTimeFilter(field_name='create_time', lookup_expr='lte')
+
     # examine_date = django_filters.DateFilter(field_name='examine_results__examine_date', help_text='检测日期')
     # transport_date = django_filters.DateFilter(field_name='examine_results__transport_date', help_text='收货日期')
 
@@ -155,3 +155,20 @@ class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):
                   'qualified',
                   'material_create_time_b',
                   'material_create_time_e')
+
+
+class MaterialReportEquipFilter(django_filters.rest_framework.FilterSet):
+    no = django_filters.CharFilter(field_name='no', lookup_expr='icontains')
+    type = django_filters.CharFilter(field_name='type__id', lookup_expr='icontains')
+
+    class Meta:
+        model = MaterialReportEquip
+        fields = ('no', 'type')
+
+
+class MaterialReportValueFilter(django_filters.rest_framework.FilterSet):
+    created_date = django_filters.DateTimeFilter(field_name='created_date__date', help_text='数据上报日期')
+
+    class Meta:
+        model = MaterialReportValue
+        fields = ('created_date',)
