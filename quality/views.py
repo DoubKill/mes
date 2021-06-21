@@ -1792,7 +1792,6 @@ class MaterialReportValueViewSet(mixins.CreateModelMixin,
 
         # 返回未绑定数据
         queryset = self.filter_queryset(self.get_queryset())
-        report_ip_values = queryset.values('ip')
         prepare_data = list(queryset.values())
         for i in prepare_data:
             row = list(MaterialReportEquip.objects.filter(ip=i['ip']).values('no', 'type'))[0]

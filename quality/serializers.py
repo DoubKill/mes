@@ -1347,6 +1347,7 @@ class UnqualifiedMaterialProcessModeSerializer(serializers.ModelSerializer):
 
 
 class MaterialReportEquipSerializer(BaseModelSerializer):
+    type_name = serializers.ReadOnlyField(source='type.name')
     class Meta:
         model = MaterialReportEquip
         fields = '__all__'
