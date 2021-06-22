@@ -1054,7 +1054,6 @@ class ProductReportValueViewSerializer(serializers.ModelSerializer):
     equip_no = serializers.CharField(max_length=64, help_text='机台', write_only=True)
     production_factory_date = serializers.DateField(help_text='工厂日期', write_only=True)
 
-    @atomic()
     def create(self, validated_data):
         equip_no = validated_data['equip_no']
         product_no = validated_data['product_no']

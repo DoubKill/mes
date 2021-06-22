@@ -1434,7 +1434,6 @@ class ProductReportValueViewSet(mixins.CreateModelMixin,
             ret.append(item)
         return Response(ret)
 
-    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         if not isinstance(data, list):

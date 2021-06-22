@@ -2048,7 +2048,8 @@ class WmsInventoryStockView(APIView):
                  c.Name AS MaterialName,
                  a.BatchNo,
                  a.SpaceId,
-                 a.Sn
+                 a.Sn,
+                 a.WeightUnit
                 FROM
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -2079,7 +2080,8 @@ class WmsInventoryStockView(APIView):
                  'MaterialName': item[2],
                  'BatchNo': item[3],
                  'SpaceId': item[4],
-                 'Sn': item[5]
+                 'Sn': item[5],
+                 'unit': item[6]
                  })
         sc.close()
         return Response({'results': result, "count": count})
