@@ -1862,3 +1862,30 @@ class MaterialReportValueViewSet(mixins.CreateModelMixin,
             else:
                 i['qualified'] = 1 if i['qualified_range'][0] <= i['value'] <= i['qualified_range'][1] else 0
         return Response({'results': prepare_data})
+
+
+class ReportValueView(APIView):
+    """
+    原材料、胶料检测数据上报，
+    {"report_type": 上报类型  1原材料  2胶料，
+    "ip": IP地址，
+    "value": 检测值}
+    """
+
+    def post(self, request):
+        data = self.request.data
+        if not isinstance(data, dict):
+            raise ValidationError('数据错误')
+        report_type = data.pop('report_type', None)
+        if report_type not in (1, 2):
+            raise ValidationError('上报类型错误')
+        data['created_date'] = datetime.datetime.now()
+        try:
+            if report_type == 1:
+                # 原材料数据上报
+                MaterialReportValue.objects.create(**data)
+            else:
+                ProductReportValue.objects.create(**data)
+        except Exception:
+            raise ValidationError('参数错误')
+        return Response('上报成功！')
