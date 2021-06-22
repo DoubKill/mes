@@ -1525,7 +1525,7 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
         material = instance.material
         material.qualified = instance.qualified
         material.save()
-        obj = MaterialReportValue.objects.get(ip=self.initial_data['ip'])
+        obj = MaterialReportValue.objects.get(id=self.initial_data['id'])
         obj.is_binding = True
         obj.save()
         return instance
