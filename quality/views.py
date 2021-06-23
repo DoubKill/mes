@@ -34,13 +34,15 @@ from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
-    ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter
+    ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
+    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo
+    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
+    ProductReportEquip, ProductReportValue
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -53,7 +55,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
-    MaterialExamineResultMainCreateSerializer
+    MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
+    MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -112,7 +115,7 @@ class DataPointStandardErrorViewSet(ModelViewSet):
     queryset = DataPointStandardError.objects.filter(delete_flag=False)
     serializer_class = DataPointStandardErrorSerializer
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('data_point_id', )
+    filter_fields = ('data_point_id',)
     pagination_class = None
 
 
@@ -1256,7 +1259,7 @@ class ImportAndExportView(APIView):
         by_dict = {'MH': 7, 'ML': 8, 'TC10': 9, 'TC50': 10, 'TC90': 11, '比重值': 12, 'ML(1+4)': 13, '硬度值': 14, 'M300': 15,
                    '扯断强度': 16, '伸长率': 17, '焦烧': 18, '钢拔': 19}
         for i in data:
-            for j in ['MH', 'ML', 'TC10', 'TC50', 'TC90', '比重值', 'ML(1+4)',  '硬度值', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
+            for j in ['MH', 'ML', 'TC10', 'TC50', 'TC90', '比重值', 'ML(1+4)', '硬度值', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
                 # 本来这里的Ml(1+4)就是门尼  M300、扯断强度、伸长率属于物性  焦烧就是焦烧 钢拔就是钢拔 MH、TC10、TC50、TC90属于流变
                 if i[by_dict[j]]:
                     dp_obj = DataPoint.objects.filter(name=j).first()
@@ -1388,6 +1391,59 @@ class IgnoredProductInfoViewSet(viewsets.GenericViewSet,
     queryset = IgnoredProductInfo.objects.all()
     serializer_class = IgnoredProductInfoSerializer
     permission_classes = (IsAuthenticated,)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductReportEquipViewSet(mixins.CreateModelMixin,
+                                mixins.UpdateModelMixin,
+                                mixins.ListModelMixin,
+                                viewsets.GenericViewSet):
+    """胶料上报设备管理"""
+    queryset = ProductReportEquip.objects.all()
+    serializer_class = ProductReportEquipSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductReportEquipFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductReportValueViewSet(mixins.CreateModelMixin,
+                                mixins.ListModelMixin,
+                                viewsets.GenericViewSet):
+    """胶料设备数据上报"""
+    permission_classes = (IsAuthenticated,)
+    queryset = ProductReportValue.objects.filter(is_binding=False)
+    serializer_class = ProductReportValueViewSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductReportValueFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        value_data = queryset.values('id', 'ip', 'value', 'created_date')
+        equip_data = ProductReportEquip.objects.values('ip', 'data_point__test_type', 'no',
+                                                       'data_point', 'data_point__name')
+        equip_data_dict = {item['ip']: item for item in equip_data}
+        ret = []
+        for item in value_data:
+            item['created_date'] = datetime.datetime.strftime(item['created_date'], '%Y-%m-%d %H:%M:%S')
+            if item['ip'] in equip_data_dict:
+                item['data_point_name'] = equip_data_dict[item['ip']]['data_point__name']
+                item['test_type'] = equip_data_dict[item['ip']]['data_point__test_type']
+                item['data_point'] = equip_data_dict[item['ip']]['data_point']
+                item['report_equip_no'] = equip_data_dict[item['ip']]['no']
+            ret.append(item)
+        return Response(ret)
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        for item in data:
+            s = ProductReportValueViewSerializer(data=item, context={'request': request})
+            if not s.is_valid():
+                raise ValidationError(s.errors)
+            s.save()
+        return Response('新建成功！')
 
 
 """新原材料快检"""
@@ -1640,6 +1696,7 @@ class MaterialExamineResultViewSet(viewsets.GenericViewSet,
 @method_decorator([api_recorder], name="dispatch")
 class MaterialSingleTypeExamineResultView(APIView):
     """批次原材料不合格项，参数：material=原材料id"""
+
     def get(self, request):
         ret = {}
         material_id = self.request.query_params.get('material')
@@ -1684,7 +1741,7 @@ class UnqualifiedMaterialProcessModeViewSet(viewsets.GenericViewSet,
     serializer_class = UnqualifiedMaterialProcessModeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('material_id', )
+    filter_fields = ('material_id',)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1725,3 +1782,110 @@ class ExamineResultCurveView(APIView):
             date = datetime.datetime.strftime(item.material_examine_result.examine_date, '%Y-%m-%d')
             y_axis[item.type.name]['data'][days.index(date)] = item.value
         return Response({'x_axis': days, 'y_axis': y_axis.values()})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class MaterialReportEquipViewSet(mixins.CreateModelMixin,
+                                 mixins.ListModelMixin,
+                                 mixins.UpdateModelMixin,
+                                 mixins.RetrieveModelMixin,
+                                 viewsets.GenericViewSet):
+    """
+    list:
+        原材料上报设备列表
+    create:
+        新建原材料上报设备
+    update：
+        修改原材料上报设备
+    """
+    queryset = MaterialReportEquip.objects.all()
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialReportEquipFilter
+    serializer_class = MaterialReportEquipSerializer
+
+
+@method_decorator([api_recorder], name='dispatch')
+class MaterialReportValueViewSet(mixins.CreateModelMixin,
+                                 mixins.ListModelMixin,
+                                 viewsets.GenericViewSet):
+    queryset = MaterialReportValue.objects.filter(is_binding=False)
+    permission_classes = (IsAuthenticated,)
+    pagination_class = SinglePageNumberPagination
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialReportValueFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return MaterialReportValueCreateSerializer
+        return MaterialReportValueSerializer
+
+    def create(self, request, *args, **kwargs):
+        data = self.request.data
+        for item in data:
+            s = MaterialReportValueCreateSerializer(data=item, context={'request': self.request})
+            s.is_valid(raise_exception=True)
+            self.perform_create(s)
+        return Response("提交成功")
+
+    def list(self, request, *args, **kwargs):
+        # 获取类型判断值
+        data = MaterialExamineType.objects.all().select_related("unit").prefetch_related('standards').values("id",
+                                                                                                             "name",
+                                                                                                             'interval_type',
+                                                                                                             'limit_value')
+        for item in data:
+            if item['interval_type'] == 1:
+                standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=item['id']).first()
+                if standard:
+                    item['qualified_range'] = [standard.lower_limiting_value, standard.upper_limit_value]
+            elif item['interval_type'] == 2:
+                item['qualified_range'] = [None, item['limit_value']]
+            elif item['interval_type'] == 3:
+                item['qualified_range'] = [item['limit_value'], None]
+
+        # 返回未绑定数据
+        queryset = self.filter_queryset(self.get_queryset())
+        prepare_data = list(queryset.values())
+        for i in prepare_data:
+            row = list(MaterialReportEquip.objects.filter(ip=i['ip']).values('no', 'type'))[0]
+            for j in data:
+                j['type'] = j.pop('id') if 'id' in j else j['type']
+                if j['type'] == row['type']:
+                    row.update(j)
+            i.update(row)
+            if None in i['qualified_range']:
+                if i['qualified_range'].index(None) == 0:
+                    i['qualified'] = 1 if i['value'] <= i['qualified_range'][1] else 0
+                else:
+                    i['qualified'] = 1 if i['qualified_range'][0] <= i['value'] else 0
+            else:
+                i['qualified'] = 1 if i['qualified_range'][0] <= i['value'] <= i['qualified_range'][1] else 0
+        return Response({'results': prepare_data})
+
+
+class ReportValueView(APIView):
+    """
+    原材料、胶料检测数据上报，
+    {"report_type": 上报类型  1原材料  2胶料，
+    "ip": IP地址，
+    "value": 检测值}
+    """
+
+    def post(self, request):
+        data = self.request.data
+        if not isinstance(data, dict):
+            raise ValidationError('数据错误')
+        report_type = data.pop('report_type', None)
+        if report_type not in (1, 2):
+            raise ValidationError('上报类型错误')
+        data['created_date'] = datetime.datetime.now()
+        try:
+            if report_type == 1:
+                # 原材料数据上报
+                MaterialReportValue.objects.create(**data)
+            else:
+                ProductReportValue.objects.create(**data)
+        except Exception:
+            raise ValidationError('参数错误')
+        return Response('上报成功！')

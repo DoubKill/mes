@@ -11,7 +11,6 @@ from quality.views import *
 
 router = DefaultRouter()
 
-
 """胶料"""
 # 试验指标
 router.register('test-indicators', TestIndicatorViewSet)
@@ -59,6 +58,12 @@ router.register('pallet-feed-test', PalletFeedbacksTestListView)
 # 不做pass章的判定胶种
 router.register('ignored-product-info', IgnoredProductInfoViewSet)
 
+# 胶料上报设备管理
+router.register('product-report-equip', ProductReportEquipViewSet)
+
+# 胶料上报值管理
+router.register('product-report-value', ProductReportValueViewSet)
+
 
 """# 原材料新"""
 # 检测设备类型
@@ -82,6 +87,11 @@ router.register('examine-material', ExamineMaterialViewSet)
 # 原材料不合格管理
 router.register('material-unqualified-process', UnqualifiedMaterialProcessModeViewSet)
 
+# 原材料上报设备
+router.register('material-report-equip', MaterialReportEquipViewSet)
+
+# 原材料数据上报
+router.register('material-report-value', MaterialReportValueViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -105,5 +115,6 @@ urlpatterns = [
     path('material-unqualified-types/', MaterialSingleTypeExamineResultView.as_view()),
     path('material-examine-result-curve/', ExamineResultCurveView.as_view()),
     path('show-qualified-range/', ShowQualifiedRange.as_view()),  # 全局配置快检卡片打印显示合格区间
-    path('wms-material-search/', WMSMaterialSearchView.as_view())
+    path('wms-material-search/', WMSMaterialSearchView.as_view()),
+    path('report-value/', ReportValueView.as_view())
 ]
