@@ -427,6 +427,9 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no).first()
         test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
+        classes = plan.work_schedule_plan.classes.global_name
+        group = plan.work_schedule_plan.group.global_name
         ret['day_time'] = str(test_order_data.production_factory_date)  # 工厂日期
         ret['product_no'] = pallet_data.product_no  # 胶料编码
         ret['equip_no'] = pallet_data.equip_no  # 设备编号
@@ -435,11 +438,11 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['operation_user'] = pallet_data.operation_user  # 操作员
         ret['actual_trains'] = '/'.join(
             [str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
-        ret['classes_group'] = test_order_data.production_class + '/' + test_order_data.production_group  # 班次班组
+        ret['classes_group'] = classes + '/' + group  # 班次班组
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date.strftime('%Y-%m-%d %H:%M:%S'),
-                       'test_class': test_order_data.production_class,
+                       'test_class': classes,
                        'pallet_no': pallet_data.pallet_no,
                        'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
         product_time = instance.production_factory_date
