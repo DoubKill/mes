@@ -13,7 +13,8 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from production.models import PalletFeedbacks
-from quality.models import MaterialTestOrder, MaterialTestResult, TestType
+from quality.models import MaterialTestOrder, MaterialTestResult, TestType, MaterialTestMethod, \
+    MaterialDataPointIndicator
 from basics.models import WorkSchedulePlan
 from quality.models import ZCKJConfig
 
@@ -158,29 +159,29 @@ def main():
                             production_equip_no=equip_no,
                             production_factory_date=product_date
                         )
-                    # TODO   由MES判断检测结果
-                    # material_test_method = MaterialTestMethod.objects.filter(
-                    #     material__material_no=product_no,
-                    #     test_method__name=method_name,
-                    #     test_method__test_type__test_indicator__name=indicator_name,
-                    #     data_point__name=data_point_name,
-                    #     data_point__test_type__test_indicator__name=indicator_name).first()
-                    # if material_test_method:
-                    #     indicator = MaterialDataPointIndicator.objects.filter(
-                    #         material_test_method=material_test_method,
-                    #         data_point__name=data_point_name,
-                    #         data_point__test_type__test_indicator__name=indicator_name,
-                    #         upper_limit__gte=value,
-                    #         lower_limit__lte=value).first()
-                    #     if indicator:
-                    #         mes_result = indicator.result
-                    #         level = indicator.level
-                    #     else:
-                    #         mes_result = '三等品'
-                    #         level = 2
-                    # else:
-                    #     mes_result = '三等品'
-                    #     level = 2
+                    # 由MES判断检测结果
+                    material_test_method = MaterialTestMethod.objects.filter(
+                        material__material_no=product_no,
+                        test_method__name=method_name,
+                        test_method__test_type__test_indicator__name=indicator_name,
+                        data_point__name=data_point_name,
+                        data_point__test_type__test_indicator__name=indicator_name).first()
+                    if material_test_method:
+                        indicator = MaterialDataPointIndicator.objects.filter(
+                            material_test_method=material_test_method,
+                            data_point__name=data_point_name,
+                            data_point__test_type__test_indicator__name=indicator_name,
+                            upper_limit__gte=value,
+                            lower_limit__lte=value).first()
+                        if indicator:
+                            mes_result = indicator.result
+                            level = indicator.level
+                        else:
+                            mes_result = '三等品'
+                            level = 2
+                    else:
+                        mes_result = '三等品'
+                        level = 2
 
                     if not MaterialTestResult.objects.filter(
                             material_test_order=test_order,
@@ -196,11 +197,11 @@ def main():
                             data_point_name=data_point_name,
                             test_method_name=method_name,
                             test_indicator_name=indicator_name,
-                            result='一等品' if result == '合格' else '三等品',
-                            mes_result=result,
+                            result=result,
+                            mes_result=mes_result,
                             machine_name=indicator_name+'仪',
                             test_group=test_group,
-                            level=1 if result == '合格' else 2,
+                            level=level,
                             test_class=production_class,
                             origin=config.id)
             conn.close()
