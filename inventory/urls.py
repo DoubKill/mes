@@ -88,11 +88,17 @@ urlpatterns = [
     path('wms-stock/', WmsInventoryStockView.as_view()),  # 原材料货位列表
     path('wms-weight-stock/', WmsInventoryWeightStockView.as_view()),  # 原材料重量库存
     path('wms-entrance/', InventoryEntranceView.as_view()),  # 出库口列表
+    path('wms-tunnels/', WMSTunnelView.as_view()),  # 巷道列表
+    path('wms-material-groups/', WMSMaterialGroupNameView.as_view()),  # 物料组列表
+    path('wms-inventory/', WMSInventoryView.as_view()),  # 库存统计列表
 
     # 炭黑出库
     path('th-stock/', THInventoryStockView.as_view()),  # 炭黑货位列表
     path('th-weight-stock/', THInventoryWeightStockView.as_view()),  # 炭黑重量库存
     path('th-entrance/', THInventoryEntranceView.as_view()),  # 炭黑出库口列表
+    path('th-tunnels/', THTunnelView.as_view()),  # 巷道列表
+    path('th-material-groups/', THMaterialGroupNameView.as_view()),  # 物料组列表
+    path('th-inventory/', THInventoryView.as_view()),  # 库存统计列表
 
     # 出库大屏
     path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
