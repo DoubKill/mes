@@ -593,6 +593,9 @@ permission_data = [
     {'id': 461, 'code': 'material_yearly_summary', 'name': '原材料出库年报', 'parent_id': None},
     {'id': 462, 'code': 'view_material_yearly_summary', 'name': '查看', 'parent_id': 461},
 
+    {'id': 489, 'code': 'material_inventory_summary', 'name': '原材料库存统计', 'parent_id': None},
+    {'id': 490, 'code': 'view_material_inventory_summary', 'name': '查看', 'parent_id': 489},
+
     {'id': 463, 'code': 'th_outbound_record', 'name': '炭黑库出库单据', 'parent_id': None},
     {'id': 464, 'code': 'view_th_outbound_record', 'name': '查看', 'parent_id': 463},
     {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
@@ -609,6 +612,9 @@ permission_data = [
 
     {'id': 473, 'code': 'th_yearly_summary', 'name': '炭黑库出库年报', 'parent_id': None},
     {'id': 474, 'code': 'view_th_yearly_summary', 'name': '查看', 'parent_id': 473},
+
+    {'id': 491, 'code': 'th_inventory_summary', 'name': '炭黑库存统计', 'parent_id': None},
+    {'id': 492, 'code': 'view_th_inventory_summary', 'name': '查看', 'parent_id': 491},
 
     {'id': 475, 'code': 'material_report_equip', 'name': '原材料上报设备管理', 'parent_id': None},
     {'id': 476, 'code': 'view_material_report_equip', 'name': '查看', 'parent_id': 475},

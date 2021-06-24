@@ -2020,6 +2020,7 @@ class ProductDetailsView(APIView):
 """原材料库出库接口"""
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WmsInventoryStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
@@ -2037,11 +2038,11 @@ class WmsInventoryStockView(APIView):
         if not entrance_name:
             raise ValidationError('请选择出库口！')
         if material_name:
-            extra_where_str += "and c.Name like '%{}%'".format(material_name)
+            extra_where_str += " and c.Name like '%{}%'".format(material_name)
         if material_no:
-            extra_where_str += "and c.MaterialCode like '%{}%'".format(material_no)
+            extra_where_str += " and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
-            extra_where_str += "and a.StockDetailState={}".format(quality_status)
+            extra_where_str += " and a.StockDetailState={}".format(quality_status)
         sql = """SELECT
                  a.StockDetailState,
                  c.MaterialCode,
@@ -2087,6 +2088,7 @@ class WmsInventoryStockView(APIView):
         return Response({'results': result, "count": count})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WmsInventoryWeightStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
@@ -2143,6 +2145,7 @@ class WmsInventoryWeightStockView(APIView):
         return Response({'results': result, "count": count})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class InventoryEntranceView(APIView):
     """获取所有出库口名称"""
     DATABASE_CONF = WMS_CONF
@@ -2161,16 +2164,153 @@ class InventoryEntranceView(APIView):
         return Response(result)
 
 
+@method_decorator([api_recorder], name="dispatch")
+class WMSMaterialGroupNameView(APIView):
+    """获取所有原材料库物料组名称"""
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        sql = 'select Name from t_inventory_material_group;'
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {'name': item[0]})
+        sc.close()
+        return Response(result)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSTunnelView(APIView):
+    """获取所有原材料库巷道名称"""
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        sql = 'select TunnelName from t_inventory_tunnel;'
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {'name': item[0]})
+        sc.close()
+        return Response(result)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSInventoryView(APIView):
+    """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        material_group_name = self.request.query_params.get('material_group_name')
+        tunnel_name = self.request.query_params.get('tunnel_name')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+        if material_no:
+            if extra_where_str:
+                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+            else:
+                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+        if material_group_name:
+            if extra_where_str:
+                extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
+            else:
+                extra_where_str += "where m.MaterialGroupName='{}'".format(material_group_name)
+        if tunnel_name:
+            if extra_where_str:
+                extra_where_str += " and temp.TunnelName='{}'".format(tunnel_name)
+            else:
+                extra_where_str += "where temp.TunnelName='{}'".format(tunnel_name)
+        sql = """
+                select
+            m.Name AS MaterialName,
+            m.MaterialCode,
+            m.ZCMaterialCode,
+            m.WeightUnit,
+            m.Pdm,
+            m.MaterialGroupName,
+            temp.TunnelName,
+            temp.quantity,
+            temp.WeightOfActual,
+            temp.BatchNo
+        from (
+            select
+                a.MaterialCode,
+                a.BatchNo,
+                d.TunnelName,
+                SUM ( a.WeightOfActual ) AS WeightOfActual,
+                SUM ( a.Quantity ) AS quantity
+            from dbo.t_inventory_stock AS a
+            INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId
+            group by
+                 a.MaterialCode,
+                 d.TunnelName,
+                 a.BatchNo
+            ) temp
+        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        count = len(temp)
+        temp = temp[st:et]
+        result = []
+        for item in temp:
+            result.append(
+                {'name': item[0],
+                 'code': item[1],
+                 'zc_material_code': item[2],
+                 'unit': item[3],
+                 'pdm': item[4],
+                 'group_name': item[5],
+                 'tunnel_name': item[6],
+                 'quantity': item[7],
+                 'weight': item[8],
+                 'batch_no': item[9]
+                 })
+        sc.close()
+        return Response({'results': result, "count": count})
+
+
+@method_decorator([api_recorder], name="dispatch")
 class THInventoryStockView(WmsInventoryStockView):
     """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = TH_CONF
 
 
+@method_decorator([api_recorder], name="dispatch")
 class THInventoryWeightStockView(WmsInventoryWeightStockView):
     """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = TH_CONF
 
 
+@method_decorator([api_recorder], name="dispatch")
 class THInventoryEntranceView(InventoryEntranceView):
     """获取所有炭黑出库口名称"""
     DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THMaterialGroupNameView(WMSMaterialGroupNameView):
+    """获取炭黑库所有物料组名称"""
+    DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THTunnelView(WMSTunnelView):
+    """获取炭黑库所有巷道名称"""
+    DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THInventoryView(WMSInventoryView):
+    """炭黑库存信息"""
+    DATABASE_CONF = TH_CONF
+
