@@ -21,6 +21,9 @@ class MaterialSerializer(BaseModelSerializer):
     material_no = serializers.CharField(max_length=64, help_text='编码',
                                         validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
                                                                     message='该原材料已存在')])
+    material_name = serializers.CharField(max_length=64, help_text='名称',
+                                        validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
+                                                                    message='该原材料名称已存在')])
     material_type_name = serializers.CharField(source='material_type.global_name', read_only=True)
     package_unit_name = serializers.CharField(source='package_unit.global_name', read_only=True)
     created_user_name = serializers.CharField(source='created_user.username', read_only=True)
@@ -33,6 +36,7 @@ class MaterialSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
         return super().update(instance, validated_data)
+
 
     class Meta:
         model = Material

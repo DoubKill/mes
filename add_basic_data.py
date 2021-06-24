@@ -1261,7 +1261,7 @@ def add_tanks():
 
 
 def add_product_batching():
-    for product_info in ProductInfo.objects.all()[:50]:
+    for product_info in ProductInfo.objects.all()[:10]:
         pb = ProductBatching.objects.create(
             site_id=GlobalCode.objects.get(global_name='C').id,
             product_info=product_info,
