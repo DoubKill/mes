@@ -10,11 +10,13 @@ import os
 
 import django
 
+from mes.common_code import order_no
+from terminal.utils import issue_plan, INWeighSystem
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from inventory.utils import BaseUploader
-from mes.common_code import order_no, INWeighSystem, issue_recipe, issue_plan
 from inventory.models import BzFinalMixingRubberInventoryLB
 
 class KJJGUploader(BaseUploader):

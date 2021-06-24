@@ -12,7 +12,7 @@ from django.dispatch import receiver
 
 from production.models import PalletFeedbacks
 from quality.models import MaterialTestResult, MaterialTestOrder, MaterialDealResult, \
-    MaterialDataPointIndicator, DataPointStandardError, IgnoredProductInfo
+    MaterialDataPointIndicator, DataPointStandardError, IgnoredProductInfo, TestMethod
 import logging
 
 from recipe.models import ProductBatching
@@ -20,22 +20,26 @@ from recipe.models import ProductBatching
 logger = logging.getLogger('quality_log')
 
 
-def judge_standard_error_deal_suggestion(data_point_name, product_no, value):
+def judge_standard_error_deal_suggestion(data_point_name, product_no, value, test_type_name, method_name):
     """
     寻找某个数据点在某个的pass章范围的处理意见
     @param data_point_name: 数据点名称
     @param product_no: 胶料名称
     @param value: 数据点检测值
+    @param test_type_name: 实验类型名称
+    @param method_name: 实验方法名称
     @return: pass章处理意见
     """
     indicator = MaterialDataPointIndicator.objects.filter(
         data_point__name=data_point_name,
         material_test_method__material__material_name=product_no,
+        material_test_method__test_method__name=method_name,
         level=1).first()
     if indicator:
         upper_limit = indicator.upper_limit
         lower_limit = indicator.lower_limit
-        for error in DataPointStandardError.objects.filter(data_point__name=data_point_name).all():
+        for error in DataPointStandardError.objects.filter(data_point__name=data_point_name,
+                                                           data_point__test_type__name=test_type_name).all():
             lower_value = error.lower_value
             upper_value = error.upper_value
             lv_type = error.lv_type
@@ -84,13 +88,16 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
             # 判断当前数据点检测值是否在合格区间，存在的话更新改test_result的is_passed字段为true和处理意见
             if instance.level > 1:
                 ignored_products = IgnoredProductInfo.objects.values_list('product_no', flat=True)
+                test_method = TestMethod.objects.filter(name=instance.test_method_name).first()
                 product_nos = set(ProductBatching.objects.filter(
                     product_info__product_no__in=ignored_products).values_list('stage_product_batch_no', flat=True))
-                if material_test_order.product_no not in product_nos:
+                if material_test_order.product_no not in product_nos and test_method:
                     # 不在失效胶种里面，则做pass判定
                     deal_suggestion = judge_standard_error_deal_suggestion(instance.data_point_name,
                                                                            material_test_order.product_no,
-                                                                           instance.value)
+                                                                           instance.value,
+                                                                           test_method.test_type.name,
+                                                                           test_method.name)
                     if deal_suggestion:
                         MaterialTestResult.objects.filter(
                             id=instance.id).update(

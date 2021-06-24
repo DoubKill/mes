@@ -22,7 +22,8 @@ logger = logging.getLogger('send_log')
 def send_bz():
     # 5、向北自接口发送数据
     # 5.1、先判断库存和线边库里有没有数据
-    deal_results = MaterialDealResult.objects.exclude(update_store_test_flag=1).filter(send_count__lt=SEND_COUNT)
+    deal_results = MaterialDealResult.objects.exclude(
+        update_store_test_flag=1).filter(send_count__lt=SEND_COUNT)
     for mdr_obj in deal_results:
         pfb_obj = PalletFeedbacks.objects.filter(lot_no=mdr_obj.lot_no).first()
         bz_obj = BzFinalMixingRubberInventory.objects.using('bz').filter(
