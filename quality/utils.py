@@ -120,7 +120,7 @@ def export_mto():
         first_col = w.col(j)
         first_col.width = 256 * 20
     # 写入表头
-    w.write(0, 0, u'检测数据录入 说明:不可修改表格格式内容')
+    w.write(0, 0, u'检测数据录入 说明:每次只能导入同批次生产数据！！！！')
     w.write(1, 0, u'胶料规格编码')
     w.write(1, 1, u'判定日期(2020/01/01)')
     w.write(1, 2, u'密炼日期(2020/01/01)')
