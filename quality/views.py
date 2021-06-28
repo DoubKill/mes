@@ -1245,6 +1245,7 @@ class TestDataPointCurveView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
+    """快检数据导入，一次只能导入同一批生产数据"""
 
     def get(self, request, *args, **kwargs):
         """快检数据导入模板"""
@@ -1256,94 +1257,135 @@ class ImportAndExportView(APIView):
         file = request.FILES.get('file')
         cur_sheet = get_cur_sheet(file)
         data = get_sheet_data(cur_sheet, start_row=2)
-        by_dict = {'MH': 7, 'ML': 8, 'TC10': 9, 'TC50': 10, 'TC90': 11, '比重值': 12, 'ML(1+4)': 13, '硬度值': 14, 'M300': 15,
-                   '扯断强度': 16, '伸长率': 17, '焦烧': 18, '钢拔': 19}
-        for i in data:
-            for j in ['MH', 'ML', 'TC10', 'TC50', 'TC90', '比重值', 'ML(1+4)', '硬度值', 'M300', '扯断强度', '伸长率', '焦烧', '钢拔']:
-                # 本来这里的Ml(1+4)就是门尼  M300、扯断强度、伸长率属于物性  焦烧就是焦烧 钢拔就是钢拔 MH、TC10、TC50、TC90属于流变
-                if i[by_dict[j]]:
-                    dp_obj = DataPoint.objects.filter(name=j).first()
-                    if not dp_obj:
-                        raise ValidationError(f'{j}数据点信息不存在,请检查Excel表格或者使用复制功能')
-                    # mtm_obj = MaterialTestMethod.objects.filter(material=m_obj, data_point=dp_obj).first()
-                    mtm_obj = MaterialTestMethod.objects.filter(material__material_name=i[0].strip(),
-                                                                data_point__name=j).first()
-                    if not mtm_obj:
-                        raise ValidationError(f"{i[0]}与{j}的物料实验方法不存在,请检查Excel表格或者使用复制功能")
-                    item = {'value': i[by_dict[j]], 'data_point_name': dp_obj.name,
-                            'test_method_name': mtm_obj.test_method.name,
-                            'test_indicator_name': dp_obj.test_type.test_indicator.name}
-                    delta = datetime.timedelta(days=i[2])
-                    date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
-                    factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
-                    pfb_obj = PalletFeedbacks.objects.filter(equip_no=i[4], factory_date=factory_date,
-                                                             classes=i[3].strip() + '班',
-                                                             product_no=i[0].strip(), begin_trains__lte=i[6],
-                                                             end_trains__gte=i[6]).first()
-                    if not pfb_obj:
-                        continue
-                        # raise ValidationError('托盘产出反馈不存在,,请检查Excel表格或者使用复制功能')
-                    test_order = MaterialTestOrder.objects.filter(lot_no=pfb_obj.lot_no,
-                                                                  actual_trains=i[6]).first()
-                    if test_order:
-                        instance = test_order
-                        created = False
+        by_dict = {'MH': 7,
+                   'ML': 8,
+                   'TC10': 9,
+                   'TC50': 10,
+                   'TC90': 11,
+                   '比重值': 12,
+                   'ML(1+4)': 13,
+                   '硬度值': 14,
+                   'M300': 15,
+                   '扯断强度': 16,
+                   '伸长率': 17,
+                   '焦烧': 18,
+                   '钢拔': 19}
+        # 取第一行数据
+        try:
+            production_data = data[0]
+        except Exception:
+            raise ValidationError('请填入检测数据后再导入！')
+        # 胶料
+        product_no = production_data[0].strip()
+        # 密炼日期
+        delta = datetime.timedelta(days=production_data[2])
+        date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
+        factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+        # 班次
+        classes = production_data[3].strip() + '班'
+        # 机台
+        equip_no = production_data[4].strip()
+        # 取数据点
+        reverse_dict = {value: key for key, value in by_dict.items()}
+        data_points = [reverse_dict.get(i) for i in range(7, 20) if production_data[i]]
+        if not data_points:
+            raise ValidationError('请填入检测数据后再导入！')
+        data_point_method_map = {}
+        for data_point_name in data_points:
+            mtm = MaterialTestMethod.objects.filter(material__material_no=product_no,
+                                                    data_point__name=data_point_name)
+            if not mtm:
+                raise ValidationError('该胶料{}不存在数据点{}试验方法！'.format(product_no, data_point_name))
+            if mtm.count() > 1:
+                raise ValidationError('该胶料{}存在多种数据点{}试验方法，请联系管理员！'.format(product_no, data_point_name))
+            else:
+                data_point_method_map[data_point_name] = mtm.values('id',
+                                                                    'test_method__name',
+                                                                    'test_method__test_type__test_indicator__name')[0]
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    material_test_method=mtm.first(),
+                    data_point__name=data_point_name,
+                    data_point__test_type__test_indicator__name=mtm.first().test_method.test_type.test_indicator.name,
+                    level=1
+                ).first()
+                if indicator:
+                    data_point_method_map[data_point_name]['qualified_range'] = [indicator.lower_limit,
+                                                                                 indicator.upper_limit]
+        pallet_data = PalletFeedbacks.objects.filter(equip_no=equip_no,
+                                                     factory_date=factory_date,
+                                                     classes=classes,
+                                                     product_no=product_no
+                                                     ).values('lot_no', 'begin_trains',
+                                                              'end_trains', 'plan_classes_uid')
+        pallet_trains_map = {}  # 车次与收皮条码map数据
+        for pallet in pallet_data:
+            for j in range(pallet['begin_trains'], pallet['end_trains']+1):
+                pallet_trains_map[j] = {'lot_no': pallet['lot_no'],
+                                        'plan_classes_uid': pallet['plan_classes_uid']}
+
+        del j, data_points, pallet_data, production_data, reverse_dict
+
+        for item in data:
+            try:
+                actual_trains = int(item[6])
+            except Exception:
+                raise ValidationError('车次数据错误！')
+            if not pallet_trains_map.get(actual_trains):  # 未找到收皮条码
+                continue
+            lot_no = pallet_trains_map[actual_trains]['lot_no']
+            plan_classes_uid = pallet_trains_map[actual_trains]['plan_classes_uid']
+            test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                          actual_trains=actual_trains
+                                                          ).first()
+            if test_order:
+                instance = test_order
+                created = False
+            else:
+                validated_data = dict()
+                validated_data['material_test_order_uid'] = uuid.uuid1()
+                validated_data['actual_trains'] = actual_trains
+                validated_data['lot_no'] = lot_no
+                validated_data['product_no'] = product_no
+                validated_data['plan_classes_uid'] = plan_classes_uid
+                validated_data['production_class'] = classes
+                validated_data['production_equip_no'] = equip_no
+                validated_data['production_factory_date'] = factory_date
+                instance = MaterialTestOrder.objects.create(**validated_data)
+                created = True
+            for data_point_name, method in data_point_method_map.items():
+                test_method_name = method['test_method__name']
+                test_indicator_name = method['test_method__test_type__test_indicator__name']
+                point_value = item[by_dict[data_point_name]]  # 数据点检测值
+                if not point_value:
+                    continue
+                result_data = {'material_test_order': instance,
+                               'test_factory_date': datetime.datetime.now(),
+                               'value': point_value,
+                               'data_point_name': data_point_name,
+                               'test_method_name': test_method_name,
+                               'test_indicator_name': test_indicator_name,
+                               'mes_result': '三等品',
+                               'result': '三等品',
+                               'level': 2,
+                               }
+                if method.get('qualified_range'):
+                    if method['qualified_range'][0] <= point_value <= method['qualified_range'][1]:
+                        result_data['mes_result'] = '一等品'
+                        result_data['result'] = '一等品'
+                        result_data['level'] = 1
+                if created:
+                    result_data['test_times'] = 1
+                else:
+                    last_test_result = MaterialTestResult.objects.filter(
+                        material_test_order=instance,
+                        test_indicator_name=test_indicator_name,
+                        data_point_name=data_point_name,
+                    ).order_by('-test_times').first()
+                    if last_test_result:
+                        result_data['test_times'] = last_test_result.test_times + 1
                     else:
-                        validated_data = {}
-                        validated_data['material_test_order_uid'] = uuid.uuid1()
-                        validated_data['actual_trains'] = i[6]
-                        validated_data['lot_no'] = pfb_obj.lot_no
-                        validated_data['product_no'] = i[0].strip()
-                        validated_data['plan_classes_uid'] = pfb_obj.plan_classes_uid
-                        validated_data['production_class'] = i[3].strip() + '班'
-                        validated_data['production_equip_no'] = i[4]
-                        validated_data['production_factory_date'] = factory_date
-                        instance = MaterialTestOrder.objects.create(**validated_data)
-                        created = True
-                    material_no = i[0].strip()
-                    if not item.get('value'):
-                        continue
-                    item['material_test_order'] = instance
-                    item['test_factory_date'] = datetime.datetime.now()
-                    if created:
-                        item['test_times'] = 1
-                    else:
-                        last_test_result = MaterialTestResult.objects.filter(
-                            material_test_order=instance,
-                            test_indicator_name=item['test_indicator_name'],
-                            data_point_name=item['data_point_name'],
-                        ).order_by('-test_times').first()
-                        if last_test_result:
-                            item['test_times'] = last_test_result.test_times + 1
-                        else:
-                            item['test_times'] = 1
-                    material_test_method = MaterialTestMethod.objects.filter(
-                        material__material_no=material_no,
-                        test_method__name=item['test_method_name'],
-                        test_method__test_type__test_indicator__name=item['test_indicator_name'],
-                        data_point__name=item['data_point_name'],
-                        data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
-                    if material_test_method:
-                        indicator = MaterialDataPointIndicator.objects.filter(
-                            material_test_method=material_test_method,
-                            data_point__name=item['data_point_name'],
-                            data_point__test_type__test_indicator__name=item['test_indicator_name'],
-                            upper_limit__gte=item['value'],
-                            lower_limit__lte=item['value']).first()
-                        if indicator:
-                            item['mes_result'] = indicator.result
-                            item['data_point_indicator'] = indicator
-                            item['level'] = indicator.level
-                        else:
-                            item['mes_result'] = '三等品'
-                            item['level'] = 2
-                    else:
-                        item['mes_result'] = '三等品'
-                        item['level'] = 2
-                    item['created_user'] = request.user  # 加一个create_user
-                    item['test_class'] = i[3].strip() + '班'  # 暂时先这么写吧
-                    item['test_group'] = i[5].strip() + '班'
-                    MaterialTestResult.objects.create(**item)
+                        result_data['test_times'] = 1
+                MaterialTestResult.objects.create(**result_data)
         return Response('导入成功')
 
 
