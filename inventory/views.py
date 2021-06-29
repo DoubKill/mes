@@ -2235,7 +2235,7 @@ class WMSInventoryView(APIView):
             m.Name AS MaterialName,
             m.MaterialCode,
             m.ZCMaterialCode,
-            m.WeightUnit,
+            temp.WeightUnit,
             m.Pdm,
             m.MaterialGroupName,
             temp.TunnelName,
@@ -2247,6 +2247,7 @@ class WMSInventoryView(APIView):
                 a.MaterialCode,
                 a.BatchNo,
                 d.TunnelName,
+                a.WeightUnit,
                 SUM ( a.WeightOfActual ) AS WeightOfActual,
                 SUM ( a.Quantity ) AS quantity
             from dbo.t_inventory_stock AS a
@@ -2254,7 +2255,8 @@ class WMSInventoryView(APIView):
             group by
                  a.MaterialCode,
                  d.TunnelName,
-                 a.BatchNo
+                 a.BatchNo,
+                 a.WeightUnit
             ) temp
         inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
