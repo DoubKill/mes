@@ -455,7 +455,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                 param = {"hours": material_detail.period_of_validity}
             else:
                 param = {"days": material_detail.period_of_validity}
-            expire_time = product_time + timedelta(**param)
+            expire_time = (product_time + timedelta(**param)).strftime('%Y-%m-%d %H:%M:%S')
             ret['valid_time'] = expire_time  # 有效期
         else:
             ret['valid_time'] = None
