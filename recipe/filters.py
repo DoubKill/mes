@@ -53,8 +53,20 @@ class MaterialAttributeFilter(django_filters.rest_framework.FilterSet):
 class ZCMaterialFilter(django_filters.rest_framework.FilterSet):
     material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料编码', lookup_expr='icontains')
     material_name = django_filters.CharFilter(field_name='material_name', help_text='原材料名称', lookup_expr='icontains')
-    material_id = django_filters.CharFilter(field_name='material_id', help_text='mes物料id')
 
     class Meta:
         model = ZCMaterial
-        fields = ('material_no', 'material_name', 'material_id')
+        fields = ('material_no', 'material_name')
+
+
+class ERPMaterialFilter(django_filters.rest_framework.FilterSet):
+    material_type_name = django_filters.CharFilter(field_name='material_type__global_name', help_text='原材料类别名称')
+    material_type_id = django_filters.NumberFilter(field_name='material_type', help_text='原材料类别')
+    material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料代码', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', help_text='原材料名称', lookup_expr='icontains')
+    for_short = django_filters.CharFilter(field_name='for_short', help_text='原材料简称', lookup_expr='icontains')
+
+    class Meta:
+        model = Material
+        fields = ('material_type_id', 'use_flag', 'material_no',
+                  'material_name', 'material_type_name', 'for_short')

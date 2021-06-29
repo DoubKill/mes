@@ -1,6 +1,7 @@
 from datetime import datetime
 import logging
 
+from django.db.models import Q
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -11,7 +12,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial
+    MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 sync_logger = logging.getLogger('sync_log')
@@ -32,11 +33,14 @@ class MaterialSerializer(BaseModelSerializer):
     period_of_validity = serializers.IntegerField(source='material_attr.period_of_validity', read_only=True,
                                                   default=None)
     validity_unit = serializers.CharField(source='material_attr.validity_unit', read_only=True, default=None)
+    is_binding = serializers.SerializerMethodField()
+
+    def get_is_binding(self, obj):
+        return 'Y' if obj.zc_materials.count() > 1 else 'N'
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
         return super().update(instance, validated_data)
-
 
     class Meta:
         model = Material
@@ -649,20 +653,92 @@ class WeighCntTypeSerializer(serializers.ModelSerializer):
         read_only_fields = ('weigh_type',)
 
 
-class ZCMaterialCreateSerializer(serializers.ModelSerializer):
-    zc_material_ids = serializers.ListField(help_text='中策erp物料id列表', write_only=True)
+class ERPMaterialBindingSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ERPMESMaterialRelation
+        fields = ('zc_material', 'use_flag')
+
+
+class ERPMaterialCreateSerializer(BaseModelSerializer):
+    erp_material_data = ERPMaterialBindingSerializer(help_text="""
+    [{"zc_material": erp物料id, "use_flag": 使用与否}]""", write_only=True, many=True)
 
     def create(self, validated_data):
-        zc_material_ids = validated_data.pop('zc_material_ids')
-        ZCMaterial.objects.filter(id__in=zc_material_ids).update(material=validated_data['material'])
+        erp_material_data = validated_data.pop('erp_material_data', [])
+        m = Material.objects.filter(Q(material_no=validated_data['material_no']) |
+                                    Q(material_name=validated_data['material_name'])).first()
+        if m:
+            material = m
+        else:
+            material = Material.objects.create(**validated_data)
+        for item in erp_material_data:
+            item['material'] = material
+            ERPMESMaterialRelation.objects.create(**item)
+        # material.save()
         return validated_data
 
     class Meta:
-        model = ZCMaterial
-        fields = ('material', 'zc_material_ids')
+        model = Material
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'material_no': {'validators': []}}
+
+
+class ERPMaterialSerializer(BaseModelSerializer):
+    material_type_name = serializers.ReadOnlyField(source='material_type.global_name')
+    package_unit_name = serializers.ReadOnlyField(source='package_unit.global_name', default=None)
+    created_user_name = serializers.ReadOnlyField(source='created_user.username', default=None)
+    update_user_name = serializers.ReadOnlyField(source='last_updated_user.username', default=None, read_only=True)
+    is_binding = serializers.SerializerMethodField()
+
+    def get_is_binding(self, obj):
+        return 'Y' if obj.zc_materials.count() >= 1 else 'N'
+
+    class Meta:
+        model = Material
+        fields = '__all__'
 
 
 class ZCMaterialSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = ZCMaterial
         fields = '__all__'
+
+
+class ERPMaterialUpdateSerializer(BaseModelSerializer):
+    zc_materials = serializers.SerializerMethodField(read_only=True)
+    material_type_name = serializers.ReadOnlyField(source='material_type.global_name', read_only=True)
+    package_unit_name = serializers.ReadOnlyField(source='package_unit.global_name', read_only=True)
+    created_user_name = serializers.ReadOnlyField(source='created_user.username', read_only=True)
+    update_user_name = serializers.ReadOnlyField(source='last_updated_user.username', default=None, read_only=True)
+    erp_material_data = ERPMaterialBindingSerializer(help_text="""
+        [{"zc_material": erp物料id, "use_flag": 使用与否}]""", write_only=True, many=True)
+
+    def get_zc_materials(self, obj):
+        data = ERPMESMaterialRelation.objects.filter(material=obj).values('zc_material__material_no',
+                                                                          'zc_material__material_name',
+                                                                          'use_flag',
+                                                                          'zc_material__id')
+        ret = []
+        for item in data:
+            ret.append({'id': item['zc_material__id'],
+                        'material_no': item['zc_material__material_no'],
+                        'material_name': item['zc_material__material_name'],
+                        'use_flag': item['use_flag']})
+        return ret
+
+    def update(self, instance, validated_data):
+        erp_material_data = validated_data.pop('erp_material_data', [])
+        instance = super().update(instance, validated_data)
+        ERPMESMaterialRelation.objects.filter(material=instance).delete()
+        for item in erp_material_data:
+            item['material'] = instance
+            ERPMESMaterialRelation.objects.create(**item)
+        return instance
+
+    class Meta:
+        model = Material
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
