@@ -450,6 +450,7 @@ permission_data = [
     {'id': 350, 'code': 'view_material_map', 'name': '查看', 'parent_id': 349},
     {'id': 351, 'code': 'add_material_map', 'name': '新增', 'parent_id': 349},
     {'id': 493, 'code': 'change_material_map', 'name': '修改', 'parent_id': 349},
+    {'id': 494, 'code': 'delete_material_map', 'name': '停用/启用', 'parent_id': 349},
 
     {'id': 352, 'code': 'bar_code', 'name': '条码变更', 'parent_id': None},
     {'id': 353, 'code': 'view_bar_code', 'name': '查看', 'parent_id': 352},
@@ -635,7 +636,7 @@ permission_data = [
     {'id': 487, 'code': 'view_product_report_value', 'name': '查看', 'parent_id': 486},
     {'id': 488, 'code': 'add_product_report_value', 'name': '新增', 'parent_id': 486},
 
-    # 下个权限id值从494开始
+    # 下个权限id值从495开始
 ]
 
 
