@@ -36,7 +36,7 @@ class MaterialSerializer(BaseModelSerializer):
     is_binding = serializers.SerializerMethodField()
 
     def get_is_binding(self, obj):
-        return 'Y' if obj.zc_materials.count() > 1 else 'N'
+        return 'Y' if obj.zc_materials.count() >= 1 else 'N'
 
     def update(self, instance, validated_data):
         validated_data['last_updated_user'] = self.context['request'].user
@@ -671,6 +671,7 @@ class ERPMaterialCreateSerializer(BaseModelSerializer):
         if m:
             material = m
         else:
+            validated_data.update(created_user=self.context["request"].user)
             material = Material.objects.create(**validated_data)
         for item in erp_material_data:
             item['material'] = material
@@ -715,6 +716,9 @@ class ERPMaterialUpdateSerializer(BaseModelSerializer):
     update_user_name = serializers.ReadOnlyField(source='last_updated_user.username', default=None, read_only=True)
     erp_material_data = ERPMaterialBindingSerializer(help_text="""
         [{"zc_material": erp物料id, "use_flag": 使用与否}]""", write_only=True, many=True)
+    material_name = serializers.CharField(max_length=64, help_text='名称',
+                                          validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
+                                                                      message='该原材料名称已存在')])
 
     def get_zc_materials(self, obj):
         data = ERPMESMaterialRelation.objects.filter(material=obj).values('zc_material__material_no',
@@ -731,6 +735,7 @@ class ERPMaterialUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         erp_material_data = validated_data.pop('erp_material_data', [])
+        validated_data.update(last_updated_user=self.context["request"].user)
         instance = super().update(instance, validated_data)
         ERPMESMaterialRelation.objects.filter(material=instance).delete()
         for item in erp_material_data:
@@ -741,4 +746,5 @@ class ERPMaterialUpdateSerializer(BaseModelSerializer):
     class Meta:
         model = Material
         fields = '__all__'
+        extra_kwargs = {'material_no': {'read_only': True}}
         read_only_fields = COMMON_READ_ONLY_FIELDS
