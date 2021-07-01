@@ -134,7 +134,7 @@ def main():
                     # 根据机台编号、胶料代码、班次、日期找托盘lot_no
                     pallet = PalletFeedbacks.objects.filter(
                         equip_no=equip_no,
-                        product_no__icontains=product_no,
+                        product_no=product_no,
                         classes=production_class,
                         factory_date=product_date,
                         begin_trains__lte=i,
