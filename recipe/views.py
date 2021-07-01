@@ -4,22 +4,25 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelViewSet
 
+from basics.models import GlobalCode
 from basics.views import CommonDeleteMixin
 from mes import settings
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
-    MaterialAttributeFilter, ZCMaterialFilter
+    MaterialAttributeFilter, ERPMaterialFilter, ZCMaterialFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingListSerializer, ProductBatchingCreateSerializer, MaterialAttributeSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
     ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
-    ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ZCMaterialCreateSerializer, ZCMaterialSerializer
+    ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
+    ERPMaterialUpdateSerializer, ZCMaterialSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial
 
@@ -320,17 +323,62 @@ class ProductBatchingDetailListView(ReadOnlyModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class ZCMaterialViewSet(ModelViewSet):
-    """中策ERP系统物料"""
-    queryset = ZCMaterial.objects.filter(delete_flag=False)
+class ZCMaterialListView(ListAPIView):
+    """中策ERP系统物料列表"""
+    queryset = ZCMaterial.objects.all()
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('material_id',)
+    serializer_class = ZCMaterialSerializer
     filter_class = ZCMaterialFilter
-    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        is_binding = self.request.query_params.get('is_binding')
+        if is_binding:
+            if is_binding == 'Y':
+                queryset = queryset.filter(material__isnull=False).distinct()
+            else:
+                queryset = queryset.filter(material__isnull=True).distinct()
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'material_no', 'material_name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ERPMaterialViewSet(CommonDeleteMixin, ModelViewSet):
+    """ERP物料绑定关系数据"""
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ERPMaterialFilter
+
+    def get_queryset(self):
+        stage_names = GlobalCode.objects.filter(
+            global_type__type_name='胶料段次').values_list('global_name', flat=True)
+        erp_material_no = self.request.query_params.get('erp_material_no')
+        erp_material_name = self.request.query_params.get('erp_material_name')
+        is_binding = self.request.query_params.get('is_binding')
+        filter_kwargs = {}
+        query_set = Material.objects.exclude(
+            material_type__global_name__in=stage_names).prefetch_related('zc_materials').order_by('-created_date')
+        if erp_material_no:
+            filter_kwargs['zc_materials__material_no__icontains'] = erp_material_no
+        if erp_material_name:
+            filter_kwargs['zc_materials__material_name__icontains'] = erp_material_name
+        if is_binding:
+            if is_binding == 'Y':
+                filter_kwargs['zc_materials__isnull'] = False
+            else:
+                filter_kwargs['zc_materials__isnull'] = True
+        if filter_kwargs:
+            query_set = query_set.filter(**filter_kwargs).distinct()
+        return query_set
 
     def get_serializer_class(self):
         if self.action == 'create':
-            return ZCMaterialCreateSerializer
+            return ERPMaterialCreateSerializer
+        elif self.action == 'list':
+            return ERPMaterialSerializer
         else:
-            return ZCMaterialSerializer
+            return ERPMaterialUpdateSerializer

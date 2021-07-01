@@ -33,8 +33,8 @@ def main():
         return
     if isinstance(data, list):
         for item in data:
-            default = {'wlxxid': item.pop('wlxxid', None)}
-            kwargs = {
+            kwargs = {'wlxxid': item.pop('wlxxid', None)}
+            default = {
                 'material_no': item['wlbh'],
                 'material_name': item['wlmc'],
                 'jybj': item['jybj'],
