@@ -15,7 +15,7 @@ from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClasses
 from production.models import PalletFeedbacks
 from recipe.models import ZCMaterial
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
-    WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan
+    WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, ReportWeight
 import logging
 
 from terminal.utils import INWeighSystem
@@ -494,3 +494,22 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Plan
         fields = ('id', 'setno', 'action', 'equip_no')
+
+
+class RecipePreSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = RecipePre
+        fields = '__all__'
+
+
+class ReportBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportBasic
+        fields = '__all__'
+
+
+class ReportWeightSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReportWeight
+        fields = '__all__'

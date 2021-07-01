@@ -31,7 +31,8 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
     LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, \
     WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer, \
-    MaterialInfoSerializer, BinSerializer, PlanSerializer, PlanUpdateSerializer
+    MaterialInfoSerializer, BinSerializer, PlanSerializer, PlanUpdateSerializer, RecipePreSerializer, \
+    ReportBasicSerializer, ReportWeightSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -584,6 +585,9 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
                 ret['A'].append(item)
             else:
                 ret['B'].append(item)
+        for v in ret.values():
+            v.sort(key=lambda x: int(x['bin'][:-1]), reverse=False)
+
         return Response(ret)
 
     @action(methods=['put'],
@@ -614,12 +618,14 @@ class XLBinVIewSet(GenericViewSet, ListModelMixin):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class RecipePreVIew(APIView):
+class RecipePreVIew(ListAPIView):
     """
     小料配方列表，参数：equip_no=设备&name=配方名称&ver=版本&remark1=备注&use_not=是否使用(0使用，1不使用)&st=开始时间&et=结束时间
     """
+    serializer_class = RecipePreSerializer
+    queryset = RecipePre.objects.all()
 
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         name = self.request.query_params.get('name')
         ver = self.request.query_params.get('ver')
@@ -627,6 +633,13 @@ class RecipePreVIew(APIView):
         use_not = self.request.query_params.get('use_not')
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
+        if self.request.query_params.get('all'):
+            try:
+                return Response(RecipePre.objects.using(equip_no).values('id', 'name', 'ver'))
+            except ConnectionDoesNotExist:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            except Exception:
+                raise
 
         filter_kwargs = {}
         if not equip_no:
@@ -643,11 +656,15 @@ class RecipePreVIew(APIView):
             filter_kwargs['time__gte'] = st
         if et:
             filter_kwargs['time__lte'] = et
+        queryset = RecipePre.objects.using(equip_no).filter(**filter_kwargs)
         try:
-            ret = list(RecipePre.objects.using(equip_no).filter(**filter_kwargs).values())
-        except Exception:
+            page = self.paginate_queryset(queryset)
+            serializer = self.get_serializer(page, many=True)
+        except ConnectionDoesNotExist:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-        return Response(ret)
+        except Exception:
+            raise
+        return self.get_paginated_response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -692,9 +709,9 @@ class XLPlanVIewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        date_time = self.request.query_params.get('date_time')
+        date_time = self.request.query_params.get('date_time', datetime.datetime.now().strftime('%Y-%m-%d'))
         grouptime = self.request.query_params.get('grouptime')
-        recipe = self.request.query_params.get('recipe_id')
+        recipe = self.request.query_params.get('recipe')
 
         filter_kwargs = {}
         if not equip_no:
@@ -704,14 +721,16 @@ class XLPlanVIewSet(ModelViewSet):
         if grouptime:
             filter_kwargs['grouptime'] = grouptime
         if recipe:
-            filter_kwargs['recipe_id'] = recipe
+            filter_kwargs['recipe'] = recipe
+        queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
         try:
-            ret = list(Plan.objects.using(equip_no).filter(**filter_kwargs).values())
+            page = self.paginate_queryset(queryset)
+            serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         except Exception:
             raise
-        return Response(ret)
+        return self.get_paginated_response(serializer.data)
 
     def get_object(self):
         """
@@ -749,15 +768,17 @@ class XLPlanVIewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class ReportBasicView(APIView):
+class ReportBasicView(ListAPIView):
     """
     称量车次报表列表，参数：equip_no=设备&planid=计划uid&s_st=开始时间&s_et=结束时间&c_st=创建开始时间&c_et=创建结束时间&recipe=配方
     """
+    serializer_class = ReportBasicSerializer
+    queryset = ReportBasic.objects.all()
 
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         planid = self.request.query_params.get('planid')
-        s_st = self.request.query_params.get('s_st')
+        s_st = self.request.query_params.get('s_st', datetime.datetime.now().strftime('%Y-%m-%d'))
         s_et = self.request.query_params.get('s_et')
         c_st = self.request.query_params.get('c_st')
         c_et = self.request.query_params.get('c_et')
@@ -772,35 +793,40 @@ class ReportBasicView(APIView):
         if planid:
             filter_kwargs['planid__icontains'] = planid
         if s_st:
-            filter_kwargs['starttime__gte'] = s_st
+            filter_kwargs['starttime__gte'] = s_st + ' 00:00:00'
         if s_et:
-            filter_kwargs['starttime__lte'] = s_et
+            filter_kwargs['starttime__lte'] = s_et + ' 23:59:59'
         if c_st:
             filter_kwargs['savetime__gte'] = c_st
         if c_et:
             filter_kwargs['savetime__lte'] = c_et
         if recipe:
             filter_kwargs['recipe__icontains'] = recipe
+
+        queryset = ReportBasic.objects.using(equip_no).filter(**filter_kwargs)
         try:
-            ret = list(ReportBasic.objects.using(equip_no).filter(**filter_kwargs).values())
+            page = self.paginate_queryset(queryset)
+            serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         except Exception:
             raise
-        return Response(ret)
+        return self.get_paginated_response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
-class ReportWeightView(APIView):
+class ReportWeightView(ListAPIView):
     """
     物料消耗报表，参数：equip_no=设备&planid=计划uid&recipe=配方&st=计划开始时间&et=计划结束时间
     """
+    serializer_class = ReportWeightSerializer
+    queryset = ReportWeight.objects.all()
 
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         planid = self.request.query_params.get('planid')
         recipe = self.request.query_params.get('recipe')
-        st = self.request.query_params.get('st')
+        st = self.request.query_params.get('st', datetime.datetime.now().strftime('%Y-%m-%d'))
         et = self.request.query_params.get('et')
 
         if not equip_no:
@@ -810,24 +836,27 @@ class ReportWeightView(APIView):
         if not equip_no:
             raise ValidationError('参数缺失')
         if planid:
-            filter_kwargs['planid__icontains'] = planid
+            filter_kwargs['planid'] = planid
         if recipe:
-            filter_kwargs['recipe__icontains'] = recipe
+            filter_kwargs['recipe'] = recipe
         if st or et:
             plan_queryset = Plan.objects.using(equip_no).all()
             if st:
-                plan_queryset = plan_queryset.filter(addtime__gte=st)
+                plan_queryset = plan_queryset.filter(date_time__gte=st)
             if et:
-                plan_queryset = plan_queryset.filter(addtime__lte=et)
+                plan_queryset = plan_queryset.filter(date_time__lte=et)
             try:
-                plan_ids = plan_queryset.values_list('id', flat=True)
+                plan_ids = plan_queryset.values_list('planid', flat=True)
             except Exception:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             filter_kwargs['planid__in'] = list(plan_ids)
+
+        queryset = ReportWeight.objects.using(equip_no).filter(**filter_kwargs)
         try:
-            ret = list(ReportWeight.objects.using(equip_no).filter(**filter_kwargs).values())
+            page = self.paginate_queryset(queryset)
+            serializer = self.get_serializer(page, many=True)
         except ConnectionDoesNotExist:
             raise ValidationError('称量机台{}服务错误！'.format(equip_no))
         except Exception:
             raise
-        return Response(ret)
+        return self.get_paginated_response(serializer.data)

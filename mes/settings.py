@@ -259,9 +259,8 @@ LOGGING = {
     },
 }
 
-if DEBUG:
-    DATABASES = {
-        'default': {
+DATABASES = {
+    'default': {
             'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
             'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 数据库名称 SID
             'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
@@ -269,35 +268,31 @@ if DEBUG:
             'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
             'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
         },
-        #  'default': {
-        #     'ENGINE': 'django.db.backends.sqlite3',
-        #     'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        # },
-        'bz': {
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'ASRS_ZC_AJ_2',
-            'HOST': '10.4.23.101',
-            'PORT': '1433',
-            'USER': 'GZ_MES',
-            'PASSWORD': 'mes@_123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
+    'bz': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_2',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
         },
-        'wms': {
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'zhada_wms_zhongc',
-            'HOST': '10.4.24.25',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': 'Admin123$',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
+    },
+    'wms': {
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'zhada_wms_zhongc',
+        'HOST': '10.4.24.25',
+        'PORT': '1433',
+        'USER': 'sa',
+        'PASSWORD': 'Admin123$',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
         },
-        'cb': {
+    },
+    'cb': {
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'zhada_wms_zhongc',
             'HOST': '10.4.24.25',
@@ -308,80 +303,20 @@ if DEBUG:
                 'driver': 'ODBC Driver 17 for SQL Server',
                 'MARS_Connection': True,
             },
+    },
+    "lb": {  # 帘布库|终炼胶库缩写
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'ASRS_ZC_AJ_4',
+        'HOST': '10.4.23.101',
+        'PORT': '1433',
+        'USER': 'GZ_MES',
+        'PASSWORD': 'mes@_123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
         },
-        "lb": {  # 帘布库|终炼胶库缩写
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'ASRS_ZC_AJ_4',
-            'HOST': '10.4.23.101',
-            'PORT': '1433',
-            'USER': 'GZ_MES',
-            'PASSWORD': 'mes@_123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        "F01": {  # 细料称1
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'YK_XL',
-            'HOST': '10.4.23.81',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': '123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        "F02": {  # 细料称2
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'YK_XL',
-            'HOST': '10.4.23.82',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': '123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        "F03": {  # 细料称3
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'YK_XL',
-            'HOST': '10.4.23.83',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': '123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        "S01": {  # 硫磺称1
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'YK_XL',
-            'HOST': '10.4.23.79',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': '123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        "S02": {  # 硫磺称2
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'YK_XL',
-            'HOST': '10.4.23.80',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': '123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        'SFJ': {  # 上辅机群控地址
+    },
+    'SFJ': {  # 上辅机群控地址
             'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
             'NAME': os.getenv('SFJ_DATABASE_NAME', 'sfj'),  # 数据库名称
             'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
@@ -389,82 +324,67 @@ if DEBUG:
             'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
             'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
         },
-    }
-else:
-    DATABASES = {
-        'default': {
-                'ENGINE': os.getenv('MES_ENGINE', 'django.db.backends.oracle'),  # 数据库引擎
-                'NAME': os.getenv('MES_DATABASE_NAME', 'xe'),  # 数据库名称 SID
-                'USER': os.getenv('MES_DATABASE_USERNAME', 'mes'),  # 用户名
-                'PASSWORD': os.getenv('MES_DATABASE_PASSWORD', 'mes'),  # 密码
-                'HOST': os.getenv('MES_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
-                'PORT': os.getenv('MES_MONOCLE_API_PORT', '1521'),  # 端口
-            },
-        # 'default': {
-        #     'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-        #     'NAME': os.getenv('SFJ_DATABASE_NAME', 'mes'),  # 数据库名称
-        #     'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
-        #     'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
-        #     'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.10.120.40'),  # HOST
-        #     'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
-        # },
-        'bz': {
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'ASRS_ZC_AJ_2',
-            'HOST': '10.4.23.101',
-            'PORT': '1433',
-            'USER': 'GZ_MES',
-            'PASSWORD': 'mes@_123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
+    "F01": {  # 细料称1
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'YK_XL',
+        'HOST': os.getenv('FO1_IP', '10.10.10.10'),
+        'PORT': '1433',
+        'USER': 'gz',
+        'PASSWORD': '123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
         },
-        'wms': {
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'zhada_wms_zhongc',
-            'HOST': '10.4.24.25',
-            'PORT': '1433',
-            'USER': 'sa',
-            'PASSWORD': 'Admin123$',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
+    },
+    "F02": {  # 细料称2
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'YK_XL',
+        'HOST': os.getenv('FO2_IP', '10.10.10.10'),
+        'PORT': '1433',
+        'USER': 'gz',
+        'PASSWORD': '123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
         },
-        'cb': {
-                'ENGINE': 'sql_server.pyodbc',
-                'NAME': 'zhada_wms_zhongc',
-                'HOST': '10.4.24.25',
-                'PORT': '1433',
-                'USER': 'sa',
-                'PASSWORD': 'Admin123$',
-                'OPTIONS': {
-                    'driver': 'ODBC Driver 17 for SQL Server',
-                    'MARS_Connection': True,
-                },
-        },
-        "lb": {  # 帘布库|终炼胶库缩写
-            'ENGINE': 'sql_server.pyodbc',
-            'NAME': 'ASRS_ZC_AJ_4',
-            'HOST': '10.4.23.101',
-            'PORT': '1433',
-            'USER': 'GZ_MES',
-            'PASSWORD': 'mes@_123',
-            'OPTIONS': {
-                'driver': 'ODBC Driver 17 for SQL Server',
-                'MARS_Connection': True,
-            },
-        },
-        'SFJ': {  # 上辅机群控地址
-                'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
-                'NAME': os.getenv('SFJ_DATABASE_NAME', 'sfj'),  # 数据库名称
-                'USER': os.getenv('SFJ_DATABASE_USERNAME', 'root'),  # 用户名
-                'PASSWORD': os.getenv('SFJ_DATABASE_PASSWORD', 'mes'),  # 密码
-                'HOST': os.getenv('SFJ_DATABASE_HOSTNAME', '10.4.14.6'),  # HOST
-                'PORT': os.getenv('SFJ_MONOCLE_API_PORT', '3306'),  # 端口
-            },
-    }
+    },
+    # "F03": {  # 细料称3
+    #     'ENGINE': 'sql_server.pyodbc',
+    #     'NAME': 'YK_XL',
+    #     'HOST': os.getenv('FO3_IP', '10.10.10.10'),
+    #     'PORT': '1433',
+    #     'USER': 'gz',
+    #     'PASSWORD': '123',
+    #     'OPTIONS': {
+    #         'driver': 'ODBC Driver 17 for SQL Server',
+    #         'MARS_Connection': True,
+    #     },
+    # },
+    # "S01": {  # 硫磺称1
+    #     'ENGINE': 'sql_server.pyodbc',
+    #     'NAME': 'YK_XL',
+    #     'HOST': os.getenv('SO1_IP', '10.10.10.10'),
+    #     'PORT': '1433',
+    #     'USER': 'gz',
+    #     'PASSWORD': '123',
+    #     'OPTIONS': {
+    #         'driver': 'ODBC Driver 17 for SQL Server',
+    #         'MARS_Connection': True,
+    #     },
+    # },
+    # "S02": {  # 硫磺称2
+    #     'ENGINE': 'sql_server.pyodbc',
+    #     'NAME': 'YK_XL',
+    #     'HOST': os.getenv('SO2_IP', '10.10.10.10'),
+    #     'PORT': '1433',
+    #     'USER': 'gz',
+    #     'PASSWORD': '123',
+    #     'OPTIONS': {
+    #         'driver': 'ODBC Driver 17 for SQL Server',
+    #         'MARS_Connection': True,
+    #     },
+    # },
+}
 
 
 CACHES = {
