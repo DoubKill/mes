@@ -412,7 +412,7 @@ class PalletFeedbacksTestListView(ModelViewSet):
         if equip_no:
             pfb_filter['production_equip_no'] = equip_no
         if product_no:
-            pfb_filter['product_no__icontains'] = product_no
+            pfb_filter['product_no'] = product_no
         if classes:
             pfb_filter['production_class'] = classes
         if pfb_filter:
@@ -1278,9 +1278,12 @@ class ImportAndExportView(APIView):
         # 胶料
         product_no = production_data[0].strip()
         # 密炼日期
-        delta = datetime.timedelta(days=production_data[2])
-        date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
-        factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+        try:
+            delta = datetime.timedelta(days=production_data[2])
+            date_1 = datetime.datetime.strptime('1899-12-30', '%Y-%m-%d') + delta
+            factory_date = datetime.datetime.strftime(date_1, '%Y-%m-%d')
+        except Exception:
+            raise ValidationError('密炼日期格式错误！')
         # 班次
         classes = production_data[3].strip() + '班'
         # 机台
@@ -1317,6 +1320,8 @@ class ImportAndExportView(APIView):
                                                      product_no=product_no
                                                      ).values('lot_no', 'begin_trains',
                                                               'end_trains', 'plan_classes_uid')
+        if not pallet_data:
+            raise ValidationError('未找到该批次生产数据：【{}】-【{}】-【{}】-【{}】！！'.format(factory_date, classes, equip_no, product_no))
         pallet_trains_map = {}  # 车次与收皮条码map数据
         for pallet in pallet_data:
             for j in range(pallet['begin_trains'], pallet['end_trains']+1):
