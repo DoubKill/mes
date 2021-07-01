@@ -663,16 +663,17 @@ class ERPMaterialBindingSerializer(serializers.ModelSerializer):
 class ERPMaterialCreateSerializer(BaseModelSerializer):
     erp_material_data = ERPMaterialBindingSerializer(help_text="""
     [{"zc_material": erp物料id, "use_flag": 使用与否}]""", write_only=True, many=True)
+    material_no = serializers.CharField(max_length=64, help_text='编码',
+                                        validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
+                                                                    message='该原材料编码已存在！')])
+    material_name = serializers.CharField(max_length=64, help_text='名称',
+                                          validators=[UniqueValidator(queryset=Material.objects.filter(delete_flag=0),
+                                                                      message='该原材料名称已存在！')])
 
     def create(self, validated_data):
         erp_material_data = validated_data.pop('erp_material_data', [])
-        m = Material.objects.filter(Q(material_no=validated_data['material_no']) |
-                                    Q(material_name=validated_data['material_name'])).first()
-        if m:
-            material = m
-        else:
-            validated_data.update(created_user=self.context["request"].user)
-            material = Material.objects.create(**validated_data)
+        validated_data.update(created_user=self.context["request"].user)
+        material = Material.objects.create(**validated_data)
         for item in erp_material_data:
             item['material'] = material
             ERPMESMaterialRelation.objects.create(**item)
