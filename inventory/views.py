@@ -2366,8 +2366,18 @@ class DepotPalltModelViewSet(ModelViewSet):
             lst = []
             for i in serializer.data:
                 lst.append({'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains']), 'num': 1, 'actual_weight': float(i['actual_weight'])})
-            data = json.loads(pd.DataFrame(lst).groupby('product_no').sum().reset_index().to_json(orient='records'))
-            return Response({'results': data})
+            c = {i['product_no']: {} for i in lst}
+
+            for i in lst:
+
+                if not c[i['product_no']]:
+                    i.update({"num": 1})
+                    c[i['product_no']].update(i)
+                else:
+                    c[i['product_no']]['num'] += 1
+                    c[i['product_no']]['trains'] += i['trains']
+                    c[i['product_no']]['actual_weight'] += i['actual_weight']
+            return Response({'results': c.values()})
         except:
             raise ValidationError('没有数据')
 
@@ -2457,7 +2467,7 @@ class PalletDataModelViewSet(ModelViewSet):
     """线边库出入库管理"""
     queryset = PalletFeedbacks.objects.exclude(palletfeedbacks__pallet_status=2).order_by('-product_time')
     serializer_class = PalletDataModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = PalletDataFilter
 
@@ -2498,7 +2508,7 @@ class SulfurDepotModelViewSet(ModelViewSet):
     """硫磺库库区"""
     queryset = SulfurDepot.objects.all()
     serializer_class = SulfurDepotModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -2511,7 +2521,7 @@ class SulfurDepotSiteModelViewSet(ModelViewSet):
     """硫磺库库位"""
     queryset = SulfurDepotSite.objects.all()
     serializer_class = SulfurDepotSiteModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -2526,9 +2536,7 @@ class SulfurDataModelViewSet(ModelViewSet):
 
     queryset = Sulfur.objects.filter(sulfur_status=1)
     serializer_class = SulfurDataModelSerializer
-
-    # permission_classes = [IsAuthenticated,]
-
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = SulfurDataFilter
 
@@ -2561,7 +2569,7 @@ class DepotSulfurModelViewSet(ModelViewSet):
     """硫磺库库存查询"""
     queryset = Sulfur.objects.filter(sulfur_status=1)
     serializer_class = DepotSulfurModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSulfurFilter
 
@@ -2588,7 +2596,7 @@ class DepotSulfurInfoModelViewSet(ModelViewSet):
     """硫磺库库存查询详情"""
     queryset =  Sulfur.objects.filter(sulfur_status=1)
     serializer_class = DepotSulfurInfoModelSerializer
-
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSulfurFilter
 
@@ -2601,7 +2609,7 @@ class SulfurResumeModelViewSet(ModelViewSet):
     """硫磺库出入库履历"""
     queryset = Sulfur.objects.all()
     serializer_class = SulfurResumeModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = SulfurResumeFilter
 
