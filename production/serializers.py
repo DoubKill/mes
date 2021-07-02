@@ -3,7 +3,6 @@ import datetime
 import math
 from rest_framework import serializers
 from rest_framework.fields import Field
-
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
@@ -293,3 +292,5 @@ class WeighInformationSerializer2(serializers.ModelSerializer):
         model = ExpendMaterial
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+

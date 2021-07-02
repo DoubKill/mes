@@ -2,12 +2,13 @@ import datetime
 import json
 import logging
 import random
+import pandas as pd
 from io import BytesIO
 
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum
+from django.db.models import Sum, Q, Count, F
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -16,33 +17,38 @@ from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
+from rest_framework.pagination import PageNumberPagination
 
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter
+    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, PalletDataFilter, DepotDataFilter, \
+    DepotResumeFilter, SulfurDataFilter, DepotSulfurFilter, SulfurResumeFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
     MaterialInHistory, MaterialInventoryLog, FinalGumOutInventoryLog, \
     MaterialInHistory, MaterialInventoryLog, CarbonOutPlan
-from inventory.models import DeliveryPlan, MaterialInventory
+from inventory.models import DeliveryPlan, MaterialInventory, Depot, DepotSite, DepotPallt,  SulfurDepot, SulfurDepotSite, \
+    Sulfur
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
     InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
     MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer, \
-    CarbonPlanManagementSerializer
+    CarbonPlanManagementSerializer, DepotModelSerializer, DepotSiteModelSerializer, DepotPalltModelSerializer, DepotPalltInfoModelSerializer, \
+    SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, DepotSulfurModelSerializer, SulfurResumeModelSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
-    WmsInventoryStockSerializer, InventoryLogSerializer
+    WmsInventoryStockSerializer, InventoryLogSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, SulfurDataModelSerializer, \
+    DepotSulfurInfoModelSerializer
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF, TH_CONF
 from mes.derorators import api_recorder
@@ -2315,4 +2321,217 @@ class THTunnelView(WMSTunnelView):
 class THInventoryView(WMSInventoryView):
     """炭黑库存信息"""
     DATABASE_CONF = TH_CONF
+
+
+class DepotModelViewSet(ModelViewSet):
+    """线边库库区"""
+    queryset = Depot.objects.all()
+    serializer_class = DepotModelSerializer
+    permission_classes = [IsAuthenticated,]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_name')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+class DepotSiteModelViewSet(ModelViewSet):
+    """线边库库位"""
+    queryset = DepotSite.objects.all()
+    serializer_class = DepotSiteModelSerializer
+    permission_classes = [IsAuthenticated,]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_site_name', 'depot')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+
+class DepotPalltModelViewSet(ModelViewSet):
+    """线边库库存查询"""
+    queryset = DepotPallt.objects.filter(pallet_status=1)
+    serializer_class = DepotPalltModelSerializer
+    # permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotDataFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        try:
+            lst = []
+            for i in serializer.data:
+                lst.append({'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains']), 'num': 1, 'actual_weight': float(i['actual_weight'])})
+            data = json.loads(pd.DataFrame(lst).groupby('product_no').sum().reset_index().to_json(orient='records'))
+            return Response({'results': data})
+        except:
+            raise ValidationError('没有数据')
+
+class DepotPalltInfoModelViewSet(ModelViewSet):
+    """库存查询详情"""
+    queryset = DepotPallt.objects.filter(pallet_status=1)
+    serializer_class = DepotPalltInfoModelSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotDataFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+class PalletDataModelViewSet(ModelViewSet):
+    """线边库出入库管理"""
+    queryset = PalletFeedbacks.objects.exclude(palletfeedbacks__pallet_status=2).order_by('-product_time')
+    serializer_class = PalletDataModelSerializer
+    # permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PalletDataFilter
+
+    def create(self, request, *args, **kwargs):
+        pallet_id = request.data.get('id')
+        pallet_status = request.data.get('status')
+        enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        depot_site = request.data.get('depot_site')
+        depot_site_obj = DepotSite.objects.filter(depot_site_name=depot_site).first()
+        pallet_data_obj = PalletFeedbacks.objects.get(pk=pallet_id)
+
+        if pallet_status == 1:  # 入库
+            q = DepotPallt.objects.filter(depot_site=depot_site_obj).all()
+            for i in q:
+                if i.pallet_status == 1:
+                    raise ValidationError("库位正在使用")
+            data_obj = DepotPallt.objects.create(pallet_data=pallet_data_obj, depot_site=depot_site_obj, enter_time=enter_time, pallet_status=pallet_status)
+            data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
+
+        elif pallet_status == 2:  # 出库
+            DepotPallt.objects.filter(depot_site=depot_site_obj).update(pallet_status=2, outer_time=enter_time)
+            data_obj = DepotPallt.objects.filter(depot_site=depot_site_obj).first()
+            data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
+        serializer = PalletDataModelSerializer(instance=data)
+        return Response({"result": serializer.data})
+
+
+class DepotResumeModelViewSet(ModelViewSet):
+    """线边库出入库履历"""
+    queryset = DepotPallt.objects.all()
+    serializer_class = DepotResumeModelSerializer
+    permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotResumeFilter
+
+
+class SulfurDepotModelViewSet(ModelViewSet):
+    """硫磺库库区"""
+    queryset = SulfurDepot.objects.all()
+    serializer_class = SulfurDepotModelSerializer
+    # permission_classes = [IsAuthenticated,]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_name')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+class SulfurDepotSiteModelViewSet(ModelViewSet):
+    """硫磺库库位"""
+    queryset = SulfurDepotSite.objects.all()
+    serializer_class = SulfurDepotSiteModelSerializer
+    # permission_classes = [IsAuthenticated,]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_site_name', 'depot')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+
+class SulfurDataModelViewSet(ModelViewSet):
+    """硫磺库出入库管理"""
+
+    queryset = Sulfur.objects.filter(sulfur_status=1)
+    serializer_class = SulfurDataModelSerializer
+
+    # permission_classes = [IsAuthenticated,]
+
+    filter_backends = [DjangoFilterBackend]
+    filter_class = SulfurDataFilter
+
+    def create(self, request, *args, **kwargs):
+        if request.data.get('sulfur_status') == 1:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            try:
+                depot_site_obj = SulfurDepotSite.objects.get(pk=request.data.get('depot_site'))
+            except:
+                raise ValidationError('该库位不存在')
+
+            if Sulfur.objects.filter(depot_site=depot_site_obj):
+                raise ValidationError('库位以被使用')
+
+            enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
+            serializer = SulfurDataModelSerializer(instance=data)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        elif request.data.get('sulfur_status') == 2:
+
+            outer_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            Sulfur.objects.filter(id=request.data.get('id')).update(sulfur_status=2, outer_time=outer_time)
+            return Response({'results': '出库成功'})
+
+
+class DepotSulfurModelViewSet(ModelViewSet):
+    """硫磺库库存查询"""
+    queryset = Sulfur.objects.filter(sulfur_status=1)
+    serializer_class = DepotSulfurModelSerializer
+    # permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotSulfurFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        lst = []
+        for i in serializer.data:
+            lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no']})
+
+        c = {i['name']: {} for i in lst}
+
+        for i in lst:
+            if not c[i['name']]:
+                i.update({"num": 1})
+                c[i['name']].update(i)
+            else:
+                c[i['name']]['num'] += 1
+
+        return Response({'results': c.values()})
+
+
+class DepotSulfurInfoModelViewSet(ModelViewSet):
+    """硫磺库库存查询详情"""
+    queryset =  Sulfur.objects.filter(sulfur_status=1)
+    serializer_class = DepotSulfurInfoModelSerializer
+
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotSulfurFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+class SulfurResumeModelViewSet(ModelViewSet):
+    """硫磺库出入库履历"""
+    queryset = Sulfur.objects.all()
+    serializer_class = SulfurResumeModelSerializer
+    # permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = SulfurResumeFilter
 
