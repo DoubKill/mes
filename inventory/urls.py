@@ -143,5 +143,10 @@ urlpatterns = [
 
     path('product-station-statics/', InventoryStaticsView.as_view()),  # 胶种库存分段统计
     path('product-details/', ProductDetailsView.as_view()),            # 胶料车间库存明细
+
+    # 线边库快检信息
+    path('pallet-test-result/', PalletTestResultView.as_view())
 ]
+
+
 

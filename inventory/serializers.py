@@ -1338,13 +1338,12 @@ class DepotPalltModelSerializer(serializers.ModelSerializer):
 
 class DepotPalltInfoModelSerializer(serializers.ModelSerializer):
     product_no = serializers.ReadOnlyField(source='pallet_data.product_no')
-    pallet_status = serializers.ReadOnlyField(source='pallet_data.pallet_status')
     depot_site_name = serializers.ReadOnlyField(source='depot_site.depot_site_name')
-
+    lot_no = serializers.ReadOnlyField(source='pallet_data.lot_no')
     class Meta:
         model = DepotPallt
-        fields = ['enter_time', 'pallet_status', 'depot_name', 'depot_site_name',
-                  'product_no', 'outer_time']
+        fields = ['enter_time', 'depot_name', 'depot_site_name',
+                  'product_no', 'outer_time', 'lot_no']
 
 
 class PalletDataModelSerializer(serializers.ModelSerializer):

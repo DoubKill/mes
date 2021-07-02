@@ -60,7 +60,8 @@ from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train
+from quality.models import LabelPrint, Train, MaterialDealResult
+from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
 from .conf import wms_ip, wms_port, IS_BZ_USING
@@ -2354,7 +2355,7 @@ class DepotPalltModelViewSet(ModelViewSet):
     """线边库库存查询"""
     queryset = DepotPallt.objects.filter(pallet_status=1)
     serializer_class = DepotPalltModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotDataFilter
 
@@ -2374,6 +2375,7 @@ class DepotPalltInfoModelViewSet(ModelViewSet):
     """库存查询详情"""
     queryset = DepotPallt.objects.filter(pallet_status=1)
     serializer_class = DepotPalltInfoModelSerializer
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotDataFilter
 
@@ -2381,6 +2383,74 @@ class DepotPalltInfoModelViewSet(ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+@method_decorator([api_recorder], name='dispatch')
+class PalletTestResultView(APIView):
+    """查询某拖收皮数据的检测结果，参数:lot_no=xxx"""
+
+    def get(self, request):
+        lot_no = self.request.query_params.get('lot_no')
+        if not lot_no:
+            raise ValidationError('参数缺失')
+        # {
+        #     '门尼': ['ML(1+4)'],
+        #     '流变': ['MH', 'ML', 'TC10'],
+        #     '比重': ['比重值']
+        # }
+        # [
+        #     {
+        #         'trains': 1,
+        #         'level': 1,  # 等级
+        #         'test_data': {
+        #                     '门尼': {
+        #                         'ML(1+4)': 66,
+        #
+        #                     },
+        #                     '流变': {
+        #                         'MH': 55,
+        #                         'ML': 99,
+        #                         'TC10': 12,
+        #                     }
+        #                 }
+        #     },
+        #     {
+        #         'trains': 2,
+        #         'level': 1,
+        #         'test_data': {
+        #             '门尼': {
+        #                 'ML(1+4)': 66,
+        #
+        #             },
+        #         }
+        #     }
+        # ]
+        ret = []
+        mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
+        if mdr_obj:
+            serializers = MaterialDealResultListSerializer(instance=mdr_obj)
+            deal_result = serializers.data
+        else:
+            return Response([])
+        table_head = deal_result['mtr_list']['table_head']
+        mtr_list = deal_result['mtr_list']
+        mtr_list.pop('table_head', None)
+        test_result = deal_result['test_result']
+        data = {}
+        for train, item in mtr_list.items():
+            data['trains'] = train
+            data['test_data'] = {}
+            for j in item:
+                data['status'] = j.get('status')
+                test_indicator_name = j['test_indicator_name']
+                data_point_name = j['data_point_name']
+                value = j['value']
+                if test_indicator_name in data['test_data']:
+                    data['test_data'][test_indicator_name][data_point_name] = value
+                else:
+                    data['test_data'][test_indicator_name] = {data_point_name: value}
+            ret.append(data)
+
+        return Response({'table_head': table_head, 'results': ret, 'test_result': test_result})
 
 
 class PalletDataModelViewSet(ModelViewSet):
