@@ -62,8 +62,14 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.filter(use_flag=1).values('id', 'material_no',
-                                                      'material_name', 'material_type__global_name')
+            queryset = queryset.filter(use_flag=1)
+            if self.request.query_params.get('exclude_stage'):
+                stage_names = GlobalCode.objects.filter(
+                    global_type__type_name='胶料段次').values_list('global_name', flat=True)
+                queryset = queryset.exclude(material_type__global_name__in=stage_names)
+            data = queryset.values('id', 'material_no', 'material_name',
+                                   'material_type__global_name', 'material_type', 'for_short',
+                                   'package_unit', 'package_unit__global_name', 'use_flag')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
