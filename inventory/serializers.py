@@ -1358,7 +1358,7 @@ class PalletDataModelSerializer(serializers.ModelSerializer):
     class Meta:
         model = PalletFeedbacks
         fields = ['factory_date', 'product_no', 'classes', 'equip_no', 'begin_trains', 'end_trains',
-                  'enter_time','outer_time', 'pallet_status', 'depot_site_name', 'depot_name', 'id']
+                  'enter_time','outer_time', 'pallet_status', 'depot_site_name', 'depot_name', 'id', 'lot_no']
 
 
 class DepotResumeModelSerializer(serializers.ModelSerializer):

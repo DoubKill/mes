@@ -937,7 +937,9 @@ class DepotPallt(models.Model):
     def depot_name(self):
         return self.depot_site.depot.depot_name
 
-
+    @property
+    def depot_site_name(self):
+        return self.depot_site.depot_site_name
 
 class SulfurDepot(models.Model):
     """硫磺 库区表"""
