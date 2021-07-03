@@ -1334,7 +1334,7 @@ class DepotPalltModelSerializer(serializers.ModelSerializer):
     actual_weight = serializers.ReadOnlyField(source='pallet_data.actual_weight')
     class Meta:
         model = DepotPallt
-        fields = [ 'product_no', 'begin_trains', 'end_trains', 'actual_weight']
+        fields = ['product_no', 'begin_trains', 'end_trains', 'actual_weight']
 
 class DepotPalltInfoModelSerializer(serializers.ModelSerializer):
     product_no = serializers.ReadOnlyField(source='pallet_data.product_no')

@@ -2,7 +2,6 @@ import datetime
 import json
 import logging
 import random
-import pandas as pd
 from io import BytesIO
 
 import requests
