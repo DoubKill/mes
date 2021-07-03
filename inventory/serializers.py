@@ -1369,9 +1369,10 @@ class DepotResumeModelSerializer(serializers.ModelSerializer):
     product_no = serializers.ReadOnlyField(source='pallet_data.product_no')
     begin_trains = serializers.ReadOnlyField(source='pallet_data.begin_trains')
     end_trains = serializers.ReadOnlyField(source='pallet_data.end_trains')
+    lot_no = serializers.ReadOnlyField(source='pallet_data.lot_no')
     class Meta:
         model = DepotPallt
-        fields = ['factory_date', 'classes', 'equip_no', 'product_no', 'begin_trains',
+        fields = ['factory_date', 'classes', 'equip_no', 'product_no', 'begin_trains', 'lot_no',
                   'end_trains', 'pallet_status', 'enter_time', 'outer_time', 'depot_name', 'depot_site_name']
 
 
