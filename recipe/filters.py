@@ -9,10 +9,13 @@ class MaterialFilter(django_filters.rest_framework.FilterSet):
     # use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否使用')
     material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料代码', lookup_expr='icontains')
     material_name = django_filters.CharFilter(field_name='material_name', help_text='原材料名称', lookup_expr='icontains')
+    eq_material_no = django_filters.CharFilter(field_name='material_no', help_text='原材料代码(判等查询)')
+    eq_material_name = django_filters.CharFilter(field_name='material_name', help_text='原材料名称(判等查询)')
 
     class Meta:
         model = Material
-        fields = ('material_type_id', 'use_flag', 'material_no', 'material_name', 'material_type_name')
+        fields = ('material_type_id', 'use_flag', 'material_no', 'material_name', 'material_type_name',
+                  'eq_material_no', 'eq_material_name')
 
 
 class ProductInfoFilter(django_filters.rest_framework.FilterSet):
