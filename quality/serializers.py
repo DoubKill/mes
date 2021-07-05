@@ -428,8 +428,12 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
-        classes = plan.work_schedule_plan.classes.global_name
-        group = plan.work_schedule_plan.group.global_name
+        if not plan:
+            classes = pallet_data.classes
+            group = ''
+        else:
+            classes = plan.work_schedule_plan.classes.global_name
+            group = plan.work_schedule_plan.group.global_name
         ret['day_time'] = str(test_order_data.production_factory_date)  # 工厂日期
         ret['product_no'] = pallet_data.product_no  # 胶料编码
         ret['equip_no'] = pallet_data.equip_no  # 设备编号
