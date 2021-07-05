@@ -24,6 +24,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.pagination import PageNumberPagination
 
+from plan.models import ProductClassesPlan
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
@@ -2466,9 +2467,23 @@ class PalletDataModelViewSet(ModelViewSet):
     """线边库出入库管理"""
     queryset = PalletFeedbacks.objects.exclude(palletfeedbacks__pallet_status=2).order_by('-product_time')
     serializer_class = PalletDataModelSerializer
-    permission_classes = [IsAuthenticated,]
+    # permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = PalletDataFilter
+    #todo
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            for i in serializer.data:
+                s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
+                i.update({'group':s['work_schedule_plan__group__global_name']})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
         pallet_id = request.data.get('id')
@@ -2498,10 +2513,23 @@ class DepotResumeModelViewSet(ModelViewSet):
     """线边库出入库履历"""
     queryset = DepotPallt.objects.all()
     serializer_class = DepotResumeModelSerializer
-    permission_classes = [IsAuthenticated,]
+    # permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotResumeFilter
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            for i in serializer.data:
+                s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
+                i.update({'group':s['work_schedule_plan__group__global_name']})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 class SulfurDepotModelViewSet(ModelViewSet):
     """硫磺库库区"""

@@ -1353,11 +1353,11 @@ class PalletDataModelSerializer(serializers.ModelSerializer):
     depot_name = serializers.ReadOnlyField(source='palletfeedbacks.depot_site.depot.depot_name')
     enter_time = serializers.DateTimeField(source='palletfeedbacks.enter_time')
     outer_time = serializers.DateTimeField(source='palletfeedbacks.outer_time')
-
+    # group = serializers.CharField(read_only=True, default=a)
 
     class Meta:
         model = PalletFeedbacks
-        fields = ['factory_date', 'product_no', 'classes', 'equip_no', 'begin_trains', 'end_trains',
+        fields = ['factory_date', 'product_no', 'classes', 'equip_no', 'begin_trains', 'end_trains', 'plan_classes_uid',
                   'enter_time','outer_time', 'pallet_status', 'depot_site_name', 'depot_name', 'id', 'lot_no']
 
 
@@ -1370,9 +1370,11 @@ class DepotResumeModelSerializer(serializers.ModelSerializer):
     begin_trains = serializers.ReadOnlyField(source='pallet_data.begin_trains')
     end_trains = serializers.ReadOnlyField(source='pallet_data.end_trains')
     lot_no = serializers.ReadOnlyField(source='pallet_data.lot_no')
+    plan_classes_uid = serializers.ReadOnlyField(source='pallet_data.plan_classes_uid')
+
     class Meta:
         model = DepotPallt
-        fields = ['factory_date', 'classes', 'equip_no', 'product_no', 'begin_trains', 'lot_no',
+        fields = ['factory_date', 'classes', 'equip_no', 'product_no', 'begin_trains', 'lot_no', 'plan_classes_uid',
                   'end_trains', 'pallet_status', 'enter_time', 'outer_time', 'depot_name', 'depot_site_name']
 
 
