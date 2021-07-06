@@ -4,7 +4,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, DepotPallt
 
-from inventory.models import DeliveryPlan, Sulfur
+from inventory.models import DeliveryPlan, Sulfur, DepotSite, SulfurDepotSite
 from production.models import PalletFeedbacks
 
 
@@ -204,6 +204,22 @@ class PalletDataFilter(django_filters.rest_framework.FilterSet):
         model = PalletFeedbacks
         fields = ('equip_no', 'product_no', "classes", "factory_date")
 
+
+class DepotSiteDataFilter(django_filters.rest_framework.FilterSet):
+    """线边库库位过滤器"""
+    depot_name = django_filters.CharFilter(field_name='depot__depot_name', lookup_expr='icontains')
+
+    class Meta:
+        model = DepotSite
+        fields = ('depot_name',)
+
+class SulfurDepotSiteFilter(django_filters.rest_framework.FilterSet):
+    """硫磺库库位过滤器"""
+    depot_name = django_filters.CharFilter(field_name='depot__depot_name', lookup_expr='icontains')
+
+    class Meta:
+        model = SulfurDepotSite
+        fields = ('depot_name',)
 
 class DepotDataFilter(django_filters.rest_framework.FilterSet):
     """线边库出入库数据过滤器"""

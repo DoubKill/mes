@@ -29,7 +29,7 @@ from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
     MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, PalletDataFilter, DepotDataFilter, \
-    DepotResumeFilter, SulfurDataFilter, DepotSulfurFilter, SulfurResumeFilter
+    DepotResumeFilter, SulfurDataFilter, DepotSulfurFilter, SulfurResumeFilter, DepotSiteDataFilter, SulfurDepotSiteFilter
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
@@ -2342,11 +2342,13 @@ class DepotSiteModelViewSet(ModelViewSet):
     queryset = DepotSite.objects.all()
     serializer_class = DepotSiteModelSerializer
     permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotSiteDataFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'depot_site_name', 'depot')
+            data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
@@ -2561,11 +2563,13 @@ class SulfurDepotSiteModelViewSet(ModelViewSet):
     queryset = SulfurDepotSite.objects.all()
     serializer_class = SulfurDepotSiteModelSerializer
     permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = SulfurDepotSiteFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'depot_site_name', 'depot')
+            data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
