@@ -2337,11 +2337,12 @@ class DepotModelViewSet(ModelViewSet):
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
+
 class DepotSiteModelViewSet(ModelViewSet):
     """线边库库位"""
     queryset = DepotSite.objects.all()
     serializer_class = DepotSiteModelSerializer
-    permission_classes = [IsAuthenticated,]
+    # permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSiteDataFilter
 
@@ -2569,7 +2570,7 @@ class SulfurDepotSiteModelViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name')
+            data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name', 'description')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
