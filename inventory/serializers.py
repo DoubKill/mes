@@ -1353,7 +1353,6 @@ class PalletDataModelSerializer(serializers.ModelSerializer):
     depot_name = serializers.ReadOnlyField(source='palletfeedbacks.depot_site.depot.depot_name')
     enter_time = serializers.DateTimeField(source='palletfeedbacks.enter_time')
     outer_time = serializers.DateTimeField(source='palletfeedbacks.outer_time')
-    # group = serializers.CharField(read_only=True, default=a)
 
     class Meta:
         model = PalletFeedbacks

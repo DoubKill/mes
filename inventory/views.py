@@ -2467,10 +2467,10 @@ class PalletDataModelViewSet(ModelViewSet):
     """线边库出入库管理"""
     queryset = PalletFeedbacks.objects.exclude(palletfeedbacks__pallet_status=2).order_by('-product_time')
     serializer_class = PalletDataModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = PalletDataFilter
-    #todo
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 
@@ -2480,7 +2480,13 @@ class PalletDataModelViewSet(ModelViewSet):
             for i in serializer.data:
                 s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
                 i.update({'group':s['work_schedule_plan__group__global_name']})
-            return self.get_paginated_response(serializer.data)
+
+            if request.query_params.get('group'):
+                group = request.query_params.get('group')
+                data = [i for i in serializer.data if i['group'].startswith(group)]
+                return self.get_paginated_response(data)
+            else:
+                return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
@@ -2513,7 +2519,7 @@ class DepotResumeModelViewSet(ModelViewSet):
     """线边库出入库履历"""
     queryset = DepotPallt.objects.all()
     serializer_class = DepotResumeModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotResumeFilter
 
@@ -2526,7 +2532,13 @@ class DepotResumeModelViewSet(ModelViewSet):
             for i in serializer.data:
                 s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
                 i.update({'group':s['work_schedule_plan__group__global_name']})
-            return self.get_paginated_response(serializer.data)
+
+            if request.query_params.get('group'):
+                group = request.query_params.get('group')
+                data = [i for i in serializer.data if i['group'].startswith(group)]
+                return self.get_paginated_response(data)
+            else:
+                return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
