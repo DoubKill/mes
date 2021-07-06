@@ -2348,7 +2348,7 @@ class DepotSiteModelViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
-            data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name')
+            data = queryset.values('id', 'depot_site_name', 'description', 'depot', 'depot__depot_name')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
