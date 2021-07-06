@@ -653,7 +653,7 @@ permission_data = [
     {'id': 506, 'code': 'view_depot_pallet', 'name': '查看', 'parent_id': 505},
 
     {'id': 507, 'code': 'depot_resume', 'name': '线边库履历管理', 'parent_id': None},
-    {'id': 508, 'code': 'view_depot_resume', 'name': '查看', 'parent_id': 508},
+    {'id': 508, 'code': 'view_depot_resume', 'name': '查看', 'parent_id': 507},
 
     {'id': 509, 'code': 'sulfur_depot', 'name': '硫磺库库区库位管理', 'parent_id': None},
     {'id': 510, 'code': 'view_sulfur_depot', 'name': '查看库区', 'parent_id': 509},
