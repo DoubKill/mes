@@ -2371,7 +2371,7 @@ class DepotPalltModelViewSet(ModelViewSet):
         try:
             lst = []
             for i in serializer.data:
-                lst.append({'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains']), 'num': 1, 'actual_weight': float(i['actual_weight'])})
+                lst.append({'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains'] + 1), 'num': 1, 'actual_weight': float(i['actual_weight'])})
             c = {i['product_no']: {} for i in lst}
 
             for i in lst:
@@ -2492,7 +2492,7 @@ class PalletDataModelViewSet(ModelViewSet):
                 data = [i for i in serializer.data if i['group'].startswith(group)]
                 return self.get_paginated_response(data)
             elif request.query_params.get('all'):
-                data = PalletFeedbacks.objects.values('product_no').annotate(num=Count('product_no'))
+                data = PalletFeedbacks.objects.filter(delete_flag=False).values('product_no').distinct()
                 return Response({'results':data})
             else:
                 return self.get_paginated_response(serializer.data)
