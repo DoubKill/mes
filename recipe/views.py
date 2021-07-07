@@ -77,8 +77,9 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if ProductBatchingDetail.objects.filter(material=instance).exists():
-            raise ValidationError('该原材料已关联配方，无法删除')
+        if instance.use_flag is True and ProductBatchingDetail.objects.filter(material=instance,
+                                                                              delete_flag=False).exists():
+            raise ValidationError('该原材料已关联配方，无法停用!')
         else:
             return super().destroy(request, *args, **kwargs)
 

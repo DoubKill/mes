@@ -13,7 +13,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ZCMaterial
+from recipe.models import ZCMaterial, ERPMESMaterialRelation
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, ReportWeight
 import logging
@@ -64,12 +64,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         material_no = material_name = None
 
         if wms_stock:
-            msc = ZCMaterial.objects.filter(wlxxid=wms_stock[0]['material_no'],
-                                            material__isnull=False).first()
-            if msc:
-                material_no = msc.material.material_no
-                material_name = msc.material.material_name
-            else:
+            material_name = set(ERPMESMaterialRelation.objects.filter(
+                zc_material__wlxxid=wms_stock[0]['material_no'],
+                use_flag=True
+            ).values_list('material__material_name', flat=True))
+            if not material_name:
                 raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
         if pallet_feedback:
             material_no = pallet_feedback.product_no
@@ -77,18 +76,27 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if weight_package:
             material_no = weight_package.material_no
             material_name = weight_package.material_name
-        if not material_no:
+        if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=attrs['plan_classes_uid']).first()
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
+        if isinstance(material_name, set):
+            comm_material = list(material_name & classes_plan.product_batching.batching_material_names)
+            if comm_material:
+                material_name = comm_material[0]
+                material_no = comm_material[0]
+                attrs['status'] = 1
+            else:
+                attrs['status'] = 2
+        else:
+            if material_name not in classes_plan.product_batching.batching_material_names:
+                attrs['status'] = 2
+            else:
+                attrs['status'] = 1
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
-        if material_name not in classes_plan.product_batching.batching_material_names:
-            attrs['status'] = 2
-        else:
-            attrs['status'] = 1
         # 发送条码信息到群控
         try:
             resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/',
