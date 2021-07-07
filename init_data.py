@@ -641,8 +641,8 @@ permission_data = [
     {'id': 496, 'code': 'view_depot', 'name': '查看库区', 'parent_id': 495},
     {'id': 497, 'code': 'add_depot', 'name': '新增库区', 'parent_id': 495},
     {'id': 498, 'code': 'change_depot', 'name': '修改库区', 'parent_id': 495},
-    {'id': 499, 'code': 'add_site_depot', 'name': '新增库位', 'parent_id': 495},
-    {'id': 500, 'code': 'change_site_depot', 'name': '修改库位', 'parent_id': 495},
+    {'id': 499, 'code': 'addSite_depot', 'name': '新增库位', 'parent_id': 495},
+    {'id': 500, 'code': 'changeSite_depot', 'name': '修改库位', 'parent_id': 495},
 
     {'id': 501, 'code': 'pallet_data', 'name': '线边库出入库管理', 'parent_id': None},
     {'id': 502, 'code': 'view_pallet_data', 'name': '查看', 'parent_id': 501},
@@ -659,8 +659,8 @@ permission_data = [
     {'id': 510, 'code': 'view_sulfur_depot', 'name': '查看库区', 'parent_id': 509},
     {'id': 511, 'code': 'add_sulfur_depot', 'name': '新增库区', 'parent_id': 509},
     {'id': 512, 'code': 'change_sulfur_depot', 'name': '修改库区', 'parent_id': 509},
-    {'id': 513, 'code': 'add_site_sulfur_depot', 'name': '新增库位', 'parent_id': 509},
-    {'id': 514, 'code': 'change_site_sulfur_depot', 'name': '修改库位', 'parent_id': 509},
+    {'id': 513, 'code': 'addSite_sulfur_depot', 'name': '新增库位', 'parent_id': 509},
+    {'id': 514, 'code': 'changeSite_sulfur_depot', 'name': '修改库位', 'parent_id': 509},
 
     {'id': 515, 'code': 'sulfur_data', 'name': '硫磺库出入库管理', 'parent_id': None},
     {'id': 516, 'code': 'view_sulfur_data', 'name': '查看', 'parent_id': 515},
