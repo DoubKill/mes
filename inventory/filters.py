@@ -224,12 +224,12 @@ class SulfurDepotSiteFilter(django_filters.rest_framework.FilterSet):
 class DepotDataFilter(django_filters.rest_framework.FilterSet):
     """线边库出入库数据过滤器"""
     product_no = django_filters.CharFilter(field_name='pallet_data__product_no', help_text='胶料编码', lookup_expr='icontains')
-    depot_name = django_filters.CharFilter(field_name='depot_site__depot__depot_name', help_text='库区', lookup_expr='icontains')
-    depot_site_name = django_filters.CharFilter(field_name='depot_site__depot_site_name', help_text='库位', lookup_expr='icontains')
+    depot = django_filters.CharFilter(field_name='depot_site__depot__id', help_text='库区')
+    depot_site = django_filters.CharFilter(field_name='depot_site__id', help_text='库位')
 
     class Meta:
         model = DepotPallt
-        fields = ('product_no', 'depot_name', 'depot_site_name')
+        fields = ('product_no', 'depot', 'depot_site')
 
 
 class DepotResumeFilter(django_filters.rest_framework.FilterSet):

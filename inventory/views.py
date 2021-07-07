@@ -2342,7 +2342,7 @@ class DepotSiteModelViewSet(ModelViewSet):
     """线边库库位"""
     queryset = DepotSite.objects.all()
     serializer_class = DepotSiteModelSerializer
-    # permission_classes = [IsAuthenticated,]
+    permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSiteDataFilter
 
@@ -2350,6 +2350,9 @@ class DepotSiteModelViewSet(ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'depot_site_name', 'description', 'depot', 'depot__depot_name')
+            return Response({'results': data})
+        elif request.query_params.get('depot_site'):
+            data = DepotSite.objects.exclude(depotsite__pallet_status=1).values('id', 'depot_site_name', 'depot')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
@@ -2488,6 +2491,9 @@ class PalletDataModelViewSet(ModelViewSet):
                 group = request.query_params.get('group')
                 data = [i for i in serializer.data if i['group'].startswith(group)]
                 return self.get_paginated_response(data)
+            elif request.query_params.get('all'):
+                data = PalletFeedbacks.objects.values('product_no').annotate(num=Count('product_no'))
+                return Response({'results':data})
             else:
                 return self.get_paginated_response(serializer.data)
 
@@ -2540,6 +2546,10 @@ class DepotResumeModelViewSet(ModelViewSet):
                 group = request.query_params.get('group')
                 data = [i for i in serializer.data if i['group'].startswith(group)]
                 return self.get_paginated_response(data)
+
+            elif request.query_params.get('all'):
+                data = DepotPallt.objects.values('pallet_data__product_no').annotate(num=Count('pallet_data__product_no'))
+                return Response({'results':data})
             else:
                 return self.get_paginated_response(serializer.data)
 
