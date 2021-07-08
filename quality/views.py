@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+from decimal import Decimal
 
 from suds.client import Client
 from django.db import connection
@@ -1360,7 +1361,7 @@ class ImportAndExportView(APIView):
             for data_point_name, method in data_point_method_map.items():
                 test_method_name = method['test_method__name']
                 test_indicator_name = method['test_method__test_type__test_indicator__name']
-                point_value = item[by_dict[data_point_name]]  # 数据点检测值
+                point_value = Decimal(item[by_dict[data_point_name]]).quantize(Decimal('0.000'))
                 if not point_value:
                     continue
                 result_data = {'material_test_order': instance,
