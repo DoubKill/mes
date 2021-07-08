@@ -2030,6 +2030,7 @@ class WmsInventoryStockView(APIView):
         material_no = self.request.query_params.get('material_no')
         quality_status = self.request.query_params.get('quality_status')
         entrance_name = self.request.query_params.get('entrance_name')
+        position = self.request.query_params.get('position')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
@@ -2050,7 +2051,8 @@ class WmsInventoryStockView(APIView):
                  a.BatchNo,
                  a.SpaceId,
                  a.Sn,
-                 a.WeightUnit
+                 a.WeightUnit,
+                 a.CreaterTime
                 FROM
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -2068,9 +2070,13 @@ class WmsInventoryStockView(APIView):
                      SELECT 
                             ab.TunnelCode 
                      FROM t_inventory_entrance_tunnel ab INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId 
-                     WHERE ac.name= '{}' ) {}""".format(entrance_name, extra_where_str)
+                     WHERE ac.name= '{}' ) {} order by a.CreaterTime""".format(entrance_name, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
+        if position == '内':
+            temp = list(filter(lambda x: x[4][6] in ('1', '2'), temp))
+        elif position == '外':
+            temp = list(filter(lambda x: x[4][6] in ('3', '4'), temp))
         count = len(temp)
         temp = temp[st:et]
         result = []
@@ -2082,10 +2088,81 @@ class WmsInventoryStockView(APIView):
                  'BatchNo': item[3],
                  'SpaceId': item[4],
                  'Sn': item[5],
-                 'unit': item[6]
+                 'unit': item[6],
+                 'inventory_time': item[7].strftime('%Y-%m-%d %H:%M:%S') if item[7] else '',
+                 'position': '内' if item[4][6] in ('1', '2') else '外'
                  })
         sc.close()
         return Response({'results': result, "count": count})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WmsInStockView(APIView):
+    """根据当前货物外伸位地址获取内伸位数据, 参数：entrance_name=出库口名称&space_id=货位地址"""
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        out_space_id = self.request.query_params.get('space_id')
+        entrance_name = self.request.query_params.get('entrance_name')
+        if not all([out_space_id, entrance_name]):
+            raise ValidationError('参数缺失！')
+        out_space_id_list = out_space_id.split('-')
+        if out_space_id_list[2] == '3':
+            out_space_id_list[2] = '1'
+        elif out_space_id_list[2] == '4':
+            out_space_id_list[2] = '2'
+        else:
+            return Response([])
+        in_space_id = '-'.join(out_space_id_list)
+        sql = """
+            SELECT
+                 a.StockDetailState,
+                 c.MaterialCode,
+                 c.Name AS MaterialName,
+                 a.BatchNo,
+                 a.SpaceId,
+                 a.Sn,
+                 a.WeightUnit,
+                 a.CreaterTime
+            FROM 
+                 dbo.t_inventory_stock AS a
+             INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
+             INNER JOIN t_inventory_material c ON c.MaterialCode= a.MaterialCode
+             INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId 
+            WHERE
+             NOT EXISTS ( 
+                 SELECT 
+                        tp.TrackingNumber 
+                 FROM t_inventory_space_plan tp 
+                 WHERE tp.TrackingNumber = a.TrackingNumber ) 
+             AND d.State= 1 
+             AND b.SpaceState= 1 
+             AND a.TunnelId IN ( 
+                 SELECT 
+                        ab.TunnelCode 
+                 FROM t_inventory_entrance_tunnel ab INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId 
+                 WHERE ac.name= '{}')
+             and a.SpaceId in ('{}', '{}');""".format(
+            entrance_name, in_space_id, out_space_id)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        if len(temp) <= 1:
+            return Response([])
+        result = []
+        for item in temp:
+            result.append(
+                {'StockDetailState': item[0],
+                 'MaterialCode': item[1],
+                 'MaterialName': item[2],
+                 'BatchNo': item[3],
+                 'SpaceId': item[4],
+                 'Sn': item[5],
+                 'unit': item[6],
+                 'inventory_time': item[7].strftime('%Y-%m-%d %H:%M:%S'),
+                 'position': '内' if item[4][6] in ('1', '2') else '外'
+                 })
+        sc.close()
+        return Response(result)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2284,6 +2361,11 @@ class WMSInventoryView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class THInventoryStockView(WmsInventoryStockView):
     """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
+    DATABASE_CONF = TH_CONF
+
+@method_decorator([api_recorder], name="dispatch")
+class THInStockView(WmsInStockView):
+    """炭黑库根据当前货物外伸位地址获取内伸位数据, 参数：material_no=原材料编号&entrance_name=出库口名称&space_id=货位地址"""
     DATABASE_CONF = TH_CONF
 
 

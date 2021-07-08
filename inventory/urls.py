@@ -19,7 +19,7 @@ router.register(r'material-inventory-view', views.MaterialInventoryView, basenam
 # 胶料立库
 router.register(r'product-inventory', views.ProductInventory, basename="product-inventory")
 
-# 出库计划管理
+# 混炼胶库出库计划管理
 router.register('put-plan-management', PutPlanManagement)
 
 # 帘布库出库管理
@@ -28,10 +28,10 @@ router.register(r'lb-plan-management', views.PutPlanManagementLB)
 # 终炼胶出库管理
 router.register(r'final-plan-management', views.PutPlanManagementFianl)
 
-# 原材料库出库管理
+# 原材料库出库管理（没用）
 router.register(r'material-plan-management', views.MaterialPlanManagement)
 
-# 炭黑库出库管理
+# 炭黑库出库管理（没用）
 router.register(r'carbon-plan-management', views.CarbonPlanManagement)
 
 # 过期胶料管理
@@ -91,6 +91,7 @@ urlpatterns = [
     path('wms-tunnels/', WMSTunnelView.as_view()),  # 巷道列表
     path('wms-material-groups/', WMSMaterialGroupNameView.as_view()),  # 物料组列表
     path('wms-inventory/', WMSInventoryView.as_view()),  # 库存统计列表
+    path('wms-instock/', WmsInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
 
     # 炭黑出库
     path('th-stock/', THInventoryStockView.as_view()),  # 炭黑货位列表
@@ -99,6 +100,7 @@ urlpatterns = [
     path('th-tunnels/', THTunnelView.as_view()),  # 巷道列表
     path('th-material-groups/', THMaterialGroupNameView.as_view()),  # 物料组列表
     path('th-inventory/', THInventoryView.as_view()),  # 库存统计列表
+    path('th-instock/', THInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
 
     # 出库大屏
     path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
