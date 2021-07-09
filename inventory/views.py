@@ -2089,7 +2089,7 @@ class WmsInventoryStockView(APIView):
                  'SpaceId': item[4],
                  'Sn': item[5],
                  'unit': item[6],
-                 'inventory_time': item[7].strftime('%Y-%m-%d %H:%M:%S') if item[7] else '',
+                 'inventory_time': item[7],
                  'position': '内' if item[4][6] in ('1', '2') else '外'
                  })
         sc.close()
@@ -2158,7 +2158,7 @@ class WmsInStockView(APIView):
                  'SpaceId': item[4],
                  'Sn': item[5],
                  'unit': item[6],
-                 'inventory_time': item[7].strftime('%Y-%m-%d %H:%M:%S'),
+                 'inventory_time': item[7],
                  'position': '内' if item[4][6] in ('1', '2') else '外'
                  })
         sc.close()
