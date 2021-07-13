@@ -931,6 +931,14 @@ class MaterialInventoryAPIView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
+    """
+    list:
+        混炼胶出库计划列表
+    create:
+        新建出库计划
+    update:
+        人工出库/修改出库数据/关闭出库订单
+    """
     queryset = DeliveryPlan.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializer
     filter_backends = [DjangoFilterBackend]
@@ -980,6 +988,15 @@ class PutPlanManagementLB(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PutPlanManagementFianl(ModelViewSet):
+    """
+    list:
+        终炼胶出库计划列表
+    create:
+        新建出库计划
+    update:
+        人工出库/修改出库数据/关闭出库订单
+    """
+
     queryset = DeliveryPlanFinal.objects.filter().order_by("-created_date")
     serializer_class = PutPlanManagementSerializerFinal
     filter_backends = [DjangoFilterBackend]
@@ -2363,6 +2380,7 @@ class THInventoryStockView(WmsInventoryStockView):
     """炭黑库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = TH_CONF
 
+
 @method_decorator([api_recorder], name="dispatch")
 class THInStockView(WmsInStockView):
     """炭黑库根据当前货物外伸位地址获取内伸位数据, 参数：material_no=原材料编号&entrance_name=出库口名称&space_id=货位地址"""
@@ -2398,3 +2416,152 @@ class THInventoryView(WMSInventoryView):
     """炭黑库存信息"""
     DATABASE_CONF = TH_CONF
 
+
+@method_decorator([api_recorder], name="dispatch")
+class BzMixingRubberInventory(ListAPIView):
+    """
+        北自混炼胶库存列表，参数：?material_no=物料编码&container_no=托盘号&lot_no=收皮条码&location=库存位
+                            &tunnel=巷道&quality_status=品质状态&lot_existed=收皮条码有无（1：有，0：无）
+                            &station=出库口名称
+    """
+    serializer_class = BzFinalMixingRubberInventorySerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        material_no = self.request.query_params.get('material_no')  # 物料编码
+        container_no = self.request.query_params.get('container_no')  # 托盘号
+        lot_no = self.request.query_params.get('lot_no')  # 收皮条码
+        location = self.request.query_params.get('location')  # 库存位
+        tunnel = self.request.query_params.get('tunnel')  # 巷道
+        quality_status = self.request.query_params.get('quality_status')  # 品质状态
+        lot_existed = self.request.query_params.get('lot_existed')  # 收皮条码有无（1：有，0：无）
+        station = self.request.query_params.get('station')  # 出库口名称
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位")
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
+        if container_no:
+            queryset = queryset.filter(container_no__icontains=container_no)
+        if location:
+            queryset = queryset.filter(location__icontains=location)
+        if tunnel:
+            queryset = queryset.filter(location__istartswith=tunnel)
+        if lot_no:
+            queryset = queryset.filter(lot_no__icontains=lot_no)
+        if quality_status:
+            queryset = queryset.filter(quality_level=quality_status)
+        if lot_existed:
+            if lot_existed == '1':
+                queryset = queryset.exclude(lot_no__isnull=True)
+            else:
+                queryset = queryset.filter(lot_no__isnull=True)
+        if station:
+            if station == '一层前端':
+                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+            elif station in ('二层前端', '二层后端'):
+                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+            else:
+                return []
+        return queryset
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BzMixingRubberInventorySummary(APIView):
+    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称"""
+
+    def get(self, request):
+        params = request.query_params
+        quality_status = params.get("status")
+        station = params.get("station")
+        if not all([quality_status, station]):
+            raise ValidationError('参数缺失！')
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位")
+        if station == '一层前端':
+            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+        elif station in ('二层前端', '二层后端'):
+            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+        else:
+            return Response([])
+        if status:
+            queryset = queryset.filter(quality_level=quality_status)
+        try:
+            ret = queryset.values('material_no').annotate(all_qty=Sum('qty'),
+                                                          all_weight=Sum('total_weight')
+                                                          ).values('material_no', 'all_qty', 'all_weight')
+        except Exception as e:
+            raise ValidationError(f"混炼胶库连接失败:{e}")
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BzMixingRubberInventorySearch(ListAPIView):
+    """根据出库口、搜索指定数量的混炼胶库存信息.参数：?material_no=物料编码&quality_status=品质状态&station=出库口名称&need_qty=出库数量"""
+    queryset = BzFinalMixingRubberInventory.objects.all()
+    serializer_class = BzFinalMixingRubberInventorySerializer
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        material_no = self.request.query_params.get('material_no')  # 物料编码
+        quality_status = self.request.query_params.get('quality_status')  # 品质状态
+        station = self.request.query_params.get('station')  # 出库口名称
+        need_qty = self.request.query_params.get('need_qty')  # 出库数量
+        if not all([material_no, station, need_qty]):
+            raise ValidationError('参数缺失！')
+        try:
+            need_qty = int(need_qty)
+        except Exception:
+            raise ValidationError('参数错误！')
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(
+            material_no=material_no,
+            location_status="有货货位",
+            lot_no__isnull=False).order_by('in_storage_time')
+        if station == '一层前端':
+            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+        elif station in ('二层前端', '二层后端'):
+            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+        else:
+            queryset = []
+        if quality_status:
+            queryset = queryset.filter(quality_level=quality_status)
+        storage_quantity = 0
+        ret = []
+        for item in queryset:
+            storage_quantity += item.qty
+            ret.append(item)
+            if storage_quantity >= need_qty:
+                break
+        serializer = self.get_serializer(ret, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BzFinalRubberInventorySearch(ListAPIView):
+    """根据出库口、搜索指定数量的终炼胶库存信息.参数：?material_no=物料编码&quality_status=品质状态&need_qty=出库数量"""
+    queryset = BzFinalMixingRubberInventoryLB.objects.all()
+    serializer_class = BzFinalMixingRubberLBInventorySerializer
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        material_no = self.request.query_params.get('material_no')  # 物料编码
+        quality_status = self.request.query_params.get('quality_status')  # 品质状态
+        need_qty = self.request.query_params.get('need_qty')  # 出库数量
+        if not all([material_no, need_qty]):
+            raise ValidationError('参数缺失！')
+        try:
+            need_qty = int(need_qty)
+        except Exception:
+            raise ValidationError('参数错误！')
+        queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+            material_no=material_no,
+            location_status="有货货位",
+            lot_no__isnull=False).order_by('in_storage_time')
+        if quality_status:
+            queryset = queryset.filter(quality_level=quality_status)
+        storage_quantity = 0
+        ret = []
+        for item in queryset:
+            storage_quantity += item.qty
+            ret.append(item)
+            if storage_quantity >= need_qty:
+                break
+        serializer = self.get_serializer(ret, many=True)
+        return Response(serializer.data)
