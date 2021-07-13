@@ -981,7 +981,7 @@ class Sulfur(models.Model):
     sulfur_status = models.SmallIntegerField(choices=status, help_text='状态', verbose_name='状态', null=True, blank=True)
     enter_time = models.DateTimeField(help_text='入库时间', verbose_name='入库时间', blank=True,null=True)
     outer_time = models.DateTimeField(help_text='出库时间', verbose_name='出库时间', blank=True,null=True)
-    depot_site = models.ForeignKey(SulfurDepotSite, on_delete=models.CASCADE, related_name='sulfur', help_text='库位', verbose_name='库位', unique=True)
+    depot_site = models.ForeignKey(SulfurDepotSite, on_delete=models.CASCADE, related_name='sulfur', help_text='库位', verbose_name='库位')
 
     class Meta:
         db_table = 'sulfur'

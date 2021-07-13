@@ -2664,6 +2664,9 @@ class SulfurDepotSiteModelViewSet(ModelViewSet):
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name', 'description')
             return Response({'results': data})
+        elif request.query_params.get('depot_site'):
+            data = SulfurDepotSite.objects.exclude(sulfur__sulfur_status=1).values('id', 'depot_site_name', 'depot')
+            return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
 
@@ -2684,9 +2687,6 @@ class SulfurDataModelViewSet(ModelViewSet):
                 depot_site_obj = SulfurDepotSite.objects.get(pk=request.data.get('depot_site'))
             except:
                 raise ValidationError('该库位不存在')
-
-            if Sulfur.objects.filter(depot_site=depot_site_obj):
-                raise ValidationError('库位以被使用')
 
             enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
