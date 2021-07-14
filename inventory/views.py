@@ -373,6 +373,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name', None)
         quality_status = self.request.query_params.get('quality_status', None)
+        lot_existed = self.request.query_params.get('lot_existed')
         # 终炼胶，帘布库区分 货位地址开头1-4终炼胶   5-6帘布库
         model = self.divide_tool(self.MODEL)
         queryset = None
@@ -393,6 +394,11 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
             queryset = model.objects.using('lb').all()
+            if lot_existed:
+                if lot_existed == '1':
+                    queryset = queryset.exclude(lot_no__isnull=True)
+                else:
+                    queryset = queryset.filter(lot_no__isnull=True)
             if warehouse_name == "帘布库":
                 queryset = queryset.filter(store_name="帘布库")
                 status_dict = {"合格品": "一等品", "不合格品": "三等品", "一等品": "一等品", "三等品": "三等品"}
