@@ -415,14 +415,56 @@ class UnqualifiedDealOrderDetail(AbstractEntity):
 
 class ProductReportEquip(AbstractEntity):
     """胶料快检上报设备"""
+    STATUS_CHOICE = (
+        (1, '正常'),
+        (2, '异常'),
+    )
     no = models.CharField(max_length=64, help_text='设备编号')
     ip = models.CharField(max_length=64, help_text='IP', unique=True)
-    # test_type = models.ForeignKey(TestType, help_text='试验类型', on_delete=models.CASCADE)
-    data_point = models.ForeignKey(DataPoint, help_text='数据点', on_delete=models.CASCADE)
+    status = models.PositiveIntegerField(help_text='设备连接状态', choices=STATUS_CHOICE, default=1)
 
     class Meta:
         db_table = 'product_report_equip'
         verbose_name_plural = verbose_name = '胶料快检上报设备'
+
+
+class ProductTestPlan(AbstractEntity):
+    """检测计划"""
+    STATUS_CHOICE = (
+        (1, '待检测'),
+        (2, '完成'),
+        (4, '强制结束')
+    )
+    plan_uid = models.CharField(max_length=64, help_text='计划编码')
+    test_equip_no = models.CharField(max_length=64, help_text='检测机台')
+    test_time = models.DateTimeField(help_text='检测时间')
+    test_classes = models.CharField(max_length=64, help_text='检测班次')
+    test_group = models.CharField(max_length=64, help_text='检测班组')
+    test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
+    test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
+    test_times = models.PositiveIntegerField(help_text='检验次数', default=1)
+    test_interval = models.PositiveIntegerField(help_text='检验间隔', default=1)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
+
+    class Meta:
+        db_table = 'product_test_plan'
+        verbose_name_plural = verbose_name = '胶料快检计划'
+
+
+class ProductTestPlanDetail(models.Model):
+    """检测计划详情"""
+    test_plan = models.ForeignKey(ProductTestPlan, help_text='检测计划', on_delete=models.CASCADE)
+    product_no = models.CharField(max_length=64, help_text='胶料编码')
+    factory_date = models.DateField(help_text='工厂日期')
+    lot_no = models.CharField(max_length=64, help_text='收皮条码', null=True)
+    production_classes = models.CharField(max_length=64, help_text='生产班次')
+    production_group = models.CharField(max_length=64, help_text='生产班组')
+    actual_trains = models.PositiveIntegerField(help_text='生产车次')
+    value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True)
+
+    class Meta:
+        db_table = 'product_test_plan_detail'
+        verbose_name_plural = verbose_name = '胶料快检计划详情'
 
 
 class ProductReportValue(models.Model):

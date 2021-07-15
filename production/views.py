@@ -43,7 +43,7 @@ from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIVi
     get_object_or_404
 from datetime import timedelta
 
-from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear
+from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear, MaterialTestOrder
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
@@ -601,13 +601,15 @@ class AlarmLogBatch(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class PalletTrainFeedback(APIView):
-    """获取托盘开始车次-结束车次的数据，过滤字段：equip_no=设备编码&factory_date=工厂日期&classes=班次&product_no=胶料编码"""
+    """获取托盘开始车次-结束车次的数据，过滤字段：equip_no=设备编码&factory_date=工厂日期
+        &classes=班次&product_no=胶料编码&stage=胶料段次&is_tested=是否已检测（Y已检测 N未检测）"""
 
     def get(self, request):
         equip_no = self.request.query_params.get('equip_no')
         factory_date = self.request.query_params.get('factory_date')
         classes = self.request.query_params.get('classes')
         product_no = self.request.query_params.get('product_no')
+        stage = self.request.query_params.get('stage')
         if not all([equip_no, factory_date, classes, product_no]):
             raise ValidationError('缺少参数')
         pallet_feed_backs = PalletFeedbacks.objects.filter(
@@ -616,11 +618,18 @@ class PalletTrainFeedback(APIView):
             classes=classes,
             product_no=product_no
         )
+        if stage:
+            pallet_feed_backs = pallet_feed_backs.filter(product_no__icontains=stage)
         ret = []
         for pallet_feed_back in pallet_feed_backs:
             begin_trains = pallet_feed_back.begin_trains
             end_trains = pallet_feed_back.end_trains
             for i in range(begin_trains, end_trains + 1):
+                test_order = MaterialTestOrder.objects.filter(product_no=product_no,
+                                                              production_equip_no=equip_no,
+                                                              production_factory_date=factory_date,
+                                                              actual_trains=i,
+                                                              production_class=classes).first()
                 data = {
                     'product_no': pallet_feed_back.product_no,
                     'lot_no': pallet_feed_back.lot_no,
@@ -628,7 +637,8 @@ class PalletTrainFeedback(APIView):
                     'equip_no': pallet_feed_back.equip_no,
                     'actual_trains': i,
                     'plan_classes_uid': pallet_feed_back.plan_classes_uid,
-                    'factory_date': pallet_feed_back.end_time
+                    'factory_date': pallet_feed_back.end_time,
+                    'is_tested': 'Y' if test_order else 'N'
                 }
                 ret.append(data)
         ret.sort(key=lambda x: x.get('actual_trains'))
