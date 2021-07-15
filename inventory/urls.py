@@ -102,6 +102,14 @@ urlpatterns = [
     path('th-inventory/', THInventoryView.as_view()),  # 库存统计列表
     path('th-instock/', THInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
 
+    # 混炼胶库存管理
+    path('bz-mixin-inventory/', BzMixingRubberInventory.as_view()),  # 北自混炼胶库存列表
+    path('bz-mixin-inventory-summary/', BzMixingRubberInventorySummary.as_view()),  # 根据出库口获取混炼胶库存统计列表
+    path('bz-mixin-inventory-search/', BzMixingRubberInventorySearch.as_view()),  # 根据出库口、搜索指定数量的混炼胶库存信息
+
+    # 终炼胶库存管理
+    path('bz-final-inventory-search/', BzFinalRubberInventorySearch.as_view()),  # 搜索指定数量的终炼胶库存信息
+
     # 出库大屏
     path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
     path('delivery-plan-today/', DeliveryPlanToday.as_view()),  # 混炼胶 今日的总出库量
