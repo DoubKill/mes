@@ -68,6 +68,8 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     @atomic()
     def create(self, validated_data):
         location = validated_data.get("location")
+        if DeliveryPlan.objects.filter(location=location, status=4).exists():
+            raise serializers.ValidationError('该库存位{}出库计划已存在，请勿重复添加！'.format(location))
         station = validated_data.get("station")
         # try:
         #     inventory = BzFRuinalMixingbberInventory.objects.using('bz').get(location=location)
@@ -424,6 +426,8 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
+        if DeliveryPlanFinal.objects.filter(location=location, status=4).exists():
+            raise serializers.ValidationError('该库存位{}出库计划已存在，请勿重复添加！'.format(location))
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
         if location:
@@ -1421,7 +1425,8 @@ class DepotSulfurInfoModelSerializer(serializers.ModelSerializer):
         fields = ['depot_name', 'depot_site_name']
 
 class SulfurResumeModelSerializer(serializers.ModelSerializer):
-    """履历"""
+    """硫磺库履历"""
+
     class Meta:
         model = Sulfur
         fields = ['name', 'product_no', 'provider', 'lot_no' ,'sulfur_status', 'enter_time', 'outer_time',

@@ -973,7 +973,7 @@ class Sulfur(models.Model):
     name = models.CharField(max_length=64, help_text='硫磺名称', verbose_name='硫磺名称')
     product_no = models.CharField(max_length=64, help_text='物料编码', verbose_name='物料编码')
     provider = models.CharField(max_length=64, help_text='供应商', verbose_name='供应商')
-    lot_no = models.CharField(max_length=64, help_text='批号', verbose_name='批号')
+    lot_no = models.CharField(max_length=64, help_text='批号', verbose_name='批号', unique=True)
     status = (
         (1, '入库'),
         (2, '出库')
