@@ -279,9 +279,8 @@ class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
         if plan_batching_uid:
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
             if batching_class_plan:
-                material_nos = batching_class_plan.weigh_cnt_type.weigh_batching \
-                    .product_batching.batching_details.filter(delete_flag=False
-                                                              ).values_list('material__material_no', flat=True)
+                material_nos = batching_class_plan.weigh_cnt_type.weight_details.filter(
+                    delete_flag=False).values_list('material__material_no', flat=True)
                 queryset = queryset.filter(material_no__in=material_nos)
             else:
                 raise ValidationError('配料计划uid不存在')
