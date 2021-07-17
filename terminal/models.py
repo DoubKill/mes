@@ -82,35 +82,54 @@ class LoadMaterialLog(models.Model):
 
 
 class WeightPackageLog(AbstractEntity):
-    # STATUS_CHOICE = (
-    #     (1, '投料'),
-    #     (2, '撤销')
-    # )
+    PRINT_CHOICE = (
+        (0, ''),
+        (1, '点击打印'),
+        (2, '调用打印'),
+        (3, '打印成功')
+    )
     equip_no = models.CharField(max_length=64, help_text='称量设备编号')
-    plan_batching_uid = models.CharField(max_length=64, help_text='小料称量计划号')
-    product_no = models.CharField(max_length=64, help_text='胶料名称')
-    material_name = models.CharField(max_length=64, help_text='物料打包名称')
-    material_no = models.CharField(max_length=64, help_text='物料打包编号')
-    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
-    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
+    plan_weight_uid = models.CharField(max_length=64, help_text='小料称量计划号')
+    product_no = models.CharField(max_length=64, help_text='胶料名称-配方号')
+    material_name = models.CharField(max_length=64, help_text='物料打包名称', null=True)
+    material_no = models.CharField(max_length=64, help_text='物料打包编号', null=True)
+    plan_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='单重', default=0)
+    actual_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
-    production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
-    production_classes = models.CharField(max_length=64, help_text='生产班次')
-    production_group = models.CharField(max_length=64, help_text='生产班组')
-    # status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE)
-    # batch_time = models.DateTimeField(max_length=64, help_text='打包时间')
-    batch_classes = models.CharField(max_length=64, help_text='投入班次')
-    batch_group = models.CharField(max_length=64, help_text='投入班组')
-    location_no = models.CharField(max_length=64, help_text='产线')
+    status = models.CharField(help_text='打印状态', max_length=8, default='N')
+    batch_time = models.DateTimeField(max_length=10, help_text='配料日期')
+    batch_classes = models.CharField(max_length=8, help_text='配料班次')
+    batch_group = models.CharField(max_length=8, help_text='配料班组')
+    location_no = models.CharField(max_length=64, help_text='产线', null=True)
     dev_type = models.CharField(max_length=64, help_text='机型名称')
     begin_trains = models.IntegerField(help_text='开始包')
     end_trains = models.IntegerField(help_text='结束包')
-    times = models.IntegerField(help_text='打印次数', default=1)
-    quantity = models.IntegerField(default=1, help_text='包数')
+    package_count = models.IntegerField(help_text='配置数量')
+    print_begin_trains = models.IntegerField(help_text='打印起始车次')
+    noprint_count = models.IntegerField(help_text='未打印数量')
+    package_fufil = models.IntegerField(help_text='配料完成数量')
+    package_plan_count = models.IntegerField(help_text='配料计划数量')
+    print_flag = models.IntegerField(help_text='打印交互', choices=PRINT_CHOICE)
+    print_count = models.IntegerField(help_text='打印数量', default=1)
+    expire_days = models.IntegerField(help_text='有效期')
+    record = models.IntegerField(help_text='plan表数据id', null=True)
 
     class Meta:
         db_table = 'weight_package_log'
         verbose_name_plural = verbose_name = '称量打包履历'
+
+
+class PackageExpire(models.Model):
+    product_no = models.CharField(max_length=64, help_text='配方号')
+    product_name = models.CharField(max_length=64, help_text='配方名称')
+    package_fine_usefullife = models.IntegerField(help_text='细料包有效期(天)', default=0)
+    package_sulfur_usefullife = models.IntegerField(help_text='硫磺包有效期(天)', default=0)
+    update_user = models.CharField(max_length=64, help_text='更新人员')
+    update_date = models.DateField(help_text='更新时间')
+
+    class Meta:
+        db_table = 'package_expire'
+        verbose_name_plural = verbose_name = '料包有效期'
 
 
 class WeightBatchingLog(AbstractEntity):
@@ -186,6 +205,24 @@ class FeedingLog(AbstractEntity):
     class Meta:
         db_table = 'feeding_log'
         verbose_name_plural = verbose_name = '投料履历'
+
+
+class LoadTankMaterialLog(AbstractEntity):
+    material_no = models.CharField(max_length=64, help_text='原材料编码')
+    material_name = models.CharField(max_length=64, help_text='原材料名称')
+    bra_code = models.CharField(max_length=64, help_text='条形码')
+    unit = models.CharField(db_column='WeightUnit', max_length=64)
+    scan_time = models.DateTimeField(max_length=64, help_text='扫码时间')
+    useup_time = models.DateTimeField(max_length=64, help_text='用完时间')
+    init_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='初始重量', default=0)
+    # real_weight  修正剩余量后计算使用
+    real_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='真实计算重量', default=0)
+    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='当前消耗重量', default=0)
+    adjust_left_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='调整剩余重量', default=0)
+
+    class Meta:
+        db_table = 'load_tank_material_log'
+        verbose_name_plural = verbose_name = '料框物料信息'
 
 
 class Version(models.Model):

@@ -1,6 +1,8 @@
 import datetime
+import json
 
-from django.db.models import Max
+from datetime import timedelta
+from django.db.models import Max, Sum
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -15,16 +17,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import WorkSchedulePlan
+from basics.models import WorkSchedulePlan, Equip
+from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response
 from mes.derorators import api_recorder
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
-from recipe.models import ProductBatchingDetail
+from production.models import PalletFeedbacks
+from recipe.models import ProductBatchingDetail, ZCMaterial
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
-    RecipeMaterial, ReportBasic, ReportWeight, Plan
+    RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -32,7 +36,8 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, \
     WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer, \
     MaterialInfoSerializer, BinSerializer, PlanSerializer, PlanUpdateSerializer, RecipePreSerializer, \
-    ReportBasicSerializer, ReportWeightSerializer
+    ReportBasicSerializer, ReportWeightSerializer, LoadMaterialLogUpdateSerializer, WeightPackagePlanSerializer, \
+    WeightPackageLogUpdateSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -154,8 +159,46 @@ class BatchProductBatchingVIew(APIView):
             for weight_cnt_type in classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
                 ret.append({
                     'material__material_name': weight_cnt_type.name,
-                    'actual_weight': weight_cnt_type.total_weight
+                    'actual_weight': weight_cnt_type.package_cnt
                 })
+            # 上料表中最大车次
+            max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
+                feed_log__plan_classes_uid=plan_classes_uid, status=1).aggregate(
+                max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
+            if not max_feed_log_id:
+                # 当前生产中没有, 表示未进料(所有原材料数量均为0);否则代表进料，根据条形码进行计算
+                list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0}), ret))
+            else:
+                # 根据上料表中最大车次获取到各原材料条码，物料名，单车需要重量信息
+                if max_feed_log_id != 1:
+                    now_material_info = LoadMaterialLog.objects.using('SFJ').filter(feed_log_id=max_feed_log_id, status=1)
+                    max_feed_log_id = max_feed_log_id if now_material_info.count() == len(ret) else max_feed_log_id - 1
+                now_materials = LoadMaterialLog.objects.using('SFJ').filter(feed_log_id=max_feed_log_id, status=1).values('material_name', 'bra_code')
+                # 如果上料表中一车同物料出现多条,整合相同数据
+                material_info = {i['material_name']: i for i in now_materials}
+                # 遍历配方中的数据
+                for single_material in ret:
+                    # 获取上料表中的数据
+                    load_data = material_info.get(single_material['material__material_name'])
+                    # 不存在则说明还在进料中，数量置为0
+                    if not load_data:
+                        single_material.update(
+                            {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0})
+                        continue
+                    bra_code = load_data.get('bra_code')
+                    plan_weight = single_material.get('actual_weight')
+                    # 根据条码查询料框表对应的数据
+                    material_bra = LoadTankMaterialLog.objects.filter(bra_code=bra_code).first()
+                    single_material.update({'bra_code': material_bra.bra_code, 'init_weight': material_bra.init_weight,
+                                            'used_weight': material_bra.actual_weight,
+                                            'adjust_left_weight': material_bra.adjust_left_weight,
+                                            'id': material_bra.id
+                                            })
+                    if material_bra.adjust_left_weight < plan_weight:
+                        single_material.update(
+                            {'msg': '物料：{}不足, 请扫码添加物料'.format(single_material['material__material_name'])})
+                    else:
+                        single_material.update({'msg': ''})
         else:
             # 配料计划详情
             batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
@@ -167,7 +210,10 @@ class BatchProductBatchingVIew(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class LoadMaterialLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, GenericViewSet):
+class LoadMaterialLogViewSet(TerminalCreateAPIView,
+                             mixins.ListModelMixin,
+                             mixins.UpdateModelMixin,
+                             GenericViewSet):
     """
     list:
         投料履历
@@ -201,8 +247,27 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gener
     def get_serializer_class(self):
         if self.action == 'list':
             return LoadMaterialLogSerializer
+        elif self.action == 'update':
+            return LoadMaterialLogUpdateSerializer
         else:
             return LoadMaterialLogCreateSerializer
+
+    def update(self, request, *args, **kwargs):
+        self.queryset = LoadTankMaterialLog.objects.all()
+        left_weight = request.data.get('adjust_left_weight')
+        batch_material = self.get_object()
+        serializer = self.get_serializer(batch_material, data=request.data)
+        if not serializer.is_valid():
+            return Response(data={'success': False, 'message': list(serializer.errors.values())[0][0]},
+                            status=status.HTTP_400_BAD_REQUEST)
+        if batch_material.unit == '包' and isinstance(left_weight, float):
+            return Response(data={'success': False, 'message': '包数应为整数'}, status=status.HTTP_400_BAD_REQUEST)
+        # 获得本次修正量,修改真正计算的总量
+        change_num = batch_material.adjust_left_weight - left_weight
+        batch_material.real_weight = batch_material.real_weight - change_num
+        self.perform_update(serializer)
+        batch_material.save()
+        return Response(data={'success': True, 'message': '修正成功'}, status=status.HTTP_200_OK)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -314,34 +379,222 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid():
-            return response(
-                success=False,
-                message=list(serializer.errors.values())[0][0])  # 只返回一条错误信息
+        serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return response(success=True, data=serializer.data)
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        if self.request.query_params.get('pagination'):
-            page = self.paginate_queryset(queryset)
+        client = self.request.query_params.get('client')
+        equip_no = self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else 'F01'
+        batch_time = self.request.query_params.get('batch_time') if self.request.query_params.get('batch_time') else\
+            datetime.datetime.now().strftime('%Y-%m-%d')
+        product_no = self.request.query_params.get('product_no')
+        status = self.request.query_params.get('status', 'all')
+        # client 客户端请求打印列表
+        if client:
+            equip_no_list = equip_no.split(',')
+            print_data = self.queryset.filter(equip_no__in=equip_no_list, print_flag=1).values(
+                'id', 'product_no', 'dev_type', 'plan_weight', 'equip_no', 'package_count', 'print_begin_trains',
+                'batch_time', 'expire_days', 'batch_group', 'batch_classes', 'begin_trains', 'end_trains', 'bra_code')
+            for data in print_data:
+                expire_date = datetime.datetime.strftime(data['batch_time'] + timedelta(days=data['expire_days']), '%Y-%m-%d %H:%M:%S')\
+                    if data['expire_days'] != 0 else '9999-01-01 00:00:00'
+                batch_time = data['batch_time'].strftime('%Y-%m-%d')
+                data.update({'expire_days': expire_date, 'batch_time': batch_time})
+            return Response(print_data)
+        # mes网页请求
+        # 筛选配料时间为当天的记录
+        report_basic_records = ReportBasic.objects.using(equip_no).filter(savetime__contains=batch_time).values_list('planid', 'savetime')
+        if not report_basic_records:
+            return Response([])
+        plan_ids = set(list(report_basic_records.values_list('planid', flat=True)))
+        plan_filter_kwargs = {'planid__in': plan_ids}
+        weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
+        if product_no:
+            weight_filter_kwargs.update({'product_no': product_no})
+            plan_filter_kwargs.update({'recipe': product_no})
+        # 获取称量系统生产计划数据
+        equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
+        # 履历表中已生成的record(plan表主键)
+        ids = list(set(self.queryset.filter(**weight_filter_kwargs).values_list('record', flat=True)))
+        # 设备对应机型
+        dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
+        # 打印履历表为空(全是未打印数据)
+        if not self.queryset:
+            if status == 'Y':
+                return Response([])
+            else:
+                page = self.paginate_queryset(list(equip_plan_info))
+                if page:
+                    serializer = WeightPackagePlanSerializer(page, many=True)
+                    for i in serializer.data:
+                        plan_weight = RecipePre.objects.using(equip_no).get(name=i['product_no']).weight
+                        # 配料时间
+                        actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
+                        i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
+                                  'batch_time': actual_batch_time})
+                    return self.get_paginated_response(serializer.data)
+                return Response([])
+        # 履历表不为空
+        if status == 'all':
+            # 已打印信息
+            already_print = self.queryset.filter(**weight_filter_kwargs)
+            # 未打印(剔除已打印)
+            no_print_data = equip_plan_info.exclude(id__in=ids)
+            # 分页返回
+            page = self.paginate_queryset(list(already_print) + list(no_print_data))
+            if page:
+                data = []
+                for k in page:
+                    try:
+                        y_or_n = k.status
+                        data.append(WeightPackageLogSerializer(k).data)
+                    except:
+                        serializer = WeightPackagePlanSerializer(k).data
+                        plan_weight = RecipePre.objects.using(equip_no).get(name=serializer['product_no']).weight
+                        actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
+                        serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
+                                           'batch_time': actual_batch_time})
+                        data.append(serializer)
+                return self.get_paginated_response(data)
+            return Response([])
+        # 未打印(剔除已打印)
+        elif status == 'N':
+            weight_filter_kwargs.update({'status': status})
+            # 履历表中状态为未打印
+            weight_no_print = self.queryset.filter(**weight_filter_kwargs)
+            # 生产中剔除履历表中已经打印的
+            plan_no_print = equip_plan_info.exclude(id__in=ids)
+            # 分页返回
+            page = self.paginate_queryset(list(weight_no_print) + list(plan_no_print))
+            if page:
+                data = []
+                for k in page:
+                    try:
+                        y_or_n = k.status
+                        data.append(WeightPackageLogSerializer(k).data)
+                    except:
+                        serializer = WeightPackagePlanSerializer(k).data
+                        plan_weight = RecipePre.objects.using(equip_no).get(name=serializer['product_no']).weight
+                        actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
+                        serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
+                                           'batch_time': actual_batch_time})
+                        data.append(serializer)
+                return self.get_paginated_response(data)
+            return Response([])
+        # 已打印
+        else:
+            weight_filter_kwargs.update({'status': status})
+            already_print = self.queryset.filter(**weight_filter_kwargs)
+            page = self.paginate_queryset(already_print)
             if page is not None:
-                serializer = self.get_serializer(page, many=True)
+                serializer = WeightPackageLogSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
+            serializer = self.WeightPackageLogSerializer(already_print, many=True)
+            return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        bra_code = self.request.query_params.get('bra_code')
+        plan_weight = self.request.query_params.get('plan_weight')
+        begin_trains = self.request.query_params.get('begin_trains')
+        end_trains = self.request.query_params.get('end_trains')
+        batch_time = self.request.query_params.get('batch_time')
+        # 履历表中数据详情
+        if bra_code:
+            single_print_record = self.queryset.get(bra_code=bra_code)
+            data = {'print_begin_trains': single_print_record.print_begin_trains, 'package_count': single_print_record.package_count,
+                    'product_no': single_print_record.product_no, 'dev_type': single_print_record.dev_type,
+                    'plan_weight': single_print_record.plan_weight, 'equip_no': single_print_record.equip_no,
+                    'batch_time': single_print_record.batch_time, 'batch_group': single_print_record.batch_group,
+                    'batch_classes': single_print_record.batch_classes, 'begin_trains': single_print_record.begin_trains,
+                    'end_trains': single_print_record.end_trains, 'print_count': 1}
+            return Response(data)
+        # 生产计划表中未打印数据详情
+        id = self.request.query_params.get('id')
+        equip_no = self.request.query_params.get('equip_no')
+        dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
+        plan_obj = Plan.objects.using(equip_no).get(id=id)
+        batch_group = self.request.query_params.get('batch_group')
+        same_batch_print = self.queryset.filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
+                                                product_no=plan_obj.recipe) # 删除status='Y'判断
+        # 同批次第一次打印
+        if not same_batch_print:
+            data = {'print_begin_trains': 1, 'package_count': '',
+                    'product_no': plan_obj.recipe, 'dev_type': dev_type,
+                    'plan_weight': plan_weight, 'equip_no': equip_no,
+                    'batch_time': batch_time, 'batch_group': batch_group,
+                    'batch_classes': plan_obj.grouptime, 'begin_trains': begin_trains,
+                    'end_trains': end_trains, 'print_count': 1}
+            return Response(data)
+        # 同批次非第一次打印
+        last_same_batch = same_batch_print.first()
+        data = {'print_begin_trains': last_same_batch.print_begin_trains + last_same_batch.package_count,
+                'package_count': last_same_batch.package_count, 'product_no': last_same_batch.product_no,
+                'dev_type': dev_type, 'plan_weight': plan_weight, 'equip_no': equip_no,
+                'batch_time': last_same_batch.batch_time, 'batch_group': batch_group,
+                'batch_classes': last_same_batch.batch_classes, 'begin_trains': begin_trains,
+                'end_trains': end_trains, 'print_count': 1}
+        return Response(data)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
         return Response(serializer.data)
 
     def get_serializer_class(self):
-        if self.action == 'list':
-            return WeightPackageLogSerializer
-        if self.action == 'retrieve':
-            return WeightPackageRetrieveLogSerializer
-        if self.action == 'update':  # 重新打印（终端使用，修改打印次数）
-            return WeightPackageUpdateLogSerializer
-        if self.action == 'partial_update':  # 重新打印（mes页面操作，修改条形码）
-            return WeightPackagePartialUpdateLogSerializer
-        else:
+        if self.action == 'create':
             return WeightPackageLogCreateSerializer
+        elif self.action == 'update':
+            return WeightPackageLogUpdateSerializer
+        else:
+            return WeightPackageLogSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PackageExpireView(APIView):
+    """料包有效期"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        product_no = self.request.query_params.get('product_no')
+        product_name = self.request.query_params.get('product_name')
+        filter_kwargs = {}
+        if product_no:
+            filter_kwargs['product_no'] = product_no
+        if product_name:
+            filter_kwargs['product_name'] = product_name
+        package_expire_nums = PackageExpire.objects.count()
+        if not package_expire_nums:
+            all_product_no = []
+            # 获取所有称量系统配方号
+            equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备', use_flag=1)\
+                .values_list('equip_no', flat=True)
+            for equip in equip_list:
+                single_equip_recipe = list(Plan.objects.using(equip).all().values_list('recipe', flat=True).distinct())
+                all_product_no.extend(single_equip_recipe)
+            set_product_no = list(set(all_product_no))
+            for single_product_no in set_product_no:
+                PackageExpire.objects.create(product_no=single_product_no, product_name=single_product_no,
+                                             update_user=self.request.user.username, update_date=datetime.datetime.now().date())
+        # 读取数据
+        data = PackageExpire.objects.all() if not filter_kwargs else PackageExpire.objects.filter(**filter_kwargs)
+        res = list(data.values('id', 'product_no', 'product_name', 'package_fine_usefullife', 'package_sulfur_usefullife'))
+        return Response(res)
+
+    def post(self, request):
+        id = self.request.data.pop('id')
+        f_expire_time = self.request.data.get('package_fine_usefullife')
+        s_expire_time = self.request.data.get('package_sulfur_usefullife')
+        if (f_expire_time and int(f_expire_time) < 0) or (s_expire_time and int(s_expire_time) < 0):
+            raise ValidationError('请输入正整数有效时长')
+        try:
+            self.request.data.update({'update_user': self.request.user.username, 'update_date': datetime.datetime.now().date()})
+            PackageExpire.objects.filter(id=id).update(**self.request.data)
+        except Exception as e:
+            raise ValidationError('更新数据失败：{}'.format(e.args[0]))
+        return Response('更新成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -712,6 +965,7 @@ class XLPlanVIewSet(ModelViewSet):
         date_time = self.request.query_params.get('date_time', datetime.datetime.now().strftime('%Y-%m-%d'))
         grouptime = self.request.query_params.get('grouptime')
         recipe = self.request.query_params.get('recipe')
+        state = self.request.query_params.get('state')
 
         filter_kwargs = {}
         if not equip_no:
@@ -722,15 +976,22 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['grouptime'] = grouptime
         if recipe:
             filter_kwargs['recipe'] = recipe
+        if state:
+            filter_kwargs['state__in'] = state.split(',')
         queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
-        try:
-            page = self.paginate_queryset(queryset)
-            serializer = self.get_serializer(page, many=True)
-        except ConnectionDoesNotExist:
-            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
-        except Exception:
-            raise
-        return self.get_paginated_response(serializer.data)
+        if not state:
+            try:
+                page = self.paginate_queryset(queryset)
+                serializer = self.get_serializer(page, many=True)
+            except ConnectionDoesNotExist:
+                raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+            except Exception:
+                raise
+            return self.get_paginated_response(serializer.data)
+        else:
+            new_queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
+            serializer = self.get_serializer(new_queryset, many=True)
+            return Response(serializer.data)
 
     def get_object(self):
         """

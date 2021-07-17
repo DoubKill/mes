@@ -12,7 +12,7 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
     WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, \
     ProductExchange, XLMaterialVIewSet, XLBinVIewSet, RecipePreVIew, RecipeMaterialVIew, ReportBasicView, \
-    ReportWeightView, XLPlanVIewSet
+    ReportWeightView, XLPlanVIewSet, PackageExpireView
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -40,6 +40,7 @@ urlpatterns = [
     path('batch-charge-log-list/', BatchChargeLogListViewSet.as_view()),  # 密炼投入履历
     path('weight-batching-log-list/', WeightBatchingLogListViewSet.as_view()),  # 药品投入统计
     path('product-exchange/', ProductExchange.as_view()),
+    path('weighting-package-expire/', PackageExpireView.as_view()),  # 料包有效期
 
     # 小料称量
     path('xl-recipe/', RecipePreVIew.as_view()),  # 小料配方列表
