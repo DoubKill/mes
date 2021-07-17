@@ -213,6 +213,7 @@ class DepotSiteDataFilter(django_filters.rest_framework.FilterSet):
         model = DepotSite
         fields = ('id',)
 
+
 class SulfurDepotSiteFilter(django_filters.rest_framework.FilterSet):
     """硫磺库库位过滤器"""
     id = django_filters.CharFilter(field_name='depot__id')
@@ -220,6 +221,7 @@ class SulfurDepotSiteFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = SulfurDepotSite
         fields = ('id',)
+
 
 class DepotDataFilter(django_filters.rest_framework.FilterSet):
     """线边库出入库数据过滤器"""
@@ -259,6 +261,7 @@ class SulfurDataFilter(django_filters.rest_framework.FilterSet):
         model = Sulfur
         fields = ['name', 'product_no', 'provider', 'lot_no', 'depot_name', 'depot_site_name', 's_time', 'e_time']
 
+
 class DepotSulfurFilter(django_filters.rest_framework.FilterSet):
     """硫磺库库存查询过滤器"""
     name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
@@ -269,6 +272,7 @@ class DepotSulfurFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = Sulfur
         fields = ['name', 'product_no', 'provider', 'lot_no']
+
 
 class SulfurResumeFilter(django_filters.rest_framework.FilterSet):
     """硫磺库出入库履历过滤器"""

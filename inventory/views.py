@@ -2773,6 +2773,7 @@ class SulfurResumeModelViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filter_class = SulfurResumeFilter
 
+
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventory(ListAPIView):
     """

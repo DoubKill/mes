@@ -561,7 +561,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
     """
     queryset = LabelPrint.objects.all()
     serializer_class = LabelPrintSerializer
-    permission_classes = (IsAuthenticated, )
+    # permission_classes = (IsAuthenticated, )
 
     def create(self, request, *args, **kwargs):
         lot_no_list = request.data.get('lot_no')
@@ -591,6 +591,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
         if instance:
             instance.status = 2
+            instance.save()
             serializer = self.get_serializer(instance)
             data = serializer.data
         else:

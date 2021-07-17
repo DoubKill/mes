@@ -1340,6 +1340,7 @@ class DepotPalltModelSerializer(serializers.ModelSerializer):
         model = DepotPallt
         fields = ['product_no', 'begin_trains', 'end_trains', 'actual_weight']
 
+
 class DepotPalltInfoModelSerializer(serializers.ModelSerializer):
     product_no = serializers.ReadOnlyField(source='pallet_data.product_no')
     depot_site_name = serializers.ReadOnlyField(source='depot_site.depot_site_name')
@@ -1418,11 +1419,13 @@ class DepotSulfurModelSerializer(serializers.ModelSerializer):
         model = Sulfur
         fields = ['name', 'product_no', 'provider', 'lot_no']
 
+
 class DepotSulfurInfoModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sulfur
         fields = ['depot_name', 'depot_site_name']
+
 
 class SulfurResumeModelSerializer(serializers.ModelSerializer):
     """硫磺库履历"""
