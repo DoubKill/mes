@@ -2,11 +2,10 @@ import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, MixGumOutInventoryLog, MixGumInInventoryLog, \
-    DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, DepotPallt
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, \
+    MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder
 
-from inventory.models import DeliveryPlan, Sulfur, DepotSite, SulfurDepotSite
-from production.models import PalletFeedbacks
+from inventory.models import DeliveryPlan
 
 
 class PutPlanManagementFilter(django_filters.rest_framework.FilterSet):
@@ -208,102 +207,3 @@ class FinalRubberyOutBoundOrderFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = FinalRubberyOutBoundOrder
         fields = ['order_no', 'status']
-
-
-class PalletDataFilter(django_filters.rest_framework.FilterSet):
-    """库存数据过滤器"""
-    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号', lookup_expr='icontains')
-    product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号', lookup_expr='icontains')
-    classes = django_filters.CharFilter(field_name="classes", help_text='班次', lookup_expr='icontains')
-    factory_date = django_filters.DateTimeFilter(field_name="factory_date", help_text="工厂日期", lookup_expr='icontains')
-
-    class Meta:
-        model = PalletFeedbacks
-        fields = ('equip_no', 'product_no', "classes", "factory_date")
-
-
-class DepotSiteDataFilter(django_filters.rest_framework.FilterSet):
-    """线边库库位过滤器"""
-    id = django_filters.CharFilter(field_name='depot__id')
-
-    class Meta:
-        model = DepotSite
-        fields = ('id',)
-
-class SulfurDepotSiteFilter(django_filters.rest_framework.FilterSet):
-    """硫磺库库位过滤器"""
-    id = django_filters.CharFilter(field_name='depot__id')
-
-    class Meta:
-        model = SulfurDepotSite
-        fields = ('id',)
-
-class DepotDataFilter(django_filters.rest_framework.FilterSet):
-    """线边库出入库数据过滤器"""
-    product_no = django_filters.CharFilter(field_name='pallet_data__product_no', help_text='胶料编码', lookup_expr='icontains')
-    depot = django_filters.CharFilter(field_name='depot_site__depot__id', help_text='库区')
-    depot_site = django_filters.CharFilter(field_name='depot_site__id', help_text='库位')
-
-    class Meta:
-        model = DepotPallt
-        fields = ('product_no', 'depot', 'depot_site')
-
-
-class DepotResumeFilter(django_filters.rest_framework.FilterSet):
-    """线边库出入库履历过滤器"""
-    product_no = django_filters.CharFilter(field_name='pallet_data__product_no', help_text='产出胶料编号', lookup_expr='icontains')
-    equip_no = django_filters.CharFilter(field_name='pallet_data__equip_no', help_text='机号', lookup_expr='icontains')
-    classes = django_filters.CharFilter(field_name="pallet_data__classes", help_text='班次', lookup_expr='icontains')
-    factory_date = django_filters.DateTimeFilter(field_name="pallet_data__factory_date", help_text="工厂日期", lookup_expr='icontains')
-
-    class Meta:
-        model = DepotPallt
-        fields = ('product_no', 'equip_no', "classes", "factory_date")
-
-
-class SulfurDataFilter(django_filters.rest_framework.FilterSet):
-    """硫磺库出入库过滤器"""
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains')
-    provider = django_filters.CharFilter(field_name='provider', lookup_expr='icontains')
-    lot_no = django_filters.CharFilter(field_name='lot_no', lookup_expr='icontains')
-    depot_name = django_filters.CharFilter(field_name='depot_site__depot__depot_name', help_text='库区')
-    depot_site_name = django_filters.CharFilter(field_name='depot_site__depot_site_name', help_text='库位')
-    s_time = django_filters.DateTimeFilter(field_name='enter_time', lookup_expr='gte')
-    e_time = django_filters.DateTimeFilter(field_name='enter_time', lookup_expr='lte')
-
-    class Meta:
-        model = Sulfur
-        fields = ['name', 'product_no', 'provider', 'lot_no', 'depot_name', 'depot_site_name', 's_time', 'e_time']
-
-
-class DepotSulfurFilter(django_filters.rest_framework.FilterSet):
-    """硫磺库库存查询过滤器"""
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains')
-    provider = django_filters.CharFilter(field_name='provider', lookup_expr='icontains')
-    lot_no = django_filters.CharFilter(field_name='lot_no', lookup_expr='icontains')
-
-    class Meta:
-        model = Sulfur
-        fields = ['name', 'product_no', 'provider', 'lot_no']
-
-
-class SulfurResumeFilter(django_filters.rest_framework.FilterSet):
-    """硫磺库出入库履历过滤器"""
-    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
-    product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains')
-    provider = django_filters.CharFilter(field_name='provider', lookup_expr='icontains')
-    lot_no = django_filters.CharFilter(field_name='lot_no', lookup_expr='icontains')
-
-    depot_name = django_filters.CharFilter(field_name='depot_site__depot__depot_name', help_text='库区')
-    depot_site_name = django_filters.CharFilter(field_name='depot_site__depot_site_name', help_text='库位')
-    s_etime = django_filters.DateTimeFilter(field_name='enter_time', lookup_expr='gte')
-    e_etime = django_filters.DateTimeFilter(field_name='enter_time', lookup_expr='lte')
-    s_otime = django_filters.DateTimeFilter(field_name='outer_time', lookup_expr='gte')
-    e_otime = django_filters.DateTimeFilter(field_name='outer_time', lookup_expr='lte')
-
-    class Meta:
-        model = Sulfur
-        fields = ['name', 'product_no', 'provider', 'lot_no', 'sulfur_status', 'enter_time', 'outer_time',
-                  'depot_name', 'depot_site_name']

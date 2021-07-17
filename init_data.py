@@ -637,41 +637,6 @@ permission_data = [
     {'id': 488, 'code': 'add_product_report_value', 'name': '新增', 'parent_id': 486},
 
     # 下个权限id值从495开始
-    {'id': 495, 'code': 'depot', 'name': '线边库库区库位管理', 'parent_id': None},
-    {'id': 496, 'code': 'view_depot', 'name': '查看库区', 'parent_id': 495},
-    {'id': 497, 'code': 'add_depot', 'name': '新增库区', 'parent_id': 495},
-    {'id': 498, 'code': 'change_depot', 'name': '修改库区', 'parent_id': 495},
-    {'id': 499, 'code': 'addSite_depot', 'name': '新增库位', 'parent_id': 495},
-    {'id': 500, 'code': 'changeSite_depot', 'name': '修改库位', 'parent_id': 495},
-
-    {'id': 501, 'code': 'pallet_data', 'name': '线边库出入库管理', 'parent_id': None},
-    {'id': 502, 'code': 'view_pallet_data', 'name': '查看', 'parent_id': 501},
-    {'id': 503, 'code': 'outer_pallet_data', 'name': '出库', 'parent_id': 501},
-    {'id': 504, 'code': 'enter_pallet_data', 'name': '入库', 'parent_id': 501},
-
-    {'id': 505, 'code': 'depot_pallet', 'name': '线边库库存查询管理', 'parent_id': None},
-    {'id': 506, 'code': 'view_depot_pallet', 'name': '查看', 'parent_id': 505},
-
-    {'id': 507, 'code': 'depot_resume', 'name': '线边库履历管理', 'parent_id': None},
-    {'id': 508, 'code': 'view_depot_resume', 'name': '查看', 'parent_id': 507},
-
-    {'id': 509, 'code': 'sulfur_depot', 'name': '硫磺库库区库位管理', 'parent_id': None},
-    {'id': 510, 'code': 'view_sulfur_depot', 'name': '查看库区', 'parent_id': 509},
-    {'id': 511, 'code': 'add_sulfur_depot', 'name': '新增库区', 'parent_id': 509},
-    {'id': 512, 'code': 'change_sulfur_depot', 'name': '修改库区', 'parent_id': 509},
-    {'id': 513, 'code': 'addSite_sulfur_depot', 'name': '新增库位', 'parent_id': 509},
-    {'id': 514, 'code': 'changeSite_sulfur_depot', 'name': '修改库位', 'parent_id': 509},
-
-    {'id': 515, 'code': 'sulfur_data', 'name': '硫磺库出入库管理', 'parent_id': None},
-    {'id': 516, 'code': 'view_sulfur_data', 'name': '查看', 'parent_id': 515},
-    {'id': 517, 'code': 'outer_sulfur_data', 'name': '出库', 'parent_id': 515},
-    {'id': 518, 'code': 'enter_sulfur_data', 'name': '入库', 'parent_id': 515},
-
-    {'id': 519, 'code': 'depot_sulfur', 'name': '硫磺库库存查询管理', 'parent_id': None},
-    {'id': 520, 'code': 'view_depot_sulfur', 'name': '查看', 'parent_id': 519},
-
-    {'id': 521, 'code': 'sulfur_resume', 'name': '硫磺库履历管理', 'parent_id': None},
-    {'id': 522, 'code': 'view_sulfur_resume', 'name': '查看', 'parent_id': 521},
 ]
 
 

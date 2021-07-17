@@ -1,11 +1,9 @@
 from django.db import models
-from django.db.models import Q, Count
 
 # Create your models here.
 from basics.models import GlobalCode, Equip
 from recipe.models import Material, ProductBatching
 from system.models import AbstractEntity, User
-from production.models import PalletFeedbacks
 
 
 class WarehouseInfo(AbstractEntity):
@@ -929,117 +927,3 @@ class FinalGumInInventoryLog(models.Model):
     class Meta:
         db_table = 'v_ASRS_LOG_IN_OPREATE_MESVIEW'
         managed = False
-
-
-class Depot(models.Model):
-    """线边库 库区表"""
-    depot_name = models.CharField(max_length=64, help_text='库区名称', verbose_name='库区名称', unique=True)
-    description = models.CharField(max_length=64, help_text='库区描述', verbose_name='库区描述')
-
-    def __str__(self):
-        return self.depot_name
-
-    class Meta:
-        db_table = 'depot'
-        verbose_name_plural = verbose_name = '库区'
-
-
-class DepotSite(models.Model):
-    """线边库 库位表"""
-    depot_site_name = models.CharField(max_length=64, help_text='库位名称', verbose_name='库位名称', unique=True)
-    description = models.CharField(max_length=64, help_text='库位描述', verbose_name='库位描述')
-    depot = models.ForeignKey(Depot, on_delete=models.CASCADE, related_name='depot')
-
-    def __str__(self):
-        return self.depot_site_name
-
-    class Meta:
-        db_table = 'depot_site'
-        verbose_name_plural = verbose_name = '库位'
-
-    @property
-    def depot_name(self):
-        return self.depot.depot_name
-
-
-class DepotPallt(models.Model):
-    """线边库 出入库数据"""
-    status = (
-        (1, '入库'),
-        (2, '出库')
-    )
-    enter_time = models.DateTimeField(help_text='入库时间', verbose_name='入库时间', blank=True,null=True)
-    outer_time = models.DateTimeField(help_text='出库时间', verbose_name='出库时间', blank=True,null=True)
-    pallet_status = models.SmallIntegerField(choices=status, help_text='状态', verbose_name='状态', null=True, blank=True)
-    depot_site = models.ForeignKey(DepotSite, on_delete=models.CASCADE, related_name='depotsite', help_text='库位', verbose_name='库位')
-    pallet_data = models.OneToOneField(PalletFeedbacks, on_delete=models.CASCADE, related_name='palletfeedbacks',
-                                       help_text='托盘', verbose_name='托盘')
-
-    class Meta:
-        db_table = 'depot_pallet'
-        verbose_name_plural = verbose_name = '线边库数据'
-
-    @property
-    def depot_name(self):
-        return self.depot_site.depot.depot_name
-
-    @property
-    def depot_site_name(self):
-        return self.depot_site.depot_site_name
-
-class SulfurDepot(models.Model):
-    """硫磺 库区表"""
-    depot_name = models.CharField(max_length=64, help_text='库区名称', verbose_name='库区名称', unique=True)
-    description = models.CharField(max_length=64, help_text='库区描述', verbose_name='库区描述')
-
-    class Meta:
-        db_table = 'sulfur_depot'
-        verbose_name_plural = verbose_name = '库区'
-
-    def __str__(self):
-        return self.depot_name
-
-
-class SulfurDepotSite(models.Model):
-    """硫磺库 库位表"""
-    depot_site_name = models.CharField(max_length=64, help_text='库位名称', verbose_name='库位名称', unique=True)
-    description = models.CharField(max_length=64, help_text='库位描述', verbose_name='库位描述')
-    depot = models.ForeignKey(SulfurDepot, on_delete=models.CASCADE, related_name='sulfur_depot_site')
-
-    class Meta:
-        db_table = 'sulfur_depot_site'
-        verbose_name_plural = verbose_name = '库位'
-
-    def __str__(self):
-        return self.depot_site_name
-
-
-class Sulfur(models.Model):
-    """硫磺数据"""
-    name = models.CharField(max_length=64, help_text='硫磺名称', verbose_name='硫磺名称')
-    product_no = models.CharField(max_length=64, help_text='物料编码', verbose_name='物料编码')
-    provider = models.CharField(max_length=64, help_text='供应商', verbose_name='供应商')
-    lot_no = models.CharField(max_length=64, help_text='批号', verbose_name='批号', unique=True)
-    status = (
-        (1, '入库'),
-        (2, '出库')
-    )
-    sulfur_status = models.SmallIntegerField(choices=status, help_text='状态', verbose_name='状态', null=True, blank=True)
-    enter_time = models.DateTimeField(help_text='入库时间', verbose_name='入库时间', blank=True,null=True)
-    outer_time = models.DateTimeField(help_text='出库时间', verbose_name='出库时间', blank=True,null=True)
-    depot_site = models.ForeignKey(SulfurDepotSite, on_delete=models.CASCADE, related_name='sulfur', help_text='库位', verbose_name='库位')
-
-    class Meta:
-        db_table = 'sulfur'
-        verbose_name_plural = verbose_name = '硫磺数据'
-
-    def __str__(self):
-        return self.name
-
-    @property
-    def depot_name(self):
-        return self.depot_site.depot.depot_name
-
-    @property
-    def depot_site_name(self):
-        return self.depot_site.depot_site_name
