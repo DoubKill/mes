@@ -72,6 +72,38 @@ router.register(r'inventory-log-out', InventoryLogOutViewSet)
 # 物料条码质量维护
 router.register(r'barcode-quality', BarcodeQualityViewSet)
 
+# 线边库库区
+router.register(r'depot', DepotModelViewSet)
+
+# 线边库库位
+router.register(r'depot-site', DepotSiteModelViewSet)
+
+# 线边库库存查询
+router.register(r'depot-pallet', DepotPalltModelViewSet)
+router.register(r'depot-pallet-info', DepotPalltInfoModelViewSet, basename='depot-pallet-info')
+
+# 线边库出入库管理
+router.register(r'pallet-data', PalletDataModelViewSet)
+
+# 线边库出入库履历
+router.register(r'depot-resume', DepotResumeModelViewSet, basename='depot-resume')
+
+# 硫磺库库区
+router.register(r'sulfur-depot', SulfurDepotModelViewSet)
+
+# 硫磺库库位
+router.register(r'sulfur-depot-site', SulfurDepotSiteModelViewSet)
+
+# 硫磺出入库管理
+router.register(r'sulfur-data', SulfurDataModelViewSet, basename='sulfur-data')
+
+# 硫磺库库存查询
+router.register(r'depot-sulfur', DepotSulfurModelViewSet, basename='depot-sulfur')
+router.register(r'depot-sulfur-info', DepotSulfurInfoModelViewSet, basename='depot-sulfur-info')
+
+# 硫磺库出入库履历
+router.register(r'sulfur-resume', SulfurResumeModelViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('material-trace/', MaterialTraceView.as_view()),  # 原材料条码追溯
@@ -121,4 +153,10 @@ urlpatterns = [
 
     path('product-station-statics/', InventoryStaticsView.as_view()),  # 胶种库存分段统计
     path('product-details/', ProductDetailsView.as_view()),            # 胶料车间库存明细
+
+    # 线边库快检信息
+    path('pallet-test-result/', PalletTestResultView.as_view())
 ]
+
+
+
