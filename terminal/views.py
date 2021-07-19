@@ -258,16 +258,15 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         batch_material = self.get_object()
         serializer = self.get_serializer(batch_material, data=request.data)
         if not serializer.is_valid():
-            return Response(data={'success': False, 'message': list(serializer.errors.values())[0][0]},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return response(success=False, message=list(serializer.errors.values())[0][0])
         if batch_material.unit == '包' and isinstance(left_weight, float):
-            return Response(data={'success': False, 'message': '包数应为整数'}, status=status.HTTP_400_BAD_REQUEST)
+            return response(success=False, message='包数应为整数')
         # 获得本次修正量,修改真正计算的总量
         change_num = batch_material.adjust_left_weight - left_weight
         batch_material.real_weight = batch_material.real_weight - change_num
         self.perform_update(serializer)
         batch_material.save()
-        return Response(data={'success': True, 'message': '修正成功'}, status=status.HTTP_200_OK)
+        return response(success=True, message='修正成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
