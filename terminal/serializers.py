@@ -298,14 +298,14 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         # 打印数量判断
         if print_count <= 0 or print_count > package_count or not isinstance(print_count, int):
             serializers.ValidationError('打印张数需小于等于配置数量')
-        # weight_type_record = WeighCntType.objects.filter(product_batching__stage_product_batch_no=product_no.split('(')[0], package_type=1)
-        # if weight_type_record:
-        #     attrs['material_no'] = weight_type_record.first().name
-        #     attrs['material_name'] = attrs['material_name']
-        # else:
-        #     raise serializers.ValidationError('称量系统计划中配方名称未找到对应料包名')
-        attrs['material_no'] = product_no + '(' + dev_type + ')'
-        attrs['material_name'] = attrs['material_no']
+        weight_type_record = WeighCntType.objects.filter(product_batching__stage_product_batch_no=product_no.split('(')[0], package_type=1)
+        if weight_type_record:
+            attrs['material_no'] = weight_type_record.first().name
+            attrs['material_name'] = attrs['material_name']
+        else:
+            raise serializers.ValidationError('称量系统计划中配方名称未找到对应料包名')
+        # attrs['material_no'] = product_no + '(' + dev_type + ')'
+        # attrs['material_name'] = attrs['material_no']
         # 配料时间
         batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).savetime
         # 计算有效期
