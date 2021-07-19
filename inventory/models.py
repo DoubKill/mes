@@ -221,6 +221,25 @@ class WmsInventoryMaterial(models.Model):
         managed = False
 
 
+class MixinRubberyOutBoundOrder(AbstractEntity):
+    """混炼胶出库单据"""
+    STATUS_CHOICE = (
+        (1, '已创建'),
+        (2, '等待出库'),
+        (3, '已出库'),
+        (4, '关闭'),
+        (5, '失败')
+    )
+    warehouse_name = models.CharField(max_length=64, help_text='仓库名称')
+    order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
+    order_no = models.CharField(max_length=64, verbose_name='出库单号', help_text='出库单号', unique=True)
+    status = models.PositiveIntegerField(verbose_name='状态', help_text='状态', choices=STATUS_CHOICE, default=1)
+
+    class Meta:
+        db_table = 'mixin_rubber_outbound_order'
+        verbose_name_plural = verbose_name = '混炼胶出库单据'
+
+
 class DeliveryPlan(AbstractEntity):
     """出库计划 | 混炼胶"""
     ORDER_TYPE_CHOICE = (
@@ -230,6 +249,8 @@ class DeliveryPlan(AbstractEntity):
         (4, '新建'),
         (5, '关闭')
     )
+    outbound_order = models.ForeignKey(MixinRubberyOutBoundOrder, help_text='出库单据',
+                                       on_delete=models.SET_NULL, null=True, related_name='mixin_plans')
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plans")
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
@@ -249,6 +270,8 @@ class DeliveryPlan(AbstractEntity):
                                    related_name='dispatch_mix_deliverys')
     dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='equip_mix_deliverys')
+    lot_no = models.CharField(max_length=64, help_text='托盘号', blank=True, null=True)
+    memo = models.CharField(max_length=64, help_text='车号', blank=True, null=True)
 
     class Meta:
         db_table = 'delivery_plan'
@@ -290,6 +313,25 @@ class DeliveryPlanLB(AbstractEntity):
         verbose_name_plural = verbose_name = '帘布库出库计划'
 
 
+class FinalRubberyOutBoundOrder(AbstractEntity):
+    """终炼胶出库单据"""
+    STATUS_CHOICE = (
+        (1, '已创建'),
+        (2, '等待出库'),
+        (3, '已出库'),
+        (4, '关闭'),
+        (5, '失败')
+    )
+    warehouse_name = models.CharField(max_length=64, help_text='仓库名称')
+    order_type = models.CharField(max_length=32, verbose_name='订单类型', help_text='订单类型', blank=True, null=True)
+    order_no = models.CharField(max_length=64, verbose_name='出库单号', help_text='出库单号', unique=True)
+    status = models.PositiveIntegerField(verbose_name='状态', help_text='状态', choices=STATUS_CHOICE, default=1)
+
+    class Meta:
+        db_table = 'final_rubber_outbound_order'
+        verbose_name_plural = verbose_name = '终炼胶出库单据'
+
+
 class DeliveryPlanFinal(AbstractEntity):
     """出库计划 | 终炼"""
     ORDER_TYPE_CHOICE = (
@@ -299,6 +341,8 @@ class DeliveryPlanFinal(AbstractEntity):
         (4, '新建'),
         (5, '关闭')
     )
+    outbound_order = models.ForeignKey(FinalRubberyOutBoundOrder, help_text='出库单据',
+                                       on_delete=models.SET_NULL, null=True, related_name='final_plans')
     warehouse_info = models.ForeignKey(WarehouseInfo, on_delete=models.CASCADE, related_name="delivery_plans_final")
     order_no = models.CharField(max_length=64, verbose_name='订单号', help_text='订单号')
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
@@ -318,6 +362,8 @@ class DeliveryPlanFinal(AbstractEntity):
                                    related_name='dispatch_final_deliverys')
     dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='equip_final_deliverys')
+    lot_no = models.CharField(max_length=64, help_text='托盘号', blank=True, null=True)
+    memo = models.CharField(max_length=64, help_text='车号', blank=True, null=True)
 
     class Meta:
         db_table = 'delivery_plan_final'
