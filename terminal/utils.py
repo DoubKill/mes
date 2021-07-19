@@ -100,7 +100,7 @@ class INWeighSystem(object):
 class TankStatusSync(INWeighSystem):
 
     def __init__(self, equip_no: str):
-        self.queryset = WeightTankStatus.objects.using(equip_no).filter(equip_no=equip_no)
+        self.queryset = WeightTankStatus.objects.filter(equip_no=equip_no)
         self.equip_no = equip_no
         super(TankStatusSync, self).__init__(equip_no)
 
