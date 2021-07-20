@@ -64,7 +64,6 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         destination = ",".join(set(equip_list + dispatch_list))
         return destination
 
-    @atomic()
     def create(self, validated_data):
         location = validated_data.get("location")
         if DeliveryPlan.objects.filter(location=location, status=4).exists():
@@ -421,7 +420,6 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
         destination = ",".join(set(equip_list + dispatch_list))
         return destination
 
-    @atomic()
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")

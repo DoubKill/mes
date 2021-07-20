@@ -180,9 +180,8 @@ def main():
                             mes_result = '三等品'
                             level = 2
                     else:
-                        mes_result = '三等品'
-                        level = 2
-
+                        logger.error('该胶料{}实验方法{}不存在!'.format(product_no, method_name))
+                        continue
                     if not MaterialTestResult.objects.filter(
                             material_test_order=test_order,
                             test_times=test_times,
@@ -203,7 +202,9 @@ def main():
                             test_group=test_group,
                             level=level,
                             test_class=production_class,
-                            origin=config.id)
+                            origin=config.id,
+                            is_judged=material_test_method.is_judged
+                        )
             conn.close()
             min_id += 1000
 

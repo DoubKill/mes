@@ -106,6 +106,7 @@ class MaterialTestMethod(AbstractEntity):
     material = models.ForeignKey(Material, help_text='原材料', on_delete=models.CASCADE, related_name='mat_methods')
     test_method = models.ForeignKey(TestMethod, help_text='试验方法', on_delete=models.CASCADE)
     data_point = models.ManyToManyField(DataPoint, help_text='数据点', related_name='point_methods')
+    is_judged = models.BooleanField(help_text='是否做为判定', default=True)
 
     def __str__(self):
         return self.test_method.name
@@ -258,6 +259,7 @@ class MaterialTestResult(AbstractEntity):
     origin = models.IntegerField(help_text='数据来源', default=0)
     is_passed = models.BooleanField(help_text='是否通过pass章', default=False)
     pass_suggestion = models.CharField(max_length=64, help_text='pass意见', blank=True, null=True)
+    is_judged = models.BooleanField(help_text='是否做为判定', default=True)
 
     class Meta:
         db_table = 'material_test_result'

@@ -68,7 +68,7 @@ def judge_standard_error_deal_suggestion(data_point_name, product_no, value, tes
 def batching_post_save(sender, instance=None, created=False, update_fields=None, **kwargs):
     # 等级综合判定
     try:
-        if created:
+        if created and instance.is_judged:
             # 取test_order
             material_test_order = instance.material_test_order
 
@@ -79,7 +79,7 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             # 判断该test_order是否合格：根据最后数据点的检测值等级等级大于1判断
             if max_result_ids:
-                test_results = MaterialTestResult.objects.filter(id__in=max_result_ids)
+                test_results = MaterialTestResult.objects.filter(id__in=max_result_ids, is_judged=True)
                 if test_results.filter(level__gt=1).exists():
                     material_test_order.is_qualified = False
                 else:
@@ -106,8 +106,8 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 MaterialTestResult.objects.filter(id=instance.id).update(is_passed=False)
 
             # 判断该test_order是否pass：根据这最新所有数据点通过pass章的数量和不合格的数据点是否都等于1，是的话更新is_passed字段为true
-            test_order_passed_count = MaterialTestResult.objects.filter(id__in=max_result_ids, is_passed=True).count()
-            test_order_unqualified_count = MaterialTestResult.objects.filter(id__in=max_result_ids, level__gt=1).count()
+            test_order_passed_count = MaterialTestResult.objects.filter(id__in=max_result_ids, is_passed=True, is_judged=True).count()
+            test_order_unqualified_count = MaterialTestResult.objects.filter(id__in=max_result_ids, level__gt=1, is_judged=True).count()
             if test_order_passed_count == test_order_unqualified_count == 1:
                 material_test_order.is_passed = True
             else:
@@ -142,11 +142,13 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 level = 1
                 test_result = 'PASS'
                 last_result_ids = list(MaterialTestResult.objects.filter(
+                    is_judged=True,
                     material_test_order__lot_no=lot_no).values(
                     'material_test_order', 'test_indicator_name', 'data_point_name'
                 ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
                 # 取该托唯一一个pass章的数据点
                 passed_result = MaterialTestResult.objects.filter(
+                    is_judged=True,
                     id__in=last_result_ids,
                     is_passed=True).last()
                 deal_suggestion = getattr(passed_result, 'pass_suggestion', '放行')
