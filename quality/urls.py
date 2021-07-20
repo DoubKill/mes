@@ -93,6 +93,8 @@ router.register('material-report-equip', MaterialReportEquipViewSet)
 # 原材料数据上报
 router.register('material-report-value', MaterialReportValueViewSet)
 
+router.register('product-test-plan', ProductTestPlanViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('batching-materials/', ProductBatchingMaterialListView.as_view()),  # 胶料原材料列表

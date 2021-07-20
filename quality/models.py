@@ -436,7 +436,8 @@ class ProductTestPlan(AbstractEntity):
         (4, '强制结束')
     )
     plan_uid = models.CharField(max_length=64, help_text='计划编码')
-    test_equip_no = models.CharField(max_length=64, help_text='检测机台')
+    test_equip = models.ForeignKey(ProductReportEquip, on_delete=models.CASCADE, help_text='检测机台',
+                                      related_name="product_test_plan")
     test_time = models.DateTimeField(help_text='检测时间')
     test_classes = models.CharField(max_length=64, help_text='检测班次')
     test_group = models.CharField(max_length=64, help_text='检测班组')

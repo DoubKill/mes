@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue
+    ProductReportValue, ProductTestPlan
 from recipe.models import MaterialAttribute
 
 
@@ -1543,4 +1543,10 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
             'recorder': {'read_only': True},
             'material': {'read_only': True},
         }
+        fields = '__all__'
+
+class ProductTestPlanSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductTestPlan
         fields = '__all__'

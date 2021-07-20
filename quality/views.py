@@ -43,7 +43,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
-    ProductReportEquip, ProductReportValue
+    ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -57,7 +57,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
-    MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer
+    MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
+    ProductTestPlanSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1937,3 +1938,34 @@ class ReportValueView(APIView):
         except Exception:
             raise ValidationError('参数错误')
         return Response('上报成功！')
+
+
+class ProductTestPlanViewSet(mixins.CreateModelMixin,
+                        mixins.UpdateModelMixin,
+                        GenericViewSet):
+
+    queryset = ProductTestPlan.objects.all()
+    serializer_class = ProductTestPlanSerializer
+
+    def create(self, request, *args, **kwargs):
+        # 添加检测计划
+        data = request.data
+
+        plan = data['test'] # 检测计划
+        test_equip1 = plan['test_equip']
+        test_equip = ProductReportEquip.objects.filter(no=test_equip1).first()
+        plan['test_equip'] = test_equip
+
+        s = 'M' if plan['test_indicator_name'] == '门尼' else 'S'
+        plan_uid = f"{s}{test_equip1}{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        product_plan = ProductTestPlan.objects.create(**plan, test_time=datetime.datetime.now(), status=1, plan_uid=plan_uid)
+        print(product_plan)
+        # 添加计划详情
+
+        product = data['product']
+        for item in product:
+            production_group = 'A'
+            ProductTestPlanDetail.objects.create(test_plan=product_plan, **item, production_group=production_group)
+
+        return Response('添加成功')
