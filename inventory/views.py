@@ -994,6 +994,7 @@ class PutPlanManagement(ModelViewSet):
     filter_class = PutPlanManagementFilter
     permission_classes = (IsAuthenticated, )
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         order = MixinRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
@@ -1061,6 +1062,7 @@ class PutPlanManagementFianl(ModelViewSet):
     filter_class = PutPlanManagementFinalFilter
     permission_classes = (IsAuthenticated,)
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         order = FinalRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',

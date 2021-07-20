@@ -193,6 +193,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 data_point__name=item['data_point_name'],
                 data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
             if material_test_method:
+                item['is_judged'] = material_test_method.is_judged
                 indicator = MaterialDataPointIndicator.objects.filter(
                     material_test_method=material_test_method,
                     data_point__name=item['data_point_name'],
@@ -207,8 +208,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['mes_result'] = '三等品'
                     item['level'] = 2
             else:
-                item['mes_result'] = '三等品'
-                item['level'] = 2
+                raise serializers.ValidationError('该胶料实验方法不存在！')
             item['created_user'] = self.context['request'].user  # 加一个create_user
             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
@@ -475,8 +475,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids).order_by('test_indicator_name',
-                                                                                             'data_point_name')
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids, is_judged=True).order_by('test_indicator_name',
+                                                                                      'data_point_name')
             for test_result in test_results:
                 if test_result.level == 1:
                     result = '合格'
