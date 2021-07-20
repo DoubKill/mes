@@ -2,7 +2,8 @@ import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, \
+    MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder
 
 from inventory.models import DeliveryPlan
 
@@ -18,7 +19,7 @@ class PutPlanManagementFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = DeliveryPlan
-        fields = ('st', 'et', 'status', 'material_no', 'name', 'station')
+        fields = ('st', 'et', 'status', 'material_no', 'name', 'station', 'outbound_order')
 
 
 class PutPlanManagementLBFilter(django_filters.rest_framework.FilterSet):
@@ -46,7 +47,7 @@ class PutPlanManagementFinalFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = DeliveryPlanFinal
-        fields = ('st', 'et', 'status', 'material_no', 'name', 'station')
+        fields = ('st', 'et', 'status', 'material_no', 'name', 'station', 'outbound_order')
 
 
 class MaterialPlanManagementFilter(django_filters.rest_framework.FilterSet):
@@ -190,3 +191,19 @@ class BarcodeQualityFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = BarcodeQuality
         fields = ['material_type', 'material_no', 'material_name', 'barcode']
+
+
+class MixinRubberyOutBoundOrderFilter(django_filters.rest_framework.FilterSet):
+    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains')
+
+    class Meta:
+        model = MixinRubberyOutBoundOrder
+        fields = ['order_no', 'status']
+
+
+class FinalRubberyOutBoundOrderFilter(django_filters.rest_framework.FilterSet):
+    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains')
+
+    class Meta:
+        model = FinalRubberyOutBoundOrder
+        fields = ['order_no', 'status']

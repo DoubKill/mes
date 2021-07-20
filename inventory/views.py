@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import random
+import time
 from io import BytesIO
 
 import requests
@@ -17,6 +18,8 @@ from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import ListAPIView
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin, RetrieveModelMixin
+from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -25,19 +28,21 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
-    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter
+    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, PutPlanManagementFinalFilter, \
+    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter,\
+    MixinRubberyOutBoundOrderFilter, FinalRubberyOutBoundOrderFilter
+
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
     MaterialInHistory, MaterialInventoryLog, FinalGumOutInventoryLog, \
-    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan
+    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
-    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
-    InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
+    DispatchLogSerializer, DispatchLocationSerializer, PutPlanManagementSerializerFinal, \
+    InventoryLogOutSerializer, MixinRubberyOutBoundOrderSerializer, FinalRubberyOutBoundOrderSerializer, \
     MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer, \
     CarbonPlanManagementSerializer
 from inventory.models import WmsInventoryStock
@@ -223,7 +228,6 @@ class ProductInventory(GenericViewSet,
 class OutWorkFeedBack(APIView):
 
     # 出库反馈
-    @atomic
     def post(self, request):
         """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
         生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
@@ -295,6 +299,15 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
+                    outbound_order = dp_obj.outbound_order
+                    if hasattr(outbound_order, 'final_plans'):
+                        if not outbound_order.final_plans.filter(status__gt=1).exists():
+                            outbound_order.status = 3
+                            outbound_order.save()
+                    else:
+                        if not outbound_order.mixin_plans.filter(status__gt=1).exists():
+                            outbound_order.status = 3
+                            outbound_order.save()
                 il_dict = {}
                 il_dict['warehouse_no'] = dp_obj.warehouse_info.no
                 il_dict['warehouse_name'] = dp_obj.warehouse_info.name
@@ -323,7 +336,7 @@ class OutWorkFeedBack(APIView):
             try:
                 MaterialInventory.objects.create(**material_inventory_dict)
             except Exception as e:
-                logger.error(str(e) + "data: " + json.dumps(material_inventory_dict))
+                logger.error(str(e))
             try:
                 InventoryLog.objects.create(**data, **il_dict)
             except Exception as e:
@@ -936,6 +949,36 @@ class MaterialInventoryAPIView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class MixinRubberyOutBoundOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    """
+    list:
+        混炼胶出库单列表
+    update
+         出库/关闭出库
+    """
+    queryset = MixinRubberyOutBoundOrder.objects.filter().order_by("-created_date")
+    serializer_class = MixinRubberyOutBoundOrderSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = MixinRubberyOutBoundOrderFilter
+    permission_classes = (IsAuthenticated, )
+
+
+@method_decorator([api_recorder], name="dispatch")
+class FinalRubberyOutBoundOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    """
+    list:
+        终炼胶出库单列表
+    update
+         出库/关闭出库
+    """
+    queryset = FinalRubberyOutBoundOrder.objects.filter().order_by("-created_date")
+    serializer_class = FinalRubberyOutBoundOrderSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = FinalRubberyOutBoundOrderFilter
+    permission_classes = (IsAuthenticated, )
+
+
+@method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
     """
     list:
@@ -949,15 +992,25 @@ class PutPlanManagement(ModelViewSet):
     serializer_class = PutPlanManagementSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter
+    permission_classes = (IsAuthenticated, )
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
+        order = MixinRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
+                                                         order_type='指定出库',
+                                                         order_no='CK{}'.format(
+                                                             ''.join(str(time.time()).split('.'))),
+                                                         created_user=self.request.user)
         if isinstance(data, list):
+            for item in data:
+                item['outbound_order'] = order.id
             s = PutPlanManagementSerializer(data=data, context={'request': request}, many=True)
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
         elif isinstance(data, dict):
+            data['outbound_order'] = order.id
             s = PutPlanManagementSerializer(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
@@ -1009,14 +1062,23 @@ class PutPlanManagementFianl(ModelViewSet):
     filter_class = PutPlanManagementFinalFilter
     permission_classes = (IsAuthenticated,)
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
+        order = FinalRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
+                                                         order_type='指定出库',
+                                                         order_no='CK{}'.format(
+                                                             ''.join(str(time.time()).split('.'))),
+                                                         created_user=self.request.user)
         if isinstance(data, list):
+            for item in data:
+                item['outbound_order'] = order.id
             s = PutPlanManagementSerializerFinal(data=data, context={'request': request}, many=True)
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
         elif isinstance(data, dict):
+            data['outbound_order'] = order.id
             s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
