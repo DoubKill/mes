@@ -1362,7 +1362,7 @@ class MixinRubberyOutBoundOrderSerializer(BaseModelSerializer):
         elif status == 4:
             instance.status = 4
             instance.save()
-            instance.mixin_plans.filter().update(status=5)
+            instance.mixin_plans.filter(status__gt=1).update(status=5)
         return validated_data
 
     class Meta:
@@ -1428,7 +1428,7 @@ class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
         elif status == 4:
             instance.status = 4
             instance.save()
-            instance.final_plans.filter().update(status=5)
+            instance.final_plans.filter(status__gt=1).update(status=5)
         return validated_data
 
     class Meta:
