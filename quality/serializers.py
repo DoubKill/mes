@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue
+    ProductReportValue, QualifiedRangeDisplay
 from recipe.models import MaterialAttribute
 
 
@@ -463,6 +463,54 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             ret['valid_time'] = expire_time  # 有效期
         else:
             ret['valid_time'] = None
+
+        m_list = ret.pop('mtr_list', [])
+        trains = []
+        indicators = []
+        data_point_range_data = {}
+        for indicator_name, points in m_list['table_head'].items():
+            point_head = []
+            for point in points:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    data_point__name=point,
+                    material_test_method__material__material_name=ret['product_no'],
+                    level=1).first()
+                if indicator:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": indicator.upper_limit,
+                         "lower_limit": indicator.lower_limit}
+                    )
+                    data_point_range_data[point] = [indicator.lower_limit, indicator.upper_limit]
+                else:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": None,
+                         "lower_limit": None}
+                    )
+            indicators.append({'point': indicator_name, 'point_head': point_head})
+
+        for i in m_list:
+            if i != 'table_head':
+                trains.append({'train': i, 'content': m_list[i]})
+                for item in m_list[i]:
+                    if item['result'] == '合格':
+                        item['tag'] = ''
+                    else:
+                        data_point_name = item['data_point_name']
+                        value = item['value']
+                        if not data_point_range_data.get(data_point_name):
+                            item['tag'] = ''
+                        else:
+                            if value > data_point_range_data[data_point_name][1]:
+                                item['tag'] = '+'
+                            elif value < data_point_range_data[data_point_name][0]:
+                                item['tag'] = '-'
+                            else:
+                                item['tag'] = ''
+        mtr_list = {'trains': trains, 'table_head': indicators}
+        ret['mtr_list'] = mtr_list
+        ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
         return ret
 
     def get_mtr_list(self, obj):
