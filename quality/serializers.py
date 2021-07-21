@@ -468,14 +468,15 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
     def get_mtr_list(self, obj):
         ret = {}
         table_head_top = {}
-
+        sort_rules = {'门尼': 1, '硬度': 2, '比重': 3, '流变': 4, '钢拔': 5, '物性': 6}
         test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).order_by('actual_trains')
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids, is_judged=True).order_by('test_indicator_name',
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids,
+                                                             is_judged=True).order_by('test_indicator_name',
                                                                                       'data_point_name')
             for test_result in test_results:
                 if test_result.level == 1:
@@ -506,7 +507,12 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                     table_head_top[test_indicator_name].add(test_result.data_point_name)
                 else:
                     table_head_top[test_indicator_name] = {test_result.data_point_name}
-        ret['table_head'] = table_head_top
+        table_head_top = {key: sorted(list(value)) for key, value in table_head_top.items()}
+        try:
+            table_head_top = sorted(table_head_top.items(), key=lambda d: sort_rules[d[0]])
+        except Exception:
+            pass
+        ret['table_head'] = dict(table_head_top)
         return ret
 
     class Meta:
