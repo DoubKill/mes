@@ -1325,13 +1325,13 @@ class MixinRubberyOutBoundOrderSerializer(BaseModelSerializer):
             json_data = {
                 'msgId': instance.order_no,
                 'OUTTYPE': '快检出库',
-                "msgConut": '1',
+                "msgConut": str(len(items)),
                 "SENDUSER": username,
                 "items": items
             }
             json_data = json.dumps(json_data, ensure_ascii=False)
             sender = OUTWORKUploader(end_type="指定出库")
-            result = sender.request(instance.order_no, '指定出库', '1', username, json_data)
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
             if result is not None:
                 try:
                     items = result['items']
@@ -1391,13 +1391,13 @@ class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
             json_data = {
                 'msgId': instance.order_no,
                 'OUTTYPE': '快检出库',
-                "msgConut": '1',
+                "msgConut": str(len(items)),
                 "SENDUSER": username,
                 "items": items
             }
             json_data = json.dumps(json_data, ensure_ascii=False)
             sender = OUTWORKUploaderLB(end_type="指定出库")
-            result = sender.request(instance.order_no, '指定出库', '1', username, json_data)
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
             if result is not None:
                 try:
                     items = result['items']
