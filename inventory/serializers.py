@@ -66,7 +66,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         location = validated_data.get("location")
-        if DeliveryPlan.objects.filter(location=location, status=4).exists():
+        if DeliveryPlan.objects.filter(location=location, status__in=(2, 4)).exists():
             raise serializers.ValidationError('该库存位{}出库计划已存在，请勿重复添加！'.format(location))
         station = validated_data.get("station")
         # try:
@@ -423,7 +423,7 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        if DeliveryPlanFinal.objects.filter(location=location, status=4).exists():
+        if DeliveryPlanFinal.objects.filter(location=location, status__in=(2, 4)).exists():
             raise serializers.ValidationError('该库存位{}出库计划已存在，请勿重复添加！'.format(location))
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
@@ -1362,7 +1362,7 @@ class MixinRubberyOutBoundOrderSerializer(BaseModelSerializer):
         elif status == 4:
             instance.status = 4
             instance.save()
-            instance.mixin_plans.filter().update(status=5)
+            instance.mixin_plans.filter(status__gt=1).update(status=5)
         return validated_data
 
     class Meta:
@@ -1428,7 +1428,7 @@ class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
         elif status == 4:
             instance.status = 4
             instance.save()
-            instance.final_plans.filter().update(status=5)
+            instance.final_plans.filter(status__gt=1).update(status=5)
         return validated_data
 
     class Meta:
