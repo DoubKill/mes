@@ -605,7 +605,7 @@ class MaterialCount(APIView):
         if store_name == "终炼胶库":
             try:
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
-                    store_name="炼胶库").values(
+                    store_name="炼胶库", lot_no__isnull=False).values(
                     'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
@@ -613,7 +613,7 @@ class MaterialCount(APIView):
         elif store_name == "混炼胶库":
             try:
                 ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
-                    'material_no').annotate(
+                    'material_no', lot_no__isnull=False).annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
                 raise ValidationError(f"混炼胶库连接失败:{e}")
@@ -623,7 +623,7 @@ class MaterialCount(APIView):
                 if status:
                     filter_dict["quality_status"] = status
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
-                    store_name="帘布库").values(
+                    store_name="帘布库", lot_no__isnull=False).values(
                     'material_no', 'material_name').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty',
                                                                                'material_name', 'all_weight')
@@ -2617,6 +2617,7 @@ class BzFinalRubberInventorySearch(ListAPIView):
         except Exception:
             raise ValidationError('参数错误！')
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+            store_name="炼胶库",
             material_no=material_no,
             location_status="有货货位",
             lot_no__isnull=False).order_by('in_storage_time')
