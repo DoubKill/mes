@@ -398,7 +398,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('bz').all()
+            queryset = model.objects.using('bz').filter(location_status='有货货位')
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
@@ -406,7 +406,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('lb').all()
+            queryset = model.objects.using('lb').filter(location_status='有货货位')
             if lot_existed:
                 if lot_existed == '1':
                     queryset = queryset.exclude(lot_no__isnull=True)
@@ -994,6 +994,7 @@ class PutPlanManagement(ModelViewSet):
     filter_class = PutPlanManagementFilter
     permission_classes = (IsAuthenticated, )
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         order = MixinRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
@@ -1061,6 +1062,7 @@ class PutPlanManagementFianl(ModelViewSet):
     filter_class = PutPlanManagementFinalFilter
     permission_classes = (IsAuthenticated,)
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
         order = FinalRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',

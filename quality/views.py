@@ -1305,7 +1305,8 @@ class ImportAndExportView(APIView):
             else:
                 data_point_method_map[data_point_name] = mtm.values('id',
                                                                     'test_method__name',
-                                                                    'test_method__test_type__test_indicator__name')[0]
+                                                                    'test_method__test_type__test_indicator__name',
+                                                                    'is_judged')[0]
                 indicator = MaterialDataPointIndicator.objects.filter(
                     material_test_method=mtm.first(),
                     data_point__name=data_point_name,
@@ -1361,7 +1362,11 @@ class ImportAndExportView(APIView):
             for data_point_name, method in data_point_method_map.items():
                 test_method_name = method['test_method__name']
                 test_indicator_name = method['test_method__test_type__test_indicator__name']
-                point_value = Decimal(item[by_dict[data_point_name]]).quantize(Decimal('0.000'))
+                is_judged = method['is_judged']
+                try:
+                    point_value = Decimal(item[by_dict[data_point_name]]).quantize(Decimal('0.000'))
+                except Exception:
+                    raise ValidationError('检测值{}数据错误'.format(item[by_dict[data_point_name]]))
                 if not point_value:
                     continue
                 result_data = {'material_test_order': instance,
@@ -1373,6 +1378,7 @@ class ImportAndExportView(APIView):
                                'mes_result': '三等品',
                                'result': '三等品',
                                'level': 2,
+                               'is_judged': is_judged
                                }
                 if method.get('qualified_range'):
                     if method['qualified_range'][0] <= point_value <= method['qualified_range'][1]:
