@@ -999,8 +999,7 @@ class PutPlanManagement(ModelViewSet):
         data = request.data
         order = MixinRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
                                                          order_type='指定出库',
-                                                         order_no='CK{}'.format(
-                                                             ''.join(str(time.time()).split('.'))),
+                                                         order_no=''.join(str(time.time()).split('.')),
                                                          created_user=self.request.user)
         if isinstance(data, list):
             for item in data:
@@ -1067,8 +1066,7 @@ class PutPlanManagementFianl(ModelViewSet):
         data = request.data
         order = FinalRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
                                                          order_type='指定出库',
-                                                         order_no='CK{}'.format(
-                                                             ''.join(str(time.time()).split('.'))),
+                                                         order_no=''.join(str(time.time()).split('.')),
                                                          created_user=self.request.user)
         if isinstance(data, list):
             for item in data:
