@@ -637,7 +637,8 @@ class PalletTrainFeedback(APIView):
                     'equip_no': pallet_feed_back.equip_no,
                     'actual_trains': i,
                     'plan_classes_uid': pallet_feed_back.plan_classes_uid,
-                    'factory_date': pallet_feed_back.end_time,
+                    # 'factory_date': pallet_feed_back.end_time,
+                    'factory_date': pallet_feed_back.factory_date,
                     'is_tested': 'Y' if test_order else 'N'
                 }
                 ret.append(data)

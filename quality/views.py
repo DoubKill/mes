@@ -30,13 +30,14 @@ from mes.common_code import CommonDeleteMixin, date_range, get_template_response
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
+from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
-    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter
+    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
@@ -58,7 +59,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
     MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
-    ProductTestPlanSerializer
+    ProductTestPlanSerializer, ProductTEstResumeSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1450,9 +1451,23 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
     """胶料上报设备管理"""
     queryset = ProductReportEquip.objects.all()
     serializer_class = ProductReportEquipSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductReportEquipFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if request.query_params.get('all'):
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1940,32 +1955,134 @@ class ReportValueView(APIView):
         return Response('上报成功！')
 
 
-class ProductTestPlanViewSet(mixins.CreateModelMixin,
-                        mixins.UpdateModelMixin,
-                        GenericViewSet):
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestPlanViewSet(ModelViewSet):
 
+    """门尼检测计划"""
     queryset = ProductTestPlan.objects.all()
     serializer_class = ProductTestPlanSerializer
 
+    def list(self, request, *args, **kwargs):
+        if request.query_params.get('close'):
+            res = ProductTestPlan.objects.filter(plan_uid=request.query_params.get('plan_uid')).update(status=4)
+            results = '结束检测' if res else '任务不存在'
+            return Response(results)
+        elif request.query_params.get('test_equip'):
+            queryset = ProductTestPlan.objects.filter(status=1, test_equip__no=request.query_params.get('test_equip')) # 只显示待检测的
+        elif request.query_params.get('plan_uid'):
+            queryset = ProductTestPlan.objects.filter(plan_uid=request.query_params.get('plan_uid'))
+            for obj in queryset:
+                if obj.status == 2:
+                    serializer = self.get_serializer(queryset, many=True)
+                    return Response({'msg': '全部检测完成', 'results': serializer.data})
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({'results': serializer.data})
+
     def create(self, request, *args, **kwargs):
-        # 添加检测计划
-        data = request.data
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        # 判断有没有计划正在执行
+        obj = ProductTestPlan.objects.filter(status=1).first()
+        if obj:
+            return Response('当前有计划正在执行')
+        test_indicator_name = serializer.data.get('test_indicator_name')
+        test_equip = serializer.data.get('test_equip')
 
-        plan = data['test'] # 检测计划
-        test_equip1 = plan['test_equip']
-        test_equip = ProductReportEquip.objects.filter(no=test_equip1).first()
-        plan['test_equip'] = test_equip
+        s = 'M' if test_indicator_name == '门尼' else 'L'
+        plan_uid = f"{s}{test_equip}{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        product_list = serializer.validated_data.pop('product_test_plan_detail')
+        data = serializer.data
+        data.pop('product_test_plan_detail')
+        test_equip = ProductReportEquip.objects.filter(no=test_equip).first()
 
-        s = 'M' if plan['test_indicator_name'] == '门尼' else 'S'
-        plan_uid = f"{s}{test_equip1}{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        data['test_equip'] = test_equip
+        product_plan = ProductTestPlan.objects.create(**data, test_time=datetime.datetime.now(), status=1,
+                                                      plan_uid=plan_uid)
+        # 添加检测计划详情
+        for item in product_list:
+            production_classes = item['classes']
+            item.pop('classes')
+            # 根据lot_no去找班次唯一标识
+            obj = PalletFeedbacks.objects.filter(lot_no=item['lot_no']).first()
+            s = ProductClassesPlan.objects.filter(plan_classes_uid=obj.plan_classes_uid).values(
+                'work_schedule_plan__group__global_name').first()
+            production_group = s['work_schedule_plan__group__global_name']
+            ProductTestPlanDetail.objects.create(test_plan=product_plan, **item, production_group=production_group,
+                                                 production_classes=production_classes)
+        return Response({'results': '检测任务创建成功', 'plan_uid': product_plan.plan_uid})
 
-        product_plan = ProductTestPlan.objects.create(**plan, test_time=datetime.datetime.now(), status=1, plan_uid=plan_uid)
-        print(product_plan)
-        # 添加计划详情
 
-        product = data['product']
-        for item in product:
-            production_group = 'A'
-            ProductTestPlanDetail.objects.create(test_plan=product_plan, **item, production_group=production_group)
 
-        return Response('添加成功')
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestResumeViewSet(mixins.ListModelMixin, GenericViewSet):
+    """门尼检测履历"""
+    queryset = ProductTestPlanDetail.objects.all()
+    serializer_class = ProductTEstResumeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductTestResumeFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TestDataView(APIView):
+    #todo
+    """
+    return:
+
+    """
+    def get(self, request):
+        data = ProductTestPlanDetail.objects.filter(test_plan__test_time__year=datetime.datetime.now().year,
+                                                    test_plan__test_time__month=datetime.datetime.now().month,
+                                                    test_plan__test_time__day=datetime.datetime.now().day
+                                                    ).values('raw_value')
+        return Response(data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TestValueView(APIView):
+
+    def post(self, request):
+
+        ip = request.data.get('ip')
+        # 获取检测机台
+        test_plan_obj = ProductTestPlan.objects.filter(test_equip__ip=ip, status=1).first()
+        if not test_plan_obj:
+            raise ValidationError('任务不存在')
+        obj = ProductTestPlanDetail.objects.filter(test_plan=test_plan_obj, value=None).first()
+        if obj:
+            ## 添加到 order
+            # 1. 获取检测间隔
+            test_interval = obj.test_plan.test_interval
+            # 2. 判断是否有存在
+            if MaterialTestOrder.objects.filter(lot_no=obj.lot_no).first():
+                pass
+            else:
+                # 3. 添加
+                for i in range(test_interval): # 2
+
+                    plan_classes_uid = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first().plan_classes_uid
+                    MaterialTestOrder.objects.create(
+                        lot_no = obj.lot_no,
+                        material_test_order_uid = uuid.uuid1(),
+                        actual_trains = obj.actual_trains + i,
+                        product_no = obj.product_no,
+                        plan_classes_uid = plan_classes_uid,
+                        production_class = obj.production_classes,
+                        production_group = obj.production_group,
+                        production_equip_no = obj.equip_no,
+                        production_factory_date = obj.factory_date
+                    )
+
+            obj.value = request.data.get('value')
+            obj.raw_value = request.data.get('raw_value')
+            # obj.save()
+            return Response('检测完成')
+        ProductTestPlan.objects.filter(test_equip__ip=ip, status=1).update(status=2)
+        # 添加到 result [全部检测完成后执行]
+
+        return Response('全部检测完成')
+
+

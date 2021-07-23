@@ -454,7 +454,9 @@ class ProductTestPlan(AbstractEntity):
 
 class ProductTestPlanDetail(models.Model):
     """检测计划详情"""
-    test_plan = models.ForeignKey(ProductTestPlan, help_text='检测计划', on_delete=models.CASCADE)
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    test_plan = models.ForeignKey(ProductTestPlan, help_text='检测计划', on_delete=models.CASCADE, related_name=
+                                  'product_test_plan_detail')
     product_no = models.CharField(max_length=64, help_text='胶料编码')
     factory_date = models.DateField(help_text='工厂日期')
     lot_no = models.CharField(max_length=64, help_text='收皮条码', null=True)
@@ -462,11 +464,19 @@ class ProductTestPlanDetail(models.Model):
     production_group = models.CharField(max_length=64, help_text='生产班组')
     actual_trains = models.PositiveIntegerField(help_text='生产车次')
     value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True)
+    raw_value = models.TextField(null=True, help_text='检测原数据')
 
     class Meta:
         db_table = 'product_test_plan_detail'
         verbose_name_plural = verbose_name = '胶料快检计划详情'
 
+    @property
+    def classes(self):
+        return self.production_classes
+
+    @property
+    def values(self):
+        return self.value.split(': ')[1].strip('}')
 
 class ProductReportValue(models.Model):
     """胶料快检上报值"""
