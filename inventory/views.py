@@ -612,8 +612,9 @@ class MaterialCount(APIView):
                 raise ValidationError(f"终炼胶库连接失败: {e}")
         elif store_name == "混炼胶库":
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
-                    'material_no', lot_no__isnull=False).annotate(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                    **filter_dict).filter(lot_no__isnull=False).values(
+                    'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
                 raise ValidationError(f"混炼胶库连接失败:{e}")
