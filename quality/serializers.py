@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue, QualifiedRangeDisplay
+    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail
 from recipe.models import MaterialAttribute
 
 
@@ -1099,11 +1099,17 @@ class ProductReportEquipSerializer(BaseModelSerializer):
     data_point_name = serializers.ReadOnlyField(source='data_point.name')
     test_type_name = serializers.ReadOnlyField(source='data_point.test_type.name')
     test_type = serializers.ReadOnlyField(source='data_point.test_type.id')
+    last_time = serializers.SerializerMethodField()
+
 
     class Meta:
         model = ProductReportEquip
         fields = "__all__"
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+    def get_last_time(self, obj):
+        last_time = ProductTestPlan.objects.filter(test_equip=obj).values('test_time').last()
+        return last_time['test_time'].strftime('%Y-%m-%d %H:%M:%S') if last_time else None
 
 
 class ProductReportValueViewSerializer(serializers.ModelSerializer):
@@ -1598,3 +1604,50 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
             'material': {'read_only': True},
         }
         fields = '__all__'
+
+
+class ProductTestPlanDetailSerializer(BaseModelSerializer):
+    classes = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = ProductTestPlanDetail
+        fields = ['factory_date', 'product_no', 'actual_trains', 'equip_no',
+                  'lot_no', 'classes', 'values']
+
+
+class ProductTestPlanSerializer(BaseModelSerializer):
+    test_equip = serializers.CharField(source='test_equip.no')
+    product_test_plan_detail = ProductTestPlanDetailSerializer(many=True)
+
+    class Meta:
+        model = ProductTestPlan
+        fields = ['plan_uid', 'test_equip', 'test_time', 'test_classes', 'test_group', 'test_indicator_name', 'test_method_name',
+                  'test_times', 'test_interval', 'product_test_plan_detail', 'status']
+        read_only_fields = ['plan_uid', 'test_time']
+
+
+class ProductTEstResumeSerializer(BaseModelSerializer):
+    plan_uid = serializers.ReadOnlyField(source='test_plan.plan_uid')
+    test_equip = serializers.ReadOnlyField(source='test_plan.test_equip.no')
+    test_time = serializers.SerializerMethodField()
+    test_classes = serializers.ReadOnlyField(source='test_plan.test_classes')
+    test_group = serializers.ReadOnlyField(source='test_plan.test_group')
+    test_indicator_name = serializers.ReadOnlyField(source='test_plan.test_indicator_name')
+    test_method_name = serializers.ReadOnlyField(source='test_plan.test_method_name')
+    test_times = serializers.ReadOnlyField(source='test_plan.test_times')
+    test_interval = serializers.ReadOnlyField(source='test_plan.test_interval')
+    status = serializers.ReadOnlyField(source='test_plan.status')
+
+    class Meta:
+        model = ProductTestPlanDetail
+        fields = '__all__'
+
+    def get_test_time(self, obj):
+        return obj.test_plan.test_time.strftime('%Y-%m-%d %H:%M:%S')
+
+
+class ReportValueSerializer(serializers.Serializer):
+    report_type = serializers.ChoiceField(choices=(1, 2), help_text='上报类型1：原材料 2：胶料')
+    ip = serializers.CharField(help_text='IP地址')
+    value = serializers.JSONField(help_text='{"l_4: 12"}')
+    raw_value = serializers.CharField(help_text='机台检测完整数据')
