@@ -138,25 +138,23 @@ class WeightBatchingLog(AbstractEntity):
         (2, '异常')
     )
     equip_no = models.CharField(max_length=64, help_text='称量设备编号')
-    plan_batching_uid = models.CharField(max_length=64, help_text='小料称量计划号')
-    trains = models.IntegerField(help_text='车次')
-    product_no = models.CharField(max_length=64, help_text='胶料名称')
+    # plan_batching_uid = models.CharField(max_length=64, help_text='小料称量计划号')
+    # product_no = models.CharField(max_length=64, help_text='胶料名称')
+    scan_material = models.CharField(max_length=64, help_text='条码出库原材料名')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
     material_no = models.CharField(max_length=64, help_text='原材料编码')
-    plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
-    actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
+    # plan_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='计划重量', default=0)
+    # actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='实际重量', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
-    production_factory_date = models.DateField(max_length=64, help_text='工厂时间')
-    production_classes = models.CharField(max_length=64, help_text='生产班次')
-    production_group = models.CharField(max_length=64, help_text='生产班组')
     status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
-    # batch_time = models.DateTimeField(max_length=64, help_text='投入时间')
+    batch_time = models.DateTimeField(max_length=64, help_text='投入时间')
     batch_classes = models.CharField(max_length=64, help_text='投入班次')
     batch_group = models.CharField(max_length=64, help_text='投入班组')
     tank_no = models.CharField(max_length=64, help_text='投入罐号')
     location_no = models.CharField(max_length=64, help_text='产线')
     dev_type = models.CharField(max_length=64, help_text='机型名称')
-    quantity = models.IntegerField(default=1, help_text='包数')
+    failed_reason = models.CharField(max_length=64, help_text='投料失败原因')
+    # quantity = models.IntegerField(default=1, help_text='包数')
 
     class Meta:
         db_table = 'weight_batch_log'
@@ -256,7 +254,7 @@ class Version(models.Model):
 class Bin(models.Model):
     """料仓物料信息表"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    bin = models.CharField(db_column='Bin', help_text='料仓位置' , max_length=3, blank=True, null=True)  # Field name made lowercase.
+    bin = models.CharField(db_column='Bin', help_text='料仓位置', max_length=3, blank=True, null=True)  # Field name made lowercase.
     name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
     code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
 

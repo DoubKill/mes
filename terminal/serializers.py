@@ -17,10 +17,10 @@ from production.models import PalletFeedbacks
 from recipe.models import ZCMaterial, ERPMESMaterialRelation, WeighCntType
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
-    ReportWeight, LoadTankMaterialLog, PackageExpire
+    ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial
 import logging
 
-from terminal.utils import INWeighSystem
+from terminal.utils import INWeighSystem, TankStatusSync
 
 logger = logging.getLogger('send_log')
 
@@ -196,7 +196,7 @@ class BatchingClassesEquipPlanSerializer(BaseModelSerializer):
     @staticmethod
     def get_finished_trains(obj):
         finished_trains = WeightPackageLog.objects.filter(plan_batching_uid=obj.batching_class_plan.plan_batching_uid
-                                                          ).aggregate(trains=Sum('quantity'))['trains']
+                                                          ).aggregate(trains=Max('package_fufil'))['trains']
         return finished_trains if finished_trains else 0
 
     class Meta:
@@ -205,18 +205,23 @@ class BatchingClassesEquipPlanSerializer(BaseModelSerializer):
 
 
 class WeightBatchingLogSerializer(BaseModelSerializer):
+    created_username = serializers.CharField(source='created_user.username')
+
     class Meta:
         model = WeightBatchingLog
-        fields = ('material_no', 'material_name', 'bra_code', 'status',
-                  'plan_weight', 'actual_weight', 'tank_no', 'created_date')
+        fields = ('id', 'tank_no', 'material_no', 'material_name', 'bra_code', 'created_date', 'status', 'scan_material',
+                  'created_username')
 
 
 class WeightBatchingLogCreateSerializer(BaseModelSerializer):
 
     def validate(self, attr):
-        batching_classes_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=attr['plan_batching_uid']).first()
-        if not batching_classes_plan:
-            raise serializers.ValidationError('参数错误')
+        equip_no = attr['equip_no']
+        dev_type = attr['dev_type']
+        bra_code = attr['bra_code']
+        batch_classes = attr['batch_classes']
+        batch_group = attr['batch_group']
+        location_no = attr['location_no']
         try:
             wms_stock = MaterialOutHistory.objects.using('wms').filter(
                 lot_no=attr['bra_code']).values('material_no', 'material_name')
@@ -227,33 +232,65 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                 raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
         if not wms_stock:
             raise serializers.ValidationError('该条码信息不存在！')
-        msc = ZCMaterial.objects.filter(material_no=wms_stock[0]['material_no'],
-                                        material__isnull=False).first()
-        if msc:
-            # 如果有别称
-            material_no = msc.material.material_no
-            material_name = msc.material.material_name
-        else:
-            # 否则按照wms的物料编码
-            material_no = wms_stock[0]['material_no']
-            material_name = wms_stock[0]['material_name']
-        attr['trains'] = batching_classes_plan.plan_package
-        attr['production_factory_date'] = batching_classes_plan.work_schedule_plan.plan_schedule.day_time
-        attr['production_classes'] = batching_classes_plan.work_schedule_plan.classes.global_name
-        attr['production_group'] = batching_classes_plan.work_schedule_plan.group.global_name
-        attr['dev_type'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.dev_type.category_name
-        attr['product_no'] = batching_classes_plan.weigh_cnt_type.weigh_batching.product_batching.stage_product_batch_no
-        # attr['batch_time'] = datetime.datetime.now()
-        if wms_stock.material_no not in batching_classes_plan.weigh_cnt_type.weighting_material_nos:
+        material_name = material_no = ''
+        attr['scan_material'] = wms_stock[0].get('material_name')
+        material_name_set = set(ERPMESMaterialRelation.objects.filter(
+            zc_material__wlxxid=wms_stock[0]['material_no'],
+            use_flag=True
+        ).values_list('material__material_name', flat=True))
+        if not material_name_set:
+            raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+        # 机台计划配方的所有物料名
+        try:
+            all_recipe = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'],
+                                                             addtime__startswith=datetime.now().date().strftime('%Y-%m-%d'))\
+                .values_list('recipe', flat=True)
+        except:
+            raise serializers.ValidationError('称量机台{}错误'.format(equip_no))
+        if not all_recipe:
+            raise serializers.ValidationError('机台{}无进行中或已完成的配料计划'.format(equip_no))
+        materials = set(RecipeMaterial.objects.using(equip_no).filter(recipe_name__in=set(all_recipe))
+                        .values_list('name', flat=True))
+        comm_material = list(material_name_set & materials)
+        if comm_material:
+            material_name = comm_material[0]
+            material_no = comm_material[0]
+        # else:
+        #     raise serializers.ValidationError('所扫物料不在机台{}所有配料计划配方中'.format(equip_no))
+        attr['batch_time'] = datetime.now()
+        # 扫码物料不在当日计划配方对应原材料中
+        if not material_name:
             attr['status'] = 2
+            attr['tank_no'] = ''
+            attr['failed_reason'] = '不在称量计划内, 无法开门'
+        else:
+            # 从称量系统同步料罐状态到mes表中
+            try:
+                tank_status_sync = TankStatusSync(equip_no=equip_no)
+                tank_status_sync.sync()
+            except:
+                return serializers.ValidationError('mes同步称量系统料罐状态失败')
+            # 扫码物料与所有料罐不一致
+            feed_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True, material_name=material_name)
+            if not feed_info:
+                attr['status'] = 2
+                attr['tank_no'] = ''
+                attr['failed_reason'] = '没有对应的料罐, 无法开门'
+            else:
+                single_tank = feed_info.first()
+                if single_tank.status == 2:
+                    attr['status'] = 2
+                    attr['tank_no'] = ''
+                    attr['failed_reason'] = '料罐处于高位, 无法开门'
+                else:
+                    attr['tank_no'] = feed_info.first().tank_no
         attr['material_name'] = material_name
         attr['material_no'] = material_no
         return attr
 
     class Meta:
         model = WeightBatchingLog
-        fields = ('equip_no', 'plan_batching_uid', 'bra_code', 'quantity',
-                  'batch_classes', 'batch_group', 'tank_no', 'location_no')
+        fields = ('equip_no', 'bra_code', 'batch_classes', 'batch_group', 'dev_type', 'location_no')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -290,18 +327,18 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         batch_classes = attrs['batch_classes']
         dev_type = attrs['dev_type']
         print_flag = attrs.get('print_flag')
-        print_count = attrs.get('print_count')
+        print_count = attrs.get('print_count', 1)
         plan_weight = attrs['plan_weight']
         batch_group = attrs['batch_group']
         package_plan_count = attrs['package_plan_count']
         status = attrs['status']
         # 打印数量判断
         if print_count <= 0 or print_count > package_count or not isinstance(print_count, int):
-            serializers.ValidationError('打印张数需小于等于配置数量')
+            raise serializers.ValidationError('打印张数需小于等于配置数量')
         weight_type_record = WeighCntType.objects.filter(product_batching__stage_product_batch_no=product_no.split('(')[0], package_type=1)
         if weight_type_record:
             attrs['material_no'] = weight_type_record.first().name
-            attrs['material_name'] = attrs['material_name']
+            attrs['material_name'] = attrs['material_no']
         else:
             raise serializers.ValidationError('称量系统计划中配方名称未找到对应料包名')
         # attrs['material_no'] = product_no + '(' + dev_type + ')'
@@ -678,3 +715,17 @@ class ReportWeightSerializer(serializers.ModelSerializer):
     class Meta:
         model = ReportWeight
         fields = '__all__'
+
+
+class XLPlanCSerializer(serializers.ModelSerializer):
+    dev_type = serializers.CharField(default='', help_text='生产机型')
+
+    class Meta:
+        model = Plan
+        fields = ['id', 'recipe', 'setno', 'actno', 'state', 'dev_type', 'planid']
+
+
+class XLPromptSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WeightTankStatus
+        fields = ['id', 'tank_no', 'material_name']

@@ -12,7 +12,7 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
     WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, \
     ProductExchange, XLMaterialVIewSet, XLBinVIewSet, RecipePreVIew, RecipeMaterialVIew, ReportBasicView, \
-    ReportWeightView, XLPlanVIewSet, PackageExpireView
+    ReportWeightView, XLPlanVIewSet, PackageExpireView, XLPlanCViewSet, XLPromptViewSet, WeightingTankStatus
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -25,7 +25,8 @@ router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信�
 router.register('xl-material', XLMaterialVIewSet)  # 小料原材料
 router.register('xl-bin', XLBinVIewSet)  # 料仓
 router.register('xl-plan', XLPlanVIewSet)  # 小料计划
-
+router.register('xl-plan-c', XLPlanCViewSet)  # 小料计划(C#端)
+router.register('xl-prompt', XLPromptViewSet)  # 扫码投料与提示(C#端)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -41,6 +42,7 @@ urlpatterns = [
     path('weight-batching-log-list/', WeightBatchingLogListViewSet.as_view()),  # 药品投入统计
     path('product-exchange/', ProductExchange.as_view()),
     path('weighting-package-expire/', PackageExpireView.as_view()),  # 料包有效期
+    path('weighting-tank-status/', WeightingTankStatus.as_view()),  # 料罐信息(C#端)
 
     # 小料称量
     path('xl-recipe/', RecipePreVIew.as_view()),  # 小料配方列表
