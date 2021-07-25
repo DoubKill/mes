@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue
+    ProductReportValue, QualifiedRangeDisplay
 from recipe.models import MaterialAttribute
 
 
@@ -193,6 +193,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                 data_point__name=item['data_point_name'],
                 data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
             if material_test_method:
+                item['is_judged'] = material_test_method.is_judged
                 indicator = MaterialDataPointIndicator.objects.filter(
                     material_test_method=material_test_method,
                     data_point__name=item['data_point_name'],
@@ -207,8 +208,7 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
                     item['mes_result'] = '三等品'
                     item['level'] = 2
             else:
-                item['mes_result'] = '三等品'
-                item['level'] = 2
+                raise serializers.ValidationError('该胶料实验方法不存在！')
             item['created_user'] = self.context['request'].user  # 加一个create_user
             item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
             MaterialTestResult.objects.create(**item)
@@ -463,20 +463,69 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
             ret['valid_time'] = expire_time  # 有效期
         else:
             ret['valid_time'] = None
+
+        m_list = ret.pop('mtr_list', [])
+        trains = []
+        indicators = []
+        data_point_range_data = {}
+        for indicator_name, points in m_list['table_head'].items():
+            point_head = []
+            for point in points:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    data_point__name=point,
+                    material_test_method__material__material_name=ret['product_no'],
+                    level=1).first()
+                if indicator:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": indicator.upper_limit,
+                         "lower_limit": indicator.lower_limit}
+                    )
+                    data_point_range_data[point] = [indicator.lower_limit, indicator.upper_limit]
+                else:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": None,
+                         "lower_limit": None}
+                    )
+            indicators.append({'point': indicator_name, 'point_head': point_head})
+
+        for i in m_list:
+            if i != 'table_head':
+                trains.append({'train': i, 'content': m_list[i]})
+                for item in m_list[i]:
+                    if item['result'] == '合格':
+                        item['tag'] = ''
+                    else:
+                        data_point_name = item['data_point_name']
+                        value = item['value']
+                        if not data_point_range_data.get(data_point_name):
+                            item['tag'] = ''
+                        else:
+                            if value > data_point_range_data[data_point_name][1]:
+                                item['tag'] = '+'
+                            elif value < data_point_range_data[data_point_name][0]:
+                                item['tag'] = '-'
+                            else:
+                                item['tag'] = ''
+        mtr_list = {'trains': trains, 'table_head': indicators}
+        ret['mtr_list'] = mtr_list
+        ret['range_showed'] = QualifiedRangeDisplay.objects.first().is_showed
         return ret
 
     def get_mtr_list(self, obj):
         ret = {}
         table_head_top = {}
-
+        sort_rules = {'门尼': 1, '硬度': 2, '比重': 3, '流变': 4, '钢拔': 5, '物性': 6}
         test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).order_by('actual_trains')
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids).order_by('test_indicator_name',
-                                                                                             'data_point_name')
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids,
+                                                             is_judged=True).order_by('test_indicator_name',
+                                                                                      'data_point_name')
             for test_result in test_results:
                 if test_result.level == 1:
                     result = '合格'
@@ -506,7 +555,12 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                     table_head_top[test_indicator_name].add(test_result.data_point_name)
                 else:
                     table_head_top[test_indicator_name] = {test_result.data_point_name}
-        ret['table_head'] = table_head_top
+        table_head_top = {key: sorted(list(value)) for key, value in table_head_top.items()}
+        try:
+            table_head_top = sorted(table_head_top.items(), key=lambda d: sort_rules[d[0]])
+        except Exception:
+            pass
+        ret['table_head'] = dict(table_head_top)
         return ret
 
     class Meta:

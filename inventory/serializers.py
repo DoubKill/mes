@@ -20,7 +20,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
-    BarcodeQuality, CarbonOutPlan
+    BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -64,10 +64,9 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         destination = ",".join(set(equip_list + dispatch_list))
         return destination
 
-    @atomic()
     def create(self, validated_data):
         location = validated_data.get("location")
-        if DeliveryPlan.objects.filter(location=location, status=4).exists():
+        if DeliveryPlan.objects.filter(location=location, status__in=(2, 4)).exists():
             raise serializers.ValidationError('该库存位{}出库计划已存在，请勿重复添加！'.format(location))
         station = validated_data.get("station")
         # try:
@@ -94,7 +93,7 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
         #     for location in location_set:
         #         if not location[0] in STATION_LOCATION_MAP[station]:
         #             raise serializers.ValidationError(f"货架:{location} 无法从{station}口出库，请检查")
-        order_no = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")[2:-1]
+        order_no = ''.join(str(time.time()).split('.'))
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
         status = validated_data['status']
@@ -421,11 +420,10 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
         destination = ",".join(set(equip_list + dispatch_list))
         return destination
 
-    @atomic()
     def create(self, validated_data):
         location = validated_data.get("location")
         station = validated_data.get("station")
-        if DeliveryPlanFinal.objects.filter(location=location, status=4).exists():
+        if DeliveryPlanFinal.objects.filter(location=location, status__in=(2, 4)).exists():
             raise serializers.ValidationError('该库存位{}出库计划已存在，请勿重复添加！'.format(location))
         if not station:
             raise serializers.ValidationError(f"请选择出库口")
@@ -439,7 +437,7 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
             else:
                 if temp_location.location_status != "有货货位":
                     raise serializers.ValidationError(f"{location}货架为异常货架，请操作wms")
-        order_no = time.strftime("%Y%m%d%H%M%S", time.localtime())
+        order_no = ''.join(str(time.time()).split('.'))
         validated_data["order_no"] = order_no
         warehouse_info = validated_data['warehouse_info']
         status = validated_data['status']
@@ -1306,3 +1304,134 @@ class InOutCommonSerializer(serializers.Serializer):
             return "入库"
         else:
             return "出库"
+
+
+class MixinRubberyOutBoundOrderSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        status = validated_data.get('status')
+        if status == 2:  # 调用北自出库接口
+            username = self.context['request'].user.username
+            items = []
+            for plan in instance.mixin_plans.all():
+                pallet = PalletFeedbacks.objects.filter(pallet_no=plan.pallet_no).last()
+                dict1 = {'WORKID': plan.order_no,
+                         'MID': plan.material_no,
+                         'PICI': pallet.bath_no if pallet else "1",
+                         'RFID': plan.pallet_no,
+                         'STATIONID': plan.station if plan.station else "",
+                         'SENDDATE': datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
+                items.append(dict1)
+            json_data = {
+                'msgId': instance.order_no,
+                'OUTTYPE': '快检出库',
+                "msgConut": str(len(items)),
+                "SENDUSER": username,
+                "items": items
+            }
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            sender = OUTWORKUploader(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    instance.status = 2
+                    task_status = 2
+                    instance.mixin_plans.filter().update(status=2)
+                else:  # 失败
+                    instance.status = 5
+                    instance.mixin_plans.filter().update(status=3)
+                    task_status = 3
+                instance.save()
+                for plan in instance.mixin_plans.all():
+                    DeliveryPlanStatus.objects.create(warehouse_info=plan.warehouse_info,
+                                                      order_no=plan.order_no,
+                                                      order_type='指定出库',
+                                                      status=task_status)
+                if not task_status == 2:
+                    if "不足" in msg:
+                        raise serializers.ValidationError('库存不足, 出库失败')
+                    elif "json错误" in msg:
+                        raise serializers.ValidationError(f'出库接口调用失败,提示: {msg}')
+                    else:
+                        raise serializers.ValidationError(msg)
+        elif status == 4:
+            instance.status = 4
+            instance.save()
+            instance.mixin_plans.filter(status__gt=1).update(status=5)
+        return validated_data
+
+    class Meta:
+        model = MixinRubberyOutBoundOrder
+        fields = '__all__'
+        read_only_fields = ('order_no', 'warehouse_name', 'order_type')
+
+
+class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        status = validated_data.get('status')
+        if status == 2:  # 调用北自出库接口
+            username = self.context['request'].user.username
+            items = []
+            for plan in instance.final_plans.all():
+                pallet = PalletFeedbacks.objects.filter(pallet_no=plan.pallet_no).last()
+                dict1 = {'WORKID': plan.order_no,
+                         'MID': plan.material_no,
+                         'PICI': pallet.bath_no if pallet else "1",
+                         'RFID': plan.pallet_no,
+                         'STATIONID': plan.station if plan.station else "",
+                         'SENDDATE': datetime.datetime.now().strftime('%Y%m%d %H:%M:%S'),
+                         'STOREDEF_ID': 1}
+                items.append(dict1)
+            json_data = {
+                'msgId': instance.order_no,
+                'OUTTYPE': '快检出库',
+                "msgConut": str(len(items)),
+                "SENDUSER": username,
+                "items": items
+            }
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    instance.status = 2
+                    task_status = 2
+                    instance.final_plans.filter().update(status=2)
+                else:  # 失败
+                    instance.status = 5
+                    instance.final_plans.filter().update(status=3)
+                    task_status = 3
+                instance.save()
+                for plan in instance.final_plans.all():
+                    DeliveryPlanStatus.objects.create(warehouse_info=plan.warehouse_info,
+                                                      order_no=plan.order_no,
+                                                      order_type='指定出库',
+                                                      status=task_status)
+                if not task_status == 2:
+                    if "不足" in msg:
+                        raise serializers.ValidationError('库存不足, 出库失败')
+                    elif "json错误" in msg:
+                        raise serializers.ValidationError(f'出库接口调用失败,提示: {msg}')
+                    else:
+                        raise serializers.ValidationError(msg)
+        elif status == 4:
+            instance.status = 4
+            instance.save()
+            instance.final_plans.filter(status__gt=1).update(status=5)
+        return validated_data
+
+    class Meta:
+        model = FinalRubberyOutBoundOrder
+        fields = '__all__'
+        read_only_fields = ('order_no', 'warehouse_name', 'order_type')

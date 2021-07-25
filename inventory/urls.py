@@ -41,6 +41,12 @@ router.register('overdue-material-management', OverdueMaterialManagement)
 router.register(r'material-inventory-manage', views.MaterialInventoryManageViewSet,
                 basename='material-inventory-manage'),
 
+# 混炼胶出库单
+router.register('mixin-rubbery-outbound-order', MixinRubberyOutBoundOrderViewSet)
+
+# 混炼胶出库单
+router.register('final-rubbery-outbound-order', FinalRubberyOutBoundOrderViewSet)
+
 # 物料出入库履历
 router.register(r'inventory-log', views.InventoryLogViewSet)
 
