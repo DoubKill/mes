@@ -293,3 +293,14 @@ class WeighInformationSerializer2(serializers.ModelSerializer):
         model = ExpendMaterial
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class TrainsFixSerializer(serializers.Serializer):
+    factory_date = serializers.DateField(required=False)
+    classes = serializers.CharField(required=False)
+    equip_no = serializers.CharField(required=False)
+    product_no = serializers.CharField(required=False)
+    begin_trains = serializers.IntegerField(min_value=1)
+    end_trains = serializers.IntegerField(min_value=1)
+    fix_num = serializers.IntegerField(required=False)
+    lot_no = serializers.CharField(required=False)
