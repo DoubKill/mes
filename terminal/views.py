@@ -168,10 +168,11 @@ class BatchProductBatchingVIew(APIView):
                 max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
             if not max_feed_log_id:
                 # 当前生产中没有, 表示未进料(所有原材料数量均为0);否则代表进料，根据条形码进行计算
-                list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0}), ret))
+                list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
+                                             'adjust_left_weight': 0}), ret))
             else:
                 # 根据上料表中最大车次获取到各原材料条码，物料名，单车需要重量信息
-                trains = FeedingMaterialLog.objects.get(id=max_feed_log_id).trains
+                trains = FeedingMaterialLog.objects.using('SFJ').get(id=max_feed_log_id).trains
                 if trains != 1:
                     now_material_info = LoadMaterialLog.objects.using('SFJ').filter(feed_log_id=max_feed_log_id, status=1)
                     max_feed_log_id = max_feed_log_id if now_material_info.count() == len(ret) else max_feed_log_id - 1
@@ -185,7 +186,7 @@ class BatchProductBatchingVIew(APIView):
                     # 不存在则说明还在进料中，数量置为0
                     if not load_data:
                         single_material.update(
-                            {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0})
+                            {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''})
                         continue
                     bra_code = load_data.get('bra_code')
                     plan_weight = single_material.get('actual_weight')
@@ -194,7 +195,7 @@ class BatchProductBatchingVIew(APIView):
                     single_material.update({'bra_code': material_bra.bra_code, 'init_weight': material_bra.init_weight,
                                             'used_weight': material_bra.actual_weight,
                                             'adjust_left_weight': material_bra.adjust_left_weight,
-                                            'id': material_bra.id
+                                            'id': material_bra.id, 'scan_material': material_bra.scan_material
                                             })
                     if material_bra.adjust_left_weight < plan_weight:
                         single_material.update(
@@ -263,9 +264,11 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             return response(success=False, message=list(serializer.errors.values())[0][0])
         if batch_material.unit == '包' and isinstance(left_weight, float):
             return response(success=False, message='包数应为整数')
+        if left_weight > batch_material.init_weight or left_weight < 0:
+            return response(success=False, message='请输入正确的剩余修正量数值')
         # 获得本次修正量,修改真正计算的总量
-        change_num = batch_material.adjust_left_weight - left_weight
-        batch_material.real_weight = batch_material.real_weight - change_num
+        change_num = float(batch_material.adjust_left_weight) - left_weight
+        batch_material.real_weight = float(batch_material.real_weight) - change_num
         self.perform_update(serializer)
         batch_material.save()
         return response(success=True, message='修正成功')

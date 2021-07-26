@@ -78,6 +78,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
         if wms_stock:
+            attrs['scan_material'] = wms_stock[0].get('material_name')
             material_name_set = set(ERPMESMaterialRelation.objects.filter(
                 zc_material__wlxxid=wms_stock[0]['material_no'],
                 use_flag=True
@@ -95,11 +96,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             material_name = pallet_feedback.product_no
             total_weight = pallet_feedback.actual_weight
             unit = unit
+            attrs['scan_material'] = material_name
         if weight_package:
             material_no = weight_package.material_no
             material_name = weight_package.material_name
             total_weight = weight_package.actual_weight
             unit = '包'
+            attrs['scan_material'] = material_name
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         attrs['equip_no'] = classes_plan.equip.equip_no
@@ -107,7 +110,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['material_no'] = material_no
         attrs['tank_data'] = {'msg': '', 'bra_code': bra_code, 'init_weight': total_weight, 'scan_time': datetime.now(),
                               'useup_time': datetime.strptime('1970-01-01 00:00:00', '%Y-%m-%d %H:%M:%S'), 'unit': unit,
-                              'material_no': material_no, 'material_name': material_name, 'real_weight': total_weight}
+                              'material_no': material_no, 'material_name': material_name, 'real_weight': total_weight,
+                              'scan_material': attrs.pop('scan_material', '')}
         # 判断物料是否在配方中
         if material_name not in classes_plan.product_batching.batching_material_names:
             attrs['status'] = 2

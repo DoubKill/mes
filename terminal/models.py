@@ -206,6 +206,7 @@ class FeedingLog(AbstractEntity):
 
 
 class LoadTankMaterialLog(AbstractEntity):
+    scan_material = models.CharField(max_length=64, help_text='扫码物料名', default='')
     material_no = models.CharField(max_length=64, help_text='原材料编码')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
     bra_code = models.CharField(max_length=64, help_text='条形码')
