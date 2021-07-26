@@ -1469,7 +1469,8 @@ class TrainsFixView(APIView):
             pallet.begin_trains = data['begin_trains']
             pallet.end_trains = data['end_trains']
             pallet.save()
-            fix_num = 0
+            MaterialTestOrder.objects.filter(lot_no=data['lot_no']).delete()
+            lot_nos = [data['lot_no']]
         else:
             fix_num = data['fix_num']
             pallet_data = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
@@ -1508,34 +1509,31 @@ class TrainsFixView(APIView):
                     raise ValidationError("修改后第{}车车次信息已存在！".format(last_pallet.end_trains + fix_num))
             for pallet in pallet_data:
                 # 修改收皮车次数据
-                if lot_no:
-                    pallet.begin_trains = data['begin_trains']
-                    pallet.end_trains = data['end_trains']
-                else:
+                if not pallet.begin_trains+fix_num > pc_last_trains:
                     pallet.begin_trains += fix_num
-                    if not pallet.end_trains == pc_last_trains or not pallet.begin_trains == pc_last_trains:
-                        pallet.end_trains += fix_num
+                if not pallet.end_trains+fix_num >= pc_last_trains:
+                    pallet.end_trains += fix_num
                 pallet.save()
 
-        test_order_data = MaterialTestOrder.objects.filter(
-            product_no=data['product_no'],
-            production_class=data['classes'],
-            production_factory_date=data['factory_date'],
-            production_equip_no=data['equip_no'],
-            actual_trains__gte=data['begin_trains']+fix_num,
-            actual_trains__lte=data['end_trains']+fix_num)
-        lot_nos = set(test_order_data.values_list('lot_no', flat=True))
-        for test_order in test_order_data:
-            # 修改车次检测单收皮条码
-            p = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
-                                               product_no=data['product_no'],
-                                               classes=data['classes'],
-                                               factory_date=data['factory_date'],
-                                               begin_trains__lte=test_order.actual_trains,
-                                               end_trains__gte=test_order.actual_trains).first()
-            if p:
-                test_order.lot_no = p.lot_no
-                test_order.save()
+            test_order_data = MaterialTestOrder.objects.filter(
+                product_no=data['product_no'],
+                production_class=data['classes'],
+                production_factory_date=data['factory_date'],
+                production_equip_no=data['equip_no'],
+                actual_trains__gte=data['begin_trains']+fix_num,
+                actual_trains__lte=data['end_trains']+fix_num)
+            lot_nos = set(test_order_data.values_list('lot_no', flat=True))
+            for test_order in test_order_data:
+                # 修改车次检测单收皮条码
+                p = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                   product_no=data['product_no'],
+                                                   classes=data['classes'],
+                                                   factory_date=data['factory_date'],
+                                                   begin_trains__lte=test_order.actual_trains,
+                                                   end_trains__gte=test_order.actual_trains).first()
+                if p:
+                    test_order.lot_no = p.lot_no
+                    test_order.save()
 
         MaterialDealResult.objects.filter(lot_no__in=lot_nos).delete()
         for lot_no in lot_nos:
