@@ -1464,8 +1464,10 @@ class TrainsFixView(APIView):
                                                   ).filter(Q(begin_trains__lte=data['begin_trains'],
                                                            end_trains__gte=data['begin_trains']) |
                                                            Q(begin_trains__lte=data['end_trains'],
-                                                           end_trains__gte=data['end_trains'])):
-                raise ValidationError('非法操作！')
+                                                           end_trains__gte=data['end_trains']) |
+                                                           Q(begin_trains__gte=data['begin_trains'],
+                                                             end_trains__lte=data['end_trains'])):
+                raise ValidationError('车次重复，请确认后重试！')
             pallet.begin_trains = data['begin_trains']
             pallet.end_trains = data['end_trains']
             pallet.save()
