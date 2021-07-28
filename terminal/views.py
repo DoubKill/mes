@@ -2,7 +2,7 @@ import datetime
 import json
 
 from datetime import timedelta
-from django.db.models import Max, Sum
+from django.db.models import Max, Sum, Q
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -600,33 +600,39 @@ class PackageExpireView(APIView):
             filter_kwargs['product_no__icontains'] = product_no
         if product_name:
             filter_kwargs['product_name__icontains'] = product_name
-        package_expire_nums = PackageExpire.objects.count()
-        if not package_expire_nums:
-            all_product_no = []
-            # 获取所有称量系统配方号
-            equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备', use_flag=1)\
-                .values_list('equip_no', flat=True)
-            for equip in equip_list:
+        package_expire_recipe = PackageExpire.objects.all().values_list('product_name', flat=True).distinct()
+        all_product_no = []
+        # 获取所有称量系统配方号
+        equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备', use_flag=1)\
+            .values_list('equip_no', flat=True)
+        for equip in equip_list:
+            try:
                 single_equip_recipe = list(Plan.objects.using(equip).all().values_list('recipe', flat=True).distinct())
-                all_product_no.extend(single_equip_recipe)
-            set_product_no = list(set(all_product_no))
-            for single_product_no in set_product_no:
-                PackageExpire.objects.create(product_no=single_product_no, product_name=single_product_no,
-                                             update_user=self.request.user.username, update_date=datetime.datetime.now().date())
+            except:
+                # 机台连不上
+                continue
+            all_product_no.extend(single_equip_recipe)
+        # 取plan表配方和有效期表配方差集新增数据
+        set_product_no = set(all_product_no) - set(package_expire_recipe)
+        for single_product_no in set_product_no:
+            PackageExpire.objects.create(product_no=single_product_no, product_name=single_product_no,
+                                         update_user=self.request.user.username, update_date=datetime.datetime.now().date())
         # 读取数据
         data = PackageExpire.objects.all() if not filter_kwargs else PackageExpire.objects.filter(**filter_kwargs)
         res = list(data.values('id', 'product_no', 'product_name', 'package_fine_usefullife', 'package_sulfur_usefullife'))
         return Response(res)
 
     def post(self, request):
-        id = self.request.data.pop('id')
-        f_expire_time = self.request.data.get('package_fine_usefullife')
-        s_expire_time = self.request.data.get('package_sulfur_usefullife')
-        if (f_expire_time and int(f_expire_time) < 0) or (s_expire_time and int(s_expire_time) < 0):
-            raise ValidationError('请输入正整数有效时长')
+        record_id = self.request.data.pop('id', '')
+        f_expire_time = self.request.data.get('package_fine_usefullife', '')
+        s_expire_time = self.request.data.get('package_sulfur_usefullife', '')
+        if not isinstance(record_id, int) or record_id < 0 or \
+                not isinstance(f_expire_time, int) or f_expire_time < 0 or\
+                not isinstance(s_expire_time, int) or s_expire_time < 0:
+            raise ValidationError('参数错误')
         try:
             self.request.data.update({'update_user': self.request.user.username, 'update_date': datetime.datetime.now().date()})
-            PackageExpire.objects.filter(id=id).update(**self.request.data)
+            PackageExpire.objects.filter(id=record_id).update(**self.request.data)
         except Exception as e:
             raise ValidationError('更新数据失败：{}'.format(e.args[0]))
         return Response('更新成功')
@@ -1174,17 +1180,21 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        date_now = datetime.datetime.now().date().strftime('%Y-%m-%d')
+        date_now = datetime.datetime.now().date()
+        date_before = date_now - timedelta(days=1)
+        date_now_planid = ''.join(str(date_now).split('-'))[2:]
+        date_before_planid = ''.join(str(date_before).split('-'))[2:]
+        dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
         try:
-            all_filter_plan = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'],
-                                                                  addtime__startswith=date_now).all()
+            all_filter_plan = Plan.objects.using(equip_no).filter(
+                Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+                state__in=['运行中', '等待']).all()
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_filter_plan:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan, many=True)
         for i in serializer.data:
-            dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
             i.update({'dev_type': dev_type})
         return response(success=True, data=serializer.data)
 
@@ -1201,7 +1211,10 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        date_now = datetime.datetime.now().date().strftime('%Y-%m-%d')
+        date_now = datetime.datetime.now().date()
+        date_before = date_now - timedelta(days=1)
+        date_now_planid = ''.join(str(date_now).split('-'))[2:]
+        date_before_planid = ''.join(str(date_before).split('-'))[2:]
         # 从称量系统同步料罐状态到mes表中
         tank_status_sync = TankStatusSync(equip_no=equip_no)
         try:
@@ -1210,9 +1223,9 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
             return response(success=False, message='mes同步称量系统料罐状态失败')
         try:
             # 当天称量计划的所有配方名称
-            all_recipe = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'],
-                                                             addtime__startswith=date_now)\
-                .values_list('recipe', flat=True)
+            all_recipe = Plan.objects.using(equip_no).filter(
+                Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+                state__in=['运行中', '等待']).all().values_list('recipe', flat=True)
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_recipe:

@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import requests
 from django.db.models import Q, Sum, Max
@@ -246,9 +246,13 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
             raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
         # 机台计划配方的所有物料名
         try:
-            all_recipe = Plan.objects.using(equip_no).filter(state__in=['运行中', '等待'],
-                                                             addtime__startswith=datetime.now().date().strftime('%Y-%m-%d'))\
-                .values_list('recipe', flat=True)
+            date_now = datetime.now().date()
+            date_before = date_now - timedelta(days=1)
+            date_now_planid = ''.join(str(date_now).split('-'))[2:]
+            date_before_planid = ''.join(str(date_before).split('-'))[2:]
+            all_recipe = Plan.objects.using(equip_no).filter(
+                Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+                state__in=['运行中', '等待']).all().values_list('recipe', flat=True)
         except:
             raise serializers.ValidationError('称量机台{}错误'.format(equip_no))
         if not all_recipe:
