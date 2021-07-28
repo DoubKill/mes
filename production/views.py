@@ -1496,8 +1496,9 @@ class TrainsFixView(APIView):
                                                             factory_date=data['factory_date'],
                                                             ).order_by('begin_trains').last().end_trains
             if fix_num < 0:
-                if first_pallet.begin_trains + fix_num <= 0:
-                    raise ValidationError('修改后车次不可为0！')
+                if not data['begin_trains'] > first_pallet.begin_trains:
+                    if first_pallet.begin_trains + fix_num <= 0:
+                        raise ValidationError('修改后车次不可为0！')
                 pallet_end_trains = data['begin_trains'] if first_pallet.begin_trains >= data['begin_trains'] else first_pallet.begin_trains
                 if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
                                                   product_no=data['product_no'],
