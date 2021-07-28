@@ -159,7 +159,7 @@ class ProductInventory(GenericViewSet,
             "unit_weight": round(instance[2] / instance[1], 2),
             "total_weight": instance[2],
             "need_weight": instance[2],
-            "standard_flag": True if instance[3] == "合格品" else False,
+            "standard_flag": instance[3],
             "site": instance[0]
         }
         return temp_dict
@@ -195,8 +195,8 @@ class ProductInventory(GenericViewSet,
                 filter_str += f" AND 物料编码 like '%{material_no}%'"
             else:
                 filter_str += f" where 物料编码 like '%{material_no}%'"
-        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
-            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码"""
+        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, 品质等级, 物料编码, Row_Number() OVER (order by 物料编码) sn
+            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码, 品质等级 order by 物料编码"""
         sql_all = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW"""
         sql_fm = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW where 物料编码 like '%FM%'"""
         sc = SqlClient(sql=sql)
