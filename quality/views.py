@@ -2013,10 +2013,10 @@ class ProductTestPlanViewSet(ModelViewSet):
         data = serializer.data
         data.pop('product_test_plan_detail')
         test_equip = ProductReportEquip.objects.filter(no=test_equip).first()
-
+        test_user = self.request.user.username
         data['test_equip'] = test_equip
         product_plan = ProductTestPlan.objects.create(**data, test_time=datetime.datetime.now(), status=1,
-                                                      plan_uid=plan_uid)
+                                                      plan_uid=plan_uid, test_user=test_user)
         # 添加检测计划详情
         for item in product_list:
 

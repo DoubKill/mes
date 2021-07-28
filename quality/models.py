@@ -443,6 +443,7 @@ class ProductTestPlan(AbstractEntity):
     test_time = models.DateTimeField(help_text='检测时间')
     test_classes = models.CharField(max_length=64, help_text='检测班次')
     test_group = models.CharField(max_length=64, help_text='检测班组')
+    test_user = models.CharField(max_length=64, help_text='检测人员')
     test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
     test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
     test_times = models.PositiveIntegerField(help_text='检验次数', default=1)
