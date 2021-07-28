@@ -2,12 +2,13 @@ import datetime
 import json
 import logging
 import random
+import time
 from io import BytesIO
 
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum, Q, Count, F
+from django.db.models import Sum, Count
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -16,39 +17,42 @@ from django.utils.decorators import method_decorator
 from rest_framework import mixins, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListAPIView
+from rest_framework.mixins import CreateModelMixin, ListModelMixin, UpdateModelMixin, RetrieveModelMixin
 from rest_framework.generics import ListAPIView, GenericAPIView
 from rest_framework.mixins import CreateModelMixin, ListModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework.pagination import PageNumberPagination
 
-from plan.models import ProductClassesPlan
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
-    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, InventoryFilterBackend, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, PalletDataFilter, DepotDataFilter, \
-    DepotResumeFilter, SulfurDataFilter, DepotSulfurFilter, SulfurResumeFilter, DepotSiteDataFilter, SulfurDepotSiteFilter
+    DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, PutPlanManagementFinalFilter, \
+    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, \
+    MixinRubberyOutBoundOrderFilter, FinalRubberyOutBoundOrderFilter, DepotSiteDataFilter, DepotDataFilter, \
+    SulfurResumeFilter, DepotSulfurFilter, PalletDataFilter, DepotResumeFilter, SulfurDepotSiteFilter, SulfurDataFilter
+
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
     MaterialInHistory, MaterialInventoryLog, FinalGumOutInventoryLog, \
-    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan
-from inventory.models import DeliveryPlan, MaterialInventory, Depot, DepotSite, DepotPallt,  SulfurDepot, SulfurDepotSite, \
-    Sulfur
+    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, Depot, \
+    DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite
+from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
     PutPlanManagementSerializerLB, BzFinalMixingRubberLBInventorySerializer, DispatchPlanSerializer, \
-    DispatchLogSerializer, DispatchLocationSerializer, DispatchLogCreateSerializer, PutPlanManagementSerializerFinal, \
-    InventoryLogOutSerializer, MixGumOutInventoryLogSerializer, MixGumInInventoryLogSerializer, \
+    DispatchLogSerializer, DispatchLocationSerializer, PutPlanManagementSerializerFinal, \
+    InventoryLogOutSerializer, MixinRubberyOutBoundOrderSerializer, FinalRubberyOutBoundOrderSerializer, \
     MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer, \
-    CarbonPlanManagementSerializer, DepotModelSerializer, DepotSiteModelSerializer, DepotPalltModelSerializer, DepotPalltInfoModelSerializer, \
-    SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, DepotSulfurModelSerializer, SulfurResumeModelSerializer
+    CarbonPlanManagementSerializer, DepotModelSerializer, DepotSiteModelSerializer, DepotPalltModelSerializer, \
+    SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
+    SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
+    DepotPalltInfoModelSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
-    WmsInventoryStockSerializer, InventoryLogSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, SulfurDataModelSerializer, \
-    DepotSulfurInfoModelSerializer
+    WmsInventoryStockSerializer, InventoryLogSerializer
 from mes.common_code import SqlClient
 from mes.conf import WMS_CONF, TH_CONF
 from mes.derorators import api_recorder
@@ -230,7 +234,6 @@ class ProductInventory(GenericViewSet,
 class OutWorkFeedBack(APIView):
 
     # 出库反馈
-    @atomic
     def post(self, request):
         """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
         生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
@@ -302,6 +305,15 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 1
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
+                    outbound_order = dp_obj.outbound_order
+                    if hasattr(outbound_order, 'final_plans'):
+                        if not outbound_order.final_plans.filter(status__gt=1).exists():
+                            outbound_order.status = 3
+                            outbound_order.save()
+                    else:
+                        if not outbound_order.mixin_plans.filter(status__gt=1).exists():
+                            outbound_order.status = 3
+                            outbound_order.save()
                 il_dict = {}
                 il_dict['warehouse_no'] = dp_obj.warehouse_info.no
                 il_dict['warehouse_name'] = dp_obj.warehouse_info.name
@@ -330,7 +342,7 @@ class OutWorkFeedBack(APIView):
             try:
                 MaterialInventory.objects.create(**material_inventory_dict)
             except Exception as e:
-                logger.error(str(e) + "data: " + json.dumps(material_inventory_dict))
+                logger.error(str(e))
             try:
                 InventoryLog.objects.create(**data, **il_dict)
             except Exception as e:
@@ -392,7 +404,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('bz').all()
+            queryset = model.objects.using('bz').filter(location_status='有货货位')
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
@@ -400,7 +412,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('lb').all()
+            queryset = model.objects.using('lb').filter(location_status='有货货位')
             if lot_existed:
                 if lot_existed == '1':
                     queryset = queryset.exclude(lot_no__isnull=True)
@@ -599,14 +611,15 @@ class MaterialCount(APIView):
         if store_name == "终炼胶库":
             try:
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
-                    store_name="炼胶库").values(
+                    store_name="炼胶库", lot_no__isnull=False).values(
                     'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
                 raise ValidationError(f"终炼胶库连接失败: {e}")
         elif store_name == "混炼胶库":
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                    **filter_dict).filter(lot_no__isnull=False).values(
                     'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
@@ -617,7 +630,7 @@ class MaterialCount(APIView):
                 if status:
                     filter_dict["quality_status"] = status
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
-                    store_name="帘布库").values(
+                    store_name="帘布库", lot_no__isnull=False).values(
                     'material_no', 'material_name').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty',
                                                                                'material_name', 'all_weight')
@@ -943,6 +956,36 @@ class MaterialInventoryAPIView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class MixinRubberyOutBoundOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    """
+    list:
+        混炼胶出库单列表
+    update
+         出库/关闭出库
+    """
+    queryset = MixinRubberyOutBoundOrder.objects.filter().order_by("-created_date")
+    serializer_class = MixinRubberyOutBoundOrderSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = MixinRubberyOutBoundOrderFilter
+    permission_classes = (IsAuthenticated, )
+
+
+@method_decorator([api_recorder], name="dispatch")
+class FinalRubberyOutBoundOrderViewSet(GenericViewSet, ListModelMixin, UpdateModelMixin, RetrieveModelMixin):
+    """
+    list:
+        终炼胶出库单列表
+    update
+         出库/关闭出库
+    """
+    queryset = FinalRubberyOutBoundOrder.objects.filter().order_by("-created_date")
+    serializer_class = FinalRubberyOutBoundOrderSerializer
+    filter_backends = [DjangoFilterBackend]
+    filter_class = FinalRubberyOutBoundOrderFilter
+    permission_classes = (IsAuthenticated, )
+
+
+@method_decorator([api_recorder], name="dispatch")
 class PutPlanManagement(ModelViewSet):
     """
     list:
@@ -956,15 +999,24 @@ class PutPlanManagement(ModelViewSet):
     serializer_class = PutPlanManagementSerializer
     filter_backends = [DjangoFilterBackend]
     filter_class = PutPlanManagementFilter
+    permission_classes = (IsAuthenticated, )
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
+        order = MixinRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
+                                                         order_type='指定出库',
+                                                         order_no=''.join(str(time.time()).split('.')),
+                                                         created_user=self.request.user)
         if isinstance(data, list):
+            for item in data:
+                item['outbound_order'] = order.id
             s = PutPlanManagementSerializer(data=data, context={'request': request}, many=True)
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
         elif isinstance(data, dict):
+            data['outbound_order'] = order.id
             s = PutPlanManagementSerializer(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
@@ -1016,14 +1068,22 @@ class PutPlanManagementFianl(ModelViewSet):
     filter_class = PutPlanManagementFinalFilter
     permission_classes = (IsAuthenticated,)
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         data = request.data
+        order = FinalRubberyOutBoundOrder.objects.create(warehouse_name='混炼胶库',
+                                                         order_type='指定出库',
+                                                         order_no=''.join(str(time.time()).split('.')),
+                                                         created_user=self.request.user)
         if isinstance(data, list):
+            for item in data:
+                item['outbound_order'] = order.id
             s = PutPlanManagementSerializerFinal(data=data, context={'request': request}, many=True)
             if not s.is_valid():
                 raise ValidationError(s.errors)
             s.save()
         elif isinstance(data, dict):
+            data['outbound_order'] = order.id
             s = PutPlanManagementSerializerFinal(data=data, context={'request': request})
             if not s.is_valid():
                 raise ValidationError(s.errors)
@@ -2908,6 +2968,7 @@ class BzFinalRubberInventorySearch(ListAPIView):
         except Exception:
             raise ValidationError('参数错误！')
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+            store_name="炼胶库",
             material_no=material_no,
             location_status="有货货位",
             lot_no__isnull=False).order_by('in_storage_time')

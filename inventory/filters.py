@@ -1,11 +1,12 @@
 import django_filters
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, DepotPallt
-
-from inventory.models import DeliveryPlan, Sulfur, DepotSite, SulfurDepotSite
 from production.models import PalletFeedbacks
+from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, \
+    MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, DepotSite, SulfurDepotSite, DepotPallt, Sulfur
+
+from inventory.models import DeliveryPlan
 
 
 class PutPlanManagementFilter(django_filters.rest_framework.FilterSet):
@@ -19,7 +20,7 @@ class PutPlanManagementFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = DeliveryPlan
-        fields = ('st', 'et', 'status', 'material_no', 'name', 'station')
+        fields = ('st', 'et', 'status', 'material_no', 'name', 'station', 'outbound_order')
 
 
 class PutPlanManagementLBFilter(django_filters.rest_framework.FilterSet):
@@ -47,7 +48,7 @@ class PutPlanManagementFinalFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = DeliveryPlanFinal
-        fields = ('st', 'et', 'status', 'material_no', 'name', 'station')
+        fields = ('st', 'et', 'status', 'material_no', 'name', 'station', 'outbound_order')
 
 
 class MaterialPlanManagementFilter(django_filters.rest_framework.FilterSet):
@@ -293,3 +294,18 @@ class SulfurResumeFilter(django_filters.rest_framework.FilterSet):
         fields = ['name', 'product_no', 'provider', 'lot_no', 'sulfur_status', 'enter_time', 'outer_time',
                  'depot_name', 'depot_site_name']
 
+
+class MixinRubberyOutBoundOrderFilter(django_filters.rest_framework.FilterSet):
+    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains')
+
+    class Meta:
+        model = MixinRubberyOutBoundOrder
+        fields = ['order_no', 'status']
+
+
+class FinalRubberyOutBoundOrderFilter(django_filters.rest_framework.FilterSet):
+    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains')
+
+    class Meta:
+        model = FinalRubberyOutBoundOrder
+        fields = ['order_no', 'status']
