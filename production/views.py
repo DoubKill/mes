@@ -8,7 +8,7 @@ import time
 import requests
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from django.db.models import Max, Sum, Count, Min, F
+from django.db.models import Max, Sum, Count, Min, F, Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -38,12 +38,13 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear
+from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear, MaterialTestOrder, \
+    MaterialDealResult, MaterialTestResult
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
@@ -1427,3 +1428,174 @@ class RuntimeRecordView(APIView):
                          }
             results.append(temp_dict)
         return Response({"results": results})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TrainsFixView(APIView):
+    """修改收皮车次，支持指定托修改和批次修改"""
+    # {"factory_date": "2021-07-14",
+    #  "classes": "早班",
+    #  "equip_no": "Z01",
+    #  "product_no": "C-RE-J260-02",
+    #  "begin_trains": 1,
+    #  "end_trains": 6,
+    #  "fix_num": 1,
+    #  "lot_no": "AAJ1Z062021072313078"
+    #  }
+
+    def post(self, request):
+        s = TrainsFixSerializer(data=self.request.data)
+        s.is_valid(raise_exception=True)
+        data = s.validated_data
+        lot_no = data.get('lot_no')
+        if lot_no:  # 修改特定托的车次
+            pallet = PalletFeedbacks.objects.filter(lot_no=data['lot_no']).first()
+            if not pallet:
+                raise ValidationError('未找到收皮数据！')
+            data['product_no'] = pallet.product_no
+            data['classes'] = pallet.classes
+            data['equip_no'] = pallet.equip_no
+            data['factory_date'] = pallet.factory_date
+            if PalletFeedbacks.objects.exclude(
+                    lot_no=data['lot_no']).filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date']
+                                                  ).filter(Q(begin_trains__lte=data['begin_trains'],
+                                                           end_trains__gte=data['begin_trains']) |
+                                                           Q(begin_trains__lte=data['end_trains'],
+                                                           end_trains__gte=data['end_trains']) |
+                                                           Q(begin_trains__gte=data['begin_trains'],
+                                                             end_trains__lte=data['end_trains'])):
+                raise ValidationError('车次重复，请确认后重试！')
+            pallet.begin_trains = data['begin_trains']
+            pallet.end_trains = data['end_trains']
+            pallet.save()
+            MaterialTestOrder.objects.filter(lot_no=data['lot_no']).delete()
+            lot_nos = [data['lot_no']]
+        else:
+            fix_num = data['fix_num']
+            pallet_data = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                         product_no=data['product_no'],
+                                                         classes=data['classes'],
+                                                         factory_date=data['factory_date'],
+                                                         ).filter(Q(begin_trains__lte=data['begin_trains'],
+                                                                  end_trains__gte=data['begin_trains']) |
+                                                                  Q(begin_trains__lte=data['end_trains'],
+                                                                  end_trains__gte=data['end_trains']) |
+                                                                  Q(begin_trains__gte=data['begin_trains'],
+                                                                  end_trains__lte=data['end_trains'])
+                                                                  ).order_by('begin_trains')
+            if not pallet_data:
+                raise ValidationError('未找到改批次收皮数据！')
+            lot_nos = set(pallet_data.values_list('lot_no', flat=True))
+            first_pallet = pallet_data.first()
+            last_pallet = pallet_data.last()
+            pc_last_trains = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                            product_no=data['product_no'],
+                                                            classes=data['classes'],
+                                                            factory_date=data['factory_date'],
+                                                            ).order_by('begin_trains').last().end_trains
+            if fix_num < 0:
+                if not data['begin_trains'] > first_pallet.begin_trains:
+                    if first_pallet.begin_trains + fix_num <= 0:
+                        raise ValidationError('修改后车次不可为0！')
+                pallet_end_trains = data['begin_trains'] if first_pallet.begin_trains >= data['begin_trains'] else first_pallet.begin_trains
+                if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  begin_trains__lte=pallet_end_trains + fix_num,
+                                                  end_trains__gte=pallet_end_trains + fix_num
+                                                  ).exclude(lot_no=first_pallet.lot_no).exists():
+                    raise ValidationError("修改后第{}车车次信息已存在！".format(pallet_end_trains+fix_num))
+            if fix_num > 0:
+                pallet_end_trains = data['end_trains'] if last_pallet.end_trains >= data['end_trains'] else last_pallet.end_trains
+                if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  begin_trains__lte=pallet_end_trains+fix_num,
+                                                  end_trains__gte=pallet_end_trains+fix_num
+                                                  ).exclude(lot_no=last_pallet.lot_no).exists():
+                    raise ValidationError("修改后第{}车车次信息已存在！".format(pallet_end_trains + fix_num))
+            for pallet in pallet_data:
+                # 修改收皮车次数据
+                if not pallet.begin_trains+fix_num > pc_last_trains:
+                    if not data['begin_trains'] > pallet.begin_trains:
+                        pallet.begin_trains += fix_num
+                if not pallet.end_trains+fix_num >= pc_last_trains:
+                    if not pallet.end_trains > data['end_trains']:
+                        pallet.end_trains += fix_num
+                pallet.save()
+
+            test_order_data = MaterialTestOrder.objects.filter(lot_no__in=lot_nos)
+            for test_order in test_order_data:
+                # 修改车次检测单收皮条码
+                p = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                   product_no=data['product_no'],
+                                                   classes=data['classes'],
+                                                   factory_date=data['factory_date'],
+                                                   begin_trains__lte=test_order.actual_trains,
+                                                   end_trains__gte=test_order.actual_trains).first()
+                if p:
+                    test_order.lot_no = p.lot_no
+                    test_order.save()
+
+        MaterialDealResult.objects.filter(lot_no__in=lot_nos).delete()
+        for lot_no in lot_nos:
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no)
+            # 取检测车次
+            test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
+            # 取托盘反馈生产车次
+            actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
+
+            common_trains_set = actual_trains_set & test_trains_set
+            # 判断托盘反馈车次都存在检测数据
+            if not len(actual_trains_set) == len(test_trains_set) == len(common_trains_set):
+                continue
+
+            # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
+            passed_order_count = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                  is_passed=True).count()
+            unqualified_order_count = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                       is_qualified=False).count()
+            if 0 < passed_order_count == unqualified_order_count > 0:
+                level = 1
+                test_result = 'PASS'
+                last_result_ids = list(MaterialTestResult.objects.filter(
+                    is_judged=True,
+                    material_test_order__lot_no=lot_no).values(
+                    'material_test_order', 'test_indicator_name', 'data_point_name'
+                ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
+                # 取该托唯一一个pass章的数据点
+                passed_result = MaterialTestResult.objects.filter(
+                    is_judged=True,
+                    id__in=last_result_ids,
+                    is_passed=True).last()
+                deal_suggestion = getattr(passed_result, 'pass_suggestion', '放行')
+            # 2、所有车次都合格
+            elif not MaterialTestOrder.objects.filter(is_qualified=False,
+                                                      lot_no=lot_no).exists():
+                level = 1
+                test_result = '一等品'
+                deal_suggestion = '合格'
+            # 3、不合格
+            else:
+                level = 3
+                test_result = '三等品'
+                deal_suggestion = '不合格'
+
+            deal_result_dict = {
+                'level': level,
+                'test_result': test_result,
+                'reason': 'reason',
+                'status': '待处理',
+                'deal_result': '一等品' if level == 1 else '三等品',
+                'production_factory_date': pfb_obj.end_time,
+                'deal_suggestion': deal_suggestion,
+                "lot_no": lot_no
+            }
+            MaterialDealResult.objects.create(**deal_result_dict)
+        return Response('修改成功')
