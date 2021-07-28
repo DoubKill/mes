@@ -1607,7 +1607,7 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
 
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):
-    classes = serializers.CharField(write_only=True)
+    classes = serializers.CharField()
 
     class Meta:
         model = ProductTestPlanDetail
@@ -1621,9 +1621,9 @@ class ProductTestPlanSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductTestPlan
-        fields = ['plan_uid', 'test_equip', 'test_time', 'test_classes', 'test_group', 'test_indicator_name', 'test_method_name',
-                  'test_times', 'test_interval', 'product_test_plan_detail', 'status']
-        read_only_fields = ['plan_uid', 'test_time']
+        fields = ['status', 'plan_uid', 'test_equip', 'test_time', 'test_classes', 'test_group', 'test_indicator_name', 'test_method_name',
+                  'test_times', 'test_interval', 'product_test_plan_detail']
+        read_only_fields = ['plan_uid', 'test_time', 'status']
 
 
 class ProductTEstResumeSerializer(BaseModelSerializer):
@@ -1637,6 +1637,7 @@ class ProductTEstResumeSerializer(BaseModelSerializer):
     test_times = serializers.ReadOnlyField(source='test_plan.test_times')
     test_interval = serializers.ReadOnlyField(source='test_plan.test_interval')
     status = serializers.ReadOnlyField(source='test_plan.status')
+    values = serializers.CharField(read_only=True)
 
     class Meta:
         model = ProductTestPlanDetail

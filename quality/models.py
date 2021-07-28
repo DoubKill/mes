@@ -478,7 +478,7 @@ class ProductTestPlanDetail(models.Model):
 
     @property
     def values(self):
-        return self.value.split(': ')[1].strip('}')
+        return eval(self.value).get('l_4') if self.value else None
 
 
 class ProductReportValue(models.Model):

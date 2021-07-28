@@ -121,6 +121,5 @@ urlpatterns = [
     path('show-qualified-range/', ShowQualifiedRange.as_view()),  # 全局配置快检卡片打印显示合格区间
     path('wms-material-search/', WMSMaterialSearchView.as_view()),
     path('report-value/', ReportValueView.as_view()),
-    path('test-value/', TestValueView.as_view()),
-    path('test-data/', TestDataView.as_view()), # 设备监控数据
+    path('equip-test-data/', TestDataView.as_view()), # 设备监控数据
 ]
