@@ -1488,6 +1488,7 @@ class TrainsFixView(APIView):
                                                                   ).order_by('begin_trains')
             if not pallet_data:
                 raise ValidationError('未找到改批次收皮数据！')
+            lot_nos = set(pallet_data.values_list('lot_no', flat=True))
             first_pallet = pallet_data.first()
             last_pallet = pallet_data.last()
             pc_last_trains = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
@@ -1528,14 +1529,7 @@ class TrainsFixView(APIView):
                         pallet.end_trains += fix_num
                 pallet.save()
 
-            test_order_data = MaterialTestOrder.objects.filter(
-                product_no=data['product_no'],
-                production_class=data['classes'],
-                production_factory_date=data['factory_date'],
-                production_equip_no=data['equip_no'],
-                actual_trains__gte=data['begin_trains']+fix_num,
-                actual_trains__lte=data['end_trains']+fix_num)
-            lot_nos = set(test_order_data.values_list('lot_no', flat=True))
+            test_order_data = MaterialTestOrder.objects.filter(lot_no__in=lot_nos)
             for test_order in test_order_data:
                 # 修改车次检测单收皮条码
                 p = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
