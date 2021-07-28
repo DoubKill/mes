@@ -303,4 +303,4 @@ class TrainsFixSerializer(serializers.Serializer):
     begin_trains = serializers.IntegerField(min_value=1)
     end_trains = serializers.IntegerField(min_value=1)
     fix_num = serializers.IntegerField(required=False)
-    lot_no = serializers.CharField(required=False)
+    lot_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
