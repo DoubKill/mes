@@ -1475,6 +1475,20 @@ class TrainsFixView(APIView):
             lot_nos = [data['lot_no']]
         else:
             fix_num = data['fix_num']
+            if data['begin_trains'] + fix_num <= 0:
+                raise ValidationError('修改后车次不可为0！')
+            if not PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  begin_trains=data['begin_trains']):
+                raise ValidationError('开始车次必须为一托开始车次！')
+            if not PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  end_trains=data['end_trains']):
+                raise ValidationError('结束车次必须为一托结束车次！')
             pallet_data = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
                                                          product_no=data['product_no'],
                                                          classes=data['classes'],
@@ -1489,44 +1503,29 @@ class TrainsFixView(APIView):
             if not pallet_data:
                 raise ValidationError('未找到改批次收皮数据！')
             lot_nos = set(pallet_data.values_list('lot_no', flat=True))
-            first_pallet = pallet_data.first()
-            last_pallet = pallet_data.last()
-            pc_last_trains = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
-                                                            product_no=data['product_no'],
-                                                            classes=data['classes'],
-                                                            factory_date=data['factory_date'],
-                                                            ).order_by('begin_trains').last().end_trains
-            if fix_num < 0:
-                if not data['begin_trains'] > first_pallet.begin_trains:
-                    if first_pallet.begin_trains + fix_num <= 0:
-                        raise ValidationError('修改后车次不可为0！')
-                pallet_end_trains = data['begin_trains'] if first_pallet.begin_trains >= data['begin_trains'] else first_pallet.begin_trains
-                if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
-                                                  product_no=data['product_no'],
-                                                  classes=data['classes'],
-                                                  factory_date=data['factory_date'],
-                                                  begin_trains__lte=pallet_end_trains + fix_num,
-                                                  end_trains__gte=pallet_end_trains + fix_num
-                                                  ).exclude(lot_no=first_pallet.lot_no).exists():
-                    raise ValidationError("修改后第{}车车次信息已存在！".format(pallet_end_trains+fix_num))
-            if fix_num > 0:
-                pallet_end_trains = data['end_trains'] if last_pallet.end_trains >= data['end_trains'] else last_pallet.end_trains
-                if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
-                                                  product_no=data['product_no'],
-                                                  classes=data['classes'],
-                                                  factory_date=data['factory_date'],
-                                                  begin_trains__lte=pallet_end_trains+fix_num,
-                                                  end_trains__gte=pallet_end_trains+fix_num
-                                                  ).exclude(lot_no=last_pallet.lot_no).exists():
-                    raise ValidationError("修改后第{}车车次信息已存在！".format(pallet_end_trains + fix_num))
+            # pc_last_trains = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+            #                                                 product_no=data['product_no'],
+            #                                                 classes=data['classes'],
+            #                                                 factory_date=data['factory_date'],
+            #                                                 ).order_by('begin_trains').last().end_trains
+            if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                              product_no=data['product_no'],
+                                              classes=data['classes'],
+                                              factory_date=data['factory_date']
+                                              ).exclude(id__in=pallet_data.values_list('id', flat=True)).filter(
+                    Q(begin_trains__lte=data['begin_trains']+fix_num, end_trains__gte=data['begin_trains']+fix_num) |
+                    Q(begin_trains__lte=data['end_trains']+fix_num, end_trains__gte=data['end_trains']+fix_num) |
+                    Q(begin_trains__gte=data['begin_trains']+fix_num, end_trains__lte=data['end_trains']+fix_num)
+            ).exists():
+                raise ValidationError('修改后车次信息重复！')
             for pallet in pallet_data:
                 # 修改收皮车次数据
-                if not pallet.begin_trains+fix_num > pc_last_trains:
-                    if not data['begin_trains'] > pallet.begin_trains:
-                        pallet.begin_trains += fix_num
-                if not pallet.end_trains+fix_num >= pc_last_trains:
-                    if not pallet.end_trains > data['end_trains']:
-                        pallet.end_trains += fix_num
+                # if not pallet.begin_trains+fix_num > pc_last_trains:
+                #     if not data['begin_trains'] > pallet.begin_trains:
+                pallet.begin_trains += fix_num
+                # if not pallet.end_trains+fix_num >= pc_last_trains:
+                #     if not pallet.end_trains > data['end_trains']:
+                pallet.end_trains += fix_num
                 pallet.save()
 
             test_order_data = MaterialTestOrder.objects.filter(lot_no__in=lot_nos)
@@ -1553,7 +1552,7 @@ class TrainsFixView(APIView):
 
             common_trains_set = actual_trains_set & test_trains_set
             # 判断托盘反馈车次都存在检测数据
-            if not len(actual_trains_set) == len(test_trains_set) == len(common_trains_set):
+            if not len(actual_trains_set) == len(common_trains_set):
                 continue
 
             # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章

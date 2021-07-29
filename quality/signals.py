@@ -128,7 +128,7 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             common_trains_set = actual_trains_set & test_trains_set
             # 判断托盘反馈车次都存在检测数据
-            if not len(actual_trains_set) == len(test_trains_set) == len(common_trains_set):
+            if not len(actual_trains_set) == len(common_trains_set):
                 return
 
             # 判断该托盘所有test_order检测结果
