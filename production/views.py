@@ -1477,6 +1477,18 @@ class TrainsFixView(APIView):
             fix_num = data['fix_num']
             if data['begin_trains'] + fix_num <= 0:
                 raise ValidationError('修改后车次不可为0！')
+            if not PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  begin_trains=data['begin_trains']):
+                raise ValidationError('开始车次必须为一托开始车次！')
+            if not PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  end_trains=data['end_trains']):
+                raise ValidationError('结束车次必须为一托结束车次！')
             pallet_data = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
                                                          product_no=data['product_no'],
                                                          classes=data['classes'],
@@ -1496,7 +1508,11 @@ class TrainsFixView(APIView):
             #                                                 classes=data['classes'],
             #                                                 factory_date=data['factory_date'],
             #                                                 ).order_by('begin_trains').last().end_trains
-            if PalletFeedbacks.objects.exclude(id__in=pallet_data.values_list('id', flat=True)).filter(
+            if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                              product_no=data['product_no'],
+                                              classes=data['classes'],
+                                              factory_date=data['factory_date']
+                                              ).exclude(id__in=pallet_data.values_list('id', flat=True)).filter(
                     Q(begin_trains__lte=data['begin_trains']+fix_num, end_trains__gte=data['begin_trains']+fix_num) |
                     Q(begin_trains__lte=data['end_trains']+fix_num, end_trains__gte=data['end_trains']+fix_num) |
                     Q(begin_trains__gte=data['begin_trains']+fix_num, end_trains__lte=data['end_trains']+fix_num)
