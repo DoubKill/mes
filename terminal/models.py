@@ -206,6 +206,7 @@ class FeedingLog(AbstractEntity):
 
 
 class LoadTankMaterialLog(AbstractEntity):
+    plan_classes_uid = models.CharField(max_length=64, help_text='小料称量计划号')
     scan_material = models.CharField(max_length=64, help_text='扫码物料名', default='')
     material_no = models.CharField(max_length=64, help_text='原材料编码')
     material_name = models.CharField(max_length=64, help_text='原材料名称')

@@ -146,69 +146,50 @@ class BatchProductBatchingVIew(APIView):
 
     def get(self, request):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
-        plan_batching_uid = self.request.query_params.get('plan_batching_uid')
-        if plan_classes_uid:
-            # 生产计划配方详情
-            classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
-            if not classes_plan:
-                raise ValidationError('该计划不存在')
-            ret = list(ProductBatchingDetail.objects.filter(
-                product_batching=classes_plan.product_batching,
-                delete_flag=False,
-                type=1
-            ).values('material__material_name', 'actual_weight'))
-            for weight_cnt_type in classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
-                ret.append({
-                    'material__material_name': weight_cnt_type.name,
-                    'actual_weight': weight_cnt_type.package_cnt
-                })
-            # 上料表中最大车次
-            max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
-                feed_log__plan_classes_uid=plan_classes_uid, status=1).aggregate(
-                max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
-            if not max_feed_log_id:
-                # 当前生产中没有, 表示未进料(所有原材料数量均为0);否则代表进料，根据条形码进行计算
-                list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
-                                             'adjust_left_weight': 0}), ret))
+        # 生产计划配方详情
+        classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+        if not classes_plan:
+            raise ValidationError('该计划不存在')
+        ret = list(ProductBatchingDetail.objects.filter(
+            product_batching=classes_plan.product_batching,
+            delete_flag=False,
+            type=1
+        ).values('material__material_name', 'actual_weight'))
+        for weight_cnt_type in classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
+            ret.append({
+                'material__material_name': weight_cnt_type.name,
+                'actual_weight': weight_cnt_type.package_cnt
+            })
+        # 加载物料标准信息
+        add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970')\
+            .values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight', 'adjust_left_weight')
+        # 未进料(所有原材料数量均为0);
+        if not add_materials:
+            list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
+                                         'adjust_left_weight': 0}), ret))
+            return Response(ret)
+        # 已扫码进料: 进料部分正常显示,未进料显示为0,同物料多条码显示最新
+        material_info = {i['material_name']: i for i in add_materials}
+        for single_material in ret:
+            material_name = single_material['material__material_name']
+            plan_weight = single_material['material__actual_weight']
+            load_data = material_info.get(material_name)
+            # 不存在则说明当前只完成了一部分的进料,数量置为0
+            if not load_data:
+                single_material.update(
+                    {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''})
+                continue
+            # 全部完成进料
+            single_material.update({'bra_code': load_data.bra_code, 'init_weight': load_data.init_weight,
+                                    'used_weight': load_data.actual_weight, 'scan_material': load_data.scan_material,
+                                    'adjust_left_weight': load_data.adjust_left_weight, 'id': load_data.id
+                                    })
+            # 判断物料是否够一车
+            if load_data.adjust_left_weight < plan_weight:
+                single_material.update(
+                    {'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
             else:
-                # 根据上料表中最大车次获取到各原材料条码，物料名，单车需要重量信息
-                trains = FeedingMaterialLog.objects.using('SFJ').get(id=max_feed_log_id).trains
-                if trains != 1:
-                    now_material_info = LoadMaterialLog.objects.using('SFJ').filter(feed_log_id=max_feed_log_id, status=1)
-                    max_feed_log_id = max_feed_log_id if now_material_info.count() == len(ret) else max_feed_log_id - 1
-                now_materials = LoadMaterialLog.objects.using('SFJ').filter(feed_log_id=max_feed_log_id, status=1).values('material_name', 'bra_code')
-                # 如果上料表中一车同物料出现多条,整合相同数据
-                material_info = {i['material_name']: i for i in now_materials}
-                # 遍历配方中的数据
-                for single_material in ret:
-                    # 获取上料表中的数据
-                    load_data = material_info.get(single_material['material__material_name'])
-                    # 不存在则说明还在进料中，数量置为0
-                    if not load_data:
-                        single_material.update(
-                            {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''})
-                        continue
-                    bra_code = load_data.get('bra_code')
-                    plan_weight = single_material.get('actual_weight')
-                    # 根据条码查询料框表对应的数据
-                    material_bra = LoadTankMaterialLog.objects.filter(bra_code=bra_code).first()
-                    single_material.update({'bra_code': material_bra.bra_code, 'init_weight': material_bra.init_weight,
-                                            'used_weight': material_bra.actual_weight,
-                                            'adjust_left_weight': material_bra.adjust_left_weight,
-                                            'id': material_bra.id, 'scan_material': material_bra.scan_material
-                                            })
-                    if material_bra.adjust_left_weight < plan_weight:
-                        single_material.update(
-                            {'msg': '物料：{}不足, 请扫码添加物料'.format(single_material['material__material_name'])})
-                    else:
-                        single_material.update({'msg': ''})
-        else:
-            # 配料计划详情
-            batching_class_plan = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid).first()
-            if not batching_class_plan:
-                raise ValidationError('配料计划uid不存在')
-            ret = batching_class_plan.weigh_cnt_type.weight_details.filter(
-                delete_flag=False).values('material__material_no', 'material__material_name', 'standard_weight')
+                single_material.update({'msg': ''})
         return Response(ret)
 
 
