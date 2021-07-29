@@ -1521,7 +1521,7 @@ class TrainsFixView(APIView):
                     raise ValidationError("修改后第{}车车次信息已存在！".format(pallet_end_trains + fix_num))
             for pallet in pallet_data:
                 # 修改收皮车次数据
-                if not pallet.begin_trains+fix_num > pc_last_trains:
+                if not pallet.begin_trains+fix_num >= pc_last_trains:
                     if not data['begin_trains'] > pallet.begin_trains:
                         pallet.begin_trains += fix_num
                 if not pallet.end_trains+fix_num >= pc_last_trains:
