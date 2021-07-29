@@ -114,6 +114,8 @@ urlpatterns = [
     path('bz-mixin-inventory-search/', BzMixingRubberInventorySearch.as_view()),  # 根据出库口、搜索指定数量的混炼胶库存信息
 
     # 终炼胶库存管理
+    path('bz-final-inventory/', BzFinalRubberInventory.as_view()),  # 北自终炼胶库、帘布库存列表
+    path('bz-final-inventory-summary/', BzFinalRubberInventorySummary.as_view()),  # 北自终炼胶、帘布库存统计列表
     path('bz-final-inventory-search/', BzFinalRubberInventorySearch.as_view()),  # 搜索指定数量的终炼胶库存信息
 
     # 出库大屏

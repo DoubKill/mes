@@ -159,7 +159,7 @@ class ProductInventory(GenericViewSet,
             "unit_weight": round(instance[2] / instance[1], 2),
             "total_weight": instance[2],
             "need_weight": instance[2],
-            "standard_flag": True if instance[3] == "合格品" else False,
+            "standard_flag": instance[3],
             "site": instance[0]
         }
         return temp_dict
@@ -195,8 +195,8 @@ class ProductInventory(GenericViewSet,
                 filter_str += f" AND 物料编码 like '%{material_no}%'"
             else:
                 filter_str += f" where 物料编码 like '%{material_no}%'"
-        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
-            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码"""
+        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, 品质等级, 物料编码, Row_Number() OVER (order by 物料编码) sn
+            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码, 品质等级 order by 物料编码"""
         sql_all = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW"""
         sql_fm = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW where 物料编码 like '%FM%'"""
         sc = SqlClient(sql=sql)
@@ -398,7 +398,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('bz').filter(location_status='有货货位')
+            queryset = model.objects.using('bz').all().order_by('in_storage_time')
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
@@ -406,7 +406,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('lb').filter(location_status='有货货位')
+            queryset = model.objects.using('lb').order_by('in_storage_time')
             if lot_existed:
                 if lot_existed == '1':
                     queryset = queryset.exclude(lot_no__isnull=True)
@@ -599,13 +599,13 @@ class MaterialCount(APIView):
         status = params.get("status")
         if not store_name:
             raise ValidationError("缺少立库名参数，请检查后重试")
-        filter_dict = dict(location_status="有货货位")
+        filter_dict = {}
         if status:
             filter_dict.update(quality_level=status)
         if store_name == "终炼胶库":
             try:
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
-                    store_name="炼胶库", lot_no__isnull=False).values(
+                    store_name="炼胶库").values(
                     'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
@@ -613,7 +613,7 @@ class MaterialCount(APIView):
         elif store_name == "混炼胶库":
             try:
                 ret = BzFinalMixingRubberInventory.objects.using('bz').filter(
-                    **filter_dict).filter(lot_no__isnull=False).values(
+                    **filter_dict).values(
                     'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
@@ -624,7 +624,7 @@ class MaterialCount(APIView):
                 if status:
                     filter_dict["quality_status"] = status
                 ret = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_dict).filter(
-                    store_name="帘布库", lot_no__isnull=False).values(
+                    store_name="帘布库").values(
                     'material_no', 'material_name').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty',
                                                                                'material_name', 'all_weight')
@@ -2503,7 +2503,8 @@ class BzMixingRubberInventory(ListAPIView):
         quality_status = self.request.query_params.get('quality_status')  # 品质状态
         lot_existed = self.request.query_params.get('lot_existed')  # 收皮条码有无（1：有，0：无）
         station = self.request.query_params.get('station')  # 出库口名称
-        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位")
+        location_status = self.request.query_params.get('location_status')  # 货位状态
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
             queryset = queryset.filter(material_no__icontains=material_no)
         if container_no:
@@ -2516,6 +2517,8 @@ class BzMixingRubberInventory(ListAPIView):
             queryset = queryset.filter(lot_no__icontains=lot_no)
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
+        if location_status:
+            queryset = queryset.filter(location_status=location_status)
         if lot_existed:
             if lot_existed == '1':
                 queryset = queryset.exclude(lot_no__isnull=True)
@@ -2533,23 +2536,31 @@ class BzMixingRubberInventory(ListAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventorySummary(APIView):
-    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称"""
+    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
 
     def get(self, request):
         params = request.query_params
         quality_status = params.get("status")
         station = params.get("station")
-        if not all([quality_status, station]):
-            raise ValidationError('参数缺失！')
-        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位")
-        if station == '一层前端':
-            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-        elif station in ('二层前端', '二层后端'):
-            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-        else:
-            return Response([])
-        if status:
+        location_status = params.get("location_status")
+        lot_existed = params.get("lot_existed")
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').all()
+        if location_status:
+            queryset = queryset.filter(location_status=location_status)
+        if station:
+            if station == '一层前端':
+                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+            elif station in ('二层前端', '二层后端'):
+                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+            else:
+                return Response([])
+        if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
+        if lot_existed:
+            if lot_existed == '1':
+                queryset = queryset.filter(lot_no__isnull=False)
+            else:
+                queryset = queryset.filter(lot_no__isnull=True)
         try:
             ret = queryset.values('material_no').annotate(all_qty=Sum('qty'),
                                                           all_weight=Sum('total_weight')
@@ -2598,6 +2609,96 @@ class BzMixingRubberInventorySearch(ListAPIView):
                 break
         serializer = self.get_serializer(ret, many=True)
         return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BzFinalRubberInventory(ListAPIView):
+    """
+        终炼胶、帘布库存列表
+    """
+    serializer_class = BzFinalMixingRubberLBInventorySerializer
+    permission_classes = (IsAuthenticated, )
+    filter_backends = (DjangoFilterBackend,)
+
+    def list(self, request, *args, **kwargs):
+        filter_kwargs = {}
+        store_name = self.request.query_params.get('store_name', '炼胶库')  # 仓库
+        quality_status = self.request.query_params.get('quality_status', None)
+        lot_existed = self.request.query_params.get('lot_existed')
+        container_no = self.request.query_params.get('container_no')
+        material_no = self.request.query_params.get('material_no')
+        order_no = self.request.query_params.get('order_no')
+        location = self.request.query_params.get('location')
+        tunnel = self.request.query_params.get('tunnel')
+        lot_no = self.request.query_params.get('lot_no')
+        location_status = self.request.query_params.get('location_status')  # 货位状态
+        if store_name:
+            if store_name == '终炼胶库':
+                store_name = "炼胶库"
+            filter_kwargs['store_name'] = store_name
+        if quality_status:
+            filter_kwargs['quality_level'] = quality_status
+        if lot_existed:
+            if lot_existed == '1':
+                filter_kwargs['lot_no__isnull'] = False
+            else:
+                filter_kwargs['lot_no__isnull'] = True
+        if container_no:
+            filter_kwargs['container_no__icontains'] = container_no
+        if material_no:
+            filter_kwargs['material_no'] = material_no
+        if order_no:
+            filter_kwargs['bill_id__icontains'] = container_no
+        if location:
+            filter_kwargs['location__icontains'] = location
+        if tunnel:
+            filter_kwargs['location__istartswith'] = tunnel
+        if lot_no:
+            filter_kwargs['lot_no__icontains'] = lot_no
+        if location_status:
+            filter_kwargs['location_status'] = location_status
+        queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by('in_storage_time')
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BzFinalRubberInventorySummary(APIView):
+    """终炼胶库存、帘布库库存统计列表。参数：status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
+
+    def get(self, request):
+        params = request.query_params
+        quality_status = params.get("status")
+        location_status = params.get("location_status")
+        store_name = params.get("store_name", '炼胶库')
+        lot_existed = params.get("lot_existed")
+        queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').all()
+        if location_status:
+            queryset = queryset.filter(location_status="有货货位")
+        if quality_status:
+            queryset = queryset.filter(quality_level=quality_status)
+        if store_name:
+            if store_name == '终炼胶库':
+                store_name = "炼胶库"
+            queryset = queryset.filter(store_name=store_name)
+        if lot_existed:
+            if lot_existed == '1':
+                queryset = queryset.filter(lot_no__isnull=False)
+            else:
+                queryset = queryset.filter(lot_no__isnull=True)
+        try:
+            ret = queryset.values('material_no').annotate(all_qty=Sum('qty'),
+                                                          all_weight=Sum('total_weight')
+                                                          ).values('material_no', 'all_qty', 'all_weight')
+        except Exception as e:
+            raise ValidationError(f"混炼胶库连接失败:{e}")
+        return Response(ret)
 
 
 @method_decorator([api_recorder], name="dispatch")
