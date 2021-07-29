@@ -398,7 +398,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('bz').all()
+            queryset = model.objects.using('bz').all().order_by('in_storage_time')
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
@@ -406,7 +406,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('lb').all()
+            queryset = model.objects.using('lb').order_by('in_storage_time')
             if lot_existed:
                 if lot_existed == '1':
                     queryset = queryset.exclude(lot_no__isnull=True)
@@ -2504,7 +2504,7 @@ class BzMixingRubberInventory(ListAPIView):
         lot_existed = self.request.query_params.get('lot_existed')  # 收皮条码有无（1：有，0：无）
         station = self.request.query_params.get('station')  # 出库口名称
         location_status = self.request.query_params.get('location_status')  # 货位状态
-        queryset = BzFinalMixingRubberInventory.objects.using('bz').all()
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
             queryset = queryset.filter(material_no__icontains=material_no)
         if container_no:
@@ -2618,8 +2618,9 @@ class BzFinalRubberInventory(ListAPIView):
     """
     serializer_class = BzFinalMixingRubberLBInventorySerializer
     permission_classes = (IsAuthenticated, )
+    filter_backends = (DjangoFilterBackend,)
 
-    def get_queryset(self):
+    def list(self, request, *args, **kwargs):
         filter_kwargs = {}
         store_name = self.request.query_params.get('store_name', '炼胶库')  # 仓库
         quality_status = self.request.query_params.get('quality_status', None)
@@ -2656,7 +2657,15 @@ class BzFinalRubberInventory(ListAPIView):
             filter_kwargs['lot_no__icontains'] = lot_no
         if location_status:
             filter_kwargs['location_status'] = location_status
-        return BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs)
+        queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by('in_storage_time')
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")

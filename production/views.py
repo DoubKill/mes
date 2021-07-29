@@ -1552,7 +1552,7 @@ class TrainsFixView(APIView):
 
             common_trains_set = actual_trains_set & test_trains_set
             # 判断托盘反馈车次都存在检测数据
-            if not len(actual_trains_set) == len(test_trains_set) == len(common_trains_set):
+            if not len(actual_trains_set) == len(common_trains_set):
                 continue
 
             # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
