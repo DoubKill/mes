@@ -1231,8 +1231,8 @@ class WeightingTankStatus(APIView):
         tank_status_sync = TankStatusSync(equip_no=equip_no)
         try:
             tank_status_sync.sync()
-        except:
-            return response(success=False, message='mes同步称量系统料罐状态失败')
+        except Exception as e:
+            return response(success=False, message='mes同步称量系统料罐状态失败:{}'.format(e.args[0]))
         # 获取该机台号下所有料罐信息
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True)\
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
