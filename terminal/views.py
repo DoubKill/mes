@@ -172,7 +172,7 @@ class BatchProductBatchingVIew(APIView):
         material_info = {i['material_name']: i for i in add_materials}
         for single_material in ret:
             material_name = single_material['material__material_name']
-            plan_weight = single_material['material__actual_weight']
+            plan_weight = single_material['actual_weight']
             load_data = material_info.get(material_name)
             # 不存在则说明当前只完成了一部分的进料,数量置为0
             if not load_data:
@@ -180,12 +180,12 @@ class BatchProductBatchingVIew(APIView):
                     {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''})
                 continue
             # 全部完成进料
-            single_material.update({'bra_code': load_data.bra_code, 'init_weight': load_data.init_weight,
-                                    'used_weight': load_data.actual_weight, 'scan_material': load_data.scan_material,
-                                    'adjust_left_weight': load_data.adjust_left_weight, 'id': load_data.id
+            single_material.update({'bra_code': load_data['bra_code'], 'init_weight': load_data['init_weight'],
+                                    'used_weight': load_data['actual_weight'], 'scan_material': load_data['scan_material'],
+                                    'adjust_left_weight': load_data['adjust_left_weight'], 'id': load_data['id']
                                     })
             # 判断物料是否够一车
-            if load_data.adjust_left_weight < plan_weight:
+            if load_data['adjust_left_weight'] < plan_weight:
                 single_material.update(
                     {'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
             else:

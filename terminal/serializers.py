@@ -122,8 +122,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             attrs['status'] = 2
         else:
             # 获取计划号对应料框信息
-            add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid,
-                                                               useup_time__year='1970')
+            add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970',
+                                                               material_name=material_name)
 
             if not add_materials:
                 # 上一条计划剩余量判定
@@ -138,19 +138,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                'real_weight': pre_material.real_weight, 'pre_material': pre_material,
                                                'adjust_left_weight': pre_material.adjust_left_weight})
                     attrs['status'] = 1
-                    # # 剩余量足够一车
-                    # if pre_material.adjust_left_weight >= single_material_weight:
-                    #     attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
-                    #                                'real_weight': pre_material.real_weight, 'pre_material': pre_material,
-                    #                                'adjust_left_weight': pre_material.adjust_left_weight})
-                    #     attrs['status'] = 1
-                    # # 剩余量不足一车
-                    # else:
-                    #     attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
-                    #                                'real_weight': pre_material.real_weight,
-                    #                                'pre_material': pre_material,
-                    #                                'adjust_left_weight': pre_material.adjust_left_weight})
-                    #     attrs['status'] = 2
             else:
                 # 扫码物料不在已有物料中
                 if material_name not in add_materials.values_list('material_name', flat=True):
@@ -198,6 +185,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             pre_material.adjust_left_weight = 0
             pre_material.real_weight = 0
             pre_material.useup_time = datetime.now()
+            pre_material.save()
         instance = LoadTankMaterialLog.objects.create(**tank_data)
         return instance
 
