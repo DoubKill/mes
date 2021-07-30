@@ -2490,6 +2490,7 @@ class THInventoryView(WMSInventoryView):
     DATABASE_CONF = TH_CONF
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotModelViewSet(ModelViewSet):
     """线边库库区"""
     queryset = Depot.objects.filter(is_use=True)
@@ -2515,6 +2516,7 @@ class DepotModelViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotSiteModelViewSet(ModelViewSet):
     """线边库库位"""
     queryset = DepotSite.objects.filter(is_use=True)
@@ -2544,6 +2546,7 @@ class DepotSiteModelViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotPalltModelViewSet(ModelViewSet):
     """线边库库存查询"""
     queryset = DepotPallt.objects.filter(pallet_status=1).order_by('-enter_time')
@@ -2575,6 +2578,7 @@ class DepotPalltModelViewSet(ModelViewSet):
             raise ValidationError('没有数据')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotPalltInfoModelViewSet(ModelViewSet):
     """库存查询详情"""
     queryset = DepotPallt.objects.filter(pallet_status=1)
@@ -2658,6 +2662,7 @@ class PalletTestResultView(APIView):
         return Response({'table_head': table_head, 'results': ret, 'test_result': test_result})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PalletDataModelViewSet(ModelViewSet):
     """线边库出入库管理"""
     queryset = PalletFeedbacks.objects.exclude(palletfeedbacks__pallet_status=2).order_by('-product_time')
@@ -2668,14 +2673,12 @@ class PalletDataModelViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             for i in serializer.data:
                 s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
                 i.update({'group':s['work_schedule_plan__group__global_name']})
-
             if request.query_params.get('group'):
                 group = request.query_params.get('group')
                 data = [i for i in serializer.data if i['group'].startswith(group)]
@@ -2698,13 +2701,9 @@ class PalletDataModelViewSet(ModelViewSet):
         pallet_data_obj = PalletFeedbacks.objects.get(pk=pallet_id)
 
         if pallet_status == 1:  # 入库
-            q = DepotPallt.objects.filter(depot_site=depot_site_obj).all()
-            # for i in q:
-            #     if i.pallet_status == 1:
-            #         raise ValidationError("库位正在使用")
-            data_obj = DepotPallt.objects.create(pallet_data=pallet_data_obj, depot_site=depot_site_obj, enter_time=enter_time, pallet_status=pallet_status)
+            data_obj = DepotPallt.objects.create(pallet_data=pallet_data_obj, depot_site=depot_site_obj, enter_time=enter_time,
+                                                 pallet_status=pallet_status)
             data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
-
         elif pallet_status == 2:  # 出库
             DepotPallt.objects.filter(depot_site=depot_site_obj).update(pallet_status=2, outer_time=enter_time)
             data_obj = DepotPallt.objects.filter(depot_site=depot_site_obj).first()
@@ -2713,6 +2712,7 @@ class PalletDataModelViewSet(ModelViewSet):
         return Response({"result": serializer.data})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotResumeModelViewSet(ModelViewSet):
     """线边库出入库履历"""
     queryset = DepotPallt.objects.all().order_by('-enter_time')
@@ -2746,6 +2746,7 @@ class DepotResumeModelViewSet(ModelViewSet):
         return Response(serializer.data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SulfurDepotModelViewSet(ModelViewSet):
     """硫磺库库区"""
     queryset = SulfurDepot.objects.filter(is_use=True)
@@ -2771,6 +2772,7 @@ class SulfurDepotModelViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SulfurDepotSiteModelViewSet(ModelViewSet):
     """硫磺库库位"""
     queryset = SulfurDepotSite.objects.filter(is_use=True)
@@ -2800,9 +2802,9 @@ class SulfurDepotSiteModelViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SulfurDataModelViewSet(ModelViewSet):
     """硫磺库出入库管理"""
-
     queryset = Sulfur.objects.filter(sulfur_status=1).order_by('-enter_time')
     serializer_class = SulfurDataModelSerializer
     permission_classes = (IsAuthenticated,)
@@ -2814,22 +2816,20 @@ class SulfurDataModelViewSet(ModelViewSet):
         product_no = self.request.query_params.get('_product_no')
         provider = self.request.query_params.get('_provider')
         if name:
-            queryset = Sulfur.objects.filter(name__icontains=name).values('name').annotate(num=Count('name'))
-            return Response(queryset)
+            queryset = Sulfur.objects.filter(name__icontains=name).values('name').distinct()
         elif product_no:
-            queryset = Sulfur.objects.filter(product_no__icontains=product_no).values('product_no').annotate(num=Count('product_no'))
-            return Response(queryset)
+            queryset = Sulfur.objects.filter(product_no__icontains=product_no).values('product_no').distinct()
         elif provider:
-            queryset = Sulfur.objects.filter(provider__icontains=provider).values('provider').annotate(num=Count('provider'))
-            return Response(queryset)
+            queryset = Sulfur.objects.filter(provider__icontains=provider).values('provider').distinct()
         else:
             queryset = self.filter_queryset(self.get_queryset())
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return Response(queryset)
 
     # 硫磺人工入库
     def create(self, request, *args, **kwargs):
@@ -2853,6 +2853,7 @@ class SulfurDataModelViewSet(ModelViewSet):
             return Response({'results': '出库成功'})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotSulfurModelViewSet(ModelViewSet):
     """硫磺库库存查询"""
     queryset = Sulfur.objects.filter(sulfur_status=1)
@@ -2867,19 +2868,17 @@ class DepotSulfurModelViewSet(ModelViewSet):
         lst = []
         for i in serializer.data:
             lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no']})
-
         c = {i['name']: {} for i in lst}
-
         for i in lst:
             if not c[i['name']]:
                 i.update({"num": 1})
                 c[i['name']].update(i)
             else:
                 c[i['name']]['num'] += 1
-
         return Response({'results': c.values()})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class DepotSulfurInfoModelViewSet(ModelViewSet):
     """硫磺库库存查询详情"""
     queryset =  Sulfur.objects.filter(sulfur_status=1)
@@ -2893,6 +2892,8 @@ class DepotSulfurInfoModelViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+
+@method_decorator([api_recorder], name="dispatch")
 class SulfurResumeModelViewSet(ModelViewSet):
     """硫磺库出入库履历"""
     queryset = Sulfur.objects.all().order_by('-enter_time')
