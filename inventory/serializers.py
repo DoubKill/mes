@@ -1311,7 +1311,7 @@ class InOutCommonSerializer(serializers.Serializer):
 class DepotModelSerializer(serializers.ModelSerializer):
     """线边库 库区"""
     depot_name = serializers.CharField(max_length=64, help_text='库区',
-                                       validators=[UniqueValidator(queryset=Depot.objects.all(), message='该库区已存在')])
+                                       validators=[UniqueValidator(queryset=Depot.objects.filter(is_use=True), message='该库区已存在')])
 
     class Meta:
         model = Depot
@@ -1321,7 +1321,7 @@ class DepotModelSerializer(serializers.ModelSerializer):
 class DepotSiteModelSerializer(serializers.ModelSerializer):
     """线边库 库位"""
     depot_site_name = serializers.CharField(max_length=64, help_text='库位',
-                                       validators=[UniqueValidator(queryset=DepotSite.objects.all(), message='该库位已存在')])
+                                       validators=[UniqueValidator(queryset=DepotSite.objects.filter(is_use=True), message='该库位已存在')])
     class Meta:
         model = DepotSite
         fields = ['depot_name', 'depot_site_name', 'description', 'depot', 'id']
@@ -1384,7 +1384,7 @@ class DepotResumeModelSerializer(serializers.ModelSerializer):
 class SulfurDepotModelSerializer(serializers.ModelSerializer):
     """硫磺库 库区"""
     depot_name = serializers.CharField(max_length=64, help_text='库区',
-                                       validators=[UniqueValidator(queryset=SulfurDepot.objects.all(), message='该库区已存在')])
+                                       validators=[UniqueValidator(queryset=SulfurDepot.objects.filter(is_use=True), message='该库区已存在')])
     class Meta:
         model = SulfurDepot
         fields = '__all__'
@@ -1393,7 +1393,7 @@ class SulfurDepotModelSerializer(serializers.ModelSerializer):
 class SulfurDepotSiteModelSerializer(serializers.ModelSerializer):
     """硫磺库 库位"""
     depot_site_name = serializers.CharField(max_length=64, help_text='库位',
-                                       validators=[UniqueValidator(queryset=SulfurDepotSite.objects.all(), message='该库位已存在')])
+                                       validators=[UniqueValidator(queryset=SulfurDepotSite.objects.filter(is_use=True), message='该库位已存在')])
     depot_name = serializers.ReadOnlyField(source='depot.depot_name')
     class Meta:
         model = SulfurDepotSite
@@ -1402,13 +1402,16 @@ class SulfurDepotSiteModelSerializer(serializers.ModelSerializer):
 
 class SulfurDataModelSerializer(serializers.ModelSerializer):
     """硫磺库出入库管理"""
+    depot = serializers.ReadOnlyField(source='depot_site.depot.id')
+    depot_site = serializers.ReadOnlyField(source='depot_site.id')
     depot_name = serializers.ReadOnlyField(source='depot_site.depot.depot_name')
     depot_site_name = serializers.ReadOnlyField(source='depot_site.depot_site_name')
     enter_time = serializers.DateTimeField(read_only=True, help_text='入库时间')
 
     class Meta:
         model = Sulfur
-        fields = ['id', 'name', 'product_no', 'provider', 'lot_no', 'depot_name', 'depot_site_name', 'enter_time', 'sulfur_status']
+        fields = ['id', 'name', 'product_no', 'provider', 'lot_no', 'depot_name', 'depot_site_name', 'enter_time', 'sulfur_status',
+                  'weight', 'num', 'depot', 'depot_site']
 
 
 class DepotSulfurModelSerializer(serializers.ModelSerializer):

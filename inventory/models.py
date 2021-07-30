@@ -932,8 +932,9 @@ class FinalGumInInventoryLog(models.Model):
 
 class Depot(models.Model):
     """线边库 库区表"""
-    depot_name = models.CharField(max_length=64, help_text='库区名称', verbose_name='库区名称', unique=True)
+    depot_name = models.CharField(max_length=64, help_text='库区名称', verbose_name='库区名称')
     description = models.CharField(max_length=64, help_text='库区描述', verbose_name='库区描述')
+    is_use = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=True)
 
     def __str__(self):
         return self.depot_name
@@ -945,9 +946,10 @@ class Depot(models.Model):
 
 class DepotSite(models.Model):
     """线边库 库位表"""
-    depot_site_name = models.CharField(max_length=64, help_text='库位名称', verbose_name='库位名称', unique=True)
+    depot_site_name = models.CharField(max_length=64, help_text='库位名称', verbose_name='库位名称')
     description = models.CharField(max_length=64, help_text='库位描述', verbose_name='库位描述')
     depot = models.ForeignKey(Depot, on_delete=models.CASCADE, related_name='depot')
+    is_use = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=True)
 
     def __str__(self):
         return self.depot_site_name
@@ -988,8 +990,9 @@ class DepotPallt(models.Model):
 
 class SulfurDepot(models.Model):
     """硫磺 库区表"""
-    depot_name = models.CharField(max_length=64, help_text='库区名称', verbose_name='库区名称', unique=True)
+    depot_name = models.CharField(max_length=64, help_text='库区名称', verbose_name='库区名称')
     description = models.CharField(max_length=64, help_text='库区描述', verbose_name='库区描述')
+    is_use = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=True)
 
     class Meta:
         db_table = 'sulfur_depot'
@@ -1001,9 +1004,10 @@ class SulfurDepot(models.Model):
 
 class SulfurDepotSite(models.Model):
     """硫磺库 库位表"""
-    depot_site_name = models.CharField(max_length=64, help_text='库位名称', verbose_name='库位名称', unique=True)
+    depot_site_name = models.CharField(max_length=64, help_text='库位名称', verbose_name='库位名称')
     description = models.CharField(max_length=64, help_text='库位描述', verbose_name='库位描述')
     depot = models.ForeignKey(SulfurDepot, on_delete=models.CASCADE, related_name='sulfur_depot_site')
+    is_use = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=True)
 
     class Meta:
         db_table = 'sulfur_depot_site'
@@ -1018,7 +1022,9 @@ class Sulfur(models.Model):
     name = models.CharField(max_length=64, help_text='硫磺名称', verbose_name='硫磺名称')
     product_no = models.CharField(max_length=64, help_text='物料编码', verbose_name='物料编码')
     provider = models.CharField(max_length=64, help_text='供应商', verbose_name='供应商')
-    lot_no = models.CharField(max_length=64, help_text='批号', verbose_name='批号', unique=True)
+    lot_no = models.CharField(max_length=64, help_text='批号', verbose_name='批号')
+    num = models.IntegerField(help_text='数量(包)', verbose_name='数量(包)', default=1)
+    weight = models.DecimalField(max_digits=15, decimal_places=3, help_text='重量', verbose_name='重量')
     status = (
         (1, '入库'),
         (2, '出库')

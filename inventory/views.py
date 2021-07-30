@@ -2492,7 +2492,7 @@ class THInventoryView(WMSInventoryView):
 
 class DepotModelViewSet(ModelViewSet):
     """线边库库区"""
-    queryset = Depot.objects.all()
+    queryset = Depot.objects.filter(is_use=True)
     serializer_class = DepotModelSerializer
     permission_classes = [IsAuthenticated,]
 
@@ -2503,12 +2503,23 @@ class DepotModelViewSet(ModelViewSet):
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = DepotPallt.objects.filter(depot_site__depot=instance, pallet_status=1).first()  # True不能删
+        if not s:
+            instance.is_use=0
+            DepotSite.objects.filter(depot=instance).update(is_use=0)
+            instance.save()
+        else:
+            raise ValidationError('该库区下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class DepotSiteModelViewSet(ModelViewSet):
     """线边库库位"""
-    queryset = DepotSite.objects.all()
+    queryset = DepotSite.objects.filter(is_use=True)
     serializer_class = DepotSiteModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSiteDataFilter
 
@@ -2518,14 +2529,24 @@ class DepotSiteModelViewSet(ModelViewSet):
             data = queryset.values('id', 'depot_site_name', 'description', 'depot', 'depot__depot_name')
             return Response({'results': data})
         elif request.query_params.get('depot_site'):
-            data = DepotSite.objects.exclude(depotsite__pallet_status=1).values('id', 'depot_site_name', 'depot')
+            data = DepotSite.objects.filter(is_use=True).values('id', 'depot_site_name', 'depot')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = DepotPallt.objects.filter(depot_site=instance, pallet_status=1).first()  # True不能删
+        if not s:
+            instance.is_use=0
+            instance.save()
+        else:
+            raise ValidationError('该库位下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DepotPalltModelViewSet(ModelViewSet):
     """线边库库存查询"""
-    queryset = DepotPallt.objects.filter(pallet_status=1)
+    queryset = DepotPallt.objects.filter(pallet_status=1).order_by('-enter_time')
     serializer_class = DepotPalltModelSerializer
     permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
@@ -2553,6 +2574,7 @@ class DepotPalltModelViewSet(ModelViewSet):
         except:
             raise ValidationError('没有数据')
 
+
 class DepotPalltInfoModelViewSet(ModelViewSet):
     """库存查询详情"""
     queryset = DepotPallt.objects.filter(pallet_status=1)
@@ -2565,6 +2587,7 @@ class DepotPalltInfoModelViewSet(ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
 
 @method_decorator([api_recorder], name='dispatch')
 class PalletTestResultView(APIView):
@@ -2676,9 +2699,9 @@ class PalletDataModelViewSet(ModelViewSet):
 
         if pallet_status == 1:  # 入库
             q = DepotPallt.objects.filter(depot_site=depot_site_obj).all()
-            for i in q:
-                if i.pallet_status == 1:
-                    raise ValidationError("库位正在使用")
+            # for i in q:
+            #     if i.pallet_status == 1:
+            #         raise ValidationError("库位正在使用")
             data_obj = DepotPallt.objects.create(pallet_data=pallet_data_obj, depot_site=depot_site_obj, enter_time=enter_time, pallet_status=pallet_status)
             data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
 
@@ -2692,7 +2715,7 @@ class PalletDataModelViewSet(ModelViewSet):
 
 class DepotResumeModelViewSet(ModelViewSet):
     """线边库出入库履历"""
-    queryset = DepotPallt.objects.all()
+    queryset = DepotPallt.objects.all().order_by('-enter_time')
     serializer_class = DepotResumeModelSerializer
     permission_classes = [IsAuthenticated,]
     filter_backends = [DjangoFilterBackend]
@@ -2722,11 +2745,12 @@ class DepotResumeModelViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+
 class SulfurDepotModelViewSet(ModelViewSet):
     """硫磺库库区"""
-    queryset = SulfurDepot.objects.all()
+    queryset = SulfurDepot.objects.filter(is_use=True)
     serializer_class = SulfurDepotModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -2735,11 +2759,23 @@ class SulfurDepotModelViewSet(ModelViewSet):
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = Sulfur.objects.filter(depot_site__depot=instance, sulfur_status=1).first()
+        if not s:
+            instance.is_use=0
+            SulfurDepotSite.objects.filter(depot=instance).update(is_use=0)
+            instance.save()
+        else:
+            raise ValidationError('该库区下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class SulfurDepotSiteModelViewSet(ModelViewSet):
     """硫磺库库位"""
-    queryset = SulfurDepotSite.objects.all()
+    queryset = SulfurDepotSite.objects.filter(is_use=True)
     serializer_class = SulfurDepotSiteModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = SulfurDepotSiteFilter
 
@@ -2749,20 +2785,53 @@ class SulfurDepotSiteModelViewSet(ModelViewSet):
             data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name', 'description')
             return Response({'results': data})
         elif request.query_params.get('depot_site'):
-            data = SulfurDepotSite.objects.exclude(sulfur__sulfur_status=1).values('id', 'depot_site_name', 'depot')
+            data = SulfurDepotSite.objects.filter(is_use=True).values('id', 'depot_site_name', 'depot')
             return Response({'results': data})
         return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = Sulfur.objects.filter(depot_site=instance, sulfur_status=1).first()
+        if not s:
+            instance.is_use=0
+            instance.save()
+        else:
+            raise ValidationError('该库区下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SulfurDataModelViewSet(ModelViewSet):
     """硫磺库出入库管理"""
 
-    queryset = Sulfur.objects.filter(sulfur_status=1)
+    queryset = Sulfur.objects.filter(sulfur_status=1).order_by('-enter_time')
     serializer_class = SulfurDataModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = SulfurDataFilter
 
+    def list(self, request, *args, **kwargs):
+        name = self.request.query_params.get('_name')
+        product_no = self.request.query_params.get('_product_no')
+        provider = self.request.query_params.get('_provider')
+        if name:
+            queryset = Sulfur.objects.filter(name__icontains=name).values('name').annotate(num=Count('name'))
+            return Response(queryset)
+        elif product_no:
+            queryset = Sulfur.objects.filter(product_no__icontains=product_no).values('product_no').annotate(num=Count('product_no'))
+            return Response(queryset)
+        elif provider:
+            queryset = Sulfur.objects.filter(provider__icontains=provider).values('provider').annotate(num=Count('provider'))
+            return Response(queryset)
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    # 硫磺人工入库
     def create(self, request, *args, **kwargs):
         if request.data.get('sulfur_status') == 1:
             serializer = self.get_serializer(data=request.data)
@@ -2773,7 +2842,6 @@ class SulfurDataModelViewSet(ModelViewSet):
                 raise ValidationError('该库位不存在')
 
             enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
             data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
             serializer = SulfurDataModelSerializer(instance=data)
             headers = self.get_success_headers(serializer.data)
@@ -2789,7 +2857,7 @@ class DepotSulfurModelViewSet(ModelViewSet):
     """硫磺库库存查询"""
     queryset = Sulfur.objects.filter(sulfur_status=1)
     serializer_class = DepotSulfurModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSulfurFilter
 
@@ -2816,7 +2884,7 @@ class DepotSulfurInfoModelViewSet(ModelViewSet):
     """硫磺库库存查询详情"""
     queryset =  Sulfur.objects.filter(sulfur_status=1)
     serializer_class = DepotSulfurInfoModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = DepotSulfurFilter
 
@@ -2827,9 +2895,9 @@ class DepotSulfurInfoModelViewSet(ModelViewSet):
 
 class SulfurResumeModelViewSet(ModelViewSet):
     """硫磺库出入库履历"""
-    queryset = Sulfur.objects.all()
+    queryset = Sulfur.objects.all().order_by('-enter_time')
     serializer_class = SulfurResumeModelSerializer
-    permission_classes = [IsAuthenticated,]
+    permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = SulfurResumeFilter
 
