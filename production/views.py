@@ -1594,7 +1594,11 @@ class TrainsFixView(APIView):
                 'deal_result': '一等品' if level == 1 else '三等品',
                 'production_factory_date': pfb_obj.end_time,
                 'deal_suggestion': deal_suggestion,
-                "lot_no": lot_no
+                "lot_no": lot_no,
+                'product_no': pfb_obj.product_no,
+                'classes': pfb_obj.classes,
+                'equip_no': pfb_obj.equip_no,
+                'factory_date': pfb_obj.factory_date
             }
             MaterialDealResult.objects.create(**deal_result_dict)
         return Response('修改成功')
