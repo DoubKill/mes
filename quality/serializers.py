@@ -424,8 +424,10 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no).first()
-        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
+                                                     product_no=instance.product_no).first()
+        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no,
+                                                           product_no=instance.product_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
@@ -517,7 +519,9 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret = {}
         table_head_top = {}
         sort_rules = {'门尼': 1, '硬度': 2, '比重': 3, '流变': 4, '钢拔': 5, '物性': 6}
-        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).order_by('actual_trains')
+        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no,
+                                                       product_no=obj.product_no
+                                                       ).order_by('actual_trains')
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
