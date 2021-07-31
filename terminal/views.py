@@ -561,7 +561,7 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
         for data in print_data:
             expire_date = datetime.datetime.strftime(data['batch_time'] + timedelta(days=data['expire_days']),
                                                      '%Y-%m-%d %H:%M:%S') \
-                if data['expire_days'] != 0 else '9999-01-01 00:00:00'
+                if data['expire_days'] != 0 else '9999' + str(data['batch_time'])[4:]
             batch_time = data['batch_time'].strftime('%Y-%m-%d')
             data.update({'expire_days': expire_date, 'batch_time': batch_time})
         return Response(print_data)
