@@ -36,7 +36,8 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
     MaterialInHistory, MaterialInventoryLog, FinalGumOutInventoryLog, \
-    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder
+    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, \
+    FinalGumInInventoryLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -2734,3 +2735,182 @@ class BzFinalRubberInventorySearch(ListAPIView):
                 break
         serializer = self.get_serializer(ret, many=True)
         return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutBoundTasksListView(ListAPIView):
+    """
+        根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
+    """
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        station_id = self.request.query_params.get('station_id')  # 出库口名称
+        try:
+            station = Station.objects.get(id=station_id).name
+        except Exception:
+            raise ValidationError('参数错误')
+        if warehouse_name == '混炼胶库':
+            return DeliveryPlan.objects.filter(status=1, station=station).order_by('-finish_time')
+        else:
+            return DeliveryPlanFinal.objects.filter(status=1, station=station).order_by('-finish_time')
+
+    def get_serializer_class(self):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        if warehouse_name == '混炼胶库':
+            return PutPlanManagementSerializer
+        else:
+            return PutPlanManagementSerializerFinal
+
+
+@method_decorator([api_recorder], name="dispatch")
+class InOutBoundSummaryView(APIView):
+    """混炼终炼出库口出入库统计，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id"""
+
+    def get(self, request):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        station_id = self.request.query_params.get('station_id')  # 出库口名称
+        try:
+            station = Station.objects.get(id=station_id).name
+        except Exception:
+            raise ValidationError('参数错误')
+        now = datetime.datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if current_work_schedule_plan:
+            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+        else:
+            date_now = str(now.date())
+        date_begin_time = date_now + ' 08:00:00'
+        if warehouse_name == '混炼胶库':
+            if station == '一层前端':
+                ret = [
+                    {'tunnel': '3巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='3',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '4巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='4',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                ]
+                # 出库
+            elif station in ('二层后端', '二层前端'):
+                ret = [
+                    {'tunnel': '1巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='1',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '2巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='2',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                ]
+            else:
+                ret = []
+            total_inbound_count = MixGumInInventoryLog.objects.using('bz').filter(
+                start_time__gte=date_begin_time).count()
+            total_outbound_count = DeliveryPlan.objects.filter(status=1,
+                                                               finish_time__gte=date_begin_time
+                                                               ).count()
+        else:
+            ret = [
+                    {'tunnel': '1巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='1',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '2巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='2',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '3巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='3',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '4巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='4',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '5巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='5').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='45',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '6巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='6').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='6',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     }
+                ]
+            total_inbound_count = FinalGumInInventoryLog.objects.using('lb').filter(
+                start_time__gte=date_begin_time).count()
+            total_outbound_count = DeliveryPlanFinal.objects.filter(status=1,
+                                                                    finish_time__gte=date_begin_time).count()
+        production_count = TrainsFeedbacks.objects.filter(factory_date=date_now).count()
+        return Response({"data": ret,
+                         "total_inbound_count": total_inbound_count,
+                         "total_outbound_count": total_outbound_count,
+                         "production_count": production_count
+                         })
