@@ -21,6 +21,7 @@ from basics.models import WorkSchedulePlan, Equip
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response
 from mes.derorators import api_recorder
+from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
 from recipe.models import ProductBatchingDetail, ZCMaterial
@@ -38,7 +39,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     MaterialInfoSerializer, BinSerializer, PlanSerializer, PlanUpdateSerializer, RecipePreSerializer, \
     ReportBasicSerializer, ReportWeightSerializer, LoadMaterialLogUpdateSerializer, WeightPackagePlanSerializer, \
     WeightPackageLogUpdateSerializer, XLPlanCSerializer, XLPromptSerializer
-from terminal.utils import TankStatusSync, INWeighSystem
+from terminal.utils import TankStatusSync
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -250,6 +251,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         # 获得本次修正量,修改真正计算的总量
         change_num = float(batch_material.adjust_left_weight) - left_weight
         batch_material.real_weight = float(batch_material.real_weight) - change_num
+        batch_material.adjust_left_weight = batch_material.real_weight
         self.perform_update(serializer)
         batch_material.save()
         return response(success=True, message='修正成功')
@@ -315,11 +317,12 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
         try:
             tank_status_sync = TankStatusSync(equip_no=equip_no)
             tank_no = instance.tank_no
-            door_key = '开门信号1' if tank_no.endswith('A') else '开门信号2'
-            tank_status_sync.door_info(data={door_key: tank_no[:len(tank_no) - 1]})
+            tank_num = tank_no[:len(tank_no) - 1]
+            kwargs = {'signal_a': tank_num} if tank_no.endswith('A') else {'signal_b': tank_num}
+            tank_status_sync.sync(**kwargs)
         except:
             return response(success=False, message='打开料罐门失败！')
-        WeightTankStatus.objects.filter(tank_no=instance.tank_no).update(open_flag=1)
+        # WeightTankStatus.objects.filter(tank_no=instance.tank_no).update(open_flag=1)
         return response(success=True, data={"tank_no": tank_no}, message='{}号料罐门已打开'.format(tank_no))
 
 
@@ -373,7 +376,6 @@ class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class WeightPackageLogViewSet(TerminalCreateAPIView,
                               mixins.ListModelMixin,
-                              mixins.UpdateModelMixin,
                               mixins.RetrieveModelMixin,
                               GenericViewSet):
     """
@@ -396,24 +398,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return response(success=True, data=serializer.data)
 
     def list(self, request, *args, **kwargs):
-        client = self.request.query_params.get('client')
         equip_no = self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else 'F01'
         batch_time = self.request.query_params.get('batch_time') if self.request.query_params.get('batch_time') else\
             datetime.datetime.now().strftime('%Y-%m-%d')
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
-        # client 客户端请求打印列表
-        if client:
-            equip_no_list = equip_no.split(',')
-            print_data = self.queryset.filter(equip_no__in=equip_no_list, print_flag=1).values(
-                'id', 'product_no', 'dev_type', 'plan_weight', 'equip_no', 'package_count', 'print_begin_trains',
-                'batch_time', 'expire_days', 'batch_group', 'batch_classes', 'begin_trains', 'end_trains', 'bra_code')
-            for data in print_data:
-                expire_date = datetime.datetime.strftime(data['batch_time'] + timedelta(days=data['expire_days']), '%Y-%m-%d %H:%M:%S')\
-                    if data['expire_days'] != 0 else '9999-01-01 00:00:00'
-                batch_time = data['batch_time'].strftime('%Y-%m-%d')
-                data.update({'expire_days': expire_date, 'batch_time': batch_time})
-            return Response(print_data)
         # mes网页请求
         # 筛选配料时间为当天的记录
         report_basic_records = list(ReportBasic.objects.using(equip_no).filter(
@@ -552,20 +541,37 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 'end_trains': end_trains, 'print_count': 1}
         return Response(data)
 
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
     def get_serializer_class(self):
         if self.action == 'create':
             return WeightPackageLogCreateSerializer
-        elif self.action == 'update':
-            return WeightPackageLogUpdateSerializer
         else:
             return WeightPackageLogSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
+    queryset = WeightPackageLog.objects.all().order_by('-created_date')
+
+    def list(self, request, *args, **kwargs):
+        equip_no = self.request.query_params.get('equip_no')
+        equip_no_list = equip_no.split(',')
+        print_data = self.get_queryset().filter(equip_no__in=equip_no_list, print_flag=1).values(
+            'id', 'product_no', 'dev_type', 'plan_weight', 'equip_no', 'package_count', 'print_begin_trains', 'print_count',
+            'batch_time', 'expire_days', 'batch_group', 'batch_classes', 'begin_trains', 'end_trains', 'bra_code')
+        for data in print_data:
+            expire_date = datetime.datetime.strftime(data['batch_time'] + timedelta(days=data['expire_days']),
+                                                     '%Y-%m-%d %H:%M:%S') \
+                if data['expire_days'] != 0 else '9999-01-01 00:00:00'
+            batch_time = data['batch_time'].strftime('%Y-%m-%d')
+            data.update({'expire_days': expire_date, 'batch_time': batch_time})
+        return Response(print_data)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = WeightPackageLogUpdateSerializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -584,8 +590,7 @@ class PackageExpireView(APIView):
         package_expire_recipe = PackageExpire.objects.all().values_list('product_name', flat=True).distinct()
         all_product_no = []
         # 获取所有称量系统配方号
-        equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备', use_flag=1)\
-            .values_list('equip_no', flat=True)
+        equip_list = [k for k, v in DATABASES.items() if v.get('NAME') == 'YK_XL']
         for equip in equip_list:
             try:
                 single_equip_recipe = list(Plan.objects.using(equip).all().values_list('recipe', flat=True).distinct())
@@ -781,7 +786,7 @@ class ProductExchange(APIView):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         if plan_classes_uid:
             plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
-            if plan:
+            if plan and plan.status != '完成':
                 ProductClassesPlan.objects.filter(equip=plan.equip,
                                                   work_schedule_plan=plan.work_schedule_plan,
                                                   status='运行中').update(status='完成')

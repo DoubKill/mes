@@ -109,8 +109,8 @@ class TankStatusSync(object):
     @atomic
     def sync(self, signal_a='0', signal_b='0'):
         """
-        signal_a: 开门信号1['1A'表示开1A罐门, 默认'0'表示查询料罐状态]
-        signal_b: 开门信号1['1B'表示开1B罐门, 默认'0'表示查询料罐状态]
+        signal_a: 开门信号1['1'表示开1A罐门, 默认'0'表示查询料罐状态]
+        signal_b: 开门信号1['2'表示开2B罐门, 默认'0'表示查询料罐状态]
         """
         headers = {"Content-Type": "text/xml; charset=utf-8",
                    "SOAPAction": "http://tempuri.org/INXWebService/open_door"}
@@ -137,15 +137,16 @@ class TankStatusSync(object):
             low_level = tank_no + "_low_level"
             material_name = tank_no + "_name"
             door_status = tank_no + "_door"
-            x.open_flag = False if data.get(door_status, True) else True
+            x.open_flag = data.get(door_status) if data.get(door_status) else False
+            # 默认正常
+            status = 3
             # 高位有料表示高位报警
             if data[high_level]:
-                x.status = 2
+                status = 2
             # 低位有料表示地位报警
-            if not data[low_level]:
-                x.status = 1
-            # 其余表示正常
-            x.status = 3
+            elif data[low_level]:
+                status = 1
+            x.status = status
             x.material_name = data[material_name]
             x.material_no = data[material_name]
             x.save()

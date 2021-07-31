@@ -12,7 +12,8 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     WeightBatchingLogViewSet, WeightPackageLogViewSet, WeightPackageTrainsView, CheckVersion, BarCodeTank, \
     WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, \
     ProductExchange, XLMaterialVIewSet, XLBinVIewSet, RecipePreVIew, RecipeMaterialVIew, ReportBasicView, \
-    ReportWeightView, XLPlanVIewSet, PackageExpireView, XLPlanCViewSet, XLPromptViewSet, WeightingTankStatus
+    ReportWeightView, XLPlanVIewSet, PackageExpireView, XLPlanCViewSet, XLPromptViewSet, WeightingTankStatus, \
+    WeightPackageCViewSet
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -20,6 +21,7 @@ router.register('feeding-log', FeedingLogViewSet)  # PDA投料履历
 router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
 router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信息
+router.register('weighting-package-c', WeightPackageCViewSet)  # 打印数据获取以及状态更新(C#端)
 
 """小料称量"""
 router.register('xl-material', XLMaterialVIewSet)  # 小料原材料

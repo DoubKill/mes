@@ -134,10 +134,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     attrs['status'] = 1
                 # 存在该条码信息(其他计划使用过)
                 else:
-                    attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
-                                               'real_weight': pre_material.real_weight, 'pre_material': pre_material,
-                                               'adjust_left_weight': pre_material.adjust_left_weight})
-                    attrs['status'] = 1
+                    # 未用完
+                    if pre_material.adjust_left_weight != 0:
+                        attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
+                                                   'real_weight': pre_material.real_weight, 'pre_material': pre_material,
+                                                   'adjust_left_weight': pre_material.adjust_left_weight})
+                        attrs['status'] = 1
+                    # 已用完(异常扫码)
+                    else:
+                        attrs['tank_data'].update({'msg': '该物料条码已无剩余量,请扫新条码'})
+                        attrs['status'] = 2
             else:
                 # 扫码物料不在已有物料中
                 if material_name not in add_materials.values_list('material_name', flat=True):
@@ -147,7 +153,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 else:
                     # 配方中物料单车需要重量
                     single_material_weight = classes_plan.product_batching.batching_details.filter(
-                        material__material_name=material_name).first().actual_weight
+                        material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and\
+                                                                                        '细料' not in material_name else \
+                        classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False, name=material_name).first().package_cnt
+                    classes_plan.product_batching.batching_details.filter(material__material_name=material_name)
                     now_material = add_materials.filter(material_name=material_name).last()
                     adjust_left_weight = now_material.adjust_left_weight
                     if adjust_left_weight > single_material_weight:
@@ -295,7 +304,7 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                 tank_status_sync = TankStatusSync(equip_no=equip_no)
                 tank_status_sync.sync()
             except:
-                return serializers.ValidationError('mes同步称量系统料罐状态失败')
+                raise serializers.ValidationError('mes同步称量系统{}料罐状态失败'.format(equip_no))
             # 扫码物料与所有料罐不一致
             feed_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True, material_name=material_name)
             if not feed_info:
@@ -309,7 +318,7 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                     attr['tank_no'] = ''
                     attr['failed_reason'] = '料罐处于高位, 无法开门'
                 else:
-                    attr['tank_no'] = feed_info.first().tank_no
+                    attr['tank_no'] = single_tank.tank_no
         attr['material_name'] = material_name
         attr['material_no'] = material_no
         return attr
@@ -366,9 +375,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
             attrs['material_no'] = weight_type_record.first().name
             attrs['material_name'] = attrs['material_no']
         else:
-            raise serializers.ValidationError('称量系统计划中配方名称未找到对应料包名')
-        # attrs['material_no'] = product_no + '(' + dev_type + ')'
-        # attrs['material_name'] = attrs['material_no']
+            raise serializers.ValidationError('称量系统计划中配方名称未在mes上找到对应料包名')
         # 配料时间
         batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).savetime
         # 计算有效期
@@ -436,8 +443,8 @@ class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         print_flag = attrs.get('print_flag')
-        if isinstance(print_flag, int):
-            serializers.ValidationError('回传打印状态应为整数')
+        if not isinstance(print_flag, int):
+            raise serializers.ValidationError('回传打印状态应为整数')
         attrs['status'] = 'Y'
         attrs['print_count'] = 1
         return attrs
