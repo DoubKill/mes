@@ -2742,7 +2742,6 @@ class OutBoundTasksListView(ListAPIView):
     """
         根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
     """
-    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
