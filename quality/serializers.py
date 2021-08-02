@@ -1101,7 +1101,6 @@ class ProductReportEquipSerializer(BaseModelSerializer):
     test_type = serializers.ReadOnlyField(source='data_point.test_type.id')
     last_time = serializers.SerializerMethodField()
 
-
     class Meta:
         model = ProductReportEquip
         fields = "__all__"

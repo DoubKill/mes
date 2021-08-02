@@ -1999,7 +1999,7 @@ class ProductTestPlanViewSet(ModelViewSet):
         if test_indicator_name == '门尼':
             s = 'M' if test_indicator_name == '门尼' else 'L'
         else:
-            raise ValidationError(f'实验分区选择的是{test_indicator_name}')
+            raise ValidationError(f'实验区分选择的是{test_indicator_name}')
         # 判断有没有计划正在执行
         obj = ProductTestPlan.objects.filter(status=1).first()
         if obj:
@@ -2024,7 +2024,7 @@ class ProductTestPlanViewSet(ModelViewSet):
                 end_trains__gte=item['actual_trains']
             ).first()
             if not pallet:
-                raise ValidationError('检测数据不存在')
+                raise ValidationError(f"第{item['actual_trains']}车数据不存在")
         product_plan = ProductTestPlan.objects.create(**data, test_time=datetime.datetime.now(), status=1,
                                                       plan_uid=plan_uid, test_user=test_user)
         # 添加检测计划详情
