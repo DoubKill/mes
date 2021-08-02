@@ -1996,17 +1996,14 @@ class ProductTestPlanViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         test_indicator_name = serializer.data.get('test_indicator_name')
-
         if test_indicator_name == '门尼':
             s = 'M' if test_indicator_name == '门尼' else 'L'
         else:
             raise ValidationError(f'实验分区选择的是{test_indicator_name}')
-
         # 判断有没有计划正在执行
         obj = ProductTestPlan.objects.filter(status=1).first()
         if obj:
             raise ValidationError('当前有计划正在执行')
-
         test_equip = serializer.data.get('test_equip')
         plan_uid = f"{s}{test_equip}{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
         product_list = serializer.validated_data.pop('product_test_plan_detail')
@@ -2015,11 +2012,23 @@ class ProductTestPlanViewSet(ModelViewSet):
         test_equip = ProductReportEquip.objects.filter(no=test_equip).first()
         test_user = self.request.user.username
         data['test_equip'] = test_equip
+        # 添加检测计划[判断前端提交过来的数据是否存在]
+        for item in product_list:
+            production_classes = item['classes']
+            pallet = PalletFeedbacks.objects.filter(
+                equip_no=item['equip_no'],
+                product_no=item['product_no'],
+                classes=production_classes,
+                factory_date=item['factory_date'],
+                begin_trains__lte=item['actual_trains'],
+                end_trains__gte=item['actual_trains']
+            ).first()
+            if not pallet:
+                raise ValidationError('检测数据不存在')
         product_plan = ProductTestPlan.objects.create(**data, test_time=datetime.datetime.now(), status=1,
                                                       plan_uid=plan_uid, test_user=test_user)
         # 添加检测计划详情
         for item in product_list:
-
             production_classes = item['classes']
             item.pop('classes')
             item.pop('lot_no', None)
@@ -2032,8 +2041,6 @@ class ProductTestPlanViewSet(ModelViewSet):
                 begin_trains__lte=item['actual_trains'],
                 end_trains__gte=item['actual_trains']
             ).first()
-            if not pallet:
-                raise ValidationError('检测数据不存在')
             lot_no = pallet.lot_no
             obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
             if obj:
