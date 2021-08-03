@@ -434,12 +434,22 @@ class ProductActualViewSet(mixins.ListModelMixin,
 @method_decorator([api_recorder], name="dispatch")
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-product_time")
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("factory_date", 'equip_no', 'classes',
+                                                                          'product_no', 'begin_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    ordering_fields = ('id',)
+    filter_backends = [DjangoFilterBackend, ]
     filter_class = PalletFeedbacksFilter
+
+    def get_queryset(self):
+        queryset = self.queryset
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        if st:
+            queryset = queryset.filter(factory_date__gte=st[:10])
+        if et:
+            queryset = queryset.filter(factory_date__lte=et[:10])
+        return queryset
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -808,7 +818,7 @@ class IntervalOutputStatisticsView(APIView):
 class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                              GenericViewSet):
     """车次报表展示接口"""
-    queryset = TrainsFeedbacks.objects.all()
+    queryset = TrainsFeedbacks.objects.all().order_by('factory_date', 'equip_no', 'product_no', 'actual_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = TrainsFeedbacksSerializer2
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -816,9 +826,14 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
-        equip_no = params.get("equip_no", None)
         trains = params.get("trains")
         queryset = self.filter_queryset(self.get_queryset())
+        st = params.get('begin_time')
+        et = params.get('end_time')
+        if st:
+            queryset = queryset.filter(factory_date__gte=st[:10])
+        if et:
+            queryset = queryset.filter(factory_date__lte=et[:10])
         if trains:
             try:
                 train_range = trains.split(",")
@@ -1503,11 +1518,6 @@ class TrainsFixView(APIView):
             if not pallet_data:
                 raise ValidationError('未找到改批次收皮数据！')
             lot_nos = set(pallet_data.values_list('lot_no', flat=True))
-            # pc_last_trains = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
-            #                                                 product_no=data['product_no'],
-            #                                                 classes=data['classes'],
-            #                                                 factory_date=data['factory_date'],
-            #                                                 ).order_by('begin_trains').last().end_trains
             if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
                                               product_no=data['product_no'],
                                               classes=data['classes'],
@@ -1519,86 +1529,10 @@ class TrainsFixView(APIView):
             ).exists():
                 raise ValidationError('修改后车次信息重复！')
             for pallet in pallet_data:
-                # 修改收皮车次数据
-                # if not pallet.begin_trains+fix_num > pc_last_trains:
-                #     if not data['begin_trains'] > pallet.begin_trains:
                 pallet.begin_trains += fix_num
-                # if not pallet.end_trains+fix_num >= pc_last_trains:
-                #     if not pallet.end_trains > data['end_trains']:
                 pallet.end_trains += fix_num
                 pallet.save()
 
-            test_order_data = MaterialTestOrder.objects.filter(lot_no__in=lot_nos)
-            for test_order in test_order_data:
-                # 修改车次检测单收皮条码
-                p = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
-                                                   product_no=data['product_no'],
-                                                   classes=data['classes'],
-                                                   factory_date=data['factory_date'],
-                                                   begin_trains__lte=test_order.actual_trains,
-                                                   end_trains__gte=test_order.actual_trains).first()
-                if p:
-                    test_order.lot_no = p.lot_no
-                    test_order.save()
-
+            MaterialTestOrder.objects.filter(lot_no__in=lot_nos).delete()
         MaterialDealResult.objects.filter(lot_no__in=lot_nos).delete()
-        for lot_no in lot_nos:
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
-            test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no)
-            # 取检测车次
-            test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
-            # 取托盘反馈生产车次
-            actual_trains_set = {i for i in range(pfb_obj.begin_trains, pfb_obj.end_trains + 1)}
-
-            common_trains_set = actual_trains_set & test_trains_set
-            # 判断托盘反馈车次都存在检测数据
-            if not len(actual_trains_set) == len(common_trains_set):
-                continue
-
-            # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
-            passed_order_count = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                  is_passed=True).count()
-            unqualified_order_count = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                       is_qualified=False).count()
-            if 0 < passed_order_count == unqualified_order_count > 0:
-                level = 1
-                test_result = 'PASS'
-                last_result_ids = list(MaterialTestResult.objects.filter(
-                    is_judged=True,
-                    material_test_order__lot_no=lot_no).values(
-                    'material_test_order', 'test_indicator_name', 'data_point_name'
-                ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
-                # 取该托唯一一个pass章的数据点
-                passed_result = MaterialTestResult.objects.filter(
-                    is_judged=True,
-                    id__in=last_result_ids,
-                    is_passed=True).last()
-                deal_suggestion = getattr(passed_result, 'pass_suggestion', '放行')
-            # 2、所有车次都合格
-            elif not MaterialTestOrder.objects.filter(is_qualified=False,
-                                                      lot_no=lot_no).exists():
-                level = 1
-                test_result = '一等品'
-                deal_suggestion = '合格'
-            # 3、不合格
-            else:
-                level = 3
-                test_result = '三等品'
-                deal_suggestion = '不合格'
-
-            deal_result_dict = {
-                'level': level,
-                'test_result': test_result,
-                'reason': 'reason',
-                'status': '待处理',
-                'deal_result': '一等品' if level == 1 else '三等品',
-                'production_factory_date': pfb_obj.end_time,
-                'deal_suggestion': deal_suggestion,
-                "lot_no": lot_no,
-                'product_no': pfb_obj.product_no,
-                'classes': pfb_obj.classes,
-                'equip_no': pfb_obj.equip_no,
-                'factory_date': pfb_obj.factory_date
-            }
-            MaterialDealResult.objects.create(**deal_result_dict)
         return Response('修改成功')
