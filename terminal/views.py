@@ -451,6 +451,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 for k in page:
                     try:
                         y_or_n = k.status
+                        if k.package_fufil != k.package_plan_count:
+                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                            k.package_fufil = get_status.actno
+                            k.noprint_count = get_status.actno - k.package_count
+                            k.save()
                         data.append(WeightPackageLogSerializer(k).data)
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
@@ -476,6 +481,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 for k in page:
                     try:
                         y_or_n = k.status
+                        if k.package_fufil != k.package_plan_count:
+                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                            k.package_fufil = get_status.actno
+                            k.noprint_count = get_status.actno - k.package_count
+                            k.save()
                         data.append(WeightPackageLogSerializer(k).data)
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
@@ -491,6 +501,12 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         else:
             weight_filter_kwargs.update({'status': status})
             already_print = self.queryset.filter(**weight_filter_kwargs)
+            for k in already_print:
+                if k.package_fufil != k.package_plan_count:
+                    get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                    k.package_fufil = get_status.actno
+                    k.noprint_count = get_status.actno - k.package_count
+                    k.save()
             page = self.paginate_queryset(already_print)
             if page is not None:
                 serializer = WeightPackageLogSerializer(page, many=True)
