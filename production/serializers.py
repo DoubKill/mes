@@ -2,7 +2,6 @@ import datetime
 
 import math
 from rest_framework import serializers
-from rest_framework.fields import Field
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
@@ -310,3 +309,11 @@ class TrainsFixSerializer(serializers.Serializer):
         if begin_trains > end_trains:
             raise serializers.ValidationError('开始车次不得大于结束车次')
         return attrs
+
+
+class PalletFeedbacksBatchModifySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PalletFeedbacks
+        fields = ('id', 'begin_trains', 'end_trains', 'lot_no', 'product_no')
+        extra_kwargs = {'id': {'read_only': False}}

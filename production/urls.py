@@ -81,5 +81,6 @@ urlpatterns = [
 
     path('runtime-record/', RuntimeRecordView.as_view()),  # 生产运行记录
 
-    path('trains-fix/', TrainsFixView.as_view())
+    path('trains-fix/', TrainsFixView.as_view()),  # 车次修改（+-）
+    path('pallet-train-batch-fix/', PalletTrainsBatchFixView.as_view()),  # 收皮车次批量修改
 ]

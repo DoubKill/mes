@@ -38,7 +38,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer, TrainsFixSerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -1535,4 +1535,31 @@ class TrainsFixView(APIView):
 
             MaterialTestOrder.objects.filter(lot_no__in=lot_nos).delete()
         MaterialDealResult.objects.filter(lot_no__in=lot_nos).delete()
+        return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PalletTrainsBatchFixView(ListAPIView, UpdateAPIView):
+    """
+        收皮车次批量修改
+    """
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by('begin_trains', 'begin_time')
+    permission_classes = (IsAuthenticated,)
+    serializer_class = PalletFeedbacksBatchModifySerializer
+    filter_backends = [DjangoFilterBackend, ]
+    filter_class = PalletFeedbacksFilter
+    pagination_class = None
+
+    @atomic()
+    def put(self, request, *args, **kwargs):
+        data = self.request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误！')
+        for item in data:
+            instance = PalletFeedbacks.objects.get(id=item['id'])
+            s = PalletFeedbacksBatchModifySerializer(instance=instance, data=item)
+            s.is_valid(raise_exception=True)
+            s.save()
+            MaterialTestOrder.objects.filter(lot_no=instance.lot_no).delete()
+            MaterialDealResult.objects.filter(lot_no=instance.lot_no).delete()
         return Response('修改成功')
