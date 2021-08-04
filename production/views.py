@@ -8,7 +8,7 @@ import time
 import requests
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from django.db.models import Max, Sum, Count, Min, F
+from django.db.models import Max, Sum, Count, Min, F, Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -38,12 +38,13 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
-from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear
+from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear, MaterialTestOrder, \
+    MaterialDealResult, MaterialTestResult
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
@@ -433,12 +434,22 @@ class ProductActualViewSet(mixins.ListModelMixin,
 @method_decorator([api_recorder], name="dispatch")
 class ProductionRecordViewSet(mixins.ListModelMixin,
                               GenericViewSet):
-    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("-product_time")
+    queryset = PalletFeedbacks.objects.filter(delete_flag=False).order_by("factory_date", 'equip_no', 'classes',
+                                                                          'product_no', 'begin_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = ProductionRecordSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    ordering_fields = ('id',)
+    filter_backends = [DjangoFilterBackend, ]
     filter_class = PalletFeedbacksFilter
+
+    def get_queryset(self):
+        queryset = self.queryset
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        if st:
+            queryset = queryset.filter(factory_date__gte=st[:10])
+        if et:
+            queryset = queryset.filter(factory_date__lte=et[:10])
+        return queryset
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -807,7 +818,7 @@ class IntervalOutputStatisticsView(APIView):
 class TrainsFeedbacksAPIView(mixins.ListModelMixin,
                              GenericViewSet):
     """车次报表展示接口"""
-    queryset = TrainsFeedbacks.objects.all()
+    queryset = TrainsFeedbacks.objects.all().order_by('factory_date', 'equip_no', 'product_no', 'actual_trains')
     permission_classes = (IsAuthenticatedOrReadOnly,)
     serializer_class = TrainsFeedbacksSerializer2
     filter_backends = [DjangoFilterBackend, OrderingFilter]
@@ -815,9 +826,14 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
-        equip_no = params.get("equip_no", None)
         trains = params.get("trains")
         queryset = self.filter_queryset(self.get_queryset())
+        st = params.get('begin_time')
+        et = params.get('end_time')
+        if st:
+            queryset = queryset.filter(factory_date__gte=st[:10])
+        if et:
+            queryset = queryset.filter(factory_date__lte=et[:10])
         if trains:
             try:
                 train_range = trains.split(",")
@@ -1427,3 +1443,96 @@ class RuntimeRecordView(APIView):
                          }
             results.append(temp_dict)
         return Response({"results": results})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TrainsFixView(APIView):
+    """修改收皮车次，支持指定托修改和批次修改"""
+    # {"factory_date": "2021-07-14",
+    #  "classes": "早班",
+    #  "equip_no": "Z01",
+    #  "product_no": "C-RE-J260-02",
+    #  "begin_trains": 1,
+    #  "end_trains": 6,
+    #  "fix_num": 1,
+    #  "lot_no": "AAJ1Z062021072313078"
+    #  }
+
+    def post(self, request):
+        s = TrainsFixSerializer(data=self.request.data)
+        s.is_valid(raise_exception=True)
+        data = s.validated_data
+        lot_no = data.get('lot_no')
+        if lot_no:  # 修改特定托的车次
+            pallet = PalletFeedbacks.objects.filter(lot_no=data['lot_no']).first()
+            if not pallet:
+                raise ValidationError('未找到收皮数据！')
+            data['product_no'] = pallet.product_no
+            data['classes'] = pallet.classes
+            data['equip_no'] = pallet.equip_no
+            data['factory_date'] = pallet.factory_date
+            if PalletFeedbacks.objects.exclude(
+                    lot_no=data['lot_no']).filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date']
+                                                  ).filter(Q(begin_trains__lte=data['begin_trains'],
+                                                           end_trains__gte=data['begin_trains']) |
+                                                           Q(begin_trains__lte=data['end_trains'],
+                                                           end_trains__gte=data['end_trains']) |
+                                                           Q(begin_trains__gte=data['begin_trains'],
+                                                             end_trains__lte=data['end_trains'])):
+                raise ValidationError('车次重复，请确认后重试！')
+            pallet.begin_trains = data['begin_trains']
+            pallet.end_trains = data['end_trains']
+            pallet.save()
+            MaterialTestOrder.objects.filter(lot_no=data['lot_no']).delete()
+            lot_nos = [data['lot_no']]
+        else:
+            fix_num = data['fix_num']
+            if data['begin_trains'] + fix_num <= 0:
+                raise ValidationError('修改后车次不可为0！')
+            if not PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  begin_trains=data['begin_trains']):
+                raise ValidationError('开始车次必须为一托开始车次！')
+            if not PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                  product_no=data['product_no'],
+                                                  classes=data['classes'],
+                                                  factory_date=data['factory_date'],
+                                                  end_trains=data['end_trains']):
+                raise ValidationError('结束车次必须为一托结束车次！')
+            pallet_data = PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                                         product_no=data['product_no'],
+                                                         classes=data['classes'],
+                                                         factory_date=data['factory_date'],
+                                                         ).filter(Q(begin_trains__lte=data['begin_trains'],
+                                                                  end_trains__gte=data['begin_trains']) |
+                                                                  Q(begin_trains__lte=data['end_trains'],
+                                                                  end_trains__gte=data['end_trains']) |
+                                                                  Q(begin_trains__gte=data['begin_trains'],
+                                                                  end_trains__lte=data['end_trains'])
+                                                                  ).order_by('begin_trains')
+            if not pallet_data:
+                raise ValidationError('未找到改批次收皮数据！')
+            lot_nos = set(pallet_data.values_list('lot_no', flat=True))
+            if PalletFeedbacks.objects.filter(equip_no=data['equip_no'],
+                                              product_no=data['product_no'],
+                                              classes=data['classes'],
+                                              factory_date=data['factory_date']
+                                              ).exclude(id__in=pallet_data.values_list('id', flat=True)).filter(
+                    Q(begin_trains__lte=data['begin_trains']+fix_num, end_trains__gte=data['begin_trains']+fix_num) |
+                    Q(begin_trains__lte=data['end_trains']+fix_num, end_trains__gte=data['end_trains']+fix_num) |
+                    Q(begin_trains__gte=data['begin_trains']+fix_num, end_trains__lte=data['end_trains']+fix_num)
+            ).exists():
+                raise ValidationError('修改后车次信息重复！')
+            for pallet in pallet_data:
+                pallet.begin_trains += fix_num
+                pallet.end_trains += fix_num
+                pallet.save()
+
+            MaterialTestOrder.objects.filter(lot_no__in=lot_nos).delete()
+        MaterialDealResult.objects.filter(lot_no__in=lot_nos).delete()
+        return Response('修改成功')

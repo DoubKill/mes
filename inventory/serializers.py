@@ -50,6 +50,20 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
     destination = serializers.SerializerMethodField(read_only=True)
+    production_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_production_info(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        if pallet:
+            return {'equip_no': pallet.equip_no,
+                    'factory_date': pallet.factory_date,
+                    'classes': pallet.classes,
+                    }
+        else:
+            return {'equip_no': "",
+                    'factory_date': "",
+                    'classes': "",
+                    }
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -404,6 +418,20 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
     destination = serializers.SerializerMethodField(read_only=True)
+    production_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_production_info(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        if pallet:
+            return {'equip_no': pallet.equip_no,
+                    'factory_date': pallet.factory_date,
+                    'classes': pallet.classes,
+                    }
+        else:
+            return {'equip_no': "",
+                    'factory_date': "",
+                    'classes': "",
+                    }
 
     def get_actual(self, object):
         order_no = object.order_no

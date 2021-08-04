@@ -146,9 +146,15 @@ urlpatterns = [
     path('bz-mixin-inventory-search/', BzMixingRubberInventorySearch.as_view()),  # 根据出库口、搜索指定数量的混炼胶库存信息
 
     # 终炼胶库存管理
+    path('bz-final-inventory/', BzFinalRubberInventory.as_view()),  # 北自终炼胶库、帘布库存列表
+    path('bz-final-inventory-summary/', BzFinalRubberInventorySummary.as_view()),  # 北自终炼胶、帘布库存统计列表
     path('bz-final-inventory-search/', BzFinalRubberInventorySearch.as_view()),  # 搜索指定数量的终炼胶库存信息
 
     # 出库大屏
+    # 混炼、终炼出库任务列表
+    path('out-bound-tasks/', OutBoundTasksListView.as_view()),
+    path('inout-bound-summary/', InOutBoundSummaryView.as_view()),
+
     path('delivery-plan-now/', DeliveryPlanNow.as_view()),  # 混炼胶 当前在出库口的胶料信息
     path('delivery-plan-today/', DeliveryPlanToday.as_view()),  # 混炼胶 今日的总出库量
     path('mix-gum-out-list/', MixGumOutInventoryLogAPIView.as_view()),  # 混炼胶  倒叙显示最近几条出库信息

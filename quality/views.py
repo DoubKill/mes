@@ -398,27 +398,21 @@ class PalletFeedbacksTestListView(ModelViewSet):
         product_no = self.request.query_params.get('product_no', None)
         day_time = self.request.query_params.get('day_time', None)
         classes = self.request.query_params.get('classes', None)
-        schedule_name = self.request.query_params.get('schedule_name', None)
+        # schedule_name = self.request.query_params.get('schedule_name', None)
         is_print = self.request.query_params.get('is_print', None)
         filter_dict = {'delete_flag': False}
-        pfb_filter = {}
+        # pfb_filter = {}
         if day_time:
-            pfb_filter['production_factory_date'] = day_time
-        # if schedule_name:
-        #     pcp_filter['work_schedule_plan__plan_schedule__work_schedule__schedule_name'] = schedule_name
-        # if pcp_filter:
-        #     pcp_uid_list = ProductClassesPlan.objects.filter(**pcp_filter).values_list('plan_classes_uid', flat=True)
-        #     pfb_filter['plan_classes_uid__in'] = list(pcp_uid_list)
-
+            filter_dict['factory_date'] = day_time
         if equip_no:
-            pfb_filter['production_equip_no'] = equip_no
+            filter_dict['equip_no'] = equip_no
         if product_no:
-            pfb_filter['product_no'] = product_no
+            filter_dict['product_no'] = product_no
         if classes:
-            pfb_filter['production_class'] = classes
-        if pfb_filter:
-            pfb_product_list = MaterialTestOrder.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
-            filter_dict['lot_no__in'] = list(pfb_product_list)
+            filter_dict['classes'] = classes
+        # if pfb_filter:
+        #     pfb_product_list = MaterialTestOrder.objects.filter(**pfb_filter).values_list('lot_no', flat=True)
+        #     filter_dict['lot_no__in'] = list(pfb_product_list)
         if is_print == "已打印":
             filter_dict['print_time__isnull'] = False
         elif is_print == "未打印":
@@ -1270,7 +1264,7 @@ class ImportAndExportView(APIView):
                    '硬度值': 14,
                    'M300': 15,
                    '扯断强度': 16,
-                   '伸长率': 17,
+                   '伸长率%': 17,
                    '焦烧': 18,
                    '钢拔': 19}
         # 取第一行数据

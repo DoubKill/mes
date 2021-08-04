@@ -294,3 +294,19 @@ class WeighInformationSerializer2(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class TrainsFixSerializer(serializers.Serializer):
+    factory_date = serializers.DateField(required=False)
+    classes = serializers.CharField(required=False)
+    equip_no = serializers.CharField(required=False)
+    product_no = serializers.CharField(required=False)
+    begin_trains = serializers.IntegerField(min_value=1)
+    end_trains = serializers.IntegerField(min_value=1)
+    fix_num = serializers.IntegerField(required=False)
+    lot_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate(self, attrs):
+        begin_trains = attrs['begin_trains']
+        end_trains = attrs['end_trains']
+        if begin_trains > end_trains:
+            raise serializers.ValidationError('开始车次不得大于结束车次')
+        return attrs
