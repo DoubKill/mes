@@ -8,13 +8,13 @@ class TrainsFeedbacksFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
     day_time = django_filters.DateFilter(field_name='factory_date', help_text='日期筛选')
-    begin_time = django_filters.DateTimeFilter(field_name='begin_time', lookup_expr="gte", help_text='开始时间')
-    end_time = django_filters.DateTimeFilter(field_name='end_time', lookup_expr="lte", help_text='结束时间')
+    # begin_time = django_filters.DateTimeFilter(field_name='begin_time', lookup_expr="gte", help_text='开始时间')
+    # end_time = django_filters.DateTimeFilter(field_name='end_time', lookup_expr="lte", help_text='结束时间')
     operation_user = django_filters.CharFilter(field_name="operation_user", help_text="操作员")
 
     class Meta:
         model = TrainsFeedbacks
-        fields = ('plan_classes_uid', 'equip_no', 'product_no', "day_time", 'begin_time', 'end_time','operation_user')
+        fields = ('plan_classes_uid', 'equip_no', 'product_no', "day_time", 'operation_user')
 
 
 class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
@@ -22,10 +22,10 @@ class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
     plan_classes_uid = django_filters.CharFilter(field_name='plan_classes_uid', help_text='班次计划唯一码')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号')
     product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号')
-    st = django_filters.DateTimeFilter(field_name="end_time", help_text='生产时间', lookup_expr="gte")
-    et = django_filters.DateTimeFilter(field_name="end_time", help_text='生产时间', lookup_expr="lte")
+    # st = django_filters.DateFilter(field_name="factory_date", help_text='生产时间', lookup_expr="gte")
+    # et = django_filters.DateFilter(field_name="factory_date", help_text='生产时间', lookup_expr="lte")
     classes = django_filters.CharFilter(field_name="classes", help_text='班次')
-    day_time = django_filters.DateTimeFilter(field_name="factory_date", help_text="班日期")
+    day_time = django_filters.DateFilter(field_name="factory_date", help_text="班日期")
 
     class Meta:
         model = PalletFeedbacks

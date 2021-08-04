@@ -11,6 +11,7 @@ import time
 from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
 from mes.base_serializer import BaseModelSerializer
@@ -20,7 +21,8 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
-    BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder
+    BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
+    SulfurDepotSite, Sulfur, SulfurDepot
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -48,6 +50,20 @@ class PutPlanManagementSerializer(serializers.ModelSerializer):
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
     destination = serializers.SerializerMethodField(read_only=True)
+    production_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_production_info(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        if pallet:
+            return {'equip_no': pallet.equip_no,
+                    'factory_date': pallet.factory_date,
+                    'classes': pallet.classes,
+                    }
+        else:
+            return {'equip_no': "",
+                    'factory_date': "",
+                    'classes': "",
+                    }
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -402,6 +418,20 @@ class PutPlanManagementSerializerFinal(serializers.ModelSerializer):
     order_no = serializers.CharField(required=False)
     quality_status = serializers.CharField(required=False)
     destination = serializers.SerializerMethodField(read_only=True)
+    production_info = serializers.SerializerMethodField(read_only=True)
+
+    def get_production_info(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        if pallet:
+            return {'equip_no': pallet.equip_no,
+                    'factory_date': pallet.factory_date,
+                    'classes': pallet.classes,
+                    }
+        else:
+            return {'equip_no': "",
+                    'factory_date': "",
+                    'classes': "",
+                    }
 
     def get_actual(self, object):
         order_no = object.order_no
@@ -1304,6 +1334,136 @@ class InOutCommonSerializer(serializers.Serializer):
             return "入库"
         else:
             return "出库"
+
+
+class DepotModelSerializer(serializers.ModelSerializer):
+    """线边库 库区"""
+    depot_name = serializers.CharField(max_length=64, help_text='库区',
+                                       validators=[UniqueValidator(queryset=Depot.objects.filter(is_use=True), message='该库区已存在')])
+
+    class Meta:
+        model = Depot
+        fields = '__all__'
+
+
+class DepotSiteModelSerializer(serializers.ModelSerializer):
+    """线边库 库位"""
+    depot_site_name = serializers.CharField(max_length=64, help_text='库位',
+                                       validators=[UniqueValidator(queryset=DepotSite.objects.filter(is_use=True), message='该库位已存在')])
+    class Meta:
+        model = DepotSite
+        fields = ['depot_name', 'depot_site_name', 'description', 'depot', 'id']
+
+
+class DepotPalltModelSerializer(serializers.ModelSerializer):
+    """线边库库存查询"""
+
+    product_no = serializers.ReadOnlyField(source='pallet_data.product_no')
+
+    begin_trains = serializers.ReadOnlyField(source='pallet_data.begin_trains')
+    end_trains = serializers.ReadOnlyField(source='pallet_data.end_trains')
+    actual_weight = serializers.ReadOnlyField(source='pallet_data.actual_weight')
+    class Meta:
+        model = DepotPallt
+        fields = ['product_no', 'begin_trains', 'end_trains', 'actual_weight']
+
+
+class DepotPalltInfoModelSerializer(serializers.ModelSerializer):
+    product_no = serializers.ReadOnlyField(source='pallet_data.product_no')
+    depot_site_name = serializers.ReadOnlyField(source='depot_site.depot_site_name')
+    lot_no = serializers.ReadOnlyField(source='pallet_data.lot_no')
+    class Meta:
+        model = DepotPallt
+        fields = ['enter_time', 'depot_name', 'depot_site_name',
+                  'product_no', 'outer_time', 'lot_no']
+
+
+class PalletDataModelSerializer(serializers.ModelSerializer):
+    """线边库出入库管理"""
+    depot_site_name = serializers.ReadOnlyField(source='palletfeedbacks.depot_site.depot_site_name')
+    pallet_status = serializers.ReadOnlyField(source='palletfeedbacks.pallet_status')
+    depot_name = serializers.ReadOnlyField(source='palletfeedbacks.depot_site.depot.depot_name')
+    enter_time = serializers.DateTimeField(source='palletfeedbacks.enter_time')
+    outer_time = serializers.DateTimeField(source='palletfeedbacks.outer_time')
+
+    class Meta:
+        model = PalletFeedbacks
+        fields = ['factory_date', 'product_no', 'classes', 'equip_no', 'begin_trains', 'end_trains', 'plan_classes_uid',
+                  'enter_time','outer_time', 'pallet_status', 'depot_site_name', 'depot_name', 'id', 'lot_no']
+
+
+class DepotResumeModelSerializer(serializers.ModelSerializer):
+    """线边库出入库履历"""
+    factory_date = serializers.ReadOnlyField(source='pallet_data.factory_date')
+    classes = serializers.ReadOnlyField(source='pallet_data.classes')
+    equip_no = serializers.ReadOnlyField(source='pallet_data.equip_no')
+    product_no = serializers.ReadOnlyField(source='pallet_data.product_no')
+    begin_trains = serializers.ReadOnlyField(source='pallet_data.begin_trains')
+    end_trains = serializers.ReadOnlyField(source='pallet_data.end_trains')
+    lot_no = serializers.ReadOnlyField(source='pallet_data.lot_no')
+    plan_classes_uid = serializers.ReadOnlyField(source='pallet_data.plan_classes_uid')
+
+    class Meta:
+        model = DepotPallt
+        fields = ['factory_date', 'classes', 'equip_no', 'product_no', 'begin_trains', 'lot_no', 'plan_classes_uid',
+                  'end_trains', 'pallet_status', 'enter_time', 'outer_time', 'depot_name', 'depot_site_name']
+
+
+class SulfurDepotModelSerializer(serializers.ModelSerializer):
+    """硫磺库 库区"""
+    depot_name = serializers.CharField(max_length=64, help_text='库区',
+                                       validators=[UniqueValidator(queryset=SulfurDepot.objects.filter(is_use=True), message='该库区已存在')])
+    class Meta:
+        model = SulfurDepot
+        fields = '__all__'
+
+
+class SulfurDepotSiteModelSerializer(serializers.ModelSerializer):
+    """硫磺库 库位"""
+    depot_site_name = serializers.CharField(max_length=64, help_text='库位',
+                                       validators=[UniqueValidator(queryset=SulfurDepotSite.objects.filter(is_use=True), message='该库位已存在')])
+    depot_name = serializers.ReadOnlyField(source='depot.depot_name')
+    class Meta:
+        model = SulfurDepotSite
+        fields = ['depot_name', 'depot_site_name', 'description', 'depot', 'id']
+
+
+class SulfurDataModelSerializer(serializers.ModelSerializer):
+    """硫磺库出入库管理"""
+    depot = serializers.ReadOnlyField(source='depot_site.depot.id')
+    depot_site = serializers.ReadOnlyField(source='depot_site.id')
+    depot_name = serializers.ReadOnlyField(source='depot_site.depot.depot_name')
+    depot_site_name = serializers.ReadOnlyField(source='depot_site.depot_site_name')
+    enter_time = serializers.DateTimeField(read_only=True, help_text='入库时间')
+
+    class Meta:
+        model = Sulfur
+        fields = ['id', 'name', 'product_no', 'provider', 'lot_no', 'depot_name', 'depot_site_name', 'enter_time', 'sulfur_status',
+                  'weight', 'num', 'depot', 'depot_site']
+
+
+class DepotSulfurModelSerializer(serializers.ModelSerializer):
+    """硫磺库库存查询"""
+
+    class Meta:
+        model = Sulfur
+        fields = ['name', 'product_no', 'provider', 'lot_no']
+
+
+class DepotSulfurInfoModelSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Sulfur
+        fields = ['depot_name', 'depot_site_name']
+
+
+class SulfurResumeModelSerializer(serializers.ModelSerializer):
+    """硫磺库履历"""
+
+    class Meta:
+        model = Sulfur
+        fields = ['name', 'product_no', 'provider', 'lot_no' ,'sulfur_status', 'enter_time', 'outer_time',
+                  'depot_site', 'depot_name', 'depot_site_name']
 
 
 class MixinRubberyOutBoundOrderSerializer(BaseModelSerializer):

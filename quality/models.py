@@ -349,7 +349,8 @@ class LabelPrint(models.Model):
     )
     STATUS_CHOICE = (
         (0, '未打印'),
-        (1, '已打印')
+        (1, '已打印'),
+        (2, '已下发')
     )
     label_type = models.PositiveIntegerField(help_text="标签类型", choices=TYPE_CHOICE, verbose_name="标签类型")
     lot_no = models.CharField(max_length=64, help_text="追踪条码", verbose_name="追踪条码")
