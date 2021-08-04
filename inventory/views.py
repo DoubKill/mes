@@ -8,7 +8,7 @@ from io import BytesIO
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -29,14 +29,16 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from basics.models import GlobalCode, WorkSchedulePlan
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, PutPlanManagementFinalFilter, \
-    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter,\
-    MixinRubberyOutBoundOrderFilter, FinalRubberyOutBoundOrderFilter
+    MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, \
+    MixinRubberyOutBoundOrderFilter, FinalRubberyOutBoundOrderFilter, DepotSiteDataFilter, DepotDataFilter, \
+    SulfurResumeFilter, DepotSulfurFilter, PalletDataFilter, DepotResumeFilter, SulfurDepotSiteFilter, SulfurDataFilter
 
-from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanStatus, \
+from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
-    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, MaterialOutHistory, \
-    MaterialInHistory, MaterialInventoryLog, FinalGumOutInventoryLog, \
-    MaterialInHistory, MaterialInventoryLog, CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder
+    MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, \
+    MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
+    DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
+    CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -44,7 +46,10 @@ from inventory.serializers import PutPlanManagementSerializer, \
     DispatchLogSerializer, DispatchLocationSerializer, PutPlanManagementSerializerFinal, \
     InventoryLogOutSerializer, MixinRubberyOutBoundOrderSerializer, FinalRubberyOutBoundOrderSerializer, \
     MaterialPlanManagementSerializer, BarcodeQualitySerializer, WmsStockSerializer, InOutCommonSerializer, \
-    CarbonPlanManagementSerializer
+    CarbonPlanManagementSerializer, DepotModelSerializer, DepotSiteModelSerializer, DepotPalltModelSerializer, \
+    SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
+    SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
+    DepotPalltInfoModelSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -59,7 +64,8 @@ from mes.permissions import PermissionClass
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train
+from quality.models import LabelPrint, Train, MaterialDealResult
+from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
 from .conf import wms_ip, wms_port, IS_BZ_USING
@@ -159,7 +165,7 @@ class ProductInventory(GenericViewSet,
             "unit_weight": round(instance[2] / instance[1], 2),
             "total_weight": instance[2],
             "need_weight": instance[2],
-            "standard_flag": True if instance[3] == "合格品" else False,
+            "standard_flag": instance[3],
             "site": instance[0]
         }
         return temp_dict
@@ -195,8 +201,8 @@ class ProductInventory(GenericViewSet,
                 filter_str += f" AND 物料编码 like '%{material_no}%'"
             else:
                 filter_str += f" where 物料编码 like '%{material_no}%'"
-        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, max(品质状态) as 品质状态, 物料编码, Row_Number() OVER (order by 物料编码) sn
-            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码"""
+        sql = f"""SELECT max(库房名称) as 库房名称, sum(数量) as 数量, sum(重量) as 重量, 品质等级, 物料编码, Row_Number() OVER (order by 物料编码) sn
+            FROM v_ASRS_STORE_MESVIEW {filter_str} group by 物料编码, 品质等级 order by 物料编码"""
         sql_all = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW"""
         sql_fm = """SELECT sum(数量) FROM v_ASRS_STORE_MESVIEW where 物料编码 like '%FM%'"""
         sc = SqlClient(sql=sql)
@@ -398,7 +404,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('bz').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('bz').filter(location_status='有货货位')
+            queryset = model.objects.using('bz').all().order_by('in_storage_time')
             if quality_status:
                 queryset = queryset.filter(quality_level=quality_status)
         elif model == BzFinalMixingRubberInventoryLB:
@@ -406,7 +412,7 @@ class MaterialInventoryManageViewSet(viewsets.ReadOnlyModelViewSet):
             # if self.request.query_params.get("location_status"):
             #     queryset = model.objects.using('lb').filter(location_status=self.request.query_params.get("location_status"))
             # else:
-            queryset = model.objects.using('lb').filter(location_status='有货货位')
+            queryset = model.objects.using('lb').order_by('in_storage_time')
             if lot_existed:
                 if lot_existed == '1':
                     queryset = queryset.exclude(lot_no__isnull=True)
@@ -599,7 +605,7 @@ class MaterialCount(APIView):
         status = params.get("status")
         if not store_name:
             raise ValidationError("缺少立库名参数，请检查后重试")
-        filter_dict = dict(location_status="有货货位")
+        filter_dict = {}
         if status:
             filter_dict.update(quality_level=status)
         if store_name == "终炼胶库":
@@ -612,7 +618,8 @@ class MaterialCount(APIView):
                 raise ValidationError(f"终炼胶库连接失败: {e}")
         elif store_name == "混炼胶库":
             try:
-                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(**filter_dict).values(
+                ret = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                    **filter_dict).values(
                     'material_no').annotate(
                     all_qty=Sum('qty'), all_weight=Sum('total_weight')).values('material_no', 'all_qty', 'all_weight')
             except Exception as e:
@@ -2484,6 +2491,419 @@ class THInventoryView(WMSInventoryView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class DepotModelViewSet(ModelViewSet):
+    """线边库库区"""
+    queryset = Depot.objects.filter(is_use=True)
+    serializer_class = DepotModelSerializer
+    permission_classes = [IsAuthenticated,]
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_name')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = DepotPallt.objects.filter(depot_site__depot=instance, pallet_status=1).first()  # True不能删
+        if not s:
+            instance.is_use=0
+            DepotSite.objects.filter(depot=instance).update(is_use=0)
+            instance.save()
+        else:
+            raise ValidationError('该库区下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DepotSiteModelViewSet(ModelViewSet):
+    """线边库库位"""
+    queryset = DepotSite.objects.filter(is_use=True)
+    serializer_class = DepotSiteModelSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotSiteDataFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_site_name', 'description', 'depot', 'depot__depot_name')
+            return Response({'results': data})
+        elif request.query_params.get('depot_site'):
+            data = DepotSite.objects.filter(is_use=True).values('id', 'depot_site_name', 'depot')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = DepotPallt.objects.filter(depot_site=instance, pallet_status=1).first()  # True不能删
+        if not s:
+            instance.is_use=0
+            instance.save()
+        else:
+            raise ValidationError('该库位下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DepotPalltModelViewSet(ModelViewSet):
+    """线边库库存查询"""
+    queryset = DepotPallt.objects.filter(pallet_status=1).order_by('-enter_time')
+    serializer_class = DepotPalltModelSerializer
+    permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotDataFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        try:
+            lst = []
+            for i in serializer.data:
+                lst.append({'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains'] + 1), 'num': 1, 'actual_weight': float(i['actual_weight'])})
+            c = {i['product_no']: {} for i in lst}
+
+            for i in lst:
+
+                if not c[i['product_no']]:
+                    i.update({"num": 1})
+                    c[i['product_no']].update(i)
+                else:
+                    c[i['product_no']]['num'] += 1
+                    c[i['product_no']]['trains'] += i['trains']
+                    c[i['product_no']]['actual_weight'] += i['actual_weight']
+            return Response({'results': c.values()})
+        except:
+            raise ValidationError('没有数据')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DepotPalltInfoModelViewSet(ModelViewSet):
+    """库存查询详情"""
+    queryset = DepotPallt.objects.filter(pallet_status=1)
+    serializer_class = DepotPalltInfoModelSerializer
+    permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotDataFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class PalletTestResultView(APIView):
+    """查询某拖收皮数据的检测结果，参数:lot_no=xxx"""
+
+    def get(self, request):
+        lot_no = self.request.query_params.get('lot_no')
+        if not lot_no:
+            raise ValidationError('参数缺失')
+        # {
+        #     '门尼': ['ML(1+4)'],
+        #     '流变': ['MH', 'ML', 'TC10'],
+        #     '比重': ['比重值']
+        # }
+        # [
+        #     {
+        #         'trains': 1,
+        #         'level': 1,  # 等级
+        #         'test_data': {
+        #                     '门尼': {
+        #                         'ML(1+4)': 66,
+        #
+        #                     },
+        #                     '流变': {
+        #                         'MH': 55,
+        #                         'ML': 99,
+        #                         'TC10': 12,
+        #                     }
+        #                 }
+        #     },
+        #     {
+        #         'trains': 2,
+        #         'level': 1,
+        #         'test_data': {
+        #             '门尼': {
+        #                 'ML(1+4)': 66,
+        #
+        #             },
+        #         }
+        #     }
+        # ]
+        ret = []
+        mdr_obj = MaterialDealResult.objects.filter(lot_no=lot_no).exclude(status='复测').last()
+        if mdr_obj:
+            serializers = MaterialDealResultListSerializer(instance=mdr_obj)
+            deal_result = serializers.data
+        else:
+            return Response([])
+        table_head = deal_result['mtr_list']['table_head']
+        mtr_list = deal_result['mtr_list']
+        mtr_list.pop('table_head', None)
+        test_result = deal_result['test_result']
+        for train, item in mtr_list.items():
+            data = {}
+            data['trains'] = train
+            data['test_data'] = {}
+            for j in item:
+                data['status'] = j.get('status')
+                test_indicator_name = j['test_indicator_name']
+                data_point_name = j['data_point_name']
+                value = j['value']
+                if test_indicator_name in data['test_data']:
+                    data['test_data'][test_indicator_name][data_point_name] = value
+                else:
+                    data['test_data'][test_indicator_name] = {data_point_name: value}
+            ret.append(data)
+
+        return Response({'table_head': table_head, 'results': ret, 'test_result': test_result})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PalletDataModelViewSet(ModelViewSet):
+    """线边库出入库管理"""
+    queryset = PalletFeedbacks.objects.exclude(palletfeedbacks__pallet_status=2).order_by('-product_time')
+    serializer_class = PalletDataModelSerializer
+    permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = PalletDataFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            for i in serializer.data:
+                s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
+                i.update({'group':s['work_schedule_plan__group__global_name']})
+            if request.query_params.get('group'):
+                group = request.query_params.get('group')
+                data = [i for i in serializer.data if i['group'].startswith(group)]
+                return self.get_paginated_response(data)
+            elif request.query_params.get('all'):
+                data = PalletFeedbacks.objects.filter(delete_flag=False).values('product_no').distinct()
+                return Response({'results':data})
+            else:
+                return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        pallet_id = request.data.get('id')
+        pallet_status = request.data.get('status')
+        enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        depot_site = request.data.get('depot_site')
+        depot_site_obj = DepotSite.objects.filter(depot_site_name=depot_site).first()
+        pallet_data_obj = PalletFeedbacks.objects.get(pk=pallet_id)
+
+        if pallet_status == 1:  # 入库
+            data_obj = DepotPallt.objects.create(pallet_data=pallet_data_obj, depot_site=depot_site_obj, enter_time=enter_time,
+                                                 pallet_status=pallet_status)
+            data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
+        elif pallet_status == 2:  # 出库
+            DepotPallt.objects.filter(depot_site=depot_site_obj).update(pallet_status=2, outer_time=enter_time)
+            data_obj = DepotPallt.objects.filter(depot_site=depot_site_obj).first()
+            data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
+        serializer = PalletDataModelSerializer(instance=data)
+        return Response({"result": serializer.data})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DepotResumeModelViewSet(ModelViewSet):
+    """线边库出入库履历"""
+    queryset = DepotPallt.objects.all().order_by('-enter_time')
+    serializer_class = DepotResumeModelSerializer
+    permission_classes = [IsAuthenticated,]
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotResumeFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            for i in serializer.data:
+                s = ProductClassesPlan.objects.filter(plan_classes_uid=i['plan_classes_uid']).values('work_schedule_plan__group__global_name').first()
+                i.update({'group':s['work_schedule_plan__group__global_name']})
+
+            if request.query_params.get('group'):
+                group = request.query_params.get('group')
+                data = [i for i in serializer.data if i['group'].startswith(group)]
+                return self.get_paginated_response(data)
+
+            elif request.query_params.get('all'):
+                data = DepotPallt.objects.values('pallet_data__product_no').annotate(num=Count('pallet_data__product_no'))
+                return Response({'results':data})
+            else:
+                return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SulfurDepotModelViewSet(ModelViewSet):
+    """硫磺库库区"""
+    queryset = SulfurDepot.objects.filter(is_use=True)
+    serializer_class = SulfurDepotModelSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_name')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = Sulfur.objects.filter(depot_site__depot=instance, sulfur_status=1).first()
+        if not s:
+            instance.is_use=0
+            SulfurDepotSite.objects.filter(depot=instance).update(is_use=0)
+            instance.save()
+        else:
+            raise ValidationError('该库区下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SulfurDepotSiteModelViewSet(ModelViewSet):
+    """硫磺库库位"""
+    queryset = SulfurDepotSite.objects.filter(is_use=True)
+    serializer_class = SulfurDepotSiteModelSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = SulfurDepotSiteFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'depot_site_name', 'depot', 'depot__depot_name', 'description')
+            return Response({'results': data})
+        elif request.query_params.get('depot_site'):
+            data = SulfurDepotSite.objects.filter(is_use=True).values('id', 'depot_site_name', 'depot')
+            return Response({'results': data})
+        return super().list(self, request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        s = Sulfur.objects.filter(depot_site=instance, sulfur_status=1).first()
+        if not s:
+            instance.is_use=0
+            instance.save()
+        else:
+            raise ValidationError('该库区下存在物料,不能删除!')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SulfurDataModelViewSet(ModelViewSet):
+    """硫磺库出入库管理"""
+    queryset = Sulfur.objects.filter(sulfur_status=1).order_by('-enter_time')
+    serializer_class = SulfurDataModelSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = SulfurDataFilter
+
+    def list(self, request, *args, **kwargs):
+        name = self.request.query_params.get('_name')
+        product_no = self.request.query_params.get('_product_no')
+        provider = self.request.query_params.get('_provider')
+        if name:
+            queryset = Sulfur.objects.filter(name__icontains=name).values('name').distinct()
+        elif product_no:
+            queryset = Sulfur.objects.filter(product_no__icontains=product_no).values('product_no').distinct()
+        elif provider:
+            queryset = Sulfur.objects.filter(provider__icontains=provider).values('provider').distinct()
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return Response(queryset)
+
+    # 硫磺人工入库
+    def create(self, request, *args, **kwargs):
+        if request.data.get('sulfur_status') == 1:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            try:
+                depot_site_obj = SulfurDepotSite.objects.get(pk=request.data.get('depot_site'))
+            except:
+                raise ValidationError('该库位不存在')
+
+            enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
+            serializer = SulfurDataModelSerializer(instance=data)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        elif request.data.get('sulfur_status') == 2:
+
+            outer_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            Sulfur.objects.filter(id=request.data.get('id')).update(sulfur_status=2, outer_time=outer_time)
+            return Response({'results': '出库成功'})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DepotSulfurModelViewSet(ModelViewSet):
+    """硫磺库库存查询"""
+    queryset = Sulfur.objects.filter(sulfur_status=1)
+    serializer_class = DepotSulfurModelSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotSulfurFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        lst = []
+        for i in serializer.data:
+            lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no']})
+        c = {i['name']: {} for i in lst}
+        for i in lst:
+            if not c[i['name']]:
+                i.update({"num": 1})
+                c[i['name']].update(i)
+            else:
+                c[i['name']]['num'] += 1
+        return Response({'results': c.values()})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DepotSulfurInfoModelViewSet(ModelViewSet):
+    """硫磺库库存查询详情"""
+    queryset =  Sulfur.objects.filter(sulfur_status=1)
+    serializer_class = DepotSulfurInfoModelSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = DepotSulfurFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SulfurResumeModelViewSet(ModelViewSet):
+    """硫磺库出入库履历"""
+    queryset = Sulfur.objects.all().order_by('-enter_time')
+    serializer_class = SulfurResumeModelSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = SulfurResumeFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventory(ListAPIView):
     """
         北自混炼胶库存列表，参数：?material_no=物料编码&container_no=托盘号&lot_no=收皮条码&location=库存位
@@ -2502,7 +2922,8 @@ class BzMixingRubberInventory(ListAPIView):
         quality_status = self.request.query_params.get('quality_status')  # 品质状态
         lot_existed = self.request.query_params.get('lot_existed')  # 收皮条码有无（1：有，0：无）
         station = self.request.query_params.get('station')  # 出库口名称
-        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位")
+        location_status = self.request.query_params.get('location_status')  # 货位状态
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
             queryset = queryset.filter(material_no__icontains=material_no)
         if container_no:
@@ -2515,6 +2936,8 @@ class BzMixingRubberInventory(ListAPIView):
             queryset = queryset.filter(lot_no__icontains=lot_no)
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
+        if location_status:
+            queryset = queryset.filter(location_status=location_status)
         if lot_existed:
             if lot_existed == '1':
                 queryset = queryset.exclude(lot_no__isnull=True)
@@ -2532,23 +2955,31 @@ class BzMixingRubberInventory(ListAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventorySummary(APIView):
-    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称"""
+    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
 
     def get(self, request):
         params = request.query_params
         quality_status = params.get("status")
         station = params.get("station")
-        if not all([quality_status, station]):
-            raise ValidationError('参数缺失！')
-        queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(location_status="有货货位")
-        if station == '一层前端':
-            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-        elif station in ('二层前端', '二层后端'):
-            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-        else:
-            return Response([])
-        if status:
+        location_status = params.get("location_status")
+        lot_existed = params.get("lot_existed")
+        queryset = BzFinalMixingRubberInventory.objects.using('bz').all()
+        if location_status:
+            queryset = queryset.filter(location_status=location_status)
+        if station:
+            if station == '一层前端':
+                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+            elif station in ('二层前端', '二层后端'):
+                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+            else:
+                return Response([])
+        if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
+        if lot_existed:
+            if lot_existed == '1':
+                queryset = queryset.filter(lot_no__isnull=False)
+            else:
+                queryset = queryset.filter(lot_no__isnull=True)
         try:
             ret = queryset.values('material_no').annotate(all_qty=Sum('qty'),
                                                           all_weight=Sum('total_weight')
@@ -2600,6 +3031,96 @@ class BzMixingRubberInventorySearch(ListAPIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
+class BzFinalRubberInventory(ListAPIView):
+    """
+        终炼胶、帘布库存列表
+    """
+    serializer_class = BzFinalMixingRubberLBInventorySerializer
+    permission_classes = (IsAuthenticated, )
+    filter_backends = (DjangoFilterBackend,)
+
+    def list(self, request, *args, **kwargs):
+        filter_kwargs = {}
+        store_name = self.request.query_params.get('store_name', '炼胶库')  # 仓库
+        quality_status = self.request.query_params.get('quality_status', None)
+        lot_existed = self.request.query_params.get('lot_existed')
+        container_no = self.request.query_params.get('container_no')
+        material_no = self.request.query_params.get('material_no')
+        order_no = self.request.query_params.get('order_no')
+        location = self.request.query_params.get('location')
+        tunnel = self.request.query_params.get('tunnel')
+        lot_no = self.request.query_params.get('lot_no')
+        location_status = self.request.query_params.get('location_status')  # 货位状态
+        if store_name:
+            if store_name == '终炼胶库':
+                store_name = "炼胶库"
+            filter_kwargs['store_name'] = store_name
+        if quality_status:
+            filter_kwargs['quality_level'] = quality_status
+        if lot_existed:
+            if lot_existed == '1':
+                filter_kwargs['lot_no__isnull'] = False
+            else:
+                filter_kwargs['lot_no__isnull'] = True
+        if container_no:
+            filter_kwargs['container_no__icontains'] = container_no
+        if material_no:
+            filter_kwargs['material_no'] = material_no
+        if order_no:
+            filter_kwargs['bill_id__icontains'] = container_no
+        if location:
+            filter_kwargs['location__icontains'] = location
+        if tunnel:
+            filter_kwargs['location__istartswith'] = tunnel
+        if lot_no:
+            filter_kwargs['lot_no__icontains'] = lot_no
+        if location_status:
+            filter_kwargs['location_status'] = location_status
+        queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by('in_storage_time')
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class BzFinalRubberInventorySummary(APIView):
+    """终炼胶库存、帘布库库存统计列表。参数：status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
+
+    def get(self, request):
+        params = request.query_params
+        quality_status = params.get("status")
+        location_status = params.get("location_status")
+        store_name = params.get("store_name", '炼胶库')
+        lot_existed = params.get("lot_existed")
+        queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').all()
+        if location_status:
+            queryset = queryset.filter(location_status="有货货位")
+        if quality_status:
+            queryset = queryset.filter(quality_level=quality_status)
+        if store_name:
+            if store_name == '终炼胶库':
+                store_name = "炼胶库"
+            queryset = queryset.filter(store_name=store_name)
+        if lot_existed:
+            if lot_existed == '1':
+                queryset = queryset.filter(lot_no__isnull=False)
+            else:
+                queryset = queryset.filter(lot_no__isnull=True)
+        try:
+            ret = queryset.values('material_no').annotate(all_qty=Sum('qty'),
+                                                          all_weight=Sum('total_weight')
+                                                          ).values('material_no', 'all_qty', 'all_weight')
+        except Exception as e:
+            raise ValidationError(f"混炼胶库连接失败:{e}")
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
 class BzFinalRubberInventorySearch(ListAPIView):
     """根据出库口、搜索指定数量的终炼胶库存信息.参数：?material_no=物料编码&quality_status=品质状态&need_qty=出库数量"""
     queryset = BzFinalMixingRubberInventoryLB.objects.all()
@@ -2617,6 +3138,7 @@ class BzFinalRubberInventorySearch(ListAPIView):
         except Exception:
             raise ValidationError('参数错误！')
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+            store_name="炼胶库",
             material_no=material_no,
             location_status="有货货位",
             lot_no__isnull=False).order_by('in_storage_time')
@@ -2631,3 +3153,181 @@ class BzFinalRubberInventorySearch(ListAPIView):
                 break
         serializer = self.get_serializer(ret, many=True)
         return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutBoundTasksListView(ListAPIView):
+    """
+        根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
+    """
+
+    def get_queryset(self):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        station_id = self.request.query_params.get('station_id')  # 出库口名称
+        try:
+            station = Station.objects.get(id=station_id).name
+        except Exception:
+            raise ValidationError('参数错误')
+        if warehouse_name == '混炼胶库':
+            return DeliveryPlan.objects.filter(status=1, station=station).order_by('-finish_time')
+        else:
+            return DeliveryPlanFinal.objects.filter(status=1, station=station).order_by('-finish_time')
+
+    def get_serializer_class(self):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        if warehouse_name == '混炼胶库':
+            return PutPlanManagementSerializer
+        else:
+            return PutPlanManagementSerializerFinal
+
+
+@method_decorator([api_recorder], name="dispatch")
+class InOutBoundSummaryView(APIView):
+    """混炼终炼出库口出入库统计，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id"""
+
+    def get(self, request):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        station_id = self.request.query_params.get('station_id')  # 出库口名称
+        try:
+            station = Station.objects.get(id=station_id).name
+        except Exception:
+            raise ValidationError('参数错误')
+        now = datetime.datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if current_work_schedule_plan:
+            date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+        else:
+            date_now = str(now.date())
+        date_begin_time = date_now + ' 08:00:00'
+        if warehouse_name == '混炼胶库':
+            if station == '一层前端':
+                ret = [
+                    {'tunnel': '3巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='3',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '4巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='4',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                ]
+                # 出库
+            elif station in ('二层后端', '二层前端'):
+                ret = [
+                    {'tunnel': '1巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='1',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '2巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2').count(),
+                     "out_bound_count": DeliveryPlan.objects.filter(
+                         status=1,
+                         location__startswith='2',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                ]
+            else:
+                ret = []
+            total_inbound_count = MixGumInInventoryLog.objects.using('bz').filter(
+                start_time__gte=date_begin_time).count()
+            total_outbound_count = DeliveryPlan.objects.filter(status=1,
+                                                               finish_time__gte=date_begin_time
+                                                               ).count()
+        else:
+            ret = [
+                    {'tunnel': '1巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='1',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '2巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='2',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '3巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='3',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '4巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='4',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '5巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='5').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='45',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     },
+                    {'tunnel': '6巷',
+                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='6').count(),
+                     "out_bound_count": DeliveryPlanFinal.objects.filter(
+                         status=1,
+                         location__startswith='6',
+                         finish_time__gte=date_begin_time,
+                         station=station).count()
+                     }
+                ]
+            total_inbound_count = FinalGumInInventoryLog.objects.using('lb').filter(
+                start_time__gte=date_begin_time).count()
+            total_outbound_count = DeliveryPlanFinal.objects.filter(status=1,
+                                                                    finish_time__gte=date_begin_time).count()
+        production_count = TrainsFeedbacks.objects.filter(factory_date=date_now).count()
+        return Response({"data": ret,
+                         "total_inbound_count": total_inbound_count,
+                         "total_outbound_count": total_outbound_count,
+                         "production_count": production_count
+                         })

@@ -116,10 +116,12 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             # 取托盘所有test_order
             lot_no = material_test_order.lot_no
-            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            pfb_obj = PalletFeedbacks.objects.filter(lot_no=lot_no,
+                                                     product_no=material_test_order.product_no).first()
             if not pfb_obj:
                 return
-            test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no)
+            test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                           product_no=material_test_order.product_no)
 
             # 取检测车次
             test_trains_set = set(test_orders.values_list('actual_trains', flat=True))
@@ -128,15 +130,17 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
 
             common_trains_set = actual_trains_set & test_trains_set
             # 判断托盘反馈车次都存在检测数据
-            if not len(actual_trains_set) == len(test_trains_set) == len(common_trains_set):
+            if not len(actual_trains_set) == len(common_trains_set):
                 return
 
             # 判断该托盘所有test_order检测结果
 
             # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章
             passed_order_count = MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no,
+                                                                  product_no=material_test_order.product_no,
                                                                   is_passed=True).count()
             unqualified_order_count = MaterialTestOrder.objects.filter(lot_no=material_test_order.lot_no,
+                                                                       product_no=material_test_order.product_no,
                                                                        is_qualified=False).count()
             if 0 < passed_order_count == unqualified_order_count > 0:
                 level = 1
@@ -154,7 +158,8 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 deal_suggestion = getattr(passed_result, 'pass_suggestion', '放行')
             # 2、所有车次都合格
             elif not MaterialTestOrder.objects.filter(is_qualified=False,
-                                                      lot_no=material_test_order.lot_no).exists():
+                                                      lot_no=material_test_order.lot_no,
+                                                      product_no=material_test_order.product_no).exists():
                 level = 1
                 test_result = '一等品'
                 deal_suggestion = '合格'
@@ -171,9 +176,14 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 'status': '待处理',
                 'deal_result': '一等品' if level == 1 else '三等品',
                 'production_factory_date': pfb_obj.end_time,
-                'deal_suggestion': deal_suggestion
+                'deal_suggestion': deal_suggestion,
+                'product_no': material_test_order.product_no,
+                'classes': material_test_order.production_class,
+                'equip_no': material_test_order.production_equip_no,
+                'factory_date': material_test_order.production_factory_date
             }
-            instance = MaterialDealResult.objects.filter(lot_no=lot_no)
+            instance = MaterialDealResult.objects.filter(lot_no=lot_no,
+                                                         product_no=material_test_order.product_no)
             if instance:
                 deal_result_dict['update_store_test_flag'] = 4
                 instance.update(**deal_result_dict)

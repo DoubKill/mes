@@ -2,8 +2,6 @@ import datetime
 
 import math
 from rest_framework import serializers
-from rest_framework.fields import Field
-
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
@@ -293,3 +291,29 @@ class WeighInformationSerializer2(serializers.ModelSerializer):
         model = ExpendMaterial
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class TrainsFixSerializer(serializers.Serializer):
+    factory_date = serializers.DateField(required=False)
+    classes = serializers.CharField(required=False)
+    equip_no = serializers.CharField(required=False)
+    product_no = serializers.CharField(required=False)
+    begin_trains = serializers.IntegerField(min_value=1)
+    end_trains = serializers.IntegerField(min_value=1)
+    fix_num = serializers.IntegerField(required=False)
+    lot_no = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    def validate(self, attrs):
+        begin_trains = attrs['begin_trains']
+        end_trains = attrs['end_trains']
+        if begin_trains > end_trains:
+            raise serializers.ValidationError('开始车次不得大于结束车次')
+        return attrs
+
+
+class PalletFeedbacksBatchModifySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PalletFeedbacks
+        fields = ('id', 'begin_trains', 'end_trains', 'lot_no', 'product_no')
+        extra_kwargs = {'id': {'read_only': False}}

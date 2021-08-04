@@ -8,3 +8,4 @@ logs
 __pycache__
 media
 mes/local_settings.py
+.vscode

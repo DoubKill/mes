@@ -424,7 +424,8 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no).first()
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
+                                                     product_no=instance.product_no).first()
         test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
@@ -434,9 +435,9 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         else:
             classes = plan.work_schedule_plan.classes.global_name
             group = plan.work_schedule_plan.group.global_name
-        ret['day_time'] = str(test_order_data.production_factory_date)  # 工厂日期
-        ret['product_no'] = pallet_data.product_no  # 胶料编码
-        ret['equip_no'] = pallet_data.equip_no  # 设备编号
+        ret['day_time'] = str(instance.factory_date)  # 工厂日期
+        # ret['product_no'] = pallet_data.product_no  # 胶料编码
+        # ret['equip_no'] = pallet_data.equip_no  # 设备编号
         ret['residual_weight'] = None  # 余量
         ret['actual_weight'] = pallet_data.actual_weight  # 收皮重量
         ret['operation_user'] = pallet_data.operation_user  # 操作员
@@ -517,7 +518,9 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret = {}
         table_head_top = {}
         sort_rules = {'门尼': 1, '硬度': 2, '比重': 3, '流变': 4, '钢拔': 5, '物性': 6}
-        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no).order_by('actual_trains')
+        test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no,
+                                                       product_no=obj.product_no
+                                                       ).order_by('actual_trains')
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
@@ -1049,15 +1052,16 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
-        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no).first()
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
+                                                     product_no=instance.product_no).first()
         test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
-        ret['day_time'] = str(test_order_data.production_factory_date)
-        ret['product_no'] = pallet_data.product_no
-        ret['equip_no'] = pallet_data.equip_no
+        ret['day_time'] = str(instance.factory_date)
+        # ret['product_no'] = pallet_data.product_no
+        # ret['equip_no'] = pallet_data.equip_no
         ret['residual_weight'] = None
         ret['actual_weight'] = pallet_data.actual_weight
-        ret['classes_group'] = test_order_data.production_class + '/' + test_order_data.production_group
+        ret['classes_group'] = instance.classes + '/' + test_order_data.production_group
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date,

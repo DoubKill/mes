@@ -312,6 +312,10 @@ class MaterialDealResult(AbstractEntity):
     test_time = models.PositiveIntegerField(help_text='检测次数', null=True)
     update_store_test_flag = models.IntegerField(help_text='更新立库检测结果标志', choices=CHOICE1, default=4)  # 是否重新发起更新结果
     send_count = models.IntegerField(help_text='发送次数', default=0)
+    product_no = models.CharField(max_length=64, help_text='产出胶料', verbose_name='产出胶料', null=True)
+    classes = models.CharField(max_length=64, help_text='生产班次名', null=True)
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True)
+    factory_date = models.DateField(help_text='工厂日期', null=True)
 
     class Meta:
         db_table = 'material_deal_result'
@@ -345,7 +349,8 @@ class LabelPrint(models.Model):
     )
     STATUS_CHOICE = (
         (0, '未打印'),
-        (1, '已打印')
+        (1, '已打印'),
+        (2, '已下发')
     )
     label_type = models.PositiveIntegerField(help_text="标签类型", choices=TYPE_CHOICE, verbose_name="标签类型")
     lot_no = models.CharField(max_length=64, help_text="追踪条码", verbose_name="追踪条码")
