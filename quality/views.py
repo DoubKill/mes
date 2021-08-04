@@ -584,6 +584,8 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         station = request.query_params.get("station")
         instance = self.get_queryset().filter(label_type=station_dict.get(station), status=0).order_by('id').first()
         if instance:
+            instance.status = 2
+            instance.save()
             serializer = self.get_serializer(instance)
             data = serializer.data
         else:
