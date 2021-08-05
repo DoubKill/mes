@@ -62,11 +62,11 @@ def main():
                     operation_user='admin',
                     begin_trains=st - 1,
                     end_trains=st,
-                    pallet_no=uuid.uuid1(),
+                    pallet_no=''.join(random.sample(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], 7)),
                     classes=pcp.work_schedule_plan.classes.global_name,
                     product_time=datetime.datetime.now(),
                     factory_date=pcp.work_schedule_plan.plan_schedule.day_time,
-                    lot_no=uuid.uuid1(),
+                    lot_no='AAJ1{}{}'.format(pcp.equip.equip_no, datetime.datetime.now().strftime('%Y%m%d%H%M%S%f' )),
                 )
                 # for train in [st - 1, st]:
                 #     mto = MaterialTestOrder.objects.create(
