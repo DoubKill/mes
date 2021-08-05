@@ -403,6 +403,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             datetime.datetime.now().strftime('%Y-%m-%d')
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
+        db_config = [k for k, v in DATABASES.items() if v['NAME'].startswith('YK_XL')]
+        if equip_no not in db_config:
+            return Response([])
         # mes网页请求
         # 筛选配料时间为当天的记录
         report_basic_records = list(ReportBasic.objects.using(equip_no).filter(
