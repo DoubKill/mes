@@ -186,7 +186,9 @@ class BatchProductBatchingVIew(APIView):
                                     'adjust_left_weight': load_data['adjust_left_weight'], 'id': load_data['id']
                                     })
             # 判断物料是否够一车
-            if load_data['adjust_left_weight'] < plan_weight:
+            left = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name) \
+                .aggregate(left_weight=Sum('real_weight'))['left_weight']
+            if left < plan_weight:
                 single_material.update(
                     {'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
             else:

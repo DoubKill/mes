@@ -156,10 +156,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and\
                                                                                         '细料' not in material_name else \
                         classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False, name=material_name).first().package_cnt
-                    classes_plan.product_batching.batching_details.filter(material__material_name=material_name)
-                    now_material = add_materials.filter(material_name=material_name).last()
-                    adjust_left_weight = now_material.adjust_left_weight
-                    if adjust_left_weight > single_material_weight:
+                    left_weight = add_materials.aggregate(left_weight=Sum('real_weight'))['left_weight']
+                    if left_weight > single_material_weight:
                         attrs['tank_data'].update({'msg': '同物料未使用完, 不能扫码'})
                         attrs['status'] = 2
                     else:
