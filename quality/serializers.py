@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail
+    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult
 from recipe.models import MaterialAttribute
 
 
@@ -1099,11 +1099,23 @@ class IgnoredProductInfoSerializer(BaseModelSerializer):
         read_only_fields = ('product_no',)
 
 
+class Test_Indicator_Name(serializers.ModelSerializer):
+
+    class Meta:
+        model = TestIndicator
+        fields = ['name']
+
+
 class ProductReportEquipSerializer(BaseModelSerializer):
     data_point_name = serializers.ReadOnlyField(source='data_point.name')
     test_type_name = serializers.ReadOnlyField(source='data_point.test_type.name')
     test_type = serializers.ReadOnlyField(source='data_point.test_type.id')
     last_time = serializers.SerializerMethodField()
+    test_indicator_name = serializers.SerializerMethodField()
+    no = serializers.CharField(help_text='设备编号', validators=[UniqueValidator(queryset=ProductReportEquip.objects.all(),
+                                                                               message='该设备已存在！')])
+    ip = serializers.CharField(help_text='IP', validators=[UniqueValidator(queryset=ProductReportEquip.objects.all(),
+                                                                               message='该IP已被使用！')])
 
     class Meta:
         model = ProductReportEquip
@@ -1113,6 +1125,10 @@ class ProductReportEquipSerializer(BaseModelSerializer):
     def get_last_time(self, obj):
         last_time = ProductTestPlan.objects.filter(test_equip=obj).values('test_time').last()
         return last_time['test_time'].strftime('%Y-%m-%d %H:%M:%S') if last_time else None
+
+    def get_test_indicator_name(self, obj):  # 实验类型
+        test_indicator_name = ProductReportEquip.objects.filter(id=obj.id).values('test_indicator__name')
+        return test_indicator_name
 
 
 class ProductReportValueViewSerializer(serializers.ModelSerializer):
@@ -1611,11 +1627,12 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):
     classes = serializers.CharField()
+    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ProductTestPlanDetail
         fields = ['factory_date', 'product_no', 'actual_trains', 'equip_no',
-                  'lot_no', 'classes', 'values']
+                  'lot_no', 'classes', 'values', 'id']
 
 
 class ProductTestPlanSerializer(BaseModelSerializer):
@@ -1656,3 +1673,11 @@ class ReportValueSerializer(serializers.Serializer):
     ip = serializers.CharField(help_text='IP地址')
     value = serializers.JSONField(help_text='{"l_4: 12"}')
     raw_value = serializers.CharField(help_text='机台检测完整数据')
+
+
+class RubberMaxStretchTestResultSerializer(serializers.ModelSerializer):
+    product_no = serializers.ReadOnlyField(source='product_test_plan_detail.product_no')
+    # product_no = serializers.CharField(read_only=True)
+    class Meta:
+        model = RubberMaxStretchTestResult
+        fields = '__all__'

@@ -429,6 +429,7 @@ class ProductReportEquip(AbstractEntity):
     no = models.CharField(max_length=64, help_text='设备编号')
     ip = models.CharField(max_length=64, help_text='IP', unique=True)
     status = models.PositiveIntegerField(help_text='设备连接状态', choices=STATUS_CHOICE, default=1)
+    test_indicator = models.ManyToManyField(TestIndicator, help_text='实验指标', related_name='test_indicator')
 
     class Meta:
         db_table = 'product_report_equip'
@@ -669,3 +670,34 @@ class MaterialReportValue(models.Model):
     class Meta:
         db_table = 'material_report_value'
         verbose_name_plural = verbose_name = '原材料快检上报值'
+
+
+class RubberMaxStretchTestResult(models.Model):
+    """物性、刚拔检测数据详情"""
+
+    product_test_plan_detail = models.ForeignKey(ProductTestPlanDetail, help_text='检测计划任务',
+                                                 on_delete=models.CASCADE, related_name='test_results')
+    ordering = models.IntegerField(help_text='检测次序（刚拔5次、物性3次）')
+    speed = models.FloatField(help_text='速度', null=True)
+    thickness = models.FloatField(help_text='厚度（物性）', null=True)
+    width = models.FloatField(help_text='宽度（物性）', null=True)
+    ds1 = models.FloatField(help_text='ds1', null=True)
+    ds2 = models.FloatField(help_text='ds2', null=True)
+    ds3 = models.FloatField(help_text='ds3', null=True)
+    ds4 = models.FloatField(help_text='ds4', null=True)
+    max_strength = models.FloatField(help_text='最大力', null=True)
+    max_length = models.FloatField(help_text='最大伸长', null=True)
+    end_strength = models.FloatField(help_text='结束力', null=True)
+    end_length = models.FloatField(help_text='结束伸长', null=True)
+    break_strength = models.FloatField(help_text='断裂强力', null=True)
+    break_length = models.FloatField(help_text='断裂伸长', null=True)
+    n1 = models.FloatField(help_text='n1（物性）', null=True)
+    n2 = models.FloatField(help_text='n2（物性）', null=True)
+    n3 = models.FloatField(help_text='n3（物性）', null=True)
+    test_time = models.CharField(max_length=64, help_text='检测时间', null=True)
+    test_method = models.CharField(max_length=64, help_text='检测方法', null=True)
+    result = models.CharField(max_length=64, help_text='检测结果')
+
+    class Meta:
+        db_table = 'rubber_max_stretch_test_result'
+        verbose_name_plural = verbose_name = '刚拔物性检测数据详情'
