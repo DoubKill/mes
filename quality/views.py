@@ -2150,7 +2150,7 @@ class ReportValueView(APIView):
                                                                                     M300=Avg('ds2'))
                         values['伸长率%'] = values['伸长率']
                         del values['伸长率']
-                        current_test_detail.value = values         #todo 中文不能直接dumps
+                        current_test_detail.value = values
                         current_test_detail.save()
                     else:
                         return Response('ok')
@@ -2195,71 +2195,71 @@ class ReportValueView(APIView):
                     if not pallet:
                         continue
                     lot_no = pallet.lot_no
-                    # 车次检测单
-                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                                                                  actual_trains=train
-                                                                  ).first()
-                    if not test_order:
-                        test_order = MaterialTestOrder.objects.create(
-                            lot_no=lot_no,
-                            material_test_order_uid=uuid.uuid1(),
-                            actual_trains=train,
-                            product_no=product_no,
-                            plan_classes_uid=pallet.plan_classes_uid,
-                            production_class=production_class,
-                            production_group=group,
-                            production_equip_no=equip_no,
-                            production_factory_date=product_date
-                        )
+                    #todo 车次检测单
+                    # test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                    #                                               actual_trains=train
+                    #                                               ).first()
+                    # if not test_order:
+                    test_order = MaterialTestOrder.objects.create(
+                        lot_no=lot_no,
+                        material_test_order_uid=uuid.uuid1(),
+                        actual_trains=train,
+                        product_no=product_no,
+                        plan_classes_uid=pallet.plan_classes_uid,
+                        production_class=production_class,
+                        production_group=group,
+                        production_equip_no=equip_no,
+                        production_factory_date=product_date
+                    )
 
-                        # 由MES判断检测结果
-                        material_test_method = MaterialTestMethod.objects.filter(
-                            material__material_no=product_no,
-                            test_method__name=method_name).first()
-                        if not material_test_method:
-                            continue  #todo raise 检测方法不存在?
+                    # 由MES判断检测结果
+                    material_test_method = MaterialTestMethod.objects.filter(
+                        material__material_no=product_no,
+                        test_method__name=method_name).first()
+                    if not material_test_method:
+                        raise ValidationError('检测方法不存在')
 
-                        for data_point in data_point_list:
-                            data_point_name = data_point
-                            try:
-                                if equip_test_plan.test_indicator_name == '门尼':
-                                    test_value = Decimal(list(test_value.values())[0]).quantize(Decimal('0.000'))
-                                else:
-                                    test_value = dict(current_test_detail.value)[data_point_name]
-                            except Exception:
-                                raise ValidationError('检测值{}数据错误'.format(test_value))
-
-                            indicator = MaterialDataPointIndicator.objects.filter(
-                                material_test_method=material_test_method,
-                                data_point__name=data_point_name,
-                                data_point__test_type__test_indicator__name=indicator_name,
-                                upper_limit__gte=test_value,
-                                lower_limit__lte=test_value).first()
-                            if indicator:
-                                mes_result = indicator.result
-                                level = indicator.level
+                    for data_point in data_point_list:
+                        data_point_name = data_point
+                        try:
+                            if equip_test_plan.test_indicator_name == '门尼':
+                                test_value = Decimal(list(test_value.values())[0]).quantize(Decimal('0.000'))
                             else:
-                                mes_result = '三等品'
-                                level = 2
+                                test_value = dict(current_test_detail.value)[data_point_name]
+                        except Exception:
+                            raise ValidationError('检测值{}数据错误'.format(test_value))
 
-                            MaterialTestResult.objects.create(
-                                material_test_order=test_order,
-                                test_factory_date=datetime.datetime.now(),
-                                value=test_value,
-                                test_times=test_times,
-                                data_point_name=data_point_name,
-                                test_method_name=method_name,
-                                test_indicator_name=indicator_name,
-                                result=mes_result,
-                                mes_result=mes_result,
-                                machine_name=equip_test_plan.test_equip.no,
-                                test_group=group,
-                                level=level,
-                                test_class=production_class,
-                                is_judged=material_test_method.is_judged)
-                    else:
-                        # 已经检测过的情况
-                        MaterialTestResult.objects.filter(material_test_order=test_order).update(value=test_value)
+                        indicator = MaterialDataPointIndicator.objects.filter(
+                            material_test_method=material_test_method,
+                            data_point__name=data_point_name,
+                            data_point__test_type__test_indicator__name=indicator_name,
+                            upper_limit__gte=test_value,
+                            lower_limit__lte=test_value).first()
+                        if indicator:
+                            mes_result = indicator.result
+                            level = indicator.level
+                        else:
+                            mes_result = '三等品'
+                            level = 2
+
+                        MaterialTestResult.objects.create(
+                            material_test_order=test_order,
+                            test_factory_date=datetime.datetime.now(),
+                            value=test_value,
+                            test_times=test_times,
+                            data_point_name=data_point_name,
+                            test_method_name=method_name,
+                            test_indicator_name=indicator_name,
+                            result=mes_result,
+                            mes_result=mes_result,
+                            machine_name=equip_test_plan.test_equip.no,
+                            test_group=group,
+                            level=level,
+                            test_class=production_class,
+                            is_judged=material_test_method.is_judged)
+                    # else:
+                    #     # 已经检测过的情况
+                    #     MaterialTestResult.objects.filter(material_test_order=test_order).update(value=test_value)
 
             return Response({'msg': '检测完成', 'success': True})
 
@@ -2280,7 +2280,6 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('product_test_plan_detail_id',)
 
-    # 怎么区分是不是钢拔/物性  test_indicator_name='钢拔'
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = self.get_serializer(queryset, many=True)
@@ -2295,22 +2294,19 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
         return Response({'results': serializer.data, 'avg_value': avg_value})
 
     def update(self, request, *args, **kwargs):
-
         if kwargs.get('pk'):
-            id_ = kwargs.get('pk')
-            test_plan_detail_obj = ProductTestPlanDetail.objects.get(id=id_)
-            RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).update(**request.data)
-
-        # 判断检测方法是啥 ,然后更新value
+            pk = kwargs.get('pk')
+            test_plan_detail_obj = ProductTestPlanDetail.objects.get(test_results__id=pk)
+            RubberMaxStretchTestResult.objects.filter(pk=pk).update(**request.data)
             test_plan_obj = ProductTestPlan.objects.filter(product_test_plan_detail=test_plan_detail_obj).first()
             if test_plan_obj.test_indicator_name == '钢拔':
                 data_point_list = ['钢拔']
-                values = RubberMaxStretchTestResult.objects.filter(id=kwargs.get('pk')).aggregate(
+                values = RubberMaxStretchTestResult.objects.filter(id=pk).aggregate(
                     钢拔=Avg('max_strength'))
-                ProductTestPlanDetail.objects.filter(test_results_id=kwargs.get('pk')).update(values=values)
+                ProductTestPlanDetail.objects.filter(test_results__id=pk).update(value=values)
             elif test_plan_obj.test_indicator_name == '物性':
                 data_point_list = ['扯断强度', '伸长率%', 'M300']
-                values = RubberMaxStretchTestResult.objects.filter(id=id_).aggregate(
+                values = RubberMaxStretchTestResult.objects.filter(id=pk).aggregate(
                                                                             扯断强度=Avg('break_strength'),
                                                                             伸长率=Avg('max_length'),
                                                                             M300=Avg('ds2'))
