@@ -31,7 +31,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
     IssueBatchingClassesPlanSerializer, BatchingClassesEquipPlanSerializer, PlantImportSerializer
 from production.models import PlanStatus, TrainsFeedbacks
-from recipe.models import ProductBatching, ProductBatchingDetail, Material
+from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
 from system.serializers import PlanReceiveSerializer
 
 
@@ -431,3 +431,43 @@ class PlantImportView(CreateAPIView):
     serializer_class = PlantImportSerializer
     queryset = ProductClassesPlan.objects.all()
     permission_classes = (IsAuthenticated, PermissionClass({'add': 'add_productdayplan'}))
+
+
+@method_decorator([api_recorder], name="dispatch")
+class LabelPlanInfo(APIView):
+    """根据计划编号，获取工厂日期和班组"""
+
+    def get(self, request):
+        plan_classes_uid = self.request.query_params.get('planid')  # 计划uid
+        produce_time = self.request.query_params.get('producetime')  # 生产时间
+        try:
+            produce_time = datetime.datetime.strptime(produce_time, "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            raise ValidationError('produce_time日期格式错误')
+        ret = {'factory_date': '', 'group': '', 'expire_time': ''}
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+        if plan:
+            ret['factory_date'] = plan.work_schedule_plan.plan_schedule.day_time
+            ret['group'] = plan.work_schedule_plan.group.global_name
+            material_detail = MaterialAttribute.objects.filter(
+                material__material_no=plan.product_batching.stage_product_batch_no).first()
+            if material_detail:
+                unit = material_detail.validity_unit
+                if unit in ["天", "days", "day"]:
+                    param = {"days": material_detail.period_of_validity}
+                elif unit in ["小时", "hours", "hour"]:
+                    param = {"hours": material_detail.period_of_validity}
+                else:
+                    param = {"days": material_detail.period_of_validity}
+                expire_time = (produce_time + datetime.timedelta(**param)).strftime('%Y-%m-%d %H:%M:%S')
+                ret['expire_time'] = expire_time
+        elif produce_time:
+            current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+                start_time__lte=produce_time,
+                end_time__gte=produce_time,
+                plan_schedule__work_schedule__work_procedure__global_name='密炼'
+            ).first()
+            if current_work_schedule_plan:
+                ret['factory_date'] = current_work_schedule_plan.plan_schedule.day_time
+                ret['group'] = current_work_schedule_plan.group.global_name
+        return Response(ret)
