@@ -1,8 +1,9 @@
 """
     小料对接接口封装
 """
-
+import re
 import json
+import requests
 from datetime import datetime
 
 from django.db.models import Sum
@@ -97,41 +98,55 @@ class INWeighSystem(object):
         return add
 
 
-class TankStatusSync(INWeighSystem):
+class TankStatusSync(object):
+    equip_no_ip = {k: v.get("HOST", "10.4.23.79") for k, v in DATABASES.items()}
 
     def __init__(self, equip_no: str):
+        self.url = f"http://{self.equip_no_ip.get(equip_no, '10.4.23.79')}:9000/xlserver"
         self.queryset = WeightTankStatus.objects.filter(equip_no=equip_no)
         self.equip_no = equip_no
-        super(TankStatusSync, self).__init__(equip_no)
 
     @atomic
-    def sync(self):
-        req_data = {
-            "开门信号1": "0",  # 称量系统 A料仓 1~11  例开A6号料仓门传"6"，传0表示只查不改变料门信息
-            "开门信号2": "0"  # 称量系统 B料仓 1~11  例开B6号料仓门传"6"，传0表示只查不改变料门信息
-        }
-        rep_json = self.door_info(req_data)
+    def sync(self, signal_a='0', signal_b='0'):
+        """
+        signal_a: 开门信号1['1'表示开1A罐门, 默认'0'表示查询料罐状态]
+        signal_b: 开门信号1['2'表示开2B罐门, 默认'0'表示查询料罐状态]
+        """
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/open_door"}
+        send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+                   <soapenv:Header/>
+                   <soapenv:Body>
+                      <tem:open_door>
+                         <!--Optional:-->
+                         <tem:开门信号1>{}</tem:开门信号1>
+                         <!--Optional:-->
+                         <tem:开门信号2>{}</tem:开门信号2>
+                      </tem:open_door>
+                   </soapenv:Body>
+                </soapenv:Envelope>""".format(signal_a, signal_b)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        res = door_info.content.decode('utf-8')
+        rep_json = re.findall(r'<open_doorResult>(.*)</open_doorResult>', res)[0]
         data = json.loads(rep_json)
         for x in self.queryset:
             temp_no = x.tank_no
             # 万龙表里的罐号跟接口里的罐号不一致，需要做个转换
-            if len(temp_no) == 3:
-                tank_no = temp_no[1:3] + temp_no[:1]
-            else:
-                tank_no = temp_no[::-1]
+            tank_no = temp_no[-1] + temp_no[0:-1]
             high_level = tank_no + "_high_level"
             low_level = tank_no + "_low_level"
             material_name = tank_no + "_name"
             door_status = tank_no + "_door"
-            x.open_flag = False if data.get(door_status, True) else True
+            x.open_flag = data.get(door_status) if data.get(door_status) else False
+            # 默认正常
+            status = 3
             # 高位有料表示高位报警
             if data[high_level]:
-                x.status = 2
+                status = 2
             # 低位有料表示地位报警
-            if not data[low_level]:
-                x.status = 1
-            # 其余表示正常
-            x.status = 3
+            elif data[low_level]:
+                status = 1
+            x.status = status
             x.material_name = data[material_name]
             x.material_no = data[material_name]
             x.save()
