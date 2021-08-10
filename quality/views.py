@@ -1,5 +1,6 @@
 import datetime
 import json
+import ast
 import os
 from decimal import Decimal
 
@@ -2083,6 +2084,8 @@ class ReportValueView(APIView):
             s.is_valid(raise_exception=True)
             data = s.validated_data
             raw_value = data['raw_value']
+            data['value']['ML(1+4)'] = data['value']['l_4']
+            del data['value']['l_4']
             test_value = data['value']
             ip = data['ip']
             test_type = None
@@ -2136,6 +2139,7 @@ class ReportValueView(APIView):
                                                               result=data_['Result'])
                     if ordering == 5:
                         values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
+                        values.update({'钢拔': round(values['钢拔'], 2)})
                         current_test_detail.value = values
                         current_test_detail.save()
                     else:
@@ -2169,13 +2173,16 @@ class ReportValueView(APIView):
                                                                                     M300=Avg('ds2'))
                         values['伸长率%'] = values['伸长率']
                         del values['伸长率']
+                        values.update({'扯断强度': round(values['扯断强度'], 2)})
+                        values.update({'伸长率%': round(values['伸长率%'], 2)})
+                        values.update({'M300': round(values['M300'], 2)})
                         current_test_detail.value = values
                         current_test_detail.save()
                     else:
                         return Response('ok')
             else:
-                current_test_detail.value = json.dumps(test_value)
-                current_test_detail.raw_value = json.dumps(raw_value)
+                current_test_detail.value = test_value
+                current_test_detail.raw_value = raw_value
                 current_test_detail.save()
 
             product_no = current_test_detail.product_no  # 胶料编码
@@ -2235,7 +2242,7 @@ class ReportValueView(APIView):
                         material__material_no=product_no,
                         test_method__name=method_name).first()
                     if not material_test_method:
-                        raise ValidationError('检测方法不存在')
+                        continue
 
                     for data_point in data_point_list:
                         data_point_name = data_point
