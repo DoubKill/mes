@@ -637,6 +637,13 @@ permission_data = [
     {'id': 486, 'code': 'product_report_value', 'name': '胶料上报值管理', 'parent_id': None},
     {'id': 487, 'code': 'view_product_report_value', 'name': '查看', 'parent_id': 486},
     {'id': 488, 'code': 'add_product_report_value', 'name': '新增', 'parent_id': 486},
+    {'id': 534, 'code': 'xl_weight_card', 'name': '小料称量质量追踪卡管理', 'parent_id': None},
+    {'id': 535, 'code': 'view_xl_weight_card', 'name': '查看', 'parent_id': 534},
+    {'id': 536, 'code': 'print_xl_weight_card', 'name': '打印', 'parent_id': 534},
+
+    {'id': 537, 'code': 'xl_expire_data', 'name': '小料称量料包有效期', 'parent_id': None},
+    {'id': 538, 'code': 'view_xl_expire_data', 'name': '查看', 'parent_id': 537},
+    {'id': 539, 'code': 'save_xl_expire_data', 'name': '保存', 'parent_id': 537},
 
     # 下个权限id值从495开始
     {'id': 495, 'code': 'depot', 'name': '线边库库区库位管理', 'parent_id': None},
