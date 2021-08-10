@@ -2326,12 +2326,13 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
             test_plan_obj = ProductTestPlan.objects.filter(product_test_plan_detail=test_plan_detail_obj).first()
             if test_plan_obj.test_indicator_name == '钢拔':
                 data_point_list = ['钢拔']
-                values = RubberMaxStretchTestResult.objects.filter(id=pk).aggregate(
+                values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
                     钢拔=Avg('max_strength'))
-                ProductTestPlanDetail.objects.filter(test_results__id=pk).update(value=values)
+                test_plan_detail_obj.value = values
+                test_plan_detail_obj.save()
             elif test_plan_obj.test_indicator_name == '物性':
                 data_point_list = ['扯断强度', '伸长率%', 'M300']
-                values = RubberMaxStretchTestResult.objects.filter(id=pk).aggregate(
+                values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
                                                                             扯断强度=Avg('break_strength'),
                                                                             伸长率=Avg('max_length'),
                                                                             M300=Avg('ds2'))
