@@ -2347,7 +2347,7 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                     material__material_no=test_plan_detail_obj.product_no,
                     test_method__name=test_plan_obj.test_method_name).first()
                 if not material_test_method:
-                    raise ValidationError('检测方法不存在')
+                    continue
                 indicator = MaterialDataPointIndicator.objects.filter(
                     material_test_method=material_test_method,
                     data_point__name=data_point_name,
