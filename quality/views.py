@@ -1471,6 +1471,22 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    def create(self, request, *args, **kwargs):
+        # 更新设备的状态
+        if request.data.get('equip'):
+            data = request.data.get('data')
+            for item in data:
+                equip_obj = ProductReportEquip.objects.filter(ip=item['machine']).first()
+                if equip_obj:
+                    equip_obj.status = 1 if item['status'] else 2
+                    equip_obj.save()
+            return Response('ok')
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductReportValueViewSet(mixins.CreateModelMixin,
@@ -2069,6 +2085,7 @@ class ReportValueView(APIView):
             raw_value = data['raw_value']
             test_value = data['value']
             ip = data['ip']
+            test_type = None
         else:
             # 钢拔/物性提交过来的数据
             data_ = self.request.data
@@ -2083,10 +2100,10 @@ class ReportValueView(APIView):
                                                value=list(test_value.values())[0])
             return Response({'msg': '上报成功', 'success': True})
         else:
-            test_equip_no = data_.get('test_equip_no')  # 钢拔/物性
-            if test_equip_no:
+            try:
+                test_equip_no = data_.get('test_equip_no')  # 钢拔/物性
                 equip_test_plan = ProductTestPlan.objects.filter(test_equip__no=test_equip_no, status=1).last()
-            else:
+            except:
                 # 取机台最后一条进行中的检测计划
                 equip_test_plan = ProductTestPlan.objects.filter(test_equip__ip=ip, status=1).last()
             if not equip_test_plan:
@@ -2109,6 +2126,8 @@ class ReportValueView(APIView):
                                                               max_length=data_['MaxL'],
                                                               end_strength=data_['BF'],
                                                               end_length=data_['BL'],
+                                                              yield_strength=data_['YieldF'],
+                                                              yield_length=data_['YieldL'],
                                                               test_time=data_['DateTime'],
                                                               test_method=data_['TestMethod'],
                                                               ds1=data_['DS1'],
@@ -2195,7 +2214,6 @@ class ReportValueView(APIView):
                     if not pallet:
                         continue
                     lot_no = pallet.lot_no
-                    #todo 车次检测单
                     # test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
                     #                                               actual_trains=train
                     #                                               ).first()

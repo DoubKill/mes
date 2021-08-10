@@ -691,6 +691,8 @@ class RubberMaxStretchTestResult(models.Model):
     end_length = models.FloatField(help_text='结束伸长', null=True)
     break_strength = models.FloatField(help_text='断裂强力', null=True)
     break_length = models.FloatField(help_text='断裂伸长', null=True)
+    yield_strength = models.FloatField(help_text='屈服强度', null=True)
+    yield_length = models.FloatField(help_text='屈服伸长', null=True)
     n1 = models.FloatField(help_text='n1（物性）', null=True)
     n2 = models.FloatField(help_text='n2（物性）', null=True)
     n3 = models.FloatField(help_text='n3（物性）', null=True)
