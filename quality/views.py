@@ -1454,7 +1454,7 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
     """胶料上报设备管理"""
     queryset = ProductReportEquip.objects.all()
     serializer_class = ProductReportEquipSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductReportEquipFilter
 
