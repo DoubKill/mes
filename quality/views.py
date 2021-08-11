@@ -2221,21 +2221,21 @@ class ReportValueView(APIView):
                     if not pallet:
                         continue
                     lot_no = pallet.lot_no
-                    # test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                    #                                               actual_trains=train
-                    #                                               ).first()
-                    # if not test_order:
-                    test_order = MaterialTestOrder.objects.create(
-                        lot_no=lot_no,
-                        material_test_order_uid=uuid.uuid1(),
-                        actual_trains=train,
-                        product_no=product_no,
-                        plan_classes_uid=pallet.plan_classes_uid,
-                        production_class=production_class,
-                        production_group=group,
-                        production_equip_no=equip_no,
-                        production_factory_date=product_date
-                    )
+                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                  actual_trains=train
+                                                                  ).first()
+                    if not test_order:
+                        test_order = MaterialTestOrder.objects.create(
+                            lot_no=lot_no,
+                            material_test_order_uid=uuid.uuid1(),
+                            actual_trains=train,
+                            product_no=product_no,
+                            plan_classes_uid=pallet.plan_classes_uid,
+                            production_class=production_class,
+                            production_group=group,
+                            production_equip_no=equip_no,
+                            production_factory_date=product_date
+                        )
 
                     # 由MES判断检测结果
                     material_test_method = MaterialTestMethod.objects.filter(
@@ -2248,7 +2248,7 @@ class ReportValueView(APIView):
                         data_point_name = data_point
                         try:
                             if equip_test_plan.test_indicator_name == '门尼':
-                                test_value = Decimal(list(test_value.values())[0]).quantize(Decimal('0.000'))
+                                test_value = Decimal(list(current_test_detail.value.values())[0]).quantize(Decimal('0.000'))
                             else:
                                 test_value = dict(current_test_detail.value)[data_point_name]
                         except Exception:
