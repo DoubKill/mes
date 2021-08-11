@@ -368,7 +368,8 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         # 打印数量判断
         if print_count <= 0 or print_count > package_count or not isinstance(print_count, int):
             raise serializers.ValidationError('打印张数需小于等于配置数量')
-        weight_type_record = WeighCntType.objects.filter(product_batching__stage_product_batch_no=product_no.split('(')[0], package_type=1)
+        weight_type_record = WeighCntType.objects.filter(product_batching__stage_product_batch_no=product_no.split('(')[0],
+                                                         package_type=1, product_batching__dev_type__category_no=dev_type)
         if weight_type_record:
             attrs['material_no'] = weight_type_record.first().name
             attrs['material_name'] = attrs['material_no']

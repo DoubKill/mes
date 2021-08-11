@@ -424,8 +424,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
         # 履历表中已生成的record(plan表主键)
         ids = list(set(self.queryset.filter(**weight_filter_kwargs).values_list('record', flat=True)))
-        # 设备对应机型
-        dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
         # 打印履历表为空(全是未打印数据)
         if not self.queryset:
             if status == 'Y':
@@ -436,6 +434,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     serializer = WeightPackagePlanSerializer(page, many=True)
                     for i in serializer.data:
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
+                        dev_type = recipe_pre.first().remark1 if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
                         actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
@@ -465,6 +464,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
+                        dev_type = recipe_pre.first().remark1 if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -495,6 +495,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
+                        dev_type = recipe_pre.first().remark1 if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
