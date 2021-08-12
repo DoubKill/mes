@@ -414,7 +414,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         if not report_basic_records:
             return Response([])
         plan_ids = set([i[0] for i in report_basic_records])
-        plan_filter_kwargs = {'planid__in': plan_ids}
+        plan_filter_kwargs = {'planid__in': plan_ids, 'state__in': ['运行中', '完成']}
         weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
         if product_no:
             weight_filter_kwargs.update({'product_no': product_no})
