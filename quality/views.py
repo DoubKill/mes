@@ -2016,8 +2016,12 @@ class ProductTestPlanViewSet(ModelViewSet):
             ).first()
             if not pallet:
                 raise ValidationError(f"第{item['actual_trains']}车数据不存在")
-        product_plan = ProductTestPlan.objects.create(**data, test_time=datetime.datetime.now(), status=1,
-                                                      plan_uid=plan_uid, test_user=test_user)
+            else:
+                test_times = len(ProductTestPlan.objects.filter(product_test_plan_detail__lot_no=pallet.lot_no)) + 1
+        data.pop('test_times', None)
+        product_plan = ProductTestPlan.objects.create(
+            **data, test_time=datetime.datetime.now(), status=1,
+                                                      plan_uid=plan_uid, test_user=test_user, test_times=test_times)
         # 添加检测计划详情
         for item in product_list:
             production_classes = item['classes']
