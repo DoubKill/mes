@@ -27,24 +27,21 @@ class FeedingLogFilter(django_filters.rest_framework.FilterSet):
 
 
 class WeightPackageLogFilter(django_filters.rest_framework.FilterSet):
-    plan_batching_uid = django_filters.CharFilter(field_name="plan_batching_uid", help_text="配料计划uid")
-    product_no = django_filters.CharFilter(field_name="product_no", help_text="胶料编码", lookup_expr='icontains')
-    dev_type = django_filters.CharFilter(field_name="dev_type", help_text="机型")
-    st = django_filters.DateFilter(field_name='production_factory_date', lookup_expr='gte', help_text='开始时间')
-    et = django_filters.DateFilter(field_name='production_factory_date', lookup_expr='lte', help_text='结束时间')
-    equip_no = django_filters.CharFilter(field_name="equip_no", help_text="配料机台", lookup_expr='icontains')
-    material_no = django_filters.CharFilter(field_name="material_no", help_text="料包编码", lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='配料机台', lookup_expr='icontains')
+    batch_time = django_filters.DateTimeFilter(field_name='batch_time__date', help_text='配料时间')
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料名称-配方号', lookup_expr='icontains')
+    status = django_filters.CharFilter(field_name='status', help_text='打印状态')
 
     class Meta:
         model = WeightPackageLog
-        fields = ("plan_batching_uid", "product_no", 'dev_type', 'et', 'st', 'equip_no', 'material_no')
+        fields = ('equip_no', 'batch_time', 'product_no', 'status')
 
 
 class WeightTankStatusFilter(django_filters.rest_framework.FilterSet):
     tank_no = django_filters.CharFilter(field_name='tank_no', lookup_expr='icontains', help_text='料管编码')
     equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='设备编码')
     material_no = django_filters.CharFilter(field_name='material_no', lookup_expr='icontains', help_text='物料编码')
-    status = django_filters.NumberFilter(field_name='status', help_text='料管状态，1：地位  2：高位')
+    status = django_filters.NumberFilter(field_name='status', help_text='料管状态，1：低位  2：高位')
 
     class Meta:
         model = WeightTankStatus
