@@ -289,7 +289,6 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
     queryset = WeightBatchingLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('plan_batching_uid',)
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
@@ -434,7 +433,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     serializer = WeightPackagePlanSerializer(page, many=True)
                     for i in serializer.data:
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
-                        dev_type = recipe_pre.first().remark1 if recipe_pre else ''
+                        dev_type = recipe_pre.first().ver if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
                         actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
@@ -464,7 +463,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().remark1 if recipe_pre else ''
+                        dev_type = recipe_pre.first().ver if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -495,7 +494,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().remark1 if recipe_pre else ''
+                        dev_type = recipe_pre.first().ver if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -539,8 +538,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         # 生产计划表中未打印数据详情
         id = self.request.query_params.get('id')
         equip_no = self.request.query_params.get('equip_no')
-        dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
         plan_obj = Plan.objects.using(equip_no).get(id=id)
+        recipe_pre = RecipePre.objects.using(equip_no).filter(name=plan_obj.recipe)
+        dev_type = recipe_pre.first().ver if recipe_pre else ''
         batch_group = self.request.query_params.get('batch_group')
         same_batch_print = self.queryset.filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
                                                 product_no=plan_obj.recipe) # 删除status='Y'判断
@@ -573,6 +573,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
 @method_decorator([api_recorder], name="dispatch")
 class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = WeightPackageLog.objects.all().order_by('-created_date')
+    serializer_class = WeightPackageLogUpdateSerializer
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
@@ -590,7 +591,7 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = WeightPackageLogUpdateSerializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
@@ -1192,7 +1193,6 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         date_before = date_now - timedelta(days=1)
         date_now_planid = ''.join(str(date_now).split('-'))[2:]
         date_before_planid = ''.join(str(date_before).split('-'))[2:]
-        dev_type = Equip.objects.get(equip_no=equip_no).category.category_name
         try:
             all_filter_plan = Plan.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
@@ -1203,6 +1203,8 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan, many=True)
         for i in serializer.data:
+            recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
+            dev_type = recipe_pre.first().ver if recipe_pre else ''
             i.update({'dev_type': dev_type})
         return response(success=True, data=serializer.data)
 
