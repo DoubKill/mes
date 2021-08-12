@@ -423,6 +423,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
         # 履历表中已生成的record(plan表主键)
         ids = list(set(self.queryset.filter(**weight_filter_kwargs).values_list('record', flat=True)))
+        # 称量系统ver和机型对应关系
+        ver_dev_type = {580: 'E580', 370: 'F370', 320: 'GK320', 255: 'GK255', 190: 'E190'}
         # 打印履历表为空(全是未打印数据)
         if not self.queryset:
             if status == 'Y':
@@ -433,7 +435,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     serializer = WeightPackagePlanSerializer(page, many=True)
                     for i in serializer.data:
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
-                        dev_type = recipe_pre.first().ver if recipe_pre else ''
+                        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
                         actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
@@ -463,7 +465,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().ver if recipe_pre else ''
+                        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -494,7 +496,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().ver if recipe_pre else ''
+                        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -540,7 +542,9 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_no = self.request.query_params.get('equip_no')
         plan_obj = Plan.objects.using(equip_no).get(id=id)
         recipe_pre = RecipePre.objects.using(equip_no).filter(name=plan_obj.recipe)
-        dev_type = recipe_pre.first().ver if recipe_pre else ''
+        # 称量系统ver和机型对应关系
+        ver_dev_type = {580: 'E580', 370: 'F370', 320: 'GK320', 255: 'GK255', 190: 'E190'}
+        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
         batch_group = self.request.query_params.get('batch_group')
         same_batch_print = self.queryset.filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
                                                 product_no=plan_obj.recipe) # 删除status='Y'判断
@@ -1202,9 +1206,11 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         if not all_filter_plan:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan, many=True)
+        # 称量系统ver和机型对应关系
+        ver_dev_type = {580: 'E580', 370: 'F370', 320: 'GK320', 255: 'GK255', 190: 'E190'}
         for i in serializer.data:
             recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
-            dev_type = recipe_pre.first().ver if recipe_pre else ''
+            dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
             i.update({'dev_type': dev_type})
         return response(success=True, data=serializer.data)
 
