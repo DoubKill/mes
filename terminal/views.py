@@ -289,7 +289,6 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
     queryset = WeightBatchingLog.objects.all().order_by('-created_date')
     pagination_class = None
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('plan_batching_uid',)
     filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
@@ -574,6 +573,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
 @method_decorator([api_recorder], name="dispatch")
 class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = WeightPackageLog.objects.all().order_by('-created_date')
+    serializer_class = WeightPackageLogUpdateSerializer
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
@@ -591,7 +591,7 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = WeightPackageLogUpdateSerializer(instance, data=request.data, partial=True)
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
