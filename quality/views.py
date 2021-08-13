@@ -1403,7 +1403,9 @@ class BarCodePreview(APIView):
     def get(self, request):
         lot_no = request.query_params.get("lot_no")
         # try:
-        instance = MaterialDealResult.objects.get(lot_no=lot_no)
+        instance = MaterialDealResult.objects.filter(lot_no=lot_no).first()
+        if not instance:
+            return Response({})
         serializer = MaterialDealResultListSerializer(instance)
         return Response(serializer.data)
         # except Exception as e:
