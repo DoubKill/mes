@@ -246,7 +246,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         serializer = self.get_serializer(batch_material, data=request.data)
         if not serializer.is_valid():
             return response(success=False, message=list(serializer.errors.values())[0][0])
-        if batch_material.unit == '包' and isinstance(left_weight, float):
+        if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
         if left_weight > batch_material.init_weight or left_weight < 0:
             return response(success=False, message='请输入正确的剩余修正量数值')
