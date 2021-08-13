@@ -106,7 +106,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if weight_package:
             material_no = weight_package.material_no
             material_name = weight_package.material_name
-            total_weight = weight_package.actual_weight
+            total_weight = weight_package.package_count
             unit = '包'
             attrs['scan_material'] = material_name
         if not material_name:
