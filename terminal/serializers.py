@@ -71,7 +71,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         try:
             # 查原材料出库履历查到原材料物料编码
             wms_stock = MaterialOutHistory.objects.using('wms').filter(
-                lot_no=bra_code).values('material_no', 'material_name', 'weight')
+                lot_no=bra_code).values('material_no', 'material_name', 'weight', 'unit')
         except Exception:
             raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
 
@@ -95,8 +95,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             if comm_material:
                 material_name = comm_material[0]
                 material_no = comm_material[0]
-                total_weight = wms_stock.weight
-                unit = wms_stock.unit
+                total_weight = wms_stock[0].get('weight')
+                unit = wms_stock[0].get('unit')
         if pallet_feedback:
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
@@ -106,7 +106,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if weight_package:
             material_no = weight_package.material_no
             material_name = weight_package.material_name
-            total_weight = weight_package.actual_weight
+            total_weight = weight_package.package_count
             unit = '包'
             attrs['scan_material'] = material_name
         if not material_name:
