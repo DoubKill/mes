@@ -84,10 +84,20 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
     filter_fields = ('lot_no',)
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        queryset.update(sulfur_status=2)
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        if self.request.query_params.get('last'):
+            queryset = self.get_queryset().filter(sulfur_status=1).last()
+            serializer = self.get_serializer(queryset)
+            message = None
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+            queryset.update(sulfur_status=2)
+            serializer = self.get_serializer(queryset, many=True)
+            message = '出库成功'
+        return Response({
+            'success': True,
+            'message': message,
+            'data': serializer.data
+        })
 
     def create(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
@@ -123,6 +133,19 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
             if state:
                 Sulfur.objects.create(name=name, product_no=name, provider=provider, lot_no=tmh, num=SL, weight=ZL,
                                       depot_site=depot_site, enter_time=enter_time, sulfur_status=1)
-                return Response({'msg': '入库成功', 'lot_no': tmh, 'weight': ZL})
+                return Response({
+                    'success': True,
+                    'message': '入库成功',
+                    'data': {
+                        'lot_no': tmh,
+                        'weight': ZL
+                        }
+                })
             else:
-                return Response({'lot_no': tmh})
+                return Response({
+                    'success': True,
+                    'message': None,
+                    'data': {
+                        'lot_no': tmh
+                    }
+            })
