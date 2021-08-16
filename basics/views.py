@@ -356,3 +356,4 @@ class CurrentClassView(APIView):
         current_class = work_schedule_plan.classes.global_name
         factory_date = work_schedule_plan.plan_schedule.day_time
         return Response(f"{factory_date}/{current_class}")
+

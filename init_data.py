@@ -681,6 +681,26 @@ permission_data = [
 
     {'id': 521, 'code': 'sulfur_resume', 'name': '硫磺库履历管理', 'parent_id': None},
     {'id': 522, 'code': 'view_sulfur_resume', 'name': '查看', 'parent_id': 521},
+
+    {'id': 525, 'code': 'examine_equip', 'name': '快检设备监控', 'parent_id': None},
+    {'id': 526, 'code': 'view_examine_equip', 'name': '查看', 'parent_id': 525},
+
+    {'id': 527, 'code': 'examine_test_plan', 'name': '快检检测计划', 'parent_id': None},
+    {'id': 528, 'code': 'view_examine_test_plan', 'name': '查看', 'parent_id': 527},
+    {'id': 529, 'code': 'begin_examine_test_plan', 'name': '开始检测', 'parent_id': 527},
+    {'id': 530, 'code': 'end_examine_test_plan', 'name': '结束检测', 'parent_id': 527},
+
+    {'id': 532, 'code': 'examine_sulfur', 'name': '检测履历查询', 'parent_id': None},
+    {'id': 533, 'code': 'view_examine_sulfur', 'name': '查看', 'parent_id': 532},
+
+    {'id': 534, 'code': 'xl_weight_card', 'name': '小料称量质量追踪卡管理', 'parent_id': None},
+    {'id': 535, 'code': 'view_xl_weight_card', 'name': '查看', 'parent_id': 534},
+    {'id': 536, 'code': 'print_xl_weight_card', 'name': '打印', 'parent_id': 534},
+
+    {'id': 537, 'code': 'xl_expire_data', 'name': '小料称量料包有效期', 'parent_id': None},
+    {'id': 538, 'code': 'view_xl_expire_data', 'name': '查看', 'parent_id': 537},
+    {'id': 539, 'code': 'save_xl_expire_data', 'name': '保存', 'parent_id': 537},
+
 ]
 
 
