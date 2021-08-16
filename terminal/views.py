@@ -246,7 +246,7 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         serializer = self.get_serializer(batch_material, data=request.data)
         if not serializer.is_valid():
             return response(success=False, message=list(serializer.errors.values())[0][0])
-        if batch_material.unit == '包' and isinstance(left_weight, float):
+        if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
         if left_weight > batch_material.init_weight or left_weight < 0:
             return response(success=False, message='请输入正确的剩余修正量数值')
@@ -414,7 +414,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         if not report_basic_records:
             return Response([])
         plan_ids = set([i[0] for i in report_basic_records])
-        plan_filter_kwargs = {'planid__in': plan_ids}
+        plan_filter_kwargs = {'planid__in': plan_ids, 'state__in': ['运行中', '完成']}
         weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
         if product_no:
             weight_filter_kwargs.update({'product_no': product_no})
@@ -422,9 +422,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         # 获取称量系统生产计划数据
         equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
         # 履历表中已生成的record(plan表主键)
-        ids = list(set(self.queryset.filter(**weight_filter_kwargs).values_list('record', flat=True)))
+        ids = list(set(self.get_queryset().filter(**weight_filter_kwargs).values_list('record', flat=True)))
+        # 称量系统ver和机型对应关系
+        ver_dev_type = {580: 'E580', 370: 'F370', 320: 'GK320', 255: 'GK255', 190: 'E190'}
         # 打印履历表为空(全是未打印数据)
-        if not self.queryset:
+        if not self.get_queryset():
             if status == 'Y':
                 return Response([])
             else:
@@ -433,7 +435,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     serializer = WeightPackagePlanSerializer(page, many=True)
                     for i in serializer.data:
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
-                        dev_type = recipe_pre.first().ver if recipe_pre else ''
+                        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
                         actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
@@ -444,7 +446,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         # 履历表不为空
         if status == 'all':
             # 已打印信息
-            already_print = self.queryset.filter(**weight_filter_kwargs)
+            already_print = self.get_queryset().filter(**weight_filter_kwargs)
             # 未打印(剔除已打印)
             no_print_data = equip_plan_info.exclude(id__in=ids)
             # 分页返回
@@ -463,7 +465,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().ver if recipe_pre else ''
+                        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -475,7 +477,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         elif status == 'N':
             weight_filter_kwargs.update({'status': status})
             # 履历表中状态为未打印
-            weight_no_print = self.queryset.filter(**weight_filter_kwargs)
+            weight_no_print = self.get_queryset().filter(**weight_filter_kwargs)
             # 生产中剔除履历表中已经打印的
             plan_no_print = equip_plan_info.exclude(id__in=ids)
             # 分页返回
@@ -494,7 +496,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().ver if recipe_pre else ''
+                        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -505,7 +507,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         # 已打印
         else:
             weight_filter_kwargs.update({'status': status})
-            already_print = self.queryset.filter(**weight_filter_kwargs)
+            already_print = self.get_queryset().filter(**weight_filter_kwargs)
             for k in already_print:
                 if k.package_fufil != k.package_plan_count:
                     get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
@@ -527,7 +529,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         batch_time = self.request.query_params.get('batch_time')
         # 履历表中数据详情
         if bra_code:
-            single_print_record = self.queryset.get(bra_code=bra_code)
+            single_print_record = self.get_queryset().get(bra_code=bra_code)
             data = {'print_begin_trains': single_print_record.print_begin_trains, 'package_count': single_print_record.package_count,
                     'product_no': single_print_record.product_no, 'dev_type': single_print_record.dev_type,
                     'plan_weight': single_print_record.plan_weight, 'equip_no': single_print_record.equip_no,
@@ -540,10 +542,12 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_no = self.request.query_params.get('equip_no')
         plan_obj = Plan.objects.using(equip_no).get(id=id)
         recipe_pre = RecipePre.objects.using(equip_no).filter(name=plan_obj.recipe)
-        dev_type = recipe_pre.first().ver if recipe_pre else ''
+        # 称量系统ver和机型对应关系
+        ver_dev_type = {580: 'E580', 370: 'F370', 320: 'GK320', 255: 'GK255', 190: 'E190'}
+        dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
         batch_group = self.request.query_params.get('batch_group')
-        same_batch_print = self.queryset.filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
-                                                product_no=plan_obj.recipe) # 删除status='Y'判断
+        same_batch_print = self.get_queryset().filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
+                                                      product_no=plan_obj.recipe) # 删除status='Y'判断
         # 同批次第一次打印
         if not same_batch_print:
             data = {'print_begin_trains': 1, 'package_count': '',
@@ -1202,9 +1206,11 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         if not all_filter_plan:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan, many=True)
+        # 称量系统ver和机型对应关系
+        ver_dev_type = {580: 'E580', 370: 'F370', 320: 'GK320', 255: 'GK255', 190: 'E190'}
         for i in serializer.data:
             recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
-            dev_type = recipe_pre.first().ver if recipe_pre else ''
+            dev_type = ver_dev_type.get(recipe_pre.first().ver, '') if recipe_pre else ''
             i.update({'dev_type': dev_type})
         return response(success=True, data=serializer.data)
 

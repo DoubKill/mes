@@ -3300,28 +3300,9 @@ class InOutBoundSummaryView(APIView):
                          finish_time__gte=date_begin_time,
                          station=station).count()
                      },
-                    {'tunnel': '5巷',
-                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
-                         start_time__gte=date_begin_time,
-                         location__startswith='5').count(),
-                     "out_bound_count": DeliveryPlanFinal.objects.filter(
-                         status=1,
-                         location__startswith='45',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
-                     },
-                    {'tunnel': '6巷',
-                     'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
-                         start_time__gte=date_begin_time,
-                         location__startswith='6').count(),
-                     "out_bound_count": DeliveryPlanFinal.objects.filter(
-                         status=1,
-                         location__startswith='6',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
-                     }
                 ]
-            total_inbound_count = FinalGumInInventoryLog.objects.using('lb').filter(
+            total_inbound_count = FinalGumInInventoryLog.objects.using('lb').exclude(
+                location__startswith='5').exclude(location__startswith='6').filter(
                 start_time__gte=date_begin_time).count()
             total_outbound_count = DeliveryPlanFinal.objects.filter(status=1,
                                                                     finish_time__gte=date_begin_time).count()
