@@ -92,6 +92,13 @@ router.register('material-report-equip', MaterialReportEquipViewSet)
 
 # 原材料数据上报
 router.register('material-report-value', MaterialReportValueViewSet)
+# 门尼检测计划
+router.register('product-test-plan', ProductTestPlanViewSet)
+# 门尼检测履历
+router.register('product-test-resume', ProductTestResumeViewSet)
+
+# 物性/钢拔检测数据查看/修改
+router.register('rubber-max-stretch-test-result', RubberMaxStretchTestResultViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -116,5 +123,7 @@ urlpatterns = [
     path('material-examine-result-curve/', ExamineResultCurveView.as_view()),
     path('show-qualified-range/', ShowQualifiedRange.as_view()),  # 全局配置快检卡片打印显示合格区间
     path('wms-material-search/', WMSMaterialSearchView.as_view()),
-    path('report-value/', ReportValueView.as_view())
+    path('report-value/', ReportValueView.as_view()),
+    path('equip-test-data/', TestDataView.as_view()),  # 设备监控数据
+    path('check-equip/', CheckEquip.as_view()),  # 检测机台的转态
 ]

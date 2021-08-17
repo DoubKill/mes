@@ -1,5 +1,6 @@
 import datetime
 import json
+import ast
 import os
 from decimal import Decimal
 
@@ -30,20 +31,21 @@ from mes.common_code import CommonDeleteMixin, date_range, get_template_response
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
+from plan.models import ProductClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
-    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter
+    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
-    ProductReportEquip, ProductReportValue
+    ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -57,7 +59,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
-    MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer
+    MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
+    ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1453,9 +1456,39 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
     """胶料上报设备管理"""
     queryset = ProductReportEquip.objects.all()
     serializer_class = ProductReportEquipSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductReportEquipFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if request.query_params.get('all'):
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        # 更新设备的状态
+        if request.data.get('equip'):
+            data = request.data.get('data')
+            for item in data:
+                equip_obj = ProductReportEquip.objects.filter(ip=item['machine']).first()
+                if equip_obj:
+                    equip_obj.status = 1 if item['status'] else 2
+                    equip_obj.save()
+            return Response('ok')
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1916,28 +1949,430 @@ class MaterialReportValueViewSet(mixins.CreateModelMixin,
         return Response({'results': prepare_data})
 
 
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestPlanViewSet(ModelViewSet):
+
+    """门尼检测计划"""
+    queryset = ProductTestPlan.objects.all()
+    serializer_class = ProductTestPlanSerializer
+
+    def list(self, request, *args, **kwargs):
+        if request.query_params.get('close'):
+            res = ProductTestPlan.objects.filter(plan_uid=request.query_params.get('plan_uid')).update(status=4)
+            results = '结束检测' if res else '任务不存在'
+            return Response(results)
+        elif request.query_params.get('test_equip'):
+            queryset = ProductTestPlan.objects.filter(status=1, test_equip__no=request.query_params.get('test_equip'))
+        elif request.query_params.get('plan_uid'):
+            plan_uid = request.query_params.get('plan_uid')
+            test_plan =  ProductTestPlanDetail.objects.filter(test_plan__plan_uid=plan_uid).last()
+            if test_plan.value:
+                ProductTestPlan.objects.filter(plan_uid=plan_uid, status=1).update(status=2)
+            queryset = ProductTestPlan.objects.filter(plan_uid=plan_uid).exclude(status=4)
+            for obj in queryset:
+                if obj.status == 2:
+                    serializer = self.get_serializer(queryset, many=True)
+                    return Response({'msg': '全部检测完成', 'results': serializer.data})
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response({'msg': None, 'results': serializer.data})
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        test_indicator_name = serializer.data.get('test_indicator_name')
+        if test_indicator_name == '门尼':
+            s = 'M'
+        elif test_indicator_name == '流变':
+            s = 'L'
+        elif test_indicator_name == '物性':
+            s = 'W'
+        elif test_indicator_name == '钢拔':
+            s = 'G'
+        # 判断有没有计划正在执行
+        test_equip = serializer.data.get('test_equip')
+        obj = ProductTestPlan.objects.filter(status=1, test_equip__no=test_equip).first()
+        if obj:
+            raise ValidationError('当前有计划正在执行')
+        test_equip = serializer.data.get('test_equip')
+        plan_uid = f"{s}{test_equip}{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}"
+        product_list = serializer.validated_data.pop('product_test_plan_detail')
+        data = serializer.data
+        data.pop('product_test_plan_detail')
+        test_equip = ProductReportEquip.objects.filter(no=test_equip).first()
+        test_user = self.request.user.username
+        data['test_equip'] = test_equip
+        # 添加检测计划[判断前端提交过来的数据是否存在]
+        for item in product_list:
+            production_classes = item['classes']
+            pallet = PalletFeedbacks.objects.filter(
+                equip_no=item['equip_no'],
+                product_no=item['product_no'],
+                classes=production_classes,
+                factory_date=item['factory_date'],
+                begin_trains__lte=item['actual_trains'],
+                end_trains__gte=item['actual_trains']
+            ).first()
+            if not pallet:
+                raise ValidationError(f"第{item['actual_trains']}车数据不存在")
+            else:
+                test_times = len(ProductTestPlan.objects.filter(product_test_plan_detail__lot_no=pallet.lot_no)) + 1
+        data.pop('test_times', None)
+        product_plan = ProductTestPlan.objects.create(
+            **data, test_time=datetime.datetime.now(), status=1,
+                                                      plan_uid=plan_uid, test_user=test_user, test_times=test_times)
+        # 添加检测计划详情
+        for item in product_list:
+            production_classes = item['classes']
+            item.pop('classes')
+            item.pop('lot_no', None)
+            # 根据lot_no去找班次唯一标识
+            pallet = PalletFeedbacks.objects.filter(
+                equip_no=item['equip_no'],
+                product_no=item['product_no'],
+                classes=production_classes,
+                factory_date=item['factory_date'],
+                begin_trains__lte=item['actual_trains'],
+                end_trains__gte=item['actual_trains']
+            ).first()
+            lot_no = pallet.lot_no
+            obj = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            if obj:
+                s = ProductClassesPlan.objects.filter(plan_classes_uid=obj.plan_classes_uid).values(
+                    'work_schedule_plan__group__global_name').first()
+                production_group = s['work_schedule_plan__group__global_name']
+                ProductTestPlanDetail.objects.create(test_plan=product_plan, **item, production_group=production_group,
+                                                     production_classes=production_classes, lot_no=lot_no)
+            else:
+                raise ValidationError('提交的数据不存在')
+        return Response({'results': '检测任务创建成功', 'plan_uid': product_plan.plan_uid})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestResumeViewSet(mixins.ListModelMixin, GenericViewSet):
+    """门尼检测履历"""
+    queryset = ProductTestPlanDetail.objects.order_by('-test_plan__test_time')
+    serializer_class = ProductTEstResumeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductTestResumeFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class TestDataView(APIView):
+    """设备监控"""
+    def get(self, request):
+        data = ProductTestPlanDetail.objects.filter(test_plan__test_time__year=datetime.datetime.now().year,
+                                                    test_plan__test_time__month=datetime.datetime.now().month,
+                                                    test_plan__test_time__day=datetime.datetime.now().day
+                                                    ).values('raw_value')
+        return Response(data)
+
+
+@method_decorator([api_recorder], name='dispatch')
 class ReportValueView(APIView):
     """
     原材料、胶料检测数据上报，
     {"report_type": 上报类型  1原材料  2胶料，
     "ip": IP地址，
-    "value": 检测值}
+    "value": 检测值{"l_4: 12"},
+    "raw_value": ""}
     """
 
     def post(self, request):
-        data = self.request.data
-        if not isinstance(data, dict):
-            raise ValidationError('数据错误')
-        report_type = data.pop('report_type', None)
-        if report_type not in (1, 2):
-            raise ValidationError('上报类型错误')
-        data['created_date'] = datetime.datetime.now()
-        try:
-            if report_type == 1:
-                # 原材料数据上报
-                MaterialReportValue.objects.create(**data)
+        # 原材料：{"report_type": 1, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
+        # 胶料门尼：{"report_type": 2, "ip": "IP地址", "value": {"l_4: 12"}, "raw_value": "机台检测完整数据"}
+        if not request.data.get('type'):
+            s = ReportValueSerializer(data=self.request.data)
+            s.is_valid(raise_exception=True)
+            data = s.validated_data
+            raw_value = data['raw_value']
+            data['value']['ML(1+4)'] = data['value']['l_4']
+            del data['value']['l_4']
+            test_value = data['value']
+            ip = data['ip']
+            test_type = None
+        else:
+            # 钢拔/物性提交过来的数据
+            data_ = self.request.data
+            test_type = data_.get('type')
+        report_type = request.data.get('report_type')
+        created_date = datetime.datetime.now()
+
+        if report_type == 1:
+            # 原材料数据上报
+            MaterialReportValue.objects.create(ip=ip,
+                                               created_date=created_date,
+                                               value=list(test_value.values())[0])
+            return Response({'msg': '上报成功', 'success': True})
+        else:
+            try:
+                test_equip_no = data_.get('test_equip_no')  # 钢拔/物性
+                equip_test_plan = ProductTestPlan.objects.filter(test_equip__no=test_equip_no, status=1).last()
+            except:
+                # 取机台最后一条进行中的检测计划
+                equip_test_plan = ProductTestPlan.objects.filter(test_equip__ip=ip, status=1).last()
+            if not equip_test_plan:
+                return Response({'mes': '未找到该机台正在进行中的计划', 'success': False})
+
+            # 取该计划未检测的第一条数据，并填充检测值
+            current_test_detail = ProductTestPlanDetail.objects.filter(test_plan=equip_test_plan,
+                                                                       value__isnull=True).first()
+            if not current_test_detail:
+                return Response({'msg': '全部检测完成', 'success': True})
+            # 如果是钢拔应检测五次
+            if test_type:
+                if equip_test_plan.test_indicator_name == '钢拔' and test_type == '钢拔':
+                    # 判断有没有
+                    ordering = len(RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail)) + 1
+                    RubberMaxStretchTestResult.objects.create(product_test_plan_detail=current_test_detail,
+                                                              ordering=ordering,
+                                                              speed=data_['Speed'],
+                                                              max_strength=data_['MaxF'],
+                                                              max_length=data_['MaxL'],
+                                                              end_strength=data_['BF'],
+                                                              end_length=data_['BL'],
+                                                              yield_strength=data_['YieldF'],
+                                                              yield_length=data_['YieldL'],
+                                                              test_time=data_['DateTime'],
+                                                              test_method=data_['TestMethod'],
+                                                              ds1=data_['DS1'],
+                                                              ds2=data_['DS2'],
+                                                              ds3=data_['DS3'],
+                                                              result=data_['Result'])
+                    if ordering == 5:
+                        values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
+                        values.update({'钢拔': round(values['钢拔'], 2)})
+                        current_test_detail.value = values
+                        current_test_detail.save()
+                    else:
+                        return Response('ok')
+                # 如果是物性应检测三次
+                elif equip_test_plan.test_indicator_name == '物性' and test_type == '物性':
+                    ordering = len(RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail)) + 1
+                    RubberMaxStretchTestResult.objects.create(product_test_plan_detail=current_test_detail,
+                                                              ordering=ordering,
+                                                              speed=data_['Speed'],
+                                                              thickness=data_['Thickness'],
+                                                              width=data_['Width'],
+                                                              ds1=data_['DS1'],
+                                                              ds2=data_['DS2'],
+                                                              ds3=data_['DS3'],
+                                                              ds4=data_['DS4'],
+                                                              max_strength=data_['MStrength'],
+                                                              max_length=data_['MLength'],
+                                                              break_strength=data_['BStrength'],
+                                                              break_length=data_['BLength'],
+                                                              n1=data_['N1'],
+                                                              n2=data_['N2'],
+                                                              n3=data_['N3'],
+                                                              test_time=data_['DateTime'],
+                                                              test_method=data_['TestMethod'],
+                                                              result=data_['Result'])
+                    if ordering == 3:
+                        values = RubberMaxStretchTestResult.objects.filter(
+                            product_test_plan_detail=current_test_detail).aggregate(扯断强度=Avg('break_strength'),
+                                                                                    伸长率=Avg('max_length'),
+                                                                                    M300=Avg('ds2'))
+                        values['伸长率%'] = values['伸长率']
+                        del values['伸长率']
+                        values.update({'扯断强度': round(values['扯断强度'], 2)})
+                        values.update({'伸长率%': round(values['伸长率%'], 2)})
+                        values.update({'M300': round(values['M300'], 2)})
+                        current_test_detail.value = values
+                        current_test_detail.save()
+                    else:
+                        return Response('ok')
             else:
-                ProductReportValue.objects.create(**data)
-        except Exception:
-            raise ValidationError('参数错误')
-        return Response('上报成功！')
+                current_test_detail.value = test_value
+                current_test_detail.raw_value = raw_value
+                current_test_detail.save()
+
+            product_no = current_test_detail.product_no  # 胶料编码
+            production_class = current_test_detail.production_classes  # 班次
+            group = current_test_detail.production_group  # 班组
+            equip_no = current_test_detail.equip_no  # 机台
+            product_date = current_test_detail.factory_date  # 工厂日期
+            method_name = equip_test_plan.test_method_name  # 实验方法名称
+            indicator_name = equip_test_plan.test_indicator_name  # 实验指标名称
+            test_times = equip_test_plan.test_times  # 检测次数
+
+            # try:
+            #     test_value = Decimal(list(test_value.values())[0]).quantize(Decimal('0.000'))
+            # except Exception:
+            #     raise ValidationError('检测值{}数据错误'.format(test_value))
+            # 根据检测间隔，补充车次相关test_order和test_result表数据
+            for train in range(current_test_detail.actual_trains,
+                               current_test_detail.actual_trains + equip_test_plan.test_interval):
+
+                if equip_test_plan.test_indicator_name:  # 门尼检测只会传一个数据点的检测值
+                    if equip_test_plan.test_indicator_name == '门尼':
+                        data_point_list = ['ML(1+4)']
+                    elif equip_test_plan.test_indicator_name == '钢拔':
+                        data_point_list = ['钢拔']
+                    elif equip_test_plan.test_indicator_name == '物性':
+                        data_point_list = ['扯断强度', '伸长率%', 'M300']
+
+                    pallet = PalletFeedbacks.objects.filter(
+                        equip_no=equip_no,
+                        product_no=product_no,
+                        classes=production_class,
+                        factory_date=product_date,
+                        begin_trains__lte=train,
+                        end_trains__gte=train
+                    ).first()
+                    if not pallet:
+                        continue
+                    lot_no = pallet.lot_no
+                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                  actual_trains=train
+                                                                  ).first()
+                    if not test_order:
+                        test_order = MaterialTestOrder.objects.create(
+                            lot_no=lot_no,
+                            material_test_order_uid=uuid.uuid1(),
+                            actual_trains=train,
+                            product_no=product_no,
+                            plan_classes_uid=pallet.plan_classes_uid,
+                            production_class=production_class,
+                            production_group=group,
+                            production_equip_no=equip_no,
+                            production_factory_date=product_date
+                        )
+
+                    # 由MES判断检测结果
+                    material_test_method = MaterialTestMethod.objects.filter(
+                        material__material_no=product_no,
+                        test_method__name=method_name).first()
+                    if not material_test_method:
+                        continue
+
+                    for data_point in data_point_list:
+                        data_point_name = data_point
+                        try:
+                            if equip_test_plan.test_indicator_name == '门尼':
+                                test_value = Decimal(list(current_test_detail.value.values())[0]).quantize(Decimal('0.000'))
+                            else:
+                                test_value = dict(current_test_detail.value)[data_point_name]
+                        except Exception:
+                            raise ValidationError('检测值{}数据错误'.format(test_value))
+
+                        indicator = MaterialDataPointIndicator.objects.filter(
+                            material_test_method=material_test_method,
+                            data_point__name=data_point_name,
+                            data_point__test_type__test_indicator__name=indicator_name,
+                            upper_limit__gte=test_value,
+                            lower_limit__lte=test_value).first()
+                        if indicator:
+                            mes_result = indicator.result
+                            level = indicator.level
+                        else:
+                            mes_result = '三等品'
+                            level = 2
+
+                        MaterialTestResult.objects.create(
+                            material_test_order=test_order,
+                            test_factory_date=datetime.datetime.now(),
+                            value=test_value,
+                            test_times=test_times,
+                            data_point_name=data_point_name,
+                            test_method_name=method_name,
+                            test_indicator_name=indicator_name,
+                            result=mes_result,
+                            mes_result=mes_result,
+                            machine_name=equip_test_plan.test_equip.no,
+                            test_group=group,
+                            level=level,
+                            test_class=production_class,
+                            is_judged=material_test_method.is_judged)
+                    # else:
+                    #     # 已经检测过的情况
+                    #     MaterialTestResult.objects.filter(material_test_order=test_order).update(value=test_value)
+
+            return Response({'msg': '检测完成', 'success': True})
+
+
+class CheckEquip(APIView):
+    """检测设备状态"""
+    def get(self, request):
+        equip = ProductReportEquip.objects.first()
+        last_date = datetime.datetime.timestamp(equip.last_updated_date)
+        now_date = datetime.datetime.timestamp(datetime.datetime.now())
+        return Response({'status': False} if now_date - last_date > 10 else {'status': True})
+
+
+class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, mixins.UpdateModelMixin):
+    """物性/钢拔检测数据查看"""
+    queryset = RubberMaxStretchTestResult.objects.all()
+    serializer_class = RubberMaxStretchTestResultSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('product_test_plan_detail_id',)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        avg_value = queryset.aggregate(最大力=Avg('max_strength'),
+                                       结束力=Avg('end_strength'),
+                                       厚度=Avg('thickness'),
+                                       百分之百=Avg('ds1'),
+                                       百分之三百=Avg('ds2'),
+                                       断裂强力=Avg('break_strength'),
+                                       断裂伸长=Avg('break_length'),
+                                       )
+        return Response({'results': serializer.data, 'avg_value': avg_value})
+
+    def update(self, request, *args, **kwargs):
+        if kwargs.get('pk'):
+            pk = kwargs.get('pk')
+            test_plan_detail_obj = ProductTestPlanDetail.objects.get(test_results__id=pk)
+            RubberMaxStretchTestResult.objects.filter(pk=pk).update(**request.data)
+            test_plan_obj = ProductTestPlan.objects.filter(product_test_plan_detail=test_plan_detail_obj).first()
+            if test_plan_obj.test_indicator_name == '钢拔':
+                data_point_list = ['钢拔']
+                values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
+                    钢拔=Avg('max_strength'))
+                test_plan_detail_obj.value = values
+                test_plan_detail_obj.save()
+            elif test_plan_obj.test_indicator_name == '物性':
+                data_point_list = ['扯断强度', '伸长率%', 'M300']
+                values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
+                                                                            扯断强度=Avg('break_strength'),
+                                                                            伸长率=Avg('max_length'),
+                                                                            M300=Avg('ds2'))
+                values['伸长率%'] = values['伸长率']
+                del values['伸长率']
+                test_plan_detail_obj.value = values
+                test_plan_detail_obj.save()
+
+            for data_point in data_point_list:
+                data_point_name = data_point
+                test_value = values[data_point_name]
+                material_test_method = MaterialTestMethod.objects.filter(
+                    material__material_no=test_plan_detail_obj.product_no,
+                    test_method__name=test_plan_obj.test_method_name).first()
+                if not material_test_method:
+                    continue
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    material_test_method=material_test_method,
+                    data_point__name=data_point_name,
+                    data_point__test_type__test_indicator__name=test_plan_obj.test_indicator_name,
+                    upper_limit__gte=test_value,
+                    lower_limit__lte=test_value).first()
+                if indicator:
+                    mes_result = indicator.result
+                    level = indicator.level
+                else:
+                    mes_result = '三等品'
+                    level = 2
+
+                material_test_order_list = MaterialTestOrder.objects.filter(lot_no=test_plan_detail_obj.lot_no)
+                for material_test_order in material_test_order_list:
+                    MaterialTestResult.objects.filter(material_test_order=material_test_order,
+                                                      data_point_name=values[data_point_name]).update(value=test_value,
+                                                                                                      result=mes_result,
+                                                                                                      mes_result=mes_result,
+                                                                                                      level=level)
+            return Response('ok')

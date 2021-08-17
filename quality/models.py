@@ -422,14 +422,70 @@ class UnqualifiedDealOrderDetail(AbstractEntity):
 
 class ProductReportEquip(AbstractEntity):
     """胶料快检上报设备"""
+    STATUS_CHOICE = (
+        (1, '正常'),
+        (2, '异常'),
+    )
     no = models.CharField(max_length=64, help_text='设备编号')
     ip = models.CharField(max_length=64, help_text='IP', unique=True)
-    # test_type = models.ForeignKey(TestType, help_text='试验类型', on_delete=models.CASCADE)
-    data_point = models.ForeignKey(DataPoint, help_text='数据点', on_delete=models.CASCADE)
+    status = models.PositiveIntegerField(help_text='设备连接状态', choices=STATUS_CHOICE, default=1)
+    test_indicator = models.ManyToManyField(TestIndicator, help_text='实验指标', related_name='test_indicator')
 
     class Meta:
         db_table = 'product_report_equip'
         verbose_name_plural = verbose_name = '胶料快检上报设备'
+
+
+class ProductTestPlan(AbstractEntity):
+    """检测计划"""
+    STATUS_CHOICE = (
+        (1, '待检测'),
+        (2, '完成'),
+        (4, '强制结束')
+    )
+    plan_uid = models.CharField(max_length=64, help_text='计划编码')
+    test_equip = models.ForeignKey(ProductReportEquip, on_delete=models.CASCADE, help_text='检测机台',
+                                      related_name="product_test_plan")
+    test_time = models.DateTimeField(help_text='检测时间')
+    test_classes = models.CharField(max_length=64, help_text='检测班次')
+    test_group = models.CharField(max_length=64, help_text='检测班组')
+    test_user = models.CharField(max_length=64, help_text='检测人员')
+    test_indicator_name = models.CharField(max_length=64, help_text='检测指标名称')
+    test_method_name = models.CharField(max_length=64, help_text='试验方法名称')
+    test_times = models.PositiveIntegerField(help_text='检验次数', default=1)
+    test_interval = models.PositiveIntegerField(help_text='检验间隔', default=1)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
+
+    class Meta:
+        db_table = 'product_test_plan'
+        verbose_name_plural = verbose_name = '胶料快检计划'
+
+
+class ProductTestPlanDetail(models.Model):
+    """检测计划详情"""
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
+    test_plan = models.ForeignKey(ProductTestPlan, help_text='检测计划', on_delete=models.CASCADE, related_name=
+                                  'product_test_plan_detail')
+    product_no = models.CharField(max_length=64, help_text='胶料编码')
+    factory_date = models.DateField(help_text='工厂日期')
+    lot_no = models.CharField(max_length=64, help_text='收皮条码', null=True)
+    production_classes = models.CharField(max_length=64, help_text='生产班次')
+    production_group = models.CharField(max_length=64, help_text='生产班组')
+    actual_trains = models.PositiveIntegerField(help_text='生产车次')
+    value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True)
+    raw_value = models.TextField(null=True, help_text='检测原数据')
+
+    class Meta:
+        db_table = 'product_test_plan_detail'
+        verbose_name_plural = verbose_name = '胶料快检计划详情'
+
+    @property
+    def classes(self):
+        return self.production_classes
+
+    @property
+    def values(self):
+        return eval(self.value).get('l_4') if self.value else None
 
 
 class ProductReportValue(models.Model):
@@ -614,3 +670,36 @@ class MaterialReportValue(models.Model):
     class Meta:
         db_table = 'material_report_value'
         verbose_name_plural = verbose_name = '原材料快检上报值'
+
+
+class RubberMaxStretchTestResult(models.Model):
+    """物性、刚拔检测数据详情"""
+
+    product_test_plan_detail = models.ForeignKey(ProductTestPlanDetail, help_text='检测计划任务',
+                                                 on_delete=models.CASCADE, related_name='test_results')
+    ordering = models.IntegerField(help_text='检测次序（刚拔5次、物性3次）')
+    speed = models.FloatField(help_text='速度', null=True)
+    thickness = models.FloatField(help_text='厚度（物性）', null=True)
+    width = models.FloatField(help_text='宽度（物性）', null=True)
+    ds1 = models.FloatField(help_text='ds1', null=True)
+    ds2 = models.FloatField(help_text='ds2', null=True)
+    ds3 = models.FloatField(help_text='ds3', null=True)
+    ds4 = models.FloatField(help_text='ds4', null=True)
+    max_strength = models.FloatField(help_text='最大力', null=True)
+    max_length = models.FloatField(help_text='最大伸长', null=True)
+    end_strength = models.FloatField(help_text='结束力', null=True)
+    end_length = models.FloatField(help_text='结束伸长', null=True)
+    break_strength = models.FloatField(help_text='断裂强力', null=True)
+    break_length = models.FloatField(help_text='断裂伸长', null=True)
+    yield_strength = models.FloatField(help_text='屈服强度', null=True)
+    yield_length = models.FloatField(help_text='屈服伸长', null=True)
+    n1 = models.FloatField(help_text='n1（物性）', null=True)
+    n2 = models.FloatField(help_text='n2（物性）', null=True)
+    n3 = models.FloatField(help_text='n3（物性）', null=True)
+    test_time = models.CharField(max_length=64, help_text='检测时间', null=True)
+    test_method = models.CharField(max_length=64, help_text='检测方法', null=True)
+    result = models.CharField(max_length=64, help_text='检测结果')
+
+    class Meta:
+        db_table = 'rubber_max_stretch_test_result'
+        verbose_name_plural = verbose_name = '刚拔物性检测数据详情'

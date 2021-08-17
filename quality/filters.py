@@ -3,7 +3,7 @@ import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
     ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, \
-    MaterialReportValue, ProductReportEquip, ProductReportValue
+    MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -189,3 +189,16 @@ class ProductReportValueFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = ProductReportValue
         fields = ('created_date',)
+
+
+class ProductTestResumeFilter(django_filters.rest_framework.FilterSet):
+    test_indicator_name = django_filters.CharFilter(field_name='test_plan__test_indicator_name', help_text='实验分区')
+    test_time = django_filters.CharFilter(field_name='test_plan__test_time', lookup_expr='icontains', help_text='检测时间')
+    test_classes = django_filters.CharFilter(field_name='test_plan__test_classes', help_text='检测班次')
+    test_equip = django_filters.CharFilter(field_name='test_plan__test_equip__no', help_text='检测机台')
+    plan_uid = django_filters.CharFilter(field_name='test_plan__plan_uid', lookup_expr='icontains', help_text='检测计划编码')
+    status = django_filters.CharFilter(field_name='test_plan__status', help_text='检测状态')
+
+    class Meta:
+        model = ProductTestPlanDetail
+        fields = '__all__'
