@@ -1482,7 +1482,7 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
                 equip_obj = ProductReportEquip.objects.filter(ip=item['machine']).first()
                 if equip_obj:
                     equip_obj.status = 1 if item['status'] else 2
-                    # equip_obj.create_time = ''
+                    equip_obj.last_updated_date = datetime.datetime.now()
                     equip_obj.save()
             return Response('ok')
         serializer = self.get_serializer(data=request.data)
