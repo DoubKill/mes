@@ -14,7 +14,7 @@ class TrainsFeedbacksFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = TrainsFeedbacks
-        fields = ('plan_classes_uid', 'equip_no', 'product_no', "day_time", 'operation_user')
+        fields = ('plan_classes_uid', 'equip_no', 'product_no', "day_time", 'operation_user', 'classes')
 
 
 class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
