@@ -8,7 +8,7 @@ from io import BytesIO
 import requests
 import xlwt
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -2945,9 +2945,11 @@ class BzMixingRubberInventory(ListAPIView):
                 queryset = queryset.filter(lot_no__isnull=True)
         if station:
             if station == '一层前端':
-                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+                queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
+                # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
             elif station in ('二层前端', '二层后端'):
-                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+                queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
+                # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
             else:
                 return []
         return queryset
@@ -2968,9 +2970,11 @@ class BzMixingRubberInventorySummary(APIView):
             queryset = queryset.filter(location_status=location_status)
         if station:
             if station == '一层前端':
-                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+                queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
+                # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
             elif station in ('二层前端', '二层后端'):
-                queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+                queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
+                # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
             else:
                 return Response([])
         if quality_status:
@@ -3012,9 +3016,11 @@ class BzMixingRubberInventorySearch(ListAPIView):
             location_status="有货货位",
             lot_no__isnull=False).order_by('in_storage_time')
         if station == '一层前端':
-            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
+            queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
+            # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
         elif station in ('二层前端', '二层后端'):
-            queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
+            queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
+            # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
         else:
             queryset = []
         if quality_status:
