@@ -196,7 +196,7 @@ class ProductTestResumeFilter(django_filters.rest_framework.FilterSet):
     test_time = django_filters.CharFilter(field_name='test_plan__test_time', lookup_expr='icontains', help_text='检测时间')
     test_classes = django_filters.CharFilter(field_name='test_plan__test_classes', help_text='检测班次')
     test_equip = django_filters.CharFilter(field_name='test_plan__test_equip__no', help_text='检测机台')
-    plan_uid = django_filters.CharFilter(field_name='test_plan__plan_uid', help_text='检测计划编码')
+    plan_uid = django_filters.CharFilter(field_name='test_plan__plan_uid', lookup_expr='icontains', help_text='检测计划编码')
     status = django_filters.CharFilter(field_name='test_plan__status', help_text='检测状态')
 
     class Meta:

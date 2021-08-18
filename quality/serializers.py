@@ -1632,7 +1632,7 @@ class ProductTestPlanDetailSerializer(BaseModelSerializer):
     class Meta:
         model = ProductTestPlanDetail
         fields = ['factory_date', 'product_no', 'actual_trains', 'equip_no',
-                  'lot_no', 'classes', 'values', 'id']
+                  'lot_no', 'classes', 'values', 'id', 'value']
 
 
 class ProductTestPlanSerializer(BaseModelSerializer):
@@ -1677,7 +1677,7 @@ class ReportValueSerializer(serializers.Serializer):
 
 class RubberMaxStretchTestResultSerializer(serializers.ModelSerializer):
     product_no = serializers.ReadOnlyField(source='product_test_plan_detail.product_no')
-    # product_no = serializers.CharField(read_only=True)
+
     class Meta:
         model = RubberMaxStretchTestResult
         fields = '__all__'

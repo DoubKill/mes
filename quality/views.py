@@ -1,5 +1,6 @@
 import datetime
 import json
+import ast
 import os
 from decimal import Decimal
 
@@ -1455,7 +1456,7 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
     """胶料上报设备管理"""
     queryset = ProductReportEquip.objects.all()
     serializer_class = ProductReportEquipSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductReportEquipFilter
 
@@ -1472,6 +1473,23 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        # 更新设备的状态
+        if request.data.get('equip'):
+            data = request.data.get('data')
+            for item in data:
+                equip_obj = ProductReportEquip.objects.filter(ip=item['machine']).first()
+                if equip_obj:
+                    equip_obj.status = 1 if item['status'] else 2
+                    equip_obj.last_updated_date = datetime.datetime.now()
+                    equip_obj.save()
+            return Response('ok')
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2001,8 +2019,12 @@ class ProductTestPlanViewSet(ModelViewSet):
             ).first()
             if not pallet:
                 raise ValidationError(f"第{item['actual_trains']}车数据不存在")
-        product_plan = ProductTestPlan.objects.create(**data, test_time=datetime.datetime.now(), status=1,
-                                                      plan_uid=plan_uid, test_user=test_user)
+            else:
+                test_times = len(ProductTestPlan.objects.filter(product_test_plan_detail__lot_no=pallet.lot_no)) + 1
+        data.pop('test_times', None)
+        product_plan = ProductTestPlan.objects.create(
+            **data, test_time=datetime.datetime.now(), status=1,
+                                                      plan_uid=plan_uid, test_user=test_user, test_times=test_times)
         # 添加检测计划详情
         for item in product_list:
             production_classes = item['classes']
@@ -2069,8 +2091,11 @@ class ReportValueView(APIView):
             s.is_valid(raise_exception=True)
             data = s.validated_data
             raw_value = data['raw_value']
+            data['value']['ML(1+4)'] = data['value']['l_4']
+            del data['value']['l_4']
             test_value = data['value']
             ip = data['ip']
+            test_type = None
         else:
             # 钢拔/物性提交过来的数据
             data_ = self.request.data
@@ -2085,10 +2110,10 @@ class ReportValueView(APIView):
                                                value=list(test_value.values())[0])
             return Response({'msg': '上报成功', 'success': True})
         else:
-            test_equip_no = data_.get('test_equip_no')  # 钢拔/物性
-            if test_equip_no:
+            try:
+                test_equip_no = data_.get('test_equip_no')  # 钢拔/物性
                 equip_test_plan = ProductTestPlan.objects.filter(test_equip__no=test_equip_no, status=1).last()
-            else:
+            except:
                 # 取机台最后一条进行中的检测计划
                 equip_test_plan = ProductTestPlan.objects.filter(test_equip__ip=ip, status=1).last()
             if not equip_test_plan:
@@ -2111,6 +2136,8 @@ class ReportValueView(APIView):
                                                               max_length=data_['MaxL'],
                                                               end_strength=data_['BF'],
                                                               end_length=data_['BL'],
+                                                              yield_strength=data_['YieldF'],
+                                                              yield_length=data_['YieldL'],
                                                               test_time=data_['DateTime'],
                                                               test_method=data_['TestMethod'],
                                                               ds1=data_['DS1'],
@@ -2119,6 +2146,7 @@ class ReportValueView(APIView):
                                                               result=data_['Result'])
                     if ordering == 5:
                         values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
+                        values.update({'钢拔': round(values['钢拔'], 2)})
                         current_test_detail.value = values
                         current_test_detail.save()
                     else:
@@ -2152,13 +2180,16 @@ class ReportValueView(APIView):
                                                                                     M300=Avg('ds2'))
                         values['伸长率%'] = values['伸长率']
                         del values['伸长率']
+                        values.update({'扯断强度': round(values['扯断强度'], 2)})
+                        values.update({'伸长率%': round(values['伸长率%'], 2)})
+                        values.update({'M300': round(values['M300'], 2)})
                         current_test_detail.value = values
                         current_test_detail.save()
                     else:
                         return Response('ok')
             else:
-                current_test_detail.value = json.dumps(test_value)
-                current_test_detail.raw_value = json.dumps(raw_value)
+                current_test_detail.value = test_value
+                current_test_detail.raw_value = raw_value
                 current_test_detail.save()
 
             product_no = current_test_detail.product_no  # 胶料编码
@@ -2197,35 +2228,34 @@ class ReportValueView(APIView):
                     if not pallet:
                         continue
                     lot_no = pallet.lot_no
-                    #todo 车次检测单
-                    # test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
-                    #                                               actual_trains=train
-                    #                                               ).first()
-                    # if not test_order:
-                    test_order = MaterialTestOrder.objects.create(
-                        lot_no=lot_no,
-                        material_test_order_uid=uuid.uuid1(),
-                        actual_trains=train,
-                        product_no=product_no,
-                        plan_classes_uid=pallet.plan_classes_uid,
-                        production_class=production_class,
-                        production_group=group,
-                        production_equip_no=equip_no,
-                        production_factory_date=product_date
-                    )
+                    test_order = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                                  actual_trains=train
+                                                                  ).first()
+                    if not test_order:
+                        test_order = MaterialTestOrder.objects.create(
+                            lot_no=lot_no,
+                            material_test_order_uid=uuid.uuid1(),
+                            actual_trains=train,
+                            product_no=product_no,
+                            plan_classes_uid=pallet.plan_classes_uid,
+                            production_class=production_class,
+                            production_group=group,
+                            production_equip_no=equip_no,
+                            production_factory_date=product_date
+                        )
 
                     # 由MES判断检测结果
                     material_test_method = MaterialTestMethod.objects.filter(
                         material__material_no=product_no,
                         test_method__name=method_name).first()
                     if not material_test_method:
-                        raise ValidationError('检测方法不存在')
+                        continue
 
                     for data_point in data_point_list:
                         data_point_name = data_point
                         try:
                             if equip_test_plan.test_indicator_name == '门尼':
-                                test_value = Decimal(list(test_value.values())[0]).quantize(Decimal('0.000'))
+                                test_value = Decimal(list(current_test_detail.value.values())[0]).quantize(Decimal('0.000'))
                             else:
                                 test_value = dict(current_test_detail.value)[data_point_name]
                         except Exception:
@@ -2269,7 +2299,7 @@ class ReportValueView(APIView):
 class CheckEquip(APIView):
     """检测设备状态"""
     def get(self, request):
-        equip = ProductReportEquip.objects.first()
+        equip = ProductReportEquip.objects.order_by('-last_updated_date').first()
         last_date = datetime.datetime.timestamp(equip.last_updated_date)
         now_date = datetime.datetime.timestamp(datetime.datetime.now())
         return Response({'status': False} if now_date - last_date > 10 else {'status': True})
@@ -2303,12 +2333,13 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
             test_plan_obj = ProductTestPlan.objects.filter(product_test_plan_detail=test_plan_detail_obj).first()
             if test_plan_obj.test_indicator_name == '钢拔':
                 data_point_list = ['钢拔']
-                values = RubberMaxStretchTestResult.objects.filter(id=pk).aggregate(
+                values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
                     钢拔=Avg('max_strength'))
-                ProductTestPlanDetail.objects.filter(test_results__id=pk).update(value=values)
+                test_plan_detail_obj.value = values
+                test_plan_detail_obj.save()
             elif test_plan_obj.test_indicator_name == '物性':
                 data_point_list = ['扯断强度', '伸长率%', 'M300']
-                values = RubberMaxStretchTestResult.objects.filter(id=pk).aggregate(
+                values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
                                                                             扯断强度=Avg('break_strength'),
                                                                             伸长率=Avg('max_length'),
                                                                             M300=Avg('ds2'))
@@ -2324,7 +2355,7 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                     material__material_no=test_plan_detail_obj.product_no,
                     test_method__name=test_plan_obj.test_method_name).first()
                 if not material_test_method:
-                    raise ValidationError('检测方法不存在')
+                    continue
                 indicator = MaterialDataPointIndicator.objects.filter(
                     material_test_method=material_test_method,
                     data_point__name=data_point_name,
