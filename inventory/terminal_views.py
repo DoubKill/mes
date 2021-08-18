@@ -138,7 +138,8 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                     'message': '入库成功',
                     'data': {
                         'lot_no': tmh,
-                        'weight': ZL
+                        'weight': ZL,
+                        'product_no': name
                         }
                 })
             else:
