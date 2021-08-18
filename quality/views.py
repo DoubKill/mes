@@ -1482,6 +1482,7 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
                 equip_obj = ProductReportEquip.objects.filter(ip=item['machine']).first()
                 if equip_obj:
                     equip_obj.status = 1 if item['status'] else 2
+                    equip_obj.last_updated_date = datetime.datetime.now()
                     equip_obj.save()
             return Response('ok')
         serializer = self.get_serializer(data=request.data)
@@ -2298,7 +2299,7 @@ class ReportValueView(APIView):
 class CheckEquip(APIView):
     """检测设备状态"""
     def get(self, request):
-        equip = ProductReportEquip.objects.first()
+        equip = ProductReportEquip.objects.order_by('-last_updated_date').first()
         last_date = datetime.datetime.timestamp(equip.last_updated_date)
         now_date = datetime.datetime.timestamp(datetime.datetime.now())
         return Response({'status': False} if now_date - last_date > 10 else {'status': True})
