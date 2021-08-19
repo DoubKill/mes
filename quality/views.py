@@ -1482,7 +1482,6 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
                 equip_obj = ProductReportEquip.objects.filter(ip=item['machine']).first()
                 if equip_obj:
                     equip_obj.status = 1 if item['status'] else 2
-                    equip_obj.last_updated_date = datetime.datetime.now()
                     equip_obj.save()
             return Response('ok')
         serializer = self.get_serializer(data=request.data)
@@ -1995,6 +1994,7 @@ class ProductTestPlanViewSet(ModelViewSet):
             s = 'G'
         # 判断有没有计划正在执行
         test_equip = serializer.data.get('test_equip')
+        test_method_name = serializer.data.get('test_method_name')
         obj = ProductTestPlan.objects.filter(status=1, test_equip__no=test_equip).first()
         if obj:
             raise ValidationError('当前有计划正在执行')
@@ -2020,7 +2020,9 @@ class ProductTestPlanViewSet(ModelViewSet):
             if not pallet:
                 raise ValidationError(f"第{item['actual_trains']}车数据不存在")
             else:
-                test_times = len(ProductTestPlan.objects.filter(product_test_plan_detail__lot_no=pallet.lot_no)) + 1
+                test_times = len(ProductTestPlan.objects.filter(product_test_plan_detail__lot_no=pallet.lot_no,
+                                                                test_method_name=test_method_name,
+                                                                product_test_plan_detail__actual_trains=item['actual_trains'])) + 1
         data.pop('test_times', None)
         product_plan = ProductTestPlan.objects.create(
             **data, test_time=datetime.datetime.now(), status=1,
