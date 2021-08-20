@@ -1,3 +1,5 @@
+import json
+import logging
 import random
 import re
 from datetime import datetime, timedelta
@@ -9,18 +11,16 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import PlanSchedule, GlobalCode
-from inventory.models import MaterialOutHistory, WmsInventoryMaterial
+from inventory.models import MaterialOutHistory
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ZCMaterial, ERPMESMaterialRelation, WeighCntType
+from recipe.models import ERPMESMaterialRelation, WeighCntType
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial
-import logging
-
 from terminal.utils import INWeighSystem, TankStatusSync
 
 logger = logging.getLogger('send_log')
@@ -114,10 +114,17 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
+        # 配方中物料单车需要重量
+        single_material_weight = classes_plan.product_batching.batching_details.filter(
+            material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and \
+                                                                            '细料' not in material_name else \
+            classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False,
+                                                                  name=material_name).first().package_cnt
         attrs['tank_data'] = {'msg': '', 'bra_code': bra_code, 'init_weight': total_weight, 'scan_time': datetime.now(),
                               'useup_time': datetime.strptime('1970-01-01 00:00:00', '%Y-%m-%d %H:%M:%S'), 'unit': unit,
                               'material_no': material_no, 'material_name': material_name, 'real_weight': total_weight,
-                              'scan_material': attrs.pop('scan_material', ''), 'plan_classes_uid': plan_classes_uid}
+                              'scan_material': attrs.pop('scan_material', ''), 'plan_classes_uid': plan_classes_uid,
+                              'single_need': single_material_weight}
         # 判断物料是否在配方中
         if material_name not in classes_plan.product_batching.batching_material_names:
             attrs['status'] = 2
@@ -152,28 +159,33 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     attrs['status'] = 1
                 # 同物料扫码
                 else:
-                    # 配方中物料单车需要重量
-                    single_material_weight = classes_plan.product_batching.batching_details.filter(
-                        material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and\
-                                                                                        '细料' not in material_name else \
-                        classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False, name=material_name).first().package_cnt
                     left_weight = add_materials.aggregate(left_weight=Sum('real_weight'))['left_weight']
                     if left_weight > single_material_weight:
                         attrs['tank_data'].update({'msg': '同物料未使用完, 不能扫码'})
                         attrs['status'] = 2
                     else:
                         # 剩余物料 < 单车需要物料
-                        attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight})
-                        attrs['status'] = 1
+                        # 上一条计划剩余量判定
+                        pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).first()
+                        # 料框表中无该条码信息
+                        if not pre_material:
+                            attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight})
+                            attrs['status'] = 1
+                        # 存在该条码信息(其他计划使用过)
+                        else:
+                            # 未用完
+                            if pre_material.adjust_left_weight != 0:
+                                attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
+                                                           'real_weight': pre_material.real_weight,
+                                                           'pre_material': pre_material,
+                                                           'adjust_left_weight': pre_material.adjust_left_weight})
+                                attrs['status'] = 1
+                            # 已用完(异常扫码)
+                            else:
+                                attrs['tank_data'].update({'msg': '该物料条码已无剩余量,请扫新条码'})
+                                attrs['status'] = 2
         try:
-            resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/',
-                                 data=attrs, timeout=5)
-            code = resp.status_code
-            if code == 200:
-                logger.error('条码信息下发成功：{}'.format(resp.text))
-            else:
-                logger.error('条码信息下发错误：{}'.format(resp.text))
-                raise serializers.ValidationError(resp.text)
+            resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/current_weigh/', data=attrs, timeout=5)
         except Exception as e:
             logger.error('群控服务器错误！')
             raise serializers.ValidationError(e.args[0])
@@ -186,6 +198,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         tank_data = validated_data.get('tank_data')
+        plan_classes_uid = validated_data.get('plan_classes_uid')
+        trains = validated_data.get('trains')
         pre_material = tank_data.pop('pre_material', '')
         # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0)
         if pre_material:
@@ -195,6 +209,20 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             pre_material.useup_time = datetime.now()
             pre_material.save()
         instance = LoadTankMaterialLog.objects.create(**tank_data)
+        # 判断补充进料后是否能进上辅机
+        fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
+        if fml.add_feed_result == 1:
+            # 请求进料判断接口
+            try:
+                resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5,
+                                     data=validated_data)
+                content = json.loads(resp.content.decode())
+                if content['success']:
+                    logger.info('扫码补料后调用接口成功')
+                else:
+                    logger.error('扫码补料后调用接口时不可进料')
+            except:
+                logger.error('扫码补料后调用接口时群控服务器错误！')
         return instance
 
     class Meta:
