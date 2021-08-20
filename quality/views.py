@@ -2148,7 +2148,7 @@ class ReportValueView(APIView):
                                                               result=data_['Result'])
                     if ordering == 5:
                         values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
-                        values.update({'钢拔': round(values['钢拔'], 2)})
+                        values.update({'钢拔': round(values['钢拔'], 3)})
                         current_test_detail.value = values
                         current_test_detail.save()
                     else:
@@ -2182,9 +2182,9 @@ class ReportValueView(APIView):
                                                                                     M300=Avg('ds2'))
                         values['伸长率%'] = values['伸长率']
                         del values['伸长率']
-                        values.update({'扯断强度': round(values['扯断强度'], 2)})
-                        values.update({'伸长率%': round(values['伸长率%'], 2)})
-                        values.update({'M300': round(values['M300'], 2)})
+                        values.update({'扯断强度': round(values['扯断强度'], 3)})
+                        values.update({'伸长率%': round(values['伸长率%'], 3)})
+                        values.update({'M300': round(values['M300'], 3)})
                         current_test_detail.value = values
                         current_test_detail.save()
                     else:
@@ -2327,7 +2327,7 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                                        )
         for k, v in avg_value.items():
             if avg_value[k]:
-                avg_value[k] = round(v, 2)
+                avg_value[k] = round(v, 3)
         return Response({'results': serializer.data, 'avg_value': avg_value})
 
     def update(self, request, *args, **kwargs):
@@ -2340,7 +2340,7 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                 data_point_list = ['钢拔']
                 values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=test_plan_detail_obj).aggregate(
                     钢拔=Avg('max_strength'))
-                values = {'钢拔': round(values['钢拔'], 2)}
+                values = {'钢拔': round(values['钢拔'], 3)}
                 test_plan_detail_obj.value = values
                 test_plan_detail_obj.save()
             elif test_plan_obj.test_indicator_name == '物性':
@@ -2349,9 +2349,9 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                                                                             扯断强度=Avg('break_strength'),
                                                                             伸长率=Avg('max_length'),
                                                                             M300=Avg('ds2'))
-                values = {'扯断强度': round(values['扯断强度'], 2),
-                          '伸长率%': round(values['伸长率'], 2),
-                          'M300': round(values['M300'], 2)}
+                values = {'扯断强度': round(values['扯断强度'], 3),
+                          '伸长率%': round(values['伸长率'], 3),
+                          'M300': round(values['M300'], 3)}
                 test_plan_detail_obj.value = values
                 test_plan_detail_obj.save()
 
