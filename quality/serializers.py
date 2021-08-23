@@ -23,7 +23,7 @@ from production.models import PalletFeedbacks
 from quality.models import TestMethod, MaterialTestOrder, \
     MaterialTestResult, MaterialDataPointIndicator, MaterialTestMethod, TestType, DataPoint, DealSuggestion, \
     TestDataPoint, BatchMonth, BatchDay, BatchEquip, BatchClass, BatchProductNo, MaterialDealResult, LevelResult, \
-    TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
+    TestIndicator, LabelPrint, UnqualifiedProductDealOrder, UnqualifiedProductDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
@@ -239,7 +239,7 @@ class UnqualifiedDealOrderDetailSerializer(serializers.ModelSerializer):
         return ret
 
     class Meta:
-        model = UnqualifiedDealOrderDetail
+        model = UnqualifiedProductDealOrderDetail
         exclude = ('unqualified_deal_order',)
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -286,12 +286,12 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
         instance = super().create(validated_data)
         for deal_detail in deal_details:
             deal_detail['unqualified_deal_order'] = instance
-            UnqualifiedDealOrderDetail.objects.create(**deal_detail)
+            UnqualifiedProductDealOrderDetail.objects.create(**deal_detail)
             MaterialDealResult.objects.filter(lot_no=deal_detail['lot_no']).update(is_deal=True)
         return instance
 
     class Meta:
-        model = UnqualifiedDealOrder
+        model = UnqualifiedProductDealOrder
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
         extra_kwargs = {'deal_user': {'read_only': True},
@@ -309,14 +309,14 @@ class UnqualifiedDealOrderSerializer(BaseModelSerializer):
         return 'Y' if obj.t_deal_user else 'N'
 
     class Meta:
-        model = UnqualifiedDealOrder
+        model = UnqualifiedProductDealOrder
         fields = '__all__'
 
 
 class TechDealOrderDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = UnqualifiedDealOrderDetail
+        model = UnqualifiedProductDealOrderDetail
         fields = ('id', 'is_release', 'suggestion')
         extra_kwargs = {'id': {'read_only': False}}
 
@@ -330,7 +330,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
         tech_deal_result = validated_data.pop('tech_deal_result', {})
         instance = super().update(instance, validated_data)
         for item in tech_deal_result:
-            deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
+            deal_details = UnqualifiedProductDealOrderDetail.objects.filter(id=item['id'])
             deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
 
         c_deal_suggestion = validated_data.get('c_deal_suggestion', '')
@@ -340,7 +340,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
         return instance
 
     class Meta:
-        model = UnqualifiedDealOrder
+        model = UnqualifiedProductDealOrder
         exclude = ('unqualified_deal_order_uid', )
         read_only_fields = COMMON_READ_ONLY_FIELDS
 

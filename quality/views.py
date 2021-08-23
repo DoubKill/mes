@@ -41,7 +41,7 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
-    LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
+    LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedProductDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
@@ -1079,12 +1079,12 @@ class UnqualifiedOrderTrains(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class UnqualifiedDealOrderViewSet(ModelViewSet):
     """不合格处置"""
-    queryset = UnqualifiedDealOrder.objects.all()
+    queryset = UnqualifiedProductDealOrder.objects.all()
     filter_backends = (DjangoFilterBackend,)
     filter_class = UnqualifiedDealOrderFilter
 
     def get_queryset(self):
-        queryset = UnqualifiedDealOrder.objects.all()
+        queryset = UnqualifiedProductDealOrder.objects.all()
         t_deal = self.request.query_params.get('t_solved')
         c_deal = self.request.query_params.get('c_solved')
         if t_deal == 'Y':  # 技术部门已处理
@@ -1112,7 +1112,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
 class DealMethodHistoryView(APIView):
 
     def get(self, request):
-        return Response(set(UnqualifiedDealOrder.objects.filter(
+        return Response(set(UnqualifiedProductDealOrder.objects.filter(
             deal_method__isnull=False).values_list('deal_method', flat=True)))
 
 
