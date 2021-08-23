@@ -126,4 +126,8 @@ urlpatterns = [
     path('report-value/', ReportValueView.as_view()),
     path('equip-test-data/', TestDataView.as_view()),  # 设备监控数据
     path('check-equip/', CheckEquip.as_view()),  # 检测机台的转态
+
+    # 不合格收皮数据列表
+    path('unqialified-pallet-list/', UnqualifiedPalletFeedBackListView.as_view()),
+    path('data-point-list/', DataPointListView.as_view()),
 ]

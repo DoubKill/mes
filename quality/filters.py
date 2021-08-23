@@ -88,10 +88,14 @@ class PalletFeedbacksTestFilter(django_filters.rest_framework.FilterSet):
 class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
     st = django_filters.DateFilter(field_name='created_date__date', lookup_expr='gte', help_text='开始时间')
     et = django_filters.DateFilter(field_name='created_date__date', lookup_expr='lte', help_text='结束时间')
+    department = django_filters.CharFilter(field_name='department', lookup_expr='icontains', help_text='发生部门')
+    status = django_filters.CharFilter(field_name='status', lookup_expr='icontains', help_text='不合格状态')
+    unqualified_deal_order_uid = django_filters.CharFilter(field_name='unqualified_deal_order_uid',
+                                                           lookup_expr='icontains', help_text='处置单号')
 
     class Meta:
         model = UnqualifiedDealOrder
-        fields = ('st', 'et')
+        fields = ('st', 'et', 'department', 'status', 'unqualified_deal_order_uid')
 
 
 """新原材料快检"""
