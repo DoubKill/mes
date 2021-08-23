@@ -1,7 +1,7 @@
 import django_filters
 
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
-    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedProductDealOrder, \
+    MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
     ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, \
     MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail
 
@@ -94,7 +94,7 @@ class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
                                                            lookup_expr='icontains', help_text='处置单号')
 
     class Meta:
-        model = UnqualifiedProductDealOrder
+        model = UnqualifiedDealOrder
         fields = ('st', 'et', 'department', 'status', 'unqualified_deal_order_uid')
 
 
