@@ -113,7 +113,7 @@ urlpatterns = [
     path('deal-suggestion-view/', DealSuggestionView.as_view()),  # 处理意见展示
     path('test-result-history/', MaterialTestResultHistoryView.as_view()),
     path('print-material-deal-result/', PrintMaterialDealResult.as_view()),  # 不合格处理导出功能
-    path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
+    # path('unqualified-trains/', UnqualifiedOrderTrains.as_view()),
     path('import-material-test-orders/', ImportAndExportView.as_view()),  # 快检数据导入
     path('barcode-preview/', BarCodePreview.as_view()),  # 条码追溯中的条码预览接口
     path('deal-mathod-history/', DealMethodHistoryView.as_view()),

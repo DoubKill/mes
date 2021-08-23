@@ -421,7 +421,7 @@ class UnqualifiedDealOrderDetail(AbstractEntity):
     equip_no = models.CharField(max_length=64, help_text='机台号', null=True)
     classes = models.CharField(max_length=64, help_text='班次', null=True)
     product_no = models.CharField(max_length=64, help_text='胶料名称', null=True)
-    test_data = models.CharField(max_length=512, help_text='检测详情', null=True)
+    test_data = models.TextField(help_text='检测详情', null=True)
     is_release = models.NullBooleanField(help_text='是否放行', default=None)
     suggestion = models.CharField(max_length=100, help_text='处理结果', null=True)
     trains = models.CharField(max_length=64, help_text='车次', null=True)
