@@ -177,8 +177,18 @@ class BatchProductBatchingVIew(APIView):
             load_data = material_info.get(material_name)
             # 不存在则说明当前只完成了一部分的进料,数量置为0
             if not load_data:
-                single_material.update(
-                    {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''})
+                # 存在物料, 但是已经使用完
+                used_up = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name).last()
+                if used_up:
+                    single_material.update({'bra_code': used_up.bra_code, 'init_weight': used_up.init_weight,
+                                            'used_weight': used_up.actual_weight,
+                                            'scan_material': used_up.scan_material,
+                                            'adjust_left_weight': used_up.adjust_left_weight, 'id': used_up.id,
+                                            'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)
+                                            })
+                else:
+                    single_material.update(
+                        {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''})
                 continue
             # 全部完成进料
             single_material.update({'bra_code': load_data['bra_code'], 'init_weight': load_data['init_weight'],
@@ -243,18 +253,22 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         self.queryset = LoadTankMaterialLog.objects.all()
         left_weight = request.data.get('adjust_left_weight')
         batch_material = self.get_object()
-        serializer = self.get_serializer(batch_material, data=request.data)
-        if not serializer.is_valid():
-            return response(success=False, message=list(serializer.errors.values())[0][0])
+        # 修改数量机台和使用机台不相同时, 不可修改
+        last_bra_code_info = LoadTankMaterialLog.objects.filter(bra_code=batch_material.bra_code).last()
+        if last_bra_code_info.plan_classes_uid != batch_material.plan_classes_uid:
+            return response(success=False, message='该物料(条码)已在其他计划中使用, 本计划不可修改')
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
         if left_weight > batch_material.init_weight or left_weight < 0:
             return response(success=False, message='请输入正确的剩余修正量数值')
+        serializer = self.get_serializer(batch_material, data=request.data)
+        if not serializer.is_valid():
+            return response(success=False, message=list(serializer.errors.values())[0][0])
         # 获得本次修正量,修改真正计算的总量
         change_num = float(batch_material.adjust_left_weight) - left_weight
         batch_material.real_weight = float(batch_material.real_weight) - change_num
         batch_material.adjust_left_weight = batch_material.real_weight
-        self.perform_update(serializer)
+        batch_material.useup_time = datetime.datetime.now() if left_weight == 0 else '1970-01-01 00:00:00'
         batch_material.save()
         return response(success=True, message='修正成功')
 
@@ -423,8 +437,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
         # 履历表中已生成的record(plan表主键)
         ids = list(set(self.get_queryset().filter(**weight_filter_kwargs).values_list('record', flat=True)))
-        # 称量系统ver和机型对应关系
-        ver_dev_type = {'580': 'E580', '370': 'F370', '320': 'GK320', '255': 'GK255', '190': 'E190'}
         # 打印履历表为空(全是未打印数据)
         if not self.get_queryset():
             if status == 'Y':
@@ -435,7 +447,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     serializer = WeightPackagePlanSerializer(page, many=True)
                     for i in serializer.data:
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
-                        dev_type = ver_dev_type.get(recipe_pre.first().ver.strip(), '') if recipe_pre else ''
+                        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
                         actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
@@ -465,7 +477,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = ver_dev_type.get(recipe_pre.first().ver.strip(), '') if recipe_pre else ''
+                        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -496,7 +508,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         serializer = WeightPackagePlanSerializer(k).data
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = ver_dev_type.get(recipe_pre.first().ver.strip(), '') if recipe_pre else ''
+                        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -542,9 +554,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_no = self.request.query_params.get('equip_no')
         plan_obj = Plan.objects.using(equip_no).get(id=id)
         recipe_pre = RecipePre.objects.using(equip_no).filter(name=plan_obj.recipe)
-        # 称量系统ver和机型对应关系
-        ver_dev_type = {'580': 'E580', '370': 'F370', '320': 'GK320', '255': 'GK255', '190': 'E190'}
-        dev_type = ver_dev_type.get(recipe_pre.first().ver.strip(), '') if recipe_pre else ''
+        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
         batch_group = self.request.query_params.get('batch_group')
         same_batch_print = self.get_queryset().filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
                                                       product_no=plan_obj.recipe) # 删除status='Y'判断
@@ -1206,11 +1216,9 @@ class XLPlanCViewSet(ListModelMixin, GenericViewSet):
         if not all_filter_plan:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         serializer = self.get_serializer(all_filter_plan, many=True)
-        # 称量系统ver和机型对应关系
-        ver_dev_type = {'580': 'E580', '370': 'F370', '320': 'GK320', '255': 'GK255', '190': 'E190'}
         for i in serializer.data:
             recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['recipe'])
-            dev_type = ver_dev_type.get(recipe_pre.first().ver.strip(), '') if recipe_pre else ''
+            dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
             i.update({'dev_type': dev_type})
         return response(success=True, data=serializer.data)
 
