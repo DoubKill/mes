@@ -2146,7 +2146,7 @@ class ReportValueView(APIView):
                                                               ds2=data_['DS2'],
                                                               ds3=data_['DS3'],
                                                               result=data_['Result'])
-                    if ordering == 5:
+                    if ordering == equip_test_plan.count:
                         values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
                         values.update({'钢拔': round(values['钢拔'], 3)})
                         current_test_detail.value = values
