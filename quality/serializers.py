@@ -282,7 +282,14 @@ class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
     def create(self, validated_data):
         deal_details = validated_data.pop('deal_details', [])
         validated_data['deal_user'] = self.context['request'].user.username
-        validated_data['deal_date'] = datetime.now().date()
+        validated_data['t_deal_suggestion'] = None
+        validated_data['c_deal_suggestion'] = None
+        validated_data['t_deal_user'] = None
+        validated_data['t_deal_date'] = None
+        validated_data['c_deal_user'] = None
+        validated_data['c_deal_date'] = None
+        validated_data['desc'] = None
+        validated_data['deal_method'] = None
         instance = super().create(validated_data)
         for deal_detail in deal_details:
             deal_detail['unqualified_deal_order'] = instance
@@ -328,7 +335,10 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         tech_deal_result = validated_data.pop('tech_deal_result', {})
-        instance = super().update(instance, validated_data)
+        for key, value in dict(validated_data).items():
+            if not value:
+                validated_data.pop(key)
+        UnqualifiedDealOrder.objects.filter(id=instance.id).update(**validated_data)
         for item in tech_deal_result:
             deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
             deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
