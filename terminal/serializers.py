@@ -524,7 +524,9 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
             .prefetch_related('work_schedule_plan__classes', 'work_schedule_plan__group')[0].work_schedule_plan
         for i in work_schedule_plan.values_list('classes', 'group'):
             classes = GlobalCode.objects.get(id=i[0]).global_name
-            if classes == obj.grouptime:
+            group = obj.grouptime if obj.grouptime != '中班' else (
+                '早班' if '08:00:00' < obj.addtime[-8:] < '20:00:00' else '夜班')
+            if classes == group:
                 return GlobalCode.objects.get(id=i[1]).global_name
 
     class Meta:
