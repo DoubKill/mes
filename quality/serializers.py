@@ -1742,7 +1742,7 @@ class ProductTestPlanSerializer(BaseModelSerializer):
     class Meta:
         model = ProductTestPlan
         fields = ['status', 'plan_uid', 'test_equip', 'test_time', 'test_classes', 'test_group', 'test_indicator_name', 'test_method_name',
-                  'test_times', 'test_interval', 'product_test_plan_detail']
+                  'test_times', 'test_interval', 'product_test_plan_detail', 'count']
         read_only_fields = ['plan_uid', 'test_time', 'status']
 
 
