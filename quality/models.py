@@ -443,6 +443,7 @@ class ProductTestPlan(AbstractEntity):
         (2, '完成'),
         (4, '强制结束')
     )
+    count = models.PositiveIntegerField(help_text='钢拔同一车次的检测次数(4/5)', default=4)
     plan_uid = models.CharField(max_length=64, help_text='计划编码')
     test_equip = models.ForeignKey(ProductReportEquip, on_delete=models.CASCADE, help_text='检测机台',
                                       related_name="product_test_plan")
