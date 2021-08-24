@@ -21,7 +21,7 @@ from recipe.models import ERPMESMaterialRelation, WeighCntType
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial
-from terminal.utils import INWeighSystem, TankStatusSync
+from terminal.utils import INWeighSystem, TankStatusSync, CLSystem
 
 logger = logging.getLogger('send_log')
 
@@ -672,10 +672,16 @@ class PlanSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         equip_no = validated_data.pop('equip_no')
+        last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
+                                                              grouptime=validated_data['grouptime']
+                                                              ).order_by('order_by').last()
+        if last_group_plan:
+            validated_data['order_by'] = last_group_plan.order_by + 1
+        else:
+            validated_data['order_by'] = 1
         validated_data['planid'] = datetime.now().strftime('%Y%m%d%H%M%S')[2:]
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
-        validated_data['order_by'] = 1
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         validated_data['oper'] = self.context['request'].user.username
         try:
@@ -684,6 +690,8 @@ class PlanSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('称量机台{}服务错误！'.format(equip_no))
         except Exception:
             raise
+        ins = CLSystem(equip_no)
+        ins.add_plan(instance.planid)
         return instance
 
     class Meta:
@@ -699,61 +707,23 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         action = validated_data['action']
         equip_no = validated_data['equip_no']
-        if settings.DEBUG:
-            if action == 1:
-                instance.state = '运行'
-                instance.save()
-            elif action == 2:
-                pass
-            elif action == 3:
-                setno = validated_data['setno']
-                actno = instance.actno if instance.actno else 0
-                if not setno:
-                    raise serializers.ValidationError('设定车次不可为空!')
-                if setno <= actno:
-                    raise serializers.ValidationError('设定车次不能小于完成车次!')
-                instance.setno = setno
-                instance.save()
-            elif action == 4:
-                instance.state = '终止'
-                instance.save()
+        ins = CLSystem(equip_no)
+        if action == 1:
+            ins.issue_plan(instance.planid, instance.recipe, instance.setno)
+        elif action == 2:
+            ins.reload_plan(instance.planid, instance.recipe)
+        elif action == 3:
+            setno = validated_data['setno']
+            actno = instance.actno if instance.actno else 0
+            if not setno:
+                raise serializers.ValidationError('设定车次不可为空!')
+            if setno <= actno:
+                raise serializers.ValidationError('设定车次不能小于完成车次!')
+            ins.update_trains(instance.planid, setno)
+        elif action == 4:
+            ins.stop(instance.planid)
         else:
-            ins = INWeighSystem(equip_no)
-            if action == 1:
-                ins.issue_plan({
-                    "plan_no": instance.planid,
-                    "recipe_no": instance.recipe,
-                    "num": instance.setno,
-                    "action": "1"
-                    })
-            elif action == 2:
-                ins.reload_plan(
-                    {
-                        "plan_no": instance.planid,
-                        "action": "1",
-                    }
-                )
-            elif action == 3:
-                setno = validated_data['setno']
-                actno = instance.actno if instance.actno else 0
-                if not setno:
-                    raise serializers.ValidationError('设定车次不可为空!')
-                if setno <= actno:
-                    raise serializers.ValidationError('设定车次不能小于完成车次!')
-                ins.update_trains(
-                    {
-                        "plan_no": instance.planid,
-                        "action": "1",
-                        "num": instance.setno
-                    }
-                )
-            elif action == 4:
-                ins.stop({
-                            "plan_no": instance.planid,
-                            "action": "1"
-                        })
-            else:
-                raise serializers.ValidationError('action参数错误！')
+            raise serializers.ValidationError('action参数错误！')
         return instance
 
     class Meta:
