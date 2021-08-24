@@ -1045,7 +1045,7 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['state__in'] = state.split(',')
         if batch_time:
             filter_kwargs['planid__startswith'] = ''.join(batch_time.split('-'))[2:]
-        queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
+        queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
                 page = self.paginate_queryset(queryset)
