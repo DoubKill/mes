@@ -10,7 +10,7 @@ from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from basics.models import PlanSchedule, GlobalCode
+from basics.models import PlanSchedule, GlobalCode, WorkSchedulePlan
 from inventory.models import MaterialOutHistory
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
@@ -411,7 +411,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError('称量系统计划中配方名称未在mes上找到对应料包名')
         # 配料时间
-        batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).savetime
+        batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).starttime
         # 计算有效期
         single_expire_record = PackageExpire.objects.filter(product_no=product_no)
         if not single_expire_record:
@@ -523,15 +523,10 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
     batch_classes = serializers.ReadOnlyField(source='grouptime')
 
     def get_batch_group(self, obj):
-        work_schedule_plan = PlanSchedule.objects.filter(day_time=obj.date_time, delete_flag=False)\
-            .select_related('work_schedule')\
-            .prefetch_related('work_schedule_plan__classes', 'work_schedule_plan__group')[0].work_schedule_plan
-        for i in work_schedule_plan.values_list('classes', 'group'):
-            classes = GlobalCode.objects.get(id=i[0]).global_name
-            group = obj.grouptime if obj.grouptime != '中班' else (
-                '早班' if '08:00:00' < obj.addtime[-8:] < '20:00:00' else '夜班')
-            if classes == group:
-                return GlobalCode.objects.get(id=i[1]).global_name
+        group = obj.grouptime if obj.grouptime != '中班' else ('早班' if '08:00:00' < obj.addtime[-8:] < '20:00:00' else '夜班')
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=obj.date_time, classes__global_name=group,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        return record.group.global_name
 
     class Meta:
         model = Plan
