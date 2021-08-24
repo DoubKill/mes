@@ -222,3 +222,125 @@ def sync_tank(equip_no):
 
 def delete_plan(equip_no, plan_no):
     Plan.objects.using(equip_no).filter(planid=plan_no).delete()
+
+
+class CLSystem(object):
+    equip_no_ip = {k: v.get("HOST", "10.4.23.79") for k, v in DATABASES.items()}
+
+    def __init__(self, equip_no: str):
+        self.url = f"http://{self.equip_no_ip.get(equip_no, '10.4.23.79')}:9000/xlserver?wsdl"
+
+    def door_info(self, door_1, door_2):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/open_door"}
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+       <soapenv:Header/>
+       <soapenv:Body>
+          <tem:open_door>
+             <!--Optional:-->
+             <tem:开门信号1>{}</tem:开门信号1>
+             <!--Optional:-->
+             <tem:开门信号2>{}</tem:开门信号2>
+          </tem:open_door>
+       </soapenv:Body>
+    </soapenv:Envelope>""".format(door_1, door_2)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        return ret
+
+    def add_plan(self, plan_no):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/plan_add"}
+
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+               <soapenv:Header/>
+               <soapenv:Body>
+                  <tem:plan_add>
+                     <!--Optional:-->
+                     <tem:plan_no>{}</tem:plan_no>
+                     <!--Optional:-->
+                     <tem:action>1</tem:action>
+                  </tem:plan_add>
+               </soapenv:Body>
+            </soapenv:Envelope>""".format(plan_no)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        return ret
+
+    def issue_plan(self, plan_no, recipe_no, num):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/plan_down"}
+
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+               <soapenv:Header/>
+               <soapenv:Body>
+                  <tem:plan_down>
+                     <!--Optional:-->
+                     <tem:plan_no>{}</tem:plan_no>
+                     <!--Optional:-->
+                     <tem:recipe_no>{}</tem:recipe_no>
+                     <!--Optional:-->
+                     <tem:num>{}</tem:num>
+                     <!--Optional:-->
+                     <tem:action>1</tem:action>
+                  </tem:plan_down>
+               </soapenv:Body>
+            </soapenv:Envelope>""".format(plan_no, recipe_no, num)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        return ret
+
+    def reload_plan(self, plan_no, recipe_no):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/reload_plan"}
+
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+               <soapenv:Header/>
+               <soapenv:Body>
+                  <tem:reload_plan>
+                     <!--Optional:-->
+                     <tem:plan_no>{}</tem:plan_no>
+                     <!--Optional:-->
+                     <tem:action>1</tem:action>
+                     <!--Optional:-->
+                     <tem:recipe_no>{}</tem:recipe_no>
+                  </tem:reload_plan>
+               </soapenv:Body>
+            </soapenv:Envelope>""".format(plan_no, recipe_no)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        return ret
+
+    def stop(self, plan_no):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/stop_plan"}
+
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+               <soapenv:Header/>
+               <soapenv:Body>
+                  <tem:stop_plan>
+                     <!--Optional:-->
+                     <tem:plan_no>{}</tem:plan_no>
+                     <!--Optional:-->
+                     <tem:action>1</tem:action>
+                  </tem:stop_plan>
+               </soapenv:Body>
+            </soapenv:Envelope>""".format(plan_no)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        return ret
+
+    def update_trains(self, plan_no, number):
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/update_num"}
+
+        data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+               <soapenv:Header/>
+               <soapenv:Body>
+                  <tem:update_num>
+                     <!--Optional:-->
+                     <tem:plan_no>{}</tem:plan_no>
+                     <!--Optional:-->
+                     <tem:action>1</tem:action>
+                     <!--Optional:-->
+                     <tem:number>{}</tem:number>
+                  </tem:update_num>
+               </soapenv:Body>
+            </soapenv:Envelope>""".format(plan_no, number)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        return ret

@@ -348,18 +348,18 @@ DATABASES = {
             'MARS_Connection': True,
         },
     },
-    # "F03": {  # 细料称3
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'YK_XL',
-    #     'HOST': os.getenv('FO3_IP', '10.10.10.10'),
-    #     'PORT': '1433',
-    #     'USER': 'gz',
-    #     'PASSWORD': '123',
-    #     'OPTIONS': {
-    #         'driver': 'ODBC Driver 17 for SQL Server',
-    #         'MARS_Connection': True,
-    #     },
-    # },
+    "F03": {  # 细料称3
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'YK_XL',
+        'HOST': os.getenv('FO3_IP', '10.10.10.10'),
+        'PORT': '1433',
+        'USER': 'gz',
+        'PASSWORD': '123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+        },
+    },
     "S01": {  # 硫磺称1
         'ENGINE': 'sql_server.pyodbc',
         'NAME': 'YK_XL',
@@ -372,18 +372,18 @@ DATABASES = {
             'MARS_Connection': True,
         },
     },
-    # "S02": {  # 硫磺称2
-    #     'ENGINE': 'sql_server.pyodbc',
-    #     'NAME': 'YK_XL',
-    #     'HOST': os.getenv('SO2_IP', '10.10.10.10'),
-    #     'PORT': '1433',
-    #     'USER': 'gz',
-    #     'PASSWORD': '123',
-    #     'OPTIONS': {
-    #         'driver': 'ODBC Driver 17 for SQL Server',
-    #         'MARS_Connection': True,
-    #     },
-    # },
+    "S02": {  # 硫磺称2
+        'ENGINE': 'sql_server.pyodbc',
+        'NAME': 'YK_XL',
+        'HOST': os.getenv('SO2_IP', '10.10.10.10'),
+        'PORT': '1433',
+        'USER': 'gz',
+        'PASSWORD': '123',
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server',
+            'MARS_Connection': True,
+        },
+    },
 }
 
 
