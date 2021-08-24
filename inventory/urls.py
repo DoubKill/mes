@@ -1,14 +1,14 @@
 # -*- coding: UTF-8 -*-
 """
-auther: 
+auther:
 datetime: 2020/8/28
-name: 
+name:
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
 from . import views
-from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet
+from .terminal_views import TerminalDispatchLogViewSet, TerminalDispatchViewSet, SulfurAutoPlanViewSet
 from .views import *
 
 router = DefaultRouter()
@@ -109,6 +109,9 @@ router.register(r'depot-sulfur-info', DepotSulfurInfoModelViewSet, basename='dep
 
 # 硫磺库出入库履历
 router.register(r'sulfur-resume', SulfurResumeModelViewSet)
+
+# 硫磺PDA出入库
+router.register(r'sulfur-auto-plan', SulfurAutoPlanViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

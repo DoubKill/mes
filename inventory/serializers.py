@@ -1,8 +1,8 @@
 # -*- coding: UTF-8 -*-
 """
-auther: 
+auther:
 datetime: 2020/10/14
-name: 
+name:
 """
 import datetime
 import json
@@ -1462,8 +1462,21 @@ class SulfurResumeModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sulfur
-        fields = ['name', 'product_no', 'provider', 'lot_no' ,'sulfur_status', 'enter_time', 'outer_time',
+        fields = ['name', 'product_no', 'provider', 'lot_no', 'sulfur_status', 'enter_time', 'outer_time',
                   'depot_site', 'depot_name', 'depot_site_name']
+
+
+class SulfurAutoPlanSerializer(serializers.ModelSerializer):
+    lot_no = serializers.CharField(help_text='物料条码', validators=[UniqueValidator(queryset=Sulfur.objects.filter(sulfur_status=1), message='该物料已存在')])
+    product_no = serializers.CharField(read_only=True)
+    weight = serializers.CharField(read_only=True)
+    depot_name = serializers.ReadOnlyField(source='depot_site.depot.depot_name')
+    depot_site_name = serializers.ReadOnlyField(source='depot_site.depot_site_name')
+    state = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Sulfur
+        fields = ['lot_no', 'depot_site', 'state', 'depot_name', 'depot_site_name', 'product_no', 'weight']
 
 
 class MixinRubberyOutBoundOrderSerializer(BaseModelSerializer):
