@@ -10,7 +10,7 @@ from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from basics.models import PlanSchedule, GlobalCode
+from basics.models import PlanSchedule, GlobalCode, WorkSchedulePlan
 from inventory.models import MaterialOutHistory
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
@@ -114,21 +114,20 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
-        # 配方中物料单车需要重量
-        single_material_weight = classes_plan.product_batching.batching_details.filter(
-            material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and \
-                                                                            '细料' not in material_name else \
-            classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False,
-                                                                  name=material_name).first().package_cnt
         attrs['tank_data'] = {'msg': '', 'bra_code': bra_code, 'init_weight': total_weight, 'scan_time': datetime.now(),
                               'useup_time': datetime.strptime('1970-01-01 00:00:00', '%Y-%m-%d %H:%M:%S'), 'unit': unit,
                               'material_no': material_no, 'material_name': material_name, 'real_weight': total_weight,
-                              'scan_material': attrs.pop('scan_material', ''), 'plan_classes_uid': plan_classes_uid,
-                              'single_need': single_material_weight}
+                              'scan_material': attrs.pop('scan_material', ''), 'plan_classes_uid': plan_classes_uid}
         # 判断物料是否在配方中
         if material_name not in classes_plan.product_batching.batching_material_names:
             attrs['status'] = 2
         else:
+            # 配方中物料单车需要重量
+            single_material_weight = classes_plan.product_batching.batching_details.filter(
+                material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and \
+                                                                                '细料' not in material_name else \
+                classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False,
+                                                                      name=material_name).first().package_cnt
             # 获取计划号对应料框信息
             add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970',
                                                                material_name=material_name)
@@ -138,7 +137,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).first()
                 # 料框表中无该条码信息
                 if not pre_material:
-                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight})
+                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight,
+                                               'single_need': single_material_weight})
                     attrs['status'] = 1
                 # 存在该条码信息(其他计划使用过)
                 else:
@@ -146,7 +146,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     if pre_material.adjust_left_weight != 0:
                         attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
                                                    'real_weight': pre_material.real_weight, 'pre_material': pre_material,
-                                                   'adjust_left_weight': pre_material.adjust_left_weight})
+                                                   'adjust_left_weight': pre_material.adjust_left_weight,
+                                                   'single_need': single_material_weight})
                         attrs['status'] = 1
                     # 已用完(异常扫码)
                     else:
@@ -155,7 +156,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:
                 # 扫码物料不在已有物料中
                 if material_name not in add_materials.values_list('material_name', flat=True):
-                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight})
+                    attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight,
+                                               'single_need': single_material_weight})
                     attrs['status'] = 1
                 # 同物料扫码
                 else:
@@ -169,7 +171,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         pre_material = LoadTankMaterialLog.objects.filter(bra_code=bra_code).first()
                         # 料框表中无该条码信息
                         if not pre_material:
-                            attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight})
+                            attrs['tank_data'].update({'actual_weight': 0, 'adjust_left_weight': total_weight,
+                                                       'single_need': single_material_weight})
                             attrs['status'] = 1
                         # 存在该条码信息(其他计划使用过)
                         else:
@@ -178,7 +181,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
                                                            'real_weight': pre_material.real_weight,
                                                            'pre_material': pre_material,
-                                                           'adjust_left_weight': pre_material.adjust_left_weight})
+                                                           'adjust_left_weight': pre_material.adjust_left_weight,
+                                                           'single_need': single_material_weight})
                                 attrs['status'] = 1
                             # 已用完(异常扫码)
                             else:
@@ -407,7 +411,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError('称量系统计划中配方名称未在mes上找到对应料包名')
         # 配料时间
-        batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).savetime
+        batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).starttime
         # 计算有效期
         single_expire_record = PackageExpire.objects.filter(product_no=product_no)
         if not single_expire_record:
@@ -519,13 +523,10 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
     batch_classes = serializers.ReadOnlyField(source='grouptime')
 
     def get_batch_group(self, obj):
-        work_schedule_plan = PlanSchedule.objects.filter(day_time=obj.date_time, delete_flag=False)\
-            .select_related('work_schedule')\
-            .prefetch_related('work_schedule_plan__classes', 'work_schedule_plan__group')[0].work_schedule_plan
-        for i in work_schedule_plan.values_list('classes', 'group'):
-            classes = GlobalCode.objects.get(id=i[0]).global_name
-            if classes == obj.grouptime:
-                return GlobalCode.objects.get(id=i[1]).global_name
+        group = obj.grouptime if obj.grouptime != '中班' else ('早班' if '08:00:00' < obj.addtime[-8:] < '20:00:00' else '夜班')
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=obj.date_time, classes__global_name=group,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        return record.group.global_name
 
     class Meta:
         model = Plan
