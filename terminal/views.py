@@ -422,13 +422,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         if equip_no not in db_config:
             return Response([])
         # mes网页请求
-        # 筛选配料时间为当天的记录
-        report_basic_records = list(ReportBasic.objects.using(equip_no).filter(
-            planid__startswith=''.join(batch_time.split('-'))[2:]).values_list('planid', 'savetime'))
-        if not report_basic_records:
-            return Response([])
-        plan_ids = set([i[0] for i in report_basic_records])
-        plan_filter_kwargs = {'planid__in': plan_ids, 'state__in': ['运行中', '完成']}
+        plan_filter_kwargs = {'date_time': batch_time, 'actno__gte': 1}
         weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
         if product_no:
             weight_filter_kwargs.update({'product_no': product_no})
@@ -450,7 +444,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
-                        actual_batch_time = [j for j in report_basic_records if j[0] == i['plan_weight_uid']][0][1]
+                        actual_batch_time = equip_plan_info.filter(planid=i['plan_weight_uid']).first().starttime
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
                                   'batch_time': actual_batch_time})
                     return self.get_paginated_response(serializer.data)
@@ -479,7 +473,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
-                        actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
+                        actual_batch_time = equip_plan_info.filter(planid=serializer['plan_weight_uid']).first().starttime
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time})
                         data.append(serializer)
@@ -510,7 +504,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
-                        actual_batch_time = [j for j in report_basic_records if j[0] == serializer['plan_weight_uid']][0][1]
+                        actual_batch_time = equip_plan_info.filter(planid=serializer['plan_weight_uid']).first().starttime
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time})
                         data.append(serializer)
@@ -557,7 +551,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
         batch_group = self.request.query_params.get('batch_group')
         same_batch_print = self.get_queryset().filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
-                                                      product_no=plan_obj.recipe) # 删除status='Y'判断
+                                                      product_no=plan_obj.recipe)  # 删除status='Y'判断
         # 同批次第一次打印
         if not same_batch_print:
             data = {'print_begin_trains': 1, 'package_count': '',
@@ -1045,7 +1039,7 @@ class XLPlanVIewSet(ModelViewSet):
             filter_kwargs['state__in'] = state.split(',')
         if batch_time:
             filter_kwargs['planid__startswith'] = ''.join(batch_time.split('-'))[2:]
-        queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('-id')
+        queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
                 page = self.paginate_queryset(queryset)

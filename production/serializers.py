@@ -315,5 +315,5 @@ class PalletFeedbacksBatchModifySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PalletFeedbacks
-        fields = ('id', 'begin_trains', 'end_trains', 'lot_no', 'product_no')
+        fields = ('id', 'begin_trains', 'end_trains', 'lot_no', 'product_no', 'actual_weight')
         extra_kwargs = {'id': {'read_only': False}}
