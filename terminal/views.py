@@ -1036,9 +1036,9 @@ class XLPlanVIewSet(ModelViewSet):
         if recipe:
             filter_kwargs['recipe'] = recipe
         if state:
-            filter_kwargs['state__in'] = state.split(',')
+            filter_kwargs['actno__gte'] = 1
         if batch_time:
-            filter_kwargs['planid__startswith'] = ''.join(batch_time.split('-'))[2:]
+            filter_kwargs['date_time'] = batch_time
         queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
@@ -1050,7 +1050,6 @@ class XLPlanVIewSet(ModelViewSet):
                 raise
             return self.get_paginated_response(serializer.data)
         else:
-            filter_kwargs.pop('date_time')
             new_queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
             serializer = self.get_serializer(new_queryset, many=True)
             return Response(serializer.data)
