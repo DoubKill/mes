@@ -2376,7 +2376,8 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                     mes_result = '三等品'
                     level = 2
 
-                material_test_order_list = MaterialTestOrder.objects.filter(lot_no=test_plan_detail_obj.lot_no)
+                material_test_order_list = MaterialTestOrder.objects.filter(lot_no=test_plan_detail_obj.lot_no,
+                                                                            actual_trains=test_plan_detail_obj.actual_trains)
                 for material_test_order in material_test_order_list:
                     MaterialTestResult.objects.filter(material_test_order=material_test_order,
                                                       data_point_name=data_point).update(value=test_value,
