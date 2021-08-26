@@ -163,7 +163,8 @@ class BatchProductBatchingVIew(APIView):
             })
         # 加载物料标准信息
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970')\
-            .values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight', 'adjust_left_weight')
+            .order_by('id').values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight',
+                                   'adjust_left_weight')
         # 未进料(所有原材料数量均为0);
         if not add_materials:
             list(map(lambda x: x.update({'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'scan_material': '',
