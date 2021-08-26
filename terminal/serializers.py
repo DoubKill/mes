@@ -684,7 +684,6 @@ class PlanSerializer(serializers.ModelSerializer):
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        validated_data['oper'] = self.context['request'].user.username
         try:
             instance = Plan.objects.using(equip_no).create(**validated_data)
         except ConnectionDoesNotExist:
