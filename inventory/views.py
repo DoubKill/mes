@@ -3215,22 +3215,34 @@ class InOutBoundSummaryView(APIView):
                     {'tunnel': '3巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='3').count(),
-                     "out_bound_count": DeliveryPlan.objects.filter(
-                         status=1,
-                         location__startswith='3',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='3'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '4巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='4').count(),
-                     "out_bound_count": DeliveryPlan.objects.filter(
-                         status=1,
-                         location__startswith='4',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='4'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count']
                      },
                 ]
                 # 出库
@@ -3239,80 +3251,124 @@ class InOutBoundSummaryView(APIView):
                     {'tunnel': '1巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='1').count(),
-                     "out_bound_count": DeliveryPlan.objects.filter(
-                         status=1,
-                         location__startswith='1',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='1'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '2巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='2').count(),
-                     "out_bound_count": DeliveryPlan.objects.filter(
-                         status=1,
-                         location__startswith='2',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='2'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2'
+                     ).exclude(Q(material_no__icontains='RE') |
+                               Q(material_no__icontains='FM') |
+                               Q(material_no__icontains='RFM')
+                               ).aggregate(count=Sum('qty'))['count']
                      },
                 ]
             else:
                 ret = []
+            # 混炼胶总入库车数
             total_inbound_count = MixGumInInventoryLog.objects.using('bz').filter(
-                start_time__gte=date_begin_time).count()
-            total_outbound_count = DeliveryPlan.objects.filter(status=1,
-                                                               finish_time__gte=date_begin_time
-                                                               ).count()
+                start_time__gte=date_begin_time).exclude(Q(material_no__icontains='RE') |
+                                                         Q(material_no__icontains='FM') |
+                                                         Q(material_no__icontains='RFM')
+                                                         ).aggregate(count=Sum('qty'))['count']
+            # 混炼胶总出库数量
+            total_outbound_count = MixGumOutInventoryLog.objects.using('bz').filter(
+                start_time__gte=date_begin_time).exclude(Q(material_no__icontains='RE') |
+                                                         Q(material_no__icontains='FM') |
+                                                         Q(material_no__icontains='RFM')
+                                                         ).aggregate(count=Sum('qty'))['count']
+            # 混炼胶总生产车次
+            production_count = TrainsFeedbacks.objects.filter(
+                factory_date=date_now).exclude(
+                Q(product_no__icontains='RE') |
+                Q(product_no__icontains='FM') |
+                Q(product_no__icontains='RFM')).count()
         else:
             ret = [
                     {'tunnel': '1巷',
                      'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='1').count(),
-                     "out_bound_count": DeliveryPlanFinal.objects.filter(
-                         status=1,
-                         location__startswith='1',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='1').aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": FinalGumOutInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time, location__startswith='1').aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '2巷',
                      'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='2').count(),
-                     "out_bound_count": DeliveryPlanFinal.objects.filter(
-                         status=1,
-                         location__startswith='2',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='2').aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": FinalGumOutInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time, location__startswith='2').aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '3巷',
                      'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='3').count(),
-                     "out_bound_count": DeliveryPlanFinal.objects.filter(
-                         status=1,
-                         location__startswith='3',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='3').aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": FinalGumOutInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time, location__startswith='3').aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '4巷',
                      'in_bound_count': FinalGumInInventoryLog.objects.using('lb').filter(
                          start_time__gte=date_begin_time,
-                         location__startswith='4').count(),
-                     "out_bound_count": DeliveryPlanFinal.objects.filter(
-                         status=1,
-                         location__startswith='4',
-                         finish_time__gte=date_begin_time,
-                         station=station).count()
+                         location__startswith='4').aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": FinalGumOutInventoryLog.objects.using('lb').filter(
+                         start_time__gte=date_begin_time, location__startswith='4').aggregate(count=Sum('qty'))['count']
                      },
                 ]
-            total_inbound_count = FinalGumInInventoryLog.objects.using('lb').exclude(
-                location__startswith='5').exclude(location__startswith='6').filter(
-                start_time__gte=date_begin_time).count()
-            total_outbound_count = DeliveryPlanFinal.objects.filter(status=1,
-                                                                    finish_time__gte=date_begin_time).count()
-        production_count = TrainsFeedbacks.objects.filter(factory_date=date_now).count()
+            # 终炼库区终炼胶入库总车数
+            final_inbound_count = FinalGumInInventoryLog.objects.using('lb').filter(
+                start_time__gte=date_begin_time).filter(Q(location__startswith='1') |
+                                                        Q(location__startswith='2') |
+                                                        Q(location__startswith='3') |
+                                                        Q(location__startswith='4')
+                                                        ).aggregate(count=Sum('qty'))['count']
+            # 混炼库区终炼胶入库总车数
+            mixin_inbound_count = MixGumInInventoryLog.objects.using('bz').filter(
+                start_time__gte=date_begin_time).filter(Q(material_no__icontains='RE') |
+                                                        Q(material_no__icontains='FM') |
+                                                        Q(material_no__icontains='RFM')
+                                                        ).aggregate(count=Sum('qty'))['count']
+            # 终炼总入库车数
+            total_inbound_count = final_inbound_count if final_inbound_count else 0 + mixin_inbound_count if mixin_inbound_count else 0
+
+            # 终炼库区终炼胶出库总车数
+            final_outbound_count = FinalGumOutInventoryLog.objects.using('lb').filter(
+                start_time__gte=date_begin_time).filter(Q(location__startswith='1') |
+                                                        Q(location__startswith='2') |
+                                                        Q(location__startswith='3') |
+                                                        Q(location__startswith='4')
+                                                        ).aggregate(count=Sum('qty'))['count']
+            # 混炼库区终炼胶出库总车数
+            mixin_outbound_count = MixGumOutInventoryLog.objects.using('bz').filter(
+                start_time__gte=date_begin_time).filter(Q(material_no__icontains='RE') |
+                                                        Q(material_no__icontains='FM') |
+                                                        Q(material_no__icontains='RFM')
+                                                        ).aggregate(count=Sum('qty'))['count']
+            # 终炼总出库车数
+            total_outbound_count = final_outbound_count if final_outbound_count else 0 + mixin_outbound_count if mixin_outbound_count else 0
+            # 终炼总车次
+            production_count = TrainsFeedbacks.objects.filter(
+                factory_date=date_now).filter(
+                Q(product_no__icontains='RE') |
+                Q(product_no__icontains='FM') |
+                Q(product_no__icontains='RFM')).count()
         return Response({"data": ret,
                          "total_inbound_count": total_inbound_count,
                          "total_outbound_count": total_outbound_count,
