@@ -17,7 +17,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ERPMESMaterialRelation, WeighCntType
+from recipe.models import ERPMESMaterialRelation, WeighCntType, ProductBatching
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial
@@ -83,6 +83,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
+        # 获取配方信息
+        product_batch_info = ProductBatching.objects.filter(id=classes_plan.product_batching_id).first()
+        material_name_weight = product_batch_info.get_product_batch
+        if not material_name_weight:
+            raise serializers.ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
+        detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
+        materials = detail_infos.keys()
         if wms_stock:
             attrs['scan_material'] = wms_stock[0].get('material_name')
             material_name_set = set(ERPMESMaterialRelation.objects.filter(
@@ -91,7 +98,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             ).values_list('material__material_name', flat=True))
             if not material_name_set:
                 raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
-            comm_material = list(material_name_set & classes_plan.product_batching.batching_material_names)
+            comm_material = list(material_name_set & materials)
             if comm_material:
                 material_name = comm_material[0]
                 material_no = comm_material[0]
@@ -119,15 +126,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                               'material_no': material_no, 'material_name': material_name, 'real_weight': total_weight,
                               'scan_material': attrs.pop('scan_material', ''), 'plan_classes_uid': plan_classes_uid}
         # 判断物料是否在配方中
-        if material_name not in classes_plan.product_batching.batching_material_names:
+        if material_name not in materials:
             attrs['status'] = 2
         else:
             # 配方中物料单车需要重量
-            single_material_weight = classes_plan.product_batching.batching_details.filter(
-                material__material_name=material_name).first().actual_weight if '硫磺' not in material_name and \
-                                                                                '细料' not in material_name else \
-                classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False,
-                                                                      name=material_name).first().package_cnt
+            single_material_weight = detail_infos[material_name]
             # 获取计划号对应料框信息
             add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970',
                                                                material_name=material_name)
@@ -193,7 +196,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         except Exception as e:
             logger.error('群控服务器错误！')
             raise serializers.ValidationError(e.args[0])
-        if material_name not in classes_plan.product_batching.batching_material_names:
+        if material_name not in materials:
             raise serializers.ValidationError('条码错误，该物料不在生产配方中！')
         msg = attrs['tank_data'].pop('msg')
         if msg:
