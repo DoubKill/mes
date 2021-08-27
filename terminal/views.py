@@ -24,7 +24,7 @@ from mes.derorators import api_recorder
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ProductBatchingDetail, ZCMaterial
+from recipe.models import ProductBatchingDetail, ZCMaterial, ProductBatching
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
@@ -151,16 +151,11 @@ class BatchProductBatchingVIew(APIView):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             raise ValidationError('该计划不存在')
-        ret = list(ProductBatchingDetail.objects.filter(
-            product_batching=classes_plan.product_batching,
-            delete_flag=False,
-            type=1
-        ).values('material__material_name', 'actual_weight'))
-        for weight_cnt_type in classes_plan.product_batching.weight_cnt_types.filter(delete_flag=False):
-            ret.append({
-                'material__material_name': weight_cnt_type.name,
-                'actual_weight': weight_cnt_type.package_cnt
-            })
+        product_batch_info = ProductBatching.objects.filter(id=classes_plan.product_batching_id).first()
+        # 配方信息
+        ret = product_batch_info.get_product_batch
+        if not ret:
+            return Response({'msg': f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}'})
         # 加载物料标准信息
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970')\
             .order_by('id').values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight',
