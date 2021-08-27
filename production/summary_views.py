@@ -565,7 +565,7 @@ class IndexProductionAnalyze(APIView):
                 select
                        ps.day_time,
                        (CASE
-                        WHEN gc.global_name='FM' THEN '加硫'
+                        WHEN gc.global_name in ('FM','RE','RFM') THEN '加硫'
                         ELSE '无硫' END) as stage_name,
                        sum(pcp.plan_trains) as plan_trains
                 from
@@ -590,7 +590,7 @@ class IndexProductionAnalyze(APIView):
                 select
                        tf.factory_date,
                        (CASE
-                        WHEN gc.GLOBAL_NAME='FM' THEN '加硫'
+                        WHEN gc.GLOBAL_NAME in ('FM','RE','RFM') THEN '加硫'
                         ELSE '无硫' END) as stage_name,
                        count(tf.id) as actual_trains
                 from
