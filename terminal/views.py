@@ -155,7 +155,7 @@ class BatchProductBatchingVIew(APIView):
         # 配方信息
         ret = product_batch_info.get_product_batch
         if not ret:
-            return Response({'msg': f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}'})
+            return ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         # 加载物料标准信息
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970')\
             .order_by('id').values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight',
