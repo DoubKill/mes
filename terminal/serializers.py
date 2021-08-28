@@ -218,7 +218,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         instance = LoadTankMaterialLog.objects.create(**tank_data)
         # 判断补充进料后是否能进上辅机
         fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
-        if fml.add_feed_result == 1:
+        if fml and fml.add_feed_result == 1:
             # 请求进料判断接口
             try:
                 resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5,
