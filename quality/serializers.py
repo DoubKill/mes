@@ -1056,16 +1056,23 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
                                                      product_no=instance.product_no).first()
         test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
+        if not plan:
+            classes = pallet_data.classes
+            group = ''
+        else:
+            classes = plan.work_schedule_plan.classes.global_name
+            group = plan.work_schedule_plan.group.global_name
         ret['day_time'] = str(instance.factory_date)
         # ret['product_no'] = pallet_data.product_no
         # ret['equip_no'] = pallet_data.equip_no
         ret['residual_weight'] = None
         ret['actual_weight'] = pallet_data.actual_weight
-        ret['classes_group'] = instance.classes + '/' + test_order_data.production_group
+        ret['classes_group'] = classes + '/' + group  # 班次班组
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date,
-                       'test_class': test_order_data.production_class,
+                       'test_class': classes,
                        'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
         if pallet_data.begin_trains and pallet_data.end_trains:
             trains = [str(x) for x in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]
