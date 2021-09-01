@@ -1806,6 +1806,7 @@ class UnqualifiedPalletFeedBackSerializer(serializers.ModelSerializer):
             'material_test_order', 'test_indicator_name', 'data_point_name'
         ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
         return MaterialTestResult.objects.filter(
+            level__gt=1,
             id__in=last_result_ids).values(
             'data_point_name').annotate(min_value=Min('value'),
                                         max_value=Max('value')
