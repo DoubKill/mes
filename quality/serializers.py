@@ -346,7 +346,10 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
         c_deal_suggestion = validated_data.get('c_deal_suggestion', '')
         if '同意' in c_deal_suggestion:
             for detail in instance.deal_details.filter(is_release=True):
-                MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS', deal_suggestion=detail.suggestion)
+                MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
+                                                                               deal_suggestion=detail.suggestion,
+                                                                               deal_time=datetime.now(),
+                                                                               deal_user=self.context['request'].user.username)
         return instance
 
     class Meta:
