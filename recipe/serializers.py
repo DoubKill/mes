@@ -433,12 +433,12 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.check_time = datetime.now()
             elif instance.used_type == 3:  # 启用
                 # 废弃旧版本
-                ProductBatching.objects.filter(used_type=4,
-                                               site=instance.site,
-                                               product_info=instance.product_info,
-                                               factory=instance.factory,
-                                               stage=instance.stage
-                                               ).update(used_type=6, used_time=datetime.now())
+                # ProductBatching.objects.filter(used_type=4,
+                #                                site=instance.site,
+                #                                product_info=instance.product_info,
+                #                                factory=instance.factory,
+                #                                stage=instance.stage
+                #                                ).update(used_type=6, used_time=datetime.now())
                 instance.used_type = 4
                 instance.used_user = self.context['request'].user
                 instance.used_time = datetime.now()
@@ -452,10 +452,10 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                         if ProductClassesPlan.objects.exclude(status='完成').filter(product_batching=instance,
                                                                                   delete_flag=False).exists():
                             raise serializers.ValidationError('该配方有关联尚未完成的计划，无法废弃！')
-                        try:
-                            ProductObsoleteInterface(instance=instance).request()
-                        except Exception as e:
-                            sync_logger.error(e)
+                        # try:
+                        #     ProductObsoleteInterface(instance=instance).request()
+                        # except Exception as e:
+                        #     sync_logger.error(e)
                 instance.obsolete_user = self.context['request'].user
                 instance.used_type = 6
                 instance.obsolete_time = datetime.now()
