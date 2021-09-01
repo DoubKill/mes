@@ -1,4 +1,6 @@
 import os
+import time
+
 import django
 
 
@@ -31,12 +33,11 @@ def send_bz():
         if bz_obj:
             try:
                 # 4、update_store_test_flag这个字段用choise 1对应成功 2对应失败 3对应库存线边库都没有
-                msg_ids = order_no()
-                mto_obj = MaterialTestOrder.objects.filter(lot_no=mdr_obj.lot_no).first()
+                msg_ids = ''.join(str(time.time()).split('.'))
                 item = []
                 item_dict = {"WORKID": str(int(msg_ids) + 1),
-                             "MID": mto_obj.product_no,
-                             "PICI": str(pfb_obj.plan_classes_uid),
+                             "MID": pfb_obj.product_no,
+                             "PICI": str(bz_obj.bill_id),
                              "RFID": pfb_obj.pallet_no,
                              "DJJG": mdr_obj.deal_result,
                              "SENDDATE": datetime.datetime.now().strftime('%Y%m%d %H:%M:%S')}
