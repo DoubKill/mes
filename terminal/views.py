@@ -23,7 +23,7 @@ from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response
 from mes.derorators import api_recorder
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
-from production.models import PalletFeedbacks
+from production.models import PalletFeedbacks, PlanStatus
 from recipe.models import ProductBatchingDetail, ZCMaterial, ProductBatching
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
@@ -110,17 +110,21 @@ class BatchProductionInfoView(APIView):
                 actual_trains = last_feed_log.trains
             else:
                 actual_trains = 0
+            # 任务状态
+            plan_status_info = PlanStatus.objects.using("SFJ").filter(
+                plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
+            plan_status = plan_status_info.status if plan_status_info else plan.status
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
                     'plan_trains': plan.plan_trains,
                     'actual_trains': actual_trains,
                     'plan_classes_uid': plan.plan_classes_uid,
-                    'status': plan.status,
+                    'status': plan_status,
                     'classes': plan.work_schedule_plan.classes.global_name
                 }
             )
-            if plan.status == '运行中':
+            if plan_status == '运行中':
                 max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
                     feed_log__plan_classes_uid=plan.plan_classes_uid).aggregate(
                     max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
@@ -155,7 +159,7 @@ class BatchProductBatchingVIew(APIView):
         # 配方信息
         ret = product_batch_info.get_product_batch
         if not ret:
-            return Response({'msg': f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}'})
+            raise ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         # 加载物料标准信息
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970')\
             .order_by('id').values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight',
@@ -194,6 +198,8 @@ class BatchProductBatchingVIew(APIView):
             # 判断物料是否够一车
             left = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name) \
                 .aggregate(left_weight=Sum('real_weight'))['left_weight']
+            if not left:
+                left = 0
             if left < plan_weight:
                 single_material.update(
                     {'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
