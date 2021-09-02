@@ -401,6 +401,7 @@ class UnqualifiedDealOrder(AbstractEntity):
     t_deal_date = models.DateField(help_text='技术日期', blank=True, null=True)
     c_deal_user = models.CharField(max_length=64, help_text='检查部门处理人', blank=True, null=True)
     c_deal_date = models.DateField(help_text='检查日期', blank=True, null=True)
+    c_agreed = models.NullBooleanField(help_text='检查科是否同意', default=None)
     desc = models.TextField(help_text='备注', blank=True, null=True)
     deal_method = models.CharField(max_length=64, help_text='处理方式', null=True)
 

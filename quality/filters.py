@@ -95,7 +95,7 @@ class UnqualifiedDealOrderFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = UnqualifiedDealOrder
-        fields = ('st', 'et', 'department', 'status', 'unqualified_deal_order_uid')
+        fields = ('st', 'et', 'department', 'status', 'unqualified_deal_order_uid', 'c_agreed')
 
 
 """新原材料快检"""

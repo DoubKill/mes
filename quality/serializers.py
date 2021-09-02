@@ -335,21 +335,48 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         tech_deal_result = validated_data.pop('tech_deal_result', {})
+        c_agreed = validated_data.get('c_agreed')
+
         for key, value in dict(validated_data).items():
             if not value:
                 validated_data.pop(key)
-        UnqualifiedDealOrder.objects.filter(id=instance.id).update(**validated_data)
-        for item in tech_deal_result:
-            deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
-            deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
 
-        c_deal_suggestion = validated_data.get('c_deal_suggestion', '')
-        if '同意' in c_deal_suggestion:
-            for detail in instance.deal_details.filter(is_release=True):
-                MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
-                                                                               deal_suggestion=detail.suggestion,
-                                                                               deal_time=datetime.now(),
-                                                                               deal_user=self.context['request'].user.username)
+        # 技术科处理
+        if tech_deal_result:
+            validated_data['c_deal_suggestion'] = None
+            validated_data['c_deal_user'] = None
+            validated_data['c_deal_date'] = None
+            validated_data['c_agreed'] = None
+            for detail in instance.deal_details.all():
+                MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
+                                                                               deal_suggestion='不合格',
+                                                                               deal_time=None,
+                                                                               deal_user=None)
+        if tech_deal_result:
+            for item in tech_deal_result:
+                deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
+                deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
+
+        UnqualifiedDealOrder.objects.filter(id=instance.id).update(**validated_data)
+
+        # 检查科处理
+        if c_agreed is not None:
+            if c_agreed:
+                # 同意
+                for detail in instance.deal_details.filter(is_release=True):
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
+                                                                                   deal_suggestion=detail.suggestion,
+                                                                                   deal_time=datetime.now(),
+                                                                                   deal_user=self.context['request'].
+                                                                                   user.username)
+            else:
+                # 不同意
+                for detail in instance.deal_details.filter(is_release=True):
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
+                                                                                   deal_suggestion='不合格',
+                                                                                   deal_time=datetime.now(),
+                                                                                   deal_user=self.context['request'].
+                                                                                   user.username)
         return instance
 
     class Meta:
