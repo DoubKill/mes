@@ -85,7 +85,7 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
 
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('last'):
-            queryset = self.get_queryset().filter(sulfur_status=1).last()
+            queryset = self.get_queryset().last()
             serializer = self.get_serializer(queryset)
             message = None
         else:
