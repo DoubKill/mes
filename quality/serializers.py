@@ -338,7 +338,7 @@ class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
         c_agreed = validated_data.get('c_agreed')
 
         for key, value in dict(validated_data).items():
-            if not value:
+            if value is None or value == '':
                 validated_data.pop(key)
 
         # 技术科处理
@@ -556,7 +556,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret = super().to_representation(instance)
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
                                                      product_no=instance.product_no).first()
-        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
@@ -579,7 +579,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                        'test_factory_date': last_test_result.test_factory_date.strftime('%Y-%m-%d %H:%M:%S'),
                        'test_class': classes,
                        'pallet_no': pallet_data.pallet_no,
-                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+                       'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
         product_time = instance.production_factory_date
         material_detail = MaterialAttribute.objects.filter(material__material_no=pallet_data.product_no).first()
         if material_detail:
@@ -1184,7 +1184,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
                                                      product_no=instance.product_no).first()
-        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
@@ -1203,7 +1203,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date,
                        'test_class': classes,
-                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+                       'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
         if pallet_data.begin_trains and pallet_data.end_trains:
             trains = [str(x) for x in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]
             trains = ",".join(trains)

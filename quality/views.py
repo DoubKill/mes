@@ -583,9 +583,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             raise ValidationError('数据格式错误！')
         for lot_no in lot_no_list:
             data = receive_deal_result(lot_no)
-            data = json.loads(data)
-            data['test']['test_user'] = self.request.user.username
-            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=json.dumps(data))
+            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=data)
         return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
@@ -1166,6 +1164,7 @@ class TestDataPointCurveView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
     """快检数据导入，一次只能导入同一批生产数据"""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         """快检数据导入模板"""
@@ -1297,7 +1296,8 @@ class ImportAndExportView(APIView):
                                'mes_result': '三等品',
                                'result': '三等品',
                                'level': 2,
-                               'is_judged': is_judged
+                               'is_judged': is_judged,
+                               'created_user': self.request.user
                                }
                 if method.get('qualified_range'):
                     if method['qualified_range'][0] <= point_value <= method['qualified_range'][1]:
@@ -1875,6 +1875,7 @@ class ProductTestPlanViewSet(ModelViewSet):
     """门尼检测计划"""
     queryset = ProductTestPlan.objects.all()
     serializer_class = ProductTestPlanSerializer
+    permission_classes = (IsAuthenticated, )
 
     def list(self, request, *args, **kwargs):
         if request.query_params.get('close'):
@@ -1945,8 +1946,13 @@ class ProductTestPlanViewSet(ModelViewSet):
                                                                 product_test_plan_detail__actual_trains=item['actual_trains'])) + 1
         data.pop('test_times', None)
         product_plan = ProductTestPlan.objects.create(
-            **data, test_time=datetime.datetime.now(), status=1,
-                                                      plan_uid=plan_uid, test_user=test_user, test_times=test_times)
+            **data,
+            test_time=datetime.datetime.now(),
+            status=1,
+            plan_uid=plan_uid,
+            test_user=test_user,
+            created_user=self.request.user,
+            test_times=test_times)
         # 添加检测计划详情
         for item in product_list:
             production_classes = item['classes']
@@ -2210,7 +2216,9 @@ class ReportValueView(APIView):
                             test_group=group,
                             level=level,
                             test_class=production_class,
-                            is_judged=material_test_method.is_judged)
+                            is_judged=material_test_method.is_judged,
+                            created_user=equip_test_plan.created_user
+                        )
                     # else:
                     #     # 已经检测过的情况
                     #     MaterialTestResult.objects.filter(material_test_order=test_order).update(value=test_value)
