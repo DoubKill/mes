@@ -1467,7 +1467,7 @@ class SulfurResumeModelSerializer(serializers.ModelSerializer):
 
 
 class SulfurAutoPlanSerializer(serializers.ModelSerializer):
-    lot_no = serializers.CharField(help_text='物料条码', validators=[UniqueValidator(queryset=Sulfur.objects.filter(sulfur_status=1), message='该物料已存在')])
+    lot_no = serializers.CharField(help_text='物料条码')
     product_no = serializers.CharField(read_only=True)
     weight = serializers.CharField(read_only=True)
     depot_name = serializers.ReadOnlyField(source='depot_site.depot.depot_name')
