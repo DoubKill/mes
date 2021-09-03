@@ -60,7 +60,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
     MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
-    ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer
+    ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer,\
+    UnqualifiedPalletFeedBackSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -78,6 +79,22 @@ class TestIndicatorViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         data = self.queryset.values('id', 'name')
         return Response(data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DataPointListView(APIView):
+    """数据点列表"""
+
+    def get(self, request):
+        ret = []
+        indicator_names = {'门尼': 1, '硬度': 2, '比重': 3, '流变': 4, '钢拔': 5, '物性': 6}
+        for indicator_name in indicator_names:
+            data_points = DataPoint.objects.filter(
+                test_type__test_indicator__name=indicator_name).order_by('name').values_list('name', flat=True)
+            for data_point in data_points:
+                if data_point not in ret:
+                    ret.append(data_point)
+        return Response(ret)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -154,7 +171,7 @@ class TestIndicatorDataPointListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         ret = []
-        test_indicators_names = ['门尼', '比重', '硬度', '流变', '钢拔']
+        test_indicators_names = ['门尼', '比重', '硬度', '流变', '钢拔', '物性']
         for name in test_indicators_names:
             test_indicator = TestIndicator.objects.filter(name__icontains=name).first()
             if test_indicator:
@@ -566,9 +583,7 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             raise ValidationError('数据格式错误！')
         for lot_no in lot_no_list:
             data = receive_deal_result(lot_no)
-            data = json.loads(data)
-            data['test']['test_user'] = self.request.user.username
-            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=json.dumps(data))
+            LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=data)
         return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
@@ -1067,125 +1082,28 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
     filter_class = UnqualifiedDealOrderFilter
 
     def get_queryset(self):
-        queryset = self.queryset
-        reason = self.request.query_params.get('reason')
-        t_deal_suggestion = self.request.query_params.get('t_deal_suggestion')
-        c_deal_suggestion = self.request.query_params.get('c_deal_suggestion')
-        if reason == 'true':  # 未处理
-            queryset = queryset.filter(reason__isnull=True)
-        elif reason == 'false':  # 已处理
-            queryset = queryset.filter(reason__isnull=False)
-        if t_deal_suggestion == 'true':  # 未处理
-            queryset = queryset.filter(t_deal_suggestion__isnull=True)
-        elif t_deal_suggestion == 'false':  # 已处理
-            queryset = queryset.filter(t_deal_suggestion__isnull=False)
-        if c_deal_suggestion == 'true':  # 未处理
-            queryset = queryset.filter(c_deal_suggestion__isnull=True)
-        elif c_deal_suggestion == 'false':  # 已处理
-            queryset = queryset.filter(c_deal_suggestion__isnull=False)
+        queryset = UnqualifiedDealOrder.objects.all()
+        t_deal = self.request.query_params.get('t_solved')
+        c_deal = self.request.query_params.get('c_solved')
+        if t_deal == 'Y':  # 技术部门已处理
+            queryset = queryset.filter(t_deal_user__isnull=False)
+        elif t_deal == 'N':  # 技术部门未处理
+            queryset = queryset.filter(t_deal_user__isnull=True)
+        if c_deal == 'Y':  # 检查部门已处理
+            queryset = queryset.filter(c_deal_user__isnull=False)
+        elif c_deal == 'N':  # 检查部门未处理
+            queryset = queryset.filter(c_deal_user__isnull=True)
         return queryset
 
     def get_serializer_class(self):
         if self.action == 'create':
             return UnqualifiedDealOrderCreateSerializer
-        if self.action in ('update', 'partial_update'):
+        elif self.action == 'retrieve':
+            return UnqualifiedDealOrderCreateSerializer
+        elif self.action in ('update', 'partial_update'):
             return UnqualifiedDealOrderUpdateSerializer
         else:
             return UnqualifiedDealOrderSerializer
-
-    def retrieve(self, request, *args, **kwargs):
-        if settings.DATABASES['default']['ENGINE'] == 'django.db.backends.oracle':
-            engine = 1
-        else:
-            engine = 2
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        serializer_data = serializer.data
-        order_ids = instance.deal_details.values_list('material_test_order_id', flat=True)
-        create_data = datetime.datetime.strftime(instance.created_date, '%Y-%m-%d %H:%M:%S')
-        if engine == 2:
-            sql = """
-                select
-                       mto.production_factory_date,
-                       mto.production_class,
-                       mto.production_equip_no,
-                       mto.product_no,
-                       mto.actual_trains,
-                       mtr.test_indicator_name,
-                       mtr.data_point_name,
-                       mtr.value,
-                       mtr.material_test_order_id
-                from material_test_result mtr
-                inner join (select
-                       material_test_order_id,
-                       test_indicator_name,
-                       data_point_name,
-                        max(test_times) max_times
-                    from material_test_result
-                    where created_date<='{}'
-                    group by test_indicator_name, data_point_name, material_test_order_id
-                    ) tmp on tmp.material_test_order_id=mtr.material_test_order_id
-                                 and tmp.data_point_name=mtr.data_point_name
-                                 and tmp.test_indicator_name=mtr.test_indicator_name
-                                 and tmp.max_times=mtr.test_times
-                inner join material_test_order mto on mtr.material_test_order_id = mto.id
-                where mtr.level>1 and mto.id in ({});
-                """.format(create_data, ','.join([str(i) for i in order_ids]))
-        else:
-            sql = """
-            select
-                   mto.PRODUCTION_FACTORY_DATE,
-                   mto.PRODUCTION_CLASS,
-                   mto.PRODUCTION_EQUIP_NO,
-                   mto.PRODUCT_NO,
-                   mto.ACTUAL_TRAINS,
-                   mtr.TEST_INDICATOR_NAME,
-                   mtr.DATA_POINT_NAME,
-                   mtr.VALUE
-            from MATERIAL_TEST_RESULT mtr
-            inner join (
-                select
-                    MATERIAL_TEST_ORDER_ID,
-                    TEST_INDICATOR_NAME,
-                    DATA_POINT_NAME,
-                    max(TEST_TIMES) as max_times
-                from
-                     MATERIAL_TEST_RESULT
-                where to_char(CREATED_DATE, 'yyyy-mm-dd HH24:mi:ss')<='{}'
-                group by TEST_INDICATOR_NAME, DATA_POINT_NAME, MATERIAL_TEST_ORDER_ID
-                ) tmp on tmp.MATERIAL_TEST_ORDER_ID=mtr.MATERIAL_TEST_ORDER_ID
-                             and tmp.DATA_POINT_NAME=mtr.DATA_POINT_NAME
-                             and tmp.TEST_INDICATOR_NAME=mtr.TEST_INDICATOR_NAME
-                             and tmp.max_times=mtr.TEST_TIMES
-            inner join MATERIAL_TEST_ORDER mto on mtr.MATERIAL_TEST_ORDER_ID = mto.ID
-            where mtr."LEVEL">1 and mto.ID in ({});""".format(create_data, ','.join([str(i) for i in order_ids]))
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        data = cursor.fetchall()
-        ret = {}
-        form_head_data = set()
-        for item in data:
-            item_key = datetime.datetime.strftime(item[0], '%Y-%m-%d') + '-' + item[1] + '-' + item[2] + '-' + item[3]
-            data_point_key = item[6] if item[5] == '流变' else item[5]
-            form_head_data.add(data_point_key)
-            if item_key not in ret:
-                ret[item_key] = {
-                    'date': datetime.datetime.strftime(item[0], '%Y-%m-%d'),
-                    'classes': item[1],
-                    'equip_no': item[2],
-                    'product_no': item[3],
-                    'actual_trains': {item[4]},
-                    'indicator_data': {data_point_key: [item[7]]},
-                }
-            else:
-                ret[item_key]['actual_trains'].add(item[4])
-                if data_point_key not in ret[item_key]['indicator_data']:
-                    ret[item_key]['indicator_data'][data_point_key] = [item[7]]
-                else:
-                    ret[item_key]['indicator_data'][data_point_key].append(item[7])
-        serializer_data['form_head_data'] = form_head_data
-        serializer_data['deal_details'] = ret.values()
-        return Response(serializer_data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1246,6 +1164,7 @@ class TestDataPointCurveView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class ImportAndExportView(APIView):
     """快检数据导入，一次只能导入同一批生产数据"""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         """快检数据导入模板"""
@@ -1377,7 +1296,8 @@ class ImportAndExportView(APIView):
                                'mes_result': '三等品',
                                'result': '三等品',
                                'level': 2,
-                               'is_judged': is_judged
+                               'is_judged': is_judged,
+                               'created_user': self.request.user
                                }
                 if method.get('qualified_range'):
                     if method['qualified_range'][0] <= point_value <= method['qualified_range'][1]:
@@ -1955,6 +1875,7 @@ class ProductTestPlanViewSet(ModelViewSet):
     """门尼检测计划"""
     queryset = ProductTestPlan.objects.all()
     serializer_class = ProductTestPlanSerializer
+    permission_classes = (IsAuthenticated, )
 
     def list(self, request, *args, **kwargs):
         if request.query_params.get('close'):
@@ -2025,8 +1946,13 @@ class ProductTestPlanViewSet(ModelViewSet):
                                                                 product_test_plan_detail__actual_trains=item['actual_trains'])) + 1
         data.pop('test_times', None)
         product_plan = ProductTestPlan.objects.create(
-            **data, test_time=datetime.datetime.now(), status=1,
-                                                      plan_uid=plan_uid, test_user=test_user, test_times=test_times)
+            **data,
+            test_time=datetime.datetime.now(),
+            status=1,
+            plan_uid=plan_uid,
+            test_user=test_user,
+            created_user=self.request.user,
+            test_times=test_times)
         # 添加检测计划详情
         for item in product_list:
             production_classes = item['classes']
@@ -2290,7 +2216,9 @@ class ReportValueView(APIView):
                             test_group=group,
                             level=level,
                             test_class=production_class,
-                            is_judged=material_test_method.is_judged)
+                            is_judged=material_test_method.is_judged,
+                            created_user=equip_test_plan.created_user
+                        )
                     # else:
                     #     # 已经检测过的情况
                     #     MaterialTestResult.objects.filter(material_test_order=test_order).update(value=test_value)
@@ -2385,3 +2313,13 @@ class RubberMaxStretchTestResultViewSet(GenericViewSet, mixins.ListModelMixin, m
                                                                                                       mes_result=mes_result,
                                                                                                       level=level)
             return Response('ok')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class UnqualifiedPalletFeedBackListView(ListAPIView):
+    """不合格收皮数据列表"""
+    queryset = MaterialDealResult.objects.filter(test_result='三等品').order_by('factory_date', 'classes', 'equip_no', 'product_no')
+    serializer_class = UnqualifiedPalletFeedBackSerializer
+    permission_classes = (IsAuthenticated, )
+    filter_backends = (DjangoFilterBackend, )
+    filter_fields = ('product_no', 'factory_date', 'classes', 'equip_no', 'is_deal')
