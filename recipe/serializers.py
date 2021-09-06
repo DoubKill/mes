@@ -183,9 +183,9 @@ class WeighCntTypeCreateSerializer(serializers.ModelSerializer):
 
 class ProductBatchingCreateSerializer(BaseModelSerializer):
     batching_details = ProductBatchingDetailSerializer(many=True, required=False,
-                                                       help_text="""
-                                                           [{"sn": 序号, "material":原材料id, 
-                                                           "actual_weight":重量, "standard_error":误差值}]""")
+                                                       help_text="""[{"sn": 序号, "material":原材料id, 
+                                                       "type":"1:密炼机投料口,2:炭黑粉料罐,3:油料罐","actual_weight":重量, 
+                                                       "standard_error":误差值}]""")
     weight_cnt_types = WeighCntTypeCreateSerializer(many=True, required=False, help_text="""
     [
         {
@@ -227,12 +227,12 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         if batching_details:
             batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
-                material = detail.get('material')
+                # material = detail.get('material')
                 detail.pop('id', None)
-                if material.material_type.global_name == '炭黑':
-                    detail['type'] = 2
-                elif material.material_type.global_name == '油料':
-                    detail['type'] = 3
+                # if material.material_type.global_name == '炭黑':
+                #     detail['type'] = 2
+                # elif material.material_type.global_name == '油料':
+                #     detail['type'] = 3
                 detail['product_batching'] = instance
                 batching_detail_list[i] = ProductBatchingDetail(**detail)
             ProductBatchingDetail.objects.bulk_create(batching_detail_list)
@@ -360,11 +360,11 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
         if batching_details is not None:
             for detail in batching_details:
                 batching_detail_id = detail.pop('id', None)
-                material = detail.get('material')
-                if material.material_type.global_name == '炭黑':
-                    detail['type'] = 2
-                elif material.material_type.global_name == '油料':
-                    detail['type'] = 3
+                # material = detail.get('material')
+                # if material.material_type.global_name == '炭黑':
+                #     detail['type'] = 2
+                # elif material.material_type.global_name == '油料':
+                #     detail['type'] = 3
                 if batching_detail_id:
                     # 更新
                     batching_detail_instance = ProductBatchingDetail.objects.filter(id=batching_detail_id).first()
