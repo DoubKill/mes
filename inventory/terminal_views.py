@@ -83,21 +83,30 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('lot_no',)
 
+    def results(self, success, message=None, data=None):
+        return Response({
+            'success': success,
+            'message': message,
+            'data': data
+        })
     def list(self, request, *args, **kwargs):
         if self.request.query_params.get('last'):
-            queryset = self.get_queryset().filter(sulfur_status=1).last()
-            serializer = self.get_serializer(queryset)
-            message = None
+            queryset = self.get_queryset().last()
+            if queryset == None:
+                return self.results(False)
+            else:
+                serializer = self.get_serializer(queryset)
+                return self.results(True, None, data=serializer.data)
         else:
             queryset = self.filter_queryset(self.get_queryset())
-            queryset.update(sulfur_status=2)
-            serializer = self.get_serializer(queryset, many=True)
-            message = '出库成功'
-        return Response({
-            'success': True,
-            'message': message,
-            'data': serializer.data
-        })
+            if queryset:
+                queryset.update(sulfur_status=2)
+                serializer = self.get_serializer(queryset, many=True)
+                message = '出库成功'
+                return self.results(True, message, serializer.data)
+            else:
+                message = '该条码不存在'
+                return self.results(False, message, None)
 
     def create(self, request, *args, **kwargs):
         serializer = self.serializer_class(data=request.data)
@@ -105,19 +114,19 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
 
             tmh = serializer.validated_data.get('lot_no')
             if not tmh:
-                raise ValidationError('请输入条码号')  # BHZ12105311651140001
+                return self.results(False, '请输入条码号')  # # BHZ12105311651140001
             url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
             try:
                 client = Client(url)
                 json_data = {"tofac": "AJ1", "tmh": tmh}
                 data = client.service.FindZcdtmList(json.dumps(json_data))
             except Exception:
-                raise ValidationError('网络异常！')
+                return self.results(False, '网络异常')
             data = json.loads(data)
-            ret = data.get('Table')[0]
-
-            if not ret:
-                raise ValidationError('未找到该条码对应物料信息！')
+            try:
+                ret = data.get('Table')[0]
+            except:
+                return self.results(False, '未找到该条码对应物料信息！')
             depot_site = serializer.validated_data.get('depot_site')
             enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             state = serializer.validated_data.get('state')
@@ -128,25 +137,16 @@ class SulfurAutoPlanViewSet(GenericViewSet, ListModelMixin, CreateModelMixin):
                 ZL = ret['ZL']  # 重量
                 SL = ret['SL']  # 数量
             except:
-                raise ValidationError('原材料数据有误')
+                return self.results(False, '原材料数据有误！')
 
             if state:
+                queryset = Sulfur.objects.filter(sulfur_status=1, lot_no=tmh)
+                if queryset:
+                    return self.results(False, '请勿重复入库')
                 Sulfur.objects.create(name=name, product_no=name, provider=provider, lot_no=tmh, num=SL, weight=ZL,
                                       depot_site=depot_site, enter_time=enter_time, sulfur_status=1)
-                return Response({
-                    'success': True,
-                    'message': '入库成功',
-                    'data': {
-                        'lot_no': tmh,
-                        'weight': ZL,
-                        'product_no': name
-                        }
-                })
+                data = {'lot_no': tmh, 'weight': ZL, 'product_no': name}
+                return self.results(True, '入库成功', data)
             else:
-                return Response({
-                    'success': True,
-                    'message': None,
-                    'data': {
-                        'lot_no': tmh
-                    }
-            })
+                data = {'lot_no': tmh}
+                return self.results(True, None, data)

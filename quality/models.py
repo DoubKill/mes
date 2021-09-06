@@ -316,6 +316,7 @@ class MaterialDealResult(AbstractEntity):
     classes = models.CharField(max_length=64, help_text='生产班次名', null=True)
     equip_no = models.CharField(max_length=64, help_text='机台', null=True)
     factory_date = models.DateField(help_text='工厂日期', null=True)
+    is_deal = models.BooleanField(help_text='是否有过不合格处理', default=False)
 
     class Meta:
         db_table = 'material_deal_result'
@@ -392,15 +393,16 @@ class UnqualifiedDealOrder(AbstractEntity):
     deal_department = models.CharField(max_length=64, help_text='部门', blank=True, null=True)
     status = models.CharField(max_length=64, help_text='状态', blank=True, null=True)
     deal_user = models.CharField(max_length=64, help_text='经办人', blank=True, null=True)
-    deal_date = models.DateField(max_length=64, help_text='经办日期', blank=True, null=True)
-    reason = models.TextField(help_text='原因', blank=True, null=True)
+    deal_date = models.DateField(help_text='经办日期', blank=True, null=True)
+    reason = models.TextField(help_text='不合格情况', blank=True, null=True)
     t_deal_suggestion = models.TextField(help_text='技术部门处理意见', blank=True, null=True)
     c_deal_suggestion = models.TextField(help_text='检查部门处理意见', blank=True, null=True)
     t_deal_user = models.CharField(max_length=64, help_text='技术部门处理人', blank=True, null=True)
     t_deal_date = models.DateField(help_text='技术日期', blank=True, null=True)
     c_deal_user = models.CharField(max_length=64, help_text='检查部门处理人', blank=True, null=True)
     c_deal_date = models.DateField(help_text='检查日期', blank=True, null=True)
-    desc = models.TextField(help_text='描述', blank=True, null=True)
+    c_agreed = models.NullBooleanField(help_text='检查科是否同意', default=None)
+    desc = models.TextField(help_text='备注', blank=True, null=True)
     deal_method = models.CharField(max_length=64, help_text='处理方式', null=True)
 
     class Meta:
@@ -411,9 +413,20 @@ class UnqualifiedDealOrder(AbstractEntity):
 class UnqualifiedDealOrderDetail(AbstractEntity):
     unqualified_deal_order = models.ForeignKey(UnqualifiedDealOrder, help_text='处置单',
                                                on_delete=models.CASCADE, related_name='deal_details')
-    unqualified_deal_order_detail_uid = models.CharField(max_length=64, help_text='唯一码')
-    material_test_order = models.OneToOneField(MaterialTestOrder, help_text='物料检测单',
-                                               on_delete=models.CASCADE, related_name='unqualified_order')
+    # unqualified_deal_order_detail_uid = models.CharField(max_length=64, help_text='唯一码')
+    # material_test_order = models.OneToOneField(MaterialTestOrder, help_text='物料检测单',
+    #                                            on_delete=models.CASCADE, related_name='unqualified_order')
+    ordering = models.IntegerField(help_text='序号', null=True)
+    lot_no = models.CharField(max_length=64, help_text='收皮条码', null=True)
+    factory_date = models.DateField(help_text='工厂日期', null=True)
+    equip_no = models.CharField(max_length=64, help_text='机台号', null=True)
+    classes = models.CharField(max_length=64, help_text='班次', null=True)
+    product_no = models.CharField(max_length=64, help_text='胶料名称', null=True)
+    test_data = models.TextField(help_text='检测详情', null=True)
+    is_release = models.NullBooleanField(help_text='是否放行', default=None)
+    suggestion = models.CharField(max_length=100, help_text='处理结果', null=True)
+    trains = models.CharField(max_length=64, help_text='车次', null=True)
+    reason = models.CharField(max_length=200, help_text='不合格情况', null=True)
 
     class Meta:
         db_table = 'unqualified_deal_order_detail'

@@ -1,10 +1,11 @@
+import json
 import logging
 import re
 import time
 import uuid
 from datetime import datetime, timedelta
 from django.db.models import Q, F
-from django.db.models import Count
+from django.db.models import Count, Min
 from django.db.models import FloatField
 from django.db.transaction import atomic
 from rest_framework import serializers
@@ -220,38 +221,167 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class UnqualifiedDealOrderDetailSerializer(serializers.ModelSerializer):
+    test_data = serializers.ListField(help_text='检测数据详情', write_only=True)
+
+    def validate(self, attrs):
+        test_data = attrs['test_data']
+        try:
+            test_data = json.dumps(test_data)
+        except Exception:
+            raise serializers.ValidationError('json格式错误！')
+        attrs['test_data'] = test_data
+        return attrs
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['test_data'] = json.loads(instance.test_data)
+        return ret
+
+    class Meta:
+        model = UnqualifiedDealOrderDetail
+        exclude = ('unqualified_deal_order',)
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class UnqualifiedDealOrderCreateSerializer(BaseModelSerializer):
-    order_ids = serializers.PrimaryKeyRelatedField(help_text='检测单列表', many=True,
-                                                   write_only=True, queryset=MaterialTestOrder.objects.all())
+    deal_details = UnqualifiedDealOrderDetailSerializer(many=True, help_text="""[{"ordering": "序号",
+                                                                               "lot_no": "收皮条码",
+                                                                               "factory_date": "工厂日期",
+                                                                               "equip_no": "机台号",
+                                                                               "classes": "班次",
+                                                                               "product_no": "胶料名称",
+                                                                               "test_data": "检测详情",
+                                                                               "trains": "车次",
+                                                                               "reason": "不合格情况"
+                                                                               }]""")
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        deal_details = ret.pop('deal_details', [])
+        deal_items = {}
+        for item in deal_details:
+            if item['ordering'] not in deal_items:
+                deal_items[item['ordering']] = {
+                    "ordering": item['ordering'],
+                    "lot_no": item['lot_no'],
+                    "factory_date": item['factory_date'],
+                    "equip_no": item['equip_no'],
+                    "classes": item['classes'],
+                    "product_no": item['product_no'],
+                    "test_data": item['test_data'],
+                    "reason": item['reason'],
+                    "trains": [{"id": item['id'], "train": item['trains']}]
+                }
+            else:
+                deal_items[item['ordering']]['trains'].append({"id": item['id'], "train": item['trains']})
+        ret['deal_details'] = list(deal_items.values())
+        return ret
 
     @atomic()
     def create(self, validated_data):
-        order_ids = validated_data.pop('order_ids')
-        validated_data['unqualified_deal_order_uid'] = uuid.uuid1()
+        deal_details = validated_data.pop('deal_details', [])
+        validated_data['deal_user'] = self.context['request'].user.username
+        validated_data['t_deal_suggestion'] = None
+        validated_data['c_deal_suggestion'] = None
+        validated_data['t_deal_user'] = None
+        validated_data['t_deal_date'] = None
+        validated_data['c_deal_user'] = None
+        validated_data['c_deal_date'] = None
+        validated_data['desc'] = None
+        validated_data['deal_method'] = None
         instance = super().create(validated_data)
-        for order_id in order_ids:
-            detail = {"unqualified_deal_order": instance,
-                      "unqualified_deal_order_detail_uid": uuid.uuid1(),
-                      "material_test_order": order_id}
-            UnqualifiedDealOrderDetail.objects.create(**detail)
+        for deal_detail in deal_details:
+            deal_detail['unqualified_deal_order'] = instance
+            UnqualifiedDealOrderDetail.objects.create(**deal_detail)
+            MaterialDealResult.objects.filter(lot_no=deal_detail['lot_no']).update(is_deal=True)
         return instance
 
     class Meta:
         model = UnqualifiedDealOrder
-        exclude = ('unqualified_deal_order_uid',)
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'deal_user': {'read_only': True},
+                        'deal_date': {'read_only': True}}
 
 
 class UnqualifiedDealOrderSerializer(BaseModelSerializer):
+    c_solved = serializers.SerializerMethodField()
+    t_solved = serializers.SerializerMethodField()
+
+    def get_c_solved(self, obj):
+        return 'Y' if obj.c_deal_user else 'N'
+
+    def get_t_solved(self, obj):
+        return 'Y' if obj.t_deal_user else 'N'
+
     class Meta:
         model = UnqualifiedDealOrder
         fields = '__all__'
 
 
+class TechDealOrderDetailSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UnqualifiedDealOrderDetail
+        fields = ('id', 'is_release', 'suggestion')
+        extra_kwargs = {'id': {'read_only': False}}
+
+
 class UnqualifiedDealOrderUpdateSerializer(BaseModelSerializer):
+    tech_deal_result = TechDealOrderDetailSerializer(help_text='[{"id": "处置单详情id", "is_release": "是否放行", '
+                                                       '"suggestion":"意见"}]', required=False, write_only=True,
+                                                     many=True)
+
+    def update(self, instance, validated_data):
+        tech_deal_result = validated_data.pop('tech_deal_result', {})
+        c_agreed = validated_data.get('c_agreed')
+
+        for key, value in dict(validated_data).items():
+            if value is None or value == '':
+                validated_data.pop(key)
+
+        # 技术科处理
+        if tech_deal_result:
+            validated_data['c_deal_suggestion'] = None
+            validated_data['c_deal_user'] = None
+            validated_data['c_deal_date'] = None
+            validated_data['c_agreed'] = None
+            for detail in instance.deal_details.all():
+                MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
+                                                                               deal_suggestion='不合格',
+                                                                               deal_time=None,
+                                                                               deal_user=None)
+        if tech_deal_result:
+            for item in tech_deal_result:
+                deal_details = UnqualifiedDealOrderDetail.objects.filter(id=item['id'])
+                deal_details.update(suggestion=item['suggestion'], is_release=item['is_release'])
+
+        UnqualifiedDealOrder.objects.filter(id=instance.id).update(**validated_data)
+
+        # 检查科处理
+        if c_agreed is not None:
+            if c_agreed:
+                # 同意
+                for detail in instance.deal_details.filter(is_release=True):
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='PASS',
+                                                                                   deal_suggestion=detail.suggestion,
+                                                                                   deal_time=datetime.now(),
+                                                                                   deal_user=self.context['request'].
+                                                                                   user.username)
+            else:
+                # 不同意
+                for detail in instance.deal_details.filter(is_release=True):
+                    MaterialDealResult.objects.filter(lot_no=detail.lot_no).update(test_result='三等品',
+                                                                                   deal_suggestion='不合格',
+                                                                                   deal_time=datetime.now(),
+                                                                                   deal_user=self.context['request'].
+                                                                                   user.username)
+        return instance
+
     class Meta:
         model = UnqualifiedDealOrder
-        exclude = ('unqualified_deal_order_uid', 'status')
+        exclude = ('unqualified_deal_order_uid', )
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -426,7 +556,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret = super().to_representation(instance)
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
                                                      product_no=instance.product_no).first()
-        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
@@ -449,7 +579,7 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
                        'test_factory_date': last_test_result.test_factory_date.strftime('%Y-%m-%d %H:%M:%S'),
                        'test_class': classes,
                        'pallet_no': pallet_data.pallet_no,
-                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+                       'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
         product_time = instance.production_factory_date
         material_detail = MaterialAttribute.objects.filter(material__material_no=pallet_data.product_no).first()
         if material_detail:
@@ -1054,7 +1184,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
         pallet_data = PalletFeedbacks.objects.filter(lot_no=instance.lot_no,
                                                      product_no=instance.product_no).first()
-        test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
+        # test_order_data = MaterialTestOrder.objects.filter(lot_no=instance.lot_no).first()
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
@@ -1073,7 +1203,7 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date,
                        'test_class': classes,
-                       'test_user': None if not test_order_data.created_user else test_order_data.created_user.username}
+                       'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
         if pallet_data.begin_trains and pallet_data.end_trains:
             trains = [str(x) for x in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]
             trains = ",".join(trains)
@@ -1687,4 +1817,31 @@ class RubberMaxStretchTestResultSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RubberMaxStretchTestResult
+        fields = '__all__'
+
+
+class UnqualifiedPalletFeedBackSerializer(serializers.ModelSerializer):
+    trains = serializers.SerializerMethodField()
+    test_data = serializers.SerializerMethodField()
+
+    def get_trains(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        return '{}-{}'.format(pallet.begin_trains, pallet.end_trains) if not \
+            pallet.begin_trains == pallet.end_trains else pallet.begin_trains
+
+    def get_test_data(self, obj):
+        last_result_ids = list(MaterialTestResult.objects.filter(
+            is_judged=True,
+            material_test_order__lot_no=obj.lot_no).values(
+            'material_test_order', 'test_indicator_name', 'data_point_name'
+        ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
+        return MaterialTestResult.objects.filter(
+            level__gt=1,
+            id__in=last_result_ids).values(
+            'data_point_name').annotate(min_value=Min('value'),
+                                        max_value=Max('value')
+                                        ).values('data_point_name', 'min_value', 'max_value')
+
+    class Meta:
+        model = MaterialDealResult
         fields = '__all__'
