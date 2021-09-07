@@ -232,8 +232,8 @@ class LoadTankMaterialLog(AbstractEntity):
 class MaterialChangeLog(models.Model):
     bra_code = models.CharField(max_length=64, help_text='条形码')
     material_name = models.CharField(max_length=64, help_text='原材料名称')
-    created_time = models.DateTimeField(max_length=64, help_text='修改时间')
-    qty_change = models.DecimalField(decimal_places=2, max_digits=8, help_text='本次变化量', null=True, blank=True, default=0)
+    created_time = models.DateTimeField(help_text='修改时间')
+    qty_change = models.DecimalField(decimal_places=2, max_digits=8, help_text='本次变化量', default=0)
 
     class Meta:
         db_table = 'material_change_log'
