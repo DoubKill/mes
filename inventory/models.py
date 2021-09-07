@@ -1,6 +1,8 @@
 from django.db import models
 
 # Create your models here.
+from django.db.models import Sum
+
 from basics.models import GlobalCode, Equip
 from production.models import PalletFeedbacks
 from recipe.models import Material, ProductBatching
@@ -143,7 +145,7 @@ class WmsInventoryStock(models.Model):
     location = models.CharField(max_length=255, db_column='SpaceId')
     unit = models.CharField(max_length=64, db_column='WeightUnit')
     quality_status = models.IntegerField(db_column='StockDetailState')
-    material_type = models.CharField(max_length=64)
+    # material_type = models.CharField(max_length=64)
     batch_no = models.CharField(max_length=64, db_column='BatchNo')
     container_no = models.CharField(max_length=32, db_column="LadenToolNumber")
     in_storage_time = models.DateTimeField(db_column='CreaterTime')
@@ -220,6 +222,75 @@ class WmsInventoryMaterial(models.Model):
     class Meta:
         db_table = 't_inventory_material'
         managed = False
+
+
+class OutBoundDeliveryOrder(AbstractEntity):
+    """
+        胶料出库单据
+    """
+    WAREHOUSE_CHOICE = (
+        ('混炼胶库', '混炼胶库'),
+        ('终炼胶库', '终炼胶库')
+    )
+    STATUS_CHOICE = (
+        (1, '已创建'),
+        (2, '等待出库'),
+        (3, '已出库'),
+        (4, '关闭'),
+        (5, '失败')
+    )
+    warehouse = models.CharField(max_length=64, verbose_name='库区', help_text='库区(混炼胶库/终炼胶库)', choices=WAREHOUSE_CHOICE)
+    order_no = models.CharField(max_length=64, verbose_name='出库单号', help_text='出库单号', unique=True)
+    status = models.PositiveIntegerField(verbose_name='状态', help_text='状态', choices=STATUS_CHOICE, default=1)
+    product_no = models.CharField(max_length=64, help_text='胶料名称')
+    station = models.CharField(max_length=64, help_text='出库口名称')
+    order_qty = models.IntegerField(help_text='订单数量', default=0)
+    # need_qty = models.IntegerField(help_text='需求数量', default=0)
+    # work_qty = models.IntegerField(help_text='工作数量', default=0)
+    # finished_qty = models.IntegerField(help_text='完成数量', default=0)
+    need_weight = models.FloatField(help_text='需求重量', default=0)
+    finished_weight = models.FloatField(help_text='完成重量', default=0)
+    inventory_type = models.CharField(max_length=32, verbose_name='出库类型', help_text='出库类型', blank=True, null=True)
+    inventory_reason = models.CharField(max_length=32, verbose_name='出库原因', help_text='出库原因', blank=True, null=True)
+
+    class Meta:
+        db_table = 'outbound_delivery_order'
+        verbose_name_plural = verbose_name = '胶料出库单据'
+
+
+class OutBoundDeliveryOrderDetail(AbstractEntity):
+    """
+        胶料出库单据详情
+    """
+    STATUS_CHOICE = (
+        (1, '新建'),
+        (2, '执行中'),
+        (3, '已出库'),
+        (4, '关闭'),
+        (5, '失败')
+    )
+    outbound_delivery_order = models.ForeignKey(OutBoundDeliveryOrder, help_text='出库单据', on_delete=models.CASCADE,
+                                                related_name='outbound_delivery_details')
+    order_no = models.CharField(max_length=64, verbose_name='出库任务编号', help_text='出库任务编号')
+    # station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
+    status = models.PositiveIntegerField(verbose_name='出库任务状态', help_text='出库任务状态', choices=STATUS_CHOICE, default=4)
+    pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
+    location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
+    lot_no = models.CharField(max_length=64, help_text='收皮条码', blank=True, null=True)
+    memo = models.CharField(max_length=64, help_text='车号', blank=True, null=True)
+    qty = models.IntegerField(help_text='车数', default=0)
+    weight = models.FloatField(help_text='重量', default=0)
+    quality_status = models.CharField(max_length=64, help_text='品质状态')
+    inventory_time = models.DateTimeField(verbose_name='入库时间', blank=True, null=True)
+    finish_time = models.DateTimeField(verbose_name='出库完成时间', blank=True, null=True)
+    equip = models.ManyToManyField(Equip, verbose_name="设备", help_text="设备", blank=True,
+                                   related_name='equip_delivery_details')
+    dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
+                                      related_name='dispatch_delivery_details')
+
+    class Meta:
+        db_table = 'outbound_delivery_order_details'
+        verbose_name_plural = verbose_name = '胶料出库单据详情'
 
 
 class MixinRubberyOutBoundOrder(AbstractEntity):
