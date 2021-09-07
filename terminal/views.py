@@ -29,7 +29,7 @@ from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
-    RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire
+    RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -261,17 +261,26 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
             return response(success=False, message='该物料(条码)已在其他计划中使用, 本计划不可修改')
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
-        if left_weight > batch_material.init_weight or left_weight < 0:
-            return response(success=False, message='请输入正确的剩余修正量数值')
         serializer = self.get_serializer(batch_material, data=request.data)
         if not serializer.is_valid():
             return response(success=False, message=list(serializer.errors.values())[0][0])
         # 获得本次修正量,修改真正计算的总量
         change_num = float(batch_material.adjust_left_weight) - left_weight
+        variety = float(batch_material.variety) - change_num
+        # 数量变换取值[累加](包数：[负整框:10], 重量：[负整框:100])
+        beyond = 10 if batch_material.unit == '包' else 100
+        if variety > beyond or variety + float(batch_material.init_weight) < 0:
+            return response(success=False, message='修改值达到上限,不可修改')
+        batch_material.variety = float(batch_material.variety) - change_num
         batch_material.real_weight = float(batch_material.real_weight) - change_num
         batch_material.adjust_left_weight = batch_material.real_weight
         batch_material.useup_time = datetime.datetime.now() if left_weight == 0 else '1970-01-01 00:00:00'
         batch_material.save()
+        # 增加修改履历
+        MaterialChangeLog.objects.create(**{'bra_code': batch_material.bra_code,
+                                            'material_name': batch_material.material_name,
+                                            'created_time': datetime.datetime.now(),
+                                            'qty_change': -change_num})
         return response(success=True, message='修正成功')
 
 
