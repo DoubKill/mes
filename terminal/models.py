@@ -222,10 +222,22 @@ class LoadTankMaterialLog(AbstractEntity):
     actual_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='当前消耗重量', default=0)
     adjust_left_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='调整剩余重量', default=0)
     single_need = models.DecimalField(decimal_places=2, max_digits=8, help_text='单车需要物料数量', null=True, blank=True)
+    variety = models.DecimalField(decimal_places=2, max_digits=8, help_text='物料修改变化量', null=True, blank=True, default=0)
 
     class Meta:
         db_table = 'load_tank_material_log'
         verbose_name_plural = verbose_name = '料框物料信息'
+
+
+class MaterialChangeLog(models.Model):
+    bra_code = models.CharField(max_length=64, help_text='条形码')
+    material_name = models.CharField(max_length=64, help_text='原材料名称')
+    created_time = models.DateTimeField(help_text='修改时间')
+    qty_change = models.DecimalField(decimal_places=2, max_digits=8, help_text='本次变化量', default=0)
+
+    class Meta:
+        db_table = 'material_change_log'
+        verbose_name_plural = verbose_name = '料框物料修改履历'
 
 
 class Version(models.Model):
