@@ -47,7 +47,10 @@ router.register(r'material-inventory-manage', views.MaterialInventoryManageViewS
 # 混炼胶出库单
 # router.register('final-rubbery-outbound-order', FinalRubberyOutBoundOrderViewSet)
 
+# 胶片库出库单据
 router.register('outbound-delivery-orders', OutBoundDeliveryOrderViewSet)
+
+# 胶片库出库任务
 router.register('outbound-delivery-order-details', OutBoundDeliveryOrderDetailViewSet)
 
 # 物料出入库履历

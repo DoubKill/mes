@@ -63,6 +63,7 @@ from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
+from mes.settings import DEBUG
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
@@ -75,7 +76,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
-from .utils import export_xls
+from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB
 
 logger = logging.getLogger('send_log')
 
@@ -3836,13 +3837,54 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderDetailFilter
 
-    @atomic()
     def create(self, request, *args, **kwargs):
         data = self.request.data
         if not isinstance(data, list):
-            raise ValidationError('参数错误')
+            raise ValidationError('参数错误！')
+        if not data:
+            raise ValidationError('请选择货物出库！')
+        detail_ids = []
         for item in data:
             s = self.serializer_class(data=item)
             s.is_valid(raise_exception=True)
-            s.save()
+            instance = s.validated_data['outbound_delivery_order']
+            detail = s.save()
+            detail_ids.append(detail.id)
+        if not DEBUG:
+            # 出库
+            username = self.request.user.username
+            items = []
+            for detail in OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids):
+                pallet = PalletFeedbacks.objects.filter(pallet_no=detail.pallet_no).last()
+                dict1 = {'WORKID': detail.order_no,
+                         'MID': instance.product_no,
+                         'PICI': pallet.bath_no if pallet else "1",
+                         'RFID': detail.pallet_no,
+                         'STATIONID': instance.station,
+                         'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                items.append(dict1)
+            json_data = {
+                'msgId': instance.order_no,
+                'OUTTYPE': '快检出库',
+                "msgConut": str(len(items)),
+                "SENDUSER": username,
+                "items": items
+            }
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            if instance.warehouse == '混炼胶库':
+                sender = OUTWORKUploader(end_type="指定出库")
+            else:
+                sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=1)
+                else:  # 失败
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
+                    raise ValidationError('出库失败：{}'.format(msg))
         return Response('ok')

@@ -273,7 +273,7 @@ class OutBoundDeliveryOrderDetail(AbstractEntity):
                                                 related_name='outbound_delivery_details')
     order_no = models.CharField(max_length=64, verbose_name='出库任务编号', help_text='出库任务编号')
     # station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
-    status = models.PositiveIntegerField(verbose_name='出库任务状态', help_text='出库任务状态', choices=STATUS_CHOICE, default=4)
+    status = models.PositiveIntegerField(verbose_name='出库任务状态', help_text='出库任务状态', choices=STATUS_CHOICE, default=1)
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
     location = models.CharField(max_length=64, verbose_name='货位地址', help_text='货位地址', blank=True, null=True)
     lot_no = models.CharField(max_length=64, help_text='收皮条码', blank=True, null=True)
