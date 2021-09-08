@@ -295,7 +295,7 @@ DATABASES = {
     'cb': {
             'ENGINE': 'sql_server.pyodbc',
             'NAME': 'zhada_wms_zhongc',
-            'HOST': '10.4.24.25',
+            'HOST': '10.4.24.33',
             'PORT': '1433',
             'USER': 'sa',
             'PASSWORD': 'Admin123$',
