@@ -150,6 +150,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
                                                    'real_weight': pre_material.real_weight, 'pre_material': pre_material,
                                                    'adjust_left_weight': pre_material.adjust_left_weight,
+                                                   'variety': pre_material.variety,
                                                    'single_need': single_material_weight})
                         attrs['status'] = 1
                     # 已用完(异常扫码)
@@ -184,6 +185,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
                                                            'real_weight': pre_material.real_weight,
                                                            'pre_material': pre_material,
+                                                           'variety': pre_material.variety,
                                                            'adjust_left_weight': pre_material.adjust_left_weight,
                                                            'single_need': single_material_weight})
                                 attrs['status'] = 1

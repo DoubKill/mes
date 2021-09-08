@@ -15,6 +15,7 @@ from inventory.filters import DispatchLogFilter
 from inventory.models import DispatchPlan, DispatchLog, Sulfur
 from inventory.serializers import DispatchPlanSerializer, DispatchLogCreateSerializer, DispatchLogSerializer, \
     TerminalDispatchPlanUpdateSerializer, SulfurAutoPlanSerializer
+from mes.common_code import TerminalCreateAPIView
 from mes.derorators import api_recorder
 
 
@@ -41,7 +42,7 @@ class TerminalDispatchViewSet(ListModelMixin,
 
 
 @method_decorator([api_recorder], name="dispatch")
-class TerminalDispatchLogViewSet(CreateModelMixin,
+class TerminalDispatchLogViewSet(TerminalCreateAPIView,
                                  ListModelMixin,
                                  GenericViewSet):
     """
