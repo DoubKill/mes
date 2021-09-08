@@ -75,6 +75,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
+from .utils import export_xls
 
 logger = logging.getLogger('send_log')
 
@@ -2172,12 +2173,17 @@ class WmsStorageView(ListAPIView):
     serializer_class = WmsInventoryStockSerializer
     permission_classes = (IsAuthenticated,)
     DATABASE_CONF = 'wms'
+    FILE_NAME = '原材料库位明细'
+    EXPORT_FIELDS_DICT = {"物料名称": "material_name", "物料编码": "material_no", "质检条码": "lot_no",
+                          "托盘号": "container_no", "库位地址": "location", "单位": "unit",
+                          "单位重量": "unit_weight", "总重量": "total_weight", "品质状态": "quality_status"}
 
     def list(self, request, *args, **kwargs):
         filter_kwargs = {}
         container_no = self.request.query_params.get('pallet_no')
         material_name = self.request.query_params.get('material_name')
         material_no = self.request.query_params.get('material_no')
+        export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         if material_no:
             filter_kwargs['material_no__icontains'] = material_no
         if material_name:
@@ -2185,9 +2191,14 @@ class WmsStorageView(ListAPIView):
         if container_no:
             filter_kwargs['container_no__icontains'] = container_no
         queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs)
-
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True)
+        if export:
+            if export == '1':
+                data = serializer.data
+            else:
+                data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         data = self.get_paginated_response(serializer.data).data
         sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
                                       total_trains=Sum('qty'))
@@ -2537,6 +2548,7 @@ class WMSInventoryView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class THStorageView(WmsStorageView):
     DATABASE_CONF = 'cb'
+    FILE_NAME = '炭黑库位明细'
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3037,7 +3049,7 @@ class BzMixingRubberInventory(ListAPIView):
             sheet.write(data_row, 10, 'kg')
             sheet.write(data_row, 11, i['unit_weight'])
             sheet.write(data_row, 12, i['total_weight'])
-            sheet.write(data_row, 13, i['total_weight'])
+            sheet.write(data_row, 13, i['quality_status'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -3095,16 +3107,16 @@ class BzMixingRubberInventory(ListAPIView):
                 queryset = []
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True)
+        if export:
+            if export == '1':
+                return self.export_xls(serializer.data)
+            elif export == '2':
+                return self.export_xls(self.get_serializer(queryset, many=True).data)
         data = self.get_paginated_response(serializer.data).data
         sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
                                       total_trains=Sum('qty'))
         data['total_weight'] = sum_data['total_weight']
         data['total_trains'] = sum_data['total_trains']
-        if export:
-            if export == '1':
-                return self.export_xls(serializer.data)
-            elif export == '2':
-                return self.export_xls(self.get_serializer(queryset, many=True))
         return Response(data)
 
 
@@ -3237,7 +3249,7 @@ class BzFinalRubberInventory(ListAPIView):
             sheet.write(data_row, 10, 'kg')
             sheet.write(data_row, 11, i['unit_weight'])
             sheet.write(data_row, 12, i['total_weight'])
-            sheet.write(data_row, 13, i['total_weight'])
+            sheet.write(data_row, 13, i['quality_status'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -3295,16 +3307,16 @@ class BzFinalRubberInventory(ListAPIView):
 
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True)
+        if export:
+            if export == '1':
+                return self.export_xls(serializer.data)
+            elif export == '2':
+                return self.export_xls(self.get_serializer(queryset, many=True).data)
         data = self.get_paginated_response(serializer.data).data
         sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
                                       total_trains=Sum('qty'))
         data['total_weight'] = sum_data['total_weight']
         data['total_trains'] = sum_data['total_trains']
-        if export:
-            if export == '1':
-                return self.export_xls(serializer.data)
-            elif export == '2':
-                return self.export_xls(self.get_serializer(queryset, many=True))
         return Response(data)
 
 

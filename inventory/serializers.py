@@ -1623,14 +1623,21 @@ class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
 
 
 class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
+    work_qty = serializers.SerializerMethodField(read_only=True)
+    finished_qty = serializers.SerializerMethodField(read_only=True)
+    period_of_validity = serializers.SerializerMethodField(read_only=True)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        ret['finished_qty'] = ret['order_qty'] - ret['work_qty'] - ret['finished_qty']
+        ret['need_qty'] = ret['order_qty'] - ret['work_qty'] - ret['finished_qty']
         return ret
 
-    work_qty = serializers.SerializerMethodField(read_only=True, default=0)
-    finished_qty = serializers.SerializerMethodField(read_only=True, default=0)
+    def get_period_of_validity(self, obj):
+        material_detail = MaterialAttribute.objects.filter(material__material_no=obj.product_no).first()
+        if material_detail:
+                return material_detail.period_of_validity
+        else:
+            return None
 
     def get_work_qty(self, obj):
         work_qty = obj.outbound_delivery_details.filter(status=2).aggregate(work_qty=Sum('qty'))['work_qty']
