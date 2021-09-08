@@ -404,7 +404,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         filter_dict = {}
-        store_name = self.request.query_params.get("store_name")
+        store_name = self.request.query_params.get("warehouse_name")
         if not store_name:
             store_name = "混炼胶库"
         order_type = self.request.query_params.get("order_type", "出库")
@@ -517,7 +517,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             return InventoryLog.objects.filter(**filter_dict).order_by('-start_time')
 
     def get_serializer_class(self):
-        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        store_name = self.request.query_params.get("warehouse_name", "混炼胶库")
         order_type = self.request.query_params.get("order_type", "出库")
         serializer_dispatch = {
             "混炼胶库": InventoryLogSerializer,
