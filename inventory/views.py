@@ -260,9 +260,23 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 3
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
+                    try:
+                        depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
+                        depot, _ = Depot.objects.get_or_create(depot_name=depot_name,
+                                                               description=depot_name)
+                        depot_site, _ = DepotSite.objects.get_or_create(depot=depot,
+                                                                        depot_site_name=depot_name,
+                                                                        description=depot_name)
+                        DepotPallt.objects.create(enter_time=datetime.datetime.now(),
+                                                  pallet_status=1,
+                                                  pallet_data=PalletFeedbacks.objects.filter(lot_no=dp_obj.lot_no).first(),
+                                                  depot_site=depot_site
+                                                  )
+                    except Exception:
+                        pass
                 else:
                     return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
-                station = dp_obj.station
+                station = dp_obj.outbound_delivery_order.station
                 station_dict = {
                     "一层前端": 3,
                     "一层后端": 4,
