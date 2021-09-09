@@ -1660,7 +1660,7 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
                 ordering = last_ordering.zfill(len(last_ordering))
         else:
             ordering = '00001'
-        validated_data['order_no'] = 'CKD{}{}{}'.format('Z' if warehouse == '混炼胶库' else 'H',
+        validated_data['order_no'] = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
                                                          datetime.datetime.now().date().strftime('%Y%m%d'),
                                                          ordering)
         return super(OutBoundDeliveryOrderSerializer, self).create(validated_data)
@@ -1696,7 +1696,7 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
                 ordering = last_ordering.zfill(len(last_ordering))
         else:
             ordering = '00001'
-        attrs['order_no'] = 'MES{}{}{}'.format('Z' if warehouse == '混炼胶库' else 'H',
+        attrs['order_no'] = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
                                                         datetime.datetime.now().date().strftime('%Y%m%d'),
                                                         ordering)
         return attrs
