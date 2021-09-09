@@ -560,10 +560,10 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
-            classes = pallet_data.classes
+            # classes = pallet_data.classes
             group = ''
         else:
-            classes = plan.work_schedule_plan.classes.global_name
+            # classes = plan.work_schedule_plan.classes.global_name
             group = plan.work_schedule_plan.group.global_name
         ret['day_time'] = str(instance.factory_date)  # 工厂日期
         # ret['product_no'] = pallet_data.product_no  # 胶料编码
@@ -573,11 +573,11 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         ret['operation_user'] = pallet_data.operation_user  # 操作员
         ret['actual_trains'] = '/'.join(
             [str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)])  # 托盘车次
-        ret['classes_group'] = classes + '/' + group  # 班次班组
+        ret['classes_group'] = instance.classes + '/' + group  # 班次班组
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date.strftime('%Y-%m-%d %H:%M:%S'),
-                       'test_class': classes,
+                       'test_class': instance.classes,
                        'pallet_no': pallet_data.pallet_no,
                        'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
         product_time = instance.production_factory_date
@@ -1188,28 +1188,24 @@ class MaterialDealResultListSerializer1(serializers.ModelSerializer):
         test_results = MaterialTestResult.objects.filter(material_test_order__lot_no=instance.lot_no)
         plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
         if not plan:
-            classes = pallet_data.classes
+            # classes = pallet_data.classes
             group = ''
         else:
-            classes = plan.work_schedule_plan.classes.global_name
+            # classes = plan.work_schedule_plan.classes.global_name
             group = plan.work_schedule_plan.group.global_name
         ret['day_time'] = str(instance.factory_date)
         # ret['product_no'] = pallet_data.product_no
         # ret['equip_no'] = pallet_data.equip_no
         ret['residual_weight'] = None
         ret['actual_weight'] = pallet_data.actual_weight
-        ret['classes_group'] = classes + '/' + group  # 班次班组
+        ret['classes_group'] = instance.classes + '/' + group  # 班次班组
         last_test_result = test_results.last()
         ret['test'] = {'test_status': '复检' if test_results.filter(test_times__gt=1).exists() else '正常',
                        'test_factory_date': last_test_result.test_factory_date,
-                       'test_class': classes,
+                       'test_class': instance.classes,
                        'test_user': None if not last_test_result.created_user else last_test_result.created_user.username}
-        if pallet_data.begin_trains and pallet_data.end_trains:
-            trains = [str(x) for x in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]
-            trains = ",".join(trains)
-        else:
-            trains = ""
-        ret["trains"] = trains
+        trains = [str(x) for x in range(instance.begin_trains, instance.end_trains + 1)]
+        ret["trains"] = ",".join(trains)
         return ret
 
     class Meta:
