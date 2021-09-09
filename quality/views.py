@@ -399,7 +399,8 @@ class MaterialDealResultUpdateValidTime(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class PalletFeedbacksTestListView(ModelViewSet):
     # 快检信息综合管里
-    queryset = MaterialDealResult.objects.filter(delete_flag=False).order_by('lot_no')
+    queryset = MaterialDealResult.objects.filter(delete_flag=False).order_by('factory_date', 'classes',
+                                                                             'equip_no', 'begin_trains')
     serializer_class = MaterialDealResultListSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = PalletFeedbacksTestFilter
