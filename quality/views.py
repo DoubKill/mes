@@ -400,7 +400,8 @@ class MaterialDealResultUpdateValidTime(APIView):
 class PalletFeedbacksTestListView(ModelViewSet):
     # 快检信息综合管里
     queryset = MaterialDealResult.objects.filter(delete_flag=False).order_by('factory_date', 'classes',
-                                                                             'equip_no', 'begin_trains')
+                                                                             'equip_no', 'product_no',
+                                                                             'begin_trains')
     serializer_class = MaterialDealResultListSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = PalletFeedbacksTestFilter
@@ -438,7 +439,9 @@ class PalletFeedbacksTestListView(ModelViewSet):
             filter_dict['print_time__isnull'] = False
         elif is_print == "未打印":
             filter_dict['print_time__isnull'] = True
-        pfb_queryset = MaterialDealResult.objects.filter(**filter_dict).exclude(status='复测').order_by('lot_no')
+        pfb_queryset = MaterialDealResult.objects.filter(
+            **filter_dict).exclude(status='复测').order_by('factory_date', 'classes', 'equip_no',
+                                                          'product_no', 'begin_trains')
         return pfb_queryset
 
 
