@@ -1660,9 +1660,9 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
                 ordering = last_ordering.zfill(len(last_ordering))
         else:
             ordering = '00001'
-        validated_data['order_no'] = 'MES{}{}{}'.format('Z' if warehouse == '混炼胶库' else 'H',
-                                                        datetime.datetime.now().date().strftime('%Y%m%d'),
-                                                        ordering)
+        validated_data['order_no'] = 'CKD{}{}{}'.format('Z' if warehouse == '混炼胶库' else 'H',
+                                                         datetime.datetime.now().date().strftime('%Y%m%d'),
+                                                         ordering)
         return super(OutBoundDeliveryOrderSerializer, self).create(validated_data)
 
     def update(self, instance, validated_data):
@@ -1681,7 +1681,7 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
                             'inventory_type', 'inventory_reason')
 
 
-class OutBoundDeliveryOrderDetailSerializer(serializers.ModelSerializer):
+class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
 
     def validate(self, attrs):
         warehouse = attrs['outbound_delivery_order'].warehouse
@@ -1708,3 +1708,27 @@ class OutBoundDeliveryOrderDetailSerializer(serializers.ModelSerializer):
                             'delete_flag', 'created_user', 'last_updated_user',
                             'delete_user', 'order_no', 'status',
                             'equip', 'dispatch', 'finish_time')
+
+
+class OutBoundTasksSerializer(BaseModelSerializer):
+    created_user = serializers.CharField(source='created_user.username')
+    material_no = serializers.CharField(source='outbound_delivery_order.product_no')
+    inventory_reason = serializers.CharField(source='quality_status')
+    production_info = serializers.SerializerMethodField()
+
+    def get_production_info(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        if pallet:
+            return {'equip_no': pallet.equip_no,
+                    'factory_date': pallet.factory_date,
+                    'classes': pallet.classes,
+                    }
+        else:
+            return {'equip_no': "",
+                    'factory_date': "",
+                    'classes': "",
+                    }
+
+    class Meta:
+        model = OutBoundDeliveryOrderDetail
+        fields = '__all__'

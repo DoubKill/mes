@@ -313,11 +313,11 @@ class FinalRubberyOutBoundOrderFilter(django_filters.rest_framework.FilterSet):
 
 class OutBoundDeliveryOrderFilter(django_filters.rest_framework.FilterSet):
     order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains', help_text='订单编号')
-    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料名称')
+    product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains', help_text='胶料名称')
     warehouse = django_filters.CharFilter(field_name='warehouse', help_text='库区')
     station = django_filters.CharFilter(field_name='station', help_text='出库口')
-    st = django_filters.DateTimeFilter(field_name='created_date', lookup_expr='gte', help_text='开始时间')
-    et = django_filters.DateTimeFilter(field_name='created_date', lookup_expr='lte', help_text='结束时间')
+    st = django_filters.DateFilter(field_name='created_date__date', lookup_expr='gte', help_text='开始时间')
+    et = django_filters.DateFilter(field_name='created_date__date', lookup_expr='lte', help_text='结束时间')
 
     class Meta:
         model = OutBoundDeliveryOrder
