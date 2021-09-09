@@ -180,7 +180,9 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
                 'product_no': material_test_order.product_no,
                 'classes': material_test_order.production_class,
                 'equip_no': material_test_order.production_equip_no,
-                'factory_date': material_test_order.production_factory_date
+                'factory_date': material_test_order.production_factory_date,
+                'begin_trains': pfb_obj.begin_trains,
+                'end_trains': pfb_obj.end_trains,
             }
             instance = MaterialDealResult.objects.filter(lot_no=lot_no,
                                                          product_no=material_test_order.product_no)
