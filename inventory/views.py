@@ -3346,7 +3346,11 @@ class InOutBoundSummaryView(APIView):
                                                         Q(material_no__icontains='RFM')
                                                         ).aggregate(count=Sum('qty'))['count']
             # 终炼总入库车数
-            total_inbound_count = final_inbound_count if final_inbound_count else 0 + mixin_inbound_count if mixin_inbound_count else 0
+            if not final_inbound_count:
+                final_inbound_count = 0
+            if not mixin_inbound_count:
+                mixin_inbound_count = 0
+            total_inbound_count = final_inbound_count + mixin_inbound_count
 
             # 终炼库区终炼胶出库总车数
             final_outbound_count = FinalGumOutInventoryLog.objects.using('lb').filter(
@@ -3362,7 +3366,11 @@ class InOutBoundSummaryView(APIView):
                                                         Q(material_no__icontains='RFM')
                                                         ).aggregate(count=Sum('qty'))['count']
             # 终炼总出库车数
-            total_outbound_count = final_outbound_count if final_outbound_count else 0 + mixin_outbound_count if mixin_outbound_count else 0
+            if not final_outbound_count:
+                final_outbound_count = 0
+            if not mixin_outbound_count:
+                mixin_outbound_count = 0
+            total_outbound_count = final_outbound_count + mixin_outbound_count
             # 终炼总车次
             production_count = TrainsFeedbacks.objects.filter(
                 factory_date=date_now).filter(
