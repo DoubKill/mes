@@ -8,7 +8,8 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.views import APIView
 
 from basics.models import WorkSchedulePlan, Equip
-from inventory.models import InventoryLog, DispatchLog, FinalGumInInventoryLog, MixGumInInventoryLog
+from inventory.models import InventoryLog, DispatchLog, FinalGumInInventoryLog, MixGumInInventoryLog, \
+    FinalGumOutInventoryLog, MixGumOutInventoryLog
 from mes import settings
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
@@ -460,7 +461,7 @@ class IndexOverview(APIView):
 
     def get(self, request):
         ret = {}
-        factory_date, _, _ = self.get_current_factory_date()
+        factory_date, begin_time, _ = self.get_current_factory_date()
 
         # 日计划量
         plan_data = ProductClassesPlan.objects.filter(
@@ -471,30 +472,23 @@ class IndexOverview(APIView):
                                      output_field=DecimalField())/1000)
 
         # 日总产量
-        # actual_weight = TrainsFeedbacks.objects.filter(
-        #     factory_date=factory_date
-        # ).aggregate(total_weight=Sum('actual_weight'))['total_weight']
-        # actual_trains = TrainsFeedbacks.objects.filter(
-        #     factory_date=factory_date
-        # ).values('plan_classes_uid').annotate(max_trains=Max('actual_trains')).values_list('max_trains', flat=True)
-        # actual_data = {'total_trains': sum(actual_trains), 'total_weight': actual_weight}
         actual_data = TrainsFeedbacks.objects.filter(
             factory_date=factory_date
         ).aggregate(total_trains=Count('id'),
-                    total_weight=Sum('actual_weight')/1000)
+                    total_weight=Sum('actual_weight')/100000)
 
         # 日入库量
         try:
             final_gum_data = FinalGumInInventoryLog.objects.using('lb').filter(
-                start_time__date=factory_date).aggregate(
-                total_trains=Count('qty'),
+                start_time__gte=begin_time).aggregate(
+                total_trains=Sum('qty'),
                 total_weight=Sum('weight')/1000)
             final_gum_qyt = final_gum_data['total_trains'] if final_gum_data['total_trains'] else 0
             final_gum_weight = final_gum_data['total_weight'] if final_gum_data['total_weight'] else 0
 
             mix_gum_data = MixGumInInventoryLog.objects.using('bz').filter(
-                start_time__date=factory_date).aggregate(
-                total_trains=Count('qty'),
+                start_time__gte=begin_time).aggregate(
+                total_trains=Sum('qty'),
                 total_weight=Sum('weight') / 1000)
             mix_gum_qyt = mix_gum_data['total_trains'] if mix_gum_data['total_trains'] else 0
             mix_gum_weight = mix_gum_data['total_weight'] if mix_gum_data['total_weight'] else 0
@@ -502,15 +496,36 @@ class IndexOverview(APIView):
             final_gum_qyt = final_gum_weight = 0
             mix_gum_qyt = mix_gum_weight = 0
         inbound_data = {
-                        'total_trains': final_gum_qyt + mix_gum_qyt,
+                        'total_trains': int(final_gum_qyt + mix_gum_qyt),
                         'total_weight': final_gum_weight + mix_gum_weight
         }
 
         # 日出库量
-        outbound_data = InventoryLog.objects.filter(
-            fin_time__date=factory_date
-        ).aggregate(total_trains=Sum('qty'),
-                    total_weight=Sum('weight')/1000)
+        try:
+            final_outbound_data = FinalGumOutInventoryLog.objects.using('lb').filter(
+                start_time__gte=begin_time).filter(Q(location__startswith='1') |
+                                                   Q(location__startswith='2') |
+                                                   Q(location__startswith='3') |
+                                                   Q(location__startswith='4')
+                                                   ).aggregate(
+                total_trains=Sum('qty'),
+                total_weight=Sum('weight')/1000)
+            final_outbound_qyt = final_outbound_data['total_trains'] if final_outbound_data['total_trains'] else 0
+            final_outbound_weight = final_outbound_data['total_weight'] if final_outbound_data['total_weight'] else 0
+
+            mix_outbound_data = MixGumOutInventoryLog.objects.using('bz').filter(
+                start_time__gte=begin_time
+            ).aggregate(total_trains=Sum('qty'),
+                        total_weight=Sum('weight') / 1000)
+            mix_outbound_qyt = mix_outbound_data['total_trains'] if mix_outbound_data['total_trains'] else 0
+            mix_outbound_weight = mix_outbound_data['total_weight'] if mix_outbound_data['total_weight'] else 0
+        except Exception:
+            final_outbound_qyt = final_outbound_weight = 0
+            mix_outbound_qyt = mix_outbound_weight = 0
+        outbound_data = {
+                        'total_trains': int(final_outbound_qyt + mix_outbound_qyt),
+                        'total_weight': final_outbound_weight + mix_outbound_weight
+        }
 
         # 日发货量
         dispatch_data = DispatchLog.objects.filter(
