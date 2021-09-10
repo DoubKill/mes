@@ -1958,7 +1958,7 @@ class InventoryStaticsView(APIView):
 
         a = MaterialInventory.objects.using('default').filter(material__material_no__icontains=self.product_type
                                                               ).values('material__material_no').annotate(
-            qty=Sum('qty'), weight=Sum('total_weight')).values('material__material_no', 'qty', 'weight')
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material__material_no', 'qty', 'weight').order_by('material')
 
         aa = []
         if len(a) > 0:
@@ -1967,11 +1967,11 @@ class InventoryStaticsView(APIView):
 
         bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type
                                                               ).values('material_no').annotate(
-            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight')
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
 
         lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type, store_name='炼胶库'
                                                               ).values('material_no').annotate(
-            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight')
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
 
         edge = list(aa)  # 车间
         subject = list(bz) + list(lb)  # 立库
