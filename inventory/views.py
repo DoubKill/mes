@@ -51,8 +51,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     CarbonPlanManagementSerializer, DepotModelSerializer, DepotSiteModelSerializer, DepotPalltModelSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
-    DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer
+    DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -260,24 +259,9 @@ class OutWorkFeedBack(APIView):
                     dp_obj.status = 3
                     dp_obj.finish_time = datetime.datetime.now()
                     dp_obj.save()
-                    try:
-                        depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
-                        depot_site_name = '混炼线边库位' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库位"
-                        depot, _ = Depot.objects.get_or_create(depot_name=depot_name,
-                                                               description=depot_name)
-                        depot_site, _ = DepotSite.objects.get_or_create(depot=depot,
-                                                                        depot_site_name=depot_site_name,
-                                                                        description=depot_site_name)
-                        DepotPallt.objects.create(enter_time=datetime.datetime.now(),
-                                                  pallet_status=1,
-                                                  pallet_data=PalletFeedbacks.objects.filter(lot_no=dp_obj.lot_no).first(),
-                                                  depot_site=depot_site
-                                                  )
-                    except Exception:
-                        pass
                 else:
                     return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
-                station = dp_obj.outbound_delivery_order.station
+                station = dp_obj.station
                 station_dict = {
                     "一层前端": 3,
                     "一层后端": 4,
@@ -1958,7 +1942,7 @@ class InventoryStaticsView(APIView):
 
         a = MaterialInventory.objects.using('default').filter(material__material_no__icontains=self.product_type
                                                               ).values('material__material_no').annotate(
-            qty=Sum('qty'), weight=Sum('total_weight')).values('material__material_no', 'qty', 'weight')
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material__material_no', 'qty', 'weight').order_by('material')
 
         aa = []
         if len(a) > 0:
@@ -1967,11 +1951,11 @@ class InventoryStaticsView(APIView):
 
         bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type
                                                               ).values('material_no').annotate(
-            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight')
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
 
         lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type, store_name='炼胶库'
                                                               ).values('material_no').annotate(
-            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight')
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
 
         edge = list(aa)  # 车间
         subject = list(bz) + list(lb)  # 立库
@@ -3207,11 +3191,11 @@ class BzMixingRubberInventory(ListAPIView):
             if station == '一层前端':
                 queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-            elif station == '二层前端':
+            elif station in ('二层前端', '二层后端'):
                 queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-            elif station == '一层后端':
-                raise ValidationError('该出库口不可用！')
+            else:
+                queryset = []
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True)
         if export:
@@ -3244,10 +3228,10 @@ class BzMixingRubberInventorySummary(APIView):
             if station == '一层前端':
                 queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-            elif station == '二层前端':
+            elif station in ('二层前端', '二层后端'):
                 queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-            elif station == '一层后端':
+            else:
                 return Response([])
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
@@ -3292,11 +3276,9 @@ class BzMixingRubberInventorySearch(ListAPIView):
         if station == '一层前端':
             queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
             # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-        elif station == '二层前端':
+        elif station in ('二层前端', '二层后端'):
             queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
             # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-        elif station == '一层后端':
-            raise ValidationError('该出库口不可用！')
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
         if st:
@@ -3510,7 +3492,6 @@ class OutBoundTasksListView(ListAPIView):
     """
         根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
     """
-    serializer_class = OutBoundTasksSerializer
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
@@ -3519,10 +3500,17 @@ class OutBoundTasksListView(ListAPIView):
             station = Station.objects.get(id=station_id).name
         except Exception:
             raise ValidationError('参数错误')
-        return OutBoundDeliveryOrderDetail.objects.filter(outbound_delivery_order__warehouse=warehouse_name,
-                                                          outbound_delivery_order__station=station,
-                                                          status=3
-                                                          ).order_by('-finish_time')
+        if warehouse_name == '混炼胶库':
+            return DeliveryPlan.objects.filter(status=1, station=station).order_by('-finish_time')
+        else:
+            return DeliveryPlanFinal.objects.filter(status=1, station=station).order_by('-finish_time')
+
+    def get_serializer_class(self):
+        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
+        if warehouse_name == '混炼胶库':
+            return PutPlanManagementSerializer
+        else:
+            return PutPlanManagementSerializerFinal
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3684,11 +3672,7 @@ class InOutBoundSummaryView(APIView):
                                                         Q(material_no__icontains='RFM')
                                                         ).aggregate(count=Sum('qty'))['count']
             # 终炼总入库车数
-            if not final_inbound_count:
-                final_inbound_count = 0
-            if not mixin_inbound_count:
-                mixin_inbound_count = 0
-            total_inbound_count = final_inbound_count + mixin_inbound_count
+            total_inbound_count = final_inbound_count if final_inbound_count else 0 + mixin_inbound_count if mixin_inbound_count else 0
 
             # 终炼库区终炼胶出库总车数
             final_outbound_count = FinalGumOutInventoryLog.objects.using('lb').filter(
@@ -3704,11 +3688,7 @@ class InOutBoundSummaryView(APIView):
                                                         Q(material_no__icontains='RFM')
                                                         ).aggregate(count=Sum('qty'))['count']
             # 终炼总出库车数
-            if not final_outbound_count:
-                final_outbound_count = 0
-            if not mixin_outbound_count:
-                mixin_outbound_count = 0
-            total_outbound_count = final_outbound_count + mixin_outbound_count
+            total_outbound_count = final_outbound_count if final_outbound_count else 0 + mixin_outbound_count if mixin_outbound_count else 0
             # 终炼总车次
             production_count = TrainsFeedbacks.objects.filter(
                 factory_date=date_now).filter(
@@ -3959,7 +3939,7 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
-    queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-created_date')
+    queryset = OutBoundDeliveryOrderDetail.objects.all()
     serializer_class = OutBoundDeliveryOrderDetailSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderDetailFilter
@@ -3972,7 +3952,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             raise ValidationError('请选择货物出库！')
         detail_ids = []
         for item in data:
-            s = self.serializer_class(data=item, context={'request': request})
+            s = self.serializer_class(data=item)
             s.is_valid(raise_exception=True)
             instance = s.validated_data['outbound_delivery_order']
             detail = s.save()
@@ -3989,8 +3969,6 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
                          'RFID': detail.pallet_no,
                          'STATIONID': instance.station,
                          'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                if instance.warehouse == '终炼胶库':
-                    dict1['STOREDEF_ID'] = 1
                 items.append(dict1)
             json_data = {
                 'msgId': instance.order_no,
@@ -4012,7 +3990,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
                 except:
                     msg = result[0]['msg']
                 if "TRUE" in msg:  # 成功
-                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=1)
                 else:  # 失败
                     OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
                     raise ValidationError('出库失败：{}'.format(msg))
