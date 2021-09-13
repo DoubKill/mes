@@ -340,94 +340,74 @@ class ProductActualViewSet(mixins.ListModelMixin,
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
-        search_time_str = params.get("search_time")
+        day_time = params.get("search_time", datetime.datetime.now().date())
         target_equip_no = params.get('equip_no')
-        if search_time_str:
-            if not re.search(r"[0-9]{4}\-[0-9]{1,2}\-[0-9]{1,2}", search_time_str):
-                raise ValidationError("查询时间格式异常")
-        else:
-            search_time_str = str(datetime.date.today())
+        plan_queryset = ProductClassesPlan.objects.filter(delete_flag=False,
+                                                          work_schedule_plan__plan_schedule__day_time=day_time
+                                                          ).order_by('equip__equip_no')
         if target_equip_no:
-            pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=search_time_str,
-                                                        work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
-                                                        equip__equip_no=target_equip_no,
-                                                        delete_flag=False).select_related('equip__equip_no',
-                                                                                          'product_batching__stage_product_batch_no',
-                                                                                          'work_schedule_plan__classes__global_name',
-                                                                                          'product_day_plan_id',
-                                                                                          "work_schedule_plan__plan_schedule__plan_schedule_no")
-        else:
-            pcp_set = ProductClassesPlan.objects.filter(work_schedule_plan__plan_schedule__day_time=search_time_str,
-                                                        work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name="密炼",
-                                                        delete_flag=False).select_related('equip__equip_no',
-                                                                                          'product_batching__stage_product_batch_no',
-                                                                                          'work_schedule_plan__classes__global_name',
-                                                                                          'product_day_plan_id',
-                                                                                          "work_schedule_plan__plan_schedule__plan_schedule_no")
-        uid_list = pcp_set.values_list("plan_classes_uid", flat=True)
-        day_plan_list_temp = pcp_set.values_list("product_batching__stage_product_batch_no", "equip__equip_no")
-        day_plan_list = list(set([x[0] + x[1] for x in day_plan_list_temp]))
-        tf_set = TrainsFeedbacks.objects.values('plan_classes_uid').filter(plan_classes_uid__in=uid_list).annotate(
-            actual_trains=Max('actual_trains'), actual_weight=Max('actual_weight'), classes=Max('classes'))
-        tf_dict = {x.get("plan_classes_uid"): [x.get("actual_trains"), x.get("actual_weight"), x.get("classes")] for x
-                   in tf_set}
-        day_plan_dict = {x: {"plan_weight": 0, "plan_trains": 0, "actual_trains": 0, "actual_weight": 0,
-                             "classes_data": [{"plan_trains": 0, "actual_trains": 0, "classes": "早班"},
-                                              {"plan_trains": 0, "actual_trains": 0, "classes": "中班"},
-                                              {"plan_trains": 0, "actual_trains": 0, "classes": "夜班"}
-                                              ]}
-                         for x in day_plan_list}
-        pcp_data = pcp_set.values("plan_classes_uid", "weight", "plan_trains", 'equip__equip_no',
-                                  'product_batching__stage_product_batch_no',
-                                  'product_day_plan_id',
-                                  'work_schedule_plan__classes__global_name',
-                                  "work_schedule_plan__plan_schedule__plan_schedule_no")
-        for pcp in pcp_data:
-            class_name = pcp.get("work_schedule_plan__classes__global_name")
-            day_plan_id = pcp.get("product_batching__stage_product_batch_no") + pcp.get("equip__equip_no")
-            plan_classes_uid = pcp.get('plan_classes_uid')
-            day_plan_dict[day_plan_id].update(
-                equip_no=pcp.get('equip__equip_no'),
-                product_no=pcp.get('product_batching__stage_product_batch_no'))
-            day_plan_dict[day_plan_id]["plan_weight"] += pcp.get('weight', 0)
-            day_plan_dict[day_plan_id]["plan_trains"] += pcp.get('plan_trains', 0)
-            if not tf_dict.get(plan_classes_uid):
-                if class_name == "早班":
-                    day_plan_dict[day_plan_id]["classes_data"][0] = {
-                        "plan_trains": pcp.get('plan_trains'),
-                        "actual_trains": 0,
-                        "classes": "早班"
-                    }
-                if class_name == "中班":
-                    day_plan_dict[day_plan_id]["classes_data"][1] = {
-                        "plan_trains": pcp.get('plan_trains'),
-                        "actual_trains": 0,
-                        "classes": "中班"
-                    }
-                if class_name == "夜班":
-                    day_plan_dict[day_plan_id]["classes_data"][2] = {
-                        "plan_trains": pcp.get('plan_trains'),
-                        "actual_trains": 0,
-                        "classes": "夜班"
-                    }
-                continue
-            day_plan_dict[day_plan_id]["actual_trains"] += tf_dict[plan_classes_uid][0]
-            day_plan_dict[day_plan_id]["actual_weight"] += tf_dict[plan_classes_uid][1]
-            if tf_dict[plan_classes_uid][2] == "早班":
-                day_plan_dict[day_plan_id]["classes_data"][0]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][0]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
-                    0]
-            if tf_dict[plan_classes_uid][2] == "中班":
-                day_plan_dict[day_plan_id]["classes_data"][1]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][1]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
-                    0]
-            if tf_dict[plan_classes_uid][2] == "夜班":
-                day_plan_dict[day_plan_id]["classes_data"][2]["plan_trains"] += pcp.get('plan_trains')
-                day_plan_dict[day_plan_id]["classes_data"][2]["actual_trains"] += tf_dict[pcp.get("plan_classes_uid")][
-                    0]
-        ret_list = [_ for _ in day_plan_dict.values()]
-        ret_list.sort(key=lambda x: x.get("equip_no"))
-        ret = {"data": ret_list}
+            plan_queryset = plan_queryset.filter(equip__equip_no=target_equip_no)
+        plan_data = plan_queryset.values(
+            'equip__equip_no',
+            'product_batching__stage_product_batch_no',
+            'work_schedule_plan__classes__global_name'
+        ).annotate(plan_trains=Sum('plan_trains')).values(equip_no=F('equip__equip_no'),
+                                                           product_no=F('product_batching__stage_product_batch_no'),
+                                                           plan_trains=F('plan_trains'),
+                                                           classes=F('work_schedule_plan__classes__global_name'))
+        plan_data_dict = {item['equip_no']+item['product_no']+item['classes']: item for item in plan_data}
+
+        plan_classes_uid_list = plan_queryset.values_list('plan_classes_uid', flat=True)
+        tf_set = TrainsFeedbacks.objects.filter(
+            plan_classes_uid__in=plan_classes_uid_list
+        ).values('equip_no',
+                 'product_no',
+                 'classes'
+                 ).annotate(
+            actual_trains=Count('actual_trains'),
+            actual_weight=Max('actual_weight'),
+            plan_weight=Max('plan_weight')
+        ).values('equip_no', 'product_no', 'classes', 'actual_trains', 'actual_weight', 'plan_weight')
+        actual_data_dict = {item['equip_no']+item['product_no']+item['classes']: item for item in tf_set}
+        ret = {}
+
+        for key, value in plan_data_dict.items():
+            if key in actual_data_dict:
+                value['actual_trains'] = actual_data_dict[key]['actual_trains']
+                value['actual_weight'] = actual_data_dict[key]['actual_weight']
+                value['plan_weight'] = actual_data_dict[key]['plan_weight']
+            else:
+                value['actual_trains'] = 0
+                value['actual_weight'] = 0
+                value['plan_weight'] = 0
+            equip_product_key = value['equip_no']+value['product_no']
+            if equip_product_key not in ret:
+                classes_data = {'早班': {'plan_trains': 0, 'actual_trains': 0, 'classes': '早班'},
+                                '中班': {'plan_trains': 0, 'actual_trains': 0, 'classes': '中班'},
+                                '夜班': {'plan_trains': 0, 'actual_trains': 0, 'classes': '夜班'}}
+                classes_data[value['classes']] = {'plan_trains': value['plan_trains'],
+                                                  'actual_trains': value['actual_trains'],
+                                                  'classes': value['classes']}
+                ret[equip_product_key] = {
+                               'equip_no': value['equip_no'],
+                               'product_no': value['product_no'],
+                               'plan_trains': value['plan_trains'],
+                               'actual_trains': value['actual_trains'],
+                               'plan_weight': value['plan_weight'],
+                               'actual_weight': value['actual_weight'],
+                               'classes_data': classes_data,
+                           }
+            else:
+                ret[equip_product_key]['plan_trains'] += value['plan_trains']
+                ret[equip_product_key]['actual_trains'] += value['actual_trains']
+                ret[equip_product_key]['classes_data'][value['classes']] = {
+                    'plan_trains': value['plan_trains'],
+                    'actual_trains': value['actual_trains'],
+                    'classes': value['classes']}
+
+        for item in ret.values():
+            item['classes_data'] = item['classes_data'].values()
+        ret = {"data": ret.values()}
         return Response(ret)
 
 
