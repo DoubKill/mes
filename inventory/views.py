@@ -3727,39 +3727,40 @@ class InOutBoundSummaryView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class LIBRARYINVENTORYView(ListAPIView):
 
-    def get_result(self, model, db, material_no, stage, store_name, location, location_status, warehouse_name):
-        # 胶料品质状态数据
-        result = model.objects.using(db).filter(
-            material_no__icontains=material_no,
-            material_no__contains=f'-{stage}',
-            location__startswith=location,
-            location_status__in=location_status,
-            store_name=store_name
-        ).values('material_no', 'quality_level').annotate(qty=Sum('qty'), total_weight=Sum('total_weight')).values(
-            'material_no', 'quality_level', 'qty', 'total_weight', 'location').order_by('material_no')
-
+    def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
         # 各胶料封闭货位数据
-        fb = model.objects.using(db).filter(location_status='封闭货位').values('material_no').annotate(qty=Sum('qty'),
-                                           total_weight=Sum('total_weight')
-                                           ).values('material_no', 'qty', 'total_weight')
+        fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(qty=Sum('qty'),
+                                            total_weight=Sum('total_weight')
+                                            ).values('material_no', 'qty', 'total_weight')
+        # 胶料品质状态数据
+        query_set = model.objects.using(db).filter(store_name=store_name).filter(**kwargs)
+        if location_status:
+            if location_status == 'Y':
+                query_set = query_set.filter(location_status='封闭货位')
+            else:
+                query_set = query_set.exclude(location_status='封闭货位')
+                fb = []
+        result = query_set.values('material_no', 'quality_level').annotate(qty=Sum('qty'), total_weight=Sum('total_weight')).values(
+            'material_no', 'quality_level', 'qty', 'total_weight').order_by('material_no')
+
         res = {}
         for i in result:
-            s = {i['material_no']: {
-                'material_no': i['material_no'],
-                'warehouse_name': warehouse_name,
-                'location': i['location'].split('-')[0],
-                'stage': i['material_no'].split('-')[1],
-                'all_qty': i['qty'],
-                'total_weight': i['total_weight'],
-                i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight']},
-
-            }}
-            if res.get(i['material_no']):
-                res[i['material_no']].update({i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight']}})
+            if i['material_no'] not in res:
+                res[i['material_no']] = {
+                    'material_no': i['material_no'],
+                    'warehouse_name': warehouse_name,
+                    'location': kwargs.get('location__startswith'),
+                    'stage': i['material_no'].split('-')[1],
+                    'all_qty': i['qty'],
+                    'total_weight': i['total_weight'],
+                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight']},
+                }
+            else:
+                res[i['material_no']][i['quality_level']] = {
+                    'qty': i['qty'],
+                    'total_weight': i['total_weight']}
                 res[i['material_no']]['all_qty'] += i['qty']
                 res[i['material_no']]['total_weight'] += i['total_weight']
-            else:
-                res.update(s)
 
         for i in fb:
             if res.get(i['material_no']):
@@ -3797,7 +3798,7 @@ class LIBRARYINVENTORYView(ListAPIView):
                 sheet.write(data_row, 2, i['material_no'])
                 sheet.write(data_row, 3, i['material_no'])
                 sheet.write(data_row, 4, i['warehouse_name'])
-                sheet.write(data_row, 5, i['location'].split('-')[0])
+                sheet.write(data_row, 5, i['location'])
                 sheet.write(data_row, 6, i['一等品']['qty'] if i.get('一等品') else None)
                 sheet.write(data_row, 7, i['一等品']['total_weight'] if i.get('一等品') else None)
                 sheet.write(data_row, 8, i['三等品']['qty'] if i.get('三等品') else None)
@@ -3838,39 +3839,36 @@ class LIBRARYINVENTORYView(ListAPIView):
                 raise ValidationError("page/page_size值异常")
             if et not in range(0, 99999):
                 raise ValidationError("page/page_size值异常")
-        stage_list = GlobalCode.objects.filter(use_flag=True, global_type__use_flag=True,
-                                               global_type__type_name="胶料段次").values_list("global_name", flat=True)
-        if stage and not '':
-            if stage not in stage_list:
-                raise ValidationError("胶料段次异常请修正后重试")
 
-        if location_status == 'Y':
-            location_status = ['封闭货位']
-        elif location_status == 'N':
-            location_status = ['有货货位', '工作货位', '异常货位']
-        else:
-            location_status = ['有货货位', '工作货位', '异常货位', '封闭货位']
+        filter_kwargs = {}
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if stage:
+            filter_kwargs['material_no__contains'] = f'-{stage}'
+        if location:
+            filter_kwargs['location__startswith'] = location
 
         if warehouse_name == '混炼胶库':
             model = BzFinalMixingRubberInventory
             store_name = '立体库'
-            temp = self.get_result(model,'bz', material_no, stage, store_name, location, location_status, warehouse_name)
+            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, **filter_kwargs)
 
         elif warehouse_name == '终炼胶库':
             model = BzFinalMixingRubberInventoryLB
             store_name = '炼胶库'
-            temp = self.get_result(model, 'lb', material_no, stage, store_name, location, location_status, warehouse_name)
+            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, **filter_kwargs)
 
         else:
             model1 = BzFinalMixingRubberInventory
             store_name1 = '立体库'
             warehouse_name1 = '混炼胶库'
-            temp1 = self.get_result(model1, 'bz', material_no, stage, store_name1, location, location_status, warehouse_name1)
+            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, **filter_kwargs)
             model2 = BzFinalMixingRubberInventoryLB
             store_name2 = '炼胶库'
             warehouse_name2 = '终炼胶库'
-            temp2 = self.get_result(model2, 'lb', material_no, stage, store_name2, location, location_status, warehouse_name2)
+            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
             temp = list(temp1) + list(temp2)
+            temp = sorted(temp, key=lambda x: x['material_no'])
 
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
