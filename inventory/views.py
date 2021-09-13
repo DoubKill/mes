@@ -3734,18 +3734,18 @@ class LIBRARYINVENTORYView(ListAPIView):
             location_status__in=location_status,
             store_name=store_name
         ).values('material_no', 'quality_level').annotate(qty=Sum('qty'), total_weight=Sum('total_weight')).values(
-            'material_no', 'quality_level', 'qty', 'total_weight').order_by('material_no')
+            'material_no', 'quality_level', 'qty', 'total_weight', 'location').order_by('material_no')
 
         # 各胶料封闭货位数据
         fb = model.objects.using(db).filter(location_status='封闭货位').values('material_no').annotate(qty=Sum('qty'),
                                            total_weight=Sum('total_weight')
                                            ).values('material_no', 'qty', 'total_weight')
-
         res = {}
         for i in result:
             s = {i['material_no']: {
                 'material_no': i['material_no'],
                 'warehouse_name': warehouse_name,
+                'location': i['location'].split('-')[0],
                 'stage': i['material_no'].split('-')[1],
                 'all_qty': i['qty'],
                 'total_weight': i['total_weight'],
@@ -3795,16 +3795,17 @@ class LIBRARYINVENTORYView(ListAPIView):
                 sheet.write(data_row, 2, i['material_no'])
                 sheet.write(data_row, 3, i['material_no'])
                 sheet.write(data_row, 4, i['warehouse_name'])
-                sheet.write(data_row, 5, i['一等品']['qty'] if i.get('一等品') else None)
-                sheet.write(data_row, 6, i['一等品']['total_weight'] if i.get('一等品') else None)
-                sheet.write(data_row, 7, i['三等品']['qty'] if i.get('三等品') else None)
-                sheet.write(data_row, 8, i['三等品']['total_weight'] if i.get('三等品') else None)
-                sheet.write(data_row, 9, i['待检品']['qty'] if i.get('待检品') else None)
-                sheet.write(data_row, 10, i['待检品']['total_weight'] if i.get('待检品') else None)
-                sheet.write(data_row, 11, i['all_qty'])
-                sheet.write(data_row, 12, i['total_weight'])
-                sheet.write(data_row, 13, i['封闭']['qty'] if i.get('封闭') else None)
-                sheet.write(data_row, 14, i['封闭']['total_weight'] if i.get('封闭') else None)
+                sheet.write(data_row, 5, i['location'].split('-')[0])
+                sheet.write(data_row, 6, i['一等品']['qty'] if i.get('一等品') else None)
+                sheet.write(data_row, 7, i['一等品']['total_weight'] if i.get('一等品') else None)
+                sheet.write(data_row, 8, i['三等品']['qty'] if i.get('三等品') else None)
+                sheet.write(data_row, 9, i['三等品']['total_weight'] if i.get('三等品') else None)
+                sheet.write(data_row, 10, i['待检品']['qty'] if i.get('待检品') else None)
+                sheet.write(data_row, 11, i['待检品']['total_weight'] if i.get('待检品') else None)
+                sheet.write(data_row, 12, i['all_qty'])
+                sheet.write(data_row, 13, i['total_weight'])
+                sheet.write(data_row, 14, i['封闭']['qty'] if i.get('封闭') else None)
+                sheet.write(data_row, 15, i['封闭']['total_weight'] if i.get('封闭') else None)
                 data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
