@@ -301,7 +301,7 @@ class PlanRealityViewSet(mixins.ListModelMixin,
                 equip_no=pcp.get('equip__equip_no'),
                 product_no=pcp.get('product_batching__stage_product_batch_no'),
                 stage=pcp.get('product_batching__stage__global_name'))
-            day_plan_dict[day_plan_id]["plan_weight"] += pcp.get('weight', 0)
+            day_plan_dict[day_plan_id]["plan_weight"] = pcp.get('weight', 0)
             day_plan_dict[day_plan_id]["plan_trains"] += pcp.get('plan_trains', 0)
             day_plan_dict[day_plan_id]["plan_time"] += pcp.get('time', 0)
             if not tf_dict.get(plan_classes_uid):
