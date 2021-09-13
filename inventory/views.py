@@ -3313,7 +3313,8 @@ class BzMixingRubberInventorySearch(ListAPIView):
             if storage_quantity >= need_qty:
                 break
         serializer = self.get_serializer(ret, many=True)
-        return Response(serializer.data)
+        total_trains = queryset.aggregate(total_count=Sum('qty'))['total_count']
+        return Response({'data': serializer.data, 'total_trains': total_trains if total_trains else 0})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3502,7 +3503,8 @@ class BzFinalRubberInventorySearch(ListAPIView):
             if storage_quantity >= need_qty:
                 break
         serializer = self.get_serializer(ret, many=True)
-        return Response(serializer.data)
+        total_trains = queryset.aggregate(total_count=Sum('qty'))['total_count']
+        return Response({'data': serializer.data, 'total_trains': total_trains if total_trains else 0})
 
 
 @method_decorator([api_recorder], name="dispatch")
