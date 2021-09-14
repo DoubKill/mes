@@ -3765,8 +3765,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         for i in fb:
             if res.get(i['material_no']):
                 res[i['material_no']].update({'封闭': {'qty': i['qty'], 'total_weight': i['total_weight']}})
-                res[i['material_no']]['all_qty'] += i['qty']
-                res[i['material_no']]['total_weight'] += i['total_weight']
+
 
         return list(res.values())
 
