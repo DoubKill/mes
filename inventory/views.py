@@ -3785,7 +3785,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
 
-        columns = ['No', '胶料类型', '物料编码', '物料名称', '库区', '一等品库存数(车)', '重量(kg)', '三等品库存数(车)', '重量(kg)',
+        columns = ['No', '胶料类型', '物料编码', '物料名称', '库区', '巷道', '一等品库存数(车)', '重量(kg)', '三等品库存数(车)', '重量(kg)',
                    '待检品库存数(车)', '重量(kg)', '总库存数(车)', '总重量(kg)', '封闭库存数(车)', '重量(kg)']
         # 写入文件标题
         for col_num in range(len(columns)):
