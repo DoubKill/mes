@@ -1905,9 +1905,7 @@ class InventoryStaticsView(APIView):
 
     def get_sections(self, s_time, e_time):
         main_titles = []
-        main_type = []
         edge_titles = []
-        edge_type = []
         product_set = set(
             BzFinalMixingRubberInventory.objects.filter(material_no__icontains=self.product_type,
                                                         in_storage_time__gte=s_time,
@@ -1918,12 +1916,10 @@ class InventoryStaticsView(APIView):
         for x in product_set:
             try:
                 t = x.split('-')[1]
-                s = x.split('-')[2]
             except:
                 pass
             else:
                 main_titles.append(t)
-                main_type.append(s)
         edge_set = set(MaterialInventory.objects.filter(material__material_no=self.product_type,
                                                         created_date__gte=s_time,
                                                         created_date__lte=e_time
@@ -1933,13 +1929,11 @@ class InventoryStaticsView(APIView):
         for x in edge_set:
             try:
                 t = x.split('-')[1]
-                s = x.split('-')[2]
             except:
                 pass
             else:
                 edge_titles.append(t)
-                edge_type.append(s)
-        return list(product_set) + list(edge_set), list(main_titles), list(edge_titles)
+        return list(main_titles), list(edge_titles)
 
     def get(self, request):
         product_type = request.query_params.get("name")
@@ -1950,24 +1944,30 @@ class InventoryStaticsView(APIView):
             s_time, e_time = '1111-11-11', '9999-11-11'
 
         self.product_type = product_type
-        material_list, main_titles, edge_titles = self.get_sections(s_time, e_time)
+        main_titles, edge_titles = self.get_sections(s_time, e_time)
         # st = (int(page) - 1) * 10
         # et = int(page) * 10
 
-        a = MaterialInventory.objects.using('default').filter(material__material_no__icontains=self.product_type
+        a = MaterialInventory.objects.using('default').filter(material__material_no__icontains=self.product_type,
+                                                              created_date__gte=s_time,
+                                                              created_date__lte=e_time
                                                               ).values('material__material_no').annotate(
             qty=Sum('qty'), weight=Sum('total_weight')).values('material__material_no', 'qty', 'weight').order_by('material')
-
         aa = []
         if len(a) > 0:
             for i in a:
                 aa.append({'material_no': i['material__material_no'], 'qty': i['qty'], 'weight': i['weight']})
 
-        bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type
+        bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type,
+                                                                     in_storage_time__gte=s_time,
+                                                                     in_storage_time__lte=e_time
                                                               ).values('material_no').annotate(
             qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
 
-        lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type, store_name='炼胶库'
+        lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type,
+                                                                       store_name='炼胶库',
+                                                                       in_storage_time__gte=s_time,
+                                                                       in_storage_time__lte=e_time
                                                               ).values('material_no').annotate(
             qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
 
@@ -2038,69 +2038,47 @@ class InventoryStaticsView(APIView):
                 results[i]['edge']["FM"]["weight"] = self.my_cut(fm2_weight, rfm2_weight)
                 results[i]['edge']["FM"]["qty"] = self.my_cut(fm2_qty, rfm2_qty)
 
-        # 不合格加硫计算
+        # 不合格加硫计算/ 加硫总量计算
         s = ["FM", 'RE', 'RFM']
         for station in s:
             edge_error = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type).filter(
-                material__material_no__icontains=station,
-                quality_status="三等品").values('material__material_no').annotate(weight=Sum("total_weight")).values('material__material_no', 'weight')
+                material__material_no__icontains=f'-{station}').values('material__material_no', 'quality_status').annotate(
+                weight=Sum("total_weight")).values('material__material_no', 'weight', 'quality_status')
             if len(edge_error) > 0:
                 for i in edge_error:
                     try:
-                        if results.get(i['material__material_no'].split('-')[2]):
+                        if results.get(i['material__material_no'].split('-')[2]) and i['quality_status'] == '三等品':
                             results[i['material__material_no'].split('-')[2]]['error'] += i['weight']
-                    except: pass
-
-            inventory_error = BzFinalMixingRubberInventory.objects.using('bz').filter(
-                material_no__icontains=self.product_type).filter(material_no__icontains=station,
-                                                                 quality_level="三等品").values('material_no').\
-                annotate(weight=Sum("total_weight")).values('material_no', 'weight')
-            if len(inventory_error) > 0:
-                for i in inventory_error:
-                    try:
-                        if results.get(i['material_no'].split('-')[2]):
-                            results[i['material_no'].split('-')[2]]['error'] += i['weight']
-                    except: pass
-
-            lb_error = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
-                material_no__icontains=self.product_type).filter(material_no__icontains=station,
-                                                                 quality_level="三等品").values('material_no').\
-                annotate(weight=Sum("total_weight")).values('material_no', 'weight')
-            if len(lb_error) > 0:
-                for i in lb_error:
-                    try:
-                        if results.get(i['material_no'].split('-')[2]):
-                            results[i['material_no'].split('-')[2]]['error'] += i['weight']
-                    except: pass
-
-        # 加硫总量计算
-        for station in s:
-            fm_mi = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type).filter(
-                material__material_no__icontains=station).values('material__material_no').annotate(weight=Sum("total_weight")).values('material__material_no', 'weight')
-            if len(fm_mi) > 0:
-                for i in fm_mi:
-                    try:
                         if results.get(i['material__material_no'].split('-')[2]):
                             results[i['material__material_no'].split('-')[2]]['fm_all'] += i['weight']
                     except: pass
 
-            fm_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(
-                material_no__icontains=self.product_type).filter(material_no__icontains=station).values('material_no').\
-                annotate(weight=Sum("total_weight")).values('material_no', 'weight')
-            if len(fm_bz) > 0:
-                for i in fm_bz:
+            inventory_error = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                in_storage_time__gte=s_time,
+                in_storage_time__lte=e_time,
+                material_no__icontains=self.product_type).filter(material_no__icontains=f'-{station}',
+                                                                ).values('material_no', 'quality_level').\
+                annotate(weight=Sum("total_weight")).values('material_no', 'weight', 'quality_level')
+            if len(inventory_error) > 0:
+                for i in inventory_error:
                     try:
+                        if results.get(i['material_no'].split('-')[2]) and i['quality_level'] == '三等品':
+                            results[i['material_no'].split('-')[2]]['error'] += i['weight']
                         if results.get(i['material_no'].split('-')[2]):
                             results[i['material_no'].split('-')[2]]['fm_all'] += i['weight']
                     except: pass
 
-
-            fm_lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
-                material_no__icontains=self.product_type).filter(material_no__icontains=station).values('material_no').\
-                annotate(weight=Sum("total_weight")).values('material_no', 'weight')
-            if len(fm_lb) > 0:
-                for i in fm_lb:
+            lb_error = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                in_storage_time__gte=s_time,
+                in_storage_time__lte=e_time,
+                material_no__icontains=self.product_type).filter(material_no__icontains=f'-{station}',
+                                                                 ).values('material_no', 'quality_level').\
+                annotate(weight=Sum("total_weight")).values('material_no', 'weight', 'quality_level')
+            if len(lb_error) > 0:
+                for i in lb_error:
                     try:
+                        if results.get(i['material_no'].split('-')[2]) and i['quality_level'] == '三等品':
+                            results[i['material_no'].split('-')[2]]['error'] += i['weight']
                         if results.get(i['material_no'].split('-')[2]):
                             results[i['material_no'].split('-')[2]]['fm_all'] += i['weight']
                     except: pass
@@ -2108,7 +2086,10 @@ class InventoryStaticsView(APIView):
         # 无硫总量计算
         ws = ["CMB", 'HMB', 'NF', 'RMB', '1MB', '2MB', '3MB']
         for station in ws:
-            product_mi = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type).filter(
+            product_mi = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type,
+                                                          created_date__gte=s_time,
+                                                          created_date__lte=e_time
+                                                          ).filter(
                                                 material__material_no__icontains=station).values('material__material_no').\
                 annotate(weight=Sum("total_weight")).values('material__material_no', 'weight')
             if len(product_mi) > 0:
@@ -2118,7 +2099,10 @@ class InventoryStaticsView(APIView):
                             results[i['material__material_no'].split('-')[2]]['ufm_all'] += i['weight']
                     except: pass
 
-            product_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type).filter(
+            product_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type,
+                                                                                 in_storage_time__gte=s_time,
+                                                                                 in_storage_time__lte=e_time,
+                                                                                 ).filter(
                 material_no__icontains=station).values('material_no').annotate(weight=Sum("total_weight")).values('material_no', 'weight')
             if len(product_bz) > 0:
                 for i in product_bz:
@@ -2127,7 +2111,10 @@ class InventoryStaticsView(APIView):
                             results[i['material_no'].split('-')[2]]['ufm_all'] += i['weight']
                     except: pass
 
-            product_lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type).filter(
+            product_lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type,
+                                                                                   in_storage_time__gte=s_time,
+                                                                                   in_storage_time__lte=e_time,
+                                                                                   ).filter(
                 material_no__icontains=station).values('material_no').annotate(weight=Sum("total_weight")).values('material_no', 'weight')
             if len(product_lb) > 0:
                 for i in product_lb:
@@ -2226,12 +2213,9 @@ class ProductDetailsView(APIView):
         export = params.get("export")
         filters = dict()
         other_filters = dict()
-        if material_type:
-            filters.update(material_no__icontains=material_type)
-            other_filters.update(material__material_no__icontains=material_no)
-        if material_no:
-            filters.update(material_no__icontains=material_no)
-            other_filters.update(material__material_no__icontains=material_type)
+        filters.update(material_no__icontains=material_no, material_no__contains=material_type)
+        other_filters.update(material__material_no__icontains=material_no, material__material_no__contains=material_type)
+
         mix_set = BzFinalMixingRubberInventory.objects.using('bz').filter(**filters)
         final_set = BzFinalMixingRubberInventory.objects.using('lb').filter(store_name='炼胶库').filter(**filters)
         mix_data = mix_set.values("material_no").annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
