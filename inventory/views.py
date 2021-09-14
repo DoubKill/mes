@@ -612,7 +612,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export', None)
-        order_type = self.request.query_params.get('export', None)
+        order_type = self.request.query_params.get('order_type', None)
         store_name = self.request.query_params.get("warehouse_name")
         if order_type == '出库':
             queryset = self.get_queryset('出库')
