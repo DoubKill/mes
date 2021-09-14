@@ -1901,8 +1901,6 @@ class InventoryStaticsView(APIView):
                                                      }).values(filter_key.split('__icontains')[0]).annotate(
             qty=Sum('qty'), weight=Sum('total_weight')).values(filter_key.split('__icontains')[0], 'qty', 'weight')
 
-        print(temp_set)
-
         return temp_set
 
     def get_sections(self, s_time, e_time):
@@ -1991,8 +1989,12 @@ class InventoryStaticsView(APIView):
                 }
 
                 if results.get(i['material_no'].split('-')[2]):
-                    results[i['material_no'].split('-')[2]]['subject'].update(
-                        {i['material_no'].split('-')[1]: {'qty': i['qty'], 'weight': i['weight']}})
+                    if results[i['material_no'].split('-')[2]]['subject'].get(i['material_no'].split('-')[1]):
+                        results[i['material_no'].split('-')[2]]['subject'][i['material_no'].split('-')[1]]['qty'] += i['qty']
+                        results[i['material_no'].split('-')[2]]['subject'][i['material_no'].split('-')[1]]['weight'] += i['weight']
+                    else:
+                        results[i['material_no'].split('-')[2]]['subject'].update(
+                            {i['material_no'].split('-')[1]: {'qty': i['qty'], 'weight': i['weight']}})
                 else:
                     results.update(res)
             except:
