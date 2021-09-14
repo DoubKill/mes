@@ -7,6 +7,7 @@ from io import BytesIO, StringIO
 
 import requests
 import xlwt
+from itertools import chain
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q
 from django.db.transaction import atomic
@@ -419,12 +420,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     # filter_backends = (InventoryFilterBackend,)
 
-    def get_queryset(self):
+    def get_queryset(self, order_type):
         filter_dict = {}
         store_name = self.request.query_params.get("warehouse_name")
-        if not store_name:
-            store_name = "混炼胶库"
-        order_type = self.request.query_params.get("order_type", "出库")
+        order_type = order_type
         start_time = self.request.query_params.get("start_time")
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
@@ -531,7 +530,28 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 return MaterialInHistory.objects.using('cb').filter(**filter_dict)
 
         else:
-            return InventoryLog.objects.filter(**filter_dict).order_by('-start_time')
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
+            if order_type == "出库":
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                bz_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-start_time'))
+                lb_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
+                    material_no__icontains="M").order_by('-start_time'))
+                return list(bz_set) + list(lb_set)
+            else:
+                bz_set = MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
+                lb_set = MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(
+                    material_no__icontains="M")
+                return list(bz_set) + list(lb_set)
 
     def get_serializer_class(self):
         store_name = self.request.query_params.get("warehouse_name", "混炼胶库")
@@ -592,16 +612,27 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export', None)
+        order_type = self.request.query_params.get('export', None)
+        store_name = self.request.query_params.get("warehouse_name")
+        if order_type == '出库':
+            queryset = self.get_queryset('出库')
+        elif order_type == '入库':
+            queryset = self.get_queryset('入库')
+        else:
+            queryset = list(chain(self.get_queryset('出库'), self.get_queryset('入库'))) # 出库 19098  入库 19572
 
-        page = self.paginate_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+
         if export:
-            serializer = self.get_serializer(self.get_queryset(), many=True)
-            return self.export_xls(list(serializer.data))
+            serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
+            serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
+            return self.export_xls(list(serializer1.data) + list(serializer2.data))
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(self.get_queryset(), many=True)
-        return Response({'results': serializer.data})
+        serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
+        serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
+        return Response({'results': list(serializer1.data) + list(serializer2.data)})
 
 
 @method_decorator([api_recorder], name="dispatch")
