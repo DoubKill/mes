@@ -22,7 +22,7 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
-    SulfurDepotSite, Sulfur, SulfurDepot
+    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -662,21 +662,27 @@ class BzFinalMixingRubberInventorySerializer(serializers.ModelSerializer):
             unit_weight = "数据异常"
         return unit_weight
 
-
     def get_product_info(self, obj):
-        lot_no = obj.lot_no
-        pf = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
-        product_time = ""
-        if pf:
-            try:
-                product_time = pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                product_time = ""
-        return {
-            "equip_no": pf.equip_no if pf else "",
-            "classes": pf.classes if pf else "",
-            "product_time": product_time
-        }
+        if not obj.lot_no:
+            return {
+                "equip_no": "",
+                "classes": "",
+                "product_time": ""
+            }
+        else:
+            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+            if not pf:
+                return {
+                    "equip_no": "",
+                    "classes": "",
+                    "product_time": ""
+                }
+            else:
+                return {
+                    "equip_no": pf.equip_no,
+                    "classes": pf.classes,
+                    "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+                }
 
     def get_equip_no(self, obj):
         try:
@@ -716,21 +722,27 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
             unit_weight = "数据异常"
         return unit_weight
 
-
     def get_product_info(self, obj):
-        lot_no = obj.lot_no
-        pf = PalletFeedbacks.objects.filter(lot_no=lot_no).last()
-        product_time = ""
-        if pf:
-            try:
-                product_time = pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                product_time = ""
-        return {
-            "equip_no": pf.equip_no if pf else "",
-            "classes": pf.classes if pf else "",
-            "product_time": product_time
-        }
+        if not obj.lot_no:
+            return {
+                "equip_no": "",
+                "classes": "",
+                "product_time": ""
+            }
+        else:
+            pf = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).last()
+            if not pf:
+                return {
+                    "equip_no": "",
+                    "classes": "",
+                    "product_time": ""
+                }
+            else:
+                return {
+                    "equip_no": pf.equip_no,
+                    "classes": pf.classes,
+                    "product_time": pf.product_time.strftime('%Y-%m-%d %H:%M:%S')
+                }
 
     def get_equip_no(self, obj):
         try:
@@ -1608,3 +1620,115 @@ class FinalRubberyOutBoundOrderSerializer(BaseModelSerializer):
         model = FinalRubberyOutBoundOrder
         fields = '__all__'
         read_only_fields = ('order_no', 'warehouse_name', 'order_type')
+
+
+class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
+    work_qty = serializers.SerializerMethodField(read_only=True)
+    finished_qty = serializers.SerializerMethodField(read_only=True)
+    period_of_validity = serializers.SerializerMethodField(read_only=True)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['need_qty'] = ret['order_qty'] - ret['work_qty'] - ret['finished_qty']
+        return ret
+
+    def get_period_of_validity(self, obj):
+        material_detail = MaterialAttribute.objects.filter(material__material_no=obj.product_no).first()
+        if material_detail:
+                return material_detail.period_of_validity
+        else:
+            return None
+
+    def get_work_qty(self, obj):
+        work_qty = obj.outbound_delivery_details.filter(status=2).aggregate(work_qty=Sum('qty'))['work_qty']
+        return work_qty if work_qty else 0
+
+    def get_finished_qty(self, obj):
+        finished_qty = obj.outbound_delivery_details.filter(status=3).aggregate(finished_qty=Sum('qty'))['finished_qty']
+        return finished_qty if finished_qty else 0
+
+    def create(self, validated_data):
+        warehouse = validated_data.get('warehouse')
+        last_order = OutBoundDeliveryOrder.objects.filter(
+            created_date__date=datetime.datetime.now().date()
+        ).order_by('created_date').last()
+        if last_order:
+            last_ordering = str(int(last_order.order_no[12:])+1)
+            if len(last_ordering) <= 5:
+                ordering = last_ordering.zfill(5)
+            else:
+                ordering = last_ordering.zfill(len(last_ordering))
+        else:
+            ordering = '00001'
+        validated_data['order_no'] = 'MES{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+                                                         datetime.datetime.now().date().strftime('%Y%m%d'),
+                                                         ordering)
+        return super(OutBoundDeliveryOrderSerializer, self).create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'status' in validated_data:
+            if validated_data['status'] == 4:
+                instance.outbound_delivery_details.exclude(status=1).update(status=1)
+        return super(OutBoundDeliveryOrderSerializer, self).update(instance, validated_data)
+
+    class Meta:
+        model = OutBoundDeliveryOrder
+        fields = '__all__'
+        read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
+                            'delete_flag', 'created_user', 'last_updated_user',
+                            'delete_user', 'order_no', 'need_qty',
+                            'work_qty', 'finished_qty', 'need_weight', 'finished_weight',
+                            'inventory_type', 'inventory_reason')
+
+
+class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
+
+    def validate(self, attrs):
+        warehouse = attrs['outbound_delivery_order'].warehouse
+        last_order = OutBoundDeliveryOrderDetail.objects.filter(
+            created_date__date=datetime.datetime.now().date()
+        ).order_by('created_date').last()
+        if last_order:
+            last_ordering = str(int(last_order.order_no[12:]) + 1)
+            if len(last_ordering) <= 5:
+                ordering = last_ordering.zfill(5)
+            else:
+                ordering = last_ordering.zfill(len(last_ordering))
+        else:
+            ordering = '00001'
+        attrs['order_no'] = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+                                                        datetime.datetime.now().date().strftime('%Y%m%d'),
+                                                        ordering)
+        return attrs
+
+    class Meta:
+        model = OutBoundDeliveryOrderDetail
+        fields = '__all__'
+        read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
+                            'delete_flag', 'created_user', 'last_updated_user',
+                            'delete_user', 'order_no', 'status',
+                            'equip', 'dispatch', 'finish_time')
+
+
+class OutBoundTasksSerializer(BaseModelSerializer):
+    created_user = serializers.CharField(source='created_user.username')
+    material_no = serializers.CharField(source='outbound_delivery_order.product_no')
+    inventory_reason = serializers.CharField(source='quality_status')
+    production_info = serializers.SerializerMethodField()
+
+    def get_production_info(self, obj):
+        pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
+        if pallet:
+            return {'equip_no': pallet.equip_no,
+                    'factory_date': pallet.factory_date,
+                    'classes': pallet.classes,
+                    }
+        else:
+            return {'equip_no': "",
+                    'factory_date': "",
+                    'classes': "",
+                    }
+
+    class Meta:
+        model = OutBoundDeliveryOrderDetail
+        fields = '__all__'

@@ -3,10 +3,11 @@ import json
 import logging
 import random
 import time
-from io import BytesIO
+from io import BytesIO, StringIO
 
 import requests
 import xlwt
+from itertools import chain
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q
 from django.db.transaction import atomic
@@ -31,14 +32,16 @@ from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanM
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, PutPlanManagementFinalFilter, \
     MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, \
     MixinRubberyOutBoundOrderFilter, FinalRubberyOutBoundOrderFilter, DepotSiteDataFilter, DepotDataFilter, \
-    SulfurResumeFilter, DepotSulfurFilter, PalletDataFilter, DepotResumeFilter, SulfurDepotSiteFilter, SulfurDataFilter
+    SulfurResumeFilter, DepotSulfurFilter, PalletDataFilter, DepotResumeFilter, SulfurDepotSiteFilter, SulfurDataFilter, \
+    OutBoundDeliveryOrderFilter, OutBoundDeliveryOrderDetailFilter
 
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, \
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
-    CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog
+    CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
+    OutBoundDeliveryOrderDetail
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -49,7 +52,8 @@ from inventory.serializers import PutPlanManagementSerializer, \
     CarbonPlanManagementSerializer, DepotModelSerializer, DepotSiteModelSerializer, DepotPalltModelSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
-    DepotPalltInfoModelSerializer
+    DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
+    OutBoundTasksSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -61,6 +65,7 @@ from rest_framework import permissions
 
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
+from mes.settings import DEBUG
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
@@ -73,6 +78,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
+from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB
 
 logger = logging.getLogger('send_log')
 
@@ -232,55 +238,47 @@ class ProductInventory(GenericViewSet,
 
 @method_decorator([api_recorder], name="dispatch")
 class OutWorkFeedBack(APIView):
+    """{"order_no": "ZJO202109060057",
+     "pallet_no": "20104101",
+     "location": "2-3-5-1",
+     "qty": 1,
+     "weight": 700.0,
+     "quality_status": "2",
+     "lot_no": "88888888",
+     "inventory_type": "生产出库",
+     "fin_time": "2021-09-07T00: 32:27.4085235Z",
+     "status": "- 无 - "}"""
 
     # 出库反馈
     def post(self, request):
-        """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
-        生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
-        # 任务编号
-
-        data = request.data
-        # data = {'order_no':'20201114131845',"pallet_no":'20102494',
-        #         'location':'二层前端','qty':'2','weight':'2.00',
-        #         'quality_status':'合格','lot_no':'122222',
-        #         'inout_num_type':'123456','fin_time':'2020-11-10 15:02:41'
-        #         }
+        data = self.request.data
         if data:
             lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
-            data = dict(data)
-            data.pop("status", None)
-            if data.get("inventory_type") == "生产出库":
-                data["inout_num_type"] = "正常出库"
-            elif data.get("inventory_type") == "快检出库":
-                data["inout_num_type"] = "指定出库"
-            else:
-                data["inout_num_type"] = data.get("inventory_type")
             order_no = data.get('order_no')
             if order_no:
-                if InventoryLog.objects.filter(order_no=order_no, pallet_no=data.get("pallet_no")).exists():
-                    return Response({"99": "FALSE", "message": "该托盘已反馈"})
-                temp = InventoryLog.objects.filter(order_no=order_no).aggregate(all_qty=Sum('qty'))
-                all_qty = temp.get("all_qty")
-                if all_qty:
-                    all_qty += int(data.get("qty"))
-                else:
-                    all_qty = int(data.get("qty"))
-                dp_obj = DeliveryPlan.objects.filter(order_no=order_no).first()
-
-                # 这部分最开始做的时候没有设计好，也没有考虑全，目前只能按照一个库一个库去匹配这种方式去判断订单是否正确
+                dp_obj = OutBoundDeliveryOrderDetail.objects.filter(order_no=order_no).first()
                 if dp_obj:
-                    need_qty = dp_obj.need_qty
+                    dp_obj.status = 3
+                    dp_obj.finish_time = datetime.datetime.now()
+                    dp_obj.save()
+                    try:
+                        depot_name = '混炼线边库区' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库区"
+                        depot_site_name = '混炼线边库位' if dp_obj.outbound_delivery_order.warehouse == '混炼胶库' else "终炼线边库位"
+                        depot, _ = Depot.objects.get_or_create(depot_name=depot_name,
+                                                               description=depot_name)
+                        depot_site, _ = DepotSite.objects.get_or_create(depot=depot,
+                                                                        depot_site_name=depot_site_name,
+                                                                        description=depot_site_name)
+                        DepotPallt.objects.create(enter_time=datetime.datetime.now(),
+                                                  pallet_status=1,
+                                                  pallet_data=PalletFeedbacks.objects.filter(lot_no=dp_obj.lot_no).first(),
+                                                  depot_site=depot_site
+                                                  )
+                    except Exception:
+                        pass
                 else:
-                    dp_obj = DeliveryPlanFinal.objects.filter(order_no=order_no).first()
-                    if dp_obj:
-                        need_qty = dp_obj.need_qty
-                    else:
-                        dp_obj = DeliveryPlanLB.objects.filter(order_no=order_no).first()
-                        if dp_obj:
-                            need_qty = dp_obj.need_qty
-                        else:
-                            return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
-                station = dp_obj.station
+                    return Response({"99": "FALSE", "message": "该订单非mes下发订单"})
+                station = dp_obj.outbound_delivery_order.station
                 station_dict = {
                     "一层前端": 3,
                     "一层后端": 4,
@@ -300,57 +298,9 @@ class OutWorkFeedBack(APIView):
                     logger.error(f"条码错误{a}")
                 except Exception as e:
                     logger.error(f"未知错误{e}")
-
-                if int(all_qty) >= need_qty:  # 若加上当前反馈后出库数量已达到订单需求数量则改为(1:完成)
-                    dp_obj.status = 1
-                    dp_obj.finish_time = datetime.datetime.now()
-                    dp_obj.save()
-                    outbound_order = dp_obj.outbound_order
-                    if hasattr(outbound_order, 'final_plans'):
-                        if not outbound_order.final_plans.filter(status__gt=1).exists():
-                            outbound_order.status = 3
-                            outbound_order.save()
-                    else:
-                        if not outbound_order.mixin_plans.filter(status__gt=1).exists():
-                            outbound_order.status = 3
-                            outbound_order.save()
-                il_dict = {}
-                il_dict['warehouse_no'] = dp_obj.warehouse_info.no
-                il_dict['warehouse_name'] = dp_obj.warehouse_info.name
-                il_dict['inout_reason'] = dp_obj.inventory_reason
-                il_dict['unit'] = dp_obj.unit
-                il_dict['initiator'] = dp_obj.created_user
-                il_dict['material_no'] = dp_obj.material_no
-                il_dict['start_time'] = dp_obj.created_date
-                il_dict['order_type'] = dp_obj.order_type if dp_obj.order_type else "出库"
-                material = Material.objects.filter(material_no=dp_obj.material_no).first()
-                material_inventory_dict = {
-                    "material": material,
-                    "container_no": data.get("pallet_no"),
-                    "site_id": 15,
-                    "qty": data.get("qty"),
-                    "unit": dp_obj.unit,
-                    "unit_weight": float(data.get("weight")) / float(data.get("qty")),
-                    "total_weight": data.get("weight"),
-                    "quality_status": data.get("quality_status"),
-                    "lot_no": data.get("lot_no"),
-                    "location": "预留",
-                    "warehouse_info": dp_obj.warehouse_info,
-                }
+                return Response({"01": "TRUES", "message": "反馈成功，OK"})
             else:
                 raise ValidationError("订单号不能为空")
-            try:
-                MaterialInventory.objects.create(**material_inventory_dict)
-            except Exception as e:
-                logger.error(str(e))
-            try:
-                InventoryLog.objects.create(**data, **il_dict)
-            except Exception as e:
-                logger.error(e)
-                result = {"99": "FALSE", f"message": f"反馈失败，原因: {e}"}
-            else:
-                result = {"01": "TRUES", "message": "反馈成功，OK"}
-            return Response(result)
         return Response({"99": "FALSE", "message": "反馈失败，原因: 未收到具体的出库反馈信息，请检查请求体数据"})
 
 
@@ -470,12 +420,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
 
     # filter_backends = (InventoryFilterBackend,)
 
-    def get_queryset(self):
+    def get_queryset(self, order_type):
         filter_dict = {}
-        store_name = self.request.query_params.get("store_name")
-        if not store_name:
-            store_name = "混炼胶库"
-        order_type = self.request.query_params.get("order_type", "出库")
+        store_name = self.request.query_params.get("warehouse_name")
+        order_type = order_type
         start_time = self.request.query_params.get("start_time")
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
@@ -582,10 +530,31 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 return MaterialInHistory.objects.using('cb').filter(**filter_dict)
 
         else:
-            return InventoryLog.objects.filter(**filter_dict).order_by('-start_time')
+            if start_time:
+                filter_dict.update(start_time__gte=start_time)
+            if end_time:
+                filter_dict.update(start_time__lte=end_time)
+            if order_type == "出库":
+                if self.request.query_params.get("type") == "正常出库":
+                    actual_type = "生产出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                elif self.request.query_params.get("type") == "指定出库":
+                    actual_type = "快检出库"
+                    filter_dict.update(inout_num_type=actual_type)
+                else:
+                    actual_type = "生产出库"
+                bz_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-start_time'))
+                lb_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
+                    material_no__icontains="M").order_by('-start_time'))
+                return list(bz_set) + list(lb_set)
+            else:
+                bz_set = MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
+                lb_set = MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(
+                    material_no__icontains="M")
+                return list(bz_set) + list(lb_set)
 
     def get_serializer_class(self):
-        store_name = self.request.query_params.get("store_name", "混炼胶库")
+        store_name = self.request.query_params.get("warehouse_name", "混炼胶库")
         order_type = self.request.query_params.get("order_type", "出库")
         serializer_dispatch = {
             "混炼胶库": InventoryLogSerializer,
@@ -594,6 +563,76 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             "炭黑库": InOutCommonSerializer,
         }
         return serializer_dispatch.get(store_name, InventoryLogSerializer)
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '物料出入库履历'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('出入库信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '类型', '出入库单号', '质检条码', '托盘号', '机台', '时间/班次', '车号', '物料编码', '出入库原因',
+                   '出入库类型', '出入库数', '单位', '重量', '发起人', '发起时间', '完成时间']
+        # 写入文件标题
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['order_type'])
+            sheet.write(data_row, 2, i['order_no'])
+            sheet.write(data_row, 3, i['lot_no'])
+            sheet.write(data_row, 4, i['pallet_no'])
+            sheet.write(data_row, 5, i['product_info']['equip_no'])
+            sheet.write(data_row, 6, i['product_info']['classes'])
+            sheet.write(data_row, 7, i['product_info']['memo'])
+            sheet.write(data_row, 8, i['material_no'])
+            sheet.write(data_row, 9, i['inout_reason'])
+            sheet.write(data_row, 10, i['inout_num_type'])
+            sheet.write(data_row, 11, i['qty'])
+            sheet.write(data_row, 12, i['unit'])
+            sheet.write(data_row, 13, i['weight'])
+            sheet.write(data_row, 14, i['initiator'])
+            sheet.write(data_row, 15, i['start_time'])
+            sheet.write(data_row, 16, i['fin_time'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export', None)
+        order_type = self.request.query_params.get('order_type', None)
+        store_name = self.request.query_params.get("warehouse_name")
+        if order_type == '出库':
+            queryset = self.get_queryset('出库')
+        elif order_type == '入库':
+            queryset = self.get_queryset('入库')
+        else:
+            queryset = list(chain(self.get_queryset('出库'), self.get_queryset('入库'))) # 出库 19098  入库 19572
+
+        page = self.paginate_queryset(queryset)
+
+        if export:
+            serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
+            serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
+            return self.export_xls(list(serializer1.data) + list(serializer2.data))
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
+        serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
+        return Response({'results': list(serializer1.data) + list(serializer2.data)})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1858,7 +1897,7 @@ class FinalGumOutInventoryLogAPIView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class InventoryStaticsView(APIView):
-    permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_stock_detail'}))
+    # permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_product_stock_detail'}))
 
     # def single_mix_inventory(self, product_type, model=BzFinalMixingRubberInventory):
     #     temp_set = model.objects.filter(material_no__icontains=product_type)
@@ -1888,24 +1927,23 @@ class InventoryStaticsView(APIView):
             y = 0
         return x - y
 
-    def single(self, model, data, titles, filter_key="material__material_no__icontains", db="default"):
-        temp_set = model.objects.using(db).filter(**{filter_key: self.product_type})
-        for section in titles:
-            temp = temp_set.filter(**{filter_key: section}).aggregate(
-                weight=Sum('total_weight') / 1000, qty=Sum("qty"))
-            if data.get(section):
-                data[section]["weight"] += temp.get("weight") if temp.get("weight") else 0
-                data[section]["qty"] += temp.get("qty") if temp.get("qty") else 0
-            else:
-                data.update(**{section: temp})
-        return data
+    def single(self, model, filter_key="material__material_no__icontains", db="default"):
+        temp_set = model.objects.using(db).filter(**{filter_key: self.product_type,
+                                                     }).values(filter_key.split('__icontains')[0]).annotate(
+            qty=Sum('qty'), weight=Sum('total_weight')).values(filter_key.split('__icontains')[0], 'qty', 'weight')
 
-    def get_sections(self):
+        return temp_set
+
+    def get_sections(self, s_time, e_time):
         main_titles = []
         edge_titles = []
         product_set = set(
-            BzFinalMixingRubberInventory.objects.filter(material_no__icontains=self.product_type).using('bz').values(
+            BzFinalMixingRubberInventory.objects.filter(material_no__icontains=self.product_type,
+                                                        in_storage_time__gte=s_time,
+                                                        in_storage_time__lte=e_time
+                                                        ).using('bz').values(
                 'material_no').annotate().values_list('material_no', flat=True))
+
         for x in product_set:
             try:
                 t = x.split('-')[1]
@@ -1913,8 +1951,12 @@ class InventoryStaticsView(APIView):
                 pass
             else:
                 main_titles.append(t)
-        edge_set = set(MaterialInventory.objects.filter(material__material_no=self.product_type).values(
+        edge_set = set(MaterialInventory.objects.filter(material__material_no=self.product_type,
+                                                        created_date__gte=s_time,
+                                                        created_date__lte=e_time
+                                                        ).values(
             'material__material_no').annotate().values_list('material__material_no', flat=True))
+
         for x in edge_set:
             try:
                 t = x.split('-')[1]
@@ -1922,122 +1964,259 @@ class InventoryStaticsView(APIView):
                 pass
             else:
                 edge_titles.append(t)
-        return list(edge_titles), list(main_titles)
+        return list(main_titles), list(edge_titles)
 
     def get(self, request):
         product_type = request.query_params.get("name")
-        edge_data = {}
-        main_data = {}
-        inventory_data = {"subject": {}, "edge": {}, "error": None, "fm_all": None, "ufm_all": None}
-        if product_type:
-            self.product_type = product_type  # 当前胶料种类
-            edge_titles, main_titles = self.get_sections()
-            inventory_data["edge"] = self.single(MaterialInventory, edge_data, edge_titles,
-                                                 filter_key="material__material_no__icontains")
-            inventory_data["subject"] = self.single(BzFinalMixingRubberInventory, main_data, main_titles,
-                                                    filter_key="material_no__icontains", db="bz")
-            inventory_data["subject"] = self.single(BzFinalMixingRubberInventoryLB, inventory_data["subject"],
-                                                    main_titles,
-                                                    filter_key="material_no__icontains", db='lb')  # 终炼胶库暂未启用
-            # RFM，FM 规格统计计算
+        s_time = request.query_params.get("s_time")
+        e_time = request.query_params.get("e_time")
+        page = request.query_params.get("page", 1)
+        if not s_time and not e_time:
+            s_time, e_time = '1111-11-11', '9999-11-11'
+
+        self.product_type = product_type
+        main_titles, edge_titles = self.get_sections(s_time, e_time)
+        # st = (int(page) - 1) * 10
+        # et = int(page) * 10
+
+        a = MaterialInventory.objects.using('default').filter(material__material_no__icontains=self.product_type,
+                                                              created_date__gte=s_time,
+                                                              created_date__lte=e_time
+                                                              ).values('material__material_no').annotate(
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material__material_no', 'qty', 'weight').order_by('material')
+        aa = []
+        if len(a) > 0:
+            for i in a:
+                aa.append({'material_no': i['material__material_no'], 'qty': i['qty'], 'weight': i['weight']})
+
+        bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type,
+                                                                     in_storage_time__gte=s_time,
+                                                                     in_storage_time__lte=e_time
+                                                              ).values('material_no').annotate(
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
+
+        lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type,
+                                                                       store_name='炼胶库',
+                                                                       in_storage_time__gte=s_time,
+                                                                       in_storage_time__lte=e_time
+                                                              ).values('material_no').annotate(
+            qty=Sum('qty'), weight=Sum('total_weight')).values('material_no', 'qty', 'weight').order_by('material_no')
+
+        edge = list(aa)  # 车间
+        subject = list(bz) + list(lb)  # 立库
+
+        results = {}
+
+        for i in subject:
+            try:
+                res = {
+                    i['material_no'].split('-')[2]: {
+                    'subject': {i['material_no'].split('-')[1]: {'qty': i['qty'], 'weight': i['weight']}},
+                    'edge':{},
+                    'error': 0,
+                    'fm_all': 0,
+                    'ufm_all': 0  # 不加硫
+                    }
+                }
+
+                if results.get(i['material_no'].split('-')[2]):
+                    if results[i['material_no'].split('-')[2]]['subject'].get(i['material_no'].split('-')[1]):
+                        results[i['material_no'].split('-')[2]]['subject'][i['material_no'].split('-')[1]]['qty'] += i['qty']
+                        results[i['material_no'].split('-')[2]]['subject'][i['material_no'].split('-')[1]]['weight'] += i['weight']
+                    else:
+                        results[i['material_no'].split('-')[2]]['subject'].update(
+                            {i['material_no'].split('-')[1]: {'qty': i['qty'], 'weight': i['weight']}})
+                else:
+                    results.update(res)
+            except:
+                pass
+
+        for i in edge:
+            try:
+                res = {i['material_no'].split('-')[2]: {
+                    'subject': {},
+                    'edge': {i['material_no'].split('-')[1]: {'qty': i['qty'], 'weight': i['weight']}},
+                    'error': 0,
+                    'fm_all': 0,
+                    'ufm_all': 0  # 不加硫
+                    } }
+
+                if results.get(i['material_no'].split('-')[2]):
+                    if results[i['material_no'].split('-')[2]]['subject'].get(i['material_no'].split('-')[1]):
+                        results[i['material_no'].split('-')[2]]['subject'][i['material_no'].split('-')[1]]['qty'] += i['qty']
+                        results[i['material_no'].split('-')[2]]['subject'][i['material_no'].split('-')[1]]['weight'] += i['weight']
+                    else:
+                        results[i['material_no'].split('-')[2]]['subject'].update(
+                            {i['material_no'].split('-')[1]: {'qty': i['qty'], 'weight': i['weight']}})
+                else:
+                    results.update(res)
+            except:
+                pass
+
+        for i in results:
+            if "RFM" in main_titles and "FM" in main_titles:  # ['1MB', 'HMB']
+                fm1_weight = results[i]['subject'].get("FM", {}).get("weight")
+                rfm1_weight = results[i]['subject'].get("RFM", {}).get("weight")
+                fm1_qty = results[i]['subject'].get("FM", {}).get("qty")
+                rfm1_qty = results[i]['subject'].get("RFM", {}).get("qty")
+                results[i]['subject']["FM"]["weight"] = self.my_cut(fm1_weight, rfm1_weight)
+                results[i]['subject']["FM"]["qty"] = self.my_cut(fm1_qty, rfm1_qty)
             if "RFM" in main_titles and "FM" in main_titles:
-                fm1_weight = inventory_data["subject"].get("FM", {}).get("weight")
-                rfm1_weight = inventory_data["subject"].get("RFM", {}).get("weight")
-                fm1_qty = inventory_data["subject"].get("FM", {}).get("qty")
-                rfm1_qty = inventory_data["subject"].get("RFM", {}).get("qty")
-                inventory_data["subject"]["FM"]["weight"] = self.my_cut(fm1_weight, rfm1_weight)
-                inventory_data["subject"]["FM"]["qty"] = self.my_cut(fm1_qty, rfm1_qty)
-            if "RFM" in main_titles and "FM" in main_titles:
-                fm2_weight = inventory_data["edge"].get("FM", {}).get("weight")
-                rfm2_weight = inventory_data["edge"].get("RFM", {}).get("weight")
-                fm2_qty = inventory_data["edge"].get("FM", {}).get("qty")
-                rfm2_qty = inventory_data["edge"].get("RFM", {}).get("qty")
-                inventory_data["edge"]["FM"]["weight"] = self.my_cut(fm2_weight, rfm2_weight)
-                inventory_data["edge"]["FM"]["qty"] = self.my_cut(fm2_qty, rfm2_qty)
+                fm2_weight = results[i]['edge'].get("FM", {}).get("weight")
+                rfm2_weight = results[i]['edge'].get("RFM", {}).get("weight")
+                fm2_qty = results[i]['edge'].get("FM", {}).get("qty")
+                rfm2_qty = results[i]['edge'].get("RFM", {}).get("qty")
+                results[i]['edge']["FM"]["weight"] = self.my_cut(fm2_weight, rfm2_weight)
+                results[i]['edge']["FM"]["qty"] = self.my_cut(fm2_qty, rfm2_qty)
 
-        else:
-            raise ValidationError("请传入胶料种类")
+        # 不合格加硫计算/ 加硫总量计算
+        s = ["FM", 'RE', 'RFM']
+        for station in s:
+            edge_error = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type).filter(
+                material__material_no__icontains=f'-{station}').values('material__material_no', 'quality_status').annotate(
+                weight=Sum("total_weight")).values('material__material_no', 'weight', 'quality_status')
+            if len(edge_error) > 0:
+                for i in edge_error:
+                    try:
+                        if results.get(i['material__material_no'].split('-')[2]) and i['quality_status'] == '三等品':
+                            results[i['material__material_no'].split('-')[2]]['error'] += i['weight']
+                        if results.get(i['material__material_no'].split('-')[2]):
+                            results[i['material__material_no'].split('-')[2]]['fm_all'] += i['weight']
+                    except: pass
 
-        # 不合格加硫计算
-        edge_error = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type).filter(
-            material__material_no__icontains="FM",
-            quality_status="三等品").aggregate(weight=Sum("total_weight") / 1000).get(
-            "weight", 0)
-        edge_error = edge_error if edge_error else 0
+            inventory_error = BzFinalMixingRubberInventory.objects.using('bz').filter(
+                in_storage_time__gte=s_time,
+                in_storage_time__lte=e_time,
+                material_no__icontains=self.product_type).filter(material_no__icontains=f'-{station}',
+                                                                ).values('material_no', 'quality_level').\
+                annotate(weight=Sum("total_weight")).values('material_no', 'weight', 'quality_level')
+            if len(inventory_error) > 0:
+                for i in inventory_error:
+                    try:
+                        if results.get(i['material_no'].split('-')[2]) and i['quality_level'] == '三等品':
+                            results[i['material_no'].split('-')[2]]['error'] += i['weight']
+                        if results.get(i['material_no'].split('-')[2]):
+                            results[i['material_no'].split('-')[2]]['fm_all'] += i['weight']
+                    except: pass
 
-        inventory_error = BzFinalMixingRubberInventory.objects.using('bz').filter(
-            material_no__icontains=self.product_type).filter(material_no__icontains="FM",
-                                                             quality_level="三等品").aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        inventory_error = inventory_error if inventory_error else 0
-        lb_error = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
-            material_no__icontains=self.product_type).filter(material_no__icontains="FM",
-                                                             quality_level="三等品").aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        lb_error = lb_error if lb_error else 0
-        inventory_error += lb_error
+            lb_error = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
+                in_storage_time__gte=s_time,
+                in_storage_time__lte=e_time,
+                material_no__icontains=self.product_type).filter(material_no__icontains=f'-{station}',
+                                                                 ).values('material_no', 'quality_level').\
+                annotate(weight=Sum("total_weight")).values('material_no', 'weight', 'quality_level')
+            if len(lb_error) > 0:
+                for i in lb_error:
+                    try:
+                        if results.get(i['material_no'].split('-')[2]) and i['quality_level'] == '三等品':
+                            results[i['material_no'].split('-')[2]]['error'] += i['weight']
+                        if results.get(i['material_no'].split('-')[2]):
+                            results[i['material_no'].split('-')[2]]['fm_all'] += i['weight']
+                    except: pass
 
-        # 加硫总量计算
-        fm_mi = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type, ).filter(
-            material__material_no__icontains="FM",
-            quality_status__in=["一等品", "三等品"]).aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        fm_mi = fm_mi if fm_mi else 0
+        # 无硫总量计算
+        ws = ["CMB", 'HMB', 'NF', 'RMB', '1MB', '2MB', '3MB']
+        for station in ws:
+            product_mi = MaterialInventory.objects.filter(material__material_no__icontains=self.product_type,
+                                                          created_date__gte=s_time,
+                                                          created_date__lte=e_time
+                                                          ).filter(
+                                                material__material_no__icontains=station).values('material__material_no').\
+                annotate(weight=Sum("total_weight")).values('material__material_no', 'weight')
+            if len(product_mi) > 0:
+                for i in product_mi:
+                    try:
+                        if results.get(i['material__material_no'].split('-')[2]):
+                            results[i['material__material_no'].split('-')[2]]['ufm_all'] += i['weight']
+                    except: pass
 
-        fm_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(
-            material_no__icontains=self.product_type, ).filter(material_no__icontains="FM",
-                                                               quality_level__in=["一等品", "三等品"]).aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        fm_lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
-            material_no__icontains=self.product_type, ).filter(material_no__icontains="FM",
-                                                               quality_level__in=["一等品", "三等品"]).aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        fm_bz = fm_bz if fm_bz else 0
-        fm_lb = fm_lb if fm_lb else 0
-        fm_all = fm_mi + fm_bz + fm_lb
+            product_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(material_no__icontains=self.product_type,
+                                                                                 in_storage_time__gte=s_time,
+                                                                                 in_storage_time__lte=e_time,
+                                                                                 ).filter(
+                material_no__icontains=station).values('material_no').annotate(weight=Sum("total_weight")).values('material_no', 'weight')
+            if len(product_bz) > 0:
+                for i in product_bz:
+                    try:
+                        if results.get(i['material_no'].split('-')[2]):
+                            results[i['material_no'].split('-')[2]]['ufm_all'] += i['weight']
+                    except: pass
 
-        # 胶总量计算
-        product_mi = MaterialInventory.objects.filter(quality_status__in=["一等品", "三等品"],
-                                                      material__material_no__icontains=self.product_type).aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        product_mi = product_mi if product_mi else 0
+            product_lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(material_no__icontains=self.product_type,
+                                                                                   in_storage_time__gte=s_time,
+                                                                                   in_storage_time__lte=e_time,
+                                                                                   ).filter(
+                material_no__icontains=station).values('material_no').annotate(weight=Sum("total_weight")).values('material_no', 'weight')
+            if len(product_lb) > 0:
+                for i in product_lb:
+                    try:
+                        if results.get(i['material_no'].split('-')[2]):
+                            results[i['material_no'].split('-')[2]]['ufm_all'] += i['weight']
+                    except: pass
 
-        product_bz = BzFinalMixingRubberInventory.objects.using('bz').filter(quality_level__in=["一等品", "三等品"],
-                                                                             material_no__icontains=self.product_type, ).aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
+        for i in results:
+            lst = ["CMB", 'HMB', 'NF', 'RMB', '1MB', '2MB', '3MB', "FM", 'RE', 'RFM']
+            for j in lst:
+                try:
+                    results[i]['subject'][j]['weight'] = round(results[i]['subject'][j]['weight'] / 1000, 3) if results[i]['subject'].get(j) else None
+                except: pass
+                try:
+                    results[i]['edge'][j]['weight'] = round(results[i]['edge'][j]['weight'] / 1000, 3) if results[i]['edge'].get(j) else None
+                except: pass
+            results[i]['error'] = round(results[i]['error'] / 1000, 3)
+            results[i]['fm_all'] = round(results[i]['fm_all'] / 1000, 3)
+            results[i]['ufm_all'] = round(results[i]['ufm_all'] / 1000, 3)
 
-        product_lb = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(quality_level__in=["一等品", "三等品"],
-                                                                               material_no__icontains=self.product_type, ).aggregate(
-            weight=Sum("total_weight") / 1000).get("weight", 0)
-        product_bz = product_bz if product_bz else 0
-        product_lb = product_lb if product_lb else 0
-        product_all = product_mi + product_bz + product_lb
-
-        # 不加留
-        ufm_all = product_all - fm_all
-        inventory_data["error"] = edge_error + inventory_error
-        inventory_data["ufm_all"] = ufm_all
-        inventory_data["fm_all"] = fm_all
-        inventory_data["edge_titles"] = edge_titles
-        inventory_data["main_titles"] = main_titles
-        return Response(inventory_data)
-
-        # product_set = set(
-        #     BzFinalMixingRubberInventory.objects.values('material_no').annotate().values_list('material_no'))
-        # product_types = []
-        # for x in product_set:
-        #     try:
-        #         product_type = x.split('-')[2]
-        #     except:
-        #         pass
-        #     else:
-        #         product_types.append(product_type)
-        # product_types = set(product_types)
+        return Response({'results': results, 'count': len(results)})
 
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductDetailsView(APIView):
     permission_classes = (IsAuthenticated, PermissionClass({'view': 'view_workshop_stock_detail'}))
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '车间库存明细'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '胶料类型', '胶料编码', '胶料名称', '数量', '重量/kg', '数量/kg', '重量', '数量', '重量/kg']
+        # 写入文件标题
+        sheet.write_merge(0, 0, 0, 3, '基础信息')
+        sheet.write_merge(0, 0, 4, 5, '立库库存量')
+        sheet.write_merge(0, 0, 6, 7, '线边库库存量')
+        sheet.write_merge(0, 0, 8, 9, '总量')
+
+        for col_num in range(len(columns)):
+            sheet.write(1, col_num, columns[col_num])
+            # 写入数据
+        data_row = 2
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['material_type'])
+            sheet.write(data_row, 2, i['material_no'])
+            sheet.write(data_row, 3, i['material_name'])
+            sheet.write(data_row, 4, i['qty'])
+            sheet.write(data_row, 5, i['weight'])
+            sheet.write(data_row, 6, i['other_qty'])
+            sheet.write(data_row, 7, i['other_weight'])
+            sheet.write(data_row, 8, i['all_qty'])
+            sheet.write(data_row, 9, i['all_weight'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
 
     def deal(self, datas):
         for x in datas:
@@ -2062,14 +2241,12 @@ class ProductDetailsView(APIView):
         params = request.query_params
         material_type = params.get("material_type", "")
         material_no = params.get("material_no", "")
+        export = params.get("export")
         filters = dict()
         other_filters = dict()
-        if material_type:
-            filters.update(material_no__icontains=material_type)
-            other_filters.update(material__material_no__icontains=material_no)
-        if material_no:
-            filters.update(material_no__icontains=material_no)
-            other_filters.update(material__material_no__icontains=material_type)
+        filters.update(material_no__icontains=material_no, material_no__contains=material_type)
+        other_filters.update(material__material_no__icontains=material_no, material__material_no__contains=material_type)
+
         mix_set = BzFinalMixingRubberInventory.objects.using('bz').filter(**filters)
         final_set = BzFinalMixingRubberInventory.objects.using('lb').filter(store_name='炼胶库').filter(**filters)
         mix_data = mix_set.values("material_no").annotate(qty=Sum('qty'), weight=Sum('total_weight')).values(
@@ -2104,10 +2281,52 @@ class ProductDetailsView(APIView):
             else:
                 self.data[material_no]["all_weight"] = x.get("weight")
         data = self.data.values()
+        if export:
+            return self.export_xls(list(data))
         return Response({"results": data})
 
 
 """原材料库出库接口"""
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WmsStorageView(ListAPIView):
+    queryset = WmsInventoryStock.objects.all()
+    serializer_class = WmsInventoryStockSerializer
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = 'wms'
+    FILE_NAME = '原材料库位明细'
+    EXPORT_FIELDS_DICT = {"物料名称": "material_name", "物料编码": "material_no", "质检条码": "lot_no",
+                          "托盘号": "container_no", "库位地址": "location", "单位": "unit",
+                          "单位重量": "unit_weight", "总重量": "total_weight", "品质状态": "quality_status"}
+
+    def list(self, request, *args, **kwargs):
+        filter_kwargs = {}
+        container_no = self.request.query_params.get('pallet_no')
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        export = self.request.query_params.get('export')  # 1：当前页面  2：所有
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if material_name:
+            filter_kwargs['material_name__icontains'] = material_name
+        if container_no:
+            filter_kwargs['container_no__icontains'] = container_no
+        queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs)
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        if export:
+            if export == '1':
+                data = serializer.data
+            else:
+                data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        data = self.get_paginated_response(serializer.data).data
+        sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
+                                      total_trains=Sum('qty'))
+        data['total_weight'] = sum_data['total_weight']
+        data['total_trains'] = sum_data['total_trains']
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2446,6 +2665,12 @@ class WMSInventoryView(APIView):
                  })
         sc.close()
         return Response({'results': result, "count": count})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THStorageView(WmsStorageView):
+    DATABASE_CONF = 'cb'
+    FILE_NAME = '炭黑库位明细'
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2908,12 +3133,55 @@ class BzMixingRubberInventory(ListAPIView):
     """
         北自混炼胶库存列表，参数：?material_no=物料编码&container_no=托盘号&lot_no=收皮条码&location=库存位
                             &tunnel=巷道&quality_status=品质状态&lot_existed=收皮条码有无（1：有，0：无）
-                            &station=出库口名称
+                            &station=出库口名称&st=入库开始时间&et=入库结束时间
     """
     serializer_class = BzFinalMixingRubberInventorySerializer
     permission_classes = (IsAuthenticated,)
+    queryset = BzFinalMixingRubberInventory.objects.all()
 
-    def get_queryset(self):
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '库位明细'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        columns = ['No', '胶料类型', '胶料编码', '质检条码', '货位状态', '生产机台', '生产班次',
+                   '托盘号', '库位地址', '数库存量', '单位', '单位重量', '总重量', '品质状态']
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, data_row)
+            sheet.write(data_row, 1, i['material_type'])
+            sheet.write(data_row, 2, i['material_no'])
+            sheet.write(data_row, 3, i['lot_no'])
+            sheet.write(data_row, 4, i['location_status'])
+            sheet.write(data_row, 5, i['product_info']['equip_no'])
+            sheet.write(data_row, 6, i['product_info']['classes'])
+            sheet.write(data_row, 7, i['container_no'])
+            sheet.write(data_row, 8, i['location'])
+            sheet.write(data_row, 9, i['qty'])
+            sheet.write(data_row, 10, 'kg')
+            sheet.write(data_row, 11, i['unit_weight'])
+            sheet.write(data_row, 12, i['total_weight'])
+            sheet.write(data_row, 13, i['quality_status'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def list(self, request, *args, **kwargs):
         material_no = self.request.query_params.get('material_no')  # 物料编码
         container_no = self.request.query_params.get('container_no')  # 托盘号
         lot_no = self.request.query_params.get('lot_no')  # 收皮条码
@@ -2923,9 +3191,12 @@ class BzMixingRubberInventory(ListAPIView):
         lot_existed = self.request.query_params.get('lot_existed')  # 收皮条码有无（1：有，0：无）
         station = self.request.query_params.get('station')  # 出库口名称
         location_status = self.request.query_params.get('location_status')  # 货位状态
+        st = self.request.query_params.get('st')  # 入库开始时间
+        et = self.request.query_params.get('et')  # 入库结束时间
+        export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         queryset = BzFinalMixingRubberInventory.objects.using('bz').all().order_by('in_storage_time')
         if material_no:
-            queryset = queryset.filter(material_no__icontains=material_no)
+            queryset = queryset.filter(material_no=material_no)
         if container_no:
             queryset = queryset.filter(container_no__icontains=container_no)
         if location:
@@ -2938,6 +3209,10 @@ class BzMixingRubberInventory(ListAPIView):
             queryset = queryset.filter(quality_level=quality_status)
         if location_status:
             queryset = queryset.filter(location_status=location_status)
+        if st:
+            queryset = queryset.filter(in_storage_time__gte=st)
+        if et:
+            queryset = queryset.filter(in_storage_time__lte=et)
         if lot_existed:
             if lot_existed == '1':
                 queryset = queryset.exclude(lot_no__isnull=True)
@@ -2947,12 +3222,24 @@ class BzMixingRubberInventory(ListAPIView):
             if station == '一层前端':
                 queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-            elif station in ('二层前端', '二层后端'):
+            elif station == '二层前端':
                 queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-            else:
-                return []
-        return queryset
+            elif station == '一层后端':
+                raise ValidationError('该出库口不可用！')
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        if export:
+            if export == '1':
+                return self.export_xls(serializer.data)
+            elif export == '2':
+                return self.export_xls(self.get_serializer(queryset, many=True).data)
+        data = self.get_paginated_response(serializer.data).data
+        sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
+                                      total_trains=Sum('qty'))
+        data['total_weight'] = sum_data['total_weight']
+        data['total_trains'] = sum_data['total_trains']
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2972,10 +3259,10 @@ class BzMixingRubberInventorySummary(APIView):
             if station == '一层前端':
                 queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-            elif station in ('二层前端', '二层后端'):
+            elif station == '二层前端':
                 queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
                 # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-            else:
+            elif station == '一层后端':
                 return Response([])
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
@@ -3005,7 +3292,10 @@ class BzMixingRubberInventorySearch(ListAPIView):
         quality_status = self.request.query_params.get('quality_status')  # 品质状态
         station = self.request.query_params.get('station')  # 出库口名称
         need_qty = self.request.query_params.get('need_qty')  # 出库数量
-        if not all([material_no, station, need_qty]):
+        tunnel = self.request.query_params.get('tunnel')  # 巷道
+        st = self.request.query_params.get('st')  # 入库开始时间
+        et = self.request.query_params.get('et')  # 入库结束时间
+        if not all([material_no, need_qty]):
             raise ValidationError('参数缺失！')
         try:
             need_qty = int(need_qty)
@@ -3013,18 +3303,23 @@ class BzMixingRubberInventorySearch(ListAPIView):
             raise ValidationError('参数错误！')
         queryset = BzFinalMixingRubberInventory.objects.using('bz').filter(
             material_no=material_no,
-            location_status="有货货位",
-            lot_no__isnull=False).order_by('in_storage_time')
+            location_status="有货货位").order_by('in_storage_time')
         if station == '一层前端':
             queryset = queryset.filter(Q(location__startswith='3') | Q(location__startswith='4'))
             # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (3, 4)"])
-        elif station in ('二层前端', '二层后端'):
+        elif station == '二层前端':
             queryset = queryset.filter(Q(location__startswith='1') | Q(location__startswith='2'))
             # queryset = queryset.extra(where=["substring(货位地址, 0, 2) in (1, 2)"])
-        else:
-            queryset = []
+        elif station == '一层后端':
+            raise ValidationError('该出库口不可用！')
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
+        if st:
+            queryset = queryset.filter(in_storage_time__gte=st)
+        if et:
+            queryset = queryset.filter(in_storage_time__lte=et)
+        if tunnel:
+            queryset = queryset.filter(location__istartswith=tunnel)
         storage_quantity = 0
         ret = []
         for item in queryset:
@@ -3033,7 +3328,8 @@ class BzMixingRubberInventorySearch(ListAPIView):
             if storage_quantity >= need_qty:
                 break
         serializer = self.get_serializer(ret, many=True)
-        return Response(serializer.data)
+        total_trains = queryset.aggregate(total_count=Sum('qty'))['total_count']
+        return Response({'data': serializer.data, 'total_trains': total_trains if total_trains else 0})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3044,6 +3340,49 @@ class BzFinalRubberInventory(ListAPIView):
     serializer_class = BzFinalMixingRubberLBInventorySerializer
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend,)
+    queryset = BzFinalMixingRubberInventoryLB.objects.all()
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '库位明细'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        columns = ['No', '胶料类型', '胶料编码', '质检条码', '货位状态', '生产机台', '生产班次',
+                   '托盘号', '库位地址', '数库存量', '单位', '单位重量', '总重量', '品质状态']
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, data_row)
+            sheet.write(data_row, 1, i['material_type'])
+            sheet.write(data_row, 2, i['material_no'])
+            sheet.write(data_row, 3, i['lot_no'])
+            sheet.write(data_row, 4, i['location_status'])
+            sheet.write(data_row, 5, i['product_info']['equip_no'])
+            sheet.write(data_row, 6, i['product_info']['classes'])
+            sheet.write(data_row, 7, i['container_no'])
+            sheet.write(data_row, 8, i['location'])
+            sheet.write(data_row, 9, i['qty'])
+            sheet.write(data_row, 10, 'kg')
+            sheet.write(data_row, 11, i['unit_weight'])
+            sheet.write(data_row, 12, i['total_weight'])
+            sheet.write(data_row, 13, i['quality_status'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
 
     def list(self, request, *args, **kwargs):
         filter_kwargs = {}
@@ -3057,6 +3396,9 @@ class BzFinalRubberInventory(ListAPIView):
         tunnel = self.request.query_params.get('tunnel')
         lot_no = self.request.query_params.get('lot_no')
         location_status = self.request.query_params.get('location_status')  # 货位状态
+        st = self.request.query_params.get('st')  # 入库开始时间
+        et = self.request.query_params.get('et')  # 入库结束时间
+        export = self.request.query_params.get('export')  # 1：当前页面  2：所有
         if store_name:
             if store_name == '终炼胶库':
                 store_name = "炼胶库"
@@ -3082,15 +3424,25 @@ class BzFinalRubberInventory(ListAPIView):
             filter_kwargs['lot_no__icontains'] = lot_no
         if location_status:
             filter_kwargs['location_status'] = location_status
+        if st:
+            filter_kwargs['in_storage_time__gte'] = st
+        if et:
+            filter_kwargs['in_storage_time__lte'] = et
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(**filter_kwargs).order_by('in_storage_time')
 
         page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        serializer = self.get_serializer(page, many=True)
+        if export:
+            if export == '1':
+                return self.export_xls(serializer.data)
+            elif export == '2':
+                return self.export_xls(self.get_serializer(queryset, many=True).data)
+        data = self.get_paginated_response(serializer.data).data
+        sum_data = queryset.aggregate(total_weight=Sum('total_weight'),
+                                      total_trains=Sum('qty'))
+        data['total_weight'] = sum_data['total_weight']
+        data['total_trains'] = sum_data['total_trains']
+        return Response(data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3137,6 +3489,9 @@ class BzFinalRubberInventorySearch(ListAPIView):
         material_no = self.request.query_params.get('material_no')  # 物料编码
         quality_status = self.request.query_params.get('quality_status')  # 品质状态
         need_qty = self.request.query_params.get('need_qty')  # 出库数量
+        tunnel = self.request.query_params.get('tunnel')  # 巷道
+        st = self.request.query_params.get('st')  # 入库开始时间
+        et = self.request.query_params.get('et')  # 入库结束时间
         if not all([material_no, need_qty]):
             raise ValidationError('参数缺失！')
         try:
@@ -3146,10 +3501,15 @@ class BzFinalRubberInventorySearch(ListAPIView):
         queryset = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
             store_name="炼胶库",
             material_no=material_no,
-            location_status="有货货位",
-            lot_no__isnull=False).order_by('in_storage_time')
+            location_status="有货货位").order_by('in_storage_time')
         if quality_status:
             queryset = queryset.filter(quality_level=quality_status)
+        if st:
+            queryset = queryset.filter(in_storage_time__gte=st)
+        if et:
+            queryset = queryset.filter(in_storage_time__lte=et)
+        if tunnel:
+            queryset = queryset.filter(location__istartswith=tunnel)
         storage_quantity = 0
         ret = []
         for item in queryset:
@@ -3158,7 +3518,8 @@ class BzFinalRubberInventorySearch(ListAPIView):
             if storage_quantity >= need_qty:
                 break
         serializer = self.get_serializer(ret, many=True)
-        return Response(serializer.data)
+        total_trains = queryset.aggregate(total_count=Sum('qty'))['total_count']
+        return Response({'data': serializer.data, 'total_trains': total_trains if total_trains else 0})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3166,6 +3527,7 @@ class OutBoundTasksListView(ListAPIView):
     """
         根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
     """
+    serializer_class = OutBoundTasksSerializer
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
@@ -3174,17 +3536,10 @@ class OutBoundTasksListView(ListAPIView):
             station = Station.objects.get(id=station_id).name
         except Exception:
             raise ValidationError('参数错误')
-        if warehouse_name == '混炼胶库':
-            return DeliveryPlan.objects.filter(status=1, station=station).order_by('-finish_time')
-        else:
-            return DeliveryPlanFinal.objects.filter(status=1, station=station).order_by('-finish_time')
-
-    def get_serializer_class(self):
-        warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
-        if warehouse_name == '混炼胶库':
-            return PutPlanManagementSerializer
-        else:
-            return PutPlanManagementSerializerFinal
+        return OutBoundDeliveryOrderDetail.objects.filter(outbound_delivery_order__warehouse=warehouse_name,
+                                                          outbound_delivery_order__station=station,
+                                                          status=3
+                                                          ).order_by('-finish_time')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3382,3 +3737,302 @@ class InOutBoundSummaryView(APIView):
                          "total_outbound_count": total_outbound_count,
                          "production_count": production_count
                          })
+
+
+@method_decorator([api_recorder], name="dispatch")
+class LIBRARYINVENTORYView(ListAPIView):
+
+    def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
+        # 各胶料封闭货位数据
+        fb = model.objects.using(db).filter(**kwargs).filter(location_status='封闭货位').values('material_no').annotate(qty=Sum('qty'),
+                                            total_weight=Sum('total_weight')
+                                            ).values('material_no', 'qty', 'total_weight')
+        # 胶料品质状态数据
+        query_set = model.objects.using(db).filter(store_name=store_name).filter(**kwargs)
+        if location_status:
+            if location_status == 'Y':
+                query_set = query_set.filter(location_status='封闭货位')
+            else:
+                query_set = query_set.exclude(location_status='封闭货位')
+                fb = []
+        result = query_set.values('material_no', 'quality_level').annotate(qty=Sum('qty'), total_weight=Sum('total_weight')).values(
+            'material_no', 'quality_level', 'qty', 'total_weight').order_by('material_no')
+
+        res = {}
+        for i in result:
+            if i['material_no'] not in res:
+                try:
+                    stage = i['material_no'].split('-')[1]
+                except Exception:
+                    stage = i['material_no']
+                res[i['material_no']] = {
+                    'material_no': i['material_no'],
+                    'warehouse_name': warehouse_name,
+                    'location': kwargs.get('location__startswith'),
+                    'stage': stage,
+                    'all_qty': i['qty'],
+                    'total_weight': i['total_weight'],
+                    i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight']},
+                }
+            else:
+                res[i['material_no']][i['quality_level']] = {
+                    'qty': i['qty'],
+                    'total_weight': i['total_weight']}
+                res[i['material_no']]['all_qty'] += i['qty']
+                res[i['material_no']]['total_weight'] += i['total_weight']
+
+        for i in fb:
+            if res.get(i['material_no']):
+                res[i['material_no']].update({'封闭': {'qty': i['qty'], 'total_weight': i['total_weight']}})
+
+
+        return list(res.values())
+
+    def get_queryset(self):
+        return
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '库内库存明细'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '胶料类型', '物料编码', '物料名称', '库区', '巷道', '一等品库存数(车)', '重量(kg)', '三等品库存数(车)', '重量(kg)',
+                   '待检品库存数(车)', '重量(kg)', '总库存数(车)', '总重量(kg)', '封闭库存数(车)', '重量(kg)']
+        # 写入文件标题
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+        # 写入数据
+            data_row = 1
+            for i in result:
+                sheet.write(data_row, 0, result.index(i) + 1)
+                sheet.write(data_row, 1, i['stage'])
+                sheet.write(data_row, 2, i['material_no'])
+                sheet.write(data_row, 3, i['material_no'])
+                sheet.write(data_row, 4, i['warehouse_name'])
+                sheet.write(data_row, 5, i['location'])
+                sheet.write(data_row, 6, i['一等品']['qty'] if i.get('一等品') else None)
+                sheet.write(data_row, 7, i['一等品']['total_weight'] if i.get('一等品') else None)
+                sheet.write(data_row, 8, i['三等品']['qty'] if i.get('三等品') else None)
+                sheet.write(data_row, 9, i['三等品']['total_weight'] if i.get('三等品') else None)
+                sheet.write(data_row, 10, i['待检品']['qty'] if i.get('待检品') else None)
+                sheet.write(data_row, 11, i['待检品']['total_weight'] if i.get('待检品') else None)
+                sheet.write(data_row, 12, i['all_qty'])
+                sheet.write(data_row, 13, i['total_weight'])
+                sheet.write(data_row, 14, i['封闭']['qty'] if i.get('封闭') else None)
+                sheet.write(data_row, 15, i['封闭']['total_weight'] if i.get('封闭') else None)
+                data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def list(self, request, *args, **kwargs):
+        params = request.query_params
+        page = params.get("page", 1)
+        page_size = params.get("page_size", 10)
+        warehouse_name = params.get("warehouse_name", '')  # 库区
+        stage = params.get("stage", '')  # 段次
+        material_no = params.get("material_no", '')  # 物料编码
+        location = params.get('location', '')  # 巷道
+        location_status = params.get('location_status', '')  # 有无封闭货位
+        export = params.get("export", None)
+
+        try:
+            st = (int(page) - 1) * int(page_size)
+            et = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+        else:
+            if st not in range(0, 99999):
+                raise ValidationError("page/page_size值异常")
+            if et not in range(0, 99999):
+                raise ValidationError("page/page_size值异常")
+
+        filter_kwargs = {}
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if stage:
+            filter_kwargs['material_no__contains'] = f'-{stage}'
+        if location:
+            filter_kwargs['location__startswith'] = location
+
+        if warehouse_name == '混炼胶库':
+            model = BzFinalMixingRubberInventory
+            store_name = '立体库'
+            temp = self.get_result(model, 'bz', store_name, warehouse_name, location_status, **filter_kwargs)
+
+        elif warehouse_name == '终炼胶库':
+            model = BzFinalMixingRubberInventoryLB
+            store_name = '炼胶库'
+            temp = self.get_result(model, 'lb', store_name, warehouse_name, location_status, **filter_kwargs)
+
+        else:
+            model1 = BzFinalMixingRubberInventory
+            store_name1 = '立体库'
+            warehouse_name1 = '混炼胶库'
+            temp1 = self.get_result(model1, 'bz', store_name1, warehouse_name1, location_status, **filter_kwargs)
+            model2 = BzFinalMixingRubberInventoryLB
+            store_name2 = '炼胶库'
+            warehouse_name2 = '终炼胶库'
+            temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
+            temp = list(temp1) + list(temp2)
+            temp = sorted(temp, key=lambda x: x['material_no'])
+
+        weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
+
+        for i in temp:
+            weight_1 += i['一等品']['total_weight'] if i.get('一等品') else 0
+            qty_1 += i['一等品']['qty'] if i.get('一等品') else 0
+            weight_3 += i['三等品']['total_weight'] if i.get('三等品') else 0
+            qty_3 += i['三等品']['qty'] if i.get('三等品') else 0
+            weight_dj += i['待检品']['total_weight'] if i.get('待检品') else 0
+            qty_dj += i['待检品']['qty'] if i.get('待检品') else 0
+            weight_fb += i['封闭']['total_weight'] if i.get('封闭') else 0
+            qty_fb += i['封闭']['qty'] if i.get('封闭') else 0
+
+        total_qty = qty_1 + qty_3 + qty_dj + qty_fb
+        total_weight = weight_1 + weight_3 + weight_dj + weight_fb
+        count = len(temp)
+        if export == 'all':
+            result = temp
+        else:
+            result = temp[st:et]
+        if export:
+            return self.export_xls(result)
+
+        return Response({'results': result,
+                         "total_count": total_qty,
+                         "total_weight": total_weight,
+                         'weight_1': weight_1,
+                         'qty_1': qty_1,
+                         'weight_3': weight_3,
+                         'qty_3': qty_3,
+                         'weight_dj': weight_dj,
+                         'qty_dj': qty_dj,
+                         'weight_fb': weight_fb,
+                         'qty_fb': qty_fb,
+                         'count': count
+                         })
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutBoundDeliveryOrderViewSet(ModelViewSet):
+    queryset = OutBoundDeliveryOrder.objects.all().order_by("-created_date")
+    serializer_class = OutBoundDeliveryOrderSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = OutBoundDeliveryOrderFilter
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='export',
+            url_name='export')
+    def export(self, request):
+        order_ids = self.request.query_params.get('order_ids', '')
+        order_id_list = order_ids.split(',')
+        try:
+            orders = OutBoundDeliveryOrder.objects.filter(id__in=order_id_list)
+        except Exception:
+            raise ValidationError('参数错误')
+        ws = xlwt.Workbook(encoding='utf-8')
+        for order in orders:
+            # 创建工作薄
+            w = ws.add_sheet("{}".format(order.order_no))
+            w.write(0, 0, "订单子编号")
+            w.write(0, 1, "胶料编码")
+            w.write(0, 2, "lot_no")
+            w.write(0, 3, "托盘号")
+            w.write(0, 4, "车次")
+            w.write(0, 5, "库位编号")
+            w.write(0, 6, "出库时间")
+            w.write(0, 7, "状态")
+            # 写入数据
+            excel_row = 1
+            for obj in order.outbound_delivery_details.all():
+                w.write(excel_row, 0, obj.order_no)
+                w.write(excel_row, 1, order.product_no)
+                w.write(excel_row, 2, obj.lot_no)
+                w.write(excel_row, 3, obj.pallet_no)
+                w.write(excel_row, 4, obj.memo)
+                w.write(excel_row, 5, obj.location)
+                w.write(excel_row, 6, obj.finish_time)
+                w.write(excel_row, 7, obj.get_status_display())
+                excel_row += 1
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '备品备件信息导入模板'
+        response['Content-Disposition'] = 'attachment;filename= ' + filename.encode('gbk').decode('ISO-8859-1') + '.xls'
+        output = BytesIO()
+        ws.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
+    queryset = OutBoundDeliveryOrderDetail.objects.all().order_by('-created_date')
+    serializer_class = OutBoundDeliveryOrderDetailSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = OutBoundDeliveryOrderDetailFilter
+
+    def create(self, request, *args, **kwargs):
+        data = self.request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误！')
+        if not data:
+            raise ValidationError('请选择货物出库！')
+        detail_ids = []
+        for item in data:
+            s = self.serializer_class(data=item, context={'request': request})
+            s.is_valid(raise_exception=True)
+            instance = s.validated_data['outbound_delivery_order']
+            detail = s.save()
+            detail_ids.append(detail.id)
+        if not DEBUG:
+            # 出库
+            username = self.request.user.username
+            items = []
+            for detail in OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids):
+                pallet = PalletFeedbacks.objects.filter(pallet_no=detail.pallet_no).last()
+                dict1 = {'WORKID': detail.order_no,
+                         'MID': instance.product_no,
+                         'PICI': pallet.bath_no if pallet else "1",
+                         'RFID': detail.pallet_no,
+                         'STATIONID': instance.station,
+                         'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                if instance.warehouse == '终炼胶库':
+                    dict1['STOREDEF_ID'] = 1
+                items.append(dict1)
+            json_data = {
+                'msgId': instance.order_no,
+                'OUTTYPE': '快检出库',
+                "msgConut": str(len(items)),
+                "SENDUSER": username,
+                "items": items
+            }
+            json_data = json.dumps(json_data, ensure_ascii=False)
+            if instance.warehouse == '混炼胶库':
+                sender = OUTWORKUploader(end_type="指定出库")
+            else:
+                sender = OUTWORKUploaderLB(end_type="指定出库")
+            result = sender.request(instance.order_no, '指定出库', str(len(items)), username, json_data)
+            if result is not None:
+                try:
+                    items = result['items']
+                    msg = items[0]['msg']
+                except:
+                    msg = result[0]['msg']
+                if "TRUE" in msg:  # 成功
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=2)
+                else:  # 失败
+                    OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
+                    raise ValidationError('出库失败：{}'.format(msg))
+        return Response('ok')

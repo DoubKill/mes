@@ -5,9 +5,12 @@ datetime: 2020/10/29
 name: 
 """
 import json
+from io import BytesIO
 
 import requests
+import xlwt
 import xmltodict
+from django.http import HttpResponse
 
 
 class BaseUploader(object):
@@ -150,3 +153,30 @@ def wms_out(url, body, method="POST"):
     }
     ret = requests.request(method, url, json=body, headers=header)
     return ret.json()
+
+
+def export_xls(field_dict, result, filename):
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+        'ISO-8859-1') + '.xls'
+    # 创建一个文件对象
+    wb = xlwt.Workbook(encoding='utf8')
+    # 创建一个sheet对象
+    sheet = wb.add_sheet('sheet1', cell_overwrite_ok=True)
+    style = xlwt.XFStyle()
+    style.alignment.wrap = 1
+    for idx, column in enumerate(field_dict.keys()):
+        sheet.write(0, idx, column)
+        # 写入数据
+    data_row = 1
+    for i in result:
+        for idx, key in enumerate(field_dict.values()):
+            sheet.write(data_row, idx, i[key])
+        data_row = data_row + 1
+    # 写出到IO
+    output = BytesIO()
+    wb.save(output)
+    # 重新定位到开始
+    output.seek(0)
+    response.write(output.getvalue())
+    return response

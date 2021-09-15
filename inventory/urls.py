@@ -20,13 +20,13 @@ router.register(r'material-inventory-view', views.MaterialInventoryView, basenam
 router.register(r'product-inventory', views.ProductInventory, basename="product-inventory")
 
 # 混炼胶库出库计划管理
-router.register('put-plan-management', PutPlanManagement)
+# router.register('put-plan-management', PutPlanManagement)
 
 # 帘布库出库管理
 router.register(r'lb-plan-management', views.PutPlanManagementLB)
 
 # 终炼胶出库管理
-router.register(r'final-plan-management', views.PutPlanManagementFianl)
+# router.register(r'final-plan-management', views.PutPlanManagementFianl)
 
 # 原材料库出库管理（没用）
 router.register(r'material-plan-management', views.MaterialPlanManagement)
@@ -42,10 +42,16 @@ router.register(r'material-inventory-manage', views.MaterialInventoryManageViewS
                 basename='material-inventory-manage'),
 
 # 混炼胶出库单
-router.register('mixin-rubbery-outbound-order', MixinRubberyOutBoundOrderViewSet)
+# router.register('mixin-rubbery-outbound-order', MixinRubberyOutBoundOrderViewSet)
 
 # 混炼胶出库单
-router.register('final-rubbery-outbound-order', FinalRubberyOutBoundOrderViewSet)
+# router.register('final-rubbery-outbound-order', FinalRubberyOutBoundOrderViewSet)
+
+# 胶片库出库单据
+router.register('outbound-delivery-orders', OutBoundDeliveryOrderViewSet)
+
+# 胶片库出库任务
+router.register('outbound-delivery-order-details', OutBoundDeliveryOrderDetailViewSet)
 
 # 物料出入库履历
 router.register(r'inventory-log', views.InventoryLogViewSet)
@@ -126,8 +132,9 @@ urlpatterns = [
     path('sampling-rules/', SamplingRules.as_view()),
 
     # 原材料出库
+    path('wms-storage/', WmsStorageView.as_view()),  # 原材料库存明细
     path('wms-stock/', WmsInventoryStockView.as_view()),  # 原材料货位列表
-    path('wms-weight-stock/', WmsInventoryWeightStockView.as_view()),  # 原材料重量库存
+    path('wms-weight-stock/', WmsInventoryWeightStockView.as_view()),  # 根据出库口获取原材料重量库存
     path('wms-entrance/', InventoryEntranceView.as_view()),  # 出库口列表
     path('wms-tunnels/', WMSTunnelView.as_view()),  # 巷道列表
     path('wms-material-groups/', WMSMaterialGroupNameView.as_view()),  # 物料组列表
@@ -135,13 +142,17 @@ urlpatterns = [
     path('wms-instock/', WmsInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
 
     # 炭黑出库
-    path('th-stock/', THInventoryStockView.as_view()),  # 炭黑货位列表
+    path('th-storage/', THStorageView.as_view()),  # 炭黑库存明细
+    path('th-stock/', THInventoryStockView.as_view()),  # 根据出库口获取炭黑货位列表
     path('th-weight-stock/', THInventoryWeightStockView.as_view()),  # 炭黑重量库存
     path('th-entrance/', THInventoryEntranceView.as_view()),  # 炭黑出库口列表
     path('th-tunnels/', THTunnelView.as_view()),  # 巷道列表
     path('th-material-groups/', THMaterialGroupNameView.as_view()),  # 物料组列表
     path('th-inventory/', THInventoryView.as_view()),  # 库存统计列表
     path('th-instock/', THInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
+
+    # 胶料库内库存统计
+    path('In-library_inventory/', LIBRARYINVENTORYView.as_view()),
 
     # 混炼胶库存管理
     path('bz-mixin-inventory/', BzMixingRubberInventory.as_view()),  # 北自混炼胶库存列表
