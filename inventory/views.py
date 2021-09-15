@@ -3761,11 +3761,15 @@ class LIBRARYINVENTORYView(ListAPIView):
         res = {}
         for i in result:
             if i['material_no'] not in res:
+                try:
+                    stage = i['material_no'].split('-')[1]
+                except Exception:
+                    stage = i['material_no']
                 res[i['material_no']] = {
                     'material_no': i['material_no'],
                     'warehouse_name': warehouse_name,
                     'location': kwargs.get('location__startswith'),
-                    'stage': i['material_no'].split('-')[1],
+                    'stage': stage,
                     'all_qty': i['qty'],
                     'total_weight': i['total_weight'],
                     i['quality_level']: {'qty': i['qty'], 'total_weight': i['total_weight']},
