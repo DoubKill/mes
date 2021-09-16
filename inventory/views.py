@@ -72,6 +72,7 @@ from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint, Train, MaterialDealResult
 from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
+from system.models import User
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
 from .conf import wms_ip, wms_port, IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -4070,3 +4071,25 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
                     OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
                     raise ValidationError('出库失败：{}'.format(msg))
         return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutBoundHistory(APIView):
+
+    def get(self, request):
+        user_id = self.request.query_params.get('user_id')
+        try:
+            user = User.objects.get(id=user_id)
+        except Exception:
+            raise ValidationError('改用户不存在')
+        last_out_bound_order = OutBoundDeliveryOrder.objects.filter(
+            created_user=user).order_by('created_date').last()
+        if last_out_bound_order:
+            data = {
+                'warehouse': last_out_bound_order.warehouse,
+                'station': last_out_bound_order.station,
+                'order_qty': last_out_bound_order.order_qty
+            }
+        else:
+            data = {}
+        return Response(data)
