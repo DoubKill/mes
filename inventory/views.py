@@ -4004,11 +4004,29 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             raise ValidationError('参数错误！')
         if not data:
             raise ValidationError('请选择货物出库！')
+        try:
+            instance = OutBoundDeliveryOrder.objects.get(id=data[0]['outbound_delivery_order'])
+        except Exception:
+            raise ValidationError('出库单据号不存在')
+
+        last_order_detail = instance.outbound_delivery_details.order_by('created_date').last()
+        if not last_order_detail:
+            sub_no = '00001'
+        else:
+            if last_order_detail.sub_no:
+                last_sub_no = str(int(last_order_detail.sub_no) + 1)
+                if len(last_sub_no) <= 5:
+                    sub_no = last_sub_no.zfill(5)
+                else:
+                    sub_no = last_sub_no.zfill(len(last_sub_no))
+            else:
+                sub_no = '00001'
+
         detail_ids = []
         for item in data:
+            item['sub_no'] = sub_no
             s = self.serializer_class(data=item, context={'request': request})
             s.is_valid(raise_exception=True)
-            instance = s.validated_data['outbound_delivery_order']
             detail = s.save()
             detail_ids.append(detail.id)
         if not DEBUG:
