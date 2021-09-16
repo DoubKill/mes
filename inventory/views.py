@@ -251,6 +251,7 @@ class OutWorkFeedBack(APIView):
 
     # 出库反馈
     def post(self, request):
+        logger.info('北自出库反馈数据：{}'.format(request.data))
         data = self.request.data
         if data:
             lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
@@ -3780,11 +3781,12 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'total_weight': i['total_weight']}
                 res[i['material_no']]['all_qty'] += i['qty']
                 res[i['material_no']]['total_weight'] += i['total_weight']
+            res[i['material_no']]['active_qty'] = res[i['material_no']]['all_qty']
 
         for i in fb:
             if res.get(i['material_no']):
                 res[i['material_no']].update({'封闭': {'qty': i['qty'], 'total_weight': i['total_weight']}})
-
+                res[i['material_no']]['active_qty'] -= res[i['material_no']]['封闭']['qty']
 
         return list(res.values())
 
@@ -3804,7 +3806,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         style.alignment.wrap = 1
 
         columns = ['No', '胶料类型', '物料编码', '物料名称', '库区', '巷道', '一等品库存数(车)', '重量(kg)', '三等品库存数(车)', '重量(kg)',
-                   '待检品库存数(车)', '重量(kg)', '总库存数(车)', '总重量(kg)', '封闭库存数(车)', '重量(kg)']
+                   '待检品库存数(车)', '重量(kg)', '总库存数(车)', '总重量(kg)', '封闭库存数(车)', '重量(kg)', '有效库存数']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -3827,6 +3829,7 @@ class LIBRARYINVENTORYView(ListAPIView):
                 sheet.write(data_row, 13, i['total_weight'])
                 sheet.write(data_row, 14, i['封闭']['qty'] if i.get('封闭') else None)
                 sheet.write(data_row, 15, i['封闭']['total_weight'] if i.get('封闭') else None)
+                sheet.write(data_row, 16, i['active_qty'])
                 data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -3910,6 +3913,16 @@ class LIBRARYINVENTORYView(ListAPIView):
         if export:
             return self.export_xls(result)
 
+        if warehouse_name == '终炼胶库':
+            total_goods_num = 1428
+            used_goods_num = len(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库'))
+        elif warehouse_name == '混炼胶库':
+            total_goods_num = 1952
+            used_goods_num = len(BzFinalMixingRubberInventory.objects.using('bz').all())
+        else:
+            total_goods_num = 1428 + 1952
+            used_goods_num = len(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库')) + len(BzFinalMixingRubberInventory.objects.using('bz').all())
+
         return Response({'results': result,
                          "total_count": total_qty,
                          "total_weight": total_weight,
@@ -3921,7 +3934,10 @@ class LIBRARYINVENTORYView(ListAPIView):
                          'qty_dj': qty_dj,
                          'weight_fb': weight_fb,
                          'qty_fb': qty_fb,
-                         'count': count
+                         'count': count,
+                         'total_goods_num': total_goods_num,
+                         'used_goods_num': used_goods_num,
+                         'empty_goods_num': total_goods_num - used_goods_num
                          })
 
 
@@ -3989,11 +4005,29 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             raise ValidationError('参数错误！')
         if not data:
             raise ValidationError('请选择货物出库！')
+        try:
+            instance = OutBoundDeliveryOrder.objects.get(id=data[0]['outbound_delivery_order'])
+        except Exception:
+            raise ValidationError('出库单据号不存在')
+
+        last_order_detail = instance.outbound_delivery_details.order_by('created_date').last()
+        if not last_order_detail:
+            sub_no = '00001'
+        else:
+            if last_order_detail.sub_no:
+                last_sub_no = str(int(last_order_detail.sub_no) + 1)
+                if len(last_sub_no) <= 5:
+                    sub_no = last_sub_no.zfill(5)
+                else:
+                    sub_no = last_sub_no.zfill(len(last_sub_no))
+            else:
+                sub_no = '00001'
+
         detail_ids = []
         for item in data:
+            item['sub_no'] = sub_no
             s = self.serializer_class(data=item, context={'request': request})
             s.is_valid(raise_exception=True)
-            instance = s.validated_data['outbound_delivery_order']
             detail = s.save()
             detail_ids.append(detail.id)
         if not DEBUG:

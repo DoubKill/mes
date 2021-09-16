@@ -287,6 +287,7 @@ class OutBoundDeliveryOrderDetail(AbstractEntity):
                                    related_name='equip_delivery_details')
     dispatch = models.ManyToManyField('DispatchPlan', verbose_name="发货单", help_text="发货单", blank=True,
                                       related_name='dispatch_delivery_details')
+    sub_no = models.CharField(max_length=64, help_text='订单自编号', blank=True, null=True)
 
     class Meta:
         db_table = 'outbound_delivery_order_details'
