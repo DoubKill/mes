@@ -3780,11 +3780,12 @@ class LIBRARYINVENTORYView(ListAPIView):
                     'total_weight': i['total_weight']}
                 res[i['material_no']]['all_qty'] += i['qty']
                 res[i['material_no']]['total_weight'] += i['total_weight']
+            res[i['material_no']]['active_qty'] = res[i['material_no']]['all_qty']
 
         for i in fb:
             if res.get(i['material_no']):
                 res[i['material_no']].update({'封闭': {'qty': i['qty'], 'total_weight': i['total_weight']}})
-
+                res[i['material_no']]['active_qty'] -= res[i['material_no']]['封闭']['qty']
 
         return list(res.values())
 
@@ -3804,7 +3805,7 @@ class LIBRARYINVENTORYView(ListAPIView):
         style.alignment.wrap = 1
 
         columns = ['No', '胶料类型', '物料编码', '物料名称', '库区', '巷道', '一等品库存数(车)', '重量(kg)', '三等品库存数(车)', '重量(kg)',
-                   '待检品库存数(车)', '重量(kg)', '总库存数(车)', '总重量(kg)', '封闭库存数(车)', '重量(kg)']
+                   '待检品库存数(车)', '重量(kg)', '总库存数(车)', '总重量(kg)', '封闭库存数(车)', '重量(kg)', '有效库存数']
         # 写入文件标题
         for col_num in range(len(columns)):
             sheet.write(0, col_num, columns[col_num])
@@ -3827,6 +3828,7 @@ class LIBRARYINVENTORYView(ListAPIView):
                 sheet.write(data_row, 13, i['total_weight'])
                 sheet.write(data_row, 14, i['封闭']['qty'] if i.get('封闭') else None)
                 sheet.write(data_row, 15, i['封闭']['total_weight'] if i.get('封闭') else None)
+                sheet.write(data_row, 16, i['active_qty'])
                 data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -3910,6 +3912,16 @@ class LIBRARYINVENTORYView(ListAPIView):
         if export:
             return self.export_xls(result)
 
+        if warehouse_name == '终炼胶库':
+            total_goods_num = 1428
+            used_goods_num = len(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库'))
+        elif warehouse_name == '混炼胶库':
+            total_goods_num = 1952
+            used_goods_num = len(BzFinalMixingRubberInventory.objects.using('bz').all())
+        else:
+            total_goods_num = 1428 + 1952
+            used_goods_num = len(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库')) + len(BzFinalMixingRubberInventory.objects.using('bz').all())
+
         return Response({'results': result,
                          "total_count": total_qty,
                          "total_weight": total_weight,
@@ -3921,7 +3933,10 @@ class LIBRARYINVENTORYView(ListAPIView):
                          'qty_dj': qty_dj,
                          'weight_fb': weight_fb,
                          'qty_fb': qty_fb,
-                         'count': count
+                         'count': count,
+                         'total_goods_num': total_goods_num,
+                         'used_goods_num': used_goods_num,
+                         'empty_goods_num': total_goods_num - used_goods_num
                          })
 
 
