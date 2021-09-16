@@ -251,6 +251,7 @@ class OutWorkFeedBack(APIView):
 
     # 出库反馈
     def post(self, request):
+        logger.info('北自出库反馈数据：{}'.format(request.data))
         data = self.request.data
         if data:
             lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
