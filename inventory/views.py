@@ -2,6 +2,7 @@ import datetime
 import json
 import logging
 import random
+import re
 import time
 from io import BytesIO, StringIO
 
@@ -635,6 +636,83 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
         serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
         return Response({'results': list(serializer1.data) + list(serializer2.data)})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class AdditionalPrintDetailView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, *args, **kwargs):
+        data = self.request.query_params
+        location = data.get('location')
+        material_no = data.get('material_no')
+        start_time = data.get('start_time')
+        initiator = data.get('initiator')
+        weight = data.get('weight')
+        pallet_no = data.get('pallet_no')
+        type = data.get('type')
+        lot_no = data.get('lot_no') if data.get('lot_no') != '88888888' else \
+            re.sub('-| |:', '', start_time[2:]) + type + location.replace('-', '')
+        label = receive_deal_result(lot_no)
+        if not label:
+            label = {
+                "id": None, "day_time": start_time[:10], "product_no": material_no, "equip_no": "", "lot_no": lot_no,
+                "residual_weight": None, "actual_weight": weight, "operation_user": initiator, "actual_trains": "",
+                "classes_group": "", "valid_time": "", "range_showed": 0, "deal_suggestion": "", "deal_user": "",
+                "deal_time": "", "production_factory_date": start_time[:10], "deal_result": "",
+                "test": {"test_status": "", "test_factory_date": "", "test_class": "", "pallet_no": pallet_no,
+                         "test_user": ""},
+                "print_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "mtr_list": {"trains": [], "table_head": []}
+            }
+        return Response(label)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class AdditionalPrintView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    # 补打印
+    def post(self, request):
+        """WMS->MES:任务编号、物料信息ID、物料名称、PDM号（促进剂以外为空）、批号、条码、重量、重量单位、
+        生产日期、使用期限、托盘RFID、工位（出库口）、MES->WMS:信息接收成功or失败"""
+        data = self.request.data
+        station_dict = {
+            "一层前端": 3,
+            "一层后端": 4,
+            "二层前端": 5,
+            "二层后端": 6,
+            "炼胶#出库口#1": 7,
+            "炼胶#出库口#2": 8,
+            "炼胶#出库口#3": 9,
+            "帘布#出库口#0": 10
+        }
+        for single_data in data:
+            # 有条码直接打印, 无条码生成新码
+            location = single_data.get('location')
+            station = single_data.get('station')
+            material_no = single_data.get('material_no')
+            start_time = single_data.get('start_time')
+            initiator = single_data.get('initiator')
+            weight = single_data.get('weight')
+            pallet_no = single_data.get('pallet_no')
+            type = single_data.get('type')
+            lot_no = single_data.get('lot_no') if single_data.get('lot_no') != '88888888' else \
+                re.sub('-| |:', '', single_data["start_time"][2:]) + type + location.replace('-', '')
+            label = receive_deal_result(lot_no)
+            if not label:
+                label = {
+                    "id": None, "day_time": start_time[:10], "product_no": material_no, "equip_no": "",
+                    "residual_weight": None, "actual_weight": weight, "operation_user": initiator, "actual_trains": "",
+                    "classes_group": "", "valid_time": "", "range_showed": 0, "deal_suggestion": "", "deal_user": "",
+                    "deal_time": "", "production_factory_date": start_time[:10], "deal_result": "", "lot_no": lot_no,
+                    "test": {"test_status": "", "test_factory_date": "", "test_class": "", "pallet_no": pallet_no,
+                             "test_user": ""},
+                    "print_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "mtr_list": {"trains": [], "table_head": []}
+                }
+            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=json.dumps(label))
+        return Response('下发打印完成')
 
 
 @method_decorator([api_recorder], name="dispatch")
