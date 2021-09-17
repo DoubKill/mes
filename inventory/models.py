@@ -252,6 +252,7 @@ class OutBoundDeliveryOrder(AbstractEntity):
     finished_weight = models.FloatField(help_text='完成重量', default=0)
     inventory_type = models.CharField(max_length=32, verbose_name='出库类型', help_text='出库类型', blank=True, null=True)
     inventory_reason = models.CharField(max_length=32, verbose_name='出库原因', help_text='出库原因', blank=True, null=True)
+    quality_status = models.CharField(max_length=64, help_text='品质状态', blank=True, null=True)
 
     class Meta:
         db_table = 'outbound_delivery_order'

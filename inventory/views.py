@@ -3324,11 +3324,11 @@ class BzMixingRubberInventory(ListAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventorySummary(APIView):
-    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
+    """根据出库口获取混炼胶库存统计列表。参数：quality_status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
 
     def get(self, request):
         params = request.query_params
-        quality_status = params.get("status")
+        quality_status = params.get("quality_status")
         station = params.get("station")
         location_status = params.get("location_status")
         lot_existed = params.get("lot_existed")
@@ -3527,11 +3527,11 @@ class BzFinalRubberInventory(ListAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BzFinalRubberInventorySummary(APIView):
-    """终炼胶库存、帘布库库存统计列表。参数：status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
+    """终炼胶库存、帘布库库存统计列表。参数：quality_status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
 
     def get(self, request):
         params = request.query_params
-        quality_status = params.get("status")
+        quality_status = params.get("quality_status")
         location_status = params.get("location_status")
         store_name = params.get("store_name", '炼胶库')
         lot_existed = params.get("lot_existed")
@@ -3968,7 +3968,7 @@ class LIBRARYINVENTORYView(ListAPIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-            temp = sorted(temp, key=lambda x: x['material_no'])
+        temp = sorted(temp, key=lambda x: x['material_no'])
 
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
@@ -3982,8 +3982,8 @@ class LIBRARYINVENTORYView(ListAPIView):
             weight_fb += i['封闭']['total_weight'] if i.get('封闭') else 0
             qty_fb += i['封闭']['qty'] if i.get('封闭') else 0
 
-        total_qty = qty_1 + qty_3 + qty_dj + qty_fb
-        total_weight = weight_1 + weight_3 + weight_dj + weight_fb
+        total_qty = qty_1 + qty_3 + qty_dj
+        total_weight = weight_1 + weight_3 + weight_dj
         count = len(temp)
         if export == 'all':
             result = temp
@@ -4153,15 +4153,11 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class OutBoundHistory(APIView):
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
-        user_id = self.request.query_params.get('user_id')
-        try:
-            user = User.objects.get(id=user_id)
-        except Exception:
-            raise ValidationError('改用户不存在')
         last_out_bound_order = OutBoundDeliveryOrder.objects.filter(
-            created_user=user).order_by('created_date').last()
+            created_user=self.request.user).order_by('created_date').last()
         if last_out_bound_order:
             data = {
                 'warehouse': last_out_bound_order.warehouse,
