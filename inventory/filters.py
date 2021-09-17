@@ -325,8 +325,11 @@ class OutBoundDeliveryOrderFilter(django_filters.rest_framework.FilterSet):
 
 
 class OutBoundDeliveryOrderDetailFilter(django_filters.rest_framework.FilterSet):
-    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains', help_text='任务编号')
+    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains', help_text='出库任务号')
+    sub_no = django_filters.CharFilter(field_name='sub_no', lookup_expr='icontains', help_text='订单子编号')
+    pallet_no = django_filters.CharFilter(field_name='pallet_no', lookup_expr='icontains', help_text='托盘号')
+    lot_no = django_filters.CharFilter(field_name='lot_no', lookup_expr='icontains', help_text='收皮条码')
 
     class Meta:
         model = OutBoundDeliveryOrderDetail
-        fields = ['outbound_delivery_order_id', 'order_no']
+        fields = ['outbound_delivery_order_id', 'order_no', 'pallet_no', 'lot_no']

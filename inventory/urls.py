@@ -151,6 +151,7 @@ urlpatterns = [
     path('th-inventory/', THInventoryView.as_view()),  # 库存统计列表
     path('th-instock/', THInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
 
+    path('outbound-history/', OutBoundHistory.as_view()),
     # 胶料库内库存统计
     path('In-library_inventory/', LIBRARYINVENTORYView.as_view()),
 

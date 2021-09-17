@@ -1683,8 +1683,8 @@ class OutBoundDeliveryOrderSerializer(BaseModelSerializer):
 
 class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
 
-    def validate(self, attrs):
-        warehouse = attrs['outbound_delivery_order'].warehouse
+    def create(self, validated_data):
+        warehouse = validated_data['outbound_delivery_order'].warehouse
         last_order = OutBoundDeliveryOrderDetail.objects.filter(
             created_date__date=datetime.datetime.now().date()
         ).order_by('created_date').last()
@@ -1696,18 +1696,17 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
                 ordering = last_ordering.zfill(len(last_ordering))
         else:
             ordering = '00001'
-        attrs['order_no'] = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+        validated_data['order_no'] = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
                                                         datetime.datetime.now().date().strftime('%Y%m%d'),
                                                         ordering)
-        return attrs
+        return super().create(validated_data)
 
     class Meta:
         model = OutBoundDeliveryOrderDetail
         fields = '__all__'
         read_only_fields = ('created_date', 'last_updated_date', 'delete_date',
                             'delete_flag', 'created_user', 'last_updated_user',
-                            'delete_user', 'order_no', 'status',
-                            'equip', 'dispatch', 'finish_time')
+                            'delete_user', 'order_no', 'equip', 'dispatch', 'finish_time')
 
 
 class OutBoundTasksSerializer(BaseModelSerializer):

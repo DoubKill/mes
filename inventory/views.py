@@ -72,6 +72,7 @@ from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint, Train, MaterialDealResult
 from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
+from system.models import User
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
 from .conf import wms_ip, wms_port, IS_BZ_USING
 from .conf import wms_ip, wms_port, cb_ip, cb_port
@@ -251,6 +252,7 @@ class OutWorkFeedBack(APIView):
 
     # 出库反馈
     def post(self, request):
+        logger.info('北自出库反馈数据：{}'.format(request.data))
         data = self.request.data
         if data:
             lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
@@ -3244,11 +3246,11 @@ class BzMixingRubberInventory(ListAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventorySummary(APIView):
-    """根据出库口获取混炼胶库存统计列表。参数：status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
+    """根据出库口获取混炼胶库存统计列表。参数：quality_status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
 
     def get(self, request):
         params = request.query_params
-        quality_status = params.get("status")
+        quality_status = params.get("quality_status")
         station = params.get("station")
         location_status = params.get("location_status")
         lot_existed = params.get("lot_existed")
@@ -3447,11 +3449,11 @@ class BzFinalRubberInventory(ListAPIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class BzFinalRubberInventorySummary(APIView):
-    """终炼胶库存、帘布库库存统计列表。参数：status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
+    """终炼胶库存、帘布库库存统计列表。参数：quality_status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
 
     def get(self, request):
         params = request.query_params
-        quality_status = params.get("status")
+        quality_status = params.get("quality_status")
         location_status = params.get("location_status")
         store_name = params.get("store_name", '炼胶库')
         lot_existed = params.get("lot_existed")
@@ -3888,7 +3890,7 @@ class LIBRARYINVENTORYView(ListAPIView):
             warehouse_name2 = '终炼胶库'
             temp2 = self.get_result(model2, 'lb', store_name2, warehouse_name2, location_status, **filter_kwargs)
             temp = list(temp1) + list(temp2)
-            temp = sorted(temp, key=lambda x: x['material_no'])
+        temp = sorted(temp, key=lambda x: x['material_no'])
 
         weight_1 = qty_1 = weight_3 = qty_3 = weight_dj = qty_dj = weight_fb = qty_fb = 0
 
@@ -4004,11 +4006,29 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
             raise ValidationError('参数错误！')
         if not data:
             raise ValidationError('请选择货物出库！')
+        try:
+            instance = OutBoundDeliveryOrder.objects.get(id=data[0]['outbound_delivery_order'])
+        except Exception:
+            raise ValidationError('出库单据号不存在')
+
+        last_order_detail = instance.outbound_delivery_details.order_by('created_date').last()
+        if not last_order_detail:
+            sub_no = '00001'
+        else:
+            if last_order_detail.sub_no:
+                last_sub_no = str(int(last_order_detail.sub_no) + 1)
+                if len(last_sub_no) <= 5:
+                    sub_no = last_sub_no.zfill(5)
+                else:
+                    sub_no = last_sub_no.zfill(len(last_sub_no))
+            else:
+                sub_no = '00001'
+
         detail_ids = []
         for item in data:
+            item['sub_no'] = sub_no
             s = self.serializer_class(data=item, context={'request': request})
             s.is_valid(raise_exception=True)
-            instance = s.validated_data['outbound_delivery_order']
             detail = s.save()
             detail_ids.append(detail.id)
         if not DEBUG:
@@ -4051,3 +4071,21 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
                     OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids).update(status=5)
                     raise ValidationError('出库失败：{}'.format(msg))
         return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class OutBoundHistory(APIView):
+    permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        last_out_bound_order = OutBoundDeliveryOrder.objects.filter(
+            created_user=self.request.user).order_by('created_date').last()
+        if last_out_bound_order:
+            data = {
+                'warehouse': last_out_bound_order.warehouse,
+                'station': last_out_bound_order.station,
+                'order_qty': last_out_bound_order.order_qty
+            }
+        else:
+            data = {}
+        return Response(data)
