@@ -3902,8 +3902,8 @@ class LIBRARYINVENTORYView(ListAPIView):
             weight_fb += i['封闭']['total_weight'] if i.get('封闭') else 0
             qty_fb += i['封闭']['qty'] if i.get('封闭') else 0
 
-        total_qty = qty_1 + qty_3 + qty_dj + qty_fb
-        total_weight = weight_1 + weight_3 + weight_dj + weight_fb
+        total_qty = qty_1 + qty_3 + qty_dj
+        total_weight = weight_1 + weight_3 + weight_dj
         count = len(temp)
         if export == 'all':
             result = temp
