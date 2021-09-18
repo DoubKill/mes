@@ -130,4 +130,9 @@ urlpatterns = [
     # 不合格收皮数据列表
     path('unqialified-pallet-list/', UnqualifiedPalletFeedBackListView.as_view()),
     path('data-point-list/', DataPointListView.as_view()),
+
+    # 不合格率统计
+    path('product-test-statics/', ProductTestStaticsView.as_view()),  # 胶料别不合格率统计
+    path('class-test-statics/', ClassTestStaticsView.as_view()),  # 班次别不合格率统计
+    path('unqialified-equip/', UnqialifiedEquipView.as_view()),  # 机台别 不合格率统计
 ]

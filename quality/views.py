@@ -2,6 +2,7 @@ import datetime
 import json
 import ast
 import os
+import re
 from decimal import Decimal
 
 from suds.client import Client
@@ -67,7 +68,7 @@ from django.db.models import Prefetch
 from django.db.models import Q
 from quality.utils import print_mdr, get_cur_sheet, get_sheet_data, export_mto
 from recipe.models import Material, ProductBatching
-from django.db.models import Max, Sum, Avg
+from django.db.models import Max, Sum, Avg, Count
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2327,3 +2328,298 @@ class UnqualifiedPalletFeedBackListView(ListAPIView):
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend, )
     filter_fields = ('product_no', 'factory_date', 'classes', 'equip_no', 'is_deal')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class ProductTestStaticsView(APIView):
+    """胶料别不合格率统计"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        product_segment = self.request.query_params.get('station', '')
+        product_standard = self.request.query_params.get('product_type', '')
+        production_equip_no = self.request.query_params.get('equip_no', '')
+        production_class = self.request.query_params.get('classes', '')
+        start_time = self.request.query_params.get('s_time')
+        end_time = self.request.query_params.get('e_time')
+        queryset = MaterialTestResult.objects.filter(
+            material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
+            material_test_order__production_factory_date__gte=start_time,
+            material_test_order__production_factory_date__lte=end_time,
+            material_test_order__production_equip_no__icontains=production_equip_no,
+            material_test_order__production_class__icontains=production_class
+            )
+        # 检查数与合格数
+        records = queryset.values('material_test_order__product_no').annotate(
+            JC=Count('material_test_order_id', distinct=True),
+            HG=Count('material_test_order_id', distinct=True, filter=Q(material_test_order__is_qualified=True)))
+        if not records:
+            return Response([])
+
+        result = {re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group():
+                      {'product_type': re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group(),
+                       'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0,
+                       'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2)} for j in records}
+        """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1}}"""
+        pre_data = queryset.values('material_test_order__product_no', 'test_indicator_name', 'data_point_name')\
+            .annotate(num=Count('id', distinct=True, filter=Q(~Q(level=1))))\
+            .values('material_test_order_id', 'material_test_order__product_no', 'test_indicator_name', 'data_point_name', 'num', 'test_times')\
+            .order_by('test_times')
+        # 处理数据
+        data = {(str(i['material_test_order_id'])+'_'+re.search(r"\w{1,2}\d{3}", i['material_test_order__product_no']).group()+'_'+i['test_indicator_name']+'_'+i['data_point_name']): [i['num'], i['test_times']] for i in pre_data}
+        """{'182_J260_比重_比重值': [2, 1], '182_J260_流变_MH': [2, 1], '182_J260_流变_TC10': [2, 1], '182_J260_流变_TC50': [2, 1], 
+        '182_J260_流变_TC90': [2, 1], '182_J260_物性_M300': [2, 1], '182_J260_物性_伸长率%': [2, 1], '182_J260_物性_扯断强度': [2, 1], 
+        '182_J260_硬度_硬度值': [2, 1], '182_J260_钢拔_钢拔': [2, 1], '182_J260_门尼_ML(1+4)': [2, 1], '183_J260_门尼_ML(1+4)': [1, 0]}"""
+        for k, v in data.items():
+            single_data = result.get(k.split('_')[1])
+            order_id = k.split('_')[0]
+            if 'ML(1+4)' in k:
+                single_data['MN'] += v[0]
+                if order_id not in single_data['RATE_1'] and v[0] != 0:
+                    single_data['RATE_1'].append(order_id)
+            elif '硬度值' in k:
+                single_data['YD'] += v[0]
+                if order_id not in single_data['RATE_1'] and v[0] != 0:
+                    single_data['RATE_1'].append(order_id)
+            elif '比重值' in k:
+                single_data['BZ'] += v[0]
+                if order_id not in single_data['RATE_1'] and v[0] != 0:
+                    single_data['RATE_1'].append(order_id)
+            elif 'MH' in k:
+                single_data['MH'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'ML' in k:
+                single_data['ML'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'TC10' in k:
+                single_data['TC10'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'TC50' in k:
+                single_data['TC50'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'TC90' in k:
+                single_data['TC90'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            else:
+                continue
+        res_data = result.values()
+        for v in res_data:
+            v['RATE_1_PASS'] = round((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100, 2)
+            v['sum_s'] = v['MH'] + v['ML'] + v['TC10'] + v['TC50'] + v['TC90']
+            v['cp_all'] = v['sum_s'] + v['MN'] + v['YD'] + v['BZ']
+            v['RATE_S_PASS'] = round((v['JC'] - len(v.pop('RATE_S'))) / v['JC'] * 100, 2)
+        return Response({'result': res_data})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class ClassTestStaticsView(APIView):
+    """班次别不合格率统计"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        product_segment = self.request.query_params.get('station', '')
+        product_standard = self.request.query_params.get('product_type', '')
+        production_equip_no = self.request.query_params.get('equip_no', '')
+        production_class = self.request.query_params.get('classes', '')
+        start_time = self.request.query_params.get('s_time')
+        end_time = self.request.query_params.get('e_time')
+        queryset = MaterialTestResult.objects.filter(
+            material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
+            material_test_order__production_factory_date__gte=start_time,
+            material_test_order__production_factory_date__lte=end_time,
+            material_test_order__production_equip_no__icontains=production_equip_no,
+            material_test_order__production_class__icontains=production_class
+        )
+        # 检查数与合格数
+        records = queryset.values('material_test_order__production_factory_date',
+                                  'material_test_order__production_class').annotate(
+            JC=Count('material_test_order_id', distinct=True),
+            HG=Count('material_test_order_id', distinct=True, filter=Q(material_test_order__is_qualified=True)))
+        if not records:
+            return Response([])
+        result = {}
+        for j in records:
+            factory_date = str(j['material_test_order__production_factory_date'])
+            production_class = j['material_test_order__production_class']
+            result.update({
+                factory_date + '_' + production_class: {
+                    'date': factory_date,
+                    'class': production_class,
+                    'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0, 'TC10': 0,
+                    'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2),
+                    'sort_class': 0 if production_class == '早班' else 1
+                }
+            })
+        pre_data = queryset.values('material_test_order__production_factory_date',
+                                   'material_test_order__production_class', 'test_indicator_name', 'data_point_name') \
+            .annotate(num=Count('id', distinct=True, filter=Q(~Q(level=1)))) \
+            .values('material_test_order__production_factory_date', 'material_test_order__production_class',
+                    'material_test_order_id', 'test_indicator_name', 'data_point_name', 'num', 'test_times') \
+            .order_by('test_times')
+        # 处理数据
+        data = {(str(i['material_test_order_id']) + '_' + str(i['material_test_order__production_factory_date']) + '_'
+                 + i['material_test_order__production_class'] + '_' + i['test_indicator_name'] + '_' + i[
+                     'data_point_name']): [i['num'], i['test_times']] for i in pre_data}
+        for k, v in data.items():
+            single_data = result.get(k.split('_')[1] + '_' + k.split('_')[2])
+            order_id = k.split('_')[0]
+            if 'ML(1+4)' in k:
+                single_data['MN'] += v[0]
+                if order_id not in single_data['RATE_1'] and v[0] != 0:
+                    single_data['RATE_1'].append(order_id)
+            elif '硬度值' in k:
+                single_data['YD'] += v[0]
+                if order_id not in single_data['RATE_1'] and v[0] != 0:
+                    single_data['RATE_1'].append(order_id)
+            elif '比重值' in k:
+                single_data['BZ'] += v[0]
+                if order_id not in single_data['RATE_1'] and v[0] != 0:
+                    single_data['RATE_1'].append(order_id)
+            elif 'MH' in k:
+                single_data['MH'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'ML' in k:
+                single_data['ML'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'TC10' in k:
+                single_data['TC10'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'TC50' in k:
+                single_data['TC50'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            elif 'TC90' in k:
+                single_data['TC90'] += v[0]
+                if order_id not in single_data['RATE_S'] and v[0] != 0:
+                    single_data['RATE_S'].append(order_id)
+            else:
+                continue
+        res_data = result.values()
+        for v in res_data:
+            v['RATE_1_PASS'] = round((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100, 2)
+            v['sum_s'] = v['MH'] + v['ML'] + v['TC10'] + v['TC50'] + v['TC90']
+            v['cp_all'] = v['sum_s'] + v['MN'] + v['YD'] + v['BZ']
+            v['RATE_S_PASS'] = round((v['JC'] - len(v.pop('RATE_S'))) / v['JC'] * 100, 2)
+        return Response({'result': sorted(res_data, key=lambda x: (x['date'], x['sort_class']))})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class UnqialifiedEquipView(APIView):
+
+    def get(self, request):
+        station = self.request.query_params.get("station", '')
+        product_type = self.request.query_params.get("product_type", '')
+        s_time = self.request.query_params.get('s_time')
+        e_time = self.request.query_params.get('e_time')
+        equip_no = self.request.query_params.get('equip_no', '')
+        classes = self.request.query_params.get('classes', '')
+        params = f'{station}-{product_type}'
+        if not s_time and not e_time:
+            raise ValidationError('请输入检测时间！')
+        s_time = f'{s_time} 00:00:00'
+        e_time = f'{e_time} 23:59:59'
+        queryset = MaterialTestOrder.objects.filter(product_no__icontains=params,
+                                                    last_updated_date__gte=s_time,
+                                                    last_updated_date__lte=e_time,
+                                                    production_equip_no__icontains=equip_no,
+                                                    production_class__icontains=classes
+                                                    )
+
+        # 检查数
+        test_all = queryset.values('production_equip_no').annotate(count=Count('product_no')).values('production_equip_no', 'count')
+        # 合格数
+        test_right = queryset.filter(is_qualified=True).values('production_equip_no').annotate(count=Count('product_no'))
+
+        result = MaterialTestResult.objects.filter(material_test_order__product_no__icontains=params,
+                                                   test_factory_date__gte=s_time,
+                                                   test_factory_date__lte=e_time,
+                                                   material_test_order__production_equip_no__icontains=equip_no,
+                                                   material_test_order__production_class__icontains=classes
+                                                   ).values('material_test_order_id', 'data_point_name', 'test_indicator_name','material_test_order__production_equip_no'
+                                                   ).annotate(count=Count('id')).values('material_test_order_id', 'data_point_name', 'test_indicator_name', 'level', 'material_test_order__production_equip_no')
+        equip_queryset = MaterialTestOrder.objects.filter(production_equip_no__icontains=equip_no).values('production_equip_no').annotate(sum=Count('production_equip_no')).values('production_equip_no')
+        equip_list = [equip['production_equip_no'] for equip in equip_queryset]
+        if not equip_no:
+            dic = {'Z01':{}, 'Z02':{}, 'Z03':{}, 'Z04':{}, 'Z05':{}, 'Z06':{}, 'Z07':{}, 'Z08':{}, 'Z09':{}, 'Z10':{}, 'Z11':{}, 'Z12':{}, 'Z13':{}, 'Z14':{}, 'Z15':{}}
+        else:
+            dic = {}
+            for equip in equip_list:
+                dic.update({equip: {}})
+
+        if len(test_all) > 0:
+            for i in result:
+                if dic[i['material_test_order__production_equip_no']].get(f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}"):
+                    if i['level'] == 1:
+                        del dic[i['material_test_order__production_equip_no']][f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}"]
+                else:
+                    if i['level'] == 2:
+                        dic[i['material_test_order__production_equip_no']].update({f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}": {'data_point_name':i['data_point_name'], 'test_indicator_name': i['test_indicator_name']}})
+
+
+            results = []
+            if not equip_no:
+                equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
+
+            for equip in equip_list:
+                MN = YD = BZ = MH = ML = TC10 = TC50 = TC90 = 0
+                RATE_1 = []
+                RATE_LB = []
+                try:
+                    TEST_ALL = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_all][equip_list.index(equip)]
+                    TEST_RIGHT = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_right][equip_list.index(equip)]
+                except:
+                    TEST_ALL = TEST_RIGHT = 0
+                for i in dic[equip].keys():
+                    if i.split('_')[2] == 'ML(1+4)':
+                        MN += 1
+                    elif i.split('_')[2] == '硬度值':
+                        YD += 1
+                    elif i.split('_')[2] == '比重值':
+                        BZ += 1
+                    elif i.split('_')[2] == 'MH':
+                        MH += 1
+                    elif i.split('_')[2] == 'ML':
+                        ML += 1
+                    elif i.split('_')[2] == 'TC10':
+                        TC10 += 1
+                    elif i.split('_')[2] == 'TC50':
+                        TC50 += 1
+                    elif i.split('_')[2] == 'TC90':
+                        TC90 += 1
+
+                    if i.split('_')[2] == 'ML(1+4)' or i.split('_')[2] == '硬度值' or i.split('_')[2] == '比重值':
+                        RATE_1.append(i.split('_')[0])
+                    if i.split('_')[2] == 'MH' or i.split('_')[2] == 'ML' or i.split('_')[2] == 'TC10' or i.split('_')[2] == 'TC50' or i.split('_')[2] == 'TC90':
+                        RATE_LB.append(i.split('_')[0])
+                RATE_1 = len(set(RATE_1))
+                RATE_LB = len(set(RATE_LB))
+                results.append(
+                    {
+                        'equip': equip,
+                        'test_all':  TEST_ALL,
+                        'test_right': TEST_RIGHT,
+                        'mn': MN ,
+                        'yd': YD,
+                        'bz': BZ,
+                        'rate_1': '%.2f'% (((TEST_ALL - RATE_1) / TEST_ALL)*100) if TEST_ALL else 0,
+                        'MH': MH,
+                        'ML': ML,
+                        'TC10': TC10,
+                        'TC50': TC50,
+                        'TC90': TC90,
+                        'lb_all': MH + ML + TC10 + TC50 + TC90,
+                        'rate_lb': '%.2f'% (((TEST_ALL - RATE_LB) / TEST_ALL)*100) if TEST_ALL else 0,
+                        'cp_all': MN + YD + BZ + MH + ML + TC10 + TC50 + TC90,
+                        'rate': '%.2f'% ((TEST_RIGHT / TEST_ALL)*100) if TEST_ALL else 0
+                    })
+        else:
+            results = []
+        return Response({'results': results})
