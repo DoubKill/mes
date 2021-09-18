@@ -2342,6 +2342,9 @@ class ProductTestStaticsView(APIView):
         production_class = self.request.query_params.get('classes', '')
         start_time = self.request.query_params.get('s_time')
         end_time = self.request.query_params.get('e_time')
+        diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
+        if diff.days > 7:
+            raise ValidationError('请输入七天内有效日期！')
         queryset = MaterialTestResult.objects.filter(
             material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
             material_test_order__production_factory_date__gte=start_time,
@@ -2410,7 +2413,7 @@ class ProductTestStaticsView(APIView):
         res_data = result.values()
         for v in res_data:
             v['RATE_1_PASS'] = round((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100, 2)
-            v['sum_s'] = v['MH'] + v['ML'] + v['TC10'] + v['TC50'] + v['TC90']
+            v['sum_s'] = len(v.pop('RATE_S'))
             v['cp_all'] = v['sum_s'] + v['MN'] + v['YD'] + v['BZ']
             v['RATE_S_PASS'] = round((v['JC'] - len(v.pop('RATE_S'))) / v['JC'] * 100, 2)
         return Response({'result': res_data})
@@ -2428,6 +2431,9 @@ class ClassTestStaticsView(APIView):
         production_class = self.request.query_params.get('classes', '')
         start_time = self.request.query_params.get('s_time')
         end_time = self.request.query_params.get('e_time')
+        diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
+        if diff.days > 7:
+            raise ValidationError('请输入七天内有效日期！')
         queryset = MaterialTestResult.objects.filter(
             material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
             material_test_order__production_factory_date__gte=start_time,
@@ -2505,7 +2511,7 @@ class ClassTestStaticsView(APIView):
         res_data = result.values()
         for v in res_data:
             v['RATE_1_PASS'] = round((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100, 2)
-            v['sum_s'] = v['MH'] + v['ML'] + v['TC10'] + v['TC50'] + v['TC90']
+            v['sum_s'] = len(v.pop('RATE_S'))
             v['cp_all'] = v['sum_s'] + v['MN'] + v['YD'] + v['BZ']
             v['RATE_S_PASS'] = round((v['JC'] - len(v.pop('RATE_S'))) / v['JC'] * 100, 2)
         return Response({'result': sorted(res_data, key=lambda x: (x['date'], x['sort_class']))})
