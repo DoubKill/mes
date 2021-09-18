@@ -11,7 +11,7 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import PlanSchedule, GlobalCode, WorkSchedulePlan
-from inventory.models import MaterialOutHistory
+from inventory.models import MaterialOutHistory, MixGumOutInventoryLog, DepotPallt
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -108,6 +108,21 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
             total_weight = pallet_feedback.actual_weight
+            unit = unit
+            attrs['scan_material'] = material_name
+            DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=datetime.now(), pallet_status=2)
+        if bra_code[12] in ['H', 'Z']:
+            start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
+            end_time = str(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S') + timedelta(seconds=1))
+            location = f'{bra_code[13]}-{bra_code[14]}-{bra_code[15: len(bra_code) - 1]}-{bra_code[-1]}'
+            db_name = 'bz' if bra_code[12] == 'H' else 'lb'
+            instance = MixGumOutInventoryLog.objects.using(db_name).filter(location=location, start_time__gte=start_time,
+                                                                           start_time__lte=end_time).last()
+            if not instance:
+                raise serializers.ValidationError(f'条码解析异常{bra_code}')
+            material_no = instance.material_no
+            material_name = instance.material_no
+            total_weight = instance.weight
             unit = unit
             attrs['scan_material'] = material_name
         if weight_package:

@@ -130,6 +130,8 @@ urlpatterns = [
     path('material-inventory-list/', MaterialInventoryAPIView.as_view()),  # 库存信息
     path('materia_type_name_to_according/', MateriaTypeNameToAccording.as_view()),  # 根据物料类型和编码找到存在的仓库表
     path('sampling-rules/', SamplingRules.as_view()),
+    path('additional-print/', AdditionalPrintView.as_view()),  # 补充打印
+    path('additional-print-detail/', AdditionalPrintDetailView.as_view()),  # 补充打印详情
 
     # 原材料出库
     path('wms-storage/', WmsStorageView.as_view()),  # 原材料库存明细

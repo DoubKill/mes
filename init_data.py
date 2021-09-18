@@ -719,6 +719,11 @@ permission_data = [
     {'id': 547, 'code': 'close_product_outbound_plan', 'name': '关闭', 'parent_id': 542},
     {'id': 560, 'code': 'unqualified_product_outbound_plan', 'name': '三等品出库', 'parent_id': 542},
 
+    {'id': 561, 'code': 'additional_print', 'name': '出库口补打印卡片', 'parent_id': None},
+    {'id': 562, 'code': 'view_additional_print', 'name': '查看', 'parent_id': 561},
+    {'id': 563, 'code': 'print_additional_print', 'name': '打印', 'parent_id': 561},
+
+
 ]
 
 
