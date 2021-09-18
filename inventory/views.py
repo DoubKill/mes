@@ -670,7 +670,7 @@ class AdditionalPrintDetailView(APIView):
             if data:
                 # 获取班组
                 record = ProductClassesPlan.objects.filter(plan_classes_uid=data.plan_classes_uid).first()
-                group = '' if not record else record.group.global_name
+                group = '' if not record else record.work_schedule_plan.group.global_name
                 label.update({'equip_no': data.equip_no, 'classes_group': f'{data.classes}/{group}',
                               'actual_trains': f'{data.begin_trains}/{data.end_trains}'})
         else:
@@ -726,7 +726,7 @@ class AdditionalPrintView(APIView):
                 if data:
                     # 获取班组
                     record = ProductClassesPlan.objects.filter(plan_classes_uid=data.plan_classes_uid).first()
-                    group = '' if not record else record.group.global_name
+                    group = '' if not record else record.work_schedule_plan.group.global_name
                     label.update({"equip_no": data.equip_no, "classes_group": f"{data.classes}/{group}",
                                   "actual_trains": f"{data.begin_trains}/{data.end_trains}"})
                 label = json.dumps(label)
