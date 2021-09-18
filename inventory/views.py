@@ -665,6 +665,16 @@ class AdditionalPrintDetailView(APIView):
                 "print_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "mtr_list": {"trains": [], "table_head": []}
             }
+            # 未快检的正常条码
+            data = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+            if data:
+                # 获取班组
+                record = ProductClassesPlan.objects.filter(plan_classes_uid=data.plan_classes_uid).first()
+                group = '' if not record else record.work_schedule_plan.group.global_name
+                label.update({'equip_no': data.equip_no, 'classes_group': f'{data.classes}/{group}',
+                              'actual_trains': f'{data.begin_trains}/{data.end_trains}'})
+        else:
+            label = json.loads(label)
         return Response(label)
 
 
@@ -711,7 +721,16 @@ class AdditionalPrintView(APIView):
                     "print_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "mtr_list": {"trains": [], "table_head": []}
                 }
-            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=json.dumps(label))
+                # 未快检的正常条码
+                data = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+                if data:
+                    # 获取班组
+                    record = ProductClassesPlan.objects.filter(plan_classes_uid=data.plan_classes_uid).first()
+                    group = '' if not record else record.work_schedule_plan.group.global_name
+                    label.update({"equip_no": data.equip_no, "classes_group": f"{data.classes}/{group}",
+                                  "actual_trains": f"{data.begin_trains}/{data.end_trains}"})
+                label = json.dumps(label)
+            LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0, data=label)
         return Response('下发打印完成')
 
 
