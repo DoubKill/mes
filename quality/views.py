@@ -2359,10 +2359,22 @@ class ProductTestStaticsView(APIView):
         if not records:
             return Response([])
 
-        result = {re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group():
-                      {'product_type': re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group(),
-                       'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0,
-                       'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2)} for j in records}
+        # result = {re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group():
+        #               {'product_type': re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group(),
+        #                'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0,
+        #                'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2)} for j in records}
+        result = {}
+        for j in records:
+            product_type = re.search(r'\w{1,2}\d{3}', j['material_test_order__product_no']).group()
+            if product_type not in result:
+                data = {'product_type': product_type, 'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0,
+                        'RATE_1': [], 'MH': 0, 'ML': 0, 'TC10': 0, 'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0,
+                        'rate': '%.2f' % (j['HG'] / j['JC'] * 100)}
+                result[product_type] = data
+            else:
+                data = result.get(product_type)
+                data.update({'JC': data['JC'] + j['JC'], 'HG': data['HG'] + j['HG']})
+                data.update({'rate': round(data['HG'] / data['JC'] * 100, 2)})
         """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1}}"""
         pre_data = queryset.values('material_test_order__product_no', 'test_indicator_name', 'data_point_name')\
             .annotate(num=Count('id', distinct=True, filter=Q(~Q(level=1))))\
@@ -2411,12 +2423,19 @@ class ProductTestStaticsView(APIView):
             else:
                 continue
         res_data = result.values()
+        all = {}
+        rate_1, rate_lb, rate = 0, 0, 0
         for v in res_data:
-            v['RATE_1_PASS'] = round((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100, 2)
+            v['RATE_1_PASS'] = '%.2f' % ((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100)
             v['sum_s'] = len(v.pop('RATE_S'))
-            v['cp_all'] = v['sum_s'] + v['MN'] + v['YD'] + v['BZ']
-            v['RATE_S_PASS'] = round((v['JC'] - len(v.pop('RATE_S'))) / v['JC'] * 100, 2)
-        return Response({'result': res_data})
+            v['cp_all'] = v['JC'] - v['HG']
+            v['RATE_S_PASS'] = '%.2f' % ((v['JC'] - v['sum_s']) / v['JC'] * 100)
+            rate_1 += float(v['RATE_1_PASS'])
+            rate_lb += float(v['RATE_S_PASS'])
+            rate += float(v['rate'])
+        all.update(rate_1='%.2f' % (rate_1 / len(res_data)), rate_lb='%.2f' % (rate_lb / len(res_data)),
+                   rate='%.2f' % (rate / len(res_data)))
+        return Response({'result': res_data, 'all': all})
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2457,7 +2476,7 @@ class ClassTestStaticsView(APIView):
                     'date': factory_date,
                     'class': production_class,
                     'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0, 'TC10': 0,
-                    'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': round(j['HG'] / j['JC'] * 100, 2),
+                    'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': '%.2f' % (j['HG'] / j['JC'] * 100),
                     'sort_class': 0 if production_class == '早班' else 1
                 }
             })
@@ -2509,12 +2528,19 @@ class ClassTestStaticsView(APIView):
             else:
                 continue
         res_data = result.values()
+        all = {}
+        rate_1, rate_lb, rate = 0, 0, 0
         for v in res_data:
-            v['RATE_1_PASS'] = round((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100, 2)
+            v['RATE_1_PASS'] = '%.2f' % ((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100)
             v['sum_s'] = len(v.pop('RATE_S'))
-            v['cp_all'] = v['sum_s'] + v['MN'] + v['YD'] + v['BZ']
-            v['RATE_S_PASS'] = round((v['JC'] - len(v.pop('RATE_S'))) / v['JC'] * 100, 2)
-        return Response({'result': sorted(res_data, key=lambda x: (x['date'], x['sort_class']))})
+            v['cp_all'] = v['JC'] - v['HG']
+            v['RATE_S_PASS'] = '%.2f' % ((v['JC'] - v['sum_s']) / v['JC'] * 100)
+            rate_1 += float(v['RATE_1_PASS'])
+            rate_lb += float(v['RATE_S_PASS'])
+            rate += float(v['rate'])
+        all.update(rate_1='%.2f' % (rate_1 / len(res_data)), rate_lb='%.2f' % (rate_lb / len(res_data)),
+                   rate='%.2f' % (rate / len(res_data)))
+        return Response({'result': sorted(res_data, key=lambda x: (x['date'], x['sort_class'])), 'all': all})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2528,8 +2554,15 @@ class UnqialifiedEquipView(APIView):
         equip_no = self.request.query_params.get('equip_no', '')
         classes = self.request.query_params.get('classes', '')
         params = f'{station}-{product_type}'
+
+        e = datetime.datetime.strptime(e_time, '%Y-%m-%d')
+        s = datetime.datetime.strptime(s_time, '%Y-%m-%d')
+        delta = e - s
+        if delta.days > 7:
+            raise ValidationError('请输入七天内有效日期！')
         if not s_time and not e_time:
             raise ValidationError('请输入检测时间！')
+
         s_time = f'{s_time} 00:00:00'
         e_time = f'{e_time} 23:59:59'
         queryset = MaterialTestOrder.objects.filter(product_no__icontains=params,
@@ -2540,21 +2573,29 @@ class UnqialifiedEquipView(APIView):
                                                     )
 
         # 检查数
-        test_all = queryset.values('production_equip_no').annotate(count=Count('product_no')).values('production_equip_no', 'count')
+        test_all = queryset.values('production_equip_no').annotate(count=Count('product_no')).values(
+            'production_equip_no', 'count')
         # 合格数
-        test_right = queryset.filter(is_qualified=True).values('production_equip_no').annotate(count=Count('product_no'))
+        test_right = queryset.filter(is_qualified=True).values('production_equip_no').annotate(
+            count=Count('product_no'))
 
         result = MaterialTestResult.objects.filter(material_test_order__product_no__icontains=params,
                                                    test_factory_date__gte=s_time,
                                                    test_factory_date__lte=e_time,
                                                    material_test_order__production_equip_no__icontains=equip_no,
                                                    material_test_order__production_class__icontains=classes
-                                                   ).values('material_test_order_id', 'data_point_name', 'test_indicator_name','material_test_order__production_equip_no'
-                                                   ).annotate(count=Count('id')).values('material_test_order_id', 'data_point_name', 'test_indicator_name', 'level', 'material_test_order__production_equip_no')
-        equip_queryset = MaterialTestOrder.objects.filter(production_equip_no__icontains=equip_no).values('production_equip_no').annotate(sum=Count('production_equip_no')).values('production_equip_no')
+                                                   ).values('material_test_order_id', 'data_point_name',
+                                                            'test_indicator_name',
+                                                            'material_test_order__production_equip_no'
+                                                            ).annotate(count=Count('id')).values(
+            'material_test_order_id', 'data_point_name', 'test_indicator_name', 'level',
+            'material_test_order__production_equip_no')
+        equip_queryset = MaterialTestOrder.objects.filter(production_equip_no__icontains=equip_no).values(
+            'production_equip_no').annotate(sum=Count('production_equip_no')).values('production_equip_no')
         equip_list = [equip['production_equip_no'] for equip in equip_queryset]
         if not equip_no:
-            dic = {'Z01':{}, 'Z02':{}, 'Z03':{}, 'Z04':{}, 'Z05':{}, 'Z06':{}, 'Z07':{}, 'Z08':{}, 'Z09':{}, 'Z10':{}, 'Z11':{}, 'Z12':{}, 'Z13':{}, 'Z14':{}, 'Z15':{}}
+            dic = {'Z01': {}, 'Z02': {}, 'Z03': {}, 'Z04': {}, 'Z05': {}, 'Z06': {}, 'Z07': {}, 'Z08': {}, 'Z09': {},
+                   'Z10': {}, 'Z11': {}, 'Z12': {}, 'Z13': {}, 'Z14': {}, 'Z15': {}}
         else:
             dic = {}
             for equip in equip_list:
@@ -2562,27 +2603,39 @@ class UnqialifiedEquipView(APIView):
 
         if len(test_all) > 0:
             for i in result:
-                if dic[i['material_test_order__production_equip_no']].get(f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}"):
+                if dic[i['material_test_order__production_equip_no']].get(
+                        f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}"):
                     if i['level'] == 1:
-                        del dic[i['material_test_order__production_equip_no']][f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}"]
+                        del dic[i['material_test_order__production_equip_no']][
+                            f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}"]
                 else:
                     if i['level'] == 2:
-                        dic[i['material_test_order__production_equip_no']].update({f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}": {'data_point_name':i['data_point_name'], 'test_indicator_name': i['test_indicator_name']}})
-
+                        dic[i['material_test_order__production_equip_no']].update({
+                                                                                      f"{i['material_test_order_id']}_{i['test_indicator_name']}_{i['data_point_name']}": {
+                                                                                          'data_point_name': i[
+                                                                                              'data_point_name'],
+                                                                                          'test_indicator_name': i[
+                                                                                              'test_indicator_name']}})
 
             results = []
             if not equip_no:
-                equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15']
+                equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13',
+                              'Z14', 'Z15']
 
             for equip in equip_list:
                 MN = YD = BZ = MH = ML = TC10 = TC50 = TC90 = 0
                 RATE_1 = []
                 RATE_LB = []
                 try:
-                    TEST_ALL = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_all][equip_list.index(equip)]
-                    TEST_RIGHT = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_right][equip_list.index(equip)]
+                    TEST_ALL = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_all][
+                        equip_list.index(equip)]
                 except:
-                    TEST_ALL = TEST_RIGHT = 0
+                    TEST_ALL = 0
+                try:
+                    TEST_RIGHT = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_right][
+                        equip_list.index(equip)]
+                except:
+                    TEST_RIGHT = 0
                 for i in dic[equip].keys():
                     if i.split('_')[2] == 'ML(1+4)':
                         MN += 1
@@ -2603,29 +2656,45 @@ class UnqialifiedEquipView(APIView):
 
                     if i.split('_')[2] == 'ML(1+4)' or i.split('_')[2] == '硬度值' or i.split('_')[2] == '比重值':
                         RATE_1.append(i.split('_')[0])
-                    if i.split('_')[2] == 'MH' or i.split('_')[2] == 'ML' or i.split('_')[2] == 'TC10' or i.split('_')[2] == 'TC50' or i.split('_')[2] == 'TC90':
+                    if i.split('_')[2] == 'MH' or i.split('_')[2] == 'ML' or i.split('_')[2] == 'TC10' or i.split('_')[
+                        2] == 'TC50' or i.split('_')[2] == 'TC90':
                         RATE_LB.append(i.split('_')[0])
                 RATE_1 = len(set(RATE_1))
                 RATE_LB = len(set(RATE_LB))
                 results.append(
                     {
                         'equip': equip,
-                        'test_all':  TEST_ALL,
+                        'test_all': TEST_ALL,
                         'test_right': TEST_RIGHT,
-                        'mn': MN ,
+                        'mn': MN,
                         'yd': YD,
                         'bz': BZ,
-                        'rate_1': '%.2f'% (((TEST_ALL - RATE_1) / TEST_ALL)*100) if TEST_ALL else 0,
+                        'rate_1': '%.2f' % (((TEST_ALL - RATE_1) / TEST_ALL) * 100) if TEST_ALL else 0,
                         'MH': MH,
                         'ML': ML,
                         'TC10': TC10,
                         'TC50': TC50,
                         'TC90': TC90,
-                        'lb_all': MH + ML + TC10 + TC50 + TC90,
-                        'rate_lb': '%.2f'% (((TEST_ALL - RATE_LB) / TEST_ALL)*100) if TEST_ALL else 0,
-                        'cp_all': MN + YD + BZ + MH + ML + TC10 + TC50 + TC90,
-                        'rate': '%.2f'% ((TEST_RIGHT / TEST_ALL)*100) if TEST_ALL else 0
+                        'lb_all': RATE_LB,
+                        'rate_lb': '%.2f' % (((TEST_ALL - RATE_LB) / TEST_ALL) * 100) if TEST_ALL else 0,
+                        'cp_all': TEST_ALL - TEST_RIGHT,
+                        'rate': '%.2f' % ((TEST_RIGHT / TEST_ALL) * 100) if TEST_ALL else 0
                     })
+            all = {}
+            num = rate_1 = rate_lb = rate = 0
+            for i in results:
+
+                if i['test_all'] == 0:
+                    pass
+                else:
+                    num += 1
+                    rate_1 += float(i['rate_1'])
+                    rate_lb += float(i['rate_lb'])
+                    rate += float(i['rate'])
+            if num != 0:
+                all.update(rate_1='%.2f' % (rate_1 / num), rate_lb='%.2f' % (rate_lb / num), rate='%.2f' % (rate / num))
+
         else:
             results = []
-        return Response({'results': results})
+            all = {}
+        return Response({'results': results, 'all': all})
