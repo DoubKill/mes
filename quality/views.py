@@ -2627,13 +2627,11 @@ class UnqialifiedEquipView(APIView):
                 RATE_1 = []
                 RATE_LB = []
                 try:
-                    TEST_ALL = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_all][
-                        equip_list.index(equip)]
+                    TEST_ALL = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_all][0]
                 except:
                     TEST_ALL = 0
                 try:
-                    TEST_RIGHT = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_right][
-                        equip_list.index(equip)]
+                    TEST_RIGHT = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_right][0]
                 except:
                     TEST_RIGHT = 0
                 for i in dic[equip].keys():
