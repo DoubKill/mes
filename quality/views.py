@@ -2626,13 +2626,21 @@ class UnqialifiedEquipView(APIView):
                 MN = YD = BZ = MH = ML = TC10 = TC50 = TC90 = 0
                 RATE_1 = []
                 RATE_LB = []
-                try:
-                    TEST_ALL = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_all][0]
-                except:
-                    TEST_ALL = 0
-                try:
-                    TEST_RIGHT = [i['count'] if i['production_equip_no'] == equip else 0 for i in test_right][0]
-                except:
+
+                for i in test_all:
+                    if equip == i['production_equip_no']:
+                        TEST_ALL = i['count']
+                        break
+                    else:
+                        TEST_ALL = 0
+                if len(test_right) > 0:
+                    for i in test_right:
+                        if equip == i['production_equip_no']:
+                            TEST_RIGHT = i['count']
+                            break
+                        else:
+                            TEST_RIGHT = 0
+                else:
                     TEST_RIGHT = 0
                 for i in dic[equip].keys():
                     if i.split('_')[2] == 'ML(1+4)':
