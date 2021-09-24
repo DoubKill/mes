@@ -2563,11 +2563,9 @@ class UnqialifiedEquipView(APIView):
         if not s_time and not e_time:
             raise ValidationError('请输入检测时间！')
 
-        s_time = f'{s_time} 00:00:00'
-        e_time = f'{e_time} 23:59:59'
         queryset = MaterialTestOrder.objects.filter(product_no__icontains=params,
-                                                    last_updated_date__gte=s_time,
-                                                    last_updated_date__lte=e_time,
+                                                    production_factory_date__gte=s_time,
+                                                    production_factory_date__lte=e_time,
                                                     production_equip_no__icontains=equip_no,
                                                     production_class__icontains=classes
                                                     )
@@ -2580,8 +2578,8 @@ class UnqialifiedEquipView(APIView):
             count=Count('product_no'))
 
         result = MaterialTestResult.objects.filter(material_test_order__product_no__icontains=params,
-                                                   test_factory_date__gte=s_time,
-                                                   test_factory_date__lte=e_time,
+                                                   material_test_order__production_factory_date__gte=s_time,
+                                                   material_test_order__production_factory_date__lte=e_time,
                                                    material_test_order__production_equip_no__icontains=equip_no,
                                                    material_test_order__production_class__icontains=classes
                                                    ).values('material_test_order_id', 'data_point_name',
