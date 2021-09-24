@@ -2589,7 +2589,7 @@ class UnqialifiedEquipView(APIView):
                                                             'material_test_order__production_equip_no'
                                                             ).annotate(count=Count('id')).values(
             'material_test_order_id', 'data_point_name', 'test_indicator_name', 'level',
-            'material_test_order__production_equip_no')
+            'material_test_order__production_equip_no', 'test_times').order_by('test_times')
         equip_queryset = MaterialTestOrder.objects.filter(production_equip_no__icontains=equip_no).values(
             'production_equip_no').annotate(sum=Count('production_equip_no')).values('production_equip_no')
         equip_list = [equip['production_equip_no'] for equip in equip_queryset]
