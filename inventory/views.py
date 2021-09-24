@@ -480,7 +480,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                     filter_dict.update(inout_num_type=actual_type)
                 else:
                     actual_type = "生产出库"
-                temp_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
+                temp_set = list(FinalGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
                     material_no__icontains="M").order_by('-start_time'))
                 # 目前先只查北自出入库履历
                 # filter_dict.pop("inout_num_type", None)
