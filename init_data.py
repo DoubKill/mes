@@ -723,6 +723,14 @@ permission_data = [
     {'id': 562, 'code': 'view_additional_print', 'name': '查看', 'parent_id': 561},
     {'id': 563, 'code': 'print_additional_print', 'name': '打印', 'parent_id': 561},
 
+    {'id': 564, 'code': 'product_quality_analyze', 'name': '胶料规格别合格率统计', 'parent_id': None},
+    {'id': 565, 'code': 'view_product_quality_analyze', 'name': '查看', 'parent_id': 564},
+
+    {'id': 566, 'code': 'classes_quality_analyze', 'name': '班次别合格率统计', 'parent_id': None},
+    {'id': 567, 'code': 'view_classes_quality_analyze', 'name': '查看', 'parent_id': 566},
+
+    {'id': 568, 'code': 'equip_quality_analyze', 'name': '机台别合格率统计', 'parent_id': None},
+    {'id': 569, 'code': 'view_equip_quality_analyze', 'name': '查看', 'parent_id': 568},
 
 ]
 
