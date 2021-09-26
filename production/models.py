@@ -312,3 +312,27 @@ class ProductionLineLocation(models.Model):
     class Meta:
         db_table = 'production_line_location'
         verbose_name_plural = verbose_name = '产线位置点'
+
+
+class ProductionDailyRecords(models.Model):
+    factory_date = models.DateField('工厂日期')
+    equip_error_record = models.TextField(help_text='设备异常记录', null=True)
+    process_shutdown_record = models.TextField(help_text='工艺停机记录', null=True)
+    production_shutdown_record = models.TextField(help_text='生产停机记录', null=True)
+    auxiliary_positions_record = models.TextField(help_text='辅助岗位名单记录', null=True)
+    classes = models.CharField(help_text='班次', max_length=64, null=True)
+    shift_leader = models.CharField(help_text='值班长', max_length=64, null=True)
+
+    class Meta:
+        db_table = 'production_daily_records'
+
+
+class ProductionPersonnelRecords(models.Model):
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
+    production_daily = models.ForeignKey(ProductionDailyRecords, related_name='production_personnel', on_delete=models.CASCADE)
+    feeding_post = models.CharField('投料岗位', max_length=64, null=True)
+    extrusion_post = models.CharField('挤出岗位', max_length=64, null=True)
+    collection_post = models.CharField('收皮岗位', max_length=64, null=True)
+
+    class Meta:
+        db_table = 'production_personnel_records'
