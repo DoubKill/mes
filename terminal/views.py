@@ -332,7 +332,7 @@ class WeightBatchingLogViewSet(TerminalCreateAPIView, mixins.ListModelMixin, Gen
 
     def create(self, request, *args, **kwargs):
         equip_no = self.request.data.get('equip_no')
-        serializer = self.get_serializer(data=self.request.data)
+        serializer = self.get_serializer(data=self.request.data, context={'request': request})
         # ERP与MES物料未绑定
         if not serializer.is_valid():
             return response(success=False, message=list(serializer.errors.values())[0][0])
@@ -757,56 +757,6 @@ class WeightBatchingLogListViewSet(ListAPIView):
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = WeightBatchingLogListFilter
-
-    def get_queryset(self):
-        queryset = super(WeightBatchingLogListViewSet, self).get_queryset()
-        interval = self.request.query_params.get('interval', "日")  # 班次 日 周 月  年
-        production_factory_date = self.request.query_params.get('production_factory_date',None)
-        if interval and production_factory_date:
-            from datetime import timedelta
-            production_factory_date = datetime.datetime.strptime(production_factory_date, "%Y-%m-%d")
-            this_week_start = production_factory_date - timedelta(days=production_factory_date.weekday())  # 当天坐在的周的周一
-            this_week_end = production_factory_date + timedelta(days=6 - production_factory_date.weekday())  # 当天所在周的周日
-            if interval == "班次":
-                bcp_set = BatchingClassesPlan.objects.filter(
-                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    work_schedule_plan__plan_schedule__day_time=production_factory_date).values_list(
-                    'plan_batching_uid', flat=True)
-                plan_batching_uid_list = list(bcp_set)
-                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
-            elif interval == "日":
-                bcp_set = BatchingClassesPlan.objects.filter(
-                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    work_schedule_plan__plan_schedule__day_time=production_factory_date).values_list(
-                    'plan_batching_uid', flat=True)
-                plan_batching_uid_list = list(bcp_set)
-                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
-            elif interval == "周":
-                bcp_set = BatchingClassesPlan.objects.filter(
-                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    work_schedule_plan__plan_schedule__day_time__gte=this_week_start.date(),
-                    work_schedule_plan__plan_schedule__day_time__lte=this_week_end.date()).values_list(
-                    'plan_batching_uid', flat=True)
-                plan_batching_uid_list = list(bcp_set)
-                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
-            elif interval == "月":
-                bcp_set = BatchingClassesPlan.objects.filter(
-                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    work_schedule_plan__plan_schedule__day_time__year=production_factory_date.year,
-                    work_schedule_plan__plan_schedule__day_time__month=production_factory_date.month).values_list(
-                    'plan_batching_uid', flat=True)
-                plan_batching_uid_list = list(bcp_set)
-                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
-            elif interval == "年":
-                bcp_set = BatchingClassesPlan.objects.filter(
-                    work_schedule_plan__plan_schedule__work_schedule__work_procedure__global_name='密炼',
-                    work_schedule_plan__plan_schedule__day_time__year=production_factory_date.year).values_list(
-                    'plan_batching_uid', flat=True)
-                plan_batching_uid_list = list(bcp_set)
-                queryset = queryset.filter(plan_batching_uid__in=plan_batching_uid_list).all()
-        else:
-            raise ValidationError('参数不全')
-        return queryset
 
 
 @method_decorator([api_recorder], name="dispatch")
