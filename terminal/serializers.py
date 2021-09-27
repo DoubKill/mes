@@ -372,6 +372,7 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                     attr['tank_no'] = single_tank.tank_no
         attr['material_name'] = material_name
         attr['material_no'] = material_no
+        attr['created_user'] = self.context['request'].user
         return attr
 
     class Meta:
@@ -639,17 +640,6 @@ class LoadMaterialLogListSerializer(serializers.ModelSerializer):
 
 
 class WeightBatchingLogListSerializer(BaseModelSerializer):
-    weight_batch_no = serializers.SerializerMethodField(help_text='小料配方', read_only=True)
-
-    def get_weight_batch_no(self, obj):
-        try:
-            plan_batching_uid = obj.plan_batching_uid
-            bcp_obj = BatchingClassesPlan.objects.filter(plan_batching_uid=plan_batching_uid, delete_flag=False).first()
-            weight_batch_no = bcp_obj.weigh_cnt_type.weigh_batching.weight_batch_no
-            return weight_batch_no
-        except Exception as e:
-            # print(e)
-            return None
 
     class Meta:
         model = WeightBatchingLog
