@@ -55,6 +55,7 @@ class FeedingMaterialLog(models.Model):
     judge_reason = models.CharField(max_length=64, help_text='防错结果', blank=True, null=True)
     feed_status = models.CharField(max_length=8, help_text='进料类型: 正常;处理;强制;', blank=True, null=True)
     add_feed_result = models.IntegerField(help_text='扫码补充物料后是否能进上辅机: 0 可进; 1 不可进', blank=True, null=True)
+    created_username = models.CharField(max_length=64, help_text='投入操作人', null=True, blank=True)
 
     class Meta:
         db_table = 'feed_material_log'

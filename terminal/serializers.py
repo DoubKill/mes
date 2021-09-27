@@ -626,6 +626,7 @@ class LoadMaterialLogListSerializer(serializers.ModelSerializer):
     production_factory_date = serializers.ReadOnlyField(source='feed_log.production_factory_date')
     production_classes = serializers.ReadOnlyField(source='feed_log.production_classes')
     equip_no = serializers.ReadOnlyField(source='feed_log.equip_no')
+    created_username = serializers.ReadOnlyField(source='feed_log.created_username')
 
     def get_mixing_finished(self, obj):
         product_no = obj.feed_log.product_no
