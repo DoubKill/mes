@@ -64,11 +64,11 @@ class LoadMaterialLogFilter(django_filters.rest_framework.FilterSet):
 
 
 class WeightBatchingLogListFilter(django_filters.rest_framework.FilterSet):
-    # production_factory_date = django_filters.DateFilter(field_name='production_factory_date', help_text='工厂时间')
+    batch_time = django_filters.DateFilter(field_name='batch_time__date', help_text='工厂时间')
     tank_no = django_filters.CharFilter(field_name='tank_no', help_text='罐号')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='投入设备')
-    material_no = django_filters.CharFilter(field_name='material_no', help_text='物料编码', lookup_expr='icontains')
+    batch_classes = django_filters.CharFilter(field_name='batch_classes', help_text='投入班次', lookup_expr='icontains')
 
     class Meta:
         model = WeightBatchingLog
-        fields = ('equip_no', 'material_no', 'tank_no')
+        fields = ('equip_no', 'batch_classes', 'tank_no', 'batch_time')
