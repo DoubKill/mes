@@ -2708,16 +2708,16 @@ class WMSInventoryView(APIView):
         data_row = 1
         for i in result:
             sheet.write(data_row, 0, result.index(i) + 1)
-            sheet.write(data_row, 1, i['name'])
-            sheet.write(data_row, 2, i['code'])
-            sheet.write(data_row, 3, i['zc_material_code'])
-            sheet.write(data_row, 4, i['batch_no'])
-            sheet.write(data_row, 5, i['unit'])
-            sheet.write(data_row, 6, i['pdm'])
-            sheet.write(data_row, 7, i['group_name'])
-            sheet.write(data_row, 8, i['tunnel_name'])
-            sheet.write(data_row, 9, i['quantity'])
-            sheet.write(data_row, 10, i['weight'])
+            sheet.write(data_row, 1, i[0])
+            sheet.write(data_row, 2, i[1])
+            sheet.write(data_row, 3, i[2])
+            sheet.write(data_row, 4, i[9])
+            sheet.write(data_row, 5, i[3])
+            sheet.write(data_row, 6, i[4])
+            sheet.write(data_row, 7, i[5])
+            sheet.write(data_row, 8, i[6])
+            sheet.write(data_row, 9, i[7])
+            sheet.write(data_row, 10, i[8])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
