@@ -3,6 +3,8 @@
 """
 import re
 import json
+import time
+
 import requests
 from datetime import datetime
 
@@ -10,6 +12,8 @@ from django.db.models import Sum
 from django.db.transaction import atomic
 from suds.client import Client
 
+from inventory.conf import cb_ip, cb_port
+from inventory.utils import wms_out
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching
@@ -150,6 +154,84 @@ class TankStatusSync(object):
             x.material_name = data[material_name]
             x.material_no = data[material_name]
             x.save()
+
+
+class CarbonDeliverySystem(object):
+    """获取炭黑罐与输送线信息"""
+    def __init__(self):
+        # url = "http://10.4.23.25:9000/shusong?wsdl"
+        # self.carbon_system = Client(url)
+        self.url = "http://10.4.23.25:9000/shusong"
+
+    def carbon_info(self):
+        # carbon_tank_details = json.loads(self.carbon_system.service.GetCarbonTankLevel())
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/GetCarbonTankLevel"}
+        send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+                       <soapenv:Header/>
+                       <soapenv:Body>
+                          <tem:GetCarbonTankLevel>
+                             <!--Optional:-->
+                             <tem:MachineNumber>1</tem:MachineNumber>
+                          </tem:GetCarbonTankLevel>
+                       </soapenv:Body>
+                    </soapenv:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        res = door_info.content.decode('utf-8')
+        rep_json = re.findall(r'<GetCarbonTankLevelResult>(.*)</GetCarbonTankLevelResult>', res)[0]
+        carbon_tank_details = json.loads(rep_json)
+
+        level_info = {0: '报警位', 1: '高位', 2: '中位', 3: '低位'}
+        carbon_tank_info = {}
+        for i in carbon_tank_details:
+            equip_id = i[-5: -2]
+            tail_info = i[-6:]
+            if equip_id not in carbon_tank_info:
+                carbon_tank_info[equip_id] = []
+            level_status = carbon_tank_details["tank_level_status" + tail_info]
+            tank_level_status = '空罐' if level_status.find('1') == -1 else level_info[level_status.find('1')]
+            tank_material_name = carbon_tank_details["tank_material_name" + tail_info]
+            item = {'tank_no': int(i[-1:]), "tank_level_status": tank_level_status, "tank_material_name": tank_material_name}
+            if item not in carbon_tank_info[equip_id]:
+                carbon_tank_info[equip_id].append(item)
+        return carbon_tank_info
+
+    def line_info(self):
+        # line_info = json.loads(self.carbon_system.service.FeedingPortToCarbonTankRelation())
+        headers = {"Content-Type": "text/xml; charset=utf-8",
+                   "SOAPAction": "http://tempuri.org/INXWebService/FeedingPortToCarbonTankRelation"}
+        send_data = """<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+                       <soapenv:Header/>
+                       <soapenv:Body>
+                          <tem:FeedingPortToCarbonTankRelation>
+                             <!--Optional:-->
+                             <tem:Request>1</tem:Request>
+                          </tem:FeedingPortToCarbonTankRelation>
+                       </soapenv:Body>
+                    </soapenv:Envelope>"""
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        res = door_info.content.decode('utf-8')
+        rep_json = re.findall(r'<FeedingPortToCarbonTankRelationResult>(.*)</FeedingPortToCarbonTankRelationResult>', res)[0]
+        line_info = json.loads(rep_json)
+        return line_info
+
+
+def out_task_carbon(task_id, station_no, material_no, material_name, need_weight):
+    url = f"http://{cb_ip}:{cb_port}/MESApi/AllocateWeightDelivery"
+    data = {
+            "taskNumber": task_id,
+            "entranceCode": station_no,
+            "allocationInventoryDetails": [{
+                "materialCode": material_no,
+                "materialName": material_name,
+                "weightOfActual ": need_weight
+            }]
+        }
+    try:
+        rep_dict = wms_out(url, data)
+    except:
+        raise ConnectionError("原材料wms调用失败，请联系wms维护人员")
+    return rep_dict
 
 
 # @atomic()

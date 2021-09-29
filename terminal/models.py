@@ -241,6 +241,106 @@ class MaterialChangeLog(models.Model):
         verbose_name_plural = verbose_name = '料框物料修改履历'
 
 
+class PowderTankSetting(models.Model):
+    """粉料罐设定"""
+    equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号')
+    tank_no = models.CharField(max_length=64, help_text="粉料罐编号", verbose_name='粉料罐编号')
+    material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE, null=True)
+    bar_code = models.CharField(max_length=64, help_text="条码", verbose_name='条码', unique=True)
+    use_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'powder_tank_status'
+        verbose_name_plural = verbose_name = '粉料罐设定'
+
+
+class OilTankSetting(models.Model):
+    """油料罐设定"""
+    tank_no = models.CharField(max_length=64, help_text="油料罐编号", verbose_name='粉料罐编号')
+    material = models.ForeignKey(Material, help_text='原材料', verbose_name='原材料', on_delete=models.CASCADE)
+    bar_code = models.CharField(max_length=64, help_text="条码", verbose_name='条码', unique=True)
+    use_flag = models.BooleanField(help_text="是否启用", verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'oil_tank_status'
+        verbose_name_plural = verbose_name = '油料罐设定'
+
+
+class CarbonTankFeedWeightSet(models.Model):
+    # TANK_TYPE = (
+    #     (1, '炭黑罐'),
+    # )
+    equip_id = models.CharField(max_length=8, help_text='密炼机台号')
+    # tank_equip_type = models.PositiveIntegerField(help_text='料罐设备类型', choices=TANK_TYPE)
+    tank_no = models.IntegerField(help_text='罐号')
+    tank_capacity_type = models.IntegerField(help_text='料罐容量类别: 0 小, 1 大', blank=True, null=True)
+    tank_capacity = models.FloatField(help_text='罐容量(立方)', blank=True, null=True)
+    feed_capacity_low = models.FloatField(help_text='低料位补料量(kg)', blank=True, null=True)
+    feed_capacity_mid = models.FloatField(help_text='中料位补料量(kg)', blank=True, null=True)
+    update_user = models.CharField(max_length=64, help_text='修改人员', default='')
+    update_datetime = models.DateField(help_text='修改时间', blank=True, null=True)
+
+    class Meta:
+        db_table = 'carbon_tank_feed_weight_set'
+        verbose_name_plural = verbose_name = '炭黑罐料罐投料重量设定'
+        ordering = ['equip_id', 'tank_no']
+
+
+class CarbonTankFeedingPrompt(models.Model):
+    FEED_STATUS = (
+        (0, '投料中'),
+        (1, '投料完成'),
+        (2, '空白')
+    )
+    equip_id = models.CharField(max_length=8, help_text='密炼机台号')
+    tank_no = models.IntegerField(help_text='罐号')
+    tank_capacity_type = models.IntegerField(help_text='料罐容量类别: 0 小, 1 大', blank=True, null=True)
+    tank_material_name = models.CharField(max_length=64, help_text='炭黑物料名称', blank=True, null=True)
+    tank_level_status = models.CharField(max_length=8, help_text='料位状态: 空罐 低位 高位 报警位', blank=True, null=True)
+    feedcapacity_weight_set = models.FloatField(help_text='补料设定重量(kg)', blank=True, null=True)
+    feedport_code = models.CharField(max_length=64, help_text='投料口', blank=True, null=True, default='')
+    feed_material_name = models.CharField(max_length=64, help_text='投入物料名称', blank=True, null=True, default='')
+    ex_warehouse_flag = models.BooleanField(help_text='是否出库', null=True, default=True)
+    feed_status = models.IntegerField(choices=FEED_STATUS, help_text='投料状态', default=2)
+    feed_change = models.IntegerField(help_text='投料口数量变化', default=1)
+    is_no_port_one = models.BooleanField(help_text='是否为选中的掺混口', default=False)
+    wlxxid = models.CharField(max_length=64, help_text='中策物料编码', blank=True, null=True)
+
+    class Meta:
+        db_table = 'carbon_tank_feeding_prompt'
+        verbose_name_plural = verbose_name = '炭黑罐投料提示'
+
+
+class FeedingOperationLog(models.Model):
+    TYPE_CHOICE = (
+        (1, '粉料'),
+        (2, '炭黑'),
+        (3, '油料')
+    )
+    RESULT_CHOICE = (
+        (1, '成功'),
+        (2, '失败'),
+    )
+    feeding_type = models.PositiveIntegerField(help_text='投料类型', choices=TYPE_CHOICE)
+    feeding_port_no = models.CharField(max_length=64, help_text="投料口", verbose_name='投料口', null=True)
+    feeding_time = models.DateTimeField(help_text="投料时间", verbose_name='投料时间')
+    feeding_classes = models.CharField(max_length=64, help_text="投料班次", verbose_name='投料班次', null=True)
+    tank_bar_code = models.CharField(max_length=64, help_text="料罐条码", verbose_name='料罐条码', null=True)
+    tank_material_name = models.CharField(max_length=64, help_text='料罐设定原材料', verbose_name='料罐设定原材料', null=True)
+    feeding_bar_code = models.CharField(max_length=64, help_text="投料物料条码", verbose_name='料罐条码', null=True)
+    feeding_material_name = models.CharField(max_length=64, help_text='投料原材料', verbose_name='投料原材料', null=True)
+    qty = models.IntegerField(help_text='数量', default=1)
+    weight = models.FloatField(help_text='重量', default=0)
+    feed_result = models.CharField(max_length=4, help_text="防错结果", verbose_name='防错结果', null=True)
+    result = models.PositiveIntegerField(help_text='投料结果', choices=RESULT_CHOICE, null=True)
+    feed_reason = models.CharField(max_length=64, help_text='防错失败原因', verbose_name='防错失败原因', null=True)
+    feeding_username = models.CharField(max_length=64, help_text="投料人", verbose_name='投料人', null=True)
+
+    class Meta:
+        db_table = 'feederrorcheck_operation_log'
+        verbose_name_plural = verbose_name = '投料履历'
+
+
 class Version(models.Model):
     VERSION_CHOICE = (
         (1, "PDA"),

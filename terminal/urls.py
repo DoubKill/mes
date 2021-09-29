@@ -13,7 +13,9 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     WeightTankStatusViewSet, BatchChargeLogListViewSet, WeightBatchingLogListViewSet, \
     ProductExchange, XLMaterialVIewSet, XLBinVIewSet, RecipePreVIew, RecipeMaterialVIew, ReportBasicView, \
     ReportWeightView, XLPlanVIewSet, PackageExpireView, XLPlanCViewSet, XLPromptViewSet, WeightingTankStatus, \
-    WeightPackageCViewSet
+    WeightPackageCViewSet, CarbonTankSetViewSet, FeedCheckOperationViewSet, FeedCapacityPlanView, \
+    CarbonFeedingPromptViewSet, PowderTankSettingViewSet, OilTankSettingViewSet, PowderTankBatchingView, \
+    FeedingErrorLampForCarbonView, FeedingOperateResultForCarbonView, CarbonOutCheckView, CarbonOutTaskView
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -22,6 +24,11 @@ router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
 router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信息
 router.register('weighting-package-c', WeightPackageCViewSet)  # 打印数据获取以及状态更新(C#端)
+router.register('carbon-tank-set', CarbonTankSetViewSet)  # 炭黑罐投料重量设定
+router.register('feed-check-operation', FeedCheckOperationViewSet)  # 投料防错操作履历(炭黑, 粉料, 油料)
+router.register('carbon-feeding-prompt', CarbonFeedingPromptViewSet)  # 炭黑罐投料提示
+router.register('powder-tank-setting', PowderTankSettingViewSet, basename='powder-tank-setting')  # 粉料罐物料设定
+router.register('oli-tank-setting', OilTankSettingViewSet, basename='oli-tank-setting')  # 油料罐物料设定
 
 """小料称量"""
 router.register('xl-material', XLMaterialVIewSet)  # 小料原材料
@@ -45,6 +52,15 @@ urlpatterns = [
     path('product-exchange/', ProductExchange.as_view()),
     path('weighting-package-expire/', PackageExpireView.as_view()),  # 料包有效期
     path('weighting-tank-status/', WeightingTankStatus.as_view()),  # 料罐信息(C#端)
+    path('feed-capacity-plan/', FeedCapacityPlanView.as_view()),  # 炭黑投料提示-计划显示
+    path('carbon-out-check/', CarbonOutCheckView.as_view()),  # 炭黑投料提示-出库确认
+    path('power-tank-batching/', PowderTankBatchingView.as_view()),  # 粉料投料(PDA)
+    path('carbon-out-task/', CarbonOutTaskView.as_view()),  # 下达炭黑出库任务
+
+
+    # 炭黑投料：wcs与mes交互
+    path('FeedingErrorLampForCarbon/', FeedingErrorLampForCarbonView.as_view()),  # 炭黑解包方请求mes防错结果
+    path('FeedingOperateResultForCarbon/', FeedingOperateResultForCarbonView.as_view()),  # 炭黑解包方回传投料结果
 
     # 小料称量
     path('xl-recipe/', RecipePreVIew.as_view()),  # 小料配方列表

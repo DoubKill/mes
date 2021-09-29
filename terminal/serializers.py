@@ -20,8 +20,9 @@ from production.models import PalletFeedbacks
 from recipe.models import ERPMESMaterialRelation, WeighCntType, ProductBatching
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
-    ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial
-from terminal.utils import INWeighSystem, TankStatusSync, CLSystem
+    ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
+    FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting
+from terminal.utils import TankStatusSync, CLSystem
 
 logger = logging.getLogger('send_log')
 
@@ -773,3 +774,78 @@ class XLPromptSerializer(serializers.ModelSerializer):
     class Meta:
         model = WeightTankStatus
         fields = ['id', 'tank_no', 'material_name']
+
+
+class PowderTankSettingSerializer(serializers.ModelSerializer):
+    material_name = serializers.ReadOnlyField(source='material.material_name')
+
+    class Meta:
+        model = PowderTankSetting
+        fields = ['id', 'equip_no', 'tank_no', 'material', 'bar_code', 'use_flag', 'material_name']
+
+
+class OilTankSettingSerializer(serializers.ModelSerializer):
+    material_name = serializers.ReadOnlyField(source='material.material_name')
+
+    class Meta:
+        model = OilTankSetting
+        fields = ['id', 'tank_no', 'material', 'bar_code', 'use_flag', 'material_name']
+
+
+class CarbonTankSetSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = CarbonTankFeedWeightSet
+        fields = '__all__'
+
+
+class CarbonTankSetUpdateSerializer(serializers.ModelSerializer):
+
+    def validate(self, attrs):
+        attrs['update_user'] = self.context['request'].user.username
+        attrs['update_datetime'] = datetime.now().date()
+        return attrs
+
+    class Meta:
+        model = CarbonTankFeedWeightSet
+        fields = ['tank_capacity_type', 'tank_capacity', 'feed_capacity_low', 'feed_capacity_mid']
+
+
+class FeedingOperationLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = FeedingOperationLog
+        fields = '__all__'
+
+
+class CarbonFeedingPromptSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = CarbonTankFeedingPrompt
+        fields = '__all__'
+
+
+class CarbonFeedingPromptCreateSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(allow_null=True)
+
+    def create(self, validated_data):
+        record_id = validated_data.pop('id')
+        equip_id = validated_data.get('equip_id')
+        tank_no = validated_data.get('tank_no')
+        changed = validated_data.get('feed_change')
+        # 没有id表示初次加载
+        if record_id:
+            # 更新旧罐号信息: 少变多按id删除数据, 多变少按罐号删除数据
+            feed_change = CarbonTankFeedingPrompt.objects.filter(equip_id=equip_id, tank_no=tank_no).count()
+            if changed >= feed_change:
+                CarbonTankFeedingPrompt.objects.filter(id=record_id).delete()
+            else:
+                CarbonTankFeedingPrompt.objects.filter(equip_id=equip_id, tank_no=tank_no).delete()
+        instance = CarbonTankFeedingPrompt.objects.create(**validated_data)
+        return instance
+
+    class Meta:
+        model = CarbonTankFeedingPrompt
+        fields = ['id', 'equip_id', 'tank_no', 'tank_capacity_type', 'tank_material_name', 'tank_level_status',
+                  'feedcapacity_weight_set', 'feedport_code', 'feed_material_name', 'feed_status', 'feed_change',
+                  'is_no_port_one', 'ex_warehouse_flag', 'wlxxid']
