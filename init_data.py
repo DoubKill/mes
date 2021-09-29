@@ -732,6 +732,19 @@ permission_data = [
     {'id': 568, 'code': 'equip_quality_analyze', 'name': '机台别合格率统计', 'parent_id': None},
     {'id': 569, 'code': 'view_equip_quality_analyze', 'name': '查看', 'parent_id': 568},
 
+    {'id': 570, 'code': 'carbon_tank_set', 'name': '投料重量设定', 'parent_id': None},
+    {'id': 571, 'code': 'view_carbon_tank_set', 'name': '查看', 'parent_id': 570},
+    {'id': 572, 'code': 'update_carbon_tank_set', 'name': '设定重量', 'parent_id': 570},
+
+    {'id': 573, 'code': 'feed_check_operation', 'name': '投料操作履历查询', 'parent_id': None},
+    {'id': 574, 'code': 'view_feed_check_operation', 'name': '查看', 'parent_id': 573},
+
+    {'id': 575, 'code': 'carbon_feeding_prompt', 'name': '投料计划', 'parent_id': None},
+    {'id': 576, 'code': 'view_carbon_feeding_prompt', 'name': '查看', 'parent_id': 575},
+    {'id': 577, 'code': 'add_carbon_feeding_prompt', 'name': '保存', 'parent_id': 575},
+    {'id': 578, 'code': 'begin_carbon_feeding_prompt', 'name': '投料开始', 'parent_id': 575},
+    {'id': 579, 'code': 'end_carbon_feeding_prompt', 'name': '投料结束', 'parent_id': 575}
+
 ]
 
 

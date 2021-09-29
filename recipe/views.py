@@ -24,7 +24,7 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial
+    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -391,3 +391,15 @@ class ERPMaterialViewSet(CommonDeleteMixin, ModelViewSet):
             return ERPMaterialSerializer
         else:
             return ERPMaterialUpdateSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class GetERPZcMaterialAPiView(APIView):
+    """通过mes物料名获取有绑定关系的中策物料"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        material_no = self.request.query_params.get('material_name')
+        zc_materials = ERPMESMaterialRelation.objects.filter(material__material_no=material_no)\
+            .values('zc_material__material_name', 'zc_material__wlxxid')
+        return Response({'results': list(zc_materials)})

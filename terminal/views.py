@@ -1,13 +1,13 @@
 import datetime
-import json
-
+import time
 from datetime import timedelta
+
 from django.db.models import Max, Sum, Q
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, status
+from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import CreateAPIView, ListAPIView
@@ -18,28 +18,33 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip
-from inventory.models import MaterialOutHistory
-from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response
+from inventory.models import MaterialOutHistory, WmsInventoryStock
+from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
+from mes.conf import TH_CONF
 from mes.derorators import api_recorder
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
-from production.models import PalletFeedbacks, PlanStatus
-from recipe.models import ProductBatchingDetail, ZCMaterial, ProductBatching
+from production.models import PlanStatus, MaterialTankStatus
+from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
-    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter
+    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
+    FeedingOperationLogFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
     WeightTankStatus, WeightPackageLog, Version, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, RecipePre, \
-    RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog
+    RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
+    FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
-    WeightPackageLogSerializer, WeightPackageLogCreateSerializer, WeightPackageUpdateLogSerializer, \
-    LoadMaterialLogListSerializer, WeightBatchingLogListSerializer, \
-    WeightPackagePartialUpdateLogSerializer, WeightPackageRetrieveLogSerializer, LoadMaterialLogSerializer, \
+    WeightPackageLogSerializer, WeightPackageLogCreateSerializer, LoadMaterialLogListSerializer, \
+    WeightBatchingLogListSerializer, \
+    LoadMaterialLogSerializer, \
     MaterialInfoSerializer, BinSerializer, PlanSerializer, PlanUpdateSerializer, RecipePreSerializer, \
     ReportBasicSerializer, ReportWeightSerializer, LoadMaterialLogUpdateSerializer, WeightPackagePlanSerializer, \
-    WeightPackageLogUpdateSerializer, XLPlanCSerializer, XLPromptSerializer
-from terminal.utils import TankStatusSync
+    WeightPackageLogUpdateSerializer, XLPlanCSerializer, XLPromptSerializer, CarbonTankSetSerializer, \
+    CarbonTankSetUpdateSerializer, FeedingOperationLogSerializer, CarbonFeedingPromptSerializer, \
+    CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer
+from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1234,3 +1239,500 @@ class WeightingTankStatus(APIView):
         tanks_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True)\
             .values('id', 'tank_no', 'tank_name', 'status', 'material_name', 'material_no', 'open_flag')
         return response(success=True, data=list(tanks_info))
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CarbonTankSetViewSet(ModelViewSet):
+    """
+    list:
+        炭黑罐投料重量设定信息
+    update:
+        炭黑罐投料重量设定
+    """
+    queryset = CarbonTankFeedWeightSet.objects.all()
+    permission_classes = (IsAuthenticated,)
+    pagination_class = None
+    filter_class = CarbonTankSetFilter
+    filter_backends = [DjangoFilterBackend]
+
+    def get_serializer_class(self, *args, **kwargs):
+        if self.action == 'list':
+            return CarbonTankSetSerializer
+        else:
+            return CarbonTankSetUpdateSerializer
+
+
+class PowderTankSettingViewSet(GenericViewSet, UpdateModelMixin, ListModelMixin):
+    queryset = PowderTankSetting.objects.all()
+    pagination_class = None
+    serializer_class = PowderTankSettingSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        equip_no = self.request.query_params.get('equip_no')
+        if equip_no:
+            queryset = PowderTankSetting.objects.filter(equip_no=equip_no)
+        else:
+            queryset = super(PowderTankSettingViewSet, self).get_queryset()
+        return queryset
+
+
+@method_decorator([api_recorder], name='dispatch')
+class PowderTankBatchingView(APIView):
+    """
+        粉料罐投料相关
+    """
+    def get(self, request):
+        """根据料罐条形码获取料罐设定的物料信息"""
+        tank_bar_code = self.request.query_params.get('tank_bar_code')
+        try:
+            tank = PowderTankSetting.objects.get(bar_code=tank_bar_code)
+        except Exception:
+            return response(success=False, message='未找到该粉料罐！')
+        if not tank.material:
+            return response(success=False, message='该料罐未设定原材料！')
+        return response(success=True, data={"tank_no": tank.tank_no,
+                                            "material_no": tank.material.material_no,
+                                            "material_name": tank.material.material_name,
+                                            "equip_no": tank.equip_no,
+                                            'tank_bar_code': tank.bar_code
+                                            })
+
+    def post(self, request):
+        """粉料罐投料"""
+        tank_bar_code = self.request.data.get('tank_bar_code')  # 料罐条码
+        material_bar_code = self.request.data.get('material_bar_code')  # 物料条码
+
+        try:
+            tank = PowderTankSetting.objects.get(bar_code=tank_bar_code)
+        except Exception:
+            return response(success=False, message='未找到该粉料罐！')
+
+        if not tank.material:
+            return response(success=False, message='该料罐未设定原材料！')
+
+        try:
+            # 查原材料出库履历查到原材料物料编码
+            wms_stock = MaterialOutHistory.objects.using('wms').filter(
+                lot_no=material_bar_code).values('material_no', 'material_name', 'weight', 'qty')
+        except Exception:
+            return response(success=False, message='连接WMS库失败，请联系管理员！')
+
+        if not wms_stock:
+            return response(success=False, message='未找到该物料出库记录，请联系管理员！')
+
+        material_name_set = list(ERPMESMaterialRelation.objects.filter(
+            zc_material__wlxxid=wms_stock[0]['material_no'],
+            use_flag=True
+        ).values_list('material__material_name', flat=True))
+
+        if not material_name_set:
+            return response(success=False, message='该物料未与MES原材料建立绑定关系！')
+        if tank.material.material_name not in material_name_set:
+            FeedingOperationLog.objects.create(
+                feeding_type=1,
+                feeding_time=datetime.datetime.now(),
+                tank_bar_code=tank_bar_code,
+                tank_material_name=tank.material.material_name,
+                feeding_bar_code=material_bar_code,
+                feeding_material_name=material_name_set[0],
+                weight=wms_stock[0]['weight'],
+                qty=wms_stock[0]['qty'],
+                result=2
+            )
+            return response(success=False,
+                            message='未找到符合料罐，不可以投料！',
+                            data={'material_name': material_name_set[0]})
+        else:
+            # TODO 通知戴工那边的程序打开料罐门
+            FeedingOperationLog.objects.create(
+                feeding_type=1,
+                feeding_time=datetime.datetime.now(),
+                tank_bar_code=tank_bar_code,
+                tank_material_name=tank.material.material_name,
+                feeding_bar_code=material_bar_code,
+                feeding_material_name=material_name_set[0],
+                weight=wms_stock[0]['weight'],
+                qty=wms_stock[0]['qty'],
+                result=1
+            )
+            return response(success=True,
+                            message='物料匹配，可以投料!',
+                            data={'material_name': tank.material.material_name})
+
+
+class OilTankSettingViewSet(GenericViewSet, UpdateModelMixin, ListModelMixin):
+    queryset = OilTankSetting.objects.all()
+    serializer_class = OilTankSettingSerializer
+    pagination_class = None
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+
+@method_decorator([api_recorder], name='dispatch')
+class FeedCheckOperationViewSet(ModelViewSet):
+    """
+    list:
+        查询投料防错操作履历
+    """
+    queryset = FeedingOperationLog.objects.all().order_by('id')
+    serializer_class = FeedingOperationLogSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+    filter_class = FeedingOperationLogFilter
+
+
+@method_decorator([api_recorder], name='dispatch')
+class FeedCapacityPlanView(APIView):
+    """炭黑投料提示-计划显示"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        # 获取当前时间的工厂日期
+        now = datetime.datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now, end_time__gte=now, plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        date_now = str(current_work_schedule_plan.plan_schedule.day_time) if current_work_schedule_plan else str(now.date())
+        classes_plans = ProductClassesPlan.objects.filter(~Q(status='完成'), delete_flag=False,
+                                                          work_schedule_plan__plan_schedule__day_time=date_now)\
+            .order_by('equip__equip_no')
+
+        plan_actual_data = []
+        for plan in classes_plans:
+            # 获取机型配方
+            product_batch = ProductBatching.objects.filter(stage_product_batch_no=plan.product_batching.stage_product_batch_no,
+                                                           used_type=4, batching_type=2).first()
+            if not product_batch:
+                continue
+            # 任务状态
+            plan_status_info = PlanStatus.objects.using("SFJ").filter(
+                plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
+            plan_status = plan_status_info.status if plan_status_info else plan.status
+            plan_actual_data.append(
+                {
+                    'id': plan.id,
+                    'date_now': date_now,
+                    'classes': plan.work_schedule_plan.classes.global_name,
+                    'equip_no': plan.equip.equip_no,
+                    'product_no': plan.product_batching.stage_product_batch_no,
+                    'plan_trains': plan.plan_trains,
+                    'status': plan_status
+                }
+            )
+        return Response(plan_actual_data)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CarbonFeedingPromptViewSet(ModelViewSet):
+    """
+    list:
+        展示炭黑罐投料提示信息
+    retrieve:
+        修改投料状态
+    create:
+        保存设定的投料信息
+    """
+    queryset = CarbonTankFeedingPrompt.objects.all()
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CarbonFeedingPromptCreateSerializer
+        else:
+            return CarbonFeedingPromptSerializer
+
+    def list(self, request, *args, **kwargs):
+        all = self.request.query_params.get('all')
+        equip_ids = [self.request.query_params.get('equip_id')] if not all else Equip.objects.filter(
+            delete_flag=False, use_flag=1, category__equip_type__global_name='密炼设备')\
+            .values_list('equip_no', flat=True).order_by('equip_no')
+        # 获取计划信息
+        now = datetime.datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now, end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        date_now = str(current_work_schedule_plan.plan_schedule.day_time) if current_work_schedule_plan else str(
+            now.date())
+        classes_plans = ProductClassesPlan.objects.filter(
+            ~Q(status='完成'), delete_flag=False, work_schedule_plan__plan_schedule__day_time=date_now)
+        try:
+            carbon_obj = CarbonDeliverySystem()
+            tank_infos = carbon_obj.carbon_info()
+        except Exception as e:
+            raise ValidationError(f'同步炭黑罐信息失败: {e.args[0]}')
+        res = {}
+        # 加载炭黑设定
+        carbon_set_info_list = CarbonTankFeedWeightSet.objects.all().values('tank_no', 'tank_capacity_type',
+                                                                            'feed_capacity_low', 'feed_capacity_mid')
+        for equip_id in equip_ids:
+            if not tank_infos.get(equip_id):
+                res[equip_id] = []
+                continue
+            # 加载罐料位信息
+            tank_info = sorted(tank_infos.get(equip_id), key=lambda x: x['tank_no'])
+            pre_tank_info = {i['tank_no']: i for i in tank_info}
+            # 炭黑罐设定信息
+            carbon_set_info = carbon_set_info_list.filter(equip_id=equip_id)
+            if not carbon_set_info:
+                raise ValidationError(f'机台未设定炭黑补料值：{equip_id}')
+            pre_data = {i['tank_no']: i for i in carbon_set_info}
+            recipes = set(classes_plans.filter(equip__equip_no=equip_id).values_list(
+                'product_batching__stage_product_batch_no', flat=True))
+            carbons = set(ProductBatchingDetail.objects.filter(product_batching__stage_product_batch_no__in=recipes,
+                                                               product_batching__used_type=4,
+                                                               product_batching__batching_type=2, delete_flag=False,
+                                                               type=2)
+                          .values_list('material__material_name', flat=True))
+            # 提示有无数据变化不同
+            query_set = self.get_queryset().filter(equip_id=equip_id).order_by('tank_no', 'id')
+            data = self.get_serializer(query_set, many=True).data if query_set else tank_info
+            for single_data in data:
+                tank_no = single_data['tank_no']
+                recv_tank = pre_tank_info[tank_no]
+                set_tank = pre_data[tank_no]
+                level = recv_tank['tank_level_status']
+                if not query_set:
+                    set_value = set_tank['feed_capacity_low'] if level == '低位' else (set_tank['feed_capacity_mid'] if level == '中位' else 0)
+                else:
+                    if not single_data['feedcapacity_weight_set']:
+                        set_value = set_tank['feed_capacity_low'] if level == '低位' else (set_tank['feed_capacity_mid'] if level == '中位' else 0)
+                    else:
+                        set_value = single_data['feedcapacity_weight_set'] if level in ['低位', '中位'] else 0
+                # 增加是否计划使用标识
+                is_plan_used = {'is_plan_used': True} if recv_tank['tank_material_name'] in carbons else {'is_plan_used': False}
+                update_data = {'tank_material_name': recv_tank['tank_material_name'], 'feedcapacity_weight_set': set_value,
+                               'tank_level_status': recv_tank['tank_level_status']} \
+                    if query_set else {'id': 0, 'tank_capacity_type': set_tank['tank_capacity_type'], 'feed_status': 2,
+                                       'feedcapacity_weight_set': set_value, 'feed_material_name': '', 'feed_change': 1,
+                                       'feedport_code': ''}
+                update_data.update(is_plan_used)
+                single_data.update(update_data)
+            res[equip_id] = sorted(data, key=lambda x: (x['tank_no'], x['id']))
+        return Response(res)
+
+    def create(self, request, *args, **kwargs):
+        check_status = [i['feed_status'] for i in self.request.data]
+        # 存在投料中状态放弃本次操作
+        if 0 in check_status:
+            raise ValidationError('有正在投料中的料罐, 本次操作不成功')
+        # 保存的补料设定值不可大于炭黑罐重量设定的值
+        for data in self.request.data:
+            equip_id = data.get('equip_id')
+            tank_no = data.get('tank_no')
+            tank_level_status = data.get('tank_level_status')
+            feedcapacity_weight_set = data.get('feedcapacity_weight_set')
+            # 当前补料设定值
+            set_info = CarbonTankFeedWeightSet.objects.filter(equip_id=equip_id, tank_no=tank_no).first()
+            if not set_info:
+                raise ValidationError(f'炭黑设定中无该机台信息:{equip_id}')
+            set_value = set_info.feed_capacity_low if tank_level_status == '低位' else (
+                set_info.feed_capacity_mid if tank_level_status == '中位' else 0)
+            if feedcapacity_weight_set < 0 or feedcapacity_weight_set > set_value:
+                raise ValidationError('保存的补料设定值不可大于炭黑罐重量设定的值')
+        serializer = self.get_serializer(data=self.request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response('保存成功')
+
+    def update(self, request, *args, **kwargs):
+        status = self.request.data.get('feed_status')
+        # 停止炭黑出库任务
+        instance = self.get_object()
+        # 非投料中不可操作
+        if status == 1 and instance.feed_status != 0:
+            raise ValidationError('非投料中状态不可操作')
+        instance.feed_status = status
+        instance.save()
+        return Response('操作成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CarbonOutCheckView(APIView):
+    """炭黑出库开始确认判定"""
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        feed_status = self.request.data.get('feed_status')
+        tank_no = self.request.data.get('tank_no')
+        equip_id = self.request.data.get('equip_id')
+        feedport_code = self.request.data.get('feedport_code')
+        feed_material_name = self.request.data.get('feed_material_name')
+        ex_warehouse_flag = self.request.data.get('ex_warehouse_flag')
+        feedcapacity_weight_set = self.request.data.get('feedcapacity_weight_set')
+        wlxxid = self.request.data.get('wlxxid')
+        if feed_status == 0:
+            raise ValidationError('该罐号正在投料中.')
+        if not feedport_code or not feed_material_name:
+            raise ValidationError('投料口或投入物料未选择')
+        if feedcapacity_weight_set == 0:
+            raise ValidationError('设定值为0不需要投料')
+        record = CarbonTankFeedingPrompt.objects.filter(equip_id=equip_id, tank_no=tank_no, feedport_code=feedport_code)
+        if not record or record.values()[0] != self.request.data:
+            raise ValidationError('请先保存再点击开始')
+        # 未选择出库, 更新投料状态即可
+        if not ex_warehouse_flag:
+            record.update(**{'feed_status': 1})
+            return Response('NO')
+        # 获取物料库存数量
+        extra_where_str = " and c.MaterialCode like '%{}%'".format(wlxxid)
+        sql = """SELECT
+                         a.StockDetailState,
+                         c.MaterialCode,
+                         c.Name AS MaterialName,
+                         a.BatchNo,
+                         a.SpaceId,
+                         a.Sn,
+                         a.WeightOfActual,
+                         a.WeightUnit,
+                         a.CreaterTime
+                        FROM
+                         dbo.t_inventory_stock AS a
+                         INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
+                         INNER JOIN t_inventory_material c ON c.MaterialCode= a.MaterialCode
+                         INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId 
+                        WHERE
+                         NOT EXISTS ( 
+                             SELECT 
+                                    tp.TrackingNumber 
+                             FROM t_inventory_space_plan tp 
+                             WHERE tp.TrackingNumber = a.TrackingNumber ) 
+                         AND d.State= 1 
+                         AND b.SpaceState= 1 
+                         AND a.TunnelId IN ( 
+                             SELECT 
+                                    ab.TunnelCode 
+                             FROM t_inventory_entrance_tunnel ab INNER JOIN t_inventory_entrance ac ON ac.Id= ab.EntranceEntityId 
+                             ) {} order by a.CreaterTime""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **TH_CONF)
+        temp = sc.all()
+        if not temp:
+            raise ValidationError(f'炭黑库存中无该物料: wlxxid {wlxxid}')
+        # 托数
+        pallets = len(temp)
+        # 总重量
+        total_weight = sum([i[6] for i in temp])
+        return Response({'pallets': pallets, 'total_weight': total_weight})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class CarbonOutTaskView(APIView):
+    """下发炭黑出库任务"""
+
+    def post(self, request):
+        # 炭黑出库和解包房线体对应关系
+        line_port = {'白炭黑': '库后出库站台6', '炭黑': '库后出库站台5', '掺混2-2号口': '库后出库站台4', '掺混2-1号口': '库后出库站台3',
+                     '掺混1-2号口': '库后出库站台2', '掺混1-1号口': '库后出库站台1'}
+        record_id = self.request.data.get('id')
+        inventory_weight = self.request.data.get('total_weight')
+        material_no = self.request.data.get('wlxxid')
+        material_name = self.request.data.get('material_name')
+        feedport_code = self.request.data.get('feedport_code')
+        feedcapacity_weight_set = self.request.data.get('feedcapacity_weight_set')
+        entrance_code = line_port.get(feedport_code)
+        # 数量判断
+        if feedcapacity_weight_set <= 0 or feedcapacity_weight_set > inventory_weight:
+            raise ValidationError('投料重量应在已有库存范围内')
+        # 下出库任务
+        task_id = 'Mes' + str(int(round(time.time() * 1000)))
+        rep_dict = out_task_carbon(task_id, entrance_code, material_no, material_name, feedcapacity_weight_set)
+        if rep_dict.get("state") != 1:
+            raise ValidationError(f'下发出库任务失败：{rep_dict.get("msg")}')
+        # 更新状态
+        CarbonTankFeedingPrompt.objects.filter(id=record_id).update(**{"feed_status": 0})
+        return Response('下发出库任务成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class FeedingErrorLampForCarbonView(APIView):
+    """炭黑解包方请求mes防错结果"""
+
+    def post(self, request):
+        data = self.request.data
+        line = data.get('LineNumber')
+        task_id = data.get('MaterialBarCode')
+        material_name = data.get('MaterialName')
+        now_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 线体与投料口关系
+        line_port = {6: '白炭黑', 5: '炭黑', 4: '掺混2-2号口', 3: '掺混2-1号口', 2: '掺混1-2号口', 1: '掺混1-1号口'}
+        feed_port = line_port.get(line)
+        # 获取班次班组
+        group = '早班' if '08:00:00' < now_time[-8:] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_time[:10], classes__global_name=group,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        classes_now = '' if not record else record.group.global_name
+        feeding_class = f"{group}/{classes_now}"
+        data = {'feeding_type': 2, 'feeding_port_no': feed_port, 'feeding_time': now_time,
+                'feeding_material_name': material_name, 'feeding_username': self.request.user.username,
+                'feed_reason': '', 'feeding_classes': feeding_class, 'feed_result': 'N'}
+        # 通过物料条码获取炭黑数量与重量
+        carbon_out_info = MaterialOutHistory.objects.using('cb').filter(order_no=task_id).first()
+        if not carbon_out_info:
+            data.update({'feed_reason': f'任务信息未找到{task_id}'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': f'任务信息未找到{task_id}', 'FeedingResult': 2})
+        if carbon_out_info.lot_no:
+            data['weight'] = carbon_out_info.weight
+            data['qty'] = carbon_out_info.qty
+            data['feeding_bar_code'] = carbon_out_info.lot_no
+        else:
+            data['weight'] = 0
+            data['qty'] = 0
+            data['feeding_bar_code'] = '99999999'
+        # 获取当前输送线与炭黑罐关系
+        try:
+            carbon_obj = CarbonDeliverySystem()
+            line_tank_info = carbon_obj.line_info()
+        except Exception as e:
+            data.update({'feed_reason': '获取输送线与炭黑罐信息失败'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': f'获取输送线与炭黑罐信息失败: {e.args[0]}', 'FeedingResult': 2})
+        # 获取解包房信息(输送线与炭黑罐信息)
+        unpack_room_info = {k: v for k, v in line_tank_info.items() if '解包房' in k and k.startswith(feed_port[:3])}
+        # 判断该投入物料是否与输送线对应炭黑罐物料一致
+        equip_id = unpack_room_info.get(feed_port[:3] + '解包房equip_id')
+        tank_no = unpack_room_info.get(feed_port[:3] + '解包房tank_no')
+        if equip_id == 0:
+            data.update({'feed_reason': f'线路未设定机台号: {line}: {feed_port[:3]}'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': f'线路未设定机台号: {line}: {feed_port[:3]}', 'FeedingResult': 2})
+        record = MaterialTankStatus.objects.using('SFJ').filter(delete_flag=False, tank_type="1", tank_no=tank_no,
+                                                                use_flag=1, equip_no='Z%02d' % equip_id).first()
+        if record.material_name != material_name:
+            data.update({'tank_material_name': record.material_name,
+                         'feed_reason': f'所投物料{material_name}与罐中{record.material_name}不一致'})
+            FeedingOperationLog.objects.create(**data)
+            return Response({'state': 0, 'msg': f'所投物料{material_name}与罐中{record.material_name}不一致', 'FeedingResult': 2})
+        # 添加防错履历
+        data.update({'tank_material_name': material_name, 'feed_result': 'Y'})
+        FeedingOperationLog.objects.create(**data)
+        return Response({'state': 0, 'msg': '防错合格', 'FeedingResult': 1})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class FeedingOperateResultForCarbonView(APIView):
+    """炭黑解包方回传投料结果"""
+
+    def post(self, request):
+        data = self.request.data
+        line = data.get('LineNumber')
+        task_id = data.get('MaterialBarCode')
+        operate_result = data.get('OperateResult')
+        # 线体与投料口关系
+        line_port = {6: '白炭黑', 5: '炭黑', 4: '掺混2-2号口', 3: '掺混2-1号口', 2: '掺混1-2号口', 1: '掺混1-1号口'}
+        feed_port = line_port.get(line)
+        # 通过物料条码获取炭黑数量与重量
+        carbon_out_info = MaterialOutHistory.objects.using('cb').filter(order_no=task_id).first()
+        material_code = carbon_out_info.lot_no if carbon_out_info.lot_no else '99999999'
+        # 更新任务状态
+        CarbonTankFeedingPrompt.objects.filter(wlxxid=carbon_out_info.material_no,
+                                               feedport_code=feed_port).update(**{'feed_status': 1})
+
+        # 更新投料履历
+        instance = FeedingOperationLog.objects.filter(feeding_type=2, feeding_bar_code=material_code,
+                                                      feeding_port_no=feed_port).last()
+        if not instance:
+            return Response({'state': 0, 'msg': '未在履历中找到对应信息'})
+        instance.result = operate_result
+        instance.save()
+        return Response({'state': 0, 'msg': '更新投料状态成功'})
