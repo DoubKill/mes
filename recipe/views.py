@@ -24,7 +24,7 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial
+    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -119,34 +119,35 @@ class ValidateProductVersionsView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        factory = self.request.query_params.get('factory')
         site = self.request.query_params.get('site')
         product_info = self.request.query_params.get('product_info')
         stage = self.request.query_params.get('stage')
         versions = self.request.query_params.get('versions')
+        dev_type = self.request.query_params.get('dev_type')
         stage_product_batch_no = self.request.query_params.get('stage_product_batch_no')
         if stage_product_batch_no:
             if ProductBatching.objects.exclude(
                     used_type=6).filter(stage_product_batch_no=stage_product_batch_no,
                                         factory__isnull=True,
-                                        batching_type=2).exists():
+                                        batching_type=2,
+                                        dev_type_id=dev_type).exists():
                 raise ValidationError('该配方已存在')
             return Response('OK')
-        if not all([versions, factory, site, product_info, stage]):
+        if not all([versions, site, product_info, stage]):
             raise ValidationError('参数不足')
         try:
             stage = int(stage)
             site = int(site)
             product_info = int(product_info)
-            factory = int(factory)
+            dev_type = int(dev_type)
         except Exception:
             raise ValidationError('参数错误')
-        product_batching = ProductBatching.objects.exclude(used_type=6).filter(factory_id=factory,
-                                                                               site_id=site,
+        product_batching = ProductBatching.objects.exclude(used_type=6).filter(site_id=site,
                                                                                stage_id=stage,
                                                                                product_info_id=product_info,
                                                                                versions=versions,
-                                                                               batching_type=2
+                                                                               batching_type=2,
+                                                                               dev_type_id=dev_type,
                                                                                ).first()
         if product_batching:
             raise ValidationError('该配方已存在')
@@ -390,3 +391,15 @@ class ERPMaterialViewSet(CommonDeleteMixin, ModelViewSet):
             return ERPMaterialSerializer
         else:
             return ERPMaterialUpdateSerializer
+
+
+@method_decorator([api_recorder], name="dispatch")
+class GetERPZcMaterialAPiView(APIView):
+    """通过mes物料名获取有绑定关系的中策物料"""
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        material_no = self.request.query_params.get('material_name')
+        zc_materials = ERPMESMaterialRelation.objects.filter(material__material_no=material_no)\
+            .values('zc_material__material_name', 'zc_material__wlxxid')
+        return Response({'results': list(zc_materials)})

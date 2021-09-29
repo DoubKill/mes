@@ -2687,6 +2687,45 @@ class WMSTunnelView(APIView):
 class WMSInventoryView(APIView):
     """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
     DATABASE_CONF = WMS_CONF
+    FILE_NAME = '原材料库存统计'
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = self.FILE_NAME
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('出入库信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        columns = ['序号', '物料名称', '物料编码', '中策物料编码', '批次号', '单位', 'PDM',
+                   '物料组', '巷道', '可用数量', '重量']
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i[0])
+            sheet.write(data_row, 2, i[1])
+            sheet.write(data_row, 3, i[2])
+            sheet.write(data_row, 4, i[9])
+            sheet.write(data_row, 5, i[3])
+            sheet.write(data_row, 6, i[4])
+            sheet.write(data_row, 7, i[5])
+            sheet.write(data_row, 8, i[6])
+            sheet.write(data_row, 9, i[7])
+            sheet.write(data_row, 10, i[8])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
 
     def get(self, request):
         material_name = self.request.query_params.get('material_name')
@@ -2695,6 +2734,7 @@ class WMSInventoryView(APIView):
         tunnel_name = self.request.query_params.get('tunnel_name')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
+        export = self.request.query_params.get('export')
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         extra_where_str = ""
@@ -2746,7 +2786,17 @@ class WMSInventoryView(APIView):
         inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
+
+        if export == '2':
+            return self.export_xls(list(temp))
+        elif export == '1':
+            return self.export_xls(list(temp[st:et]))
+
         count = len(temp)
+        total_quantity = total_weight = 0
+        for i in temp:
+            total_quantity += i[7]
+            total_weight += i[8]
         temp = temp[st:et]
         result = []
         for item in temp:
@@ -2763,7 +2813,7 @@ class WMSInventoryView(APIView):
                  'batch_no': item[9]
                  })
         sc.close()
-        return Response({'results': result, "count": count})
+        return Response({'results': result, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2812,6 +2862,7 @@ class THTunnelView(WMSTunnelView):
 class THInventoryView(WMSInventoryView):
     """炭黑库存信息"""
     DATABASE_CONF = TH_CONF
+    FILE_NAME = '炭黑库存统计'
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2968,11 +3019,11 @@ class PalletTestResultView(APIView):
         mtr_list = deal_result['mtr_list']
         mtr_list.pop('table_head', None)
         test_result = deal_result['test_result']
-        for train, item in mtr_list.items():
+        for item in mtr_list['trains']:
             data = {}
-            data['trains'] = train
+            data['trains'] = item['train']
             data['test_data'] = {}
-            for j in item:
+            for j in item['content']:
                 data['status'] = j.get('status')
                 test_indicator_name = j['test_indicator_name']
                 data_point_name = j['data_point_name']
