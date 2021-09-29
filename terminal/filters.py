@@ -1,7 +1,8 @@
 import django_filters
 
 from plan.models import BatchingClassesEquipPlan
-from terminal.models import FeedingLog, WeightPackageLog, WeightTankStatus, LoadMaterialLog, WeightBatchingLog
+from terminal.models import FeedingLog, WeightPackageLog, WeightTankStatus, LoadMaterialLog, WeightBatchingLog, \
+    CarbonTankFeedWeightSet, FeedingOperationLog
 
 
 class BatchingClassesEquipPlanFilter(django_filters.rest_framework.FilterSet):
@@ -64,11 +65,33 @@ class LoadMaterialLogFilter(django_filters.rest_framework.FilterSet):
 
 
 class WeightBatchingLogListFilter(django_filters.rest_framework.FilterSet):
-    # production_factory_date = django_filters.DateFilter(field_name='production_factory_date', help_text='工厂时间')
+    batch_time = django_filters.DateFilter(field_name='batch_time__date', help_text='工厂时间')
     tank_no = django_filters.CharFilter(field_name='tank_no', help_text='罐号')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='投入设备')
-    material_no = django_filters.CharFilter(field_name='material_no', help_text='物料编码', lookup_expr='icontains')
+    batch_classes = django_filters.CharFilter(field_name='batch_classes', help_text='投入班次', lookup_expr='icontains')
 
     class Meta:
         model = WeightBatchingLog
-        fields = ('equip_no', 'material_no', 'tank_no')
+        fields = ('equip_no', 'batch_classes', 'tank_no', 'batch_time')
+
+
+class CarbonTankSetFilter(django_filters.rest_framework.FilterSet):
+    equip_id = django_filters.CharFilter(field_name='equip_id', help_text='密炼机台号', lookup_expr='icontains')
+    tank_no = django_filters.NumberFilter(field_name='tank_no', help_text='罐号')
+
+    class Meta:
+        model = CarbonTankFeedWeightSet
+        fields = ('equip_id', 'tank_no')
+
+
+class FeedingOperationLogFilter(django_filters.rest_framework.FilterSet):
+    feeding_type = django_filters.ChoiceFilter(choices=FeedingOperationLog.TYPE_CHOICE, help_text='投料区分')
+    feeding_port_no = django_filters.CharFilter(field_name='feeding_port_no', lookup_expr='icontains', help_text='投料口')
+    feeding_time = django_filters.DateFromToRangeFilter(field_name='feeding_time__date', lookup_expr='range', help_text='投料时间')
+    feeding_classes = django_filters.CharFilter(field_name='feeding_classes', lookup_expr='icontains', help_text='投料班次')
+    feed_result = django_filters.CharFilter(field_name='feed_result', lookup_expr='icontains', help_text='防错结果')
+    feeding_username = django_filters.CharFilter(field_name='feeding_username', lookup_expr='icontains', help_text='投料人员')
+
+    class Meta:
+        model = FeedingOperationLog
+        fields = ('feeding_type', 'feeding_port_no', 'feeding_time', 'feeding_classes', 'feed_result', 'feeding_username')
