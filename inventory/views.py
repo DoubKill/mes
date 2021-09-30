@@ -3019,11 +3019,11 @@ class PalletTestResultView(APIView):
         mtr_list = deal_result['mtr_list']
         mtr_list.pop('table_head', None)
         test_result = deal_result['test_result']
-        for train, item in mtr_list.items():
+        for item in mtr_list['trains']:
             data = {}
-            data['trains'] = train
+            data['trains'] = item['train']
             data['test_data'] = {}
-            for j in item:
+            for j in item['content']:
                 data['status'] = j.get('status')
                 test_indicator_name = j['test_indicator_name']
                 data_point_name = j['data_point_name']
