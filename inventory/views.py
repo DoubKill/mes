@@ -3072,7 +3072,8 @@ class PalletDataModelViewSet(ModelViewSet):
         pallet_status = request.data.get('status')
         enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         depot_site = request.data.get('depot_site')
-        depot_site_obj = DepotSite.objects.filter(depot_site_name=depot_site).first()
+        depot_pallet_id = request.data.get('depot_pallet_id')
+        depot_site_obj = DepotSite.objects.filter(id=depot_site).first()
         pallet_data_obj = PalletFeedbacks.objects.get(pk=pallet_id)
 
         if pallet_status == 1:  # 入库
@@ -3080,8 +3081,8 @@ class PalletDataModelViewSet(ModelViewSet):
                                                  pallet_status=pallet_status)
             data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
         elif pallet_status == 2:  # 出库
-            DepotPallt.objects.filter(depot_site=depot_site_obj).update(pallet_status=2, outer_time=enter_time)
-            data_obj = DepotPallt.objects.filter(depot_site=depot_site_obj).first()
+            DepotPallt.objects.filter(id=depot_pallet_id).update(pallet_status=2, outer_time=datetime.datetime.now())
+            data_obj = DepotPallt.objects.filter(id=depot_pallet_id).first()
             data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
         serializer = PalletDataModelSerializer(instance=data)
         return Response({"result": serializer.data})
