@@ -1407,7 +1407,9 @@ class RuntimeRecordView(APIView):
         equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14',
                       'Z15']
         if classes:
-            factory_date = datetime.datetime.strptime(factory_date, '%Y-%m-%d').date()
+            if not isinstance(factory_date, datetime.date):
+                factory_date = datetime.datetime.strptime(factory_date, '%Y-%m-%d').date()
+
             if factory_date == datetime.date.today():
                 if not ProductionDailyRecords.objects.filter(factory_date=factory_date, classes=classes).first():
                     production_daily = ProductionDailyRecords.objects.create(factory_date=factory_date, classes=classes)
