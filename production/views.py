@@ -1407,15 +1407,13 @@ class RuntimeRecordView(APIView):
         equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14',
                       'Z15']
         if classes:
-            if datetime.datetime.strptime(factory_date, '%Y-%m-%d').date() == datetime.date.today():
+            factory_date = datetime.datetime.strptime(factory_date, '%Y-%m-%d').date()
+            if factory_date == datetime.date.today():
                 if not ProductionDailyRecords.objects.filter(factory_date=factory_date, classes=classes).first():
-
-                    production_daily = ProductionDailyRecords.objects.create(factory_date=datetime.datetime.strptime(factory_date, '%Y-%m-%d').date(),
-                                                          classes=classes)
+                    production_daily = ProductionDailyRecords.objects.create(factory_date=factory_date, classes=classes)
 
                     # 获取上一天的人员姓名
-                    date = datetime.datetime.strptime(factory_date, "%Y-%m-%d")
-                    last_date = (date + datetime.timedelta(days=-1)).strftime("%Y-%m-%d")
+                    last_date = (factory_date + datetime.timedelta(days=-1)).strftime("%Y-%m-%d")
                     for equip in equip_list:
                         last = ProductionPersonnelRecords.objects.filter(equip_no=equip,
                                                                          production_daily__factory_date=last_date,
