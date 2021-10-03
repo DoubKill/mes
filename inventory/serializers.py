@@ -1460,7 +1460,7 @@ class DepotSulfurModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sulfur
-        fields = ['name', 'product_no', 'provider', 'lot_no']
+        fields = ['name', 'product_no', 'provider', 'lot_no', 'num']
 
 
 class DepotSulfurInfoModelSerializer(serializers.ModelSerializer):

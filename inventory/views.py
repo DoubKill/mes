@@ -3218,14 +3218,35 @@ class SulfurDataModelViewSet(ModelViewSet):
                 raise ValidationError('该库位不存在')
 
             enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
+            """
+            {'name': '物料1', 'product_no': '编码1', 'provider': '供应商1',
+             'lot_no': '批号1', 'sulfur_status': 1, 'weight': '100.000', 'num': 10}
+            """
+            # 判断 库位和lot_no是否相同，相同就累加
+            data = Sulfur.objects.filter(depot_site=depot_site_obj, lot_no=serializer.data.get('lot_no')).first()
+            if data:
+                data.num += int(serializer.data.get('num'))
+                data.save()
+            else:
+                data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
+
             serializer = SulfurDataModelSerializer(instance=data)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         elif request.data.get('sulfur_status') == 2:
-
+            num = request.data.get('num')
+            try:
+                num = int(num)
+            except:
+                raise ValidationError('您输入的数量有误')
+            obj = Sulfur.objects.filter(id=request.data.get('id')).first()
+            if num > obj.num:
+                raise ValidationError(f"库存数量为{obj.num}！")
             outer_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            Sulfur.objects.filter(id=request.data.get('id')).update(sulfur_status=2, outer_time=outer_time)
+            obj.sulfur_status = 1 if num < obj.num else 2
+            obj.num -= num
+            obj.outer_time = outer_time
+            obj.save()
             return Response({'results': '出库成功'})
 
 
@@ -3243,14 +3264,13 @@ class DepotSulfurModelViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         lst = []
         for i in serializer.data:
-            lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no']})
+            lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no'], 'num':i['num']})
         c = {i['name']: {} for i in lst}
         for i in lst:
             if not c[i['name']]:
-                i.update({"num": 1})
                 c[i['name']].update(i)
             else:
-                c[i['name']]['num'] += 1
+                c[i['name']]['num'] += i['num']
         return Response({'results': c.values()})
 
 
