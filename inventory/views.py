@@ -1,4 +1,5 @@
 import datetime
+import decimal
 import json
 import logging
 import random
@@ -3223,7 +3224,7 @@ class SulfurDataModelViewSet(ModelViewSet):
             num = int(serializer.data.get('num'))
             if data:
                 data.num += num
-                data.weight += (weight * num)
+                data.weight +=  decimal.Decimal(weight * num)  # 转decimal
                 data.save()
             else:
                 serializer.data.update({'weight': weight * num})
