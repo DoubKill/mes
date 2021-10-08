@@ -240,8 +240,8 @@ class MaterialTestResult(AbstractEntity):
         (1, '10.4.23.140'),
         (2, '10.4.23.141'),
     )
-    data_point_indicator = models.ForeignKey(MaterialDataPointIndicator, help_text='数据评判指标id', on_delete=models.CASCADE,
-                                             blank=True, null=True)
+    data_point_indicator = models.ForeignKey(MaterialDataPointIndicator, help_text='数据评判指标id',
+                                             on_delete=models.SET_NULL, blank=True, null=True)
     material_test_order = models.ForeignKey(MaterialTestOrder, help_text='物料检测单', on_delete=models.CASCADE,
                                             related_name='order_results')
     test_factory_date = models.DateTimeField(help_text='检测时间')
