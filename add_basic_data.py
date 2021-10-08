@@ -1395,3 +1395,5 @@ if __name__ == '__main__':
 
     add_equip_current_status()
     print('add add_equip_current_status ok')
+
+# 111
