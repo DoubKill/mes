@@ -315,7 +315,7 @@ class ProductionLineLocation(models.Model):
 
 
 class ProductionDailyRecords(models.Model):
-    factory_date = models.DateField('工厂日期')
+    factory_date = models.DateField(help_text='工厂日期')
     equip_error_record = models.TextField(help_text='设备异常记录', null=True)
     process_shutdown_record = models.TextField(help_text='工艺停机记录', null=True)
     production_shutdown_record = models.TextField(help_text='生产停机记录', null=True)

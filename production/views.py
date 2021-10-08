@@ -1412,7 +1412,14 @@ class RuntimeRecordView(APIView):
 
             if factory_date == datetime.date.today():
                 if not ProductionDailyRecords.objects.filter(factory_date=factory_date, classes=classes).first():
-                    production_daily = ProductionDailyRecords.objects.create(factory_date=factory_date, classes=classes)
+
+                    production_daily = ProductionDailyRecords.objects.create(factory_date=factory_date, classes=classes,
+                                                                            equip_error_record = None,
+                                                                            process_shutdown_record = None,
+                                                                            production_shutdown_record = None,
+                                                                            auxiliary_positions_record = None,
+                                                                            shift_leader = None,
+                    )
 
                     # 获取上一天的人员姓名
                     last_date = (factory_date + datetime.timedelta(days=-1)).strftime("%Y-%m-%d")
