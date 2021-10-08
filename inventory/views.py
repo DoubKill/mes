@@ -3218,16 +3218,15 @@ class SulfurDataModelViewSet(ModelViewSet):
                 raise ValidationError('该库位不存在')
 
             enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            """
-            {'name': '物料1', 'product_no': '编码1', 'provider': '供应商1',
-             'lot_no': '批号1', 'sulfur_status': 1, 'weight': '100.000', 'num': 10}
-            """
-            # 判断 库位和lot_no是否相同，相同就累加
             data = Sulfur.objects.filter(depot_site=depot_site_obj, lot_no=serializer.data.get('lot_no')).first()
+            weight = float(serializer.data.get('weight'))
+            num = int(serializer.data.get('num'))
             if data:
-                data.num += int(serializer.data.get('num'))
+                data.num += num
+                data.weight += (weight * num)
                 data.save()
             else:
+                serializer.data.update({'weight': weight * num})
                 data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
 
             serializer = SulfurDataModelSerializer(instance=data)
