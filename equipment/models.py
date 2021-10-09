@@ -210,7 +210,7 @@ class EquipProperty(AbstractEntity):
     property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码', unique=True)
     src_no = models.CharField(max_length=64, help_text='原编码', verbose_name='原编码', blank=True, null=True)
     financial_no = models.CharField(max_length=64, help_text='财务编码', verbose_name='财务编码', blank=True, null=True)
-    equip_type = models.CharField(max_length=64, help_text='设备型号', verbose_name='设备型号', blank=True, null=True)
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
     equip_no = models.CharField(max_length=64, help_text='设备编码', verbose_name='设备编码', blank=True, null=True)
     equip_name = models.CharField(max_length=64, help_text='设备名称', verbose_name='设备名称', blank=True, null=True)
     made_in = models.CharField(max_length=64, help_text='设备制造商', verbose_name='设备制造商', blank=True, null=True)
@@ -427,6 +427,7 @@ class EquipMachineHaltReason(AbstractEntity):
     machine_halt_reason_name = models.CharField(max_length=64, help_text='停机原因名称')
     use_flag = models.BooleanField(help_text='是否启用', default=True)
     desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
+    equip_fault = models.ManyToManyField(EquipFaultType, help_text='故障分类', related_name='halt_reasons')
 
     class Meta:
         db_table = 'equip_machine_halt_reason'
