@@ -179,6 +179,10 @@ class InformContent(AbstractEntity):
         verbose_name_plural = verbose_name = '通知内容'
 
 
+# **************************2021-10-09**************************
+# **************************最新模型类**************************
+
+
 class EquipSupplier(AbstractEntity):
     """
         设备供应商
@@ -234,7 +238,7 @@ class EquipArea(AbstractEntity):
     node_code = models.CharField(max_length=64, help_text='节点编号')
     area_code = models.CharField(max_length=64, help_text='区域编号')
     area_name = models.CharField(max_length=64, help_text='区域名称')
-    inspection_line_name = models.CharField(max_length=64, help_text='巡检路线名称')
+    inspection_line_name = models.ForeignKey(GlobalCode, help_text='巡检路线名称', on_delete=models.CASCADE)
     desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
     parent_area = models.ForeignKey('self', help_text='父节点', on_delete=models.CASCADE, null=True)
 
@@ -455,3 +459,29 @@ class EquipOrderAssignRule(AbstractEntity):
     class Meta:
         db_table = 'equip_order_assign_rule'
         verbose_name_plural = verbose_name = '工单指派规则'
+
+
+class EquipTargetMTBFMTTRSetting(AbstractEntity):
+    """
+        机台目标MTBF/MTTR设定
+    """
+    equip = models.ForeignKey(Equip, on_delete=models.CASCADE, related_name="equip_target_settings", help_text='设备')
+    target_mtb = models.FloatField()
+    target_mttr = models.FloatField()
+
+    class Meta:
+        db_table = 'equip_target_mttbmttr_setting'
+        verbose_name_plural = verbose_name = '机台目标MTBF/MTTR设定'
+
+
+class EquipMaintenanceAreaSetting(AbstractEntity):
+    maintenance_user = models.ForeignKey(User, help_text='包干人员', on_delete=models.CASCADE)
+    equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台')
+    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
+                                   help_text='设备部位')
+    equip_area = models.ForeignKey(EquipArea, on_delete=models.CASCADE,
+                                   help_text='设备区域')
+
+    class Meta:
+        db_table = 'equip_maintenance_area_setting'
+        verbose_name_plural = verbose_name = '机台目标MTBF/MTTR设定'
