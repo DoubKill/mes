@@ -300,6 +300,9 @@ class EquipSpareErp(AbstractEntity):
     """
     spare_code = models.CharField(max_length=64, help_text='erp备件编码')
     spare_name = models.CharField(max_length=64, help_text='erp备件名称')
+    equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
+                                             help_text='部件分类')
+    supplier_name = models.CharField(max_length=64, help_text='供应商名称')
     specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
     technical_params = models.CharField(max_length=64, help_text='技术参数', blank=True, null=True)
     unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)
@@ -328,28 +331,28 @@ class ERPSpareComponentRelation(models.Model):
         verbose_name_plural = verbose_name = 'erp备件部件对应'
 
 
-class EquipSpare(AbstractEntity):
-    """
-        备件代码定义
-    """
-    spare_code = models.CharField(max_length=64, help_text='备件编码')
-    spare_name = models.CharField(max_length=64, help_text='备件名称')
-    equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
-                                             help_text='部件分类')
-    specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
-    technical_params = models.CharField(max_length=64, help_text='技术参数', blank=True, null=True)
-    unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)
-    key_parts_flag = models.BooleanField(help_text='是否关键部位', blank=True, null=True)
-    upper_stock = models.FloatField(help_text='库存上限', blank=True, null=True)
-    lower_stock = models.FloatField(help_text='库存下限', blank=True, null=True)
-    cost = models.FloatField(help_text='计划价格', blank=True, null=True)
-    texture_material = models.CharField(max_length=64, help_text='材质', blank=True, null=True)
-    period_validity = models.IntegerField(help_text='有效期', blank=True, null=True)
-    use_flag = models.BooleanField(help_text='是否启用', default=True)
-
-    class Meta:
-        db_table = 'erp_spare'
-        verbose_name_plural = verbose_name = '备件代码定义'
+# class EquipSpare(AbstractEntity):
+#     """
+#         备件代码定义
+#     """
+#     spare_code = models.CharField(max_length=64, help_text='备件编码')
+#     spare_name = models.CharField(max_length=64, help_text='备件名称')
+#     equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
+#                                              help_text='部件分类')
+#     specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
+#     technical_params = models.CharField(max_length=64, help_text='技术参数', blank=True, null=True)
+#     unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)
+#     key_parts_flag = models.BooleanField(help_text='是否关键部位', blank=True, null=True)
+#     upper_stock = models.FloatField(help_text='库存上限', blank=True, null=True)
+#     lower_stock = models.FloatField(help_text='库存下限', blank=True, null=True)
+#     cost = models.FloatField(help_text='计划价格', blank=True, null=True)
+#     texture_material = models.CharField(max_length=64, help_text='材质', blank=True, null=True)
+#     period_validity = models.IntegerField(help_text='有效期', blank=True, null=True)
+#     use_flag = models.BooleanField(help_text='是否启用', default=True)
+#
+#     class Meta:
+#         db_table = 'erp_spare'
+#         verbose_name_plural = verbose_name = '备件代码定义'
 
 
 class EquipFaultType(AbstractEntity):
@@ -431,7 +434,7 @@ class EquipMachineHaltReason(AbstractEntity):
     machine_halt_reason_name = models.CharField(max_length=64, help_text='停机原因名称')
     use_flag = models.BooleanField(help_text='是否启用', default=True)
     desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
-    equip_fault = models.ManyToManyField(EquipFaultType, help_text='故障分类', related_name='halt_reasons')
+    equip_fault_type = models.ManyToManyField(EquipFaultType, help_text='故障分类', related_name='halt_reasons')
 
     class Meta:
         db_table = 'equip_machine_halt_reason'
@@ -484,4 +487,40 @@ class EquipMaintenanceAreaSetting(AbstractEntity):
 
     class Meta:
         db_table = 'equip_maintenance_area_setting'
-        verbose_name_plural = verbose_name = '机台目标MTBF/MTTR设定'
+        verbose_name_plural = verbose_name = '维护包干设置'
+
+
+class EquipJobItemStandard(AbstractEntity):
+    WORK_TYPE_CHOICE = (
+        ('巡检', '巡检'),
+        ('保养', '保养'),
+        ('标定', '标定'),
+        ('润滑', '润滑'),
+        ('维修', '维修')
+    )
+    work_type = models.CharField(max_length=64, help_text='作业类型', choices=WORK_TYPE_CHOICE)
+    standard_code = models.CharField(max_length=64, help_text='标准编号')
+    standard_name = models.CharField(max_length=64, help_text='标准名称')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_job_item_standard'
+        verbose_name_plural = verbose_name = '设备作业项目标准'
+
+
+class EquipJobItemStandardDetail(AbstractEntity):
+    TYPE_CHOICE = (
+        ('有无', '巡检'),
+        ('数值', '保养'),
+        ('正常异常', '标定'),
+        ('完成未完成', '润滑'),
+    )
+    equip_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
+    sequence = models.IntegerField(help_text='次序')
+    check_standard_desc = models.CharField(max_length=64, help_text='判断标准/步骤说明')
+    check_standard_type = models.CharField(max_length=64, help_text='类型', choices=TYPE_CHOICE)
+
+    class Meta:
+        db_table = 'equip_job_item_standard_details'
+        verbose_name_plural = verbose_name = '设备作业项目标准明细'
+
