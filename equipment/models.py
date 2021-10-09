@@ -179,6 +179,10 @@ class InformContent(AbstractEntity):
         verbose_name_plural = verbose_name = '通知内容'
 
 
+# **************************2021-10-09**************************
+# **************************最新模型类**************************
+
+
 class EquipSupplier(AbstractEntity):
     """
         设备供应商
@@ -234,7 +238,7 @@ class EquipArea(AbstractEntity):
     node_code = models.CharField(max_length=64, help_text='节点编号')
     area_code = models.CharField(max_length=64, help_text='区域编号')
     area_name = models.CharField(max_length=64, help_text='区域名称')
-    inspection_line_name = models.CharField(max_length=64, help_text='巡检路线名称')
+    inspection_line_name = models.ForeignKey(GlobalCode, help_text='巡检路线名称', on_delete=models.CASCADE)
     desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
     parent_area = models.ForeignKey('self', help_text='父节点', on_delete=models.CASCADE, null=True)
 
