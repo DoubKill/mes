@@ -682,7 +682,7 @@ permission_data = [
     {'id': 512, 'code': 'change_sulfur_depot', 'name': '修改库区', 'parent_id': 509},
     {'id': 513, 'code': 'addSite_sulfur_depot', 'name': '新增库位', 'parent_id': 509},
     {'id': 514, 'code': 'changeSite_sulfur_depot', 'name': '修改库位', 'parent_id': 509},
-    {'id': 582, 'code': 'delete_sulfur_depot', 'name': '删除库位', 'parent_id': 509},
+    {'id': 582, 'code': 'delete_sulfur_depot', 'name': '删除库区', 'parent_id': 509},
     {'id': 583, 'code': 'deleteSite_sulfur_depot', 'name': '删除库位', 'parent_id': 509},
 
     {'id': 515, 'code': 'sulfur_data', 'name': '硫磺库出入库管理', 'parent_id': None},
