@@ -1,7 +1,7 @@
 # Create your models here.
 from django.db import models
 
-from basics.models import Equip, Location
+from basics.models import Equip, Location, GlobalCode, EquipCategoryAttribute
 from system.models import AbstractEntity, User
 
 
@@ -177,3 +177,281 @@ class InformContent(AbstractEntity):
     class Meta:
         db_table = 'inform_content'
         verbose_name_plural = verbose_name = '通知内容'
+
+
+class EquipSupplier(AbstractEntity):
+    """
+        设备供应商
+    """
+    supplier_code = models.CharField(max_length=64, help_text='供应商编码')
+    supplier_name = models.CharField(max_length=64, help_text='供应商名称')
+    region = models.CharField(max_length=64, help_text='地域', blank=True, null=True)
+    contact_name = models.CharField(max_length=64, help_text='联系人', blank=True, null=True)
+    contact_phone = models.CharField(max_length=64, help_text='联系人电话', blank=True, null=True)
+    supplier_type = models.CharField(max_length=64, help_text='供应商类别', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_supplier'
+        verbose_name_plural = verbose_name = '设备供应商'
+
+
+class EquipProperty(AbstractEntity):
+    """
+        设备固定资产
+    """
+    STATUSES = (
+        (1, '使用中'),
+        (2, '废弃'),
+        (3, '限制'),
+    )
+    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', null=True)
+    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', null=True)
+    property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码', unique=True)
+    src_no = models.CharField(max_length=64, help_text='原编码', verbose_name='原编码', blank=True, null=True)
+    financial_no = models.CharField(max_length=64, help_text='财务编码', verbose_name='财务编码', blank=True, null=True)
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
+    equip_no = models.CharField(max_length=64, help_text='设备编码', verbose_name='设备编码', blank=True, null=True)
+    equip_name = models.CharField(max_length=64, help_text='设备名称', verbose_name='设备名称', blank=True, null=True)
+    made_in = models.CharField(max_length=64, help_text='设备制造商', verbose_name='设备制造商', blank=True, null=True)
+    capacity = models.CharField(max_length=64, help_text='产能', verbose_name='产能', blank=True, null=True)
+    price = models.FloatField(help_text='价格', verbose_name='价格', blank=True, null=True)
+    status = models.PositiveIntegerField(choices=STATUSES, default=1, help_text='状态', verbose_name='状态')
+    leave_factory_no = models.CharField(max_length=64, help_text='出厂编码', verbose_name='出厂编码', blank=True, null=True)
+    leave_factory_date = models.DateField(help_text='出厂日期', verbose_name='出厂日期', blank=True, null=True)
+    use_date = models.DateField(help_text='使用日期', verbose_name='使用日期', blank=True, null=True)
+    equip_supplier = models.ForeignKey(EquipSupplier, help_text='设备供应商', on_delete=models.CASCADE, blank=True, null=True)
+
+    class Meta:
+        db_table = 'equip_property'
+        verbose_name_plural = verbose_name = '设备固定资产'
+
+
+class EquipArea(AbstractEntity):
+    """
+        设备区域
+    """
+    node_code = models.CharField(max_length=64, help_text='节点编号')
+    area_code = models.CharField(max_length=64, help_text='区域编号')
+    area_name = models.CharField(max_length=64, help_text='区域名称')
+    inspection_line_name = models.CharField(max_length=64, help_text='巡检路线名称')
+    desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
+    parent_area = models.ForeignKey('self', help_text='父节点', on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        db_table = 'equip_area'
+        verbose_name_plural = verbose_name = '设备区域'
+
+
+class EquipPartNew(AbstractEntity):
+    """
+        设备部位
+    """
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
+                                   help_text='所属主设备种类')
+    part_code = models.CharField(max_length=64, help_text='部位编号')
+    part_name = models.CharField(max_length=64, help_text='部位名称')
+    global_part_type = models.ForeignKey(GlobalCode, help_text='部位分类', on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'equip_part_new'
+        verbose_name_plural = verbose_name = '设备部位'
+
+
+class EquipComponentType(AbstractEntity):
+    """
+        设备部件分类
+    """
+    component_type_code = models.CharField(max_length=64, help_text='部件分类编号')
+    component_type_name = models.CharField(max_length=64, help_text='部件分类名称')
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_component_type'
+        verbose_name_plural = verbose_name = '设备部件分类'
+
+
+class EquipComponent(AbstractEntity):
+    """
+        设备部件
+    """
+    # equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
+    #                                help_text='所属主设备种类', verbose_name='所属主设备种类')
+    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
+                                   help_text='所属主设备部位')
+    equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
+                                             help_text='部件分类')
+    component_code = models.CharField(max_length=64, help_text='部件编号')
+    component_name = models.CharField(max_length=64, help_text='部件名称')
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_component'
+        verbose_name_plural = verbose_name = '设备部件'
+
+
+class EquipSpareErp(AbstractEntity):
+    """
+        erp备件物料
+    """
+    spare_code = models.CharField(max_length=64, help_text='erp备件编码')
+    spare_name = models.CharField(max_length=64, help_text='erp备件名称')
+    specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
+    technical_params = models.CharField(max_length=64, help_text='技术参数', blank=True, null=True)
+    unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)
+    key_parts_flag = models.BooleanField(help_text='是否关键部位', blank=True, null=True)
+    upper_stock = models.FloatField(help_text='库存上限', blank=True, null=True)
+    lower_stock = models.FloatField(help_text='库存下限', blank=True, null=True)
+    cost = models.FloatField(help_text='计划价格', blank=True, null=True)
+    texture_material = models.CharField(max_length=64, help_text='材质', blank=True, null=True)
+    period_validity = models.IntegerField(help_text='有效期', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+    equip_component = models.ManyToManyField(EquipComponent, help_text='设备部件', related_name='equip_components',
+                                             through='ERPSpareComponentRelation')
+
+    class Meta:
+        db_table = 'equip_spare_erp'
+        verbose_name_plural = verbose_name = 'erp备件物料'
+
+
+class ERPSpareComponentRelation(models.Model):
+    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE)
+    equip_spare_erp = models.ForeignKey(EquipSpareErp, help_text='erp备件物料', on_delete=models.CASCADE)
+    reuse_flag = models.BooleanField(help_text='是否以旧换新', default=True)
+
+    class Meta:
+        db_table = 'erp_spare_component_relation'
+        verbose_name_plural = verbose_name = 'erp备件部件对应'
+
+
+class EquipSpare(AbstractEntity):
+    """
+        备件代码定义
+    """
+    spare_code = models.CharField(max_length=64, help_text='备件编码')
+    spare_name = models.CharField(max_length=64, help_text='备件名称')
+    equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
+                                             help_text='部件分类')
+    specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
+    technical_params = models.CharField(max_length=64, help_text='技术参数', blank=True, null=True)
+    unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)
+    key_parts_flag = models.BooleanField(help_text='是否关键部位', blank=True, null=True)
+    upper_stock = models.FloatField(help_text='库存上限', blank=True, null=True)
+    lower_stock = models.FloatField(help_text='库存下限', blank=True, null=True)
+    cost = models.FloatField(help_text='计划价格', blank=True, null=True)
+    texture_material = models.CharField(max_length=64, help_text='材质', blank=True, null=True)
+    period_validity = models.IntegerField(help_text='有效期', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+
+    class Meta:
+        db_table = 'erp_spare'
+        verbose_name_plural = verbose_name = '备件代码定义'
+
+
+class EquipFaultType(AbstractEntity):
+    """
+        设备故障类型
+    """
+    fault_type_code = models.CharField(max_length=64, help_text='故障分类编码')
+    fault_type_name = models.CharField(max_length=64, help_text='故障分类名称')
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_fault_type'
+        verbose_name_plural = verbose_name = '设备故障类型'
+
+
+class EquipFault(AbstractEntity):
+    """
+        设备故障分类
+    """
+    equip_fault_type = models.ForeignKey(EquipFaultType, help_text='备件故障分类', on_delete=models.CASCADE)
+    fault_code = models.CharField(max_length=64, help_text='故障分类编码')
+    fault_name = models.CharField(max_length=64, help_text='故障分类名称')
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+    desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
+
+    class Meta:
+        db_table = 'equip_fault'
+        verbose_name_plural = verbose_name = '设备故障分类'
+
+
+class EquipFaultSignal(AbstractEntity):
+    """
+        设备故障信号
+    """
+    signal_code = models.CharField(max_length=64, help_text='故障信号编码')
+    signal_name = models.CharField(max_length=64, help_text='故障信号名称')
+    equip = models.ForeignKey(Equip, help_text='机台', on_delete=models.CASCADE)
+    # equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
+    #                                help_text='设备部位', verbose_name='设备部位')
+    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE)
+    signal_variable_name = models.CharField(max_length=64, help_text='故障变量名称', blank=True, null=True)
+    signal_variable_type = models.CharField(max_length=64, help_text='故障变量类型', blank=True, null=True)
+    alarm_signal_minvalue = models.FloatField(help_text='报警下限值', blank=True, null=True)
+    alarm_signal_maxvalue = models.FloatField(help_text='报警上限值', blank=True, null=True)
+    alarm_signal_duration = models.FloatField(help_text='报警持续时间', blank=True, null=True)
+    alarm_signal_down_flag = models.BooleanField(help_text='报警是否停机')
+    alarm_signal_desc = models.CharField(max_length=256, help_text='报警停机描述', blank=True, null=True)
+    fault_signal_minvalue = models.FloatField(help_text='故障下限值', blank=True, null=True)
+    fault_signal_maxvalue = models.FloatField(help_text='故障上限值', blank=True, null=True)
+    fault_signal_duration = models.FloatField(help_text='故障持续时间', blank=True, null=True)
+    fault_signal_down_flag = models.BooleanField(help_text='故障是否停机')
+    fault_signal_desc = models.CharField(max_length=256, help_text='故障停机描述', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_fault_signal'
+        verbose_name_plural = verbose_name = '设备故障信号'
+
+
+class EquipMachineHaltType(AbstractEntity):
+    """
+        设备停机类型
+    """
+    machine_halt_type_code = models.CharField(max_length=64, help_text='停机分类编码')
+    machine_halt_type_name = models.CharField(max_length=64, help_text='停机分类名称')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_machine_halt_type'
+        verbose_name_plural = verbose_name = '设备停机类型'
+
+
+class EquipMachineHaltReason(AbstractEntity):
+    """
+        设备停机原因
+    """
+    equip_machine_halt_type = models.ForeignKey(EquipMachineHaltType, help_text='设备停机类型', on_delete=models.CASCADE)
+    machine_halt_reason_code = models.CharField(max_length=64, help_text='停机原因编码')
+    machine_halt_reason_name = models.CharField(max_length=64, help_text='停机原因名称')
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+    desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
+    equip_fault = models.ManyToManyField(EquipFaultType, help_text='故障分类', related_name='halt_reasons')
+
+    class Meta:
+        db_table = 'equip_machine_halt_reason'
+        verbose_name_plural = verbose_name = '设备停机原因'
+
+
+class EquipOrderAssignRule(AbstractEntity):
+    """
+        工单指派规则
+    """
+    rule_code = models.CharField(max_length=64, help_text='标准编号')
+    rule_name = models.CharField(max_length=64, help_text='标准名称')
+    work_type = models.CharField(max_length=64, help_text='作业类型', blank=True, null=True)
+    equip_type = models.ForeignKey(GlobalCode, models.CASCADE, help_text='设备类型', blank=True, null=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件', blank=True, null=True)
+    important_level = models.CharField(max_length=64, help_text='重要程度', blank=True, null=True)
+    receive_interval = models.IntegerField(help_text='接单间隔时间（分钟）', blank=True, null=True)
+    receive_warning_times = models.IntegerField(help_text='接单重复提醒次数', blank=True, null=True)
+    start_interval = models.IntegerField(help_text='维修开始间隔时间（分钟）', blank=True, null=True)
+    start_warning_times = models.IntegerField(help_text='开始重复提醒次数', blank=True, null=True)
+    accept_interval = models.IntegerField(help_text='验收间隔时间（分钟）', blank=True, null=True)
+    accept_warning_times = models.IntegerField(help_text='验收重复提醒次数', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_order_assign_rule'
+        verbose_name_plural = verbose_name = '工单指派规则'

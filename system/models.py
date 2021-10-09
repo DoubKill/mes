@@ -62,6 +62,9 @@ class Section(AbstractEntity):
     name = models.CharField(max_length=30, help_text='部门名称', verbose_name='部门名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
+    parent_section = models.ForeignKey('self', help_text='父节点部门', on_delete=models.CASCADE, blank=True, null=True)
+    in_charge_user = models.ForeignKey(User, help_text='负责人', blank=True, null=True, on_delete=models.CASCADE,
+                                       related_name='in_charge_sections')
 
     def __str__(self):
         return self.name
