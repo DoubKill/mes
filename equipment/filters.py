@@ -1,7 +1,7 @@
 import django_filters
 
 from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig, \
-    EquipCurrentStatus
+    EquipCurrentStatus, EquipSupplier, EquipProperty, EquipPartNew, EquipComponent, EquipAreaDefine
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -90,3 +90,54 @@ class EquipCurrentStatusFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipCurrentStatus
         fields = ('status',)
+
+
+class EquipSupplierFilter(django_filters.rest_framework.FilterSet):
+    supplier_name = django_filters.CharFilter(field_name='supplier_name', help_text='供应商名称', lookup_expr='icontains')
+    use_flag = django_filters.CharFilter(field_name='use_flag', help_text='是否使用')
+    supplier_type = django_filters.CharFilter(field_name='supplier_type', help_text='供应商类别')
+
+    class Meta:
+        model = EquipSupplier
+        fields = ('supplier_name', 'use_flag', 'supplier_type')
+
+
+class EquipPropertyFilter(django_filters.rest_framework.FilterSet):
+    property_no = django_filters.CharFilter(field_name='property_no', help_text='固定资产编码', lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='设备编码', lookup_expr='icontains')
+    property_type = django_filters.CharFilter(field_name='property_type_node__name', help_text='固定资产类型')
+
+    class Meta:
+        model = EquipProperty
+        fields = ('property_no', 'equip_no', 'property_type')
+
+
+class EquipPartNewFilter(django_filters.rest_framework.FilterSet):
+    equip_type = django_filters.CharFilter(field_name='equip_type__category_name', help_text='所属主设备种类')
+    global_part_type = django_filters.CharFilter(field_name='global_part_type__global_name', help_text='部位分类')
+    part_code = django_filters.CharFilter(field_name='part_code', help_text='部位代码', lookup_expr='icontains')
+    part_name = django_filters.CharFilter(field_name='part_name', help_text='部位名称', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipPartNew
+        fields = ('equip_type', 'global_part_type', 'part_code', 'part_name')
+
+
+class EquipComponentFilter(django_filters.rest_framework.FilterSet):
+    equip_part = django_filters.CharFilter(field_name='equip_part__part_name', help_text='所属主设备部位')
+    equip_component_type = django_filters.CharFilter(field_name='equip_component_type__component_type_name', help_text=
+                                                     '部件分类名称')
+
+    class Meta:
+        model = EquipComponent
+        fields = ('equip_part', 'equip_component_type')
+
+
+class EquipAreaDefineFilter(django_filters.rest_framework.FilterSet):
+
+    area_name = django_filters.CharFilter(field_name='area_name', help_text='位置区域名称', lookup_expr='icontains')
+    use_flag = django_filters.CharFilter(field_name='use_flag', help_text='是否启用')
+
+    class Meta:
+        model = EquipAreaDefine
+        fields = ('area_name', 'use_flag')

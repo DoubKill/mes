@@ -36,6 +36,21 @@ router.register('platform-config', PlatformConfigViewSet)
 # 设备维修履历
 router.register('equip-maintenance-order-log', EquipMaintenanceOrderLogViewSet)
 
+# 供应商管理台账
+router.register('equip-supplier', EquipSupplierViewSet)
+
+# 设备固定资产台账
+router.register('equip-property', EquipPropertyViewSet)
+
+# 设备位置区域定义
+router.register('equip-area-define', EquipAreaDefineViewSet)
+
+# 设备部位定义
+router.register('equip-part-new', EquipPartNewViewSet)
+
+# 设备部件定义
+router.register('equip-component', EquipComponentViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),

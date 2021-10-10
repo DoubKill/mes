@@ -10,7 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
-    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter
+    PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
+    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentFilter
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.common_code import OMin, OMax, OSum
@@ -574,3 +575,80 @@ class EquipOverview(APIView):
             else:
                 rep["current"]["others"].append({"name": temp.get("equip__equip_no"), "value": temp.get("status")})
         return Response(rep)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipSupplierViewSet(ModelViewSet):
+    queryset = EquipSupplier.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = EquipSupplierSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipSupplierFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipPropertyViewSet(ModelViewSet):
+    """设备固定资产台账"""
+    queryset = EquipProperty.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = EquipPropertySerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipPropertyFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export-property',
+            url_name='export-property')
+    def export_property(self, request, pk=None):
+        """模板下载"""
+        return property_template()
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-property',
+            url_name='import-property')
+    def import_property(self, request, pk=None):
+        """模板导入"""
+        file = request.FILES.get('file')
+        property_import(file)
+        return Response('导入成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipAreaDefineViewSet(ModelViewSet):
+    queryset = EquipAreaDefine.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = EquipAreaDefineSerializer
+    # permission_classes = (IsAuthenticated)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipAreaDefineFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipPartNewViewSet(ModelViewSet):
+    queryset = EquipPartNew.objects.all().order_by('-id')
+    serializer_class = EquipPartNewSerializer
+    # permission_classes = (IsAuthenticated)
+    filter_backends = (DjangoFilterBackend, )
+    filter_class = EquipPartNewFilter
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.delete_flag:
+            instance.delete_flag = False
+        else:
+            s_obj = instance.s_spare_type.all().filter(delete_flag=False).first()
+            if s_obj:
+                raise ValidationError('此类型已被备品备件物料绑定了，不可禁用')
+            instance.delete_flag = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipComponentViewSet(ModelViewSet):
+    queryset = EquipComponent.objects.filter(delete_flag=False).order_by('-id')
+    serializer_class = EquipComponentSerializer
+    # permission_classes = (IsAuthenticated)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipComponentFilter

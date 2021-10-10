@@ -7,11 +7,12 @@ from datetime import datetime
 from django.db.transaction import atomic
 from rest_framework import serializers
 
-from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
-    PropertyTypeNode, Property, PlatformConfig
+    PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
+    EquipComponent
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -253,3 +254,64 @@ class EquipMaintenanceOrderLogSerializer(BaseModelSerializer):
     class Meta:
         model = EquipMaintenanceOrder
         fields = '__all__'
+
+
+class EquipSupplierSerializer(BaseModelSerializer):
+    supplier_code = serializers.CharField(help_text='供应商编号',
+                                          validators=[UniqueValidator(queryset=EquipSupplier.objects.all(), message='该编码已存在')])
+    supplier_name = serializers.CharField(help_text='供应商名称',
+                                          validators=[UniqueValidator(queryset=EquipSupplier.objects.filter(use_flag=True), message='该供应商已存在')])
+
+    class Meta:
+        model = EquipSupplier
+        fields = ('id', 'supplier_code', 'supplier_name', 'region', 'contact_name',
+                  'contact_phone', 'supplier_type', 'use_flag', 'supplier_type', 'created_user', 'created_date')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPropertySerializer(BaseModelSerializer):
+    property_type = serializers.CharField(source='property_type_node.name', read_only=True, help_text='类型')
+    status_name = serializers.CharField(source='get_status_display', help_text='状态', read_only=True)
+    made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备供应商')
+
+    class Meta:
+        model = EquipProperty
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipAreaDefineSerializer(BaseModelSerializer):
+    area_name = serializers.CharField(help_text='位置区域名称',
+                                      validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该名称已存在')])
+    area_code = serializers.CharField(help_text='位置区域编号',
+                                      validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该编号已存在')])
+    class Meta:
+        model = EquipAreaDefine
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPartNewSerializer(BaseModelSerializer):
+    part_code = serializers.CharField(help_text='部位编码',
+                                      validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该编码已存在')])
+    part_name = serializers.CharField(help_text='设备名称',
+                                      validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该名称已存在')])
+
+    class Meta:
+        model = EquipPartNew
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipComponentSerializer(BaseModelSerializer):
+    component_type_code = serializers.CharField(source='equip_component_type.component_type_code')
+    component_type_name = serializers.CharField(source='equip_component_type.component_type_name')
+    component_code = serializers.CharField(help_text='部件编码',
+                                           validators=[UniqueValidator(queryset=EquipComponent.objects.all(), message='该编码已存在')])
+    component_name = serializers.CharField(help_text='部件名称',
+                                           validators=[UniqueValidator(queryset=EquipComponent.objects.all(), message='该名称已存在')])
+
+    class Meta:
+        model = EquipComponent
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

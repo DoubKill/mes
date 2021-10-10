@@ -247,6 +247,21 @@ class EquipArea(AbstractEntity):
         verbose_name_plural = verbose_name = '设备区域'
 
 
+class EquipAreaDefine(AbstractEntity):
+    """
+        设备区域定义
+    """
+    area_code = models.CharField(max_length=64, help_text='区域编号')
+    area_name = models.CharField(max_length=64, help_text='区域名称')
+    inspection_line_no = models.IntegerField(help_text='巡检顺序编号', blank=True, null=True)
+    desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
+
+    class Meta:
+        db_table = 'equip_area_define'
+        verbose_name_plural = verbose_name = '设备区域定义'
+
+
 class EquipPartNew(AbstractEntity):
     """
         设备部位
