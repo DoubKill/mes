@@ -199,7 +199,7 @@ class PalletDataFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机号', lookup_expr='icontains')
     product_no = django_filters.CharFilter(field_name='product_no', help_text='产出胶料编号', lookup_expr='icontains')
     classes = django_filters.CharFilter(field_name="classes", help_text='班次', lookup_expr='icontains')
-    factory_date = django_filters.DateTimeFilter(field_name="factory_date", help_text="工厂日期", lookup_expr='icontains')
+    factory_date = django_filters.DateTimeFilter(field_name="factory_date", help_text="工厂日期")
 
     class Meta:
         model = PalletFeedbacks
@@ -240,7 +240,7 @@ class DepotResumeFilter(django_filters.rest_framework.FilterSet):
     product_no = django_filters.CharFilter(field_name='pallet_data__product_no', help_text='产出胶料编号', lookup_expr='icontains')
     equip_no = django_filters.CharFilter(field_name='pallet_data__equip_no', help_text='机号', lookup_expr='icontains')
     classes = django_filters.CharFilter(field_name="pallet_data__classes", help_text='班次', lookup_expr='icontains')
-    factory_date = django_filters.DateTimeFilter(field_name="pallet_data__factory_date", help_text="工厂日期", lookup_expr='icontains')
+    factory_date = django_filters.DateTimeFilter(field_name="pallet_data__factory_date", help_text="工厂日期")
 
     class Meta:
         model = DepotPallt

@@ -662,6 +662,8 @@ permission_data = [
     {'id': 498, 'code': 'change_depot', 'name': '修改库区', 'parent_id': 495},
     {'id': 499, 'code': 'addSite_depot', 'name': '新增库位', 'parent_id': 495},
     {'id': 500, 'code': 'changeSite_depot', 'name': '修改库位', 'parent_id': 495},
+    {'id': 580, 'code': 'delete_depot', 'name': '删除库区', 'parent_id': 495},
+    {'id': 581, 'code': 'deleteSite_depot', 'name': '删除库位', 'parent_id': 495},
 
     {'id': 501, 'code': 'pallet_data', 'name': '线边库出入库管理', 'parent_id': None},
     {'id': 502, 'code': 'view_pallet_data', 'name': '查看', 'parent_id': 501},
@@ -680,6 +682,8 @@ permission_data = [
     {'id': 512, 'code': 'change_sulfur_depot', 'name': '修改库区', 'parent_id': 509},
     {'id': 513, 'code': 'addSite_sulfur_depot', 'name': '新增库位', 'parent_id': 509},
     {'id': 514, 'code': 'changeSite_sulfur_depot', 'name': '修改库位', 'parent_id': 509},
+    {'id': 582, 'code': 'delete_sulfur_depot', 'name': '删除库区', 'parent_id': 509},
+    {'id': 583, 'code': 'deleteSite_sulfur_depot', 'name': '删除库位', 'parent_id': 509},
 
     {'id': 515, 'code': 'sulfur_data', 'name': '硫磺库出入库管理', 'parent_id': None},
     {'id': 516, 'code': 'view_sulfur_data', 'name': '查看', 'parent_id': 515},
@@ -744,6 +748,8 @@ permission_data = [
     {'id': 577, 'code': 'add_carbon_feeding_prompt', 'name': '保存', 'parent_id': 575},
     {'id': 578, 'code': 'begin_carbon_feeding_prompt', 'name': '投料开始', 'parent_id': 575},
     {'id': 579, 'code': 'end_carbon_feeding_prompt', 'name': '投料结束', 'parent_id': 575}
+
+    # ========= 下个 584开始 =======
 
 ]
 

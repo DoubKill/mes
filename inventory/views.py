@@ -3229,6 +3229,7 @@ class SulfurDataModelViewSet(ModelViewSet):
             if data:
                 data.num += num
                 data.weight += decimal.Decimal(weight * num)
+                data.enter_time = enter_time
                 data.save()
             else:
                 serializer.data.update({'weight': weight * num})
