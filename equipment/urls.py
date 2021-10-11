@@ -51,6 +51,23 @@ router.register('equip-part-new', EquipPartNewViewSet)
 # 设备部件分类
 router.register('equip-component-type', EquipComponentTypeViewSet)
 
+# 设备部件定义
+router.register('equip-component', EquipComponentViewSet)
+
+# 部件与erp备件关系
+router.register('erp-spare-component-relation', ERPSpareComponentRelationViewSet)
+
+# erp备件物料信息
+router.register('equip-spare-erp', EquipSpareErpViewSet)
+
+# 设备BOM管理
+# router.register('equip-bom', EquipBomViewSet)
+
+# 设备故障分类类型
+router.register(r'equip-fault-types', EquipFaultTypeViewSet)
+
+# 设备故障分类
+router.register(r'equip-fault-codes', EquipFaultCodeViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

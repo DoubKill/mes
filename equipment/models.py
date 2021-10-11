@@ -295,8 +295,8 @@ class EquipComponent(AbstractEntity):
     """
         设备部件
     """
-    # equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
-    #                                help_text='所属主设备种类', verbose_name='所属主设备种类')
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
+                                   help_text='所属主设备种类')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
                                    help_text='所属主设备部位')
     equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
@@ -304,6 +304,10 @@ class EquipComponent(AbstractEntity):
     component_code = models.CharField(max_length=64, help_text='部件编号')
     component_name = models.CharField(max_length=64, help_text='部件名称')
     use_flag = models.BooleanField(help_text='是否启用', default=True)
+
+    @property
+    def is_binding(self):
+        return self.equip_components.count() > 0
 
     class Meta:
         db_table = 'equip_component'
