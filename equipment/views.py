@@ -11,7 +11,11 @@ from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
-    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter
+    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter,\
+    EquipSpareErpFilter, EquipFaultTypeFilter, EquipFaultCodeFilter, ERPSpareComponentRelationFilter
+from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
+    EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
+    EquipSpareErp
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -642,3 +646,160 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipComponentTypeFilter
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipComponentViewSet(ModelViewSet):
+    """
+    list:
+        展示所有设备部件定义
+    create:
+        新建部件定义
+    update:
+        修改部件定义
+    """
+    queryset = EquipComponent.objects.all()
+    pagination_class = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+
+    def get_queryset(self):
+        query_params = self.request.query_params
+        equip_type = query_params.get('equip_type')
+        equip_part = query_params.get('equip_part')
+        equip_component_type = query_params.get('equip_component_type')
+        component_name = query_params.get('component_name')
+        is_binding = query_params.get('is_binding')
+        use_flag = query_params.get('use_flag')
+        filter_kwargs = {}
+        if equip_type:
+            filter_kwargs['equip_part__equip_type__category_name__icontains'] = equip_type
+        if equip_part:
+            filter_kwargs['equip_part__part_name__icontains'] = equip_part
+        if equip_component_type:
+            filter_kwargs['equip_component_type__component_type_name__icontains'] = equip_component_type
+        if component_name:
+            filter_kwargs['component_name__icontains'] = component_name
+        if is_binding:
+            filter_kwargs['equip_components__isnull'] = False if is_binding == 'Y' else True
+        if use_flag:
+            filter_kwargs['use_flag'] = use_flag
+        query_set = self.queryset.filter(**filter_kwargs)
+        return query_set
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EquipComponentListSerializer
+        return EquipComponentCreateSerializer
+
+
+@method_decorator([api_recorder], name='dispatch')
+class ERPSpareComponentRelationViewSet(ModelViewSet):
+    """
+    list:
+        部件erp备件关系
+    create:
+        新增部件与备件erp绑定关系
+    """
+    queryset = ERPSpareComponentRelation.objects.all()
+    pagination_class = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ERPSpareComponentRelationFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return ERPSpareComponentRelationCreateSerializer
+        return ERPSpareComponentRelationListSerializer
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipSpareErpViewSet(ModelViewSet):
+    """
+    list:
+        备件erp信息
+    create:
+        新建备件代码定义
+    update:
+        编辑、停用备件代码定义
+    retrieve:
+        备件代码定义详情
+    """
+    queryset = EquipSpareErp.objects.all()
+    pagination_class = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipSpareErpFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EquipSpareErpListSerializer
+        return EquipSpareErpCreateSerializer
+
+
+# @method_decorator([api_recorder], name='dispatch')
+# class EquipBomViewSet(ModelViewSet):
+#     """
+#         list:
+#             设备bom信息
+#         create:
+#             新建备件代码定义
+#         update:
+#             编辑、停用备件代码定义
+#         retrieve:
+#             备件代码定义详情
+#         """
+#     queryset = EquipBom.objects.all()
+#     # pagination_class = (IsAuthenticated,)
+#     filter_backends = (DjangoFilterBackend,)
+#     filter_class = EquipBomFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipFaultTypeViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list:
+        设备故障分类列表
+    create:
+        创建设备故障分类
+    update:
+        修改设备故障分类
+    destroy:
+        删除设备故障分类
+    """
+    queryset = EquipFaultType.objects.filter(delete_flag=False).order_by("id")
+    serializer_class = EquipFaultTypeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipFaultTypeFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list:
+        公共代码列表
+    create:
+        创建公共代码
+    update:
+        修改公共代码
+    """
+    queryset = EquipFault.objects.filter(delete_flag=False, equip_fault_type__use_flag=1).order_by("id")
+    serializer_class = EquipFaultCodeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    pagination_class = SinglePageNumberPagination
+    filter_class = EquipFaultCodeFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.filter(use_flag=1, equip_fault_type__use_flag=1).values('id', 'fault_code', 'fault_name',
+                                                                                    'equip_fault_type__fault_type_name')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+

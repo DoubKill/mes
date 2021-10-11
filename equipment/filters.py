@@ -1,7 +1,8 @@
 import django_filters
 
 from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig, \
-    EquipCurrentStatus, EquipSupplier, EquipProperty, EquipPartNew, EquipComponent, EquipAreaDefine, EquipComponentType
+    EquipCurrentStatus, EquipSupplier, EquipProperty, EquipPartNew, EquipComponent, EquipAreaDefine, EquipComponentType,\
+    ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -140,3 +141,67 @@ class EquipAreaDefineFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipAreaDefine
         fields = ('area_name', 'use_flag')
+
+# class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
+#     equip_component_type = django_filters.CharFilter(field_name='equip_component_type__component_type_name',
+#                                                      help_text='备件分类', lookup_expr='icontains')
+#     spare_code = django_filters.CharFilter(field_name='spare_code', help_text='备件编码', lookup_expr='icontains')
+#     spare_name = django_filters.CharFilter(field_name='spare_name', help_text='备件名称',  lookup_expr='icontains')
+#     supplier_name = django_filters.CharFilter(field_name='supplier_name', help_text='备件经销商', lookup_expr='icontains')
+#
+#     class Meta:
+#         model = EquipSpareErp
+#         fields = ('equip_component_type', 'spare_code', 'spare_name', 'supplier_name')
+
+class ERPSpareComponentRelationFilter(django_filters.rest_framework.FilterSet):
+    id = django_filters.CharFilter(field_name='equip_component__id', help_text="部件id")
+
+    class Meta:
+        model = ERPSpareComponentRelation
+        fields = ('id',)
+
+
+class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
+    equip_component_type = django_filters.CharFilter(field_name='equip_component_type__component_type_name',
+                                                     help_text='备件分类', lookup_expr='icontains')
+    spare_code = django_filters.CharFilter(field_name='spare_code', help_text='备件编码', lookup_expr='icontains')
+    spare_name = django_filters.CharFilter(field_name='spare_name', help_text='备件名称',  lookup_expr='icontains')
+    supplier_name = django_filters.CharFilter(field_name='supplier_name', help_text='供应商名称', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='specification', help_text='规格型号', lookup_expr='icontains')
+    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipSpareErp
+        fields = ('equip_component_type', 'spare_code', 'spare_name', 'supplier_name', 'specification', 'use_flag')
+
+
+# class EquipBomFilter(django_filters.rest_framework.FilterSet):
+#     factory_id = django_filters.CharFilter(field_name='factory_id', lookup_expr='icontains', help_text='分厂')
+#     property_type_node_id = django_filters.CharFilter(field_name='property_type_node_id', lookup_expr='icontains', help_text='设备类型')
+#     equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='机台')
+#     part_name = django_filters.CharFilter(field_name='part_name', lookup_expr='icontains', help_text='部位名称')
+#     component_name = django_filters.CharFilter(field_name='component_name', lookup_expr='icontains', help_text='部件名称')
+#
+#     class Meta:
+#         model = EquipBom
+#         fields = ('factory_id', 'property_type_node_id', 'equip_no', 'part_name', 'component_name')
+
+
+class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
+    fault_type_name = django_filters.CharFilter(field_name='fault_type_name', lookup_expr='icontains', help_text='故障分类名称')
+    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
+
+    class Meta:
+        model = EquipFaultType
+        fields = ('fault_type_code', 'fault_type_name', 'use_flag')
+
+
+class EquipFaultCodeFilter(django_filters.rest_framework.FilterSet):
+    id = django_filters.CharFilter(field_name='equip_fault_type__id', help_text="故障分类类型id")
+    fault_name = django_filters.CharFilter(field_name='fault_name', help_text="中故障分类名称")
+    use_flag = django_filters.NumberFilter(field_name='use_flag', help_text='0代表启用状态')
+
+    class Meta:
+        model = EquipFault
+        fields = ('id', 'fault_name', 'use_flag')
+
