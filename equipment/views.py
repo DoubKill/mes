@@ -9,13 +9,15 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from basics.filters import GlobalCodeTypeFilter
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
-    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter,\
-    EquipSpareErpFilter, EquipFaultTypeFilter, EquipFaultCodeFilter, ERPSpareComponentRelationFilter
+    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter, \
+    EquipSpareErpFilter, EquipFaultTypeFilter, EquipFaultCodeFilter, ERPSpareComponentRelationFilter, \
+    EquipFaultSignalFilter, EquipMachineHaltTypeFilter, EquipMachineHaltReasonFilter, EquipOrderAssignRuleFilter
 from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
-    EquipSpareErp
+    EquipSpareErp, EquipTargetMTBFMTTRSetting
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -581,6 +583,9 @@ class EquipOverview(APIView):
         return Response(rep)
 
 
+# **************************2021-10-09最新VIEWS**************************
+
+
 @method_decorator([api_recorder], name="dispatch")
 class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipSupplier.objects.filter(delete_flag=False).order_by('-id')
@@ -788,12 +793,6 @@ class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
     pagination_class = SinglePageNumberPagination
     filter_class = EquipFaultCodeFilter
 
-    def get_permissions(self):
-        if self.request.query_params.get('all'):
-            return ()
-        else:
-            return (IsAuthenticated(),)
-
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
@@ -803,3 +802,82 @@ class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
         else:
             return super().list(request, *args, **kwargs)
 
+    def get_permissions(self):
+        if self.request.query_params.get('all'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipFaultSignal.objects.all()
+    serializer_class = EquipFaultSignalSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipFaultSignalFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('all'):
+            data = queryset.values('id', 'signal_name', 'signal_code')
+            return Response({'results': data})
+        else:
+            return super().list(request, *args, **kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipMachineHaltTypeViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipMachineHaltType.objects.filter(delete_flag=False).order_by("id")
+    serializer_class = EquipMachineHaltTypeSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMachineHaltTypeFilter
+    pagination_class = None
+
+
+@method_decorator([api_recorder], name="dispatch")  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
+class EquipMachineHaltReasonViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipMachineHaltReason.objects.order_by("id")
+    serializer_class = EquipMachineHaltReasonSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMachineHaltReasonFilter
+    pagination_class = None
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipOrderAssignRule.objects.filter(delete_flag=False).order_by("id")
+    serializer_class = EquipOrderAssignRuleSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipOrderAssignRuleFilter
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipTargetMTBFMTTRSettingView(APIView):
+
+    def get(self, request):
+        return Response(EquipTargetMTBFMTTRSetting.objects.values('id', 'equip', 'equip__equip_no', 'equip__equip_name', 'target_mtb', 'target_mttr'))
+
+    def post(self, request):
+        data = request.data
+        if not isinstance(data, list):
+            raise ValidationError('data error!')
+        try:
+            for item in data:
+                EquipTargetMTBFMTTRSetting.objects.filter(id=item['id']).update(**{'target_mtb': item['target_mtb'],
+                                                                                   'target_mttr': item['target_mttr']})
+        except Exception:
+            raise ValidationError('数据错误')
+        return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipMaintenanceAreaSettingViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipMaintenanceAreaSetting.objects.filter(delete_flag=False).order_by("id")
+    serializer_class = EquipMaintenanceAreaSettingSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('maintenance_user_id', )

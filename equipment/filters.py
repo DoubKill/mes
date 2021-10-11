@@ -2,7 +2,8 @@ import django_filters
 
 from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMaintenanceOrder, Property, PlatformConfig, \
     EquipCurrentStatus, EquipSupplier, EquipProperty, EquipPartNew, EquipComponent, EquipAreaDefine, EquipComponentType,\
-    ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType
+    ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType,\
+    EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -93,6 +94,9 @@ class EquipCurrentStatusFilter(django_filters.rest_framework.FilterSet):
         fields = ('status',)
 
 
+# **************************2021-10-09最新序过滤器**************************
+
+
 class EquipSupplierFilter(django_filters.rest_framework.FilterSet):
     supplier_name = django_filters.CharFilter(field_name='supplier_name', help_text='供应商名称', lookup_expr='icontains')
     use_flag = django_filters.CharFilter(field_name='use_flag', help_text='是否使用')
@@ -153,6 +157,7 @@ class EquipAreaDefineFilter(django_filters.rest_framework.FilterSet):
 #         model = EquipSpareErp
 #         fields = ('equip_component_type', 'spare_code', 'spare_name', 'supplier_name')
 
+
 class ERPSpareComponentRelationFilter(django_filters.rest_framework.FilterSet):
     id = django_filters.CharFilter(field_name='equip_component__id', help_text="部件id")
 
@@ -205,3 +210,43 @@ class EquipFaultCodeFilter(django_filters.rest_framework.FilterSet):
         model = EquipFault
         fields = ('id', 'fault_name', 'use_flag')
 
+
+class EquipFaultSignalFilter(django_filters.rest_framework.FilterSet):
+    equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='机台编号')
+    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='机台名称')
+    signal_name = django_filters.CharFilter(field_name='signal_name', help_text='机台名称', lookup_expr='icontains')
+    signal_variable_type = django_filters.CharFilter(field_name='signal_variable_type', help_text='故障变量类型', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipFaultSignal
+        fields = ('alarm_signal_down_flag', 'fault_signal_down_flag', 'use_flag', 'equip_no',
+                  'equip_name', 'signal_name', 'signal_variable_type')
+
+
+class EquipMachineHaltTypeFilter(django_filters.rest_framework.FilterSet):
+    machine_halt_type_name = django_filters.CharFilter(field_name='machine_halt_type_name', help_text='停机分类名称', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipMachineHaltType
+        fields = ('machine_halt_type_name', 'use_flag')
+
+
+class EquipMachineHaltReasonFilter(django_filters.rest_framework.FilterSet):
+    machine_halt_reason_name = django_filters.CharFilter(field_name='machine_halt_reason_name', help_text='停机原因名称', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipMachineHaltReason
+        fields = ('machine_halt_reason_name', 'use_flag', 'equip_machine_halt_type_id')
+
+
+class EquipOrderAssignRuleFilter(django_filters.rest_framework.FilterSet):
+    rule_name = django_filters.CharFilter(field_name='rule_name', help_text='标准名称', lookup_expr='icontains')
+    work_type = django_filters.CharFilter(field_name='work_type', help_text='作业类型')
+    equip_type_id = django_filters.CharFilter(field_name='equip_type_id', help_text='设备类型id')
+    equip_condition = django_filters.CharFilter(field_name='equip_condition', help_text='设备条件')
+    important_level = django_filters.CharFilter(field_name='important_level', help_text='重要程度')
+    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
+
+    class Meta:
+        model = EquipOrderAssignRule
+        fields = ('rule_name', 'work_type', 'equip_type_id', 'equip_condition', 'important_level', 'use_flag')

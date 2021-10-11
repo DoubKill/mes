@@ -54,7 +54,18 @@ class UserUpdateSerializer(BaseModelSerializer):
 class UserSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
     num = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all(), message='该员工工号已存在')])
-    section_name = serializers.CharField(source="section.name", default="炼胶", read_only=True)
+    section_name = serializers.SerializerMethodField(source="section.name", default="炼胶", read_only=True)
+
+    def get_section_name(self, obj):
+        if obj.section:
+            ret = []
+            section = obj.section
+            while section:
+                ret.append(section.name)
+                section = section.parent_section
+            return '/'.join(ret[::-1])
+        else:
+            return '炼胶'
 
     def to_representation(self, instance):
         instance = super().to_representation(instance)
@@ -136,6 +147,7 @@ class GroupUserUpdateSerializer(BaseModelSerializer):
 class SectionSerializer(BaseModelSerializer):
 
     users = serializers.SerializerMethodField()
+    in_charge_username = serializers.CharField(source='in_charge_user.username', read_only=True)
 
     def get_users(self, obj):
         temp_set = obj.section_users.filter(is_leave=False).values_list("username", flat=True)

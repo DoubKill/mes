@@ -12,8 +12,9 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
     PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
-    EquipComponent, EquipComponentType, EquipArea, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault
-
+    EquipComponent, EquipComponentType, EquipArea, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault,\
+    PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
+    EquipOrderAssignRule, EquipMaintenanceAreaSetting
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -257,6 +258,9 @@ class EquipMaintenanceOrderLogSerializer(BaseModelSerializer):
         fields = '__all__'
 
 
+# **************************2021-10-09最新序列化器**************************
+
+
 class EquipSupplierSerializer(BaseModelSerializer):
     supplier_code = serializers.CharField(help_text='供应商编号',
                                           validators=[UniqueValidator(queryset=EquipSupplier.objects.all(), message='该编码已存在')])
@@ -265,6 +269,8 @@ class EquipSupplierSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipSupplier
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class EquipComponentListSerializer(serializers.ModelSerializer):
@@ -279,12 +285,31 @@ class EquipComponentListSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class EquipFaultSignalSerializer(BaseModelSerializer):
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True)
+    equip_part_name = serializers.CharField(source='equip_component.equip_part.part_name', read_only=True)
+
+    class Meta:
+        model = EquipFaultSignal
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class EquipPropertySerializer(BaseModelSerializer):
     equip_type_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备类型')
     equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
 
     class Meta:
         model = EquipProperty
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipMachineHaltTypeSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = EquipMachineHaltType
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -315,6 +340,22 @@ class EquipPartNewSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class EquipMachineHaltReasonSerializer(BaseModelSerializer):
+    equip_fault_types = serializers.SerializerMethodField(read_only=True)
+
+    def update(self, instance, validated_data):
+        instance.equip_fault_type.clear()
+        return super().update(instance, validated_data)
+
+    def get_equip_fault_types(self, obj):
+        return obj.equip_fault_type.values()
+
+    class Meta:
+        model = EquipMachineHaltReason
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class EquipComponentTypeSerializer(BaseModelSerializer):
     # 设备部件分类
     component_type_code = serializers.CharField(help_text='分类编号',
@@ -328,10 +369,21 @@ class EquipComponentTypeSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class EquipOrderAssignRuleSerializer(BaseModelSerializer):
+    equip_type_name = serializers.CharField(source='equip_type.global_name', read_only=True)
+
+    class Meta:
+        model = EquipOrderAssignRule
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class EquipAreaSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipArea
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class EquipComponentCreateSerializer(BaseModelSerializer):
@@ -470,3 +522,14 @@ class EquipFaultCodeSerializer(BaseModelSerializer):
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
+
+class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
+    equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True)
+    equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True)
+
+    class Meta:
+        model = EquipMaintenanceAreaSetting
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

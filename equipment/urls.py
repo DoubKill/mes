@@ -36,6 +36,9 @@ router.register('platform-config', PlatformConfigViewSet)
 # 设备维修履历
 router.register('equip-maintenance-order-log', EquipMaintenanceOrderLogViewSet)
 
+
+# **************************2021-10-09最新URL**************************
+
 # 供应商管理台账
 router.register('equip-supplier', EquipSupplierViewSet)
 
@@ -69,6 +72,18 @@ router.register(r'equip-fault-types', EquipFaultTypeViewSet)
 # 设备故障分类
 router.register(r'equip-fault-codes', EquipFaultCodeViewSet)
 
+# 设备故障信号
+router.register('equip-fault-signal', EquipFaultSignalViewSet)
+# 设备停机类型
+router.register('equip-machine-halt-type', EquipMachineHaltTypeViewSet)
+# 设备停机原因
+router.register('equip-machine-halt-reason', EquipMachineHaltReasonViewSet)
+# 工单指派规则
+router.register('equip-order-assign-rule', EquipOrderAssignRuleViewSet)
+# 维护包干设置
+router.register('equip-maintenance-area-settings', EquipMaintenanceAreaSettingViewSet)
+
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),
@@ -78,7 +93,11 @@ urlpatterns = [
     path('month-error-statistics/', EquipErrorMonthStatisticsView.as_view()),
     path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view()),
     path('month-error-sort/', MonthErrorSortView.as_view()),
-    path('overview/', EquipOverview.as_view())
+    path('overview/', EquipOverview.as_view()),
+
+    # **************************2021-10-09最新URL**************************
+    # 机台目标MTBF/MTTR设定
+    path('equip-target-mtbmttr-settings/', EquipTargetMTBFMTTRSettingView.as_view())
 ]
 
 

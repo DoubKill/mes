@@ -1,10 +1,12 @@
 from datetime import datetime
 
+from django.db.models import F
 from django.db.transaction import atomic
 from django.shortcuts import render
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import UpdateAPIView, CreateAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -166,20 +168,28 @@ class SectionViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = SectionFilter
 
-    def get_permissions(self):
-        if self.request.query_params.get('all'):
-            return ()
-        else:
-            return (IsAuthenticated(),)
-
-
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        if self.request.query_params.get('all'):
-            data = queryset.values('id', 'name', 'section_id', 'delete_flag')
-            return Response({'results': data})
-        else:
-            return super().list(request, *args, **kwargs)
+        data = []
+        index_tree = {}
+        for section in Section.objects.filter():
+            in_charge_username = section.in_charge_user.username if section.in_charge_user else ''
+            if section.id not in index_tree:
+                index_tree[section.id] = dict({"id": section.id, 'in_charge_username': in_charge_username, "label": section.name, 'children': []})
+
+            if not section.parent_section_id:  # 根节点
+                data.append(index_tree[section.id])  # 浅拷贝
+                continue
+
+            if section.parent_section_id in index_tree:  # 子节点
+                if "children" not in index_tree[section.parent_section_id]:
+                    index_tree[section.parent_section_id]["children"] = []
+
+                index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
+            else:  # 没有节点则加入
+                index_tree[section.parent_section_id] = dict(
+                    {"id": section.parent_section_id, 'in_charge_username': in_charge_username, "label": section.parent_section.name, "children": []})
+                index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
+        return Response({'results': data})
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -190,6 +200,34 @@ class SectionViewSet(ModelViewSet):
         instance.last_updated_user = request.user
         instance.save()
         return Response(status=status.HTTP_201_CREATED)
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='tree',
+            url_name='tree')
+    def tree(self, request):
+        data = []
+        index_tree = {}
+        for section in Section.objects.all():
+            in_charge_username = section.in_charge_user.username if section.in_charge_user else ''
+            if section.id not in index_tree:
+                index_tree[section.id] = dict(
+                    {"section_id": section.id, 'in_charge_username': in_charge_username, "label": section.name,
+                     'children': list(User.objects.filter(section=section).values(user_id=F('id'), label=F('username')))})
+
+            if not section.parent_section_id:  # 根节点
+                data.append(index_tree[section.id])  # 浅拷贝
+                continue
+
+            if section.parent_section_id in index_tree:  # 子节点
+                if "children" not in index_tree[section.parent_section_id]:
+                    index_tree[section.parent_section_id]["children"] = list(User.objects.filter(section=section.parent_section).values(user_id=F('id'), label=F('username')))
+
+                index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
+            else:  # 没有节点则加入
+                index_tree[section.parent_section_id] = dict(
+                    {"section_id": section.parent_section_id, 'in_charge_username': in_charge_username,
+                     "label": section.parent_section.name, "children": list(User.objects.filter(section=section.parent_section).values(user_id=F('id'), label=F('username')))})
+                index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
+        return Response({'results': data})
 
 
 @method_decorator([api_recorder], name="dispatch")
