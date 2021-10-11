@@ -11,10 +11,10 @@ from rest_framework.views import APIView
 
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
-    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentFilter
+    EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter
 from equipment.serializers import *
 from equipment.task import property_template, property_import
-from mes.common_code import OMin, OMax, OSum
+from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status
@@ -578,15 +578,16 @@ class EquipOverview(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class EquipSupplierViewSet(ModelViewSet):
+class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipSupplier.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipSupplierSerializer
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSupplierFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
-class EquipPropertyViewSet(ModelViewSet):
+class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
     """设备固定资产台账"""
     queryset = EquipProperty.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPropertySerializer
@@ -616,7 +617,7 @@ class EquipPropertyViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name='dispatch')
-class EquipAreaDefineViewSet(ModelViewSet):
+class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipAreaDefine.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipAreaDefineSerializer
     # permission_classes = (IsAuthenticated)
@@ -625,30 +626,19 @@ class EquipAreaDefineViewSet(ModelViewSet):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class EquipPartNewViewSet(ModelViewSet):
+class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipPartNew.objects.all().order_by('-id')
     serializer_class = EquipPartNewSerializer
     # permission_classes = (IsAuthenticated)
     filter_backends = (DjangoFilterBackend, )
     filter_class = EquipPartNewFilter
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if instance.delete_flag:
-            instance.delete_flag = False
-        else:
-            s_obj = instance.s_spare_type.all().filter(delete_flag=False).first()
-            if s_obj:
-                raise ValidationError('此类型已被备品备件物料绑定了，不可禁用')
-            instance.delete_flag = True
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 @method_decorator([api_recorder], name="dispatch")
-class EquipComponentViewSet(ModelViewSet):
-    queryset = EquipComponent.objects.filter(delete_flag=False).order_by('-id')
-    serializer_class = EquipComponentSerializer
-    # permission_classes = (IsAuthenticated)
+class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
+    """设备部件分类"""
+    queryset = EquipComponentType.objects.all()
+    serializer_class = EquipComponentTypeSerializer
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_class = EquipComponentFilter
+    filter_class = EquipComponentTypeFilter

@@ -48,8 +48,9 @@ router.register('equip-area-define', EquipAreaDefineViewSet)
 # 设备部位定义
 router.register('equip-part-new', EquipPartNewViewSet)
 
-# 设备部件定义
-router.register('equip-component', EquipComponentViewSet)
+# 设备部件分类
+router.register('equip-component-type', EquipComponentTypeViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),

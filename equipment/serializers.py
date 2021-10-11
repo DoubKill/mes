@@ -12,7 +12,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
     PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
-    EquipComponent
+    EquipComponent, EquipComponentType, EquipArea
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -264,15 +264,13 @@ class EquipSupplierSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipSupplier
-        fields = ('id', 'supplier_code', 'supplier_name', 'region', 'contact_name',
-                  'contact_phone', 'supplier_type', 'use_flag', 'supplier_type', 'created_user', 'created_date')
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class EquipPropertySerializer(BaseModelSerializer):
-    property_type = serializers.CharField(source='property_type_node.name', read_only=True, help_text='类型')
-    status_name = serializers.CharField(source='get_status_display', help_text='状态', read_only=True)
-    made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备供应商')
+    equip_type_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备类型')
+    equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
 
     class Meta:
         model = EquipProperty
@@ -285,6 +283,7 @@ class EquipAreaDefineSerializer(BaseModelSerializer):
                                       validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该名称已存在')])
     area_code = serializers.CharField(help_text='位置区域编号',
                                       validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该编号已存在')])
+
     class Meta:
         model = EquipAreaDefine
         fields = '__all__'
@@ -296,6 +295,8 @@ class EquipPartNewSerializer(BaseModelSerializer):
                                       validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该编码已存在')])
     part_name = serializers.CharField(help_text='设备名称',
                                       validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该名称已存在')])
+    category_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='所属主设备种类')
+    global_name = serializers.ReadOnlyField(source='global_part_type.global_name', help_text='部位分类')
 
     class Meta:
         model = EquipPartNew
@@ -303,15 +304,22 @@ class EquipPartNewSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class EquipComponentSerializer(BaseModelSerializer):
-    component_type_code = serializers.CharField(source='equip_component_type.component_type_code')
-    component_type_name = serializers.CharField(source='equip_component_type.component_type_name')
-    component_code = serializers.CharField(help_text='部件编码',
-                                           validators=[UniqueValidator(queryset=EquipComponent.objects.all(), message='该编码已存在')])
-    component_name = serializers.CharField(help_text='部件名称',
-                                           validators=[UniqueValidator(queryset=EquipComponent.objects.all(), message='该名称已存在')])
+class EquipComponentTypeSerializer(BaseModelSerializer):
+    # 设备部件分类
+    component_type_code = serializers.CharField(help_text='分类编号',
+                                                validators=[UniqueValidator(queryset=EquipComponentType.objects.all(), message='该编号已存在')])
+    component_type_name = serializers.CharField(help_text='分类名称',
+                                                validators=[UniqueValidator(queryset=EquipComponentType.objects.all(), message='该名称已存在')])
 
     class Meta:
-        model = EquipComponent
+        model = EquipComponentType
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipAreaSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = EquipArea
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS

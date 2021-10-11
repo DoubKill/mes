@@ -271,6 +271,7 @@ class EquipPartNew(AbstractEntity):
     part_code = models.CharField(max_length=64, help_text='部位编号')
     part_name = models.CharField(max_length=64, help_text='部位名称')
     global_part_type = models.ForeignKey(GlobalCode, help_text='部位分类', on_delete=models.CASCADE)
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
 
     class Meta:
         db_table = 'equip_part_new'
