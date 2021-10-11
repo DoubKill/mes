@@ -1,4 +1,5 @@
 import datetime
+import decimal
 import json
 import logging
 import random
@@ -3072,7 +3073,8 @@ class PalletDataModelViewSet(ModelViewSet):
         pallet_status = request.data.get('status')
         enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         depot_site = request.data.get('depot_site')
-        depot_site_obj = DepotSite.objects.filter(depot_site_name=depot_site).first()
+        depot_pallet_id = request.data.get('depot_pallet_id')
+        depot_site_obj = DepotSite.objects.filter(id=depot_site).first()
         pallet_data_obj = PalletFeedbacks.objects.get(pk=pallet_id)
 
         if pallet_status == 1:  # 入库
@@ -3080,8 +3082,8 @@ class PalletDataModelViewSet(ModelViewSet):
                                                  pallet_status=pallet_status)
             data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
         elif pallet_status == 2:  # 出库
-            DepotPallt.objects.filter(depot_site=depot_site_obj).update(pallet_status=2, outer_time=enter_time)
-            data_obj = DepotPallt.objects.filter(depot_site=depot_site_obj).first()
+            DepotPallt.objects.filter(id=depot_pallet_id).update(pallet_status=2, outer_time=datetime.datetime.now())
+            data_obj = DepotPallt.objects.filter(id=depot_pallet_id).first()
             data = PalletFeedbacks.objects.filter(palletfeedbacks=data_obj).first()
         serializer = PalletDataModelSerializer(instance=data)
         return Response({"result": serializer.data})
@@ -3217,14 +3219,39 @@ class SulfurDataModelViewSet(ModelViewSet):
                 raise ValidationError('该库位不存在')
 
             enter_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
+            data = Sulfur.objects.filter(depot_site=depot_site_obj, lot_no=serializer.data.get('lot_no'),
+                                         name=serializer.data.get('name'),
+                                         product_no=serializer.data.get('product_no'),
+                                         provider=serializer.data.get('provider'),
+            ).first()
+            weight = float(serializer.data.get('weight'))
+            num = int(serializer.data.get('num'))
+            if data:
+                data.num += num
+                data.weight += decimal.Decimal(weight * num)
+                data.enter_time = enter_time
+                data.save()
+            else:
+                serializer.data.update({'weight': weight * num})
+                data = Sulfur.objects.create(**serializer.data, depot_site=depot_site_obj, enter_time=enter_time)
+
             serializer = SulfurDataModelSerializer(instance=data)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         elif request.data.get('sulfur_status') == 2:
-
+            num = request.data.get('num')
+            try:
+                num = int(num)
+            except:
+                raise ValidationError('您输入的数量有误')
+            obj = Sulfur.objects.filter(id=request.data.get('id')).first()
+            if num > obj.num:
+                raise ValidationError(f"库存数量为{obj.num}！")
             outer_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            Sulfur.objects.filter(id=request.data.get('id')).update(sulfur_status=2, outer_time=outer_time)
+            obj.sulfur_status = 1 if num < obj.num else 2
+            obj.num -= num
+            obj.outer_time = outer_time
+            obj.save()
             return Response({'results': '出库成功'})
 
 
@@ -3242,14 +3269,13 @@ class DepotSulfurModelViewSet(ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         lst = []
         for i in serializer.data:
-            lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no']})
+            lst.append({'name': i['name'], 'product_no':i['product_no'], 'provider':i['provider'], 'lot_no':i['lot_no'], 'num':i['num']})
         c = {i['name']: {} for i in lst}
         for i in lst:
             if not c[i['name']]:
-                i.update({"num": 1})
                 c[i['name']].update(i)
             else:
-                c[i['name']]['num'] += 1
+                c[i['name']]['num'] += i['num']
         return Response({'results': c.values()})
 
 

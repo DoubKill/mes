@@ -32,7 +32,7 @@ from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
-    QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus
+    QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -1404,6 +1404,38 @@ class RuntimeRecordView(APIView):
                                                                                                    flat=True)
         equip_trains = {_: [0] for _ in equip_no_list}
 
+        equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14',
+                      'Z15']
+        if classes:
+            if not isinstance(factory_date, datetime.date):
+                factory_date = datetime.datetime.strptime(factory_date, '%Y-%m-%d').date()
+
+            if factory_date == datetime.date.today():
+                if not ProductionDailyRecords.objects.filter(factory_date=factory_date, classes=classes).first():
+
+                    production_daily = ProductionDailyRecords.objects.create(factory_date=factory_date, classes=classes,
+                                                                            equip_error_record = None,
+                                                                            process_shutdown_record = None,
+                                                                            production_shutdown_record = None,
+                                                                            auxiliary_positions_record = None,
+                                                                            shift_leader = None,
+                    )
+
+                    # 获取上一天的人员姓名
+                    last_date = (factory_date + datetime.timedelta(days=-1)).strftime("%Y-%m-%d")
+                    for equip in equip_list:
+                        last = ProductionPersonnelRecords.objects.filter(equip_no=equip,
+                                                                         production_daily__factory_date=last_date,
+                                                                         production_daily__classes=classes).first()
+                        if last:
+                            ProductionPersonnelRecords.objects.create(equip_no=equip, production_daily=production_daily,
+                                                                      feeding_post=last.feeding_post,
+                                                                      extrusion_post=last.extrusion_post,
+                                                                      collection_post=last.collection_post,
+                                                                      )
+                        else:
+                            ProductionPersonnelRecords.objects.create(equip_no=equip, production_daily=production_daily)
+
         # 获取计划表里的计划车次
         if filters:
             plan_filter = {"work_schedule_plan__classes__global_name": classes}
@@ -1418,22 +1450,120 @@ class RuntimeRecordView(APIView):
         plan_data = {_.get('equip__equip_no') + _.get('product_batching__stage_product_batch_no'): _.get('plan_trains')
                      for _ in plan_set}
         results = []
+        users = None
         for _ in data:
             equip_trains[_.get("equip_no")][0] += _.get("actual_trains")
-            temp_dict = {"equip_no": _.get("equip_no"),
+            achieve_rate = round(_.get("actual_trains") / plan_data.get(_.get("equip_no") + _.get("product_no")), 4) \
+                if plan_data.get(_.get("equip_no") + _.get("product_no")) else None
+            equip_no = _.get("equip_no")
+            if classes:
+                users = ProductionPersonnelRecords.objects.get(production_daily__factory_date=factory_date,
+                                                           production_daily__classes=classes, equip_no=equip_no)
+            else:
+                users = None
+            temp_dict = {"id": users.id if users else None,
+                         "equip_no": equip_no,
                          "product_no": _.get("product_no"),
                          "plan_trains": plan_data.get(_.get("equip_no") + _.get("product_no")),
                          "actual_trains": _.get("actual_trains"),
-                         "achieve_rate": round(
-                             _.get("actual_trains") / plan_data.get(_.get("equip_no") + _.get("product_no")), 4),
-                         "put_user": "unknown",
+                         "achieve_rate": achieve_rate,
+                         "put_user": users.feeding_post if users else None,
+                         "extrusion_user": users.extrusion_post if users else None,
+                         "collection_user": users.collection_post if users else None,
                          "product_time": (_.get("end_time") - _.get("begin_time")).total_seconds(),
                          "trains_sum": equip_trains.get(_.get("equip_no")),
                          "start_rate": (24 * 60 * 60 - equip_data.get(_.get("equip_no"))) / 60 if equip_data.get(
                              _.get("equip_no")) else 1.0
                          }
             results.append(temp_dict)
-        return Response({"results": results})
+        return Response({"results": results, "shift_leader": users.production_daily.shift_leader if users else None,
+})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RuntimeRecordDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    # 点击报表预览
+    def get(self, request, *args, **kwargs):
+        factory_date = self.request.query_params.get('date', datetime.date.today())
+        classes = self.request.query_params.get('classes', None)
+        if classes:
+            obj = ProductionDailyRecords.objects.get(factory_date=factory_date, classes=classes)
+
+            results = {
+                'id': obj.id,
+                'shift_leader': obj.shift_leader,
+                'equip_error_record': obj.equip_error_record,
+                'process_shutdown_record': obj.process_shutdown_record,
+                'production_shutdown_record': obj.production_shutdown_record,
+                'auxiliary_positions_record': obj.auxiliary_positions_record
+            }
+
+            try:
+                obj = WorkSchedulePlan.objects.filter(start_time__startswith=factory_date,
+                                                      classes__global_name=classes).first()
+                group = obj.group.global_name
+            except: group = None
+
+            return Response({'group': group, 'results': results})
+        return Response({})
+
+    def post(self, request, *args, **kwargs):
+        data = self.request.data
+        main = data.get('main')
+        detail = data.get('detail', None)
+        shift_leader = data.get('shift_leader', None)
+        feeding_post = data.get('feeding_post', None)
+        extrusion_post = data.get('extrusion_post', None)
+        collection_post = data.get('collection_post', None)
+        equip_error_record = data.get('equip_error_record', None)
+        process_shutdown_record = data.get('process_shutdown_record', None)
+        production_shutdown_record = data.get('production_shutdown_record', None)
+        auxiliary_positions_record = data.get('auxiliary_positions_record', None)
+        if detail:
+        # 修改人员姓名
+            obj = ProductionPersonnelRecords.objects.filter(id=detail).first()
+            if feeding_post:
+                obj.feeding_post = feeding_post
+            if extrusion_post:
+                obj.extrusion_post = extrusion_post
+            if collection_post:
+                obj.collection_post = collection_post
+            obj.save()
+            results = {'feeding_post': obj.feeding_post,
+                        'extrusion_post': obj.extrusion_post,
+                        'collection_post': obj.collection_post}
+            return Response(results)
+        # 修改相关记录
+        if main:
+            obj1 = ProductionDailyRecords.objects.filter(id=main).first()
+            if equip_error_record:
+                obj1.equip_error_record = equip_error_record
+            if process_shutdown_record:
+                obj1.process_shutdown_record = process_shutdown_record
+            if production_shutdown_record:
+                obj1.production_shutdown_record = production_shutdown_record
+            if auxiliary_positions_record:
+                obj1.auxiliary_positions_record = auxiliary_positions_record
+            obj1.save()
+            results = {
+                'shift_leader': obj1.shift_leader,
+                'equip_error_record': obj1.equip_error_record,
+                'process_shutdown_record': obj1.process_shutdown_record,
+                'production_shutdown_record': obj1.production_shutdown_record,
+                'auxiliary_positions_record': obj1.auxiliary_positions_record
+                 }
+            return Response(results)
+
+        if shift_leader:
+            factory_date = data.get("date")
+            classes = data.get("classes")
+            obj1 = ProductionDailyRecords.objects.filter(factory_date=factory_date, classes=classes).first()
+            if factory_date and classes:
+                obj1.shift_leader=shift_leader
+                obj1.save()
+            return Response({'shift_leader': obj1.shift_leader})
 
 
 @method_decorator([api_recorder], name="dispatch")
