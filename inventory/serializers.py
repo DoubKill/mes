@@ -1397,11 +1397,12 @@ class PalletDataModelSerializer(serializers.ModelSerializer):
     depot_name = serializers.ReadOnlyField(source='palletfeedbacks.depot_site.depot.depot_name')
     enter_time = serializers.DateTimeField(source='palletfeedbacks.enter_time')
     outer_time = serializers.DateTimeField(source='palletfeedbacks.outer_time')
+    depot_pallet_id = serializers.ReadOnlyField(source='palletfeedbacks.id')
 
     class Meta:
         model = PalletFeedbacks
         fields = ['factory_date', 'product_no', 'classes', 'equip_no', 'begin_trains', 'end_trains', 'plan_classes_uid',
-                  'enter_time','outer_time', 'pallet_status', 'depot_site_name', 'depot_name', 'id', 'lot_no']
+                  'enter_time','outer_time', 'pallet_status', 'depot_site_name', 'depot_name', 'id', 'lot_no', 'depot_pallet_id']
 
 
 class DepotResumeModelSerializer(serializers.ModelSerializer):
@@ -1459,7 +1460,7 @@ class DepotSulfurModelSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sulfur
-        fields = ['name', 'product_no', 'provider', 'lot_no']
+        fields = ['name', 'product_no', 'provider', 'lot_no', 'num']
 
 
 class DepotSulfurInfoModelSerializer(serializers.ModelSerializer):
