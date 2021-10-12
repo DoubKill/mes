@@ -2344,7 +2344,7 @@ class ProductTestStaticsView(APIView):
         end_time = self.request.query_params.get('e_time')
         diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
         if diff.days > 31:
-            raise ValidationError('请输入七天内有效日期！')
+            raise ValidationError('搜索日期跨度不得超过一个月！')
         queryset = MaterialTestResult.objects.filter(
             material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
             material_test_order__production_factory_date__gte=start_time,
@@ -2452,7 +2452,7 @@ class ClassTestStaticsView(APIView):
         end_time = self.request.query_params.get('e_time')
         diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
         if diff.days > 31:
-            raise ValidationError('请输入七天内有效日期！')
+            raise ValidationError('搜索日期跨度不得超过一个月！')
         queryset = MaterialTestResult.objects.filter(
             material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
             material_test_order__production_factory_date__gte=start_time,
@@ -2559,7 +2559,7 @@ class UnqialifiedEquipView(APIView):
         s = datetime.datetime.strptime(s_time, '%Y-%m-%d')
         delta = e - s
         if delta.days > 31:
-            raise ValidationError('请输入七天内有效日期！')
+            raise ValidationError('搜索日期跨度不得超过一个月！')
         if not s_time and not e_time:
             raise ValidationError('请输入检测时间！')
 
