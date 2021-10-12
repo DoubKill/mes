@@ -642,6 +642,13 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend, )
     filter_class = EquipPartNewFilter
 
+    def list(self, request, *args, **kwargs):
+        all = self.request.query_params.get('all')
+        if all:
+            data = EquipPartNew.objects.filter(use_flag=True).values('id', 'part_name')
+            return Response({'result': data})
+        return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
@@ -652,9 +659,16 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipComponentTypeFilter
 
+    def list(self, request, *args, **kwargs):
+        all = self.request.query_params.get('all')
+        if all:
+            data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
+            return Response({'result': data})
+        return super().list(request, *args, **kwargs)
+
 
 @method_decorator([api_recorder], name='dispatch')
-class EquipComponentViewSet(ModelViewSet):
+class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
         展示所有设备部件定义
@@ -664,7 +678,7 @@ class EquipComponentViewSet(ModelViewSet):
         修改部件定义
     """
     queryset = EquipComponent.objects.all()
-    pagination_class = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
     def get_queryset(self):
@@ -685,7 +699,7 @@ class EquipComponentViewSet(ModelViewSet):
         if component_name:
             filter_kwargs['component_name__icontains'] = component_name
         if is_binding:
-            filter_kwargs['equip_components__isnull'] = False if is_binding == 'Y' else True
+            filter_kwargs['equip_components__isnull'] = False if is_binding == '1' else True
         if use_flag:
             filter_kwargs['use_flag'] = use_flag
         query_set = self.queryset.filter(**filter_kwargs)
@@ -706,7 +720,7 @@ class ERPSpareComponentRelationViewSet(ModelViewSet):
         新增部件与备件erp绑定关系
     """
     queryset = ERPSpareComponentRelation.objects.all()
-    pagination_class = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ERPSpareComponentRelationFilter
 
@@ -715,9 +729,16 @@ class ERPSpareComponentRelationViewSet(ModelViewSet):
             return ERPSpareComponentRelationCreateSerializer
         return ERPSpareComponentRelationListSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 
 @method_decorator([api_recorder], name='dispatch')
-class EquipSpareErpViewSet(ModelViewSet):
+class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
     """
     list:
         备件erp信息
@@ -728,8 +749,8 @@ class EquipSpareErpViewSet(ModelViewSet):
     retrieve:
         备件代码定义详情
     """
-    queryset = EquipSpareErp.objects.all()
-    pagination_class = (IsAuthenticated,)
+    queryset = EquipSpareErp.objects.filter(use_flag=True)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSpareErpFilter
 
@@ -737,6 +758,17 @@ class EquipSpareErpViewSet(ModelViewSet):
         if self.action == 'list':
             return EquipSpareErpListSerializer
         return EquipSpareErpCreateSerializer
+
+    def list(self, request, *args, **kwargs):
+        all = self.request.query_params.get('all')
+        if all == '0':
+            data = self.filter_queryset(self.get_queryset()).values('id', 'equip_component_type__component_type_name')
+            return Response({'result': data})
+        elif all == '1':
+            data = EquipComponentType.objects.values('id', 'component_type_name')
+            return Response({'result': data})
+        else:
+            return super().list(request, *args, **kwargs)
 
 
 # @method_decorator([api_recorder], name='dispatch')
@@ -752,9 +784,92 @@ class EquipSpareErpViewSet(ModelViewSet):
 #             备件代码定义详情
 #         """
 #     queryset = EquipBom.objects.all()
-#     # pagination_class = (IsAuthenticated,)
+#     # permission_classes = (IsAuthenticated,)
 #     filter_backends = (DjangoFilterBackend,)
 #     filter_class = EquipBomFilter
+#
+#     # def list(self, request, *args, **kwargs):
+#     #     tree = self.request.query_params.get('tree')
+#     #     if not tree:
+#     #         return super().list(request, *args, **kwargs)
+#     #     data = []
+#     #     index_tree = {}
+#     #     for section in self.get_queryset():
+#     #         if section.id not in index_tree:
+#     #             index_tree[section.id] = dict(
+#     #                 {"id": section.id, "label": section.factory_id, 'children': []})
+#     #         if not section.parent_id:  # 根节点
+#     #             data.append(index_tree[section.id])  # 浅拷贝
+#     #             continue
+#     #
+#     #         if section.parent_id in index_tree:  # 子节点
+#     #             if "children" not in index_tree[section.parent_id]:
+#     #                 index_tree[section.parent_id]["children"] = []
+#     #
+#     #             index_tree[section.parent_id]["children"].append(index_tree[section.id])
+#     #         else:  # 没有节点则加入
+#     #             index_tree[section.parent_id] = dict(
+#     #                 {"id": section.parent_id, "label": section.parent_section.factory_id, "children": []})
+#     #             index_tree[section.parent_id]["children"].append(index_tree[section.id])
+#     #     return Response({'results': data})
+#     #
+#     # def create(self, request, *args, **kwargs):
+#     #     def add(id, parent_area=None):
+#     #         data = EquipBom.objects.get(id=id)
+#     #         d1 = EquipBom.objects.create(
+#     #             node_code=data.node_code,
+#     #             area_code=data.area_code,
+#     #             area_name=data.area_name,
+#     #             inspection_line_name=data.inspection_line_name,
+#     #             desc=data.desc,
+#     #             parent_area=data.parent_area
+#     #         )
+#     #         return d1
+#     #     data = self.request.data
+#     #     if data.get('new'):  # 新建
+#     #         id = data.get('id')  # 父节点的id
+#     #         EquipBom.objects.create(
+#     #             node_code=data.node_code,
+#     #             area_code=data.area_code,
+#     #             area_name=data.area_name,
+#     #             inspection_line_name=data.inspection_line_name,
+#     #             desc=data.desc,
+#     #             parent_area=id
+#     #         )
+#     #     else:
+#     #         res = {2: {3: {}}}
+#     #         # 添加父节点
+#     #         id_list = list(res.keys())
+#     #         for id in id_list:
+#     #             d1 = add(id)
+#     #             a1 = res.get(id)
+#     #             if not a1.get(id):
+#     #                 break
+#     #             # 添加子节点
+#     #             id_list = list(a1.keys())
+#     #             for id in id_list:
+#     #                 d2 = add(id, parent_area=d1)
+#     #                 a2 = a1.get(id)
+#     #                 if not a2.get(id):
+#     #                     break
+#     #                 # 添加子节点
+#     #                 id_list = list(a2.keys())
+#     #                 for id in id_list:
+#     #                     d3 = add(id, parent_area=d2)
+#     #                     a3 = a2.get(id)
+#     #                     if not a3.get(id):
+#     #                         break
+#     #     return Response('添加成功')
+#
+#     def list(self, request, *args, **kwargs):
+#         tree_info = self.get_queryset().first()
+#         tree = tree_info.tree if tree_info else []
+#         return Response({'result': tree})
+#
+#     def create(self, request, *args, **kwargs):
+#         # 单条新增
+#         # 复制新增
+#         pass
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -771,7 +886,7 @@ class EquipFaultTypeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = EquipFaultType.objects.filter(delete_flag=False).order_by("id")
     serializer_class = EquipFaultTypeSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFaultTypeFilter
 
@@ -788,25 +903,10 @@ class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = EquipFault.objects.filter(delete_flag=False, equip_fault_type__use_flag=1).order_by("id")
     serializer_class = EquipFaultCodeSerializer
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    pagination_class = SinglePageNumberPagination
+    pagination_class = None
     filter_class = EquipFaultCodeFilter
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        if self.request.query_params.get('all'):
-            data = queryset.filter(use_flag=1, equip_fault_type__use_flag=1).values('id', 'fault_code', 'fault_name',
-                                                                                    'equip_fault_type__fault_type_name')
-            return Response({'results': data})
-        else:
-            return super().list(request, *args, **kwargs)
-
-    def get_permissions(self):
-        if self.request.query_params.get('all'):
-            return ()
-        else:
-            return (IsAuthenticated(),)
 
 
 @method_decorator([api_recorder], name="dispatch")
