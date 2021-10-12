@@ -154,13 +154,13 @@ class GroupAddUserViewSet(UpdateAPIView):
 class SectionViewSet(ModelViewSet):
     """
     list:
-        角色列表
+        部门列表
     create:
-        创建角色
+        创建部门
     update:
-        修改角色
+        修改部门
     destroy:
-        删除角色
+        删除部门
     """
     queryset = Section.objects.filter()
     serializer_class = SectionSerializer
@@ -174,7 +174,12 @@ class SectionViewSet(ModelViewSet):
         for section in Section.objects.filter():
             in_charge_username = section.in_charge_user.username if section.in_charge_user else ''
             if section.id not in index_tree:
-                index_tree[section.id] = dict({"id": section.id, 'in_charge_username': in_charge_username, "label": section.name, 'children': []})
+                index_tree[section.id] = dict({"id": section.id,
+                                               'section_id': section.section_id,
+                                               'in_charge_user_id': section.in_charge_user_id,
+                                               'in_charge_username': in_charge_username,
+                                               "label": section.name,
+                                               'children': []})
 
             if not section.parent_section_id:  # 根节点
                 data.append(index_tree[section.id])  # 浅拷贝
@@ -187,19 +192,22 @@ class SectionViewSet(ModelViewSet):
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
             else:  # 没有节点则加入
                 index_tree[section.parent_section_id] = dict(
-                    {"id": section.parent_section_id, 'in_charge_username': in_charge_username, "label": section.parent_section.name, "children": []})
+                    {"id": section.parent_section_id,
+                     'section_id': section.section_id,
+                     'in_charge_user_id': section.in_charge_user_id,
+                     'in_charge_username': in_charge_username,
+                     "label": section.parent_section.name,
+                     "children": []})
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
         return Response({'results': data})
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if instance.delete_flag:
-            instance.delete_flag = False
-        else:
-            instance.delete_flag = True
-        instance.last_updated_user = request.user
-        instance.save()
-        return Response(status=status.HTTP_201_CREATED)
+        if instance.section_users.count() > 0:
+            raise ValidationError('操作无效，该部门下存在用户！')
+        if instance.children_sections.count() > 0:
+            raise ValidationError('操作无效，该部门下存在子部门！')
+        return super().destroy(request, *args, **kwargs)
 
     @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='tree',
             url_name='tree')

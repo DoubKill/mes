@@ -454,7 +454,7 @@ class EquipMachineHaltReason(AbstractEntity):
     machine_halt_reason_name = models.CharField(max_length=64, help_text='停机原因名称')
     use_flag = models.BooleanField(help_text='是否启用', default=True)
     desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
-    equip_fault_type = models.ManyToManyField(EquipFaultType, help_text='故障分类', related_name='halt_reasons')
+    equip_fault = models.ManyToManyField(EquipFault, help_text='故障分类', related_name='halt_reasons')
 
     class Meta:
         db_table = 'equip_machine_halt_reason'

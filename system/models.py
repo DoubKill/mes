@@ -7,7 +7,7 @@ class User(AbstractUser):
     num = models.CharField(max_length=20, help_text='工号', verbose_name='工号', unique=True)
     is_leave = models.BooleanField(help_text='是否离职', verbose_name='是否离职', default=False)
     section = models.ForeignKey("Section", blank=True, null=True, help_text='部门', verbose_name='部门',
-                                on_delete=models.CASCADE, related_name="section_users")
+                                on_delete=models.SET_NULL, related_name="section_users")
     created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
     last_updated_date = models.DateTimeField(verbose_name='修改时间', auto_now=True)
     delete_date = models.DateTimeField(blank=True, null=True,
@@ -62,7 +62,8 @@ class Section(AbstractEntity):
     name = models.CharField(max_length=30, help_text='部门名称', verbose_name='部门名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
-    parent_section = models.ForeignKey('self', help_text='父节点部门', on_delete=models.CASCADE, blank=True, null=True)
+    parent_section = models.ForeignKey('self', help_text='父节点部门', on_delete=models.CASCADE,
+                                       related_name='children_sections', blank=True, null=True)
     in_charge_user = models.ForeignKey(User, help_text='负责人', blank=True, null=True, on_delete=models.CASCADE,
                                        related_name='in_charge_sections')
 
