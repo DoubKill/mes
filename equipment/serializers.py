@@ -266,6 +266,10 @@ class EquipSupplierSerializer(BaseModelSerializer):
                                           validators=[UniqueValidator(queryset=EquipSupplier.objects.all(), message='该编码已存在')])
     supplier_name = serializers.CharField(help_text='供应商名称',
                                           validators=[UniqueValidator(queryset=EquipSupplier.objects.filter(use_flag=True), message='该供应商已存在')])
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
 
     class Meta:
         model = EquipSupplier
@@ -297,8 +301,17 @@ class EquipFaultSignalSerializer(BaseModelSerializer):
 
 
 class EquipPropertySerializer(BaseModelSerializer):
+    status_name = serializers.SerializerMethodField()
     equip_type_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备类型')
     equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
+    made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商')
+
+    def get_status_name(self, obj):
+        dic = {
+            1: '使用中',
+            2: '废弃',
+            3: '限制'}
+        return dic.get(obj.status)
 
     class Meta:
         model = EquipProperty
@@ -319,6 +332,10 @@ class EquipAreaDefineSerializer(BaseModelSerializer):
                                       validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该名称已存在')])
     area_code = serializers.CharField(help_text='位置区域编号',
                                       validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该编号已存在')])
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
 
     class Meta:
         model = EquipAreaDefine
@@ -333,6 +350,10 @@ class EquipPartNewSerializer(BaseModelSerializer):
                                       validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该名称已存在')])
     category_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='所属主设备种类')
     global_name = serializers.ReadOnlyField(source='global_part_type.global_name', help_text='部位分类')
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
 
     class Meta:
         model = EquipPartNew

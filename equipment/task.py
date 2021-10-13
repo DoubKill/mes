@@ -170,3 +170,34 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
 6、当请求失败时，会提示如下信息
     {'errcode': 400, 'errmsg': '网络异常'}
 """
+
+
+def export_xls(export_filed_dict, data, file_name ):
+    response = HttpResponse(content_type='application/vnd.ms-excel')
+    filename = file_name
+    response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+        'ISO-8859-1') + '.xls'
+    # 创建一个文件对象
+    wb = xlwt.Workbook(encoding='utf8')
+    # 创建一个sheet对象
+    sheet = wb.add_sheet(file_name, cell_overwrite_ok=True)
+    style = xlwt.XFStyle()
+    style.alignment.wrap = 1
+
+    # 写入文件标题
+    for col_num in range(len(export_filed_dict)):
+        sheet.write(0, col_num, list(export_filed_dict.keys())[col_num])
+        # 写入数据
+        data_row = 1
+        for i in data:
+            # sheet.write(data_row, 0, data_row)
+            sheet.write(data_row, col_num, i[list(export_filed_dict.values())[col_num]])
+            data_row += 1
+
+    # 写出到IO
+    output = BytesIO()
+    wb.save(output)
+    # 重新定位到开始
+    output.seek(0)
+    response.write(output.getvalue())
+    return response

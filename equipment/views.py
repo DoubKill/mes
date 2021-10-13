@@ -19,7 +19,7 @@ from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Prope
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
     EquipSpareErp, EquipTargetMTBFMTTRSetting
 from equipment.serializers import *
-from equipment.task import property_template, property_import
+from equipment.task import property_template, property_import, export_xls
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -32,9 +32,10 @@ from rest_framework.decorators import action
 
 from rest_framework.viewsets import ModelViewSet
 
-from basics.models import Equip, GlobalCode
+from basics.models import Equip, GlobalCode, EquipCategoryAttribute
 from equipment.serializers import EquipRealtimeSerializer
 from mes.paginations import SinglePageNumberPagination
+from quality.utils import get_cur_sheet, get_sheet_data
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -588,11 +589,69 @@ class EquipOverview(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
+    """供应商管理台账"""
     queryset = EquipSupplier.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipSupplierSerializer
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSupplierFilter
+
+    FILE_NAME = '供应商管理台账'
+    EXPORT_FIELDS_DICT = {'供应商编号': 'supplier_code',
+                            '供应商名称': 'supplier_name',
+                            '地域': 'region',
+                            '联系人名称': 'contact_name',
+                            '联系人电话': 'contact_phone',
+                            '供应商类别': 'supplier_type',
+                            '是否启用': 'use_flag_name',
+                            '录入者': 'created_username',
+                            '录入时间': 'created_date',
+                          }
+
+    """数据导出"""
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        all = self.request.query_params.get('all')
+        queryset = self.filter_queryset(self.get_queryset())
+        if all:
+            return Response(queryset.filter(use_flag=True).values('id', 'supplier_name'))
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet, start_row=1)
+        area_list = []
+        for item in data:
+            obj = EquipSupplier.objects.filter(supplier_code=item[0]).first()
+            if not obj:
+                if item[5] not in ['普通供应商', '集采供应商']:
+                    raise ValidationError('该供应商类别不存在')
+                area_list.append({"supplier_code": item[0],
+                                  "supplier_name": item[1],
+                                  "region": item[2],
+                                  "contact_name": item[3],
+                                  "contact_phone": item[4],
+                                  "supplier_type": item[5],
+                                  })
+        s = EquipSupplierSerializer(data=area_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -604,24 +663,87 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPropertyFilter
 
+    FILE_NAME = '设备固定资产台账'
+    EXPORT_FIELDS_DICT = {
+                    '固定资产': 'property_no',
+                    '原编码': 'src_no',
+                    '财务编码': 'financial_no',
+                    '设备型号': 'equip_type_no',
+                    '设备编码': 'equip_no',
+                    '设备名称': 'equip_name',
+                    '设备制造商': 'made_in',
+                    '产能': 'capacity',
+                    '价格': 'price',
+                    '状态': 'status_name',
+                    '设备类型': 'equip_type_name',
+                    '出厂编码': 'leave_factory_no',
+                    '出厂日期': 'leave_factory_date',
+                    '使用日期': 'use_date',
+                    '录入人': 'created_username',
+                    '录入日期': 'created_date',
+                    }
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.delete_flag = True
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated], url_path='export-property',
-            url_name='export-property')
-    def export_property(self, request, pk=None):
-        """模板下载"""
-        return property_template()
+    """数据导出"""
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
-    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import-property',
-            url_name='import-property')
-    def import_property(self, request, pk=None):
-        """模板导入"""
-        file = request.FILES.get('file')
-        property_import(file)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        area_list = []
+        for item in data:
+            obj = EquipProperty.objects.filter(property_no=item[0]).first()
+            if not obj:
+                status_dict = {'使用中': 1, '废弃': 2, '限制': 3}
+                equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3]).first()
+                equip_supplier = EquipSupplier.objects.filter(supplier_name=item[6]).first()
+                if not equip_type:
+                    raise ValidationError('主设备种类{}不存在'.format(item[3]))
+                # 设备供应商
+                if not equip_supplier:
+                    raise ValidationError('设备制造商{}不存在'.format(item[6]))
+                area_list.append({"property_no": int(item[0]) if isinstance(item[0], float) else item[0] ,
+                                  "src_no": item[1],
+                                  "financial_no": item[2],
+                                  "equip_type": equip_type.id,
+                                  "equip_no": item[4],
+                                  "equip_name": item[5],
+                                  "equip_supplier": equip_supplier.id,
+                                  "capacity": item[7],
+                                  "price": item[8],
+                                  "status": status_dict.get(item[9]),
+                                  "equip_type_name": item[10],
+                                  "leave_factory_no": item[11],
+                                  "leave_factory_date": item[12],
+                                  "use_date": item[13]
+                                  })
+        s = EquipPropertySerializer(data=area_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
 
 
@@ -632,6 +754,46 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
     # permission_classes = (IsAuthenticated)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipAreaDefineFilter
+    FILE_NAME = '位置区域信息'
+    EXPORT_FIELDS_DICT = {"位置区域编号": "area_code",
+                          "位置区域名称": "area_name",
+                          "巡检顺序编号": "inspection_line_no",
+                          "备注说明": "desc",
+                          "是否启用": "use_flag_name",
+                          "录入人": "created_username",
+                          "录入时间": "created_date"
+                          }
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        area_list = []
+        for item in data:
+            obj = EquipAreaDefine.objects.filter(area_code=item[0]).first()
+            if not obj:
+                area_list.append({"area_code": item[0],
+                                  "area_name": item[1],
+                                  "inspection_line_no": int(item[2]) if item[2] else None,
+                                  "desc": item[3]})
+        s = EquipAreaDefineSerializer(data=area_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        return super().list(request, *args, **kwargs)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -641,10 +803,52 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     # permission_classes = (IsAuthenticated)
     filter_backends = (DjangoFilterBackend, )
     filter_class = EquipPartNewFilter
+    FILE_NAME = '设备部位信息'
+    EXPORT_FIELDS_DICT = {"所属主设备种类": "category_no",
+                          "部位分类": "global_name",
+                          "部位代码": "part_code",
+                          "部位名称": "part_name",
+                          "是否启用": "use_flag_name",
+                          "录入人": "created_username",
+                          "录入时间": "created_date"
+                          }
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        parts_list = []
+        for item in data:
+            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0]).first()
+            global_part_type = GlobalCode.objects.filter(global_name=item[1]).first()
+            if not equip_type:
+                raise ValidationError('主设备种类{}不存在'.format(item[0]))
+            if not global_part_type:
+                raise ValidationError('部位分类{}不存在'.format(item[1]))
+            obj = EquipPartNew.objects.filter(part_code=item[2]).first()
+            if not obj:
+                parts_list.append({"equip_type": equip_type.id,
+                                   "global_part_type": global_part_type.id,
+                                   "part_code": item[2],
+                                   "part_name": item[3]})
+        s = EquipPartNewSerializer(data=parts_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
     def list(self, request, *args, **kwargs):
-        all = self.request.query_params.get('all')
-        if all:
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if self.request.query_params.get('all'):
             data = EquipPartNew.objects.filter(use_flag=True).values('id', 'part_name')
             return Response({'result': data})
         return super().list(request, *args, **kwargs)
@@ -658,13 +862,44 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipComponentTypeFilter
+    FILE_NAME = '设备部件分类'
+    EXPORT_FIELDS_DICT = {"部件分类": "component_type_code",
+                          "部位名称": "component_type_name",
+                          "录入人": "created_username",
+                          "录入时间": "created_date"
+                          }
 
     def list(self, request, *args, **kwargs):
-        all = self.request.query_params.get('all')
-        if all:
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        if export:
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if self.request.query_params.get('all'):
             data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
             return Response({'result': data})
         return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        parts_list = []
+        for item in data:
+            obj = EquipComponentType.objects.filter(component_type_code=item[0]).first()
+            if not obj:
+                parts_list.append({"component_type_code": item[0],
+                                   "component_type_name": item[1]})
+        s = EquipComponentTypeSerializer(data=parts_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
 
 @method_decorator([api_recorder], name='dispatch')
