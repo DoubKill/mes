@@ -54,18 +54,7 @@ class UserUpdateSerializer(BaseModelSerializer):
 class UserSerializer(BaseModelSerializer):
     is_active = serializers.BooleanField(read_only=True)
     num = serializers.CharField(validators=[UniqueValidator(queryset=User.objects.all(), message='该员工工号已存在')])
-    section_name = serializers.SerializerMethodField(source="section.name", default="炼胶", read_only=True)
-
-    def get_section_name(self, obj):
-        if obj.section:
-            ret = []
-            section = obj.section
-            while section:
-                ret.append(section.name)
-                section = section.parent_section
-            return '/'.join(ret[::-1])
-        else:
-            return '炼胶'
+    section_name = serializers.CharField(source="section.name", default="", read_only=True)
 
     def to_representation(self, instance):
         instance = super().to_representation(instance)

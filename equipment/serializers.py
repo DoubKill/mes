@@ -291,6 +291,7 @@ class EquipComponentListSerializer(BaseModelSerializer):
 
 class EquipFaultSignalSerializer(BaseModelSerializer):
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
     equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True)
     equip_part_name = serializers.CharField(source='equip_component.equip_part.part_name', read_only=True)
 
@@ -362,14 +363,14 @@ class EquipPartNewSerializer(BaseModelSerializer):
 
 
 class EquipMachineHaltReasonSerializer(BaseModelSerializer):
-    equip_fault_types = serializers.SerializerMethodField(read_only=True)
+    equip_faults = serializers.SerializerMethodField(read_only=True)
 
     def update(self, instance, validated_data):
-        instance.equip_fault_type.clear()
+        instance.equip_fault.clear()
         return super().update(instance, validated_data)
 
-    def get_equip_fault_types(self, obj):
-        return obj.equip_fault_type.values()
+    def get_equip_faults(self, obj):
+        return obj.equip_fault.values()
 
     class Meta:
         model = EquipMachineHaltReason
