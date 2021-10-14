@@ -412,7 +412,7 @@ class EquipFaultSignal(AbstractEntity):
     equip = models.ForeignKey(Equip, help_text='机台', on_delete=models.CASCADE)
     # equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
     #                                help_text='设备部位', verbose_name='设备部位')
-    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE)
+    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.SET_NULL, blank=True, null=True)
     signal_variable_name = models.CharField(max_length=64, help_text='故障变量名称', blank=True, null=True)
     signal_variable_type = models.CharField(max_length=64, help_text='故障变量类型', blank=True, null=True)
     alarm_signal_minvalue = models.FloatField(help_text='报警下限值', blank=True, null=True)
@@ -530,10 +530,10 @@ class EquipJobItemStandard(AbstractEntity):
 
 class EquipJobItemStandardDetail(AbstractEntity):
     TYPE_CHOICE = (
-        ('有无', '巡检'),
-        ('数值', '保养'),
-        ('正常异常', '标定'),
-        ('完成未完成', '润滑'),
+        ('有无', '有无'),
+        ('数值', '数值'),
+        ('正常异常', '正常异常'),
+        ('完成未完成', '完成未完成'),
     )
     equip_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
     sequence = models.IntegerField(help_text='次序')
