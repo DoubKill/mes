@@ -652,6 +652,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
