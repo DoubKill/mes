@@ -646,7 +646,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
                                   "supplier_name": item[1],
                                   "region": item[2],
                                   "contact_name": item[3],
-                                  "contact_phone": str(item[4]).split('.')[0],
+                                  "contact_phone": str(int(item[4])),
                                   "supplier_type": item[5],
                                   })
         s = EquipSupplierSerializer(data=area_list, many=True, context={'request': request})
