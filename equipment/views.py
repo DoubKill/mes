@@ -626,7 +626,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='import_xlsx',
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
     def import_xlx(self, request):
         excel_file = request.FILES.get('file', None)
@@ -640,18 +640,20 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             if not obj:
                 if item[5] not in ['普通供应商', '集采供应商']:
                     raise ValidationError('该供应商类别不存在')
+                if not isinstance(item[4], float):
+                    raise ValidationError('联系号码输入有误！')
                 area_list.append({"supplier_code": item[0],
                                   "supplier_name": item[1],
                                   "region": item[2],
                                   "contact_name": item[3],
-                                  "contact_phone": item[4],
+                                  "contact_phone": str(int(item[4])),
                                   "supplier_type": item[5],
                                   })
         s = EquipSupplierSerializer(data=area_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
             s.save()
         else:
-            raise ValidationError('导入的数据类型有误')
+            raise ValidationError('供应商或编号已存在！')
         return Response('导入成功')
 
 
