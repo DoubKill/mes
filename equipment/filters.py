@@ -247,7 +247,6 @@ class EquipOrderAssignRuleFilter(django_filters.rest_framework.FilterSet):
     equip_type_id = django_filters.CharFilter(field_name='equip_type_id', help_text='设备类型id')
     equip_condition = django_filters.CharFilter(field_name='equip_condition', help_text='设备条件')
     important_level = django_filters.CharFilter(field_name='important_level', help_text='重要程度')
-    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
 
     class Meta:
         model = EquipOrderAssignRule
