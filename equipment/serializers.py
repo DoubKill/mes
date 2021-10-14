@@ -262,9 +262,9 @@ class EquipMaintenanceOrderLogSerializer(BaseModelSerializer):
 
 
 class EquipSupplierSerializer(BaseModelSerializer):
-    supplier_code = serializers.CharField(help_text='供应商编号',
+    supplier_code = serializers.CharField(help_text='供应商编号', max_length=64,
                                           validators=[UniqueValidator(queryset=EquipSupplier.objects.all(), message='该编码已存在')])
-    supplier_name = serializers.CharField(help_text='供应商名称',
+    supplier_name = serializers.CharField(help_text='供应商名称', max_length=64,
                                           validators=[UniqueValidator(queryset=EquipSupplier.objects.filter(use_flag=True), message='该供应商已存在')])
     use_flag_name = serializers.SerializerMethodField()
 
@@ -314,11 +314,13 @@ class EquipFaultSignalSerializer(BaseModelSerializer):
 
 
 class EquipPropertySerializer(BaseModelSerializer):
+    no = serializers.ReadOnlyField()
+    name = serializers.ReadOnlyField()
     status_name = serializers.SerializerMethodField()
     equip_type_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备类型')
     equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
-    made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商')
-    property_no = serializers.CharField(help_text='固定资产编码',
+    made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商', default='')
+    property_no = serializers.CharField(help_text='固定资产编码', max_length=64,
                                       validators=[UniqueValidator(queryset=EquipProperty.objects.all(), message='固定资产名称已存在')])
 
     def get_status_name(self, obj):
@@ -343,9 +345,9 @@ class EquipMachineHaltTypeSerializer(BaseModelSerializer):
 
 
 class EquipAreaDefineSerializer(BaseModelSerializer):
-    area_name = serializers.CharField(help_text='位置区域名称',
+    area_name = serializers.CharField(help_text='位置区域名称', max_length=64,
                                       validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该名称已存在')])
-    area_code = serializers.CharField(help_text='位置区域编号',
+    area_code = serializers.CharField(help_text='位置区域编号', max_length=64,
                                       validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该编号已存在')])
     use_flag_name = serializers.SerializerMethodField()
 
@@ -359,9 +361,9 @@ class EquipAreaDefineSerializer(BaseModelSerializer):
 
 
 class EquipPartNewSerializer(BaseModelSerializer):
-    part_code = serializers.CharField(help_text='部位编码',
+    part_code = serializers.CharField(help_text='部位编码', max_length=64,
                                       validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该编码已存在')])
-    part_name = serializers.CharField(help_text='设备名称',
+    part_name = serializers.CharField(help_text='设备名称', max_length=64,
                                       validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该名称已存在')])
     category_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='所属主设备种类')
     global_name = serializers.ReadOnlyField(source='global_part_type.global_name', help_text='部位分类')
@@ -394,9 +396,9 @@ class EquipMachineHaltReasonSerializer(BaseModelSerializer):
 
 class EquipComponentTypeSerializer(BaseModelSerializer):
     # 设备部件分类
-    component_type_code = serializers.CharField(help_text='分类编号',
+    component_type_code = serializers.CharField(help_text='分类编号', max_length=64,
                                                 validators=[UniqueValidator(queryset=EquipComponentType.objects.all(), message='该编号已存在')])
-    component_type_name = serializers.CharField(help_text='分类名称',
+    component_type_name = serializers.CharField(help_text='分类名称', max_length=64,
                                                 validators=[UniqueValidator(queryset=EquipComponentType.objects.all(), message='该名称已存在')])
 
     class Meta:
@@ -442,8 +444,8 @@ class EquipComponentCreateSerializer(BaseModelSerializer):
 
 class ERPSpareComponentRelationListSerializer(serializers.ModelSerializer):
     equip_component_type_name = serializers.CharField(source='equip_spare_erp.equip_component_type.component_type_name', help_text='备件分类')
-    spare_code = serializers.CharField(source='equip_spare_erp.spare_code', help_text='备件编码')
-    spare_name = serializers.CharField(source='equip_spare_erp.spare_name', help_text='备件名称')
+    spare_code = serializers.CharField(source='equip_spare_erp.spare_code', max_length=64, help_text='备件编码')
+    spare_name = serializers.CharField(source='equip_spare_erp.spare_name', max_length=64, help_text='备件名称')
     supplier_name = serializers.CharField(source='equip_spare_erp.supplier_name', help_text='供应商名称')
 
     class Meta:
