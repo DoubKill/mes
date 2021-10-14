@@ -298,8 +298,8 @@ class EquipFaultSignalSerializer(BaseModelSerializer):
                                                               message='该故障信号名称已存在')])
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
-    equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True)
-    equip_part_name = serializers.CharField(source='equip_component.equip_part.part_name', read_only=True)
+    equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True, default='')
+    equip_part_name = serializers.CharField(source='equip_component.equip_part.part_name', read_only=True, default='')
     use_flag_name = serializers.SerializerMethodField()
     alarm_signal_down_flag_name = serializers.SerializerMethodField()
     fault_signal_down_flag_name = serializers.SerializerMethodField()
@@ -430,7 +430,7 @@ class EquipOrderAssignRuleSerializer(BaseModelSerializer):
     rule_name = serializers.CharField(validators=[
         UniqueValidator(queryset=EquipOrderAssignRule.objects.all(),
                         message='该工单指派规则名称已存在')])
-    equip_type_name = serializers.CharField(source='equip_type.global_name', read_only=True)
+    equip_type_name = serializers.CharField(source='equip_type.global_name', read_only=True, default='')
     use_flag_name = serializers.SerializerMethodField()
 
     def get_use_flag_name(self, obj):
@@ -582,8 +582,8 @@ class EquipFaultCodeSerializer(BaseModelSerializer):
 class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
-    equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True)
-    equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True)
+    equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True, default='')
+    equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True, default='')
 
     class Meta:
         model = EquipMaintenanceAreaSetting
