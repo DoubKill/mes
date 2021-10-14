@@ -295,8 +295,8 @@ class EquipComponent(AbstractEntity):
     """
         设备部件
     """
-    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
-                                   help_text='所属主设备种类')
+    # equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
+    #                                help_text='所属主设备种类')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
                                    help_text='所属主设备部位')
     equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
@@ -537,6 +537,7 @@ class EquipJobItemStandardDetail(AbstractEntity):
     )
     equip_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
     sequence = models.IntegerField(help_text='次序')
+    content = models.CharField(max_length=64, help_text='内容')
     check_standard_desc = models.CharField(max_length=64, help_text='判断标准/步骤说明')
     check_standard_type = models.CharField(max_length=64, help_text='类型', choices=TYPE_CHOICE)
 
@@ -545,31 +546,42 @@ class EquipJobItemStandardDetail(AbstractEntity):
         verbose_name_plural = verbose_name = '设备作业项目标准明细'
 
 
-# class EquipBom(AbstractEntity):
-#     """
-#         设备BOM管理
-#     """
-#     node_id = models.CharField(max_length=64, help_text='节点编号', null=True, blank=True)
-#     factory_id = models.CharField(max_length=64, help_text='分厂名称', null=True, blank=True)
-#     equip_info = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='设备信息', null=True, blank=True)
-#     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE, help_text='部位信息', null=True, blank=True)
-#     equip_component = models.ForeignKey(EquipComponent, help_text='部件信息', on_delete=models.CASCADE, null=True, blank=True)
-#     equip_area_define = models.ForeignKey(EquipAreaDefine, help_text='区域信息', on_delete=models.CASCADE, null=True, blank=True)
-#     maintenance_xunjian_flag = models.BooleanField(help_text='是否巡检', blank=True, null=True)
-#     maintenance_xunjian_id = models.ForeignKey(EquipJobItemStandard, help_text='巡检标准', on_delete=models.CASCADE, null=True, blank=True)
-#     equip_repair_standard_flag = models.BooleanField(max_length=64, help_text='是否维修', null=True, blank=True)
-#     equip_repair_standard_id = models.ForeignKey(EquipJobItemStandard, help_text='维修标准', on_delete=models.CASCADE, related_name='repair', null=True, blank=True)
-#     maintenance_baoyang_flag = models.BooleanField(max_length=64, help_text='是否保养', null=True, blank=True)
-#     maintenance_baoyang_id = models.ForeignKey(EquipJobItemStandard, help_text='保养标准', on_delete=models.CASCADE, related_name='baoyang', null=True, blank=True)
-#     maintenance_runhua_flag = models.BooleanField(max_length=64, help_text='是否润滑', null=True, blank=True)
-#     maintenance_runhua_id = models.ForeignKey(EquipJobItemStandard, help_text='润滑标准', on_delete=models.CASCADE, related_name='runhua', null=True, blank=True)
-#     maintenance_biaoding_flag = models.BooleanField(max_length=64, help_text='是否标定', null=True, blank=True)
-#     maintenance_biaoding_id = models.ForeignKey(EquipJobItemStandard, help_text='标定标准', on_delete=models.CASCADE, related_name='biaoding', null=True, blank=True)
-#     parent_id = models.ForeignKey('self', help_text='父节点id', on_delete=models.CASCADE, null=True, blank=True)
-#     tree = models.TextField(help_text='树结构数据')
-#
-#     class Meta:
-#         db_table = 'equip_bom'
-#         verbose_name_plural = verbose_name = '设备BOM'
+class EquipBom(AbstractEntity):
+    """
+        设备BOM管理
+    """
+    node_id = models.CharField(max_length=64, help_text='节点编号', null=True, blank=True)
+    factory_id = models.CharField(max_length=64, help_text='分厂名称', null=True, blank=True)
+    equip_info = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='设备信息', null=True, blank=True)
+    property_type_node = models.CharField(max_length=64, help_text='设备类型', null=True, blank=True)
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
+    equip_name = models.CharField(max_length=64, help_text='机台名称', null=True, blank=True)
+    equip_status = models.CharField(max_length=64, help_text='机台状态', null=True, blank=True)
+    equip_type = models.CharField(max_length=64, help_text='机台规格', null=True, blank=True)
+    part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE, help_text='部位编号', null=True, blank=True)
+    part_name = models.CharField(max_length=64, help_text='部位名称', null=True, blank=True)
+    component = models.ForeignKey(EquipComponent, help_text='部件编号', on_delete=models.CASCADE, null=True, blank=True)
+    component_name = models.CharField(max_length=64, help_text='部件名称', null=True, blank=True)
+    component_spart_binfingflag = models.CharField(max_length=64, help_text='是否绑定备件', null=True, blank=True)
+    part_type = models.CharField(max_length=256, help_text='部件规格', null=True, blank=True)
+    part_status = models.CharField(max_length=64, help_text='部件状态', null=True, blank=True)
+    equip_area_define = models.ForeignKey(EquipAreaDefine, help_text='区域编号', on_delete=models.CASCADE, null=True, blank=True)
+    maintenance_xunjian_flag = models.BooleanField(help_text='是否巡检', blank=True, null=True)
+    maintenance_xunjian = models.ForeignKey(EquipJobItemStandard, help_text='巡检标准', on_delete=models.CASCADE, null=True, blank=True)
+    equip_repair_standard_flag = models.BooleanField(max_length=64, help_text='是否维修', null=True, blank=True)
+    equip_repair_standard = models.ForeignKey(EquipJobItemStandard, help_text='维修标准', on_delete=models.CASCADE, related_name='repair', null=True, blank=True)
+    maintenance_baoyang_flag = models.BooleanField(max_length=64, help_text='是否保养', null=True, blank=True)
+    maintenance_baoyang = models.ForeignKey(EquipJobItemStandard, help_text='保养标准', on_delete=models.CASCADE, related_name='baoyang', null=True, blank=True)
+    maintenance_runhua_flag = models.BooleanField(max_length=64, help_text='是否润滑', null=True, blank=True)
+    maintenance_runhua = models.ForeignKey(EquipJobItemStandard, help_text='润滑标准', on_delete=models.CASCADE, related_name='runhua', null=True, blank=True)
+    maintenance_biaoding_flag = models.BooleanField(max_length=64, help_text='是否标定', null=True, blank=True)
+    maintenance_biaoding = models.ForeignKey(EquipJobItemStandard, help_text='标定标准', on_delete=models.CASCADE, related_name='biaoding', null=True, blank=True)
+    parent_flag = models.ForeignKey('self', help_text='父节点id', on_delete=models.CASCADE, null=True, blank=True)
+    level = models.IntegerField(help_text='树的层级', null=True, blank=True)
+
+    class Meta:
+        db_table = 'equip_bom'
+        verbose_name_plural = verbose_name = '设备BOM'
+
 
 
