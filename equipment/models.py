@@ -322,7 +322,7 @@ class EquipSpareErp(AbstractEntity):
     spare_name = models.CharField(max_length=64, help_text='erp备件名称')
     equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
                                              help_text='部件分类')
-    supplier_name = models.CharField(max_length=64, help_text='供应商名称')
+    supplier_name = models.CharField(max_length=64, help_text='供应商名称', blank=True, null=True)
     specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
     technical_params = models.CharField(max_length=64, help_text='技术参数', blank=True, null=True)
     unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)

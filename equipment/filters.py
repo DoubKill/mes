@@ -161,11 +161,11 @@ class EquipAreaDefineFilter(django_filters.rest_framework.FilterSet):
 
 
 class ERPSpareComponentRelationFilter(django_filters.rest_framework.FilterSet):
-    equip_component_id = django_filters.CharFilter(field_name='equip_component__id', help_text="部件id")
+    equip_component_id = django_filters.CharFilter(field_name='equip_component_id', help_text="部件id")
 
     class Meta:
         model = ERPSpareComponentRelation
-        fields = ('id',)
+        fields = ('equip_component_id',)
 
 
 class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
