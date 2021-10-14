@@ -1149,19 +1149,84 @@ class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
-    queryset = EquipFaultSignal.objects.all()
+    queryset = EquipFaultSignal.objects.order_by('id')
     serializer_class = EquipFaultSignalSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFaultSignalFilter
+    FILE_NAME = '设备故障信号定义'
+    EXPORT_FIELDS_DICT = {"信号编号": "signal_code",
+                          "信号名称": "signal_name",
+                          "机台编号": "equip_no",
+                          "机台名称": "equip_name",
+                          "设备部位": "equip_part_name",
+                          "设备部件": "equip_component_name",
+                          "信号变量名": "signal_variable_name",
+                          "信号数据类型": "signal_variable_type",
+                          "报警下限值": "alarm_signal_minvalue",
+                          "报警上限值": "alarm_signal_maxvalue",
+                          "报警持续时间（秒）": "alarm_signal_duration",
+                          "报警是否停机": "alarm_signal_down_flag_name",
+                          "报警停机描述": "alarm_signal_desc",
+                          "故障下限值": "fault_signal_minvalue",
+                          "故障上限值": "fault_signal_maxvalue",
+                          "故障持续时间（秒）": "fault_signal_duration",
+                          "故障是否停机": "fault_signal_down_flag_name",
+                          "故障停机描述": "fault_signal_desc",
+                          "是否启用": "use_flag_name",
+                          }
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'signal_name', 'signal_code')
             return Response({'results': data})
+        if self.request.query_params.get('export'):
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         else:
             return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        signal_list = []
+        for item in data:
+            equip = Equip.objects.filter(equip_no=item[2]).first()
+            equip_component = EquipComponent.objects.filter(component_name=item[5]).first()
+            if not equip:
+                raise ValidationError('机台编号{}不存在'.format(item[2]))
+            if not equip_component:
+                equip_component = None
+            if not EquipFaultSignal.objects.filter(signal_code=item[0]).exists():
+                signal_list.append({"signal_code": item[0],
+                                    "signal_name": item[1],
+                                    "signal_variable_name": str(item[6]),
+                                    "signal_variable_type": item[7],
+                                    "alarm_signal_minvalue": item[8],
+                                    "alarm_signal_maxvalue": item[9],
+                                    "alarm_signal_duration": item[10],
+                                    "alarm_signal_down_flag": True if item[11] == 'Y' else False,
+                                    "alarm_signal_desc": item[12],
+                                    "fault_signal_minvalue": item[13],
+                                    "fault_signal_maxvalue": item[14],
+                                    "fault_signal_duration": item[15],
+                                    "fault_signal_down_flag": True if item[16] == 'Y' else False,
+                                    "fault_signal_desc": item[17],
+                                    "equip": equip.id,
+                                    "equip_component": equip_component.id if equip_component else None,
+                                    })
+        s = EquipFaultSignalSerializer(data=signal_list, many=True, context={'request': request})
+        if s.is_valid():
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
