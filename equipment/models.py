@@ -500,10 +500,10 @@ class EquipTargetMTBFMTTRSetting(AbstractEntity):
 class EquipMaintenanceAreaSetting(AbstractEntity):
     maintenance_user = models.ForeignKey(User, help_text='包干人员', on_delete=models.CASCADE)
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台')
-    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
-                                   help_text='设备部位')
-    equip_area = models.ForeignKey(EquipArea, on_delete=models.CASCADE,
-                                   help_text='设备区域')
+    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.SET_NULL,
+                                   help_text='设备部位', blank=True, null=True)
+    equip_area = models.ForeignKey(EquipArea, on_delete=models.SET_NULL,
+                                   help_text='设备区域', blank=True, null=True)
 
     class Meta:
         db_table = 'equip_maintenance_area_setting'

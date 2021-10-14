@@ -294,6 +294,18 @@ class EquipFaultSignalSerializer(BaseModelSerializer):
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
     equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True)
     equip_part_name = serializers.CharField(source='equip_component.equip_part.part_name', read_only=True)
+    use_flag_name = serializers.SerializerMethodField()
+    alarm_signal_down_flag_name = serializers.SerializerMethodField()
+    fault_signal_down_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    def get_alarm_signal_down_flag_name(self, obj):
+        return 'Y' if obj.alarm_signal_down_flag else 'N'
+
+    def get_fault_signal_down_flag_name(self, obj):
+        return 'Y' if obj.fault_signal_down_flag else 'N'
 
     class Meta:
         model = EquipFaultSignal
