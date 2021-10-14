@@ -290,6 +290,12 @@ class EquipComponentListSerializer(BaseModelSerializer):
 
 
 class EquipFaultSignalSerializer(BaseModelSerializer):
+    signal_code = serializers.CharField(validators=[
+                                              UniqueValidator(queryset=EquipFaultSignal.objects.all(),
+                                                              message='该故障信号编码已存在')])
+    signal_name = serializers.CharField(validators=[
+                                              UniqueValidator(queryset=EquipFaultSignal.objects.all(),
+                                                              message='该故障信号名称已存在')])
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
     equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True)
@@ -335,6 +341,12 @@ class EquipPropertySerializer(BaseModelSerializer):
 
 
 class EquipMachineHaltTypeSerializer(BaseModelSerializer):
+    machine_halt_type_code = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltType.objects.all(),
+                        message='该停机类型编码已存在')])
+    machine_halt_type_name = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltType.objects.all(),
+                        message='该停机类型名称已存在')])
 
     class Meta:
         model = EquipMachineHaltType
@@ -377,6 +389,12 @@ class EquipPartNewSerializer(BaseModelSerializer):
 
 
 class EquipMachineHaltReasonSerializer(BaseModelSerializer):
+    machine_halt_reason_code = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltReason.objects.all(),
+                        message='该停机原因编码已存在')])
+    machine_halt_reason_name = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltReason.objects.all(),
+                        message='该停机原因名称已存在')])
     equip_faults = serializers.SerializerMethodField(read_only=True)
 
     def update(self, instance, validated_data):
@@ -406,7 +424,17 @@ class EquipComponentTypeSerializer(BaseModelSerializer):
 
 
 class EquipOrderAssignRuleSerializer(BaseModelSerializer):
+    rule_code = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipOrderAssignRule.objects.all(),
+                        message='该工单指派规则编码已存在')])
+    rule_name = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipOrderAssignRule.objects.all(),
+                        message='该工单指派规则名称已存在')])
     equip_type_name = serializers.CharField(source='equip_type.global_name', read_only=True)
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
 
     class Meta:
         model = EquipOrderAssignRule

@@ -1256,6 +1256,65 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipOrderAssignRuleFilter
+    FILE_NAME = '工单指派规则'
+    EXPORT_FIELDS_DICT = {"规则编号": "rule_code",
+                          "规则名称": "rule_name",
+                          "作业类型": "work_type",
+                          "设备类型": "equip_type_name",
+                          "设备条件": "equip_condition",
+                          "重要程度": "important_level",
+                          "接单间隔时间（分钟）": "receive_interval",
+                          "接单重复提示次数": "receive_warning_times",
+                          "维修开始时间间隔（分钟）": "start_interval",
+                          "开始重复提示次数": "start_warning_times",
+                          "验收间隔时间（分钟）": "accept_interval",
+                          "验收重复提示次数": "accept_warning_times",
+                          "是否启用": "use_flag_name",
+                          "录入人": "created_username",
+                          "录入时间": "created_date",
+                          }
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('export'):
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        else:
+            return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        signal_list = []
+        for item in data:
+            equip_type = GlobalCode.objects.filter(global_name=item[3]).first()
+            if not equip_type:
+                raise ValidationError('设备类型{}不存在'.format(item[3]))
+            if not EquipOrderAssignRule.objects.filter(rule_code=item[0]).exists():
+                signal_list.append({"rule_code": item[0],
+                                    "rule_name": item[1],
+                                    "work_type": item[2],
+                                    "equip_type": equip_type.id,
+                                    "equip_condition": item[4],
+                                    "important_level": item[5],
+                                    "receive_interval": item[6],
+                                    "receive_warning_times": item[7],
+                                    "start_interval": item[8],
+                                    "start_warning_times": item[9],
+                                    "accept_interval": item[10],
+                                    "accept_warning_times": item[11],
+                                    })
+        s = EquipOrderAssignRuleSerializer(data=signal_list, many=True, context={'request': request})
+        if s.is_valid():
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
