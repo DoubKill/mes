@@ -720,10 +720,10 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
             obj = EquipProperty.objects.filter(property_no=item[0]).first()
             if not obj:
                 status_dict = {'使用中': 1, '废弃': 2, '限制': 3}
-                equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3]).first()
-                equip_supplier = EquipSupplier.objects.filter(supplier_name=item[6]).first()
+                equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3], use_flag=True).first()
+                equip_supplier = EquipSupplier.objects.filter(supplier_name=item[6], use_flag=True).first()
                 if not equip_type:
-                    raise ValidationError('主设备种类{}不存在'.format(item[3]))
+                    raise ValidationError('导入的设备型号{}不存在'.format(item[3]))
                 # 设备供应商
                 if not equip_supplier:
                     raise ValidationError('设备制造商{}不存在'.format(item[6]))
