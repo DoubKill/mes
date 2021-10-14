@@ -640,11 +640,15 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             if not obj:
                 if item[5] not in ['普通供应商', '集采供应商']:
                     raise ValidationError('该供应商类别不存在')
+                try:
+                    phone = int(item[4])
+                except:
+                     raise ValidationError('联系号码输入有误！')
                 area_list.append({"supplier_code": item[0],
                                   "supplier_name": item[1],
                                   "region": item[2],
                                   "contact_name": item[3],
-                                  "contact_phone": item[4],
+                                  "contact_phone": phone,
                                   "supplier_type": item[5],
                                   })
         s = EquipSupplierSerializer(data=area_list, many=True, context={'request': request})
