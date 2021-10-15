@@ -1,8 +1,9 @@
 import copy
 import datetime as dt
+import json
 import uuid
 
-from django.db.models import F, Min, Max, Sum, Avg
+from django.db.models import F, Min, Max, Sum, Avg, Q
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
@@ -14,10 +15,11 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
     EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter, \
     EquipSpareErpFilter, EquipFaultTypeFilter, EquipFaultCodeFilter, ERPSpareComponentRelationFilter, \
-    EquipFaultSignalFilter, EquipMachineHaltTypeFilter, EquipMachineHaltReasonFilter, EquipOrderAssignRuleFilter
+    EquipFaultSignalFilter, EquipMachineHaltTypeFilter, EquipMachineHaltReasonFilter, EquipOrderAssignRuleFilter, \
+    EquipBomFilter, EquipJobItemStandardFilter
 from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
-    EquipSpareErp, EquipTargetMTBFMTTRSetting
+    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard
 from equipment.serializers import *
 from equipment.task import property_template, property_import, export_xls
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -853,7 +855,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
             data = EquipPartNew.objects.filter(use_flag=True).values('id', 'part_name')
-            return Response({'result': data})
+            return Response({'results': data})
         return super().list(request, *args, **kwargs)
 
 
@@ -880,7 +882,7 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
             data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
-            return Response({'result': data})
+            return Response({'results': data})
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
@@ -918,6 +920,18 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipComponent.objects.all()
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
+    FILE_NAME = '设备部件列表'
+    EXPORT_FIELDS_DICT = {
+        "所属主设备种类": "equip_type_name",
+        "所属设备部位": "equip_part_name",
+        "部件分类": "equip_component_type_name",
+        "部件代码": "component_code",
+        "部件名称": "component_name",
+        "是否绑定备件": "is_binding",
+        "是否启用": "use_flag_name",
+        "录入人": "created_username",
+        "录入时间": "created_date"
+    }
 
     def get_queryset(self):
         query_params = self.request.query_params
@@ -929,7 +943,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         use_flag = query_params.get('use_flag')
         filter_kwargs = {}
         if equip_type:
-            filter_kwargs['equip_part__equip_type__category_name__icontains'] = equip_type
+            filter_kwargs['equip_part__equip_type_id'] = equip_type
         if equip_part:
             filter_kwargs['equip_part__part_name__icontains'] = equip_part
         if equip_component_type:
@@ -947,6 +961,48 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         if self.action == 'list':
             return EquipComponentListSerializer
         return EquipComponentCreateSerializer
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        query_set = self.get_queryset()
+        if export:
+            data = self.get_serializer(query_set, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        return super(EquipComponentViewSet, self).list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        parts_list = []
+        for item in data:
+            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0]).first()
+            global_part_type = GlobalCode.objects.filter(global_name=item[1]).first()
+            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2]).first()
+            if not equip_type:
+                raise ValidationError('主设备种类{}不存在'.format(item[0]))
+            if not global_part_type:
+                raise ValidationError('部位分类{}不存在'.format(item[1]))
+            if not equip_component_type:
+                raise ValidationError('部件分类{}不存在'.format(item[2]))
+            equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id, global_part_type=global_part_type.id).first()
+            obj = EquipComponent.objects.filter(component_code=item[3]).first()
+            if not obj:
+                parts_list.append({"equip_part": equip_part.id,
+                                   "equip_component_type": equip_component_type.id,
+                                   "component_code": item[3],
+                                   "component_name": item[4],
+                                   "use_flag": 1 if item[6] == 'Y' else 0})
+        s = EquipComponentCreateSerializer(data=parts_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -991,6 +1047,25 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSpareErpFilter
+    FILE_NAME = '备件代码定义'
+    EXPORT_FIELDS_DICT = {
+        "备件代码": "spare_code",
+        "备件名称": "spare_name",
+        "备件分类": "equip_component_type_name",
+        "规格型号": "specification",
+        "技术参数": "technical_params",
+        "标准单位": "unit",
+        "关键部位": "key_parts_flag_name",
+        "库存下限": "lower_stock",
+        "库存上限": "upper_stock",
+        "计划价格": "cost",
+        "材质": "texture_material",
+        "有效期(天)": "period_validity",
+        "供应商名称": "supplier_name",
+        "是否启用": "use_flag_name",
+        "录入人": "created_username",
+        "录入时间": "created_date"
+    }
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -999,115 +1074,163 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         all = self.request.query_params.get('all')
+        export = self.request.query_params.get('export')
+        if export:
+            data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if all == '0':
-            data = self.filter_queryset(self.get_queryset()).values('id', 'equip_component_type__component_type_name')
-            return Response({'result': data})
+            data = self.get_queryset().values('equip_component_type__component_type_name').distinct()
+            return Response({'results': data})
         elif all == '1':
             data = EquipComponentType.objects.values('id', 'component_type_name')
-            return Response({'result': data})
+            return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
 
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        parts_list = []
+        for item in data:
+            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2]).first()
+            if not equip_component_type:
+                raise ValidationError('备件分类{}不存在'.format(item[2]))
+            obj = EquipSpareErp.objects.filter(Q(spare_code=item[0]) | Q(spare_name=item[1])).first()
+            if not obj:
+                parts_list.append({"spare_code": item[0],
+                                   "spare_name": item[1],
+                                   "equip_component_type": equip_component_type.id,
+                                   "specification": item[3],
+                                   "technical_params": item[4],
+                                   "unit": item[5],
+                                   "key_parts_flag": 1 if item[6] == '是' else 0,
+                                   "lower_stock": item[7],
+                                   "upper_stock": item[8],
+                                   "cost": item[9],
+                                   "texture_material": item[10],
+                                   "period_validity": item[11],
+                                   "supplier_name": item[12],
+                                   "use_flag": 1 if item[13] == 'Y' else 0})
+        s = EquipSpareErpCreateSerializer(data=parts_list, many=True, context={'request': request})
+        if s.is_valid(raise_exception=False):
+            s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
 
-# @method_decorator([api_recorder], name='dispatch')
-# class EquipBomViewSet(ModelViewSet):
-#     """
-#         list:
-#             设备bom信息
-#         create:
-#             新建备件代码定义
-#         update:
-#             编辑、停用备件代码定义
-#         retrieve:
-#             备件代码定义详情
-#         """
-#     queryset = EquipBom.objects.all()
-#     # permission_classes = (IsAuthenticated,)
-#     filter_backends = (DjangoFilterBackend,)
-#     filter_class = EquipBomFilter
-#
-#     # def list(self, request, *args, **kwargs):
-#     #     tree = self.request.query_params.get('tree')
-#     #     if not tree:
-#     #         return super().list(request, *args, **kwargs)
-#     #     data = []
-#     #     index_tree = {}
-#     #     for section in self.get_queryset():
-#     #         if section.id not in index_tree:
-#     #             index_tree[section.id] = dict(
-#     #                 {"id": section.id, "label": section.factory_id, 'children': []})
-#     #         if not section.parent_id:  # 根节点
-#     #             data.append(index_tree[section.id])  # 浅拷贝
-#     #             continue
-#     #
-#     #         if section.parent_id in index_tree:  # 子节点
-#     #             if "children" not in index_tree[section.parent_id]:
-#     #                 index_tree[section.parent_id]["children"] = []
-#     #
-#     #             index_tree[section.parent_id]["children"].append(index_tree[section.id])
-#     #         else:  # 没有节点则加入
-#     #             index_tree[section.parent_id] = dict(
-#     #                 {"id": section.parent_id, "label": section.parent_section.factory_id, "children": []})
-#     #             index_tree[section.parent_id]["children"].append(index_tree[section.id])
-#     #     return Response({'results': data})
-#     #
-#     # def create(self, request, *args, **kwargs):
-#     #     def add(id, parent_area=None):
-#     #         data = EquipBom.objects.get(id=id)
-#     #         d1 = EquipBom.objects.create(
-#     #             node_code=data.node_code,
-#     #             area_code=data.area_code,
-#     #             area_name=data.area_name,
-#     #             inspection_line_name=data.inspection_line_name,
-#     #             desc=data.desc,
-#     #             parent_area=data.parent_area
-#     #         )
-#     #         return d1
-#     #     data = self.request.data
-#     #     if data.get('new'):  # 新建
-#     #         id = data.get('id')  # 父节点的id
-#     #         EquipBom.objects.create(
-#     #             node_code=data.node_code,
-#     #             area_code=data.area_code,
-#     #             area_name=data.area_name,
-#     #             inspection_line_name=data.inspection_line_name,
-#     #             desc=data.desc,
-#     #             parent_area=id
-#     #         )
-#     #     else:
-#     #         res = {2: {3: {}}}
-#     #         # 添加父节点
-#     #         id_list = list(res.keys())
-#     #         for id in id_list:
-#     #             d1 = add(id)
-#     #             a1 = res.get(id)
-#     #             if not a1.get(id):
-#     #                 break
-#     #             # 添加子节点
-#     #             id_list = list(a1.keys())
-#     #             for id in id_list:
-#     #                 d2 = add(id, parent_area=d1)
-#     #                 a2 = a1.get(id)
-#     #                 if not a2.get(id):
-#     #                     break
-#     #                 # 添加子节点
-#     #                 id_list = list(a2.keys())
-#     #                 for id in id_list:
-#     #                     d3 = add(id, parent_area=d2)
-#     #                     a3 = a2.get(id)
-#     #                     if not a3.get(id):
-#     #                         break
-#     #     return Response('添加成功')
-#
-#     def list(self, request, *args, **kwargs):
-#         tree_info = self.get_queryset().first()
-#         tree = tree_info.tree if tree_info else []
-#         return Response({'result': tree})
-#
-#     def create(self, request, *args, **kwargs):
-#         # 单条新增
-#         # 复制新增
-#         pass
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipBomViewSet(ModelViewSet):
+    """
+        list:
+            设备bom信息
+        create:
+            新建备件代码定义
+        update:
+            编辑、停用备件代码定义
+        retrieve:
+            备件代码定义详情
+        """
+    queryset = EquipBom.objects.all()
+    # permission_classes = (IsAuthenticated,)
+    # serializer_class = EquipBomSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipBomFilter
+    FILE_NAME = '设备BOM'
+    EXPORT_FIELDS_DICT = {
+        "节点编号": "node_id",
+        "分厂": "factory_id",
+        "区域名称": "equip_area_name",
+        "区域编号": "equip_area_code",
+        "设备类型": "property_type_node",
+        "设备机台编号": "equip_no",
+        "设备机台名称": "equip_name",
+        "设备机台规格": "equip_type",
+        "设备机台状态": "equip_status",
+        "设备部位编号": "part_code",
+        "设备部位": "part_name",
+        "设备部件编号": "component_code",
+        "设备部件": "component_name",
+        "设备备件规格": "component_type",
+        "设备备件状态": "part_status",
+        "备件绑定信息": "component_spart_binfingflag",
+        "保养标准": "baoyang_standard_name",
+        "维修标准": "repair_standard_name",
+        "点检标准": "xunjian_standard_name",
+        "润滑标准": "runhua_standard_name",
+        "计量标定标准": "biaoding_standard_name",
+        "录入人": "created_username",
+        "录入时间": "created_date"
+    }
+
+    def get_serializer_class(self):
+        if self.action == 'update':
+            return EquipBomUpdateSerializer
+        return EquipBomSerializer
+
+    def list(self, request, *args, **kwargs):
+        tree = self.request.query_params.get('tree')
+        export = self.request.query_params.get('export')
+        if export:
+            data = EquipBomSerializer(self.filter_queryset(self.get_queryset()), many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if not tree:
+            return super().list(request, *args, **kwargs)
+        data = []
+        index_tree = {}
+        for section in self.get_queryset():
+            if section.id not in index_tree:
+                index_tree[section.id] = dict({"id": section.id, "factory_id": section.factory_id, "level": section.level, "children": []})
+            if not section.parent_flag:  # 根节点
+                data.append(index_tree[section.id])  # 浅拷贝
+                continue
+
+            if section.parent_flag_id in index_tree:  # 子节点
+                if "children" not in index_tree[section.parent_flag_id]:
+                    index_tree[section.parent_flag_id]["children"] = []
+
+                index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
+            else:  # 没有节点则加入
+                index_tree[section.parent_flag_id] = dict(
+                    {"id": section.parent_flag_id, "factory_id": section.parent_flag_id.factory_id, "level": section.level, "children": []})
+                index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
+        return Response({'results': data})
+
+    def create(self, request, *args, **kwargs):
+        def add_parent(parent_flag_id, children):
+            # 当前节点数据
+            for child in children:
+                child_current_data = EquipBom.objects.filter(id=child['current_flag_id']).values()[0]
+                child_current_data.pop('id')
+                child_current_data['parent_flag_id'] = parent_flag_id
+                child_instance = EquipBom.objects.create(**child_current_data)
+                e_chidren = child.pop('children', [])
+                if e_chidren:
+                    add_parent(child_instance.id, e_chidren)
+                else:
+                    continue
+
+        data = copy.deepcopy(self.request.data)
+        parent_flag = data.pop('parent_flag', '')
+        factory_id = data.pop('factory_id', '')
+        current_flag_id = data.pop('current_flag_id', '')
+        children = data.pop('children', [])
+        if parent_flag:  # 新建
+            return super().create(request, *args, **kwargs)
+        current_data = EquipBom.objects.filter(id=current_flag_id).values()[0]
+        if not current_data:
+            raise ValidationError(f'未找到节点数据{current_flag_id}')
+        current_data.pop('id')
+        current_data['factory_id'] = factory_id
+        instance = EquipBom.objects.create(**current_data)
+        if children:
+            add_parent(instance.id, children)
+        return Response('添加成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1343,3 +1466,22 @@ class EquipMaintenanceAreaSettingViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_fields = ('maintenance_user_id', )
+
+
+@method_decorator([api_recorder], name="dispatch")
+class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
+    """
+    list: 查询设备作业项目标准定义
+    retrieve: 设备作业项目标准定义详情
+    create: 新建设备作业项目标准定义
+    delete: 停用设备作业项目标准定义
+    """
+    queryset = EquipJobItemStandard.objects.filter(delete_flag=False).order_by("id")
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_classes = EquipJobItemStandardFilter
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EquipJobItemStandardListSerializer
+        return EquipJobItemStandardCreateSerializer
