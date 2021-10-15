@@ -558,7 +558,7 @@ class EquipFaultTypeSerializer(BaseModelSerializer):
         validators = [
             UniqueTogetherValidator(
                 queryset=model.objects.filter(delete_flag=False),
-                fields=('fault_type_name', 'use_flag'),
+                fields=('fault_type_name', ),
                 message="该类型名称已存在"
             )
         ]
