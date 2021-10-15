@@ -555,13 +555,6 @@ class EquipFaultTypeSerializer(BaseModelSerializer):
         model = EquipFaultType
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-        validators = [
-            UniqueTogetherValidator(
-                queryset=model.objects.filter(delete_flag=False),
-                fields=('fault_type_name', ),
-                message="该类型名称已存在"
-            )
-        ]
 
 
 class EquipFaultCodeSerializer(BaseModelSerializer):
