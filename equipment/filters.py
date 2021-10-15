@@ -212,8 +212,8 @@ class EquipFaultCodeFilter(django_filters.rest_framework.FilterSet):
 
 class EquipFaultSignalFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='equip__equip_no', help_text='机台编号')
-    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='机台名称')
-    signal_name = django_filters.CharFilter(field_name='signal_name', help_text='机台名称', lookup_expr='icontains')
+    equip_name = django_filters.CharFilter(field_name='equip__equip_name', help_text='机台名称', lookup_expr='icontains')
+    signal_name = django_filters.CharFilter(field_name='signal_name', help_text='信号名称', lookup_expr='icontains')
     signal_variable_type = django_filters.CharFilter(field_name='signal_variable_type', help_text='故障变量类型', lookup_expr='icontains')
 
     class Meta:
