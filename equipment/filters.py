@@ -120,7 +120,7 @@ class EquipPropertyFilter(django_filters.rest_framework.FilterSet):
 
 class EquipPartNewFilter(django_filters.rest_framework.FilterSet):
     equip_type = django_filters.NumberFilter(field_name='equip_type_id', help_text='所属主设备种类')
-    category_no = django_filters.CharFilter(field_name='equip_type__category_no', help_text='所属主设备种类', lookup_expr='icontains')
+    category_no = django_filters.NumberFilter(field_name='equip_type__id', help_text='所属主设备种类')
     global_name = django_filters.CharFilter(field_name='global_part_type__global_name', help_text='部位分类', lookup_expr='icontains')
     part_code = django_filters.CharFilter(field_name='part_code', help_text='部位代码', lookup_expr='icontains')
     part_name = django_filters.CharFilter(field_name='part_name', help_text='部位名称', lookup_expr='icontains')

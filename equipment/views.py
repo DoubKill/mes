@@ -1082,7 +1082,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
             data = self.get_queryset().values('equip_component_type__component_type_name').distinct()
             return Response({'results': data})
         elif all == '1':
-            data = EquipComponentType.objects.values('id', 'component_type_name')
+            data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
             return Response({'results': data})
         else:
             return super().list(request, *args, **kwargs)
