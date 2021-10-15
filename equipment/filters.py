@@ -175,7 +175,7 @@ class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
     spare_name = django_filters.CharFilter(field_name='spare_name', help_text='备件名称',  lookup_expr='icontains')
     supplier_name = django_filters.CharFilter(field_name='supplier_name', help_text='供应商名称', lookup_expr='icontains')
     specification = django_filters.CharFilter(field_name='specification', help_text='规格型号', lookup_expr='icontains')
-    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
+    use_flag = django_filters.CharFilter(field_name='use_flag', help_text='是否启用')
 
     class Meta:
         model = EquipSpareErp
@@ -196,7 +196,7 @@ class EquipBomFilter(django_filters.rest_framework.FilterSet):
 
 class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
     fault_type_name = django_filters.CharFilter(field_name='fault_type_name', lookup_expr='icontains', help_text='故障分类名称')
-    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='是否启用')
+    use_flag = django_filters.CharFilter(field_name='use_flag', help_text='是否启用')
 
     class Meta:
         model = EquipFaultType
@@ -208,7 +208,7 @@ class EquipFaultCodeFilter(django_filters.rest_framework.FilterSet):
     fault_type_name = django_filters.CharFilter(field_name='equip_fault_type__fault_type_name', help_text="大分类名称", lookup_expr='icontains')
     fault_name = django_filters.CharFilter(field_name='fault_name', help_text="中故障分类名称", lookup_expr='icontains')
     fault_code = django_filters.CharFilter(field_name='fault_code', help_text="中故障分类名称", lookup_expr='icontains')
-    use_flag = django_filters.BooleanFilter(field_name='use_flag', help_text='0代表启用状态')
+    use_flag = django_filters.CharFilter(field_name='use_flag', help_text='0代表启用状态')
 
     class Meta:
         model = EquipFault
