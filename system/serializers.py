@@ -134,7 +134,11 @@ class GroupUserUpdateSerializer(BaseModelSerializer):
 
 
 class SectionSerializer(BaseModelSerializer):
-
+    section_id = serializers.CharField(max_length=40,
+                                           validators=[
+                                               UniqueValidator(queryset=Section.objects.all(),
+                                                               message='该部门编号已存在'),
+                                           ])
     users = serializers.SerializerMethodField()
     in_charge_username = serializers.CharField(source='in_charge_user.username', read_only=True)
 
