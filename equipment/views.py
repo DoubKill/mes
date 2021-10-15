@@ -727,9 +727,9 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
                 # 设备供应商
                 if not equip_supplier:
                     raise ValidationError('设备制造商{}不存在'.format(item[6]))
-                area_list.append({"property_no": int(item[0]) if isinstance(item[0], float) else item[0] ,
-                                  "src_no": item[1],
-                                  "financial_no": item[2],
+                area_list.append({"property_no": int(item[0]) if isinstance(item[0], float) else item[0],
+                                  "src_no": int(item[1]) if isinstance(item[1], float) else item[1],
+                                  "financial_no": int(item[2]) if isinstance(item[2], float) else item[2],
                                   "equip_type": equip_type.id,
                                   "equip_no": item[4],
                                   "equip_name": item[5],
