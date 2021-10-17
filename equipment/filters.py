@@ -188,7 +188,7 @@ class EquipBomFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipBom
-        fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name')
+        fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name', 'level')
 
 
 class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
@@ -196,7 +196,7 @@ class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipFaultType
-        fields = ('fault_type_code', 'fault_type_name', 'use_flag')
+        fields = ('fault_type_name', 'use_flag')
 
 
 class EquipFaultCodeFilter(django_filters.rest_framework.FilterSet):
@@ -207,7 +207,7 @@ class EquipFaultCodeFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipFault
-        fields = ('id', 'fault_name', 'use_flag', 'fault_type_name')
+        fields = ('id', 'fault_name', 'use_flag', 'fault_type_name', 'fault_code')
 
 
 class EquipFaultSignalFilter(django_filters.rest_framework.FilterSet):
@@ -251,8 +251,8 @@ class EquipOrderAssignRuleFilter(django_filters.rest_framework.FilterSet):
 
 
 class EquipJobItemStandardFilter(django_filters.rest_framework.FilterSet):
-    work_type = django_filters.ChoiceFilter(field_name=EquipJobItemStandard.WORK_TYPE_CHOICE, help_text='作业类型')
-    standard_name = django_filters.CharFilter(field_name='standard_name', help_text='作业项目')
+    work_type = django_filters.ChoiceFilter(choices=EquipJobItemStandard.WORK_TYPE_CHOICE, help_text='作业类型')
+    standard_name = django_filters.CharFilter(field_name='standard_name', help_text='作业项目', lookup_expr='icontains')
 
     class Meta:
         model = EquipJobItemStandard

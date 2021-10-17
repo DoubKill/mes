@@ -626,19 +626,48 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
 
 
 class EquipJobItemStandardListSerializer(BaseModelSerializer):
-    work_detail = serializers.SerializerMethodField(help_text='作业详情')
-    created_user_name = serializers.ReadOnlyField(source='created_user.username', default=None)
+    work_details = serializers.SerializerMethodField(help_text='作业详情')
+    work_details_column = serializers.SerializerMethodField(help_text='作业详情展示列')
+    check_standard_desc_column = serializers.SerializerMethodField(help_text='判断标准列')
+    check_standard_type_column = serializers.SerializerMethodField(help_text='判断类型列')
 
-    def get_work_detail(self, obj):
+    def get_work_details(self, obj):
         # 获取作业详情
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).values('id', 'sequence', 'content',
                                                                                        'check_standard_desc',
                                                                                        'check_standard_type')
         return details
 
+    def get_work_details_column(self, obj):
+        # 获取作业详情
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id').values('sequence', 'content')
+        details_column = ''
+        for detail in details:
+            single_str = f"{detail['sequence']}、{detail['content']}；"
+            details_column += single_str
+        return details_column
+
+    def get_check_standard_desc_column(self, obj):
+        # 获取作业详情
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id').values('sequence', 'check_standard_desc')
+        details_column = ''
+        for detail in details:
+            single_str = f"{detail['sequence']}、{detail['check_standard_desc']}；"
+            details_column += single_str
+        return details_column
+
+    def get_check_standard_type_column(self, obj):
+        # 获取作业详情
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id').values('sequence', 'check_standard_type')
+        details_column = ''
+        for detail in details:
+            single_str = f"{detail['sequence']}、{detail['check_standard_type']}；"
+            details_column += single_str
+        return details_column
+
     class Meta:
         model = EquipJobItemStandard
-        fields = ('id', 'work_type', 'standard_code', 'standard_name', 'use_flag', 'work_detail', 'created_user_name')
+        fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -663,7 +692,6 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         work_details = validated_data.pop('work_details', [])
-        validated_data.update(created_user=self.context['request'].user)
         instance = EquipJobItemStandard.objects.create(**validated_data)
         for detail in work_details:
             detail['equip_standard'] = instance
@@ -672,5 +700,26 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipJobItemStandard
-        fields = ('work_type', 'standard_code', 'standard_name', 'use_flag', 'work_details')
+        fields = ('work_type', 'standard_code', 'standard_name', 'work_details')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
+    standard_name = serializers.CharField(max_length=64, help_text='作业标准名称',
+                                          validators=[UniqueValidator(queryset=EquipJobItemStandard.objects.all(),
+                                                                      message='作业标准名称已存在')])
+    work_details = EquipJobItemStandardDetailSerializer(help_text="""
+        [{"sequence": 1, "content": "外观检查", "check_standard_desc": "正常", "check_standard_type": "有无"}]""",
+                                                        write_only=True, many=True)
+
+    def update(self, instance, validated_data):
+        work_details = validated_data.pop('work_details', [])
+        for detail in work_details:
+            detail['equip_standard'] = instance
+            EquipJobItemStandardDetail.objects.create(**detail)
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = EquipJobItemStandard
+        fields = ('id', 'standard_name', 'work_details')
         read_only_fields = COMMON_READ_ONLY_FIELDS

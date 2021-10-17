@@ -582,6 +582,3 @@ class EquipBom(AbstractEntity):
     class Meta:
         db_table = 'equip_bom'
         verbose_name_plural = verbose_name = '设备BOM'
-
-
-
