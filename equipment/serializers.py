@@ -304,7 +304,8 @@ class EquipFaultSignalSerializer(BaseModelSerializer):
     equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
     equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True, default='')
-    equip_part_name = serializers.CharField(source='equip_component.equip_part.part_name', read_only=True, default='')
+    equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True, default='')
+    equip_category_id = serializers.IntegerField(source='equip.category_id', read_only=True, default='')
     use_flag_name = serializers.SerializerMethodField()
     alarm_signal_down_flag_name = serializers.SerializerMethodField()
     fault_signal_down_flag_name = serializers.SerializerMethodField()
@@ -332,7 +333,7 @@ class EquipPropertySerializer(BaseModelSerializer):
     equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
     made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商', default='')
     property_no = serializers.CharField(help_text='固定资产编码', max_length=64,
-                                      validators=[UniqueValidator(queryset=EquipProperty.objects.all(), message='固定资产名称已存在')])
+                                        validators=[UniqueValidator(queryset=EquipProperty.objects.all(), message='固定资产名称已存在')])
 
     def get_status_name(self, obj):
         dic = {

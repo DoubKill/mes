@@ -410,8 +410,8 @@ class EquipFaultSignal(AbstractEntity):
     signal_code = models.CharField(max_length=64, help_text='故障信号编码')
     signal_name = models.CharField(max_length=64, help_text='故障信号名称')
     equip = models.ForeignKey(Equip, help_text='机台', on_delete=models.CASCADE)
-    # equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
-    #                                help_text='设备部位', verbose_name='设备部位')
+    equip_part = models.ForeignKey(EquipPartNew, help_text='设备部位', verbose_name='设备部位',
+                                   on_delete=models.SET_NULL, blank=True, null=True)
     equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.SET_NULL, blank=True, null=True)
     signal_variable_name = models.CharField(max_length=64, help_text='故障变量名称', blank=True, null=True)
     signal_variable_type = models.CharField(max_length=64, help_text='故障变量类型', blank=True, null=True)
@@ -582,3 +582,78 @@ class EquipBom(AbstractEntity):
     class Meta:
         db_table = 'equip_bom'
         verbose_name_plural = verbose_name = '设备BOM'
+
+
+class EquipMaintenanceStandard(AbstractEntity):
+    standard_code = models.CharField(max_length=64, help_text='标准编号')
+    standard_name = models.CharField(max_length=64, help_text='标准名称')
+    work_type = models.CharField(max_length=64, help_text='作业类型')
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
+    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
+                                   help_text='设备部位', verbose_name='设备部位')
+    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE,
+                                        blank=True, null=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件')
+    important_level = models.CharField(max_length=64, help_text='重要程度')
+    equip_job_item_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
+    start_time = models.DateField(help_text='起始日期', blank=True, null=True)
+    maintenance_cycle = models.IntegerField(help_text='起始周期', blank=True, null=True)
+    cycle_unit = models.CharField(max_length=64, help_text='起始周期单位', blank=True, null=True)
+    cycle_num = models.IntegerField(help_text='周期数', blank=True, null=True)
+    cycle_person_num = models.IntegerField(help_text='所需人数', blank=True, null=True)
+    operation_time = models.IntegerField(help_text='作业时间', blank=True, null=True)
+    operation_time_unit = models.CharField(max_length=64, help_text='作业时间单位', blank=True, null=True)
+    remind_flag1 = models.BooleanField(help_text='是否钉钉提醒发送包干人员')
+    remind_flag2 = models.BooleanField(help_text='是否钉钉提醒发送上级人员')
+    remind_flag3 = models.BooleanField(help_text='是否钉钉提醒发送上上级人员')
+
+    class Meta:
+        db_table = 'equip_maintenance_standard'
+        verbose_name_plural = verbose_name = '设备维护作业标准定义'
+
+
+class EquipMaintenanceStandardMaterials(AbstractEntity):
+    equip_maintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='设备维护作业标准定义',
+                                                   related_name='maintenance_materials', on_delete=models.CASCADE)
+    equip_spare_erp = models.ForeignKey(EquipSpareErp, help_text='erp备件物料', on_delete=models.CASCADE)
+    quantity = models.IntegerField(help_text='数量')
+
+    class Meta:
+        db_table = 'equip_maintenance_standard_materials'
+        verbose_name_plural = verbose_name = '设备维护所需物料'
+
+
+class EquipRepairStandard(AbstractEntity):
+    standard_code = models.CharField(max_length=64, help_text='标准编号')
+    standard_name = models.CharField(max_length=64, help_text='标准名称')
+    work_type = models.CharField(max_length=64, help_text='作业类型')
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
+    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
+                                   help_text='设备部位', verbose_name='设备部位')
+    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE
+                                        , blank=True, null=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件')
+    important_level = models.CharField(max_length=64, help_text='重要程度')
+    equip_fault = models.ForeignKey(EquipFault, help_text='故障分类', on_delete=models.CASCADE)
+    equip_job_item_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
+    cycle_person_num = models.IntegerField(help_text='所需人数', blank=True, null=True)
+    operation_time = models.IntegerField(help_text='作业时间', blank=True, null=True)
+    operation_time_unit = models.CharField(max_length=64, help_text='作业时间单位', blank=True, null=True)
+    remind_flag1 = models.BooleanField(help_text='是否钉钉提醒发送包干人员')
+    remind_flag2 = models.BooleanField(help_text='是否钉钉提醒发送上级人员')
+    remind_flag3 = models.BooleanField(help_text='是否钉钉提醒发送上上级人员')
+
+    class Meta:
+        db_table = 'equip_repair_standard'
+        verbose_name_plural = verbose_name = '设备维修作业标准定义'
+
+
+class EquipRepairStandardMaterials(AbstractEntity):
+    equip_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='设备维修作业标准定义',
+                                                   related_name='repair_materials', on_delete=models.CASCADE)
+    equip_spare_erp = models.ForeignKey(EquipSpareErp, help_text='erp备件物料', on_delete=models.CASCADE)
+    quantity = models.IntegerField(help_text='数量')
+
+    class Meta:
+        db_table = 'equip_repair_standard_materials'
+        verbose_name_plural = verbose_name = '设备维护所需物料'
