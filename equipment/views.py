@@ -1375,11 +1375,14 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
         signal_list = []
         for item in data:
             equip = Equip.objects.filter(equip_no=item[2]).first()
+            equip_part = EquipPartNew.objects.filter(part_name=item[4]).first()
             equip_component = EquipComponent.objects.filter(component_name=item[5]).first()
             if not equip:
                 raise ValidationError('机台编号{}不存在'.format(item[2]))
             if not equip_component:
                 equip_component = None
+            if not equip_part:
+                equip_part = None
             if not EquipFaultSignal.objects.filter(Q(signal_code=item[0]) | Q(signal_name=item[1])).exists():
                 signal_list.append({"signal_code": item[0],
                                     "signal_name": item[1],
@@ -1396,6 +1399,7 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
                                     "fault_signal_down_flag": True if item[16] == 'Y' else False,
                                     "fault_signal_desc": item[17],
                                     "equip": equip.id,
+                                    "equip_part": equip_part.id if equip_part else None,
                                     "equip_component": equip_component.id if equip_component else None,
                                     })
         s = EquipFaultSignalSerializer(data=signal_list, many=True, context={'request': request})
