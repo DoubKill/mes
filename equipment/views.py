@@ -638,7 +638,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet, start_row=1)
         area_list = []
         for item in data:
-            obj = EquipSupplier.objects.filter(supplier_code=item[0]).first()
+            obj = EquipSupplier.objects.filter(Q(supplier_code=item[0]) | Q(supplier_name=item[1])).first()
             if not obj:
                 if item[5] not in ['普通供应商', '集采供应商']:
                     raise ValidationError('该供应商类别不存在')
@@ -779,7 +779,7 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         area_list = []
         for item in data:
-            obj = EquipAreaDefine.objects.filter(area_code=item[0]).first()
+            obj = EquipAreaDefine.objects.filter(Q(area_code=item[0]) | Q(area_name=item[1])).first()
             if not obj:
                 area_list.append({"area_code": item[0],
                                   "area_name": item[1],
@@ -834,7 +834,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
                 raise ValidationError('主设备种类{}不存在'.format(item[0]))
             if not global_part_type:
                 raise ValidationError('部位分类{}不存在'.format(item[1]))
-            obj = EquipPartNew.objects.filter(part_code=item[2]).first()
+            obj = EquipPartNew.objects.filter(Q(part_code=item[2]) | Q(part_name=item[3])).first()
             if not obj:
                 parts_list.append({"equip_type": equip_type.id,
                                    "global_part_type": global_part_type.id,
@@ -895,7 +895,8 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
-            obj = EquipComponentType.objects.filter(component_type_code=item[0]).first()
+            obj = EquipComponentType.objects.filter(Q(component_type_code=item[0]) |
+                                                    Q(component_type_name=item[1])).first()
             if not obj:
                 parts_list.append({"component_type_code": item[0],
                                    "component_type_name": item[1]})
@@ -990,7 +991,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
             if not equip_component_type:
                 raise ValidationError('部件分类{}不存在'.format(item[2]))
             equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id, global_part_type=global_part_type.id).first()
-            obj = EquipComponent.objects.filter(component_code=item[3]).first()
+            obj = EquipComponent.objects.filter(Q(component_code=item[3]) | Q(component_name=item[4])).first()
             if not obj:
                 parts_list.append({"equip_part": equip_part.id,
                                    "equip_component_type": equip_component_type.id,
@@ -1379,7 +1380,7 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
                 raise ValidationError('机台编号{}不存在'.format(item[2]))
             if not equip_component:
                 equip_component = None
-            if not EquipFaultSignal.objects.filter(signal_code=item[0]).exists():
+            if not EquipFaultSignal.objects.filter(Q(signal_code=item[0]) | Q(signal_name=item[1])).exists():
                 signal_list.append({"signal_code": item[0],
                                     "signal_name": item[1],
                                     "signal_variable_name": str(item[6]),
@@ -1471,7 +1472,7 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
             equip_type = GlobalCode.objects.filter(global_name=item[3]).first()
             if not equip_type:
                 raise ValidationError('设备类型{}不存在'.format(item[3]))
-            if not EquipOrderAssignRule.objects.filter(rule_code=item[0]).exists():
+            if not EquipOrderAssignRule.objects.filter(Q(rule_code=item[0]) | Q(rule_name=item[1])).exists():
                 signal_list.append({"rule_code": item[0],
                                     "rule_name": item[1],
                                     "work_type": item[2],
