@@ -1242,8 +1242,8 @@ class EquipBomViewSet(ModelViewSet):
             # return super().create(request, *args, **kwargs)
             parent_flag_info = EquipBom.objects.filter(id=parent_flag).first()
             curr_data = {'factory_id': factory_id, 'parent_flag': parent_flag_info.id}
-            if parent_flag_info.level == 1:
-                curr_data.update({'level': 2})
+            if parent_flag_info.level == 1 or parent_flag_info.level == 0:
+                curr_data.update({'level': parent_flag_info.level + 1})
             elif parent_flag_info.level == 2:
                 equip = Equip.objects.filter(id=equip_info_id).first()
                 curr_data.update({'property_type_node': parent_flag_info.factory_id, 'equip_no': equip.equip_no,
@@ -1318,6 +1318,7 @@ class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipFault.objects.filter(delete_flag=False, equip_fault_type__use_flag=1).order_by("id")
     serializer_class = EquipFaultCodeSerializer
     # permission_classes = (IsAuthenticated,)
+    pagination_class = None
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFaultCodeFilter
 
