@@ -553,6 +553,7 @@ class EquipBom(AbstractEntity):
     node_id = models.CharField(max_length=64, help_text='节点编号', null=True, blank=True)
     factory_id = models.CharField(max_length=64, help_text='分厂名称', null=True, blank=True)
     equip_info = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='设备信息', null=True, blank=True)
+    property_type = models.ForeignKey(GlobalCode, on_delete=models.CASCADE, help_text='设备类型ID', null=True, blank=True)
     property_type_node = models.CharField(max_length=64, help_text='设备类型', null=True, blank=True)
     equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
     equip_name = models.CharField(max_length=64, help_text='机台名称', null=True, blank=True)

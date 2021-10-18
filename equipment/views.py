@@ -854,7 +854,8 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
             data = self.get_serializer(queryset, many=True).data
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
-            data = EquipPartNew.objects.filter(use_flag=True).values('id', 'part_name')
+            use_flag = [True] if not self.request.query_params.get('all_part') else [True, False]
+            data = EquipPartNew.objects.filter(use_flag__in=use_flag).values('id', 'part_name')
             return Response({'results': data})
         return super().list(request, *args, **kwargs)
 
@@ -969,6 +970,9 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         if export:
             data = self.get_serializer(query_set, many=True).data
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if self.request.query_params.get('all'):
+            data = self.get_queryset().filter(use_flag=True).values('id', 'component_name')
+            return Response({'results': data})
         return super(EquipComponentViewSet, self).list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
@@ -1139,7 +1143,6 @@ class EquipBomViewSet(ModelViewSet):
         """
     queryset = EquipBom.objects.all()
     # permission_classes = (IsAuthenticated,)
-    # serializer_class = EquipBomSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipBomFilter
     FILE_NAME = '设备BOM'
@@ -1185,19 +1188,34 @@ class EquipBomViewSet(ModelViewSet):
         data = []
         index_tree = {}
         for section in self.get_queryset():
-            # 机台id
-            equip_info_id = '' if not section.equip_info else section.equip_info_id
-            # 机型id
-            equip_category_id = '' if not section.equip_info else section.equip_info.category_id
+            equip_property_type_id = equip_property_type_name = equip_info_id = equip_info_code = equip_category_id = \
+                equip_part_id = equip_part_code = equip_component_id = equip_component_code = ''
+            # 设备类型id
+            if section.property_type_id:
+                equip_property_type_id = section.property_type_id
+                equip_property_type_name = section.property_type_node
+            # 机台id和机型id
+            if section.equip_info:
+                equip_info_id = section.equip_info_id
+                equip_info_code = section.equip_info.equip_no
+                equip_category_id = section.equip_info.category_id
             # 部位id
-            equip_part_id = '' if not section.part else section.part_id
+            if section.part:
+                equip_part_id = section.part_id
+                equip_part_code = section.part.part_code
             # 部件id
-            equip_component_id = '' if not section.component else section.component_id
+            if section.component:
+                equip_component_id = section.component_id
+                equip_component_code = section.component.component_code
             if section.id not in index_tree:
                 index_tree[section.id] = dict({"id": section.id, "factory_id": section.factory_id,
                                                "level": section.level, "children": [],
                                                "equip_category_id": equip_category_id,
-                                               "equip_part_id": equip_part_id, 'equip_info_id': equip_info_id,
+                                               "equip_component_code": equip_component_code,
+                                               "equip_part_code": equip_part_code, "equip_info_name": equip_info_code,
+                                               "equip_property_type_name": equip_property_type_name,
+                                               "equip_property_type_id": equip_property_type_id,
+                                               "equip_part_id": equip_part_id, "equip_info_id": equip_info_id,
                                                "equip_component_id": equip_component_id})
             if not section.parent_flag:  # 根节点
                 data.append(index_tree[section.id])  # 浅拷贝
@@ -1212,65 +1230,104 @@ class EquipBomViewSet(ModelViewSet):
                 index_tree[section.parent_flag_id] = dict(
                     {"id": section.parent_flag_id, "factory_id": section.parent_flag_id.factory_id,
                      "level": section.level, "children": [], "equip_category_id": equip_category_id,
-                     "equip_part_id": equip_part_id, 'equip_info_id': equip_info_id,
-                     "equip_component_id": equip_component_id})
+                     "equip_part_id": equip_part_id, "equip_component_id": equip_component_id,
+                     'equip_info_id': equip_info_id, 'equip_property_type_id': equip_property_type_id,
+                     "equip_property_type_name": equip_property_type_name, "equip_component_name": equip_component_code,
+                     "equip_part_name": equip_part_code, "equip_info_name": equip_info_code})
                 index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
         return Response({'results': data})
 
     def create(self, request, *args, **kwargs):
-        def add_parent(parent_flag_id, children):
+        def add_parent(instance, children):
             # 当前节点数据
             for child in children:
-                child_current_data = EquipBom.objects.filter(id=child['current_flag_id']).values()[0]
+                child_current_data = EquipBom.objects.filter(id=child['id']).values()[0]
                 child_current_data.pop('id')
-                child_current_data['parent_flag_id'] = parent_flag_id
+                child_current_data['parent_flag_id'] = instance.id
+                if child_current_data['level'] == 2:
+                    child_current_data.update({'property_type_id': instance.property_type,
+                                               'property_type_node': instance.property_type_node})
+                elif child_current_data['level'] == 3:
+                    child_current_data.update({'property_type_id': instance.property_type_id,
+                                               'property_type_node': instance.property_type_node,
+                                               'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
+                                               'equip_status': instance.description,
+                                               'equip_type': instance.category.category_name, 'equip_info_id': instance.equip_info_id})
+                elif child_current_data['level'] == 4:
+                    child_current_data.update({'property_type_id': instance.property_type_id,
+                                               'property_type_node': instance.property_type_node,
+                                               'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
+                                               'equip_status': instance.equip_status,
+                                               'equip_info_id': instance.equip_info_id,
+                                               'equip_type': instance.equip_type,})
+                elif child_current_data['level'] == 5:
+                    child_current_data.update({'property_type_id': instance.property_type_id,
+                                               'property_type_node': instance.property_type_node,
+                                               'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
+                                               'equip_status': instance.equip_status,
+                                               'equip_info_id': instance.equip_info_id,
+                                               'equip_type': instance.equip_type,
+                                               'part_id': instance.part_id, 'part_name': instance.part_name})
+                else:
+                    pass
                 child_instance = EquipBom.objects.create(**child_current_data)
                 e_chidren = child.pop('children', [])
                 if e_chidren:
-                    add_parent(child_instance.id, e_chidren)
+                    add_parent(child_instance, e_chidren)
                 else:
                     continue
         data = copy.deepcopy(self.request.data)
+        handle = data.pop('handle')
         parent_flag = data.pop('parent_flag', '')
-        factory_id = data.pop('factory_id', '')
+        factory = data.pop('factory_id')
+        factory_id = factory.strip()
         current_flag_id = data.pop('current_flag_id', '')
         equip_category_id = data.get('equip_category_id')
-        equip_info_id = data.get('equip_info_id')
-        equip_part_id = data.get('equip_part_id')
-        equip_component_id = data.get('equip_component_id')
+        curr_label_obj_id = data.get('curr_label_obj_id')
         children = data.pop('children', [])
-        if parent_flag:  # 新建
-            # return super().create(request, *args, **kwargs)
-            parent_flag_info = EquipBom.objects.filter(id=parent_flag).first()
+        parent_flag_info = EquipBom.objects.filter(id=parent_flag).first()
+        children_of_parent = EquipBom.objects.filter(parent_flag=parent_flag)
+        if not handle:  # 新建
             curr_data = {'factory_id': factory_id, 'parent_flag': parent_flag_info.id}
-            if parent_flag_info.level == 1 or parent_flag_info.level == 0:
-                curr_data.update({'level': parent_flag_info.level + 1})
+            if parent_flag_info.level == 0:
+                if children_of_parent.filter(factory_id=factory_id):
+                    raise ValidationError('工厂名称已经存在')
+                curr_data.update({'level': 1})
+            elif parent_flag_info.level == 1:
+                equip_property_type = GlobalCode.objects.filter(id=curr_label_obj_id).first()
+                if children_of_parent.filter(property_type=equip_property_type.id):
+                    raise ValidationError('设备类型已经存在')
+                curr_data.update({'level': 2, 'property_type': equip_property_type.id,
+                                  'property_type_node': equip_property_type.global_name})
             elif parent_flag_info.level == 2:
-                equip = Equip.objects.filter(id=equip_info_id).first()
-                curr_data.update({'property_type_node': parent_flag_info.factory_id, 'equip_no': equip.equip_no,
+                equip = Equip.objects.filter(id=curr_label_obj_id).first()
+                if children_of_parent.filter(equip_info=equip.id):
+                    raise ValidationError('设备已经存在')
+                curr_data.update({'property_type': parent_flag_info.property_type_id,
+                                  'property_type_node': parent_flag_info.factory_id, 'equip_no': equip.equip_no,
                                   'equip_name': equip.equip_name, 'equip_status': equip.description, 'level': 3,
-                                  'equip_type': equip.category.category_name, 'equip_info': equip_info_id})
+                                  'equip_type': equip.category.category_name, 'equip_info': curr_label_obj_id})
             elif parent_flag_info.level == 3:
-                equip_part = EquipPartNew.objects.filter(id=equip_part_id).first()
-                curr_data.update({'property_type_node': parent_flag_info.property_type_node,
+                equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
+                if children_of_parent.filter(part=equip_part.id):
+                    raise ValidationError('设备部位已经存在')
+                curr_data.update({'property_type': parent_flag_info.property_type_id,
+                                  'property_type_node': parent_flag_info.property_type_node,
                                   'equip_no': parent_flag_info.equip_no, 'equip_name': parent_flag_info.equip_name,
                                   'equip_status': parent_flag_info.equip_status, 'equip_info': parent_flag_info.equip_info_id,
                                   'equip_type': parent_flag_info.equip_type, 'level': 4,
-                                  'part': equip_part_id, 'part_name': equip_part.part_name})
-                # if not parent_flag_info.part:
-                #     parent_flag_info.part = equip_part_id
-                #     parent_flag_info.part_name = equip_part.part_name
+                                  'part': curr_label_obj_id, 'part_name': equip_part.part_name})
             else:
-                equip_component = EquipComponent.objects.filter(id=equip_component_id).first()
-                curr_data.update({'property_type_node': parent_flag_info.property_type_node,
+                equip_component = EquipComponent.objects.filter(id=curr_label_obj_id).first()
+                if children_of_parent.filter(component=equip_component.id):
+                    raise ValidationError('设备部件已经存在')
+                curr_data.update({'property_type': parent_flag_info.property_type_id,
+                                  'property_type_node': parent_flag_info.property_type_node,
                                   'equip_no': parent_flag_info.equip_no, 'equip_name': parent_flag_info.equip_name,
                                   'equip_status': parent_flag_info.equip_status, 'equip_info': parent_flag_info.equip_info_id,
                                   'equip_type': parent_flag_info.equip_type, 'level': 5,
                                   'part': parent_flag_info.part_id, 'part_name': parent_flag_info.part_name,
-                                  'component': equip_component_id, 'component_name': equip_component.component_name})
-                # if not parent_flag_info.component:
-                #     parent_flag_info.component = equip_component_id
-                #     parent_flag_info.component_name = equip_component.component_name
+                                  'component': curr_label_obj_id, 'component_name': equip_component.component_name})
             serializer = self.get_serializer(data=curr_data)
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
@@ -1279,11 +1336,37 @@ class EquipBomViewSet(ModelViewSet):
         current_data = EquipBom.objects.filter(id=current_flag_id).values()[0]
         if not current_data:
             raise ValidationError(f'未找到节点数据{current_flag_id}')
+        if current_data['level'] == 1:
+            if EquipBom.objects.filter(factory_id=factory_id):
+                raise ValidationError('工厂名称已经存在')
+        elif current_data['level'] == 2:
+            if children_of_parent.filter(property_type=curr_label_obj_id):
+                raise ValidationError('设备类型已经存在')
+            equip_property_type = GlobalCode.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'property_type_id': curr_label_obj_id, 'property_type_node': equip_property_type.global_name})
+        elif current_data['level'] == 3:
+            if children_of_parent.filter(equip_info=curr_label_obj_id):
+                raise ValidationError('设备已经存在')
+            equip = Equip.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'equip_info_id': curr_label_obj_id, 'equip_no': equip.equip_no,
+                                 'equip_name': equip.equip_name, 'equip_type': equip.category.category_name,
+                                 'equip_status': equip.description})
+        elif current_data['level'] == 4:
+            if children_of_parent.filter(part=curr_label_obj_id):
+                raise ValidationError('设备部件已经存在')
+            equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'part': curr_label_obj_id, 'part_name': equip_part.part_name})
+        else:
+            if children_of_parent.filter(component=curr_label_obj_id):
+                raise ValidationError('设备部件已经存在')
+            equip_component = EquipComponent.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'component': curr_label_obj_id, 'component_name': equip_component.component_name})
         current_data.pop('id')
         current_data['factory_id'] = factory_id
+        current_data['parent_flag_id'] = parent_flag
         instance = EquipBom.objects.create(**current_data)
         if children:
-            add_parent(instance.id, children)
+            add_parent(instance, children)
         return Response('添加成功')
 
 

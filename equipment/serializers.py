@@ -564,6 +564,8 @@ class EquipFaultCodeSerializer(BaseModelSerializer):
     fault_type_name = serializers.ReadOnlyField(source='equip_fault_type.fault_type_name')
     fault_code = serializers.CharField(max_length=64, validators=[UniqueValidator(queryset=EquipFault.objects.all(),
                                                                                   message='该公共代码编号已存在')])
+    fault_name = serializers.CharField(max_length=64, validators=[UniqueValidator(queryset=EquipFault.objects.all(),
+                                                                                  message='该公共代码名称已存在')])
 
     @staticmethod
     def validate_equip_fault_type(equip_fault_type):
