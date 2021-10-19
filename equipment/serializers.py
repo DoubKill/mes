@@ -693,6 +693,7 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         work_details = validated_data.pop('work_details', [])
+        validated_data['created_user'] = self.context['request'].user
         instance = EquipJobItemStandard.objects.create(**validated_data)
         for detail in work_details:
             detail['equip_standard'] = instance
@@ -715,6 +716,9 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         work_details = validated_data.pop('work_details', [])
+        # 删除之前的作业内容
+        EquipJobItemStandardDetail.objects.filter(equip_standard=instance.id).delete()
+        validated_data['last_updated_user'] = self.context['request'].user
         for detail in work_details:
             detail['equip_standard'] = instance
             EquipJobItemStandardDetail.objects.create(**detail)
@@ -722,7 +726,7 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipJobItemStandard
-        fields = ('id', 'standard_name', 'work_details')
+        fields = ('standard_name', 'work_details')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 

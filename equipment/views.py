@@ -1630,7 +1630,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
     create: 新建设备作业项目标准定义
     delete: 停用设备作业项目标准定义
     """
-    queryset = EquipJobItemStandard.objects.filter(delete_flag=False).order_by("id")
+    queryset = EquipJobItemStandard.objects.filter(delete_flag=False).order_by("-created_date")
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipJobItemStandardFilter
