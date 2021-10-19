@@ -1605,7 +1605,7 @@ class EquipTargetMTBFMTTRSettingView(APIView):
 
 
 @method_decorator([api_recorder], name="dispatch")
-class EquipMaintenanceAreaSettingViewSet(CommonDeleteMixin, ModelViewSet):
+class EquipMaintenanceAreaSettingViewSet(ModelViewSet):
     queryset = EquipMaintenanceAreaSetting.objects.filter(delete_flag=False).order_by("id")
     serializer_class = EquipMaintenanceAreaSettingSerializer
     permission_classes = (IsAuthenticated,)
