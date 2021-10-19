@@ -1143,34 +1143,35 @@ class EquipBomViewSet(ModelViewSet):
         """
     queryset = EquipBom.objects.all()
     # permission_classes = (IsAuthenticated,)
+    pagination_class = None
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipBomFilter
-    FILE_NAME = '设备BOM'
-    EXPORT_FIELDS_DICT = {
-        "节点编号": "node_id",
-        "分厂": "factory_id",
-        "区域名称": "equip_area_name",
-        "区域编号": "equip_area_code",
-        "设备类型": "property_type_node",
-        "设备机台编号": "equip_no",
-        "设备机台名称": "equip_name",
-        "设备机台规格": "equip_type",
-        "设备机台状态": "equip_status",
-        "设备部位编号": "part_code",
-        "设备部位": "part_name",
-        "设备部件编号": "component_code",
-        "设备部件": "component_name",
-        "设备备件规格": "component_type",
-        "设备备件状态": "part_status",
-        "备件绑定信息": "component_spart_binfingflag",
-        "保养标准": "baoyang_standard_name",
-        "维修标准": "repair_standard_name",
-        "点检标准": "xunjian_standard_name",
-        "润滑标准": "runhua_standard_name",
-        "计量标定标准": "biaoding_standard_name",
-        "录入人": "created_username",
-        "录入时间": "created_date"
-    }
+    # FILE_NAME = '设备BOM'
+    # EXPORT_FIELDS_DICT = {
+    #     "节点编号": "node_id",
+    #     "分厂": "factory_id",
+    #     "区域名称": "equip_area_name",
+    #     "区域编号": "equip_area_code",
+    #     "设备类型": "property_type_node",
+    #     "设备机台编号": "equip_no",
+    #     "设备机台名称": "equip_name",
+    #     "设备机台规格": "equip_type",
+    #     "设备机台状态": "equip_status",
+    #     "设备部位编号": "part_code",
+    #     "设备部位": "part_name",
+    #     "设备部件编号": "component_code",
+    #     "设备部件": "component_name",
+    #     "设备备件规格": "component_type",
+    #     "设备备件状态": "part_status",
+    #     "备件绑定信息": "component_spart_binfingflag",
+    #     "保养标准": "baoyang_standard_name",
+    #     "维修标准": "repair_standard_name",
+    #     "点检标准": "xunjian_standard_name",
+    #     "润滑标准": "runhua_standard_name",
+    #     "计量标定标准": "biaoding_standard_name",
+    #     "录入人": "created_username",
+    #     "录入时间": "created_date"
+    # }
 
     def get_serializer_class(self):
         if self.action == 'update':
@@ -1179,11 +1180,15 @@ class EquipBomViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         tree = self.request.query_params.get('tree')
+        title = self.request.query_params.get('title')
         export = self.request.query_params.get('export')
         if export:
             data = EquipBomSerializer(self.filter_queryset(self.get_queryset()), many=True).data
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if not tree:
+            if title:
+                data = self.filter_queryset(self.get_queryset()).values('id', 'factory_id')
+                return Response({'results': data})
             return super().list(request, *args, **kwargs)
         data = []
         index_tree = {}
@@ -1241,7 +1246,7 @@ class EquipBomViewSet(ModelViewSet):
         def add_parent(instance, children):
             # 当前节点数据
             for child in children:
-                child_current_data = EquipBom.objects.filter(id=child['id']).values()[0]
+                child_current_data = EquipBom.objects.filter(id=child['id']).values().first()
                 child_current_data.pop('id')
                 child_current_data['parent_flag_id'] = instance.id
                 if child_current_data['level'] == 2:
@@ -1251,7 +1256,7 @@ class EquipBomViewSet(ModelViewSet):
                     child_current_data.update({'property_type_id': instance.property_type_id,
                                                'property_type_node': instance.property_type_node,
                                                'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
-                                               'equip_status': instance.description,
+                                               'equip_status': '启用' if instance.use_flag else '停用',
                                                'equip_type': instance.category.category_name, 'equip_info_id': instance.equip_info_id})
                 elif child_current_data['level'] == 4:
                     child_current_data.update({'property_type_id': instance.property_type_id,
@@ -1259,7 +1264,7 @@ class EquipBomViewSet(ModelViewSet):
                                                'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
                                                'equip_status': instance.equip_status,
                                                'equip_info_id': instance.equip_info_id,
-                                               'equip_type': instance.equip_type,})
+                                               'equip_type': instance.equip_type})
                 elif child_current_data['level'] == 5:
                     child_current_data.update({'property_type_id': instance.property_type_id,
                                                'property_type_node': instance.property_type_node,
@@ -1282,7 +1287,6 @@ class EquipBomViewSet(ModelViewSet):
         factory = data.pop('factory_id')
         factory_id = factory.strip()
         current_flag_id = data.pop('current_flag_id', '')
-        equip_category_id = data.get('equip_category_id')
         curr_label_obj_id = data.get('curr_label_obj_id')
         children = data.pop('children', [])
         parent_flag_info = EquipBom.objects.filter(id=parent_flag).first()
@@ -1305,8 +1309,8 @@ class EquipBomViewSet(ModelViewSet):
                     raise ValidationError('设备已经存在')
                 curr_data.update({'property_type': parent_flag_info.property_type_id,
                                   'property_type_node': parent_flag_info.factory_id, 'equip_no': equip.equip_no,
-                                  'equip_name': equip.equip_name, 'equip_status': equip.description, 'level': 3,
-                                  'equip_type': equip.category.category_name, 'equip_info': curr_label_obj_id})
+                                  'equip_name': equip.equip_name, 'equip_status': '启用' if equip.use_flag else '停用',
+                                  'level': 3, 'equip_type': equip.category.category_name, 'equip_info': curr_label_obj_id})
             elif parent_flag_info.level == 3:
                 equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
                 if children_of_parent.filter(part=equip_part.id):
@@ -1333,9 +1337,9 @@ class EquipBomViewSet(ModelViewSet):
             self.perform_create(serializer)
             headers = self.get_success_headers(serializer.data)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        current_data = EquipBom.objects.filter(id=current_flag_id).values()[0]
+        current_data = EquipBom.objects.filter(id=current_flag_id).values().first()
         if not current_data:
-            raise ValidationError(f'未找到节点数据{current_flag_id}')
+            raise ValidationError(f'未找到节点数据, 不可粘贴')
         if current_data['level'] == 1:
             if EquipBom.objects.filter(factory_id=factory_id):
                 raise ValidationError('工厂名称已经存在')
@@ -1350,7 +1354,7 @@ class EquipBomViewSet(ModelViewSet):
             equip = Equip.objects.filter(id=curr_label_obj_id).first()
             current_data.update({'equip_info_id': curr_label_obj_id, 'equip_no': equip.equip_no,
                                  'equip_name': equip.equip_name, 'equip_type': equip.category.category_name,
-                                 'equip_status': equip.description})
+                                 'equip_status': '启用' if equip.use_flag else '停用'})
         elif current_data['level'] == 4:
             if children_of_parent.filter(part=curr_label_obj_id):
                 raise ValidationError('设备部件已经存在')
@@ -1505,7 +1509,7 @@ class EquipMachineHaltTypeViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")  # 本来是删除，现在改为是启用就改为禁用 是禁用就改为启用
 class EquipMachineHaltReasonViewSet(CommonDeleteMixin, ModelViewSet):
-    queryset = EquipMachineHaltReason.objects.order_by("id")
+    queryset = EquipMachineHaltReason.objects.filter(equip_machine_halt_type__use_flag=1).order_by("id")
     serializer_class = EquipMachineHaltReasonSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)

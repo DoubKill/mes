@@ -405,6 +405,12 @@ class EquipMachineHaltReasonSerializer(BaseModelSerializer):
                         message='该停机原因名称已存在')])
     equip_faults = serializers.SerializerMethodField(read_only=True)
 
+    @staticmethod
+    def validate_equip_machine_halt_type(equip_machine_halt_type):
+        if equip_machine_halt_type.use_flag == 0:
+            raise serializers.ValidationError('弃用状态的停机类型不可新建')
+        return equip_machine_halt_type
+
     def update(self, instance, validated_data):
         instance.equip_fault.clear()
         return super().update(instance, validated_data)
