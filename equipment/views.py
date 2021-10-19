@@ -19,7 +19,8 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter
 from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
-    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard
+    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard, EquipWarehouseArea, \
+    EquipWarehouseLocation
 from equipment.serializers import *
 from equipment.task import property_template, property_import, export_xls
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -1684,3 +1685,29 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         else:
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
+
+
+class EquipWarehouseAreaViewSet(ModelViewSet):
+    """
+    list: 库区展示
+    create: 添加库区
+    update: 修改库区信息
+    delete: 删除库区
+    """
+    queryset = EquipWarehouseArea.objects.filter(use_flag=1)
+    serializer_class = EquipWarehouseAreaSerializer
+    pagination_class = None
+    permission_classes = (IsAuthenticated,)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # 库位有货物时, 不可删除
+        locations = EquipWarehouseLocation.objects.filter(equip_warehouse_area=instance.id)
+
+        if instance.use_flag:
+            instance.use_flag = 0
+        else:
+            instance.use_flag = 1
+        instance.last_updated_user = request.user
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
