@@ -12,7 +12,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
     PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
-    EquipComponent, EquipComponentType, EquipArea, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
+    EquipComponent, EquipComponentType, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
     PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
     EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard
 from mes.base_serializer import BaseModelSerializer
@@ -452,14 +452,6 @@ class EquipOrderAssignRuleSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipOrderAssignRule
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class EquipAreaSerializer(BaseModelSerializer):
-
-    class Meta:
-        model = EquipArea
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 

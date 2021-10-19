@@ -231,22 +231,6 @@ class EquipProperty(AbstractEntity):
         verbose_name_plural = verbose_name = '设备固定资产'
 
 
-class EquipArea(AbstractEntity):
-    """
-        设备区域
-    """
-    node_code = models.CharField(max_length=64, help_text='节点编号')
-    area_code = models.CharField(max_length=64, help_text='区域编号')
-    area_name = models.CharField(max_length=64, help_text='区域名称')
-    inspection_line_name = models.ForeignKey(GlobalCode, help_text='巡检路线名称', on_delete=models.CASCADE)
-    desc = models.CharField(max_length=256, help_text='备注说明', blank=True, null=True)
-    parent_area = models.ForeignKey('self', help_text='父节点', on_delete=models.CASCADE, null=True)
-
-    class Meta:
-        db_table = 'equip_area'
-        verbose_name_plural = verbose_name = '设备区域'
-
-
 class EquipAreaDefine(AbstractEntity):
     """
         设备区域定义
@@ -502,7 +486,7 @@ class EquipMaintenanceAreaSetting(AbstractEntity):
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.SET_NULL,
                                    help_text='设备部位', blank=True, null=True)
-    equip_area = models.ForeignKey(EquipArea, on_delete=models.SET_NULL,
+    equip_area = models.ForeignKey(EquipAreaDefine, on_delete=models.SET_NULL,
                                    help_text='设备区域', blank=True, null=True)
 
     class Meta:
