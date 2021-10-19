@@ -83,8 +83,8 @@ router.register('equip-order-assign-rule', EquipOrderAssignRuleViewSet)
 # 维护包干设置
 router.register('equip-maintenance-area-settings', EquipMaintenanceAreaSettingViewSet)
 
-# # 设备作业项目标准定义
-# router.register('equip-job-item-standard', EquipJobItemStandardViewSet)
+# 设备作业项目标准定义
+router.register('equip-job-item-standard', EquipJobItemStandardViewSet)
 #
 # # 备件库库区
 # router.register('equip-warehouse-area', EquipWarehouseAreaViewSet)

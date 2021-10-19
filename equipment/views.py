@@ -1235,7 +1235,7 @@ class EquipBomViewSet(ModelViewSet):
                 index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
             else:  # 没有节点则加入
                 index_tree[section.parent_flag_id] = dict(
-                    {"id": section.parent_flag_id, "factory_id": section.parent_flag.factory_id,
+                    {"id": section.parent_flag_id, "factory_id": section.factory_id,
                      "level": section.level, "children": [], "equip_category_id": equip_category_id,
                      "equip_part_id": equip_part_id, "equip_component_id": equip_component_id,
                      'equip_info_id': equip_info_id, 'equip_property_type_id': equip_property_type_id,
