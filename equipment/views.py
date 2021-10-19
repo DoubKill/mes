@@ -19,8 +19,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter
 from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
-    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard, EquipWarehouseArea, \
-    EquipWarehouseLocation
+    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard
 from equipment.serializers import *
 from equipment.task import property_template, property_import, export_xls
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -329,8 +328,6 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
         return Response(serializer.data)
 
 
-
-
 @method_decorator([api_recorder], name="dispatch")
 class PersonalStatisticsView(APIView):
     permission_classes = (IsAuthenticated,)
@@ -601,17 +598,18 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
 
     FILE_NAME = '供应商管理台账'
     EXPORT_FIELDS_DICT = {'供应商编号': 'supplier_code',
-                            '供应商名称': 'supplier_name',
-                            '地域': 'region',
-                            '联系人名称': 'contact_name',
-                            '联系人电话': 'contact_phone',
-                            '供应商类别': 'supplier_type',
-                            '是否启用': 'use_flag_name',
-                            '录入者': 'created_username',
-                            '录入时间': 'created_date',
+                          '供应商名称': 'supplier_name',
+                          '地域': 'region',
+                          '联系人名称': 'contact_name',
+                          '联系人电话': 'contact_phone',
+                          '供应商类别': 'supplier_type',
+                          '是否启用': 'use_flag_name',
+                          '录入者': 'created_username',
+                          '录入时间': 'created_date',
                           }
 
     """数据导出"""
+
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export')
         all = self.request.query_params.get('all')
@@ -671,23 +669,23 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
 
     FILE_NAME = '设备固定资产台账'
     EXPORT_FIELDS_DICT = {
-                    '固定资产': 'property_no',
-                    '原编码': 'src_no',
-                    '财务编码': 'financial_no',
-                    '设备型号': 'equip_type_no',
-                    '设备编码': 'equip_no',
-                    '设备名称': 'equip_name',
-                    '设备制造商': 'made_in',
-                    '产能': 'capacity',
-                    '价格': 'price',
-                    '状态': 'status_name',
-                    '设备类型': 'equip_type_name',
-                    '出厂编码': 'leave_factory_no',
-                    '出厂日期': 'leave_factory_date',
-                    '使用日期': 'use_date',
-                    '录入人': 'created_username',
-                    '录入日期': 'created_date',
-                    }
+        '固定资产': 'property_no',
+        '原编码': 'src_no',
+        '财务编码': 'financial_no',
+        '设备型号': 'equip_type_no',
+        '设备编码': 'equip_no',
+        '设备名称': 'equip_name',
+        '设备制造商': 'made_in',
+        '产能': 'capacity',
+        '价格': 'price',
+        '状态': 'status_name',
+        '设备类型': 'equip_type_name',
+        '出厂编码': 'leave_factory_no',
+        '出厂日期': 'leave_factory_date',
+        '使用日期': 'use_date',
+        '录入人': 'created_username',
+        '录入日期': 'created_date',
+    }
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -696,6 +694,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     """数据导出"""
+
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export')
         queryset = self.filter_queryset(self.get_queryset())
@@ -807,7 +806,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipPartNew.objects.all().order_by('-id')
     serializer_class = EquipPartNewSerializer
     # permission_classes = (IsAuthenticated)
-    filter_backends = (DjangoFilterBackend, )
+    filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartNewFilter
     FILE_NAME = '设备部位信息'
     EXPORT_FIELDS_DICT = {"所属主设备种类": "category_no",
@@ -995,7 +994,8 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
                 raise ValidationError('部位分类{}不存在'.format(item[1]))
             if not equip_component_type:
                 raise ValidationError('部件分类{}不存在'.format(item[2]))
-            equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id, global_part_type=global_part_type.id).first()
+            equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id,
+                                                     global_part_type=global_part_type.id).first()
             obj = EquipComponent.objects.filter(Q(component_code=item[3]) | Q(component_name=item[4])).first()
             if not obj:
                 parts_list.append({"equip_part": equip_part.id,
@@ -1147,6 +1147,7 @@ class EquipBomViewSet(ModelViewSet):
     pagination_class = None
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipBomFilter
+
     # FILE_NAME = '设备BOM'
     # EXPORT_FIELDS_DICT = {
     #     "节点编号": "node_id",
@@ -1234,7 +1235,7 @@ class EquipBomViewSet(ModelViewSet):
                 index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
             else:  # 没有节点则加入
                 index_tree[section.parent_flag_id] = dict(
-                    {"id": section.parent_flag_id, "factory_id": section.parent_flag_id.factory_id,
+                    {"id": section.parent_flag_id, "factory_id": section.parent_flag.factory_id,
                      "level": section.level, "children": [], "equip_category_id": equip_category_id,
                      "equip_part_id": equip_part_id, "equip_component_id": equip_component_id,
                      'equip_info_id': equip_info_id, 'equip_property_type_id': equip_property_type_id,
@@ -1258,7 +1259,8 @@ class EquipBomViewSet(ModelViewSet):
                                                'property_type_node': instance.property_type_node,
                                                'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
                                                'equip_status': '启用' if instance.use_flag else '停用',
-                                               'equip_type': instance.category.category_name, 'equip_info_id': instance.equip_info_id})
+                                               'equip_type': instance.category.category_name,
+                                               'equip_info_id': instance.equip_info_id})
                 elif child_current_data['level'] == 4:
                     child_current_data.update({'property_type_id': instance.property_type_id,
                                                'property_type_node': instance.property_type_node,
@@ -1282,6 +1284,7 @@ class EquipBomViewSet(ModelViewSet):
                     add_parent(child_instance, e_chidren)
                 else:
                     continue
+
         data = copy.deepcopy(self.request.data)
         handle = data.pop('handle')
         parent_flag = data.pop('parent_flag', '')
@@ -1311,7 +1314,8 @@ class EquipBomViewSet(ModelViewSet):
                 curr_data.update({'property_type': parent_flag_info.property_type_id,
                                   'property_type_node': parent_flag_info.factory_id, 'equip_no': equip.equip_no,
                                   'equip_name': equip.equip_name, 'equip_status': '启用' if equip.use_flag else '停用',
-                                  'level': 3, 'equip_type': equip.category.category_name, 'equip_info': curr_label_obj_id})
+                                  'level': 3, 'equip_type': equip.category.category_name,
+                                  'equip_info': curr_label_obj_id})
             elif parent_flag_info.level == 3:
                 equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
                 if children_of_parent.filter(part=equip_part.id):
@@ -1319,7 +1323,8 @@ class EquipBomViewSet(ModelViewSet):
                 curr_data.update({'property_type': parent_flag_info.property_type_id,
                                   'property_type_node': parent_flag_info.property_type_node,
                                   'equip_no': parent_flag_info.equip_no, 'equip_name': parent_flag_info.equip_name,
-                                  'equip_status': parent_flag_info.equip_status, 'equip_info': parent_flag_info.equip_info_id,
+                                  'equip_status': parent_flag_info.equip_status,
+                                  'equip_info': parent_flag_info.equip_info_id,
                                   'equip_type': parent_flag_info.equip_type, 'level': 4,
                                   'part': curr_label_obj_id, 'part_name': equip_part.part_name})
             else:
@@ -1329,7 +1334,8 @@ class EquipBomViewSet(ModelViewSet):
                 curr_data.update({'property_type': parent_flag_info.property_type_id,
                                   'property_type_node': parent_flag_info.property_type_node,
                                   'equip_no': parent_flag_info.equip_no, 'equip_name': parent_flag_info.equip_name,
-                                  'equip_status': parent_flag_info.equip_status, 'equip_info': parent_flag_info.equip_info_id,
+                                  'equip_status': parent_flag_info.equip_status,
+                                  'equip_info': parent_flag_info.equip_info_id,
                                   'equip_type': parent_flag_info.equip_type, 'level': 5,
                                   'part': parent_flag_info.part_id, 'part_name': parent_flag_info.part_name,
                                   'component': curr_label_obj_id, 'component_name': equip_component.component_name})
@@ -1348,7 +1354,8 @@ class EquipBomViewSet(ModelViewSet):
             if children_of_parent.filter(property_type=curr_label_obj_id):
                 raise ValidationError('设备类型已经存在')
             equip_property_type = GlobalCode.objects.filter(id=curr_label_obj_id).first()
-            current_data.update({'property_type_id': curr_label_obj_id, 'property_type_node': equip_property_type.global_name})
+            current_data.update(
+                {'property_type_id': curr_label_obj_id, 'property_type_node': equip_property_type.global_name})
         elif current_data['level'] == 3:
             if children_of_parent.filter(equip_info=curr_label_obj_id):
                 raise ValidationError('设备已经存在')
@@ -1590,7 +1597,8 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
 class EquipTargetMTBFMTTRSettingView(APIView):
 
     def get(self, request):
-        return Response(EquipTargetMTBFMTTRSetting.objects.values('id', 'equip', 'equip__equip_no', 'equip__equip_name', 'target_mtb', 'target_mttr'))
+        return Response(EquipTargetMTBFMTTRSetting.objects.values('id', 'equip', 'equip__equip_no', 'equip__equip_name',
+                                                                  'target_mtb', 'target_mttr'))
 
     def post(self, request):
         data = request.data
@@ -1611,7 +1619,7 @@ class EquipMaintenanceAreaSettingViewSet(ModelViewSet):
     serializer_class = EquipMaintenanceAreaSettingSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('maintenance_user_id', )
+    filter_fields = ('maintenance_user_id',)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1628,15 +1636,15 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
     filter_class = EquipJobItemStandardFilter
     FILE_NAME = '设备作业项目标准定义'
     EXPORT_FIELDS_DICT = {
-                          "作业类型": "work_type",
-                          "标准编号": "standard_code",
-                          "作业项目标准名称": "standard_name",
-                          "作业详细内容": "work_details_column",
-                          "判断标准": "check_standard_desc_column",
-                          "判断类型": "check_standard_type_column",
-                          "录入人": "created_username",
-                          "录入时间": "created_date",
-                          }
+        "作业类型": "work_type",
+        "标准编号": "standard_code",
+        "作业项目标准名称": "standard_name",
+        "作业详细内容": "work_details_column",
+        "判断标准": "check_standard_desc_column",
+        "判断类型": "check_standard_type_column",
+        "录入人": "created_username",
+        "录入时间": "created_date",
+    }
 
     def get_serializer_class(self):
         if self.action == 'list' or self.action == 'retrieve':
@@ -1661,9 +1669,11 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
             type = {i.split('、')[0]: i.split('、')[1] for i in check_standard_type_column.split('；')[:-1]}
             for i in work_details_column.split('；')[:-1]:
                 seq, content = i.split('、')
-                data = {"sequence": seq, "content": content, "check_standard_desc": standard[seq], "check_standard_type": type[seq]}
+                data = {"sequence": seq, "content": content, "check_standard_desc": standard[seq],
+                        "check_standard_type": type[seq]}
                 work_details.append(data)
             return work_details
+
         excel_file = request.FILES.get('file', None)
         if not excel_file:
             raise ValidationError('文件不可为空！')
@@ -1686,28 +1696,27 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
 
-
-class EquipWarehouseAreaViewSet(ModelViewSet):
-    """
-    list: 库区展示
-    create: 添加库区
-    update: 修改库区信息
-    delete: 删除库区
-    """
-    queryset = EquipWarehouseArea.objects.filter(use_flag=1)
-    serializer_class = EquipWarehouseAreaSerializer
-    pagination_class = None
-    permission_classes = (IsAuthenticated,)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        # 库位有货物时, 不可删除
-        locations = EquipWarehouseLocation.objects.filter(equip_warehouse_area=instance.id)
-
-        if instance.use_flag:
-            instance.use_flag = 0
-        else:
-            instance.use_flag = 1
-        instance.last_updated_user = request.user
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+# class EquipWarehouseAreaViewSet(ModelViewSet):
+#     """
+#     list: 库区展示
+#     create: 添加库区
+#     update: 修改库区信息
+#     delete: 删除库区
+#     """
+#     queryset = EquipWarehouseArea.objects.filter(use_flag=1)
+#     serializer_class = EquipWarehouseAreaSerializer
+#     pagination_class = None
+#     permission_classes = (IsAuthenticated,)
+#
+#     def destroy(self, request, *args, **kwargs):
+#         instance = self.get_object()
+#         # 库位有货物时, 不可删除
+#         locations = EquipWarehouseLocation.objects.filter(equip_warehouse_area=instance.id)
+#
+#         if instance.use_flag:
+#             instance.use_flag = 0
+#         else:
+#             instance.use_flag = 1
+#         instance.last_updated_user = request.user
+#         instance.save()
+#         return Response(status=status.HTTP_204_NO_CONTENT)

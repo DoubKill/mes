@@ -14,8 +14,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
     EquipComponent, EquipComponentType, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
     PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
-    EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard, \
-    EquipWarehouseArea
+    EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -727,13 +726,13 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class EquipWarehouseAreaSerializer(BaseModelSerializer):
-    area_name = serializers.CharField(max_length=64, help_text='库区名称',
-                                      validators=[UniqueValidator(queryset=EquipWarehouseArea.objects.filter(use_flag=1),
-                                                                  message='库区名称已存在')])
-    equip_component_type_name = serializers.ReadOnlyField(source='equip_component_type__component_type_name', help_text='备件分类名称')
-
-    class Meta:
-        model = EquipWarehouseArea
-        fields = '__all__'
+# class EquipWarehouseAreaSerializer(BaseModelSerializer):
+#     area_name = serializers.CharField(max_length=64, help_text='库区名称',
+#                                       validators=[UniqueValidator(queryset=EquipWarehouseArea.objects.filter(use_flag=1),
+#                                                                   message='库区名称已存在')])
+#     equip_component_type_name = serializers.ReadOnlyField(source='equip_component_type__component_type_name', help_text='备件分类名称')
+#
+#     class Meta:
+#         model = EquipWarehouseArea
+#         fields = '__all__'
 
