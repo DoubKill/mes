@@ -2345,8 +2345,13 @@ class ProductTestStaticsView(APIView):
         diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
         if diff.days > 31:
             raise ValidationError('搜索日期跨度不得超过一个月！')
+        product_str = ''
+        if product_segment:
+            product_str += '-{}'.format(product_segment)
+        if product_standard:
+            product_str += '-{}'.format(product_standard)
         queryset = MaterialTestResult.objects.filter(
-            material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
+            material_test_order__product_no__icontains=product_str,
             material_test_order__production_factory_date__gte=start_time,
             material_test_order__production_factory_date__lte=end_time,
             material_test_order__production_equip_no__icontains=production_equip_no,
@@ -2424,17 +2429,20 @@ class ProductTestStaticsView(APIView):
                 continue
         res_data = result.values()
         all = {}
-        rate_1, rate_lb, rate = 0, 0, 0
+        rate_1, rate_lb, rate_test_all, rate_pass_sum = 0, 0, 0, 0
         for v in res_data:
-            v['RATE_1_PASS'] = '%.2f' % ((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100)
             v['sum_s'] = len(v.pop('RATE_S'))
+            rate_1_pass_sum = v['JC'] - len(v.pop('RATE_1'))
+            rate_s_pass_sum = v['JC'] - v['sum_s']
+            v['RATE_1_PASS'] = '%.2f' % (rate_1_pass_sum / v['JC'] * 100)
             v['cp_all'] = v['JC'] - v['HG']
-            v['RATE_S_PASS'] = '%.2f' % ((v['JC'] - v['sum_s']) / v['JC'] * 100)
-            rate_1 += float(v['RATE_1_PASS'])
-            rate_lb += float(v['RATE_S_PASS'])
-            rate += float(v['rate'])
-        all.update(rate_1='%.2f' % (rate_1 / len(res_data)), rate_lb='%.2f' % (rate_lb / len(res_data)),
-                   rate='%.2f' % (rate / len(res_data)))
+            v['RATE_S_PASS'] = '%.2f' % (rate_s_pass_sum / v['JC'] * 100)
+            rate_1 += rate_1_pass_sum
+            rate_lb += rate_s_pass_sum
+            rate_test_all += v['JC']
+            rate_pass_sum += v['HG']
+        all.update(rate_1='%.2f' % (rate_1 / rate_test_all*100), rate_lb='%.2f' % (rate_lb / rate_test_all*100),
+                   rate='%.2f' % (rate_pass_sum / rate_test_all*100))
         return Response({'result': res_data, 'all': all})
 
 
@@ -2453,8 +2461,13 @@ class ClassTestStaticsView(APIView):
         diff = datetime.datetime.strptime(end_time, '%Y-%m-%d') - datetime.datetime.strptime(start_time, '%Y-%m-%d')
         if diff.days > 31:
             raise ValidationError('搜索日期跨度不得超过一个月！')
+        product_str = ''
+        if product_segment:
+            product_str += '-{}'.format(product_segment)
+        if product_standard:
+            product_str += '-{}'.format(product_standard)
         queryset = MaterialTestResult.objects.filter(
-            material_test_order__product_no__icontains=f'{product_segment}-{product_standard}',
+            material_test_order__product_no__icontains=product_str,
             material_test_order__production_factory_date__gte=start_time,
             material_test_order__production_factory_date__lte=end_time,
             material_test_order__production_equip_no__icontains=production_equip_no,
@@ -2529,17 +2542,20 @@ class ClassTestStaticsView(APIView):
                 continue
         res_data = result.values()
         all = {}
-        rate_1, rate_lb, rate = 0, 0, 0
+        rate_1, rate_lb, rate_test_all, rate_pass_sum = 0, 0, 0, 0
         for v in res_data:
-            v['RATE_1_PASS'] = '%.2f' % ((v['JC'] - len(v.pop('RATE_1'))) / v['JC'] * 100)
             v['sum_s'] = len(v.pop('RATE_S'))
+            rate_1_pass_sum = v['JC'] - len(v.pop('RATE_1'))
+            rate_s_pass_sum = v['JC'] - v['sum_s']
+            v['RATE_1_PASS'] = '%.2f' % (rate_1_pass_sum / v['JC'] * 100)
             v['cp_all'] = v['JC'] - v['HG']
-            v['RATE_S_PASS'] = '%.2f' % ((v['JC'] - v['sum_s']) / v['JC'] * 100)
-            rate_1 += float(v['RATE_1_PASS'])
-            rate_lb += float(v['RATE_S_PASS'])
-            rate += float(v['rate'])
-        all.update(rate_1='%.2f' % (rate_1 / len(res_data)), rate_lb='%.2f' % (rate_lb / len(res_data)),
-                   rate='%.2f' % (rate / len(res_data)))
+            v['RATE_S_PASS'] = '%.2f' % (rate_s_pass_sum / v['JC'] * 100)
+            rate_1 += rate_1_pass_sum
+            rate_lb += rate_s_pass_sum
+            rate_test_all += v['JC']
+            rate_pass_sum += v['HG']
+        all.update(rate_1='%.2f' % (rate_1 / rate_test_all*100), rate_lb='%.2f' % (rate_lb / rate_test_all*100),
+                   rate='%.2f' % (rate_pass_sum / rate_test_all*100))
         return Response({'result': sorted(res_data, key=lambda x: (x['date'], x['sort_class'])), 'all': all})
 
 
@@ -2553,8 +2569,11 @@ class UnqialifiedEquipView(APIView):
         e_time = self.request.query_params.get('e_time')
         equip_no = self.request.query_params.get('equip_no', '')
         classes = self.request.query_params.get('classes', '')
-        params = f'{station}-{product_type}'
-
+        product_str = ''
+        if station:
+            product_str += '-{}'.format(station)
+        if product_type:
+            product_str += '-{}'.format(product_type)
         e = datetime.datetime.strptime(e_time, '%Y-%m-%d')
         s = datetime.datetime.strptime(s_time, '%Y-%m-%d')
         delta = e - s
@@ -2563,7 +2582,7 @@ class UnqialifiedEquipView(APIView):
         if not s_time and not e_time:
             raise ValidationError('请输入检测时间！')
 
-        queryset = MaterialTestOrder.objects.filter(product_no__icontains=params,
+        queryset = MaterialTestOrder.objects.filter(product_no__icontains=product_str,
                                                     production_factory_date__gte=s_time,
                                                     production_factory_date__lte=e_time,
                                                     production_equip_no__icontains=equip_no,
@@ -2577,7 +2596,7 @@ class UnqialifiedEquipView(APIView):
         test_right = queryset.filter(is_qualified=True).values('production_equip_no').annotate(
             count=Count('product_no'))
 
-        result = MaterialTestResult.objects.filter(material_test_order__product_no__icontains=params,
+        result = MaterialTestResult.objects.filter(material_test_order__product_no__icontains=product_str,
                                                    material_test_order__production_factory_date__gte=s_time,
                                                    material_test_order__production_factory_date__lte=e_time,
                                                    material_test_order__production_equip_no__icontains=equip_no,
@@ -2682,22 +2701,23 @@ class UnqialifiedEquipView(APIView):
                         'lb_all': RATE_LB,
                         'rate_lb': '%.2f' % (((TEST_ALL - RATE_LB) / TEST_ALL) * 100) if TEST_ALL else 0,
                         'cp_all': TEST_ALL - TEST_RIGHT,
-                        'rate': '%.2f' % ((TEST_RIGHT / TEST_ALL) * 100) if TEST_ALL else 0
+                        'rate': '%.2f' % ((TEST_RIGHT / TEST_ALL) * 100) if TEST_ALL else 0,
+                        'rate_1_sum': TEST_ALL - RATE_1,
+                        'rate_s_sum': TEST_ALL - RATE_LB
                     })
             all = {}
-            num = rate_1 = rate_lb = rate = 0
+            num = rate_1 = rate_lb = test_all = rate_pass_sum = 0
             for i in results:
-
                 if i['test_all'] == 0:
                     pass
                 else:
                     num += 1
-                    rate_1 += float(i['rate_1'])
-                    rate_lb += float(i['rate_lb'])
-                    rate += float(i['rate'])
+                    rate_1 += i['rate_1_sum']
+                    rate_lb += i['rate_s_sum']
+                    test_all += i['test_all']
+                    rate_pass_sum += i['test_right']
             if num != 0:
-                all.update(rate_1='%.2f' % (rate_1 / num), rate_lb='%.2f' % (rate_lb / num), rate='%.2f' % (rate / num))
-
+                all.update(rate_1='%.2f' % (rate_1 / test_all*100), rate_lb='%.2f' % (rate_lb / test_all*100), rate='%.2f' % (rate_pass_sum / test_all*100))
         else:
             results = []
             all = {}
