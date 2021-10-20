@@ -1244,6 +1244,7 @@ class EquipBomViewSet(ModelViewSet):
                 index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
         return Response({'results': data})
 
+    @atomic
     def create(self, request, *args, **kwargs):
         def add_parent(instance, children):
             # 当前节点数据
@@ -1252,15 +1253,16 @@ class EquipBomViewSet(ModelViewSet):
                 child_current_data.pop('id')
                 child_current_data['parent_flag_id'] = instance.id
                 if child_current_data['level'] == 2:
-                    child_current_data.update({'property_type_id': instance.property_type,
-                                               'property_type_node': instance.property_type_node})
+                    child_current_data.update({'property_type_id': child_current_data['property_type_id'],
+                                               'property_type_node': child_current_data['property_type_node']})
                 elif child_current_data['level'] == 3:
                     child_current_data.update({'property_type_id': instance.property_type_id,
                                                'property_type_node': instance.property_type_node,
-                                               'equip_no': instance.equip_no, 'equip_name': instance.equip_name,
-                                               'equip_status': '启用' if instance.use_flag else '停用',
-                                               'equip_type': instance.category.category_name,
-                                               'equip_info_id': instance.equip_info_id})
+                                               'equip_no': child_current_data['equip_no'],
+                                               'equip_name': child_current_data['equip_name'],
+                                               'equip_status': child_current_data['equip_status'],
+                                               'equip_type': child_current_data['equip_type'],
+                                               'equip_info_id': child_current_data['equip_info_id']})
                 elif child_current_data['level'] == 4:
                     child_current_data.update({'property_type_id': instance.property_type_id,
                                                'property_type_node': instance.property_type_node,
@@ -1365,14 +1367,14 @@ class EquipBomViewSet(ModelViewSet):
                                  'equip_status': '启用' if equip.use_flag else '停用'})
         elif current_data['level'] == 4:
             if children_of_parent.filter(part=curr_label_obj_id):
-                raise ValidationError('设备部件已经存在')
+                raise ValidationError('设备部位已经存在')
             equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
-            current_data.update({'part': curr_label_obj_id, 'part_name': equip_part.part_name})
+            current_data.update({'part_id': curr_label_obj_id, 'part_name': equip_part.part_name})
         else:
             if children_of_parent.filter(component=curr_label_obj_id):
                 raise ValidationError('设备部件已经存在')
             equip_component = EquipComponent.objects.filter(id=curr_label_obj_id).first()
-            current_data.update({'component': curr_label_obj_id, 'component_name': equip_component.component_name})
+            current_data.update({'component_id': curr_label_obj_id, 'component_name': equip_component.component_name})
         current_data.pop('id')
         current_data['factory_id'] = factory_id
         current_data['parent_flag_id'] = parent_flag
