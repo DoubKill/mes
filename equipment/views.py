@@ -969,12 +969,16 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export')
+        component_id = self.request.query_params.get('component_id')
         query_set = self.get_queryset()
         if export:
             data = self.get_serializer(query_set, many=True).data
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
             data = EquipComponent.objects.filter(use_flag=True).values('id', 'component_name')
+            return Response({'results': data})
+        if component_id:
+            data = EquipComponent.objects.filter(equip_part=component_id).values('id', 'component_name')
             return Response({'results': data})
         return super(EquipComponentViewSet, self).list(request, *args, **kwargs)
 
