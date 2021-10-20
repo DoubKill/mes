@@ -12,7 +12,7 @@ from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
     PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
-    EquipComponent, EquipComponentType, EquipArea, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
+    EquipComponent, EquipComponentType, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
     PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
     EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard, \
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials
@@ -406,6 +406,12 @@ class EquipMachineHaltReasonSerializer(BaseModelSerializer):
                         message='该停机原因名称已存在')])
     equip_faults = serializers.SerializerMethodField(read_only=True)
 
+    @staticmethod
+    def validate_equip_machine_halt_type(equip_machine_halt_type):
+        if equip_machine_halt_type.use_flag == 0:
+            raise serializers.ValidationError('弃用状态的停机类型不可新建')
+        return equip_machine_halt_type
+
     def update(self, instance, validated_data):
         instance.equip_fault.clear()
         return super().update(instance, validated_data)
@@ -447,14 +453,6 @@ class EquipOrderAssignRuleSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipOrderAssignRule
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-
-class EquipAreaSerializer(BaseModelSerializer):
-
-    class Meta:
-        model = EquipArea
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
@@ -565,6 +563,8 @@ class EquipFaultCodeSerializer(BaseModelSerializer):
     fault_type_name = serializers.ReadOnlyField(source='equip_fault_type.fault_type_name')
     fault_code = serializers.CharField(max_length=64, validators=[UniqueValidator(queryset=EquipFault.objects.all(),
                                                                                   message='该公共代码编号已存在')])
+    fault_name = serializers.CharField(max_length=64, validators=[UniqueValidator(queryset=EquipFault.objects.all(),
+                                                                                  message='该公共代码名称已存在')])
 
     @staticmethod
     def validate_equip_fault_type(equip_fault_type):
@@ -694,6 +694,7 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         work_details = validated_data.pop('work_details', [])
+        validated_data['created_user'] = self.context['request'].user
         instance = EquipJobItemStandard.objects.create(**validated_data)
         for detail in work_details:
             detail['equip_standard'] = instance
@@ -716,6 +717,9 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         work_details = validated_data.pop('work_details', [])
+        # 删除之前的作业内容
+        EquipJobItemStandardDetail.objects.filter(equip_standard=instance.id).delete()
+        validated_data['last_updated_user'] = self.context['request'].user
         for detail in work_details:
             detail['equip_standard'] = instance
             EquipJobItemStandardDetail.objects.create(**detail)
@@ -723,7 +727,7 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipJobItemStandard
-        fields = ('id', 'standard_name', 'work_details')
+        fields = ('standard_name', 'work_details')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -823,3 +827,14 @@ class EquipRepairStandardImportSerializer(BaseModelSerializer):
         model = EquipRepairStandard
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+# class EquipWarehouseAreaSerializer(BaseModelSerializer):
+#     area_name = serializers.CharField(max_length=64, help_text='库区名称',
+#                                       validators=[UniqueValidator(queryset=EquipWarehouseArea.objects.filter(use_flag=1),
+#                                                                   message='库区名称已存在')])
+#     equip_component_type_name = serializers.ReadOnlyField(source='equip_component_type__component_type_name', help_text='备件分类名称')
+#
+#     class Meta:
+#         model = EquipWarehouseArea
+#         fields = '__all__'
+

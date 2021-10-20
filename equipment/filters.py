@@ -139,12 +139,12 @@ class EquipComponentTypeFilter(django_filters.rest_framework.FilterSet):
 
 
 class EquipAreaDefineFilter(django_filters.rest_framework.FilterSet):
-
     area_name = django_filters.CharFilter(field_name='area_name', help_text='位置区域名称', lookup_expr='icontains')
+    area_code = django_filters.CharFilter(field_name='area_code', help_text='位置区域编号')
 
     class Meta:
         model = EquipAreaDefine
-        fields = ('area_name', 'use_flag')
+        fields = ('area_code', 'area_name', 'use_flag')
 
 # class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
 #     equip_component_type = django_filters.CharFilter(field_name='equip_component_type__component_type_name',
@@ -185,10 +185,11 @@ class EquipBomFilter(django_filters.rest_framework.FilterSet):
     equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='机台')
     part_name = django_filters.CharFilter(field_name='part_name', lookup_expr='icontains', help_text='部位名称')
     component_name = django_filters.CharFilter(field_name='component_name', lookup_expr='icontains', help_text='部件名称')
+    level = django_filters.CharFilter(field_name='level', help_text='层级')
 
     class Meta:
         model = EquipBom
-        fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name', 'level')
+        fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name', 'level', 'equip_info')
 
 
 class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
