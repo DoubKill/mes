@@ -1600,6 +1600,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         return Response('导入成功')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipMaintenanceStandard.objects.order_by('id')
     serializer_class = EquipMaintenanceStandardSerializer
@@ -1739,6 +1740,7 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         return Response('导入成功')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipRepairStandard.objects.order_by('id')
     serializer_class = EquipRepairStandardSerializer
