@@ -591,7 +591,7 @@ class EquipBomSerializer(BaseModelSerializer):
     equip_area_code = serializers.ReadOnlyField(source='equip_area_define.area_code', help_text='区域编号', default='')
     equip_area_name = serializers.ReadOnlyField(source='equip_area_define.area_name', help_text='区域名称', default='')
     equip_type = serializers.ReadOnlyField(source='equip_info.category.category_name', help_text='设备机型', default='')
-    equip_type_nid = serializers.ReadOnlyField(source='equip_info.category.equip_type_id', help_text='设备机型id', default='')
+    equip_type_nid = serializers.ReadOnlyField(source='equip_info.category_id', help_text='设备机型id', default='')
     part_code = serializers.ReadOnlyField(source='part.part_code', help_text='设备部位编号', default='')
     component_code = serializers.ReadOnlyField(source='component.component_code', help_text='设备部件编号', default='')
     component_type = serializers.ReadOnlyField(source='component.equip_component_type.component_type_name', help_text='设备部件规格', default='')
@@ -629,9 +629,20 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
 
 class EquipJobItemStandardListSerializer(BaseModelSerializer):
     work_details = serializers.SerializerMethodField(help_text='作业详情')
-    work_details_column = serializers.SerializerMethodField(help_text='作业详情展示列')
-    check_standard_desc_column = serializers.SerializerMethodField(help_text='判断标准列')
-    check_standard_type_column = serializers.SerializerMethodField(help_text='判断类型列')
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=instance).order_by('id')\
+            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+        work_details_column = check_standard_desc_column = check_standard_type_column = ''
+        for detail in details:
+            work_details_column += f"{detail['sequence']}、{detail['content']}；"
+            check_standard_desc_column += f"{detail['sequence']}、{detail['check_standard_desc']}；"
+            check_standard_type_column += f"{detail['sequence']}、{detail['check_standard_type']}；"
+            ret.update({'work_details_column': work_details_column,
+                        'check_standard_desc_column': check_standard_desc_column,
+                        'check_standard_type_column': check_standard_type_column})
+        return ret
 
     def get_work_details(self, obj):
         # 获取作业详情
@@ -639,33 +650,6 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
                                                                                        'check_standard_desc',
                                                                                        'check_standard_type')
         return details
-
-    def get_work_details_column(self, obj):
-        # 获取作业详情
-        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id').values('sequence', 'content')
-        details_column = ''
-        for detail in details:
-            single_str = f"{detail['sequence']}、{detail['content']}；"
-            details_column += single_str
-        return details_column
-
-    def get_check_standard_desc_column(self, obj):
-        # 获取作业详情
-        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id').values('sequence', 'check_standard_desc')
-        details_column = ''
-        for detail in details:
-            single_str = f"{detail['sequence']}、{detail['check_standard_desc']}；"
-            details_column += single_str
-        return details_column
-
-    def get_check_standard_type_column(self, obj):
-        # 获取作业详情
-        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id').values('sequence', 'check_standard_type')
-        details_column = ''
-        for detail in details:
-            single_str = f"{detail['sequence']}、{detail['check_standard_type']}；"
-            details_column += single_str
-        return details_column
 
     class Meta:
         model = EquipJobItemStandard
