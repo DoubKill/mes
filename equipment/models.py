@@ -515,9 +515,10 @@ class EquipJobItemStandard(AbstractEntity):
 class EquipJobItemStandardDetail(AbstractEntity):
     TYPE_CHOICE = (
         ('有无', '有无'),
-        ('数值', '数值'),
+        ('数值范围', '数值范围'),
         ('正常异常', '正常异常'),
         ('完成未完成', '完成未完成'),
+        ('合格不合格', '合格不合格'),
     )
     equip_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
     sequence = models.IntegerField(help_text='次序')
