@@ -86,6 +86,11 @@ router.register('equip-maintenance-area-settings', EquipMaintenanceAreaSettingVi
 # 设备作业项目标准定义
 router.register('equip-job-item-standard', EquipJobItemStandardViewSet)
 
+# 设备维护作业标准定义
+router.register('equip_maintenance_standard', EquipMaintenanceStandardViewSet)
+
+# 设备维修作业标准定义
+router.register('equip-repair-standard', EquipRepairStandardViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

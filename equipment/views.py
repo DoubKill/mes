@@ -1,8 +1,10 @@
 import copy
+import datetime
 import datetime as dt
 import json
 import uuid
 
+import xlrd
 from django.db.models import F, Min, Max, Sum, Avg, Q
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
@@ -16,10 +18,11 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter, \
     EquipSpareErpFilter, EquipFaultTypeFilter, EquipFaultCodeFilter, ERPSpareComponentRelationFilter, \
     EquipFaultSignalFilter, EquipMachineHaltTypeFilter, EquipMachineHaltReasonFilter, EquipOrderAssignRuleFilter, \
-    EquipBomFilter, EquipJobItemStandardFilter
+    EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter
 from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
-    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard
+    EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard, EquipMaintenanceStandard, \
+    EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials
 from equipment.serializers import *
 from equipment.task import property_template, property_import, export_xls
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
@@ -594,7 +597,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
     """供应商管理台账"""
     queryset = EquipSupplier.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipSupplierSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSupplierFilter
 
@@ -664,7 +667,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
     """设备固定资产台账"""
     queryset = EquipProperty.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPropertySerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPropertyFilter
 
@@ -756,7 +759,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
 class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipAreaDefine.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipAreaDefineSerializer
-    # permission_classes = (IsAuthenticated)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipAreaDefineFilter
     FILE_NAME = '位置区域信息'
@@ -805,7 +808,7 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
 class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipPartNew.objects.all().order_by('-id')
     serializer_class = EquipPartNewSerializer
-    # permission_classes = (IsAuthenticated)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend, )
     filter_class = EquipPartNewFilter
     FILE_NAME = '设备部位信息'
@@ -864,7 +867,7 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
     """设备部件分类"""
     queryset = EquipComponentType.objects.all()
     serializer_class = EquipComponentTypeSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipComponentTypeFilter
     FILE_NAME = '设备部件分类'
@@ -918,7 +921,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         修改部件定义
     """
     queryset = EquipComponent.objects.all()
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     FILE_NAME = '设备部件列表'
     EXPORT_FIELDS_DICT = {
@@ -968,6 +971,9 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         if export:
             data = self.get_serializer(query_set, many=True).data
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if self.request.query_params.get('all'):
+            data = EquipComponent.objects.filter(use_flag=True).values('id', 'component_name')
+            return Response({'results': data})
         return super(EquipComponentViewSet, self).list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
@@ -1014,7 +1020,7 @@ class ERPSpareComponentRelationViewSet(ModelViewSet):
         新增部件与备件erp绑定关系
     """
     queryset = ERPSpareComponentRelation.objects.all()
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ERPSpareComponentRelationFilter
 
@@ -1044,7 +1050,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
         备件代码定义详情
     """
     queryset = EquipSpareErp.objects.filter(use_flag=True)
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSpareErpFilter
     FILE_NAME = '备件代码定义'
@@ -1589,6 +1595,271 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         s = EquipJobItemStandardCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
             s.save()
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
+
+
+class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipMaintenanceStandard.objects.order_by('id')
+    serializer_class = EquipMaintenanceStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipMaintenanceStandardFilter
+    FILE_NAME = '设备维护作业标准定义'
+    EXPORT_FIELDS_DICT = {
+                          "作业类型": "work_type",
+                          "标准编号": "standard_code",
+                          "标准名称": "standard_name",
+                          "设备种类": "equip_type_name",
+                          "部位名称": "equip_part_name",
+                          "部件名称": "equip_component_name",
+                          "设备条件": "equip_condition",
+                          "重要程度": "important_level",
+                          "作业项目": "equip_job_item_standard_name",
+                          "起始时间": "start_time",
+                          "维护周期": "maintenance_cycle",
+                          "周期单位": "cycle_unit",
+                          "周期数": "cycle_num",
+                          "所需人数": "cycle_person_num",
+                          "作业时间": "operation_time",
+                          "作业时间单位": "operation_time_unit",
+                          "所需物料名称": "spare_list_str",
+                          "录入人": "created_username",
+                          "录入时间": "created_date",
+                          }
+
+    def create(self, request, *args, **kwargs):
+        spare_list = request.data.get('spare_list', None)
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            obj = EquipMaintenanceStandard.objects.create(**serializer.validated_data, created_user=self.request.user)
+            if spare_list:
+                for item in spare_list:
+                    EquipMaintenanceStandardMaterials.objects.create(equip_maintenance_standard=obj,
+                                                                     equip_spare_erp_id=item['equip_spare_erp__id'], quantity=item['quantity'])
+            return Response('新建成功')
+
+    def update(self, request, *args, **kwargs):
+        print(kwargs,'2332')
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        id = int(kwargs.get('pk'))
+        spare_list = request.data.get('spare_list', None)
+        if spare_list:
+            EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard_id=id).delete()
+            for item in spare_list:
+                EquipMaintenanceStandardMaterials.objects.create(equip_maintenance_standard_id=id,
+                                                                equip_spare_erp_id=item['equip_spare_erp__id'], quantity=item['quantity'])
+        else:
+            EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard_id=id).delete()
+
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('export'):
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        else:
+            return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        signal_list = []
+        for item in data:
+            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3]).first()
+            equip_part = EquipPartNew.objects.filter(part_name=item[4]).first()
+            equip_component = EquipComponent.objects.filter(component_name=item[5]).first()
+            equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[8]).first()
+            if not equip_type:
+                raise ValidationError(f'设备种类{item[3]}不存在')
+            if not equip_part:
+                raise ValidationError(f'部位名称{item[4]}不存在')
+            if not equip_component:
+                raise ValidationError(f'部件名称{item[5]}不存在')
+            if not equip_job_item_standard:
+                raise ValidationError(f'作业项目{item[8]}不存在')
+            try:
+                if item[9]:
+                    start_time = dt.date(*map(int, item[9].split('-'))) if isinstance(item[9], str) else datetime.date(xlrd.xldate.xldate_as_datetime(item[9], 0))
+            except: raise ValidationError('导入的开始时间格式有误')
+            if not EquipMaintenanceStandard.objects.filter(standard_code=item[1], standard_name=item[2]).exists():
+                signal_list.append({"work_type": item[0],
+                                    "standard_code": item[1],
+                                    "standard_name": item[2],
+                                    "equip_type": equip_type.id,
+                                    "equip_part": equip_part.id,
+                                    "equip_component": equip_component.id,
+                                    "equip_condition": item[6],
+                                    "important_level": item[7],
+                                    "equip_job_item_standard": equip_job_item_standard.id,
+                                    "start_time": start_time if item[9] else None,
+                                    "maintenance_cycle": item[10],
+                                    "cycle_unit": item[11],
+                                    "cycle_num": item[12],
+                                    "cycle_person_num": item[13],
+                                    "operation_time": item[14],
+                                    "operation_time_unit": item[15],
+                                    "remind_flag1": True,
+                                    "remind_flag2": True,
+                                    "remind_flag3": False,
+                                    "spares": item[16] if item[16] else 'no',  # '清洁剂'
+                                    })
+
+        serializer = EquipMaintenanceStandardImportSerializer(data=signal_list, many=True, context={'request': request})
+        if serializer.is_valid(raise_exception=True):
+            for data in serializer.validated_data:
+                spares = dict(data).pop('spares')
+                data.pop('spares')
+                spare_list = spares.split(',') or spares.split(' ') or spares.split('，')
+                spare_obj_list = []
+                for spare in spare_list:
+                    if spare != 'no':
+                        spare_obj = EquipSpareErp.objects.filter(spare_name=spare).first()
+                        spare_obj_list.append(spare_obj)
+                        if not spare_obj:
+                            raise ValidationError(f'所选物料名称{spare}不存在')
+                obj = EquipMaintenanceStandard.objects.create(**data)
+                for spare_obj in spare_obj_list:
+                    EquipMaintenanceStandardMaterials.objects.create(equip_maintenance_standard=obj,
+                                                                     equip_spare_erp=spare_obj,
+                                                                     quantity=1)  # 默认1
+        else:
+            raise ValidationError('导入的数据类型有误')
+        return Response('导入成功')
+
+
+class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
+    queryset = EquipRepairStandard.objects.order_by('id')
+    serializer_class = EquipRepairStandardSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipRepairStandardFilter
+    FILE_NAME = '设备维修作业标准定义'
+    EXPORT_FIELDS_DICT = {
+                          "标准编号": "standard_code",
+                          "标准名称": "standard_name",
+                          "设备种类": "equip_type_name",
+                          "部位名称": "equip_part_name",
+                          "部件名称": "equip_component_name",
+                          "设备条件": "equip_condition",
+                          "重要程度": "important_level",
+                          "故障分类": "equip_fault_name",
+                          "作业项目": "equip_job_item_standard_name",
+                          "所需人数": "cycle_person_num",
+                          "作业时间": "operation_time",
+                          "作业时间单位": "operation_time_unit",
+                          "所需物料名称": "spare_list_str",
+                          "录入人": "created_username",
+                          "录入时间": "created_date",
+                          }
+
+    def create(self, request, *args, **kwargs):
+        spare_list = request.data.get('spare_list', None)
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            obj = EquipRepairStandard.objects.create(**serializer.validated_data, created_user=self.request.user)
+            if spare_list:
+                for item in spare_list:
+                    EquipRepairStandardMaterials.objects.create(equip_repair_standard=obj,
+                                                                     equip_spare_erp_id=item['equip_spare_erp__id'], quantity=item['quantity'])
+            return Response('新建成功')
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        id = int(kwargs.get('pk'))
+        spare_list = request.data.get('spare_list', None)
+        if spare_list:
+            EquipRepairStandardMaterials.objects.filter(equip_repair_standard_id=id).delete()
+            for item in spare_list:
+                EquipRepairStandardMaterials.objects.create(equip_repair_standard_id=id,
+                                                                 equip_spare_erp_id=item['equip_spare_erp__id'], quantity=item['quantity'])
+        else:
+            EquipRepairStandardMaterials.objects.filter(equip_repair_standard_id=id).delete()
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('export'):
+            data = self.get_serializer(queryset, many=True).data
+            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        else:
+            return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlsx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        data = get_sheet_data(cur_sheet)
+        signal_list = []
+        for item in data:
+            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[2]).first()
+            equip_part = EquipPartNew.objects.filter(part_name=item[3]).first()
+            equip_component = EquipComponent.objects.filter(component_name=item[4]).first()
+            equip_fault = EquipFault.objects.filter(fault_name=item[7]).first()
+            equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[8]).first()
+            if not equip_type:
+                raise ValidationError(f'设备种类{item[2]}不存在')
+            if not equip_part:
+                raise ValidationError(f'部位名称{item[3]}不存在')
+            if not equip_component:
+                raise ValidationError(f'部件名称{item[4]}不存在')
+
+            if not equip_job_item_standard:
+                raise ValidationError(f'作业项目{item[8]}不存在')
+            if not EquipRepairStandard.objects.filter(standard_code=item[0], standard_name=item[1]).exists():
+                signal_list.append({"standard_code": item[0],
+                                    "standard_name": item[1],
+                                    "equip_type": equip_type.id,
+                                    "equip_part": equip_part.id,
+                                    "equip_component": equip_component.id,
+                                    "equip_condition": item[5],
+                                    "important_level": item[6],
+                                    "equip_fault": equip_fault.id,
+                                    "equip_job_item_standard": equip_job_item_standard.id,
+                                    "cycle_person_num": item[9],
+                                    "operation_time": item[10],
+                                    "operation_time_unit": item[11],
+                                    "remind_flag1": True,
+                                    "remind_flag2": True,
+                                    "remind_flag3": False,
+                                    "spares": item[12],
+                                    })
+
+        serializer = EquipRepairStandardImportSerializer(data=signal_list, many=True, context={'request': request})
+        if serializer.is_valid(raise_exception=True):
+            for data in serializer.validated_data:
+                spares = dict(data).pop('spares')
+                data.pop('spares')
+                spare_list = spares.split(',') or spares.split(' ') or spares.split('，')
+                spare_obj_list = []
+                for spare in spare_list:
+                    spare_obj = EquipSpareErp.objects.filter(spare_name=spare).first()
+                    spare_obj_list.append(spare_obj)
+                    if not spare_obj:
+                        raise ValidationError(f'所选物料名称{spare}不存在')
+                obj = EquipRepairStandard.objects.create(**data)
+                for spare_obj in spare_obj_list:
+                    EquipRepairStandardMaterials.objects.create(equip_repair_standard=obj,
+                                                                     equip_spare_erp=spare_obj,
+                                                                     quantity=1)  # 默认1
         else:
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')

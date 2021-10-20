@@ -606,6 +606,7 @@ class EquipMaintenanceStandard(AbstractEntity):
     remind_flag1 = models.BooleanField(help_text='是否钉钉提醒发送包干人员')
     remind_flag2 = models.BooleanField(help_text='是否钉钉提醒发送上级人员')
     remind_flag3 = models.BooleanField(help_text='是否钉钉提醒发送上上级人员')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     class Meta:
         db_table = 'equip_maintenance_standard'
@@ -626,7 +627,7 @@ class EquipMaintenanceStandardMaterials(AbstractEntity):
 class EquipRepairStandard(AbstractEntity):
     standard_code = models.CharField(max_length=64, help_text='标准编号')
     standard_name = models.CharField(max_length=64, help_text='标准名称')
-    work_type = models.CharField(max_length=64, help_text='作业类型')
+    # work_type = models.CharField(max_length=64, help_text='作业类型')
     equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
                                    help_text='设备部位', verbose_name='设备部位')
@@ -642,6 +643,7 @@ class EquipRepairStandard(AbstractEntity):
     remind_flag1 = models.BooleanField(help_text='是否钉钉提醒发送包干人员')
     remind_flag2 = models.BooleanField(help_text='是否钉钉提醒发送上级人员')
     remind_flag3 = models.BooleanField(help_text='是否钉钉提醒发送上上级人员')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 
     class Meta:
         db_table = 'equip_repair_standard'

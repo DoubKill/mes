@@ -4,7 +4,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     EquipCurrentStatus, EquipSupplier, EquipProperty, EquipPartNew, EquipComponent, EquipAreaDefine, EquipComponentType, \
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
-    EquipJobItemStandard
+    EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -257,3 +257,28 @@ class EquipJobItemStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipJobItemStandard
         fields = ('work_type', 'standard_name')
+
+
+class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):
+    spare_name = django_filters.CharFilter(field_name='maintenance_materials__equip_spare_erp__spare_name', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='maintenance_materials__equip_spare_erp__specification', lookup_expr='icontains')
+    equip_part = django_filters.CharFilter(field_name='equip_part__part_name', lookup_expr='icontains')
+    equip_component = django_filters.CharFilter(field_name='equip_component__component_name', lookup_expr='icontains')
+
+
+    class Meta:
+        model = EquipMaintenanceStandard
+        fields = ('id', 'work_type', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+                  'spare_name', 'specification')
+
+
+class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
+    spare_name = django_filters.CharFilter(field_name='repair_materials__equip_spare_erp__spare_name', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='repair_materials__equip_spare_erp__specification', lookup_expr='icontains')
+    equip_part = django_filters.CharFilter(field_name='equip_part__part_name', lookup_expr='icontains')
+    equip_component = django_filters.CharFilter(field_name='equip_component__component_name', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipRepairStandard
+        fields = ('id', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+                  'spare_name', 'specification')
