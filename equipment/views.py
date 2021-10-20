@@ -1049,7 +1049,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
     retrieve:
         备件代码定义详情
     """
-    queryset = EquipSpareErp.objects.filter(use_flag=True)
+    queryset = EquipSpareErp.objects.all()
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipSpareErpFilter
@@ -1297,6 +1297,8 @@ class EquipBomViewSet(ModelViewSet):
         children = data.pop('children', [])
         parent_flag_info = EquipBom.objects.filter(id=parent_flag).first()
         children_of_parent = EquipBom.objects.filter(parent_flag=parent_flag)
+        if not factory_id:
+            raise ValidationError('输入名称不可全为空格')
         if not handle:  # 新建
             curr_data = {'factory_id': factory_id, 'parent_flag': parent_flag_info.id}
             if parent_flag_info.level == 0:
