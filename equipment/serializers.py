@@ -715,7 +715,7 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipJobItemStandard
-        fields = ('standard_name', 'work_details')
+        fields = ('work_type', 'standard_name', 'work_details')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
