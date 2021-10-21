@@ -270,7 +270,7 @@ class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipMaintenanceStandard
         fields = ('id', 'work_type', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
-                  'spare_name', 'specification')
+                  'spare_name', 'specification', 'use_flag')
 
 
 class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
@@ -282,4 +282,4 @@ class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipRepairStandard
         fields = ('id', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
-                  'spare_name', 'specification')
+                  'spare_name', 'specification', 'use_flag')
