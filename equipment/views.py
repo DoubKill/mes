@@ -1813,12 +1813,12 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     "important_level": item[7],
                                     "equip_job_item_standard": equip_job_item_standard.id,
                                     "start_time": start_time if item[9] else None,
-                                    "maintenance_cycle": item[10],
-                                    "cycle_unit": item[11],
-                                    "cycle_num": item[12],
-                                    "cycle_person_num": item[13],
-                                    "operation_time": item[14],
-                                    "operation_time_unit": item[15],
+                                    "maintenance_cycle": item[10] if item[10] else None,
+                                    "cycle_unit": item[11] if item[11] else None,
+                                    "cycle_num": item[12] if item[12] else None,
+                                    "cycle_person_num": item[13] if item[13] else None,
+                                    "operation_time": item[14] if item[14] else None,
+                                    "operation_time_unit": item[15] if item[15] else None,
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
@@ -1944,13 +1944,13 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     "important_level": item[6],
                                     "equip_fault": equip_fault.id,
                                     "equip_job_item_standard": equip_job_item_standard.id,
-                                    "cycle_person_num": item[9],
-                                    "operation_time": item[10],
+                                    "cycle_person_num": item[9] if item[9] else None,
+                                    "operation_time": item[10] if item[10] else None,
                                     "operation_time_unit": item[11],
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
-                                    "spares": item[12],
+                                    "spares": item[12] if item[12] else 'no',  # '清洁剂',
                                     })
 
         serializer = EquipRepairStandardImportSerializer(data=signal_list, many=True, context={'request': request})
@@ -1961,10 +1961,11 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 spare_list = spares.split(',') or spares.split(' ') or spares.split('，')
                 spare_obj_list = []
                 for spare in spare_list:
-                    spare_obj = EquipSpareErp.objects.filter(spare_name=spare).first()
-                    spare_obj_list.append(spare_obj)
-                    if not spare_obj:
-                        raise ValidationError(f'所选物料名称{spare}不存在')
+                    if spare != 'no':
+                        spare_obj = EquipSpareErp.objects.filter(spare_name=spare).first()
+                        spare_obj_list.append(spare_obj)
+                        if not spare_obj:
+                            raise ValidationError(f'所选物料名称{spare}不存在')
                 obj = EquipRepairStandard.objects.create(**data)
                 for spare_obj in spare_obj_list:
                     EquipRepairStandardMaterials.objects.create(equip_repair_standard=obj,
