@@ -597,7 +597,7 @@ class EquipBomSerializer(BaseModelSerializer):
     component_type = serializers.ReadOnlyField(source='component.equip_component_type.component_type_name', help_text='设备部件规格', default='')
     baoyang_standard_name = serializers.ReadOnlyField(source='maintenance_baoyang.standard_name', help_text='保养标准', default='')
     repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准', default='')
-    xunjian_standard_name = serializers.ReadOnlyField(source='maintenance_baoyang.standard_name', help_text='巡检标准', default='')
+    xunjian_standard_name = serializers.ReadOnlyField(source='maintenance_xunjian.standard_name', help_text='巡检标准', default='')
     runhua_standard_name = serializers.ReadOnlyField(source='maintenance_runhua.standard_name', help_text='润滑标准', default='')
     biaoding_standard_name = serializers.ReadOnlyField(source='maintenance_biaoding.standard_name', help_text='标定标准', default='')
 
@@ -625,6 +625,10 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
         model = EquipMaintenanceAreaSetting
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=EquipMaintenanceAreaSetting.objects.all(),
+                                              fields=('maintenance_user', 'equip', 'equip_part'),
+                                              message='请勿重复添加！'),
+                      ]
 
 
 class EquipJobItemStandardListSerializer(BaseModelSerializer):
@@ -646,9 +650,8 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
 
     def get_work_details(self, obj):
         # 获取作业详情
-        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).values('id', 'sequence', 'content',
-                                                                                       'check_standard_desc',
-                                                                                       'check_standard_type')
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id')\
+            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
         return details
 
     class Meta:
@@ -675,6 +678,24 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
     work_details = EquipJobItemStandardDetailSerializer(help_text="""
         [{"sequence": 1, "content": "外观检查", "check_standard_desc": "正常", "check_standard_type": "有无"}]""",
                                                         write_only=True, many=True)
+
+    def validate(self, attrs):
+        work_details = attrs['work_details']
+        for detail in work_details:
+            check_standard_desc = detail['check_standard_desc']
+            check_standard_type = detail['check_standard_type']
+            if check_standard_type == '数值范围':
+                try:
+                    m, n = check_standard_desc.split('-')
+                    assert float(m) <= float(n)
+                except:
+                    raise serializers.ValidationError('数值范围不正确')
+                else:
+                    continue
+            if check_standard_desc not in check_standard_type or check_standard_desc not in ['有', '无', '合格', '不合格',
+                                                                                             '完成', '未完成', '正常', '异常']:
+                raise serializers.ValidationError('判断标准不正确')
+        return attrs
 
     def create(self, validated_data):
         work_details = validated_data.pop('work_details', [])
@@ -711,7 +732,7 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipJobItemStandard
-        fields = ('standard_name', 'work_details')
+        fields = ('work_type', 'standard_name', 'work_details')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
