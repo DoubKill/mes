@@ -679,6 +679,24 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
         [{"sequence": 1, "content": "外观检查", "check_standard_desc": "正常", "check_standard_type": "有无"}]""",
                                                         write_only=True, many=True)
 
+    def validate(self, attrs):
+        work_details = attrs['work_details']
+        for detail in work_details:
+            check_standard_desc = detail['check_standard_desc']
+            check_standard_type = detail['check_standard_type']
+            if check_standard_type == '数值范围':
+                try:
+                    m, n = check_standard_desc.split('-')
+                    assert float(m) <= float(n)
+                except:
+                    raise serializers.ValidationError('数值范围不正确')
+                else:
+                    continue
+            if check_standard_desc not in check_standard_type or check_standard_desc not in ['有', '无', '合格', '不合格',
+                                                                                             '完成', '未完成', '正常', '异常']:
+                raise serializers.ValidationError('判断标准不正确')
+        return attrs
+
     def create(self, validated_data):
         work_details = validated_data.pop('work_details', [])
         validated_data['created_user'] = self.context['request'].user
