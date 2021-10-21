@@ -625,6 +625,10 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
         model = EquipMaintenanceAreaSetting
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=EquipMaintenanceAreaSetting.objects.all(),
+                                              fields=('maintenance_user', 'equip', 'equip_part'),
+                                              message='请勿重复添加！'),
+                      ]
 
 
 class EquipJobItemStandardListSerializer(BaseModelSerializer):
