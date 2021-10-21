@@ -597,7 +597,7 @@ class EquipBomSerializer(BaseModelSerializer):
     component_type = serializers.ReadOnlyField(source='component.equip_component_type.component_type_name', help_text='设备部件规格', default='')
     baoyang_standard_name = serializers.ReadOnlyField(source='maintenance_baoyang.standard_name', help_text='保养标准', default='')
     repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准', default='')
-    xunjian_standard_name = serializers.ReadOnlyField(source='maintenance_baoyang.standard_name', help_text='巡检标准', default='')
+    xunjian_standard_name = serializers.ReadOnlyField(source='maintenance_xunjian.standard_name', help_text='巡检标准', default='')
     runhua_standard_name = serializers.ReadOnlyField(source='maintenance_runhua.standard_name', help_text='润滑标准', default='')
     biaoding_standard_name = serializers.ReadOnlyField(source='maintenance_biaoding.standard_name', help_text='标定标准', default='')
 
