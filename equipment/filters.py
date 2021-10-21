@@ -126,7 +126,7 @@ class EquipPartNewFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipPartNew
-        fields = ('equip_type', 'category_no', 'global_name', 'part_code', 'part_name')
+        fields = ('equip_type', 'category_no', 'global_name', 'part_code', 'part_name', 'use_flag')
 
 
 class EquipComponentTypeFilter(django_filters.rest_framework.FilterSet):
@@ -135,7 +135,7 @@ class EquipComponentTypeFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipComponentType
-        fields = ('component_type_name', 'component_type_code')
+        fields = ('component_type_name', 'component_type_code', 'use_flag')
 
 
 class EquipAreaDefineFilter(django_filters.rest_framework.FilterSet):
