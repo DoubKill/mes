@@ -650,9 +650,8 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
 
     def get_work_details(self, obj):
         # 获取作业详情
-        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).values('id', 'sequence', 'content',
-                                                                                       'check_standard_desc',
-                                                                                       'check_standard_type')
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id')\
+            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
         return details
 
     class Meta:
