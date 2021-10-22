@@ -1680,8 +1680,8 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
             type = {i.split('、')[0]: i.split('、')[1] for i in check_standard_type_column.split('；')[:-1]}
             for i in work_details_column.split('；')[:-1]:
                 seq, content = i.split('、')
-                data = {"sequence": seq, "content": content, "check_standard_desc": standard[seq],
-                        "check_standard_type": type[seq]}
+                data = {"sequence": seq, "content": content, "check_standard_desc": standard.get(seq),
+                        "check_standard_type": type.get(seq)}
                 work_details.append(data)
             return work_details
 
