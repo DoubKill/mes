@@ -108,6 +108,7 @@ urlpatterns = [
     path('week-error-statistics/', EquipErrorWeekStatisticsView.as_view()),
     path('month-error-sort/', MonthErrorSortView.as_view()),
     path('overview/', EquipOverview.as_view()),
+    path('get-default-code/', GetDefaultCodeView.as_view()),
 
     # **************************2021-10-09最新URL**************************
     # 机台目标MTBF/MTTR设定

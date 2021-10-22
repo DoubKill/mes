@@ -2,6 +2,7 @@ import copy
 import datetime
 import datetime as dt
 import json
+import re
 import uuid
 
 import xlrd
@@ -2008,3 +2009,45 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
 #         instance.last_updated_user = request.user
 #         instance.save()
 #         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GetDefaultCodeView(APIView):
+    # permission_classes = (IsAuthenticated, )
+
+    def get(self, request):
+        work_type = self.request.query_params.get('work_type')
+        if work_type == '部件':
+            max_standard_code = EquipComponent.objects.filter(component_code__startswith='BJ').aggregate(max_code=Max('component_code'))['max_code']
+            next_standard_code = max_standard_code[:2] + '%04d' % (
+                        int(max_standard_code[2:]) + 1) if max_standard_code else 'BJ0001'
+        elif work_type in ['巡检', '维修', '保养', '润滑', '标定']:
+            map_dict = {'巡检': 'XJ', '维修': 'WX', '保养': 'BY', '润滑': 'RH', '标定': 'BD'}
+            prefix = map_dict.get(work_type)
+            max_standard_code = EquipJobItemStandard.objects.filter(work_type=work_type, standard_code__startswith=prefix).aggregate(max_code=Max('standard_code'))['max_code']
+            code_num = '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code else '0001'
+            next_standard_code = prefix + code_num
+        elif work_type == '故障':
+            equip_fault_type = self.request.query_params.get('equip_fault_type')
+            max_standard_code = EquipFault.objects.filter(equip_fault_type__fault_type_code=equip_fault_type,
+                                                          fault_code__startswith=equip_fault_type).aggregate(max_code=Max('fault_code'))['max_code']
+            code_num = '%04d' % (int(max_standard_code[len(equip_fault_type):]) + 1) if max_standard_code else '0001'
+            next_standard_code = equip_fault_type + code_num
+        elif work_type == '停机':
+            equip_machine_halt_type = self.request.query_params.get('equip_machine_halt_type')
+            max_standard_code = EquipMachineHaltReason.objects.filter(equip_machine_halt_type__machine_halt_type_code=equip_machine_halt_type,
+                                                                      machine_halt_reason_code__startswith=equip_machine_halt_type).aggregate(
+                max_code=Max('machine_halt_reason_code'))['max_code']
+            code_num = '%04d' % (int(max_standard_code[len(equip_machine_halt_type):]) + 1) if max_standard_code else '0001'
+            next_standard_code = equip_machine_halt_type + code_num
+        elif work_type == '信号':
+            max_standard_code = EquipFaultSignal.objects.filter(signal_code__startswith='IO').aggregate(max_code=Max('signal_code'))['max_code']
+            code_num = '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code else '0001'
+            next_standard_code = 'IO' + code_num
+        elif work_type == '部位':
+            max_standard_code = EquipPartNew.objects.filter(part_code__startswith='BW').aggregate(max_code=Max('part_code'))['max_code']
+            next_standard_code = max_standard_code[:2] + '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code else 'BW0001'
+        else:
+            raise ValidationError('该类型默认编码暂未提供')
+        return Response(next_standard_code)
+
