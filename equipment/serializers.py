@@ -279,7 +279,7 @@ class EquipSupplierSerializer(BaseModelSerializer):
 
 
 class EquipComponentListSerializer(BaseModelSerializer):
-    equip_type_name = serializers.CharField(source='equip_part.equip_type.category_name', help_text='所属主设备种类', max_length=64)
+    equip_type_name = serializers.CharField(source='equip_part.equip_type.category_no', help_text='所属主设备种类', max_length=64)
     equip_type = serializers.IntegerField(source='equip_part.equip_type_id')
     equip_part_name = serializers.CharField(source='equip_part.part_name', help_text='所属设备部位', max_length=64)
     equip_component_type_name = serializers.CharField(source='equip_component_type.component_type_name', help_text='所属部件分类', max_length=64)
