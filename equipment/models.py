@@ -191,7 +191,7 @@ class EquipSupplier(AbstractEntity):
     supplier_name = models.CharField(max_length=64, help_text='供应商名称')
     region = models.CharField(max_length=64, help_text='地域', blank=True, null=True)
     contact_name = models.CharField(max_length=64, help_text='联系人', blank=True, null=True)
-    contact_phone = models.CharField(max_length=64, help_text='联系人电话', blank=True, null=True)
+    contact_phone = models.BigIntegerField(help_text='联系人电话', blank=True, null=True)
     supplier_type = models.CharField(max_length=64, help_text='供应商类别', blank=True, null=True)
     use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
 

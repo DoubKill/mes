@@ -3,9 +3,12 @@ import datetime
 import datetime as dt
 import json
 import uuid
+from io import BytesIO
 
 import xlrd
+import xlwt
 from django.db.models import F, Min, Max, Sum, Avg, Q
+from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView
@@ -660,6 +663,15 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             raise ValidationError('供应商或编号已存在！')
         return Response('导入成功')
 
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
+    def get_name(self, request):
+        dic = self.queryset.aggregate(Max('supplier_code'))
+        res = dic['supplier_code__max']
+        if res:
+            results = res[0:3] + str('%04d' % (int(res[3:]) + 1))
+            return Response({'results': results})
+        return Response({'results': 'GYS0001'})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
@@ -802,6 +814,15 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
             data = self.get_serializer(queryset, many=True).data
             return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         return super().list(request, *args, **kwargs)
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
+    def get_name(self, request):
+        dic = self.queryset.aggregate(Max('area_code'))
+        res = dic['area_code__max']
+        if res:
+            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+            return Response({'results': results})
+        return Response({'results': 'WZQY0001'})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1515,6 +1536,15 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
 
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
+    def get_name(self, request):
+        dic = self.queryset.aggregate(Max('signal_code'))
+        res = dic.get('signal_code__max')
+        if res:
+            results = res[0:2] + str('%04d' % (int(res[2:]) + 1))
+            return Response({'results': results})
+        return Response({'results': 'IO0001'})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipMachineHaltTypeViewSet(CommonDeleteMixin, ModelViewSet):
@@ -1602,6 +1632,15 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
         else:
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
+    def get_name(self, request):
+        dic = self.queryset.aggregate(Max('rule_code'))
+        res = dic.get('rule_code__max')
+        if res:
+            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+            return Response({'results': results})
+        return Response({'results': 'ZPGZ0001'})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1738,6 +1777,37 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                           "录入时间": "created_date",
                           }
 
+    def export(self, export_filed_dict, data, file_name):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = file_name
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet(file_name, cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        # 写入文件标题
+        for col_num in range(len(export_filed_dict)):
+            sheet.write(0, col_num, list(export_filed_dict.keys())[col_num])
+            # 写入数据
+            data_row = 1
+            for i in data:
+                if not i.get('equip_component_name'):
+                    i.update({'equip_component_name': None})
+                sheet.write(data_row, col_num, i[list(export_filed_dict.values())[col_num]])
+                data_row += 1
+
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
     def create(self, request, *args, **kwargs):
         spare_list = request.data.get('spare_list', None)
         serializer = self.get_serializer(data=request.data)
@@ -1771,7 +1841,7 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return self.export(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1852,6 +1922,22 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
 
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
+    def get_name(self, request):
+        rule_code = self.request.query_params.get('rule_code')
+        if not rule_code:
+            raise ValidationError('传入参数有误')
+        dic = self.queryset.filter(work_type=rule_code).aggregate(Max('standard_code'))
+        res = dic.get('standard_code__max')
+        if res:
+            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+            return Response({'results': results})
+        kwargs = {'巡检': 'XJBZ0001',
+                  '保养': 'BYBZ0001',
+                  '标定': 'BDBZ0001',
+                  '润滑': 'RHBZ0001'}
+        return Response({'results': kwargs[rule_code]})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
@@ -1878,6 +1964,37 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                           "录入人": "created_username",
                           "录入时间": "created_date",
                           }
+
+    def export(self, export_filed_dict, data, file_name):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = file_name
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet(file_name, cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        # 写入文件标题
+        for col_num in range(len(export_filed_dict)):
+            sheet.write(0, col_num, list(export_filed_dict.keys())[col_num])
+            # 写入数据
+            data_row = 1
+            for i in data:
+                if not i.get('equip_component_name'):
+                    i.update({'equip_component_name': None})
+                sheet.write(data_row, col_num, i[list(export_filed_dict.values())[col_num]])
+                data_row += 1
+
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
 
     def create(self, request, *args, **kwargs):
         spare_list = request.data.get('spare_list', None)
@@ -1911,7 +2028,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return self.export(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1984,6 +2101,16 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         else:
             raise ValidationError('导入的数据类型有误')
         return Response('导入成功')
+
+    @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
+    def get_name(self, request):
+        dic = self.queryset.aggregate(Max('standard_code'))
+        res = dic.get('standard_code__max')
+        if res:
+            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+            return Response({'results': results})
+
+        return Response({'results': 'WXBZ0001'})
 # class EquipWarehouseAreaViewSet(ModelViewSet):
 #     """
 #     list: 库区展示
