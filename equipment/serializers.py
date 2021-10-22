@@ -423,6 +423,7 @@ class EquipMachineHaltReasonSerializer(BaseModelSerializer):
         model = EquipMachineHaltReason
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'equip_fault': {"required": False}}
 
 
 class EquipComponentTypeSerializer(BaseModelSerializer):
