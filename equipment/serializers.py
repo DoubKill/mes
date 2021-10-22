@@ -741,7 +741,7 @@ class EquipMaintenanceStandardSerializer(BaseModelSerializer):
         UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准编号已存在')])
     standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
         UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准名称已存在')])
-    equip_type_name = serializers.ReadOnlyField(source='equip_type.category_name', help_text='设备种类')
+    equip_type_name = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备种类')
     equip_part_name = serializers.ReadOnlyField(source='equip_part.part_name', help_text='部位名称')
     equip_component_name = serializers.ReadOnlyField(source='equip_component.component_name', help_text='部件名称')
     equip_job_item_standard_name = serializers.ReadOnlyField(source='equip_job_item_standard.standard_name', help_text='作业项目')
@@ -790,7 +790,7 @@ class EquipRepairStandardSerializer(BaseModelSerializer):
         UniqueValidator(queryset=EquipRepairStandard.objects.all(), message='标准编号已存在')])
     standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
         UniqueValidator(queryset=EquipRepairStandard.objects.all(), message='标准名称已存在')])
-    equip_type_name = serializers.ReadOnlyField(source='equip_type.category_name', help_text='设备种类')
+    equip_type_name = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备种类')
     equip_part_name = serializers.ReadOnlyField(source='equip_part.part_name', help_text='部位名称')
     equip_component_name = serializers.ReadOnlyField(source='equip_component.component_name', help_text='部件名称')
     equip_fault_name = serializers.ReadOnlyField(source='equip_fault.fault_name', help_text='故障分类')

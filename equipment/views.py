@@ -1750,7 +1750,6 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
             return Response('新建成功')
 
     def update(self, request, *args, **kwargs):
-        print(kwargs,'2332')
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -1794,21 +1793,27 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 raise ValidationError(f'设备种类{item[3]}不存在')
             if not equip_part:
                 raise ValidationError(f'部位名称{item[4]}不存在')
-            if not equip_component:
-                raise ValidationError(f'部件名称{item[5]}不存在')
             if not equip_job_item_standard:
                 raise ValidationError(f'作业项目{item[8]}不存在')
             try:
                 if item[9]:
                     start_time = dt.date(*map(int, item[9].split('-'))) if isinstance(item[9], str) else datetime.date(xlrd.xldate.xldate_as_datetime(item[9], 0))
             except: raise ValidationError('导入的开始时间格式有误')
-            if not EquipMaintenanceStandard.objects.filter(standard_code=item[1], standard_name=item[2]).exists():
+
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的物料编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的物料名称不能重复')
+
+            if not EquipMaintenanceStandard.objects.filter(Q(Q(standard_code=item[1]) | Q(standard_name=item[2]))).exists():
                 signal_list.append({"work_type": item[0],
                                     "standard_code": item[1],
                                     "standard_name": item[2],
                                     "equip_type": equip_type.id,
                                     "equip_part": equip_part.id,
-                                    "equip_component": equip_component.id,
+                                    "equip_component": equip_component.id if equip_component else None,
                                     "equip_condition": item[6],
                                     "important_level": item[7],
                                     "equip_job_item_standard": equip_job_item_standard.id,
@@ -1929,17 +1934,22 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 raise ValidationError(f'设备种类{item[2]}不存在')
             if not equip_part:
                 raise ValidationError(f'部位名称{item[3]}不存在')
-            if not equip_component:
-                raise ValidationError(f'部件名称{item[4]}不存在')
-
             if not equip_job_item_standard:
                 raise ValidationError(f'作业项目{item[8]}不存在')
-            if not EquipRepairStandard.objects.filter(standard_code=item[0], standard_name=item[1]).exists():
+
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的物料编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的物料名称不能重复')
+
+            if not EquipRepairStandard.objects.filter(Q(Q(standard_code=item[0]) | Q(standard_name=item[1]))).exists():
                 signal_list.append({"standard_code": item[0],
                                     "standard_name": item[1],
                                     "equip_type": equip_type.id,
                                     "equip_part": equip_part.id,
-                                    "equip_component": equip_component.id,
+                                    "equip_component": equip_component.id if equip_component else None,
                                     "equip_condition": item[5],
                                     "important_level": item[6],
                                     "equip_fault": equip_fault.id,
