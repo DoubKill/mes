@@ -1839,12 +1839,17 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         return Response(serializer.data)
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.filter_queryset(self.get_queryset()).distinct()
+        page = self.paginate_queryset(queryset)
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
             return self.export(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-        else:
-            return super().list(request, *args, **kwargs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
@@ -2026,12 +2031,17 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         return Response(serializer.data)
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.filter_queryset(self.get_queryset()).distinct()
+        page = self.paginate_queryset(queryset)
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
             return self.export(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-        else:
-            return super().list(request, *args, **kwargs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
             url_name='import_xlsx')
