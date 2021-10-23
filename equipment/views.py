@@ -666,12 +666,15 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
-        dic = self.queryset.aggregate(Max('supplier_code'))
-        res = dic['supplier_code__max']
-        if res:
-            results = res[0:3] + str('%04d' % (int(res[3:]) + 1))
-            return Response({'results': results})
-        return Response({'results': 'GYS0001'})
+        try:
+            dic = self.queryset.aggregate(Max('supplier_code'))
+            res = dic['supplier_code__max']
+            if res:
+                results = res[0:3] + str('%04d' % (int(res[3:]) + 1))
+                return Response({'results': results})
+            return Response({'results': 'GYS0001'})
+        except:
+            return Response({'results': 'GYS000X'})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -818,13 +821,15 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
-        dic = self.queryset.aggregate(Max('area_code'))
-        res = dic['area_code__max']
-        if res:
-            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
-            return Response({'results': results})
-        return Response({'results': 'WZQY0001'})
-
+        try:
+            dic = self.queryset.aggregate(Max('area_code'))
+            res = dic['area_code__max']
+            if res:
+                results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+                return Response({'results': results})
+            return Response({'results': 'WZQY0001'})
+        except:
+            return Response({'results': 'WZQY000X'})
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
@@ -1539,13 +1544,15 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
-        dic = self.queryset.aggregate(Max('signal_code'))
-        res = dic.get('signal_code__max')
-        if res:
-            results = res[0:2] + str('%04d' % (int(res[2:]) + 1))
-            return Response({'results': results})
-        return Response({'results': 'IO0001'})
-
+        try:
+            dic = self.queryset.aggregate(Max('signal_code'))
+            res = dic.get('signal_code__max')
+            if res:
+                results = res[0:2] + str('%04d' % (int(res[2:]) + 1))
+                return Response({'results': results})
+            return Response({'results': 'IO0001'})
+        except:
+            return Response({'results': 'IO000X'})
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipMachineHaltTypeViewSet(CommonDeleteMixin, ModelViewSet):
@@ -1636,13 +1643,15 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
-        dic = self.queryset.aggregate(Max('rule_code'))
-        res = dic.get('rule_code__max')
-        if res:
-            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
-            return Response({'results': results})
-        return Response({'results': 'ZPGZ0001'})
-
+        try:
+            dic = self.queryset.aggregate(Max('rule_code'))
+            res = dic.get('rule_code__max')
+            if res:
+                results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+                return Response({'results': results})
+            return Response({'results': 'ZPGZ0001'})
+        except:
+            return Response({'results': 'ZPGZ000X'})
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipTargetMTBFMTTRSettingView(APIView):
@@ -1928,13 +1937,15 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
         rule_code = self.request.query_params.get('rule_code')
-        if not rule_code:
-            raise ValidationError('传入参数有误')
-        dic = self.queryset.filter(work_type=rule_code).aggregate(Max('standard_code'))
-        res = dic.get('standard_code__max')
-        if res:
-            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
-            return Response({'results': results})
+        try:
+            if not rule_code:
+                raise ValidationError('传入参数有误')
+            dic = self.queryset.filter(work_type=rule_code).aggregate(Max('standard_code'))
+            res = dic.get('standard_code__max')
+            if res:
+                results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+                return Response({'results': results})
+        except: pass
         kwargs = {'巡检': 'XJBZ0001',
                   '保养': 'BYBZ0001',
                   '标定': 'BDBZ0001',
@@ -2111,13 +2122,15 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
-        dic = self.queryset.aggregate(Max('standard_code'))
-        res = dic.get('standard_code__max')
-        if res:
-            results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
-            return Response({'results': results})
-
-        return Response({'results': 'WXBZ0001'})
+        try:
+            dic = self.queryset.aggregate(Max('standard_code'))
+            res = dic.get('standard_code__max')
+            if res:
+                results = res[0:4] + str('%04d' % (int(res[4:]) + 1))
+                return Response({'results': results})
+            return Response({'results': 'WXBZ0001'})
+        except:
+            return Response({'results': 'WXBZ000X'})
 # class EquipWarehouseAreaViewSet(ModelViewSet):
 #     """
 #     list: 库区展示
