@@ -521,6 +521,25 @@ class EquipSpareErpCreateSerializer(BaseModelSerializer):
                   'period_validity', 'use_flag')
 
 
+class EquipSpareErpImportCreateSerializer(BaseModelSerializer):
+    spare_code = serializers.CharField(max_length=64,
+                                       validators=[
+                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
+                                                           message='该备件代码已存在'),
+                                       ])
+    spare_name = serializers.CharField(max_length=64,
+                                       validators=[
+                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
+                                                           message='该备件名称已存在'),
+                                       ])
+
+    class Meta:
+        model = EquipSpareErp
+        fields = ('equip_component_type', 'spare_code', 'spare_name', 'specification', 'technical_params', 'unit',
+                  'key_parts_flag', 'supplier_name', 'lower_stock', 'upper_stock', 'cost', 'texture_material',
+                  'period_validity', 'use_flag', 'info_source')
+
+
 class ERPSpareComponentRelationCreateSerializer(serializers.ModelSerializer):
 
     class Meta:

@@ -978,7 +978,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         if component_name:
             filter_kwargs['component_name__icontains'] = component_name
         if is_binding:
-            filter_kwargs['equip_components__isnull'] = False if is_binding == '1' else True
+            filter_kwargs['equip_components__isnull'] = False if is_binding == 'true' else True
         if use_flag:
             filter_kwargs['use_flag'] = use_flag
         query_set = self.queryset.filter(**filter_kwargs)
@@ -1150,8 +1150,9 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
                                    "texture_material": item[10],
                                    "period_validity": item[11],
                                    "supplier_name": item[12],
-                                   "use_flag": 1 if item[13] == 'Y' else 0})
-        s = EquipSpareErpCreateSerializer(data=parts_list, many=True, context={'request': request})
+                                   "use_flag": 1 if item[13] == 'Y' else 0,
+                                   "info_source": "ERP"})
+        s = EquipSpareErpImportCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
             s.save()
         else:
@@ -2152,34 +2153,29 @@ class GetDefaultCodeView(APIView):
         work_type = self.request.query_params.get('work_type')
         if work_type == '部件':
             max_standard_code = EquipComponent.objects.filter(component_code__startswith='BJ').aggregate(max_code=Max('component_code'))['max_code']
-            next_standard_code = max_standard_code[:2] + '%04d' % (
-                        int(max_standard_code[2:]) + 1) if max_standard_code else 'BJ0001'
+            next_standard_code = max_standard_code[:2] + '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code and max_standard_code[2:].isdigit() else 'BJ0001'
         elif work_type in ['巡检', '维修', '保养', '润滑', '标定']:
             map_dict = {'巡检': 'XJ', '维修': 'WX', '保养': 'BY', '润滑': 'RH', '标定': 'BD'}
             prefix = map_dict.get(work_type)
             max_standard_code = EquipJobItemStandard.objects.filter(work_type=work_type, standard_code__startswith=prefix).aggregate(max_code=Max('standard_code'))['max_code']
-            code_num = '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code else '0001'
-            next_standard_code = prefix + code_num
+            next_standard_code = prefix + '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code and max_standard_code[2:].isdigit() else prefix + '0001'
         elif work_type == '故障':
             equip_fault_type = self.request.query_params.get('equip_fault_type')
             max_standard_code = EquipFault.objects.filter(equip_fault_type__fault_type_code=equip_fault_type,
                                                           fault_code__startswith=equip_fault_type).aggregate(max_code=Max('fault_code'))['max_code']
-            code_num = '%04d' % (int(max_standard_code[len(equip_fault_type):]) + 1) if max_standard_code else '0001'
-            next_standard_code = equip_fault_type + code_num
+            next_standard_code = equip_fault_type + '%04d' % (int(max_standard_code[len(equip_fault_type):]) + 1) if max_standard_code and max_standard_code[len(equip_fault_type):].isdigit() else equip_fault_type + '0001'
         elif work_type == '停机':
             equip_machine_halt_type = self.request.query_params.get('equip_machine_halt_type')
             max_standard_code = EquipMachineHaltReason.objects.filter(equip_machine_halt_type__machine_halt_type_code=equip_machine_halt_type,
                                                                       machine_halt_reason_code__startswith=equip_machine_halt_type).aggregate(
                 max_code=Max('machine_halt_reason_code'))['max_code']
-            code_num = '%04d' % (int(max_standard_code[len(equip_machine_halt_type):]) + 1) if max_standard_code else '0001'
-            next_standard_code = equip_machine_halt_type + code_num
+            next_standard_code = equip_machine_halt_type + '%04d' % (int(max_standard_code[len(equip_machine_halt_type):]) + 1) if max_standard_code and max_standard_code[len(equip_machine_halt_type):].isdigit() else equip_machine_halt_type + '0001'
         elif work_type == '信号':
             max_standard_code = EquipFaultSignal.objects.filter(signal_code__startswith='IO').aggregate(max_code=Max('signal_code'))['max_code']
-            code_num = '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code else '0001'
-            next_standard_code = 'IO' + code_num
+            next_standard_code = max_standard_code[:2] + '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code and max_standard_code[2:].isdigit() else 'IO0001'
         elif work_type == '部位':
             max_standard_code = EquipPartNew.objects.filter(part_code__startswith='BW').aggregate(max_code=Max('part_code'))['max_code']
-            next_standard_code = max_standard_code[:2] + '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code else 'BW0001'
+            next_standard_code = max_standard_code[:2] + '%04d' % (int(max_standard_code[2:]) + 1) if max_standard_code and max_standard_code[2:].isdigit() else 'BW0001'
         else:
             raise ValidationError('该类型默认编码暂未提供')
         return Response(next_standard_code)
