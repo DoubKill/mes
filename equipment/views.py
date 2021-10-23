@@ -1876,11 +1876,11 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                     start_time = dt.date(*map(int, item[9].split('-'))) if isinstance(item[9], str) else datetime.date(xlrd.xldate.xldate_as_datetime(item[9], 0))
             except: raise ValidationError('导入的开始时间格式有误')
 
-            lst = [i[0] for i in data]
-            if lst.count(item[0]) > 1:
-                raise ValidationError('导入的物料编码不能重复')
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
+                raise ValidationError('导入的物料编码不能重复')
+            lst = [i[2] for i in data]
+            if lst.count(item[2]) > 1:
                 raise ValidationError('导入的物料名称不能重复')
 
             if not EquipMaintenanceStandard.objects.filter(Q(Q(standard_code=item[1]) | Q(standard_name=item[2]))).exists():
