@@ -620,6 +620,17 @@ class EquipBomSerializer(BaseModelSerializer):
     xunjian_standard_name = serializers.ReadOnlyField(source='maintenance_xunjian.standard_name', help_text='巡检标准', default='')
     runhua_standard_name = serializers.ReadOnlyField(source='maintenance_runhua.standard_name', help_text='润滑标准', default='')
     biaoding_standard_name = serializers.ReadOnlyField(source='maintenance_biaoding.standard_name', help_text='标定标准', default='')
+    part_name = serializers.ReadOnlyField(source='part.part_name', default='')
+    component_name = serializers.ReadOnlyField(source='component.component_name', default='')
+    equip_no = serializers.ReadOnlyField(source='equip_info.equip_no', default='')
+    equip_name = serializers.ReadOnlyField(source='equip_info.equip_name', default='')
+    equip_status = serializers.SerializerMethodField()
+    property_type_node = serializers.ReadOnlyField(source='property_type.global_name', default='')
+
+    def get_equip_status(self, obj):
+        if obj.equip_info:
+            return '启用' if obj.equip_info.use_flag else '停用'
+        return ''
 
     class Meta:
         model = EquipBom
