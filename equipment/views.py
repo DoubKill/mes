@@ -28,7 +28,8 @@ from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Prope
     EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard, EquipMaintenanceStandard, \
     EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials
 from equipment.serializers import *
-from equipment.task import property_template, property_import, export_xls
+from equipment.task import property_template, property_import
+from equipment.utils import gen_template_response
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -625,7 +626,7 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             return Response(queryset.filter(use_flag=True).values('id', 'supplier_name'))
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -719,7 +720,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -816,7 +817,7 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         return super().list(request, *args, **kwargs)
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
@@ -882,7 +883,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
             use_flag = [True] if not self.request.query_params.get('all_part') else [True, False]
             data = EquipPartNew.objects.filter(use_flag__in=use_flag).values('id', 'part_name')
@@ -910,7 +911,7 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if export:
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
             data = EquipComponentType.objects.filter(use_flag=True).values('id', 'component_type_name')
             return Response({'results': data})
@@ -1000,7 +1001,7 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         query_set = self.get_queryset()
         if export:
             data = self.get_serializer(query_set, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if self.request.query_params.get('all'):
             data = EquipComponent.objects.filter(use_flag=True).values('id', 'component_name')
             return Response({'results': data})
@@ -1117,7 +1118,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if all == '0':
             data = self.get_queryset().values('equip_component_type__component_type_name').distinct()
             return Response({'results': data})
@@ -1221,7 +1222,7 @@ class EquipBomViewSet(ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = EquipBomSerializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         if not tree:
             if title:
                 data = self.filter_queryset(self.get_queryset()).values('id', 'factory_id')
@@ -1494,7 +1495,7 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': data})
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1604,7 +1605,7 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         else:
             return super().list(request, *args, **kwargs)
 
@@ -1718,7 +1719,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         export = self.request.query_params.get('export')
         if export:
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
-            return export_xls(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
