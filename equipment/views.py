@@ -1879,9 +1879,6 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的物料编码不能重复')
-            lst = [i[2] for i in data]
-            if lst.count(item[2]) > 1:
-                raise ValidationError('导入的物料名称不能重复')
 
             if not EquipMaintenanceStandard.objects.filter(Q(Q(standard_code=item[1]) | Q(standard_name=item[2]))).exists():
                 signal_list.append({"work_type": item[0],
@@ -2068,9 +2065,6 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[0] for i in data]
             if lst.count(item[0]) > 1:
                 raise ValidationError('导入的物料编码不能重复')
-            lst = [i[1] for i in data]
-            if lst.count(item[1]) > 1:
-                raise ValidationError('导入的物料名称不能重复')
 
             if not EquipRepairStandard.objects.filter(Q(Q(standard_code=item[0]) | Q(standard_name=item[1]))).exists():
                 signal_list.append({"standard_code": item[0],
