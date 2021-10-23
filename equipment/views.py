@@ -2059,6 +2059,8 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 raise ValidationError(f'设备种类{item[2]}不存在')
             if not equip_part:
                 raise ValidationError(f'部位名称{item[3]}不存在')
+            if not equip_fault:
+                raise ValidationError(f'故障分类{item[7]}不存在')
             if not equip_job_item_standard:
                 raise ValidationError(f'作业项目{item[8]}不存在')
 
