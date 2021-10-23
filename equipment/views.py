@@ -1807,6 +1807,12 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的标准编码不能重复')
+            lst = [i[2] for i in data]
+            if lst.count(item[2]) > 1:
+                raise ValidationError('导入的标准名称不能重复')
             obj = EquipJobItemStandard.objects.filter(Q(standard_code=item[1]) | Q(standard_name=item[2])).first()
             if not obj:
                 parts_list.append({
@@ -1817,10 +1823,12 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 })
         s = EquipJobItemStandardCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
 
 @method_decorator([api_recorder], name="dispatch")
