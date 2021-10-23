@@ -195,7 +195,8 @@ class EquipBomFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipBom
-        fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name', 'level', 'equip_info')
+        fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name', 'level', 'equip_info',
+                  'part__use_flag')
 
 
 class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
