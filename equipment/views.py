@@ -651,7 +651,6 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的供应商名称不能重复')
-            print(item[4], type(item[4]))
             obj = EquipSupplier.objects.filter(Q(supplier_code=item[0]) | Q(supplier_name=item[1])).first()
             if not obj:
                 if item[5] not in ['普通供应商', '集采供应商']:
@@ -773,10 +772,12 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
                                   })
         s = EquipPropertySerializer(data=area_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
 
 @method_decorator([api_recorder], name='dispatch')
