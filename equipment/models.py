@@ -317,6 +317,7 @@ class EquipSpareErp(AbstractEntity):
     texture_material = models.CharField(max_length=64, help_text='材质', blank=True, null=True)
     period_validity = models.IntegerField(help_text='有效期', blank=True, null=True)
     use_flag = models.BooleanField(help_text='是否启用', default=True)
+    info_source = models.CharField(max_length=64, help_text='来源', blank=True, null=True, default='MES')
     equip_component = models.ManyToManyField(EquipComponent, help_text='设备部件', related_name='equip_components',
                                              through='ERPSpareComponentRelation')
 
