@@ -645,25 +645,32 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet, start_row=1)
         area_list = []
         for item in data:
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的供应商编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的供应商名称不能重复')
+            print(item[4], type(item[4]))
             obj = EquipSupplier.objects.filter(Q(supplier_code=item[0]) | Q(supplier_name=item[1])).first()
             if not obj:
                 if item[5] not in ['普通供应商', '集采供应商']:
                     raise ValidationError('该供应商类别不存在')
-                if not isinstance(item[4], float):
-                    raise ValidationError('联系号码输入有误！')
                 area_list.append({"supplier_code": item[0],
                                   "supplier_name": item[1],
                                   "region": item[2],
                                   "contact_name": item[3],
-                                  "contact_phone": str(int(item[4])),
-                                  "supplier_type": item[5],
+                                  "contact_phone": item[4] if item[4] else None,
+                                  "supplier_type": item[5] if item[5] else None,
                                   })
         s = EquipSupplierSerializer(data=area_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('供应商或编号已存在！')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
@@ -799,6 +806,12 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         area_list = []
         for item in data:
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的区域编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的区域名称不能重复')
             obj = EquipAreaDefine.objects.filter(Q(area_code=item[0]) | Q(area_name=item[1])).first()
             if not obj:
                 area_list.append({"area_code": item[0],
@@ -807,10 +820,12 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
                                   "desc": item[3]})
         s = EquipAreaDefineSerializer(data=area_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export')
@@ -859,6 +874,12 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[2] for i in data]
+            if lst.count(item[2]) > 1:
+                raise ValidationError('导入的部位编码不能重复')
+            lst = [i[3] for i in data]
+            if lst.count(item[3]) > 1:
+                raise ValidationError('导入的部位名称不能重复')
             equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0]).first()
             global_part_type = GlobalCode.objects.filter(global_name=item[1]).first()
             if not equip_type:
@@ -873,10 +894,12 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
                                    "part_name": item[3]})
         s = EquipPartNewSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export')
@@ -927,6 +950,12 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的类型编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的类型名称不能重复')
             obj = EquipComponentType.objects.filter(Q(component_type_code=item[0]) |
                                                     Q(component_type_name=item[1])).first()
             if not obj:
@@ -934,10 +963,12 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
                                    "component_type_name": item[1]})
         s = EquipComponentTypeSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -1020,6 +1051,12 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[3] for i in data]
+            if lst.count(item[3]) > 1:
+                raise ValidationError('导入的部件编码不能重复')
+            lst = [i[4] for i in data]
+            if lst.count(item[4]) > 1:
+                raise ValidationError('导入的部件名称不能重复')
             equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0]).first()
             global_part_type = GlobalCode.objects.filter(global_name=item[1]).first()
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2]).first()
@@ -1040,10 +1077,12 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
                                    "use_flag": 1 if item[6] == 'Y' else 0})
         s = EquipComponentCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -1138,6 +1177,12 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的备件编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的备件名称不能重复')
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2]).first()
             if not equip_component_type:
                 raise ValidationError('备件分类{}不存在'.format(item[2]))
@@ -1160,10 +1205,12 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
                                    "info_source": "ERP"})
         s = EquipSpareErpImportCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -1509,6 +1556,12 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的信号编号不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的信号名称不能重复')
             equip = Equip.objects.filter(equip_no=item[2]).first()
             equip_part = EquipPartNew.objects.filter(part_name=item[4]).first()
             equip_component = EquipComponent.objects.filter(component_name=item[5]).first()
@@ -1538,11 +1591,13 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
                                     "equip_component": equip_component.id if equip_component else None,
                                     })
         s = EquipFaultSignalSerializer(data=signal_list, many=True, context={'request': request})
-        if s.is_valid():
+        if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
@@ -1619,6 +1674,12 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
+            lst = [i[0] for i in data]
+            if lst.count(item[0]) > 1:
+                raise ValidationError('导入的类型编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的类型名称不能重复')
             equip_type = GlobalCode.objects.filter(global_name=item[3]).first()
             if not equip_type:
                 raise ValidationError('设备类型{}不存在'.format(item[3]))
@@ -1637,11 +1698,13 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
                                     "accept_warning_times": item[11],
                                     })
         s = EquipOrderAssignRuleSerializer(data=signal_list, many=True, context={'request': request})
-        if s.is_valid():
+        if s.is_valid(raise_exception=False):
+            if len(s.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             s.save()
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(s.validated_data)}条数据')
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
@@ -1890,6 +1953,9 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的物料编码不能重复')
+            lst = [i[2] for i in data]
+            if lst.count(item[2]) > 1:
+                raise ValidationError('导入的物料名称不能重复')
 
             if not EquipMaintenanceStandard.objects.filter(Q(Q(standard_code=item[1]) | Q(standard_name=item[2]))).exists():
                 signal_list.append({"work_type": item[0],
@@ -1915,7 +1981,9 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     })
 
         serializer = EquipMaintenanceStandardImportSerializer(data=signal_list, many=True, context={'request': request})
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid(raise_exception=False):
+            if len(serializer.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             for data in serializer.validated_data:
                 spares = dict(data).pop('spares')
                 data.pop('spares')
@@ -1934,7 +2002,7 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                                                      quantity=1)  # 默认1
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(serializer.validated_data)}条数据')
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
@@ -2080,6 +2148,9 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[0] for i in data]
             if lst.count(item[0]) > 1:
                 raise ValidationError('导入的物料编码不能重复')
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的物料名称不能重复')
 
             if not EquipRepairStandard.objects.filter(Q(Q(standard_code=item[0]) | Q(standard_name=item[1]))).exists():
                 signal_list.append({"standard_code": item[0],
@@ -2101,7 +2172,9 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     })
 
         serializer = EquipRepairStandardImportSerializer(data=signal_list, many=True, context={'request': request})
-        if serializer.is_valid(raise_exception=True):
+        if serializer.is_valid(raise_exception=False):
+            if len(serializer.validated_data) < 1:
+                raise ValidationError('没有可导入的数据')
             for data in serializer.validated_data:
                 spares = dict(data).pop('spares')
                 data.pop('spares')
@@ -2120,7 +2193,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                                                      quantity=1)  # 默认1
         else:
             raise ValidationError('导入的数据类型有误')
-        return Response('导入成功')
+        return Response(f'成功导入{len(serializer.validated_data)}条数据')
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='get_name', url_name='get_name')
     def get_name(self, request):
