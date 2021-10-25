@@ -11,7 +11,7 @@ class UserFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = User
-        fields = ('num', 'username', 'is_leave', 'groups', 'is_active')
+        fields = ('num', 'username', 'is_leave', 'groups', 'is_active', 'section_id')
 
 
 class GroupExtensionFilter(django_filters.rest_framework.FilterSet):
@@ -23,11 +23,10 @@ class GroupExtensionFilter(django_filters.rest_framework.FilterSet):
         fields = {"group_code", "name", 'use_flag'}
 
 
-
 class SectionFilter(django_filters.rest_framework.FilterSet):
     name = django_filters.CharFilter(field_name='name', help_text='名称', lookup_expr='icontains')
     section_id = django_filters.CharFilter(field_name='section_id', help_text="编码", lookup_expr='icontains')
 
     class Meta:
         model = Section
-        fields = ('name', 'section_id')
+        fields = ('name', 'section_id', 'parent_section_id')
