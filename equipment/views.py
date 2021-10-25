@@ -1071,16 +1071,15 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
             if lst.count(item[4]) > 1:
                 raise ValidationError('导入的部件名称不能重复')
             equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0], use_flag=1).first()
-            global_part_type = EquipPartNew.objects.filter(part_name=item[1], use_flag=1).first()
+            equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id, part_name=item[1], use_flag=1).first()
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2], use_flag=1).first()
+
             if not equip_type:
                 raise ValidationError('主设备种类{}不存在'.format(item[0]))
-            if not global_part_type:
+            if not equip_part:
                 raise ValidationError('部位{}不存在'.format(item[1]))
             if not equip_component_type:
                 raise ValidationError('部件分类{}不存在'.format(item[2]))
-            equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id,
-                                                     global_part_type=global_part_type.id).first()
             obj = EquipComponent.objects.filter(Q(component_code=item[3]) | Q(component_name=item[4])).first()
             if not obj:
                 parts_list.append({"equip_part": equip_part.id,
