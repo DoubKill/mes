@@ -24,3 +24,4 @@ django-celery-results==2.0.1
 celery==5.0.5
 suds-jurko==0.6
 xmltodict
+openpyxl==3.0.9

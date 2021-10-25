@@ -7,11 +7,15 @@ from datetime import datetime
 from django.db.transaction import atomic
 from rest_framework import serializers
 
-from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
-    PropertyTypeNode, Property, PlatformConfig
+    PropertyTypeNode, Property, PlatformConfig, EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
+    EquipComponent, EquipComponentType, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
+    PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
+    EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard, \
+    EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -253,3 +257,620 @@ class EquipMaintenanceOrderLogSerializer(BaseModelSerializer):
     class Meta:
         model = EquipMaintenanceOrder
         fields = '__all__'
+
+
+# **************************2021-10-09最新序列化器**************************
+
+
+class EquipSupplierSerializer(BaseModelSerializer):
+    supplier_code = serializers.CharField(help_text='供应商编号', max_length=64,
+                                          validators=[UniqueValidator(queryset=EquipSupplier.objects.all(), message='该编码已存在')])
+    supplier_name = serializers.CharField(help_text='供应商名称', max_length=64,
+                                          validators=[UniqueValidator(queryset=EquipSupplier.objects.filter(use_flag=True), message='该供应商已存在')])
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    class Meta:
+        model = EquipSupplier
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipComponentListSerializer(BaseModelSerializer):
+    equip_type_name = serializers.CharField(source='equip_part.equip_type.category_no', help_text='所属主设备种类', max_length=64)
+    equip_type = serializers.IntegerField(source='equip_part.equip_type_id')
+    equip_part_name = serializers.CharField(source='equip_part.part_name', help_text='所属设备部位', max_length=64)
+    equip_component_type_name = serializers.CharField(source='equip_component_type.component_type_name', help_text='所属部件分类', max_length=64)
+    is_binding = serializers.BooleanField(help_text='是否绑定备件')
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    class Meta:
+        model = EquipComponent
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipFaultSignalSerializer(BaseModelSerializer):
+    signal_code = serializers.CharField(validators=[
+                                              UniqueValidator(queryset=EquipFaultSignal.objects.all(),
+                                                              message='该故障信号编码已存在')])
+    signal_name = serializers.CharField(validators=[
+                                              UniqueValidator(queryset=EquipFaultSignal.objects.all(),
+                                                              message='该故障信号名称已存在')])
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
+    equip_component_name = serializers.CharField(source='equip_component.component_name', read_only=True, default='')
+    equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True, default='')
+    equip_category_id = serializers.IntegerField(source='equip.category_id', read_only=True, default='')
+    use_flag_name = serializers.SerializerMethodField()
+    alarm_signal_down_flag_name = serializers.SerializerMethodField()
+    fault_signal_down_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    def get_alarm_signal_down_flag_name(self, obj):
+        return 'Y' if obj.alarm_signal_down_flag else 'N'
+
+    def get_fault_signal_down_flag_name(self, obj):
+        return 'Y' if obj.fault_signal_down_flag else 'N'
+
+    class Meta:
+        model = EquipFaultSignal
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPropertySerializer(BaseModelSerializer):
+    no = serializers.ReadOnlyField()
+    name = serializers.ReadOnlyField()
+    status_name = serializers.SerializerMethodField()
+    equip_type_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备类型')
+    equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
+    made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商', default='')
+    property_no = serializers.CharField(help_text='固定资产编码', max_length=64,
+                                        validators=[UniqueValidator(queryset=EquipProperty.objects.all(), message='固定资产名称已存在')])
+
+    def get_status_name(self, obj):
+        dic = {
+            1: '使用中',
+            2: '废弃',
+            3: '限制'}
+        return dic.get(obj.status)
+
+    class Meta:
+        model = EquipProperty
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipMachineHaltTypeSerializer(BaseModelSerializer):
+    machine_halt_type_code = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltType.objects.all(),
+                        message='该停机类型编码已存在')])
+    machine_halt_type_name = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltType.objects.all(),
+                        message='该停机类型名称已存在')])
+
+    class Meta:
+        model = EquipMachineHaltType
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipAreaDefineSerializer(BaseModelSerializer):
+    area_name = serializers.CharField(help_text='位置区域名称', max_length=64,
+                                      validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该名称已存在')])
+    area_code = serializers.CharField(help_text='位置区域编号', max_length=64,
+                                      validators=[UniqueValidator(queryset=EquipAreaDefine.objects.all(), message='该编号已存在')])
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    class Meta:
+        model = EquipAreaDefine
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPartNewSerializer(BaseModelSerializer):
+    part_code = serializers.CharField(help_text='部位编码', max_length=64,
+                                      validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该编码已存在')])
+    part_name = serializers.CharField(help_text='设备名称', max_length=64,
+                                      validators=[UniqueValidator(queryset=EquipPartNew.objects.all(), message='该名称已存在')])
+    category_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='所属主设备种类')
+    global_name = serializers.ReadOnlyField(source='global_part_type.global_name', help_text='部位分类')
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    class Meta:
+        model = EquipPartNew
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipMachineHaltReasonSerializer(BaseModelSerializer):
+    machine_halt_reason_code = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltReason.objects.all(),
+                        message='该停机原因编码已存在')])
+    machine_halt_reason_name = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipMachineHaltReason.objects.all(),
+                        message='该停机原因名称已存在')])
+    equip_faults = serializers.SerializerMethodField(read_only=True)
+
+    @staticmethod
+    def validate_equip_machine_halt_type(equip_machine_halt_type):
+        if equip_machine_halt_type.use_flag == 0:
+            raise serializers.ValidationError('弃用状态的停机类型不可新建')
+        return equip_machine_halt_type
+
+    def update(self, instance, validated_data):
+        instance.equip_fault.clear()
+        return super().update(instance, validated_data)
+
+    def get_equip_faults(self, obj):
+        return obj.equip_fault.values()
+
+    class Meta:
+        model = EquipMachineHaltReason
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        extra_kwargs = {'equip_fault': {"required": False}}
+
+
+class EquipComponentTypeSerializer(BaseModelSerializer):
+    # 设备部件分类
+    component_type_code = serializers.CharField(help_text='分类编号', max_length=64,
+                                                validators=[UniqueValidator(queryset=EquipComponentType.objects.all(), message='该编号已存在')])
+    component_type_name = serializers.CharField(help_text='分类名称', max_length=64,
+                                                validators=[UniqueValidator(queryset=EquipComponentType.objects.all(), message='该名称已存在')])
+
+    class Meta:
+        model = EquipComponentType
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipOrderAssignRuleSerializer(BaseModelSerializer):
+    rule_code = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipOrderAssignRule.objects.all(),
+                        message='该工单指派规则编码已存在')])
+    rule_name = serializers.CharField(validators=[
+        UniqueValidator(queryset=EquipOrderAssignRule.objects.all(),
+                        message='该工单指派规则名称已存在')])
+    equip_type_name = serializers.CharField(source='equip_type.global_name', read_only=True, default='')
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    class Meta:
+        model = EquipOrderAssignRule
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipComponentCreateSerializer(BaseModelSerializer):
+    component_code = serializers.CharField(max_length=64,
+                                           validators=[
+                                                UniqueValidator(queryset=EquipComponent.objects.all(),
+                                                                message='该部件代码已存在'),
+                                           ])
+    component_name = serializers.CharField(max_length=64,
+                                           validators=[
+                                                UniqueValidator(queryset=EquipComponent.objects.all(),
+                                                                message='该部件名称已存在'),
+                                           ])
+
+    class Meta:
+        model = EquipComponent
+        fields = ('equip_part', 'equip_component_type', 'component_code', 'component_name', 'use_flag')
+
+
+class ERPSpareComponentRelationListSerializer(serializers.ModelSerializer):
+    equip_component_type_name = serializers.CharField(source='equip_spare_erp.equip_component_type.component_type_name', help_text='备件分类', max_length=64)
+    spare_code = serializers.CharField(source='equip_spare_erp.spare_code', help_text='备件编码', max_length=64)
+    spare_name = serializers.CharField(source='equip_spare_erp.spare_name', help_text='备件名称', max_length=64)
+    supplier_name = serializers.CharField(source='equip_spare_erp.supplier_name', help_text='供应商名称', max_length=64)
+
+    class Meta:
+        model = ERPSpareComponentRelation
+        fields = '__all__'
+
+
+class EquipSpareErpListSerializer(BaseModelSerializer):
+    equip_component_type_name = serializers.CharField(source='equip_component_type.component_type_name', help_text='备件分类', max_length=64)
+    key_parts_flag_name = serializers.SerializerMethodField()
+    use_flag_name = serializers.SerializerMethodField()
+
+    def get_key_parts_flag_name(self, obj):
+        return '是' if obj.key_parts_flag else '否'
+
+    def get_use_flag_name(self, obj):
+        return 'Y' if obj.use_flag else 'N'
+
+    class Meta:
+        model = EquipSpareErp
+        fields = '__all__'
+
+
+class EquipSpareErpCreateSerializer(BaseModelSerializer):
+    spare_code = serializers.CharField(max_length=64,
+                                       validators=[
+                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
+                                                           message='该备件代码已存在'),
+                                       ])
+    spare_name = serializers.CharField(max_length=64,
+                                       validators=[
+                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
+                                                           message='该备件名称已存在'),
+                                       ])
+
+    class Meta:
+        model = EquipSpareErp
+        fields = ('equip_component_type', 'spare_code', 'spare_name', 'specification', 'technical_params', 'unit',
+                  'key_parts_flag', 'supplier_name', 'lower_stock', 'upper_stock', 'cost', 'texture_material',
+                  'period_validity', 'use_flag')
+
+
+class EquipSpareErpImportCreateSerializer(BaseModelSerializer):
+    spare_code = serializers.CharField(max_length=64,
+                                       validators=[
+                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
+                                                           message='该备件代码已存在'),
+                                       ])
+    spare_name = serializers.CharField(max_length=64,
+                                       validators=[
+                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
+                                                           message='该备件名称已存在'),
+                                       ])
+
+    class Meta:
+        model = EquipSpareErp
+        fields = ('equip_component_type', 'spare_code', 'spare_name', 'specification', 'technical_params', 'unit',
+                  'key_parts_flag', 'supplier_name', 'lower_stock', 'upper_stock', 'cost', 'texture_material',
+                  'period_validity', 'use_flag', 'info_source')
+
+
+class ERPSpareComponentRelationCreateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ERPSpareComponentRelation
+        fields = '__all__'
+
+
+# class EquipSpareErpSerializer(serializers.ModelSerializer):
+#     equip_type_name = serializers.CharField(source='equip_component_type.category_name', help_text='备件分类')
+#     equip_part_name = serializers.CharField(source='spare_code', help_text='备件编码')
+#     equip_component_type_name = serializers.CharField(source='spare_name', help_text='备件名称')
+#     supplier_name = serializers.CharField(source='supplier_name', help_text='供应商名称')
+#
+#     class Meta:
+#         model = EquipSpareErp
+#         fields = '__all__'
+
+
+class EquipFaultTypeSerializer(BaseModelSerializer):
+    """设备故障分类类型序列化器"""
+    fault_type_code = serializers.CharField(max_length=64,
+                                            validators=[
+                                                UniqueValidator(queryset=EquipFaultType.objects.all(),
+                                                                message='该代码类型编号已存在'),
+                                            ])
+    fault_type_name = serializers.CharField(max_length=64,
+                                            validators=[
+                                                UniqueValidator(queryset=EquipFaultType.objects.filter(delete_flag=False),
+                                                                message='该代码类型名称已存在'),
+                                            ])
+
+    class Meta:
+        model = EquipFaultType
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipFaultCodeSerializer(BaseModelSerializer):
+    """设备故障分类序列化器"""
+    fault_type_code = serializers.ReadOnlyField(source='equip_fault_type.fault_type_code')
+    fault_type_name = serializers.ReadOnlyField(source='equip_fault_type.fault_type_name')
+    fault_code = serializers.CharField(max_length=64, validators=[UniqueValidator(queryset=EquipFault.objects.all(),
+                                                                                  message='该公共代码编号已存在')])
+    fault_name = serializers.CharField(max_length=64, validators=[UniqueValidator(queryset=EquipFault.objects.all(),
+                                                                                  message='该公共代码名称已存在')])
+
+    @staticmethod
+    def validate_equip_fault_type(equip_fault_type):
+        if equip_fault_type.use_flag == 0:
+            raise serializers.ValidationError('弃用状态的分类类型不可新建')
+        return equip_fault_type
+
+    def create(self, validated_data):
+        validated_data.update(created_user=self.context["request"].user)
+        instance = super().create(validated_data)
+        return instance
+
+    def update(self, instance, validated_data):
+        validated_data.update(last_updated_user=self.context["request"].user)
+        return super(EquipFaultCodeSerializer, self).update(instance, validated_data)
+
+    class Meta:
+        model = EquipFault
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipBomSerializer(BaseModelSerializer):
+    equip_area_code = serializers.ReadOnlyField(source='equip_area_define.area_code', help_text='区域编号', default='')
+    equip_area_name = serializers.ReadOnlyField(source='equip_area_define.area_name', help_text='区域名称', default='')
+    equip_type = serializers.ReadOnlyField(source='equip_info.category.category_name', help_text='设备机型', default='')
+    equip_type_nid = serializers.ReadOnlyField(source='equip_info.category_id', help_text='设备机型id', default='')
+    part_code = serializers.ReadOnlyField(source='part.part_code', help_text='设备部位编号', default='')
+    component_code = serializers.ReadOnlyField(source='component.component_code', help_text='设备部件编号', default='')
+    component_type = serializers.ReadOnlyField(source='component.equip_component_type.component_type_name', help_text='设备部件规格', default='')
+    baoyang_standard_name = serializers.ReadOnlyField(source='maintenance_baoyang.standard_name', help_text='保养标准', default='')
+    repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准', default='')
+    xunjian_standard_name = serializers.ReadOnlyField(source='maintenance_xunjian.standard_name', help_text='巡检标准', default='')
+    runhua_standard_name = serializers.ReadOnlyField(source='maintenance_runhua.standard_name', help_text='润滑标准', default='')
+    biaoding_standard_name = serializers.ReadOnlyField(source='maintenance_biaoding.standard_name', help_text='标定标准', default='')
+    part_name = serializers.ReadOnlyField(source='part.part_name', default='')
+    component_name = serializers.ReadOnlyField(source='component.component_name', default='')
+    equip_no = serializers.ReadOnlyField(source='equip_info.equip_no', default='')
+    equip_name = serializers.ReadOnlyField(source='equip_info.equip_name', default='')
+    equip_status = serializers.SerializerMethodField()
+    property_type_node = serializers.ReadOnlyField(source='property_type.global_name', default='')
+
+    def get_equip_status(self, obj):
+        if obj.equip_info:
+            return '启用' if obj.equip_info.use_flag else '停用'
+        return ''
+
+    class Meta:
+        model = EquipBom
+        fields = '__all__'
+
+
+class EquipBomUpdateSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = EquipBom
+        fields = ('equip_area_define', 'maintenance_xunjian', 'maintenance_xunjian_flag', 'equip_repair_standard',
+                  'equip_repair_standard_flag', 'maintenance_baoyang', 'maintenance_baoyang_flag', 'maintenance_runhua',
+                  'maintenance_runhua_flag', 'maintenance_biaoding', 'maintenance_biaoding_flag')
+
+
+class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
+    equip_no = serializers.CharField(source='equip.equip_no', read_only=True)
+    equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
+    equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True, default='')
+    equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True, default='')
+
+    class Meta:
+        model = EquipMaintenanceAreaSetting
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(queryset=EquipMaintenanceAreaSetting.objects.all(),
+                                              fields=('maintenance_user', 'equip', 'equip_part'),
+                                              message='请勿重复添加！'),
+                      ]
+
+
+class EquipJobItemStandardListSerializer(BaseModelSerializer):
+    work_details = serializers.SerializerMethodField(help_text='作业详情')
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=instance).order_by('id')\
+            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+        work_details_column = check_standard_desc_column = check_standard_type_column = ''
+        for detail in details:
+            work_details_column += f"{detail['sequence']}、{detail['content']}；"
+            check_standard_desc_column += f"{detail['sequence']}、{detail['check_standard_desc']}；"
+            check_standard_type_column += f"{detail['sequence']}、{detail['check_standard_type']}；"
+            ret.update({'work_details_column': work_details_column,
+                        'check_standard_desc_column': check_standard_desc_column,
+                        'check_standard_type_column': check_standard_type_column})
+        return ret
+
+    def get_work_details(self, obj):
+        # 获取作业详情
+        details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id')\
+            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+        return details
+
+    class Meta:
+        model = EquipJobItemStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipJobItemStandardDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = EquipJobItemStandardDetail
+        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
+    standard_code = serializers.CharField(max_length=64, help_text='作业标准编号',
+                                          validators=[UniqueValidator(queryset=EquipJobItemStandard.objects.all(),
+                                                                      message='作业标准编号已存在')])
+    standard_name = serializers.CharField(max_length=64, help_text='作业标准名称',
+                                          validators=[UniqueValidator(queryset=EquipJobItemStandard.objects.all(),
+                                                                      message='作业标准名称已存在')])
+    work_details = EquipJobItemStandardDetailSerializer(help_text="""
+        [{"sequence": 1, "content": "外观检查", "check_standard_desc": "正常", "check_standard_type": "有无"}]""",
+                                                        write_only=True, many=True)
+
+    def validate(self, attrs):
+        work_details = attrs['work_details']
+        for detail in work_details:
+            check_standard_desc = detail['check_standard_desc']
+            check_standard_type = detail['check_standard_type']
+            if check_standard_type == '数值范围':
+                try:
+                    m, n = check_standard_desc.split('-')
+                    assert float(m) <= float(n)
+                except:
+                    raise serializers.ValidationError('数值范围不正确')
+                else:
+                    continue
+            if check_standard_desc not in check_standard_type or check_standard_desc not in ['有', '无', '合格', '不合格',
+                                                                                             '完成', '未完成', '正常', '异常']:
+                raise serializers.ValidationError('判断标准不正确')
+        return attrs
+
+    def create(self, validated_data):
+        work_details = validated_data.pop('work_details', [])
+        validated_data['created_user'] = self.context['request'].user
+        instance = EquipJobItemStandard.objects.create(**validated_data)
+        for detail in work_details:
+            detail['equip_standard'] = instance
+            EquipJobItemStandardDetail.objects.create(**detail)
+        return validated_data
+
+    class Meta:
+        model = EquipJobItemStandard
+        fields = ('work_type', 'standard_code', 'standard_name', 'work_details')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
+    standard_name = serializers.CharField(max_length=64, help_text='作业标准名称',
+                                          validators=[UniqueValidator(queryset=EquipJobItemStandard.objects.all(),
+                                                                      message='作业标准名称已存在')])
+    work_details = EquipJobItemStandardDetailSerializer(help_text="""
+        [{"sequence": 1, "content": "外观检查", "check_standard_desc": "正常", "check_standard_type": "有无"}]""",
+                                                        write_only=True, many=True)
+
+    def update(self, instance, validated_data):
+        work_details = validated_data.pop('work_details', [])
+        # 删除之前的作业内容
+        EquipJobItemStandardDetail.objects.filter(equip_standard=instance.id).delete()
+        validated_data['last_updated_user'] = self.context['request'].user
+        for detail in work_details:
+            detail['equip_standard'] = instance
+            EquipJobItemStandardDetail.objects.create(**detail)
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = EquipJobItemStandard
+        fields = ('work_type', 'standard_name', 'work_details')
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipMaintenanceStandardSerializer(BaseModelSerializer):
+    standard_code = serializers.CharField(help_text='标准编号', max_length=64, validators=[
+        UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准编号已存在')])
+    standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
+        UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准名称已存在')])
+    equip_type_name = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备种类')
+    equip_part_name = serializers.ReadOnlyField(source='equip_part.part_name', help_text='部位名称')
+    equip_component_name = serializers.ReadOnlyField(source='equip_component.component_name', help_text='部件名称')
+    equip_job_item_standard_name = serializers.ReadOnlyField(source='equip_job_item_standard.standard_name', help_text='作业项目')
+    equip_job_item_standard_detail = serializers.SerializerMethodField()
+    spare_list = serializers.SerializerMethodField()
+    spare_list_str = serializers.SerializerMethodField()
+
+    def get_spare_list(self, obj):
+        spare_list = EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard=obj).values(
+            'equip_spare_erp__id', 'equip_spare_erp__spare_code', 'equip_spare_erp__spare_name', 'equip_spare_erp__specification',
+            'equip_spare_erp__technical_params', 'quantity', 'equip_spare_erp__unit')
+
+        return spare_list
+
+    def get_spare_list_str(self, obj):
+        spare_list = EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard=obj).values('equip_spare_erp__spare_name')
+        data = ','.join([i.get('equip_spare_erp__spare_name') for i in spare_list])
+        return data
+
+    def get_equip_job_item_standard_detail(self, obj):
+        data = EquipJobItemStandardDetail.objects.filter(equip_standard=obj.equip_job_item_standard).values('sequence', 'content')
+        res = [f"{i['sequence']}、{i['content']}；" for i in data]
+        return ''.join(res)
+
+    class Meta:
+        model = EquipMaintenanceStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipMaintenanceStandardImportSerializer(BaseModelSerializer):
+    standard_code = serializers.CharField(help_text='标准编号', max_length=64, validators=[
+        UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准编号已存在')])
+    standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
+        UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准名称已存在')])
+    spares = serializers.CharField(write_only=True, default='')
+
+    class Meta:
+        model = EquipMaintenanceStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipRepairStandardSerializer(BaseModelSerializer):
+    standard_code = serializers.CharField(help_text='标准编号', max_length=64, validators=[
+        UniqueValidator(queryset=EquipRepairStandard.objects.all(), message='标准编号已存在')])
+    standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
+        UniqueValidator(queryset=EquipRepairStandard.objects.all(), message='标准名称已存在')])
+    equip_type_name = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备种类')
+    equip_part_name = serializers.ReadOnlyField(source='equip_part.part_name', help_text='部位名称')
+    equip_component_name = serializers.ReadOnlyField(source='equip_component.component_name', help_text='部件名称')
+    equip_fault_name = serializers.ReadOnlyField(source='equip_fault.fault_name', help_text='故障分类')
+    equip_job_item_standard_name = serializers.ReadOnlyField(source='equip_job_item_standard.standard_name', help_text='作业项目')
+    equip_job_item_standard_detail = serializers.SerializerMethodField()
+    spare_list = serializers.SerializerMethodField()
+    spare_list_str = serializers.SerializerMethodField()
+
+    def get_spare_list(self, obj):
+        spare_list = EquipRepairStandardMaterials.objects.filter(equip_repair_standard=obj).values(
+            'equip_spare_erp__id', 'equip_spare_erp__spare_code', 'equip_spare_erp__spare_name', 'equip_spare_erp__specification',
+            'equip_spare_erp__technical_params', 'quantity', 'equip_spare_erp__unit')
+        return spare_list
+
+    def get_spare_list_str(self, obj):
+        spare_list = EquipRepairStandardMaterials.objects.filter(equip_repair_standard=obj).values('equip_spare_erp__spare_name')
+        data = ','.join([i.get('equip_spare_erp__spare_name') for i in spare_list])
+        return data
+
+    def get_equip_job_item_standard_detail(self, obj):
+        data = EquipJobItemStandardDetail.objects.filter(equip_standard=obj.equip_job_item_standard).values('sequence', 'content')
+        res = [f"{i['sequence']}、{i['content']}；" for i in data]
+        return ''.join(res)
+
+    class Meta:
+        model = EquipRepairStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipRepairStandardImportSerializer(BaseModelSerializer):
+    standard_code = serializers.CharField(help_text='标准编号', max_length=64, validators=[
+        UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准编号已存在')])
+    standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
+        UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准名称已存在')])
+    spares = serializers.CharField(write_only=True, default='')
+
+    class Meta:
+        model = EquipRepairStandard
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+# class EquipWarehouseAreaSerializer(BaseModelSerializer):
+#     area_name = serializers.CharField(max_length=64, help_text='库区名称',
+#                                       validators=[UniqueValidator(queryset=EquipWarehouseArea.objects.filter(use_flag=1),
+#                                                                   message='库区名称已存在')])
+#     equip_component_type_name = serializers.ReadOnlyField(source='equip_component_type__component_type_name', help_text='备件分类名称')
+#
+#     class Meta:
+#         model = EquipWarehouseArea
+#         fields = '__all__'
+

@@ -637,10 +637,12 @@ class IndexProductionAnalyze(APIView):
 
         # 日合格率
         test_date_qualify_group = MaterialTestOrder.objects.filter(
-            production_factory_date__in=date_range
+            production_factory_date__in=date_range,
+            product_no__icontains='-FM'
         ).values('is_qualified', 'production_factory_date').annotate(count=Count('id'))
         test_date_group = MaterialTestOrder.objects.filter(
-            production_factory_date__in=date_range
+            production_factory_date__in=date_range,
+            product_no__icontains='-FM'
         ).values('production_factory_date').annotate(count=Count('id'))
         test_date_group_dict = {str(item['production_factory_date']): item for item in test_date_group}
         test_date_qualify_group_dict = {}
