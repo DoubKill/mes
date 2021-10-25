@@ -1520,6 +1520,8 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
@@ -1638,6 +1640,8 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
