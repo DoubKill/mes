@@ -817,6 +817,8 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的区域名称不能重复')
+            if type(item[2]) != int or type(item[2]) != float:
+                raise ValidationError(f'巡检顺序编号导入格式有误{item[2]}')
             obj = EquipAreaDefine.objects.filter(Q(area_code=item[0]) | Q(area_name=item[1])).first()
             if not obj:
                 area_list.append({"area_code": item[0],
