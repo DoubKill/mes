@@ -1674,12 +1674,12 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
                                     "equip_type": equip_type.id,
                                     "equip_condition": item[4],
                                     "important_level": item[5],
-                                    "receive_interval": item[6],
-                                    "receive_warning_times": item[7],
-                                    "start_interval": item[8],
-                                    "start_warning_times": item[9],
-                                    "accept_interval": item[10],
-                                    "accept_warning_times": item[11],
+                                    "receive_interval": item[6] if item[6] else None,
+                                    "receive_warning_times": item[7] if item[7] else None,
+                                    "start_interval": item[8] if item[8] else None,
+                                    "start_warning_times": item[9] if item[9] else None,
+                                    "accept_interval": item[10] if item[10] else None,
+                                    "accept_warning_times": item[11] if item[11] else None,
                                     })
         s = EquipOrderAssignRuleSerializer(data=signal_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
@@ -2162,7 +2162,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     "equip_job_item_standard": equip_job_item_standard.id,
                                     "cycle_person_num": item[9] if item[9] else None,
                                     "operation_time": item[10] if item[10] else None,
-                                    "operation_time_unit": item[11],
+                                    "operation_time_unit": item[11] if item[11] else None,
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
