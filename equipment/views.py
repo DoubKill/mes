@@ -642,6 +642,8 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet, start_row=1)
         area_list = []
         for item in data:
@@ -742,6 +744,8 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         area_list = []
         for item in data:
@@ -872,6 +876,8 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
@@ -948,6 +954,8 @@ class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
@@ -1049,6 +1057,8 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
@@ -1175,6 +1185,8 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
@@ -1774,6 +1786,8 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
@@ -1911,6 +1925,8 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
@@ -2107,6 +2123,8 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         if not excel_file:
             raise ValidationError('文件不可为空！')
         cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != len(self.EXPORT_FIELDS_DICT):
+            raise ValidationError('导入文件数据错误！')
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
