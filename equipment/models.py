@@ -721,14 +721,14 @@ class EquipWarehouseOrderDetail(AbstractEntity):
 
 class EquipWarehouseInventory(AbstractEntity):
     """
-        备件库库存信息
+        备件库出入库履历
     """
     STATUS = (
-        (1, '未入库'),
-        (2, '入库中'),
-        (3, '已入库')
+        (1, '入库'),
+        (2, '出库'),
     )
-    lot_no = models.CharField(max_length=64, help_text='批号')
+    spare_barcode = models.CharField(max_length=64, help_text='备件条码')
+    order_id = models.ForeignKey(EquipWarehouseOrder, help_text='出入库单据', on_delete=models.CASCADE)
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE)
     equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
