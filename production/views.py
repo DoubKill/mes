@@ -115,6 +115,7 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         else:
             data = dict(request.query_params)
         lot_no = data.pop("lot_no", None)
+        data.pop("factory_date", None)
         if not lot_no:
             raise ValidationError("请传入lot_no")
         instance, flag = PalletFeedbacks.objects.update_or_create(defaults=data, **{"lot_no": lot_no})
