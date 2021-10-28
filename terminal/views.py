@@ -1,4 +1,5 @@
 import datetime
+import re
 import time
 from datetime import timedelta
 
@@ -25,7 +26,8 @@ from mes.derorators import api_recorder
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PlanStatus, MaterialTankStatus
-from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation
+from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
+    WeighBatchingDetail
 from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
     WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
     FeedingOperationLogFilter
@@ -943,6 +945,87 @@ class RecipePreVIew(ListAPIView):
             raise
         return self.get_paginated_response(serializer.data)
 
+    def post(self, request):
+        equip_no = self.request.data.get('equip_no')  # 机台
+        recipe_name = self.request.data.get('recipe_name')  # 配方名称
+        total_standard_error = self.request.data.get('total_standard_error')  # 总误差
+        if not all([equip_no, recipe_name, total_standard_error]):
+            raise ValidationError('参数缺失！')
+        ret = re.match(r"(.*)[（|(](.*)[）|)]", recipe_name)
+        if not ret:
+            raise ValidationError('该配方名称不规范！')
+        try:
+            total_standard_error = float(total_standard_error)
+        except Exception:
+            raise ValidationError('参数错误！')
+        product_name = ret.group(1)
+        dev_type = ret.group(2)
+        product_batching = ProductBatching.objects.exclude(
+            used_type=6).filter(stage_product_batch_no=product_name,
+                                dev_type__category_no=dev_type,
+                                batching_type=2).first()
+        if not product_batching:
+            raise ValidationError('该配方MES不存在或已废弃！')
+
+        detail_list = []
+        try:
+            ret = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_name).values())
+            for item in ret:
+                m = Material.objects.filter(material_name=item['name'], delete_flag=0).first()
+                if not m:
+                    raise ValidationError('MES不存在此物料：{}'.format(item['name']))
+                detail_list.append({"material": m,
+                                    "standard_weight": item['weight'],
+                                    "standard_error": round(item['error'], 2)}
+                                   )
+        except ConnectionDoesNotExist:
+            raise ValidationError('称量机台{}服务错误！'.format(equip_no))
+        except Exception:
+            raise
+        if 'S' in equip_no:
+            cl_material = ProductBatchingDetail.objects.filter(material__material_name='硫磺细料', delete_flag=False).first()
+        else:
+            cl_material = ProductBatchingDetail.objects.filter(material__material_name='细料', delete_flag=False).first()
+        if cl_material:
+            qk_weight = float(cl_material.actual_weight)
+            cl_weight = sum([i['standard_weight'] for i in detail_list])
+            if qk_weight // cl_weight == 1 and 0.98 * qk_weight < cl_weight < 1.02 * qk_weight:
+                package_cnt = 1
+            elif qk_weight // cl_weight == 1 and 0.5 * qk_weight < cl_weight < 0.85 * qk_weight:
+                package_cnt = 1
+            elif qk_weight // cl_weight == 2 and 0.98 * qk_weight < cl_weight * 2 < 1.02 * qk_weight:
+                package_cnt = 2
+            elif qk_weight // cl_weight == 2 and 0.65 * qk_weight < cl_weight * 2 < 0.85 * qk_weight:
+                package_cnt = 2
+            elif qk_weight // cl_weight == 2 and 0.98 * qk_weight < cl_weight * 2 < 1.02 * qk_weight:
+                package_cnt = 2
+            elif qk_weight // cl_weight == 3 and 0.65 * qk_weight < cl_weight * 3 < 0.85 * qk_weight:
+                package_cnt = 3
+            elif qk_weight // cl_weight == 3 and 0.65 * qk_weight < cl_weight * 3 < 0.85 * qk_weight:
+                package_cnt = 3
+            else:
+                package_cnt = 1
+                # raise ValidationError('小料配方重量错误，请联系工艺员确认！')
+            cl_material.delete_flag = 1
+            cl_material.save()
+        else:
+            package_cnt = 1
+
+        defaults = {"package_cnt": package_cnt,
+                    "total_standard_error": round(total_standard_error, 2)}
+        kwargs = {"name": '{}-{}-{}'.format(product_name, dev_type, '硫磺包' if 'S' in equip_no else '细料包'),
+                  "product_batching": product_batching,
+                  "weigh_type": 1 if 'S' in equip_no else 2,
+                  "delete_flag": False}
+        weigh_cnt_type, _ = WeighCntType.objects.update_or_create(defaults=defaults, **kwargs)
+        weigh_cnt_type.weight_details.all().delete()
+        for detail in detail_list:
+            detail['weigh_cnt_type'] = weigh_cnt_type
+            WeighBatchingDetail.objects.create(**detail)
+        product_batching.used_type = 1
+        product_batching.save()
+        return Response('上传成功！')
+
 
 @method_decorator([api_recorder], name="dispatch")
 class RecipeMaterialVIew(APIView):
@@ -1736,3 +1819,38 @@ class FeedingOperateResultForCarbonView(APIView):
         instance.result = operate_result
         instance.save()
         return Response({'state': 0, 'msg': '更新投料状态成功'})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class MaterialInfoIssue(APIView):
+
+    def post(self, request):
+        equip_nos = self.request.data.get('equip_nos')
+        material_id = self.request.data.get('material_id')
+        try:
+            m = Material.objects.get(id=material_id)
+        except Exception:
+            raise ValidationError('object does not exit!')
+        error_equip = []
+        for equip_no in equip_nos:
+            try:
+                if MaterialInfo.objects.using(equip_no).filter(name=m.material_name):
+                    continue
+                last_m_info = MaterialInfo.objects.using(equip_no).order_by('id').last()
+                if last_m_info:
+                    m_id = last_m_info.id + 1
+                else:
+                    m_id = 1
+                MaterialInfo.objects.using(equip_no).create(
+                    id=m_id,
+                    name=m.material_name,
+                    code=m.material_name,
+                    remark='MES',
+                    use_not=0,
+                    time=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                )
+            except Exception:
+                error_equip.append(equip_no)
+        if error_equip:
+            raise ValidationError('称量机台{}网络错误！'.format('、'.join(error_equip)))
+        return Response('成功')

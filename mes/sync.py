@@ -73,6 +73,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
         for weight_cnt_type in obj.weight_cnt_types.filter(delete_flag=False):
             weight_details.append({'material': weight_cnt_type.name,
                                    'actual_weight': float(weight_cnt_type.total_weight),
+                                   'standard_error': weight_cnt_type.total_standard_error
                                    })
         return weight_details
 
