@@ -110,15 +110,25 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
     @action(methods=['post'], detail=False, permission_classes=[], url_path='bind-rfid',
             url_name='bind-rfid')
     def bind_rfid(self, request):
+        # {"plan_classes_uid": "2021102520011276Z11", "bath_no": 367, "equip_no": "Z11", "product_no": "C-FM-F978-04",
+        #  "plan_weight": "669.66", "actual_weight": "670", "begin_time": "2021-10-26 00:18:20.436",
+        #  "end_time": "2021-10-26 00:18:20.436", "operation_user": "人工", "begin_trains": 81, "end_trains": 82,
+        #  "pallet_no": "20102905", "classes": "夜班", "lot_no": "AAJ1Z112021102630367",
+        #  "product_time": "2021-10-26 00:18:20.436", "factory_date": "2021-10-26"}
         if request.data:
             data = dict(request.data)
         else:
             data = dict(request.query_params)
-        lot_no = data.pop("lot_no", None)
-        data.pop("factory_date", None)
+        validated_data = {}
+        for key, value in data.items():
+            if isinstance(value, str):
+                value = value.strip()
+            validated_data[key] = value
+        lot_no = validated_data.pop("lot_no", None)
+        validated_data.pop("factory_date", None)
         if not lot_no:
             raise ValidationError("请传入lot_no")
-        instance, flag = PalletFeedbacks.objects.update_or_create(defaults=data, **{"lot_no": lot_no})
+        instance, flag = PalletFeedbacks.objects.update_or_create(defaults=validated_data, **{"lot_no": lot_no})
         if flag:
             message = "补充成功"
         else:
