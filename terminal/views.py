@@ -953,11 +953,11 @@ class RecipePreVIew(ListAPIView):
             raise ValidationError('参数缺失！')
         ret = re.match(r"(.*)[（|(](.*)[）|)]", recipe_name)
         if not ret:
-            raise ValidationError('该配方名称不规范！')
+            raise ValidationError('该配方名称不规范，请联系工艺员修改！')
         try:
             total_standard_error = float(total_standard_error)
         except Exception:
-            raise ValidationError('参数错误！')
+            raise ValidationError('误差值错误！')
         product_name = ret.group(1)
         dev_type = ret.group(2)
         product_batching = ProductBatching.objects.exclude(
@@ -1020,6 +1020,7 @@ class RecipePreVIew(ListAPIView):
         weigh_cnt_type, _ = WeighCntType.objects.update_or_create(defaults=defaults, **kwargs)
         weigh_cnt_type.weight_details.all().delete()
         for detail in detail_list:
+            detail['standard_weight'] *= package_cnt
             detail['weigh_cnt_type'] = weigh_cnt_type
             WeighBatchingDetail.objects.create(**detail)
         product_batching.used_type = 1
