@@ -983,9 +983,13 @@ class RecipePreVIew(ListAPIView):
         except Exception:
             raise
         if 'S' in equip_no:
-            cl_material = ProductBatchingDetail.objects.filter(material__material_name='硫磺细料', delete_flag=False).first()
+            cl_material = ProductBatchingDetail.objects.filter(product_batching=product_batching,
+                                                               material__material_name='硫磺',
+                                                               delete_flag=False).first()
         else:
-            cl_material = ProductBatchingDetail.objects.filter(material__material_name='细料', delete_flag=False).first()
+            cl_material = ProductBatchingDetail.objects.filter(product_batching=product_batching,
+                                                               material__material_name='细料',
+                                                               delete_flag=False).first()
         if cl_material:
             qk_weight = float(cl_material.actual_weight)
             cl_weight = sum([i['standard_weight'] for i in detail_list])
