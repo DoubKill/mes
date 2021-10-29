@@ -1,4 +1,7 @@
+import json
 import uuid
+
+from django.db.models import Max
 
 from basics.models import Equip
 
@@ -15,7 +18,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipComponent, EquipComponentType, ERPSpareComponentRelation, EquipSpareErp, EquipFaultType, EquipFault, \
     PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
     EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard, \
-    EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials
+    EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
+    EquipApplyRepair, EquipPlan, EquipApplyOrder, UploadImage
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -547,17 +551,6 @@ class ERPSpareComponentRelationCreateSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-# class EquipSpareErpSerializer(serializers.ModelSerializer):
-#     equip_type_name = serializers.CharField(source='equip_component_type.category_name', help_text='备件分类')
-#     equip_part_name = serializers.CharField(source='spare_code', help_text='备件编码')
-#     equip_component_type_name = serializers.CharField(source='spare_name', help_text='备件名称')
-#     supplier_name = serializers.CharField(source='supplier_name', help_text='供应商名称')
-#
-#     class Meta:
-#         model = EquipSpareErp
-#         fields = '__all__'
-
-
 class EquipFaultTypeSerializer(BaseModelSerializer):
     """设备故障分类类型序列化器"""
     fault_type_code = serializers.CharField(max_length=64,
@@ -626,6 +619,7 @@ class EquipBomSerializer(BaseModelSerializer):
     equip_name = serializers.ReadOnlyField(source='equip_info.equip_name', default='')
     equip_status = serializers.SerializerMethodField()
     property_type_node = serializers.ReadOnlyField(source='property_type.global_name', default='')
+    part_type = serializers.ReadOnlyField(source='part.global_part_type.global_name', help_text='部位分类', default='')
 
     def get_equip_status(self, obj):
         if obj.equip_info:
@@ -864,13 +858,69 @@ class EquipRepairStandardImportSerializer(BaseModelSerializer):
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
-# class EquipWarehouseAreaSerializer(BaseModelSerializer):
-#     area_name = serializers.CharField(max_length=64, help_text='库区名称',
-#                                       validators=[UniqueValidator(queryset=EquipWarehouseArea.objects.filter(use_flag=1),
-#                                                                   message='库区名称已存在')])
-#     equip_component_type_name = serializers.ReadOnlyField(source='equip_component_type__component_type_name', help_text='备件分类名称')
-#
-#     class Meta:
-#         model = EquipWarehouseArea
-#         fields = '__all__'
 
+class EquipApplyRepairSerializer(BaseModelSerializer):
+    part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称')
+    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称')
+    image_url_list = serializers.ListField(help_text='报修图片地址列表', write_only=True, default=[])
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret.update({'apply_repair_graph_url': json.loads(ret['apply_repair_graph_url'])})
+        return ret
+
+    @atomic
+    def create(self, validated_data):
+        # 生成报修编号
+        now_time = ''.join(str(datetime.now().date()).split('-'))
+        max_code = EquipApplyRepair.objects.aggregate(max_code=Max('plan_id'))['max_code']
+        sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
+        validated_data.update({
+            'plan_id': f'BX{now_time}{sequence}', 'status': '已做成',
+            'apply_repair_graph_url': json.dumps(validated_data.pop('image_url_list')),
+            'plan_name': f"{validated_data['plan_department']}{f'BX{now_time}{sequence}'}"
+        })
+        # 生成维修计划
+        equip_plan_data = {
+            'work_type': '维修', 'plan_id': validated_data['plan_id'], 'plan_name': validated_data['plan_name'],
+            'equip_no': validated_data['equip_no'], 'equip_condition': validated_data['equip_condition'],
+            'importance_level': validated_data.get('importance_level', '高'), 'status': '已生成工单',
+            'created_user': self.context['request'].user,
+            'planned_maintenance_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        EquipPlan.objects.create(**equip_plan_data)
+        # 生成维修工单
+        max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=validated_data['plan_id']).aggregate(max_order_code=Max('work_order_no'))['max_order_code']
+        work_order_no = validated_data['plan_id'] + '-' + ('%04d' % (int(max_order_code.split('-')[-1] + 1)) if max_order_code else '0001')
+        equip_order_data = {'plan_id': validated_data['plan_id'], 'plan_name': validated_data['plan_name'],
+                            'work_order_no': work_order_no, 'equip_no': validated_data['equip_no'],
+                            'equip_part_new': validated_data['equip_part_new'], 'status': '已生成',
+                            'equip_condition': validated_data['equip_condition'],
+                            'importance_level': validated_data.get('importance_level', '高'),
+                            'created_user': self.context['request'].user,
+                            'result_fault_cause': validated_data['result_fault_cause'],
+                            'planned_repair_date': str(datetime.now().date())}
+        EquipApplyOrder.objects.create(**equip_order_data)
+        return super().create(validated_data)
+
+    class Meta:
+        model = EquipApplyRepair
+        fields = '__all__'
+
+
+class EquipApplyOrderSerializer(BaseModelSerializer):
+    part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称')
+    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准名')
+    equip_maintenance_standard_name = serializers.ReadOnlyField(source='equip_maintenance_standard.standard_name', help_text='维护标准名')
+    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称')
+
+    class Meta:
+        model = EquipApplyOrder
+        fields = '__all__'
+
+
+class UploadImageSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = UploadImage
+        fields = '__all__'

@@ -98,6 +98,15 @@ router.register('equip_maintenance_standard', EquipMaintenanceStandardViewSet)
 # 设备维修作业标准定义
 router.register('equip-repair-standard', EquipRepairStandardViewSet)
 
+# 设备报修申请
+router.register('equip-apply-repair', EquipApplyRepairViewSet)
+
+# 设备维修工单查询
+router.register('equip-apply-order', EquipApplyOrderViewSet)
+
+# 图片上传
+router.register('upload-images', UploadImageViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),
@@ -109,6 +118,7 @@ urlpatterns = [
     path('month-error-sort/', MonthErrorSortView.as_view()),
     path('overview/', EquipOverview.as_view()),
     path('get-default-code/', GetDefaultCodeView.as_view()),
+    path('get-staff/', GetStaffsView.as_view()),
 
     # **************************2021-10-09最新URL**************************
     # 机台目标MTBF/MTTR设定

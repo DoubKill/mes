@@ -739,3 +739,124 @@ class EquipWarehouseInventory(AbstractEntity):
     class Meta:
         db_table = 'equip_warehouse_inventory'
         verbose_name = verbose_name_plural = '备件库库存信息'
+
+
+class EquipPlan(AbstractEntity):
+    """
+        设备维护维修计划
+    """
+    work_type = models.CharField(max_length=64, help_text='作业类型')
+    plan_id = models.CharField(max_length=64, help_text='计划编号')
+    plan_name = models.CharField(max_length=64, help_text='计划名称')
+    equip_no = models.CharField(max_length=64, help_text='机台')
+    equip_manintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='维护标准',
+                                                    on_delete=models.CASCADE, null=True, blank=True)
+    equip_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='维修标准', on_delete=models.CASCADE,
+                                              null=True, blank=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件')
+    importance_level = models.CharField(max_length=64, help_text='重要程度')
+    plan_source = models.CharField(max_length=64, help_text='来源', default='mes')
+    status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
+    planned_maintenance_date = models.DateTimeField(help_text='计划维护日期', null=True, blank=True)
+    next_maintenance_date = models.DateTimeField(help_text='下次维护日期', null=True, blank=True)
+
+    class Meta:
+        db_table = 'equip_plan'
+        verbose_name_plural = verbose_name = '设备维护维修计划'
+
+
+class EquipApplyRepair(AbstractEntity):
+    """
+        报修申请
+    """
+    plan_id = models.CharField(max_length=64, help_text='报修编号', null=True, blank=True)
+    plan_name = models.CharField(max_length=64, help_text='报修名称', default='')
+    plan_department = models.CharField(max_length=64, help_text='报修部门')
+    equip_no = models.CharField(max_length=64, help_text='机台')
+    factory_name = models.CharField(max_length=64, help_text='设备名称', null=True, blank=True)
+    equip_barcode = models.CharField(max_length=64, help_text='设备条码', null=True, blank=True)
+    equip_part_new = models.ForeignKey(EquipPartNew, help_text='部位编号', on_delete=models.CASCADE, null=True, blank=True)
+    result_fault_cause = models.ForeignKey(EquipFault, help_text='故障原因', on_delete=models.CASCADE)
+    result_fault_desc = models.CharField(max_length=64, help_text='故障描述', default='')
+    fault_datetime = models.DateTimeField(help_text='故障发生时间', null=True, blank=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件')
+    importance_level = models.CharField(max_length=64, help_text='重要程度', default='高')
+    plan_source = models.CharField(max_length=64, help_text='来源', default='mes')
+    status = models.CharField(max_length=64, help_text='状态', default='')
+    apply_repair_graph_url = models.TextField(help_text='报修图片', default='')
+
+    class Meta:
+        db_table = 'equip_apply_repair'
+        verbose_name_plural = verbose_name = '报修申请'
+
+
+class EquipApplyOrder(AbstractEntity):
+    """
+        设备维修工单
+    """
+    plan_id = models.CharField(max_length=64, help_text='报修编号')
+    plan_name = models.CharField(max_length=64, help_text='报修名称')
+    work_order_no = models.CharField(max_length=64, help_text='工单编号')
+    equip_no = models.CharField(max_length=64, help_text='机台')
+    equip_part_new = models.ForeignKey(EquipPartNew, help_text='部位名称', on_delete=models.CASCADE, null=True, blank=True)
+    equip_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='维修标准', on_delete=models.CASCADE,
+                                              null=True, blank=True)
+    planned_repair_date = models.DateField(help_text='计划维修日期', null=True, blank=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件')
+    importance_level = models.CharField(max_length=64, help_text='重要程度', default='高')
+    assign_user = models.CharField(max_length=64, help_text='指派人', null=True, blank=True)
+    assign_datetime = models.DateTimeField(help_text='指派时间', null=True, blank=True)
+    assign_to_user = models.CharField(max_length=64, help_text='被指派人', null=True, blank=True)
+    # input_user = models.CharField(max_length=64, help_text='报修人')
+    # input_datetime = models.DateTimeField(help_text='报修时间')
+    receiving_user = models.CharField(max_length=64, help_text='接单人', null=True, blank=True)
+    receiving_datetime = models.DateTimeField(help_text='接单时间', null=True, blank=True)
+    repair_user = models.CharField(max_length=64, help_text='维修人', default='')
+    repair_start_datetime = models.DateTimeField(help_text='维修开始时间', null=True, blank=True)
+    repair_end_datetime = models.DateTimeField(help_text='维修结束时间', null=True, blank=True)
+    accept_user = models.CharField(max_length=64, help_text='验收人', default='')
+    accept_datetime = models.DateTimeField(help_text='验收时间', null=True, blank=True)
+    result_fault_desc = models.CharField(max_length=64, help_text='故障描述', default='')
+    result_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='实际维修标准', on_delete=models.CASCADE,
+                                               null=True, blank=True, related_name='result_repair')
+    result_fault_cause = models.ForeignKey(EquipFault, help_text='故障原因', on_delete=models.CASCADE,
+                                           null=True, blank=True)
+    result_repair_desc = models.CharField(max_length=256, help_text='维修备注', default='')
+    result_repair_graph_url = models.TextField(help_text='维修图片', default='')
+    result_final_fault_cause = models.CharField(max_length=256, help_text='最终故障原因', default='')
+    result_material_requisition = models.BooleanField(help_text='是否物料申请', default=False)
+    result_need_outsourcing = models.BooleanField(help_text='是否需要外协助', default=False)
+    wait_material = models.BooleanField(help_text='是否等待物料', default=False)
+    wait_outsourcing = models.BooleanField(help_text='是否等待外协助', default=False)
+    result_repair_final_result = models.CharField(max_length=256, help_text='维修结论', null=True, blank=True)
+    result_accept_desc = models.CharField(max_length=256, help_text='验收备注', null=True, blank=True)
+    result_accept_result = models.CharField(max_length=256, help_text='验收结果', default='')
+    result_accept_graph_url = models.TextField(help_text='验收图片', default='')
+    status = models.CharField(max_length=64, help_text='状态', default='')
+
+    class Meta:
+        db_table = 'equip_apply_order'
+        verbose_name_plural = verbose_name = '设备维修工单'
+
+
+class UploadImage(AbstractEntity):
+    source_type = models.CharField(max_length=64, help_text='上传类型: 维修;巡检')
+    image_file_name = models.ImageField(help_text='上传图片')
+
+    class Meta:
+        db_table = 'upload_images'
+        verbose_name_plural = verbose_name = '上传图片'
+
+
+class EquipRepairMaterialReq(AbstractEntity):
+    work_type = models.CharField(max_length=64, help_text='作业类型')
+    work_order_no = models.CharField(max_length=64, help_text='工单编号')
+    warehouse_out_no = models.CharField(max_length=64, help_text='出库单号')
+    equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件编码', on_delete=models.CASCADE)
+    inventory_quantity = models.FloatField(help_text='库存数量')
+    apply = models.FloatField(help_text='申请数量')
+    submit_old_flag = models.BooleanField(help_text='是否交旧', default=False)
+
+    class Meta:
+        db_table = 'equip_repair_material_req'
+        verbose_name_plural = verbose_name = '维修物料申请'
