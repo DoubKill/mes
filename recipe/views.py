@@ -454,7 +454,11 @@ class ProductDevBatchingReceive(APIView):
                 else:
                     stage = None
                 for m in data['batching_details']:
-                    m['material'] = Material.objects.get(material_no=m.pop('material__material_no'))
+                    material_no = m.pop('material__material_no')
+                    material = Material.objects.filter(material_no=material_no).first()
+                    if not material:
+                        raise ValidationError('MES原材料:{}不存在！'.format(material_no))
+                    m['material'] = material
             except EquipCategoryAttribute.DoesNotExist:
                 raise ValidationError('MES机型{}不存在'.format(data.get('dev_type__category_no')))
             except GlobalCode.DoesNotExist as e:
