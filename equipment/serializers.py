@@ -19,7 +19,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     PropertyTypeNode, Property, PlatformConfig, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, \
     EquipOrderAssignRule, EquipMaintenanceAreaSetting, EquipBom, EquipJobItemStandardDetail, EquipJobItemStandard, \
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
-    EquipApplyRepair, EquipPlan, EquipApplyOrder, UploadImage
+    EquipApplyRepair, EquipPlan, EquipApplyOrder, UploadImage, EquipRepairMaterialReq, EquipResultDetail
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -824,6 +824,15 @@ class EquipRepairStandardSerializer(BaseModelSerializer):
     spare_list = serializers.SerializerMethodField()
     spare_list_str = serializers.SerializerMethodField()
 
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        detail_list = []
+        for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
+            seq, content = i.split('、')
+            detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+        res['detail_list'] = detail_list
+        return res
+
     def get_spare_list(self, obj):
         spare_list = EquipRepairStandardMaterials.objects.filter(equip_repair_standard=obj).values(
             'equip_spare_erp__id', 'equip_spare_erp__spare_code', 'equip_spare_erp__spare_name', 'equip_spare_erp__specification',
@@ -866,7 +875,8 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        ret.update({'apply_repair_graph_url': json.loads(ret['apply_repair_graph_url'])})
+        apply_repair_graph_url = ret.get('apply_repair_graph_url') if ret.get('apply_repair_graph_url') else '[]'
+        ret.update({'apply_repair_graph_url': json.loads(apply_repair_graph_url)})
         return ret
 
     @atomic
@@ -898,6 +908,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
                             'equip_condition': validated_data['equip_condition'],
                             'importance_level': validated_data.get('importance_level', '高'),
                             'created_user': self.context['request'].user,
+                            'result_fault_desc': validated_data['result_fault_desc'],
                             'result_fault_cause': validated_data['result_fault_cause'],
                             'planned_repair_date': str(datetime.now().date())}
         EquipApplyOrder.objects.create(**equip_order_data)
@@ -909,10 +920,26 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
 
 
 class EquipApplyOrderSerializer(BaseModelSerializer):
-    part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称')
+    part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称', default='')
     equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准名')
     equip_maintenance_standard_name = serializers.ReadOnlyField(source='equip_maintenance_standard.standard_name', help_text='维护标准名')
     result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称')
+    result_repair_standard_name = serializers.ReadOnlyField(source='result_repair_standard.standard_name', help_text='实际维修标准名称')
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        work_content = []
+        result_repair_graph_url = res.get('result_repair_graph_url') if res.get('result_repair_graph_url') else '[]'
+        result_accept_graph_url = res.get('result_accept_graph_url') if res.get('result_accept_graph_url') else '[]'
+        res.update({'result_repair_graph_url': json.loads(result_repair_graph_url),
+                    'result_accept_graph_url': json.loads(result_accept_graph_url)})
+        data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'], equip_jobitem_standard=res['result_repair_standard'])
+        if data:
+            for i in data:
+                work_content.append({'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
+                                     'job_item_check_standard': i.job_item_check_standard, 'operation_result': i.operation_result})
+            res['work_content'] = work_content
+        return res
 
     class Meta:
         model = EquipApplyOrder
@@ -924,3 +951,17 @@ class UploadImageSerializer(BaseModelSerializer):
     class Meta:
         model = UploadImage
         fields = '__all__'
+
+
+class EquipRepairMaterialReqSerializer(BaseModelSerializer):
+    spare_code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
+    spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
+    equip_component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name', help_text='备件分类')
+    specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
+    technical_params = serializers.ReadOnlyField(source='equip_spare.technical_params', help_text='技术参数')
+    unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='标准单位')
+
+    class Meta:
+        model = EquipRepairMaterialReq
+        fields = '__all__'
+

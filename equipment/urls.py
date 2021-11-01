@@ -104,6 +104,9 @@ router.register('equip-apply-repair', EquipApplyRepairViewSet)
 # 设备维修工单查询
 router.register('equip-apply-order', EquipApplyOrderViewSet)
 
+# 维修物料申请
+router.register('equip-repair-material-req', EquipRepairMaterialReqViewSet)
+
 # 图片上传
 router.register('upload-images', UploadImageViewSet)
 

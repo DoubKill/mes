@@ -28,7 +28,7 @@ from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Prope
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
     EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard, EquipMaintenanceStandard, \
     EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, EquipApplyRepair, \
-    EquipApplyOrder, UploadImage
+    EquipApplyOrder, UploadImage, EquipRepairMaterialReq, EquipResultDetail
 from equipment.serializers import *
 from equipment.task import property_template, property_import
 from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI
@@ -2280,6 +2280,12 @@ class EquipApplyOrderViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyOrderFilter
 
+    def get_queryset(self):
+        excuted = self.request.query_params.get('excuted')
+        query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=self.request.user.username) |
+                                           Q(status='已开始', repair_end_datetime__isnull=True, repair_user=self.request.user.username))) if excuted else self.queryset
+        return query_set
+
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
     def multi_update(self, request):
@@ -2292,41 +2298,49 @@ class EquipApplyOrderViewSet(ModelViewSet):
         content = {}
         if opera_type == '指派':
             assign_to_user = data.pop('assign_to_user')
-            data.update({'assign_user': user_ids,
-                         'assign_to_user': ','.join(assign_to_user),
-                         'assign_datetime': now_date})
+            data.update({'assign_user': user_ids, 'assign_to_user': ','.join(assign_to_user),
+                         'assign_datetime': now_date, 'last_updated_date': datetime.now()})
             content.update({"title": "您有新的设备维修单到达，请尽快处理！",
                             "form": [{"key": "指派人:", "value": self.request.user.username},
                                      {"key": "指派时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, names=assign_to_user)
         elif opera_type == '接单':
-            data.update({'receiving_user': user_ids,
-                         'receiving_datetime': now_date})
+            data.update({'receiving_user': user_ids, 'receiving_datetime': now_date, 'last_updated_date': datetime.now()})
             content.update({"title": f"您指派的设备维修单已被{user_ids}接单",
                             "form": [{"key": "接单人:", "value": user_ids},
                                      {"key": "接单时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '退单':
             data.update({'receiving_user': '', 'receiving_datetime': None, 'assign_user': '', 'assign_datetime': None,
-                         'assign_to_user': ''})
+                         'assign_to_user': '', 'last_updated_date': datetime.now()})
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
                                      {"key": "退单时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '开始':
-            data.update({'repair_user': user_ids,
-                         'repair_start_datetime': now_date})
+            data.update({'repair_user': user_ids, 'repair_start_datetime': now_date, 'last_updated_date': datetime.now()})
         elif opera_type == '处理':
             result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
+            work_content = data.pop('work_content', [])
+            image_url_list = data.pop('image_url_list', [])
+            result_repair_standard = data.get('result_repair_standard')
+            work_order_no = data.pop('work_order_no')
             if result_repair_final_result == '等待':
                 pass
             else:
-                data.update({'repair_end_datetime': now_date})
+                data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成'})
+            data['result_repair_graph_url'] = json.dumps(image_url_list)
+            # 更新作业内容
+            for item in work_content:
+                item.update({'work_type': '维修', 'equip_jobitem_standard_id': result_repair_standard,
+                             'work_order_no': work_order_no})
+                EquipResultDetail.objects.create(**item)
         elif opera_type == '验收':
-            data.update({'accept_user': self.request.user.username,
-                         'accept_datetime': now_date})
+            image_url_list = data.pop('image_url_list', [])
+            data.update({'accept_user': self.request.user.username, 'accept_datetime': now_date,
+                         'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()})
         else:  # 关闭
-            data.update({'status': '已关闭'})
+            data.update({'status': '已关闭', 'last_updated_date': datetime.now()})
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -2337,6 +2351,16 @@ class EquipApplyOrderViewSet(ModelViewSet):
         if isinstance(user_ids, list):
             ding_api.send_message(user_ids, content)
         return Response(f'{opera_type}操作成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipRepairMaterialReqViewSet(ModelViewSet):
+    """
+    申请维修物料
+    """
+    queryset = EquipRepairMaterialReq.objects.all()
+    serializer_class = EquipRepairMaterialReqSerializer
+    filter_backends = (DjangoFilterBackend,)
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2357,7 +2381,7 @@ class GetStaffsView(APIView):
     # permission_classes = (IsAuthenticated,)
     def get(self, request):
         ding_api = DinDinAPI()
-        section_name = self.request.query_params.get('section_name')
+        section_name = self.request.query_params.get('section_name', '维修部')
         # 查询各员工考勤状态
         result = get_staff_status(ding_api, section_name)
         return Response({'results': result})

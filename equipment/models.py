@@ -811,10 +811,10 @@ class EquipApplyOrder(AbstractEntity):
     # input_datetime = models.DateTimeField(help_text='报修时间')
     receiving_user = models.CharField(max_length=64, help_text='接单人', null=True, blank=True)
     receiving_datetime = models.DateTimeField(help_text='接单时间', null=True, blank=True)
-    repair_user = models.CharField(max_length=64, help_text='维修人', default='')
+    repair_user = models.CharField(max_length=64, help_text='维修人', null=True, blank=True)
     repair_start_datetime = models.DateTimeField(help_text='维修开始时间', null=True, blank=True)
     repair_end_datetime = models.DateTimeField(help_text='维修结束时间', null=True, blank=True)
-    accept_user = models.CharField(max_length=64, help_text='验收人', default='')
+    accept_user = models.CharField(max_length=64, help_text='验收人', null=True, blank=True)
     accept_datetime = models.DateTimeField(help_text='验收时间', null=True, blank=True)
     result_fault_desc = models.CharField(max_length=64, help_text='故障描述', default='')
     result_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='实际维修标准', on_delete=models.CASCADE,
@@ -860,3 +860,18 @@ class EquipRepairMaterialReq(AbstractEntity):
     class Meta:
         db_table = 'equip_repair_material_req'
         verbose_name_plural = verbose_name = '维修物料申请'
+
+
+class EquipResultDetail(AbstractEntity):
+    work_type = models.CharField(max_length=64, help_text='作业类型')
+    work_order_no = models.CharField(max_length=64, help_text='工单编号')
+    equip_jobitem_standard = models.ForeignKey(EquipJobItemStandard, help_text='作业标准', on_delete=models.CASCADE)
+    job_item_sequence = models.CharField(max_length=64, help_text='作业次序')
+    job_item_content = models.CharField(max_length=64, help_text='作业内容')
+    job_item_check_standard = models.CharField(max_length=64, help_text='判断标准及说明', default='')
+    operation_result = models.CharField(max_length=64, help_text='处理结果', default='完成')
+
+    class Meta:
+        db_table = 'equip_result_detail'
+        verbose_name_plural = verbose_name = '设备维修/巡检标准明细'
+
