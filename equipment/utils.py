@@ -155,3 +155,25 @@ def get_ding_uids(ding_api, pks=None, names=None):
         if res:
             user_ids.append(res)
     return user_ids
+
+
+class AutoDispatch(object):
+    """自动派单"""
+    def __init__(self):
+        self.applys = EquipApplyOrder.objects.filter(status='已生成')
+        # self.inspections = EquipInspectionOrder.objects.filter(status='已生成')
+        self.wait_orders = self.applys + []
+
+    def send_order(self):
+        # 获取单的类型
+        # 分派维修单
+        # 分派包干单
+        # 获取当前班次空闲人员
+        # 派单成功发送钉钉消息上级和当班人员, 失败发送给上级
+        pass
+
+
+if __name__ == '__main__':
+    auto_dispatch = AutoDispatch()
+    # for order in auto_dispatch.query_set:
+    #     if order.work_order_no

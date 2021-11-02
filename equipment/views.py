@@ -2298,6 +2298,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
         content = {}
         if opera_type == '指派':
             assign_to_user = data.pop('assign_to_user')
+            if not assign_to_user:
+                raise ValidationError('未选择被指派人')
             data.update({'assign_user': user_ids, 'assign_to_user': ','.join(assign_to_user),
                          'assign_datetime': now_date, 'last_updated_date': datetime.now()})
             content.update({"title": "您有新的设备维修单到达，请尽快处理！",

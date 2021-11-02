@@ -925,6 +925,12 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     equip_maintenance_standard_name = serializers.ReadOnlyField(source='equip_maintenance_standard.standard_name', help_text='维护标准名')
     result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称')
     result_repair_standard_name = serializers.ReadOnlyField(source='result_repair_standard.standard_name', help_text='实际维修标准名称')
+    work_persons = serializers.ReadOnlyField(source='equip_repair_standard.cycle_person_num', help_text='作业标准人数', default='')
+    equip_barcode = serializers.SerializerMethodField(help_text='设备条码')
+
+    def get_equip_barcode(self, obj):
+        instance = EquipApplyRepair.objects.filter(plan_id=obj.plan_id).first()
+        return instance.equip_barcode if instance else ''
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
