@@ -2817,16 +2817,25 @@ class EquipApplyOrderViewSet(ModelViewSet):
             result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
-            result_repair_standard = data.get('result_repair_standard')
+            work_type = data.pop('work_type')
             work_order_no = data.pop('work_order_no')
             if result_repair_final_result == '等待':
-                pass
+                data.update({'last_updated_date': datetime.now()})
+                # 申请了物料,需要插入到物料申请表
             else:
                 data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成'})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
             # 更新作业内容
+            if work_type == "维修":
+                result_standard = data.get('result_repair_standard')
+                instance = EquipRepairStandard.objects.filter(id=result_standard).first()
+            else:
+                result_standard = data.get('result_maintenance_standard')
+                instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
+            if not instance:
+                raise ValidationError('维修或维护标准未找到')
             for item in work_content:
-                item.update({'work_type': '维修', 'equip_jobitem_standard_id': result_repair_standard,
+                item.update({'work_type': work_type, 'equip_jobitem_standard_id': instance.equip_job_item_standard_id,
                              'work_order_no': work_order_no})
                 EquipResultDetail.objects.create(**item)
         elif opera_type == '验收':

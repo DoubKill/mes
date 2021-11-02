@@ -778,6 +778,15 @@ class EquipMaintenanceStandardSerializer(BaseModelSerializer):
     spare_list = serializers.SerializerMethodField()
     spare_list_str = serializers.SerializerMethodField()
 
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        detail_list = []
+        for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
+            seq, content = i.split('、')
+            detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+        res['detail_list'] = detail_list
+        return res
+
     def get_spare_list(self, obj):
         spare_list = EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard=obj).values(
             'equip_spare_erp__id', 'equip_spare_erp__spare_code', 'equip_spare_erp__spare_name', 'equip_spare_erp__specification',
@@ -932,6 +941,11 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     result_maintenance_standard_name = serializers.ReadOnlyField(source='result_maintenance_standard.standard_name', help_text='实际维护标准名称', default='')
     work_persons = serializers.ReadOnlyField(source='equip_repair_standard.cycle_person_num', help_text='作业标准人数', default='')
     equip_barcode = serializers.SerializerMethodField(help_text='设备条码')
+    equip_type = serializers.SerializerMethodField(help_text='设备机型')
+
+    def get_equip_type(self, obj):
+        instance = Equip.objects.filter(equip_no=obj.equip_no).first()
+        return instance.category_id if instance else ''
 
     def get_equip_barcode(self, obj):
         instance = EquipApplyRepair.objects.filter(plan_id=obj.plan_id).first()
@@ -944,11 +958,19 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         result_accept_graph_url = res.get('result_accept_graph_url') if res.get('result_accept_graph_url') else '[]'
         res.update({'result_repair_graph_url': json.loads(result_repair_graph_url),
                     'result_accept_graph_url': json.loads(result_accept_graph_url)})
-        data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'], equip_jobitem_standard=res['result_repair_standard'])
-        if data:
-            for i in data:
-                work_content.append({'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
-                                     'job_item_check_standard': i.job_item_check_standard, 'operation_result': i.operation_result})
+        # 是否申请物料
+        is_applyed = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
+        res['is_applyed'] = True if is_applyed else False
+        if res['work_type'] == '维修':
+            instance = EquipRepairStandard.objects.filter(id=res.get('result_repair_standard')).first()
+        else:
+            instance = EquipMaintenanceStandard.objects.filter(id=res.get('result_maintenance_standard')).first()
+        if instance:
+            data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'], equip_jobitem_standard=instance.equip_job_item_standard_id)
+            if data:
+                for i in data:
+                    work_content.append({'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
+                                         'job_item_check_standard': i.job_item_check_standard, 'operation_result': i.operation_result})
         res['work_content'] = work_content
         return res
 
