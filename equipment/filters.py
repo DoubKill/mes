@@ -4,8 +4,12 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     EquipSupplier, EquipProperty, EquipPartNew, EquipAreaDefine, EquipComponentType, \
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
+<<<<<<< HEAD
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
     EquipWarehouseOrderDetail
+=======
+    EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipApplyRepair, EquipApplyOrder
+>>>>>>> fcef03e4513acd65a1ee0179d10758b11d7a51f5
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -187,17 +191,20 @@ class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
 
 class EquipBomFilter(django_filters.rest_framework.FilterSet):
     factory_id = django_filters.CharFilter(field_name='factory_id', lookup_expr='icontains', help_text='分厂')
-    property_type_node = django_filters.CharFilter(field_name='property_type_node', lookup_expr='icontains',
+    property_type_node = django_filters.CharFilter(field_name='property_type__global_name', lookup_expr='icontains',
                                                    help_text='设备类型')
-    equip_no = django_filters.CharFilter(field_name='equip_no', lookup_expr='icontains', help_text='机台')
-    part_name = django_filters.CharFilter(field_name='part_name', lookup_expr='icontains', help_text='部位名称')
-    component_name = django_filters.CharFilter(field_name='component_name', lookup_expr='icontains', help_text='部件名称')
+    equip_no = django_filters.CharFilter(field_name='equip_info__equip_no', lookup_expr='icontains', help_text='机台')
+    part_name = django_filters.CharFilter(field_name='part__part_name', lookup_expr='icontains', help_text='部位名称')
+    component_name = django_filters.CharFilter(field_name='component__component_name', lookup_expr='icontains', help_text='部件名称')
     level = django_filters.CharFilter(field_name='level', help_text='层级')
+    part_type = django_filters.CharFilter(field_name='part__global_part_type__global_name', lookup_expr='icontains', help_text='部位分类')
+    part_code = django_filters.CharFilter(field_name='part__part_code', lookup_expr='icontains', help_text='部位代码')
+    equip_type = django_filters.CharFilter(field_name='equip_info__category', help_text='机型id')
 
     class Meta:
         model = EquipBom
         fields = ('factory_id', 'property_type_node', 'equip_no', 'part_name', 'component_name', 'level', 'equip_info',
-                  'part__use_flag')
+                  'part__use_flag', 'part_type', 'part_code', 'equip_type', 'node_id')
 
 
 class EquipFaultTypeFilter(django_filters.rest_framework.FilterSet):
@@ -301,6 +308,7 @@ class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
                   'spare_name', 'specification', 'use_flag')
 
 
+<<<<<<< HEAD
 class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
     order_id = django_filters.CharFilter(field_name='order_id', lookup_expr='icontains')
     s_time = django_filters.CharFilter(field_name='created_date', lookup_expr='gte')
@@ -347,3 +355,40 @@ class EquipWarehouseStatisticalFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipWarehouseRecord
         fields = ('spare_name', 'spare_code', 'equip_component_type', 'equip_spare', 'status', 's_time', 'e_time')
+=======
+class EquipApplyRepairFilter(django_filters.rest_framework.FilterSet):
+    plan_id = django_filters.CharFilter(field_name='plan_id', help_text='报修编号', lookup_expr='icontains')
+    result_fault_cause = django_filters.CharFilter(field_name='result_fault_cause__fault_name', help_text='故障原因',
+                                                   lookup_expr='icontains')
+
+    class Meta:
+        model = EquipApplyRepair
+        fields = ('plan_id', 'plan_department', 'equip_no', 'result_fault_cause', 'equip_condition', 'importance_level')
+
+
+class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
+    planned_repair_date = django_filters.DateFromToRangeFilter(field_name='planned_repair_date',
+                                                               help_text='计划维修时间', lookup_expr='range')
+    plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机台', lookup_expr='icontains')
+    work_order_no = django_filters.CharFilter(field_name='work_order_no', help_text='工单编号', lookup_expr='icontains')
+    equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_name',
+                                                      help_text='维修标准', lookup_expr='icontains')
+    result_accept_result = django_filters.CharFilter(field_name='result_accept_result', help_text='验收结果',
+                                                     lookup_expr='icontains')
+    result_final_fault_cause = django_filters.CharFilter(field_name='result_final_fault_cause', help_text='最终故障原因',
+                                                         lookup_expr='icontains')
+    assign_user = django_filters.CharFilter(field_name='assign_user', help_text='指派人', lookup_expr='icontains')
+    assign_to_user = django_filters.CharFilter(field_name='assign_to_user', help_text='被指派人', lookup_expr='icontains')
+    repair_user = django_filters.CharFilter(field_name='repair_user', help_text='维修人', lookup_expr='icontains')
+    accept_user = django_filters.CharFilter(field_name='accept_user', help_text='验收人', lookup_expr='icontains')
+    receiving_user = django_filters.CharFilter(field_name='receiving_user', help_text='接单人', lookup_expr='icontains')
+    created_user = django_filters.CharFilter(field_name='created_user__username', help_text='报修人', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipApplyOrder
+        fields = ('planned_repair_date', 'plan_name', 'equip_no', 'work_order_no', 'equip_condition', 'status',
+                  'equip_repair_standard', 'equip_condition', 'repair_user', 'accept_user', 'result_accept_result',
+                  'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'importance_level',
+                  'wait_material', 'wait_outsourcing', 'status')
+>>>>>>> fcef03e4513acd65a1ee0179d10758b11d7a51f5

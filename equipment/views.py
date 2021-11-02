@@ -26,15 +26,16 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipFaultSignalFilter, EquipMachineHaltTypeFilter, EquipMachineHaltReasonFilter, EquipOrderAssignRuleFilter, \
     EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter, \
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
-    EquipWarehouseRecordFilter
+    EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter
 from equipment.models import EquipFaultType, EquipFault, PropertyTypeNode, Property, PlatformConfig, EquipProperty, \
     EquipSupplier, EquipAreaDefine, EquipPartNew, EquipComponentType, EquipComponent, ERPSpareComponentRelation, \
     EquipSpareErp, EquipTargetMTBFMTTRSetting, EquipBom, EquipJobItemStandard, EquipMaintenanceStandard, \
-    EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, EquipWarehouseArea, \
-    EquipWarehouseLocation, EquipWarehouseOrder, EquipWarehouseOrderDetail, EquipWarehouseInventory
+    EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, EquipApplyRepair, \
+    EquipApplyOrder, UploadImage, EquipRepairMaterialReq, EquipResultDetail
+
 from equipment.serializers import *
 from equipment.task import property_template, property_import
-from equipment.utils import gen_template_response
+from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -51,6 +52,7 @@ from basics.models import Equip, GlobalCode, EquipCategoryAttribute
 from equipment.serializers import EquipRealtimeSerializer
 from mes.paginations import SinglePageNumberPagination
 from quality.utils import get_cur_sheet, get_sheet_data
+from system.models import Section, User
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -856,6 +858,7 @@ class EquipAreaDefineViewSet(CommonDeleteMixin, ModelViewSet):
         except:
             return Response({'results': 'WZQY000X'})
 
+
 @method_decorator([api_recorder], name="dispatch")
 class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipPartNew.objects.all().order_by('-id')
@@ -1354,15 +1357,21 @@ class EquipBomViewSet(ModelViewSet):
                 if child_current_data['level'] == 2:
                     child_current_data.update({'property_type_id': child_current_data['property_type_id']})
                 elif child_current_data['level'] == 3:
+                    equip = Equip.objects.filter(id=child_current_data['equip_info_id']).first()
                     child_current_data.update({'property_type_id': instance.property_type_id,
-                                               'equip_info_id': child_current_data['equip_info_id']})
+                                               'equip_info_id': child_current_data['equip_info_id'],
+                                               'node_id': equip.equip_no})
                 elif child_current_data['level'] == 4:
-                    child_current_data.update({'property_type_id': instance.property_type_id,
-                                               'equip_info_id': instance.equip_info_id})
-                elif child_current_data['level'] == 5:
+                    equip_part = EquipPartNew.objects.filter(id=child_current_data['part_id']).first()
                     child_current_data.update({'property_type_id': instance.property_type_id,
                                                'equip_info_id': instance.equip_info_id,
-                                               'part_id': instance.part_id})
+                                               'node_id': f'{instance.node_id}-{equip_part.part_code}'})
+                elif child_current_data['level'] == 5:
+                    equip_component = EquipComponent.objects.filter(id=child_current_data['component_id']).first()
+                    child_current_data.update({'property_type_id': instance.property_type_id,
+                                               'equip_info_id': instance.equip_info_id,
+                                               'part_id': instance.part_id,
+                                               'node_id': f'{instance.node_id}-{equip_component.component_code}'})
                 else:
                     pass
                 child_instance = EquipBom.objects.create(**child_current_data)
@@ -1391,29 +1400,29 @@ class EquipBomViewSet(ModelViewSet):
                     raise ValidationError('工厂名称已经存在')
                 curr_data.update({'level': 1})
             elif parent_flag_info.level == 1:
-                equip_property_type = GlobalCode.objects.filter(id=curr_label_obj_id).first()
-                if children_of_parent.filter(property_type=equip_property_type.id):
+                if children_of_parent.filter(property_type=curr_label_obj_id):
                     raise ValidationError('设备类型已经存在')
-                curr_data.update({'level': 2, 'property_type': equip_property_type.id})
+                curr_data.update({'level': 2, 'property_type': curr_label_obj_id})
             elif parent_flag_info.level == 2:
-                equip = Equip.objects.filter(id=curr_label_obj_id).first()
-                if children_of_parent.filter(equip_info=equip.id):
+                if children_of_parent.filter(equip_info=curr_label_obj_id):
                     raise ValidationError('设备已经存在')
+                equip = Equip.objects.filter(id=curr_label_obj_id).first()
                 curr_data.update({'property_type': parent_flag_info.property_type_id, 'level': 3,
-                                  'equip_info': curr_label_obj_id})
+                                  'equip_info': curr_label_obj_id, 'node_id': equip.equip_no})
             elif parent_flag_info.level == 3:
-                equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
-                if children_of_parent.filter(part=equip_part.id):
+                if children_of_parent.filter(part=curr_label_obj_id):
                     raise ValidationError('设备部位已经存在')
+                equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
                 curr_data.update({'property_type': parent_flag_info.property_type_id, 'part': curr_label_obj_id,
-                                  'equip_info': parent_flag_info.equip_info_id, 'level': 4})
+                                  'equip_info': parent_flag_info.equip_info_id, 'level': 4,
+                                  'node_id': f'{parent_flag_info.node_id}-{equip_part.part_code}'})
             else:
-                equip_component = EquipComponent.objects.filter(id=curr_label_obj_id).first()
-                if children_of_parent.filter(component=equip_component.id):
+                if children_of_parent.filter(component=curr_label_obj_id):
                     raise ValidationError('设备部件已经存在')
+                equip_component = EquipComponent.objects.filter(id=curr_label_obj_id).first()
                 curr_data.update({'property_type': parent_flag_info.property_type_id, 'part': parent_flag_info.part_id,
                                   'equip_info': parent_flag_info.equip_info_id, 'component': curr_label_obj_id,
-                                  'level': 5})
+                                  'level': 5, 'node_id': f'{parent_flag_info.node_id}-{equip_component.component_code}'})
             serializer = self.get_serializer(data=curr_data)
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
@@ -1428,20 +1437,25 @@ class EquipBomViewSet(ModelViewSet):
         elif current_data['level'] == 2:
             if children_of_parent.filter(property_type=curr_label_obj_id):
                 raise ValidationError('设备类型已经存在')
-            current_data.update(
-                {'property_type_id': curr_label_obj_id})
+            current_data.update({'property_type_id': curr_label_obj_id})
         elif current_data['level'] == 3:
             if children_of_parent.filter(equip_info=curr_label_obj_id):
                 raise ValidationError('设备已经存在')
-            current_data.update({'equip_info_id': curr_label_obj_id})
+            equip = Equip.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'equip_info_id': curr_label_obj_id, 'node_id': equip.equip_no})
         elif current_data['level'] == 4:
             if children_of_parent.filter(part=curr_label_obj_id):
                 raise ValidationError('设备部位已经存在')
-            current_data.update({'part_id': curr_label_obj_id})
+            equip_part = EquipPartNew.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'equip_info_id': parent_flag_info.equip_info_id, 'part_id': curr_label_obj_id,
+                                 'node_id': f'{parent_flag_info.node_id}-{equip_part.part_code}'})
         else:
             if children_of_parent.filter(component=curr_label_obj_id):
                 raise ValidationError('设备部件已经存在')
-            current_data.update({'component_id': curr_label_obj_id})
+            equip_component = EquipComponent.objects.filter(id=curr_label_obj_id).first()
+            current_data.update({'equip_info_id': parent_flag_info.equip_info_id, 'part_id': parent_flag_info.part_id,
+                                 'component_id': curr_label_obj_id,
+                                 'node_id': f'{parent_flag_info.node_id}-{equip_component.component_code}'})
         current_data.pop('id')
         current_data['factory_id'] = factory_id
         current_data['parent_flag_id'] = parent_flag
@@ -1595,6 +1609,7 @@ class EquipFaultSignalViewSet(CommonDeleteMixin, ModelViewSet):
         except:
             return Response({'results': 'IO000X'})
 
+
 @method_decorator([api_recorder], name="dispatch")
 class EquipMachineHaltTypeViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = EquipMachineHaltType.objects.filter(delete_flag=False).order_by("id")
@@ -1703,6 +1718,7 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': 'ZPGZ0001'})
         except:
             return Response({'results': 'ZPGZ000X'})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipTargetMTBFMTTRSettingView(APIView):
@@ -2206,30 +2222,6 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             return Response({'results': 'WXBZ0001'})
         except:
             return Response({'results': 'WXBZ000X'})
-# class EquipWarehouseAreaViewSet(ModelViewSet):
-#     """
-#     list: 库区展示
-#     create: 添加库区
-#     update: 修改库区信息
-#     delete: 删除库区
-#     """
-#     queryset = EquipWarehouseArea.objects.filter(use_flag=1)
-#     serializer_class = EquipWarehouseAreaSerializer
-#     pagination_class = None
-#     permission_classes = (IsAuthenticated,)
-#
-#     def destroy(self, request, *args, **kwargs):
-#         instance = self.get_object()
-#         # 库位有货物时, 不可删除
-#         locations = EquipWarehouseLocation.objects.filter(equip_warehouse_area=instance.id)
-#
-#         if instance.use_flag:
-#             instance.use_flag = 0
-#         else:
-#             instance.use_flag = 1
-#         instance.last_updated_user = request.user
-#         instance.save()
-#         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2755,3 +2747,135 @@ class EquipAutoPlanView(APIView):
                                                 created_user=self.request.user
                                                 )
             return Response({"success": True, "message": "入库成功", "data": inventory.equip_spare.specification})
+
+
+class EquipApplyRepairViewSet(ModelViewSet):
+    """
+    list:报修申请列表
+    create:新增报修申请
+    """
+    queryset = EquipApplyRepair.objects.all()
+    serializer_class = EquipApplyRepairSerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipApplyRepairFilter
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipApplyOrderViewSet(ModelViewSet):
+    """
+    list:设备维修工单列表
+    """
+    queryset = EquipApplyOrder.objects.all()
+    serializer_class = EquipApplyOrderSerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipApplyOrderFilter
+
+    def get_queryset(self):
+        excuted = self.request.query_params.get('excuted')
+        query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=self.request.user.username) |
+                                           Q(status='已开始', repair_end_datetime__isnull=True, repair_user=self.request.user.username))) if excuted else self.queryset
+        return query_set
+
+    @atomic
+    @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
+    def multi_update(self, request):
+        data = copy.deepcopy(self.request.data)
+        pks = data.pop('pks')
+        opera_type = data.pop('opera_type')
+        user_ids = self.request.user.username
+        ding_api = DinDinAPI()
+        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        content = {}
+        if opera_type == '指派':
+            assign_to_user = data.pop('assign_to_user')
+            if not assign_to_user:
+                raise ValidationError('未选择被指派人')
+            data.update({'assign_user': user_ids, 'assign_to_user': ','.join(assign_to_user),
+                         'assign_datetime': now_date, 'last_updated_date': datetime.now()})
+            content.update({"title": "您有新的设备维修单到达，请尽快处理！",
+                            "form": [{"key": "指派人:", "value": self.request.user.username},
+                                     {"key": "指派时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, names=assign_to_user)
+        elif opera_type == '接单':
+            data.update({'receiving_user': user_ids, 'receiving_datetime': now_date, 'last_updated_date': datetime.now()})
+            content.update({"title": f"您指派的设备维修单已被{user_ids}接单",
+                            "form": [{"key": "接单人:", "value": user_ids},
+                                     {"key": "接单时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, pks)
+        elif opera_type == '退单':
+            data.update({'receiving_user': '', 'receiving_datetime': None, 'assign_user': '', 'assign_datetime': None,
+                         'assign_to_user': '', 'last_updated_date': datetime.now()})
+            content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
+                            "form": [{"key": "退单人:", "value": user_ids},
+                                     {"key": "退单时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, pks)
+        elif opera_type == '开始':
+            data.update({'repair_user': user_ids, 'repair_start_datetime': now_date, 'last_updated_date': datetime.now()})
+        elif opera_type == '处理':
+            result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
+            work_content = data.pop('work_content', [])
+            image_url_list = data.pop('image_url_list', [])
+            result_repair_standard = data.get('result_repair_standard')
+            work_order_no = data.pop('work_order_no')
+            if result_repair_final_result == '等待':
+                pass
+            else:
+                data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成'})
+            data['result_repair_graph_url'] = json.dumps(image_url_list)
+            # 更新作业内容
+            for item in work_content:
+                item.update({'work_type': '维修', 'equip_jobitem_standard_id': result_repair_standard,
+                             'work_order_no': work_order_no})
+                EquipResultDetail.objects.create(**item)
+        elif opera_type == '验收':
+            image_url_list = data.pop('image_url_list', [])
+            data.update({'accept_user': self.request.user.username, 'accept_datetime': now_date,
+                         'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()})
+        else:  # 关闭
+            data.update({'status': '已关闭', 'last_updated_date': datetime.now()})
+            content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
+                            "form": [{"key": "闭单人:", "value": user_ids},
+                                     {"key": "关闭时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, pks)
+        # 更新数据
+        self.get_queryset().filter(id__in=pks).update(**data)
+        # 发送数据
+        if isinstance(user_ids, list):
+            ding_api.send_message(user_ids, content)
+        return Response(f'{opera_type}操作成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipRepairMaterialReqViewSet(ModelViewSet):
+    """
+    申请维修物料
+    """
+    queryset = EquipRepairMaterialReq.objects.all()
+    serializer_class = EquipRepairMaterialReqSerializer
+    filter_backends = (DjangoFilterBackend,)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class UploadImageViewSet(ModelViewSet):
+    """
+    create:上传图片
+    """
+    queryset = UploadImage.objects.all()
+    serializer_class = UploadImageSerializer
+    filter_backends = (DjangoFilterBackend,)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GetStaffsView(APIView):
+    """
+    获取维修/巡检员工信息
+    """
+    # permission_classes = (IsAuthenticated,)
+    def get(self, request):
+        ding_api = DinDinAPI()
+        section_name = self.request.query_params.get('section_name', '维修部')
+        # 查询各员工考勤状态
+        result = get_staff_status(ding_api, section_name)
+        return Response({'results': result})
