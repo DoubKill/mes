@@ -98,6 +98,27 @@ router.register('equip_maintenance_standard', EquipMaintenanceStandardViewSet)
 # 设备维修作业标准定义
 router.register('equip-repair-standard', EquipRepairStandardViewSet)
 
+# 备件库库区
+router.register('equip-warehouse-area', EquipWarehouseAreaViewSet)
+
+# 备件库库位
+router.register('equip-warehouse-location', EquipWarehouseLocationViewSet)
+
+# 备件入出库单据
+router.register('equip-warehouse-order', EquipWarehouseOrderViewSet)
+
+# 备件库出入库管理
+router.register('equip-warehouse-order-detail', EquipWarehouseOrderDetailViewSet, basename='equip-warehouse-order-detail')
+
+# 备件库库存查询
+router.register('equip-warehouse-inventory', EquipWarehouseInventoryViewSet)
+
+# 备件库出入库履历查询
+router.register('equip-warehouse-record', EquipWarehouseRecordViewSet, basename='equip-warehouse-record')
+
+# 入出库统计分析
+router.register('equip-warehouse-statistical', EquipWarehouseStatisticalViewSet)
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),
@@ -112,7 +133,9 @@ urlpatterns = [
 
     # **************************2021-10-09最新URL**************************
     # 机台目标MTBF/MTTR设定
-    path('equip-target-mtbmttr-settings/', EquipTargetMTBFMTTRSettingView.as_view())
+    path('equip-target-mtbmttr-settings/', EquipTargetMTBFMTTRSettingView.as_view()),
+    # 备件PDA出入库
+    path('equip-auto-plan/', EquipAutoPlanView.as_view())
 ]
 
 

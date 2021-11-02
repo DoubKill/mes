@@ -4,7 +4,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     EquipSupplier, EquipProperty, EquipPartNew, EquipAreaDefine, EquipComponentType, \
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
-    EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard
+    EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
+    EquipWarehouseOrderDetail
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -298,3 +299,51 @@ class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
         model = EquipRepairStandard
         fields = ('id', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
                   'spare_name', 'specification', 'use_flag')
+
+
+class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
+    order_id = django_filters.CharFilter(field_name='order_id', lookup_expr='icontains')
+    s_time = django_filters.CharFilter(field_name='created_date', lookup_expr='gte')
+    e_time = django_filters.CharFilter(field_name='created_date', lookup_expr='lte')
+
+    class Meta:
+        model = EquipWarehouseOrderDetail
+        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user')
+
+
+class EquipWarehouseRecordFilter(django_filters.rest_framework.FilterSet):
+    s_time = django_filters.CharFilter(field_name='created_date', lookup_expr='gte')
+    e_time = django_filters.CharFilter(field_name='created_date', lookup_expr='lte')
+    spare_name = django_filters.CharFilter(field_name='equip_spare__spare_name', lookup_expr='icontains')
+    spare_code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='equip_spare__specification', lookup_expr='icontains')
+    order_id = django_filters.CharFilter(field_name='equip_warehouse_order_detail__order_id')
+    equip_component_type = django_filters.CharFilter(field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipWarehouseRecord
+        fields = ('equip_warehouse_order_detail', 's_time', 'e_time', 'status', 'spare_name', 'spare_code',
+                  'specification', 'equip_component_type', 'order_id')
+
+
+class EquipWarehouseInventoryFilter(django_filters.rest_framework.FilterSet):
+    spare_name = django_filters.CharFilter(field_name='equip_spare__spare_name', lookup_expr='icontains')
+    spare_code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
+    specification = django_filters.CharFilter(field_name='equip_spare__specification', lookup_expr='icontains')
+    equip_component_type = django_filters.CharFilter(field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipWarehouseInventory
+        fields = ('spare_name', 'spare_code', 'specification', 'order_id', 'equip_spare')
+
+
+class EquipWarehouseStatisticalFilter(django_filters.rest_framework.FilterSet):
+    s_time = django_filters.CharFilter(field_name='created_date', lookup_expr='gte')
+    e_time = django_filters.CharFilter(field_name='created_date', lookup_expr='lte')
+    spare_name = django_filters.CharFilter(field_name='equip_spare__spare_name', lookup_expr='icontains')
+    spare_code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
+    equip_component_type = django_filters.CharFilter(field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipWarehouseRecord
+        fields = ('spare_name', 'spare_code', 'equip_component_type', 'equip_spare', 'status', 's_time', 'e_time')

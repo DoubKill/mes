@@ -645,8 +645,8 @@ class EquipWarehouseArea(AbstractEntity):
         备件库库区
     """
     area_name = models.CharField(max_length=64, help_text='库区名称')
-    desc = models.CharField(max_length=64, help_text='描述', default='')
-    area_barcode = models.CharField(max_length=64, help_text='库区条码', default='')
+    desc = models.CharField(max_length=64, help_text='描述',blank=True, default='')
+    area_barcode = models.CharField(max_length=64, help_text='库区条码', blank=True, default='')
     equip_component_type = models.ForeignKey(EquipComponentType, help_text='备件分类', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
@@ -675,17 +675,22 @@ class EquipWarehouseOrder(AbstractEntity):
     ORDER_STATUS = (
         (1, '未入库'),
         (2, '入库中'),
-        (3, '已入库')
+        (3, '已入库'),
+        (4, '未出库'),
+        (5, '出库中'),
+        (6, '已出库')
+
     )
-    order_type = models.CharField(max_length=64, help_text='单据类别')
     order_id = models.CharField(max_length=64, help_text='单据条码')
     submission_department = models.CharField(max_length=64, help_text='提交部门')
-    submission_user = models.CharField(max_length=64, help_text='提交人')
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
 
     class Meta:
         db_table = 'equip_warehouse_order'
         verbose_name = verbose_name_plural = '备件库出入库单据'
+
+    def _status(self):
+        return self.get_status_display()
 
 
 class EquipWarehouseOrderDetail(AbstractEntity):
@@ -700,26 +705,50 @@ class EquipWarehouseOrderDetail(AbstractEntity):
         (5, '出库中'),
         (6, '已出库')
     )
-    spare_barcode = models.CharField(max_length=64, help_text='备件条码')
+    equip_warehouse_order = models.ForeignKey(EquipWarehouseOrder, on_delete=models.CASCADE, help_text='出入库单据')
     equip_spare = models.ForeignKey(EquipSpareErp, on_delete=models.CASCADE, help_text='备件代码')
-    equip_warehouse_order = models.ForeignKey(EquipWarehouseOrder, on_delete=models.CASCADE, help_text='出库单据',
-                                              related_name='order_detail')
+    order_id = models.CharField(max_length=64, help_text='单据条码')
     order_quantity = models.IntegerField(help_text='单据数量')
-    in_quantity = models.IntegerField(help_text='已入库数量')
-    out_quantity = models.IntegerField(help_text='已出库数量')
-    equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区名称', on_delete=models.CASCADE, null=True, blank=True)
-    equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位名称', on_delete=models.CASCADE, null=True, blank=True)
-    factory_code = models.CharField(max_length=64, help_text='出厂编码')
-    factory_datetime = models.DateField(help_text='出厂日期')
-    equip_supplier = models.ForeignKey(EquipSupplier, on_delete=models.CASCADE, help_text='供应商或制造商')
+    lot_no = models.CharField(help_text='批号', max_length=64)
+    in_quantity = models.IntegerField(help_text='已入库数量', blank=True, default=0)
+    out_quantity = models.IntegerField(help_text='已出库数量', blank=True, default=0)
+    plan_out_quantity = models.IntegerField(help_text='计划出库数量', blank=True, default=0)
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
 
     class Meta:
         db_table = 'equip_warehouse_order_detail'
         verbose_name = verbose_name_plural = '备件库出入库单据明细'
 
+    def _status(self):
+        return self.get_status_display()
+
 
 class EquipWarehouseInventory(AbstractEntity):
+    """
+    备件库存统计
+    """
+    STATUS = (
+        (1, '入库'),
+        (2, '出库'),
+    )
+    order_id = models.CharField(max_length=64, help_text='单据条码')
+    lock = models.BooleanField(default=0, help_text='0解锁，1锁定')
+    equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
+    spare_code = models.CharField(help_text='备件条码', max_length=64)
+    quantity = models.IntegerField(help_text='数量', default=1)
+    one_piece = models.IntegerField(help_text='单价数量', default=1)
+    equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE, null=True, blank=True)
+    equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE, null=True, blank=True)
+    status = models.PositiveIntegerField(choices=STATUS, help_text='状态', default=1)
+    equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细', on_delete=models.CASCADE)
+
+
+    class Meta:
+        db_table = 'equip_warehouse_inventory'
+        verbose_name = verbose_name_plural = '备件库库存信息'
+
+
+class EquipWarehouseRecord(AbstractEntity):
     """
         备件库出入库履历
     """
@@ -727,15 +756,14 @@ class EquipWarehouseInventory(AbstractEntity):
         (1, '入库'),
         (2, '出库'),
     )
-    spare_barcode = models.CharField(max_length=64, help_text='备件条码')
-    order_id = models.ForeignKey(EquipWarehouseOrder, help_text='出入库单据', on_delete=models.CASCADE)
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE)
     equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
-    quantity = models.IntegerField(help_text='数量')
-    equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, on_delete=models.CASCADE)
+    spare_code = models.CharField(help_text='备件条码', max_length=64)
+    quantity = models.IntegerField(help_text='数量', default=1)
+    equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细', on_delete=models.CASCADE)
     status = models.PositiveIntegerField(choices=STATUS, help_text='状态', default=1)
 
     class Meta:
-        db_table = 'equip_warehouse_inventory'
-        verbose_name = verbose_name_plural = '备件库库存信息'
+        db_table = 'equip_warehouse_record'
+        verbose_name = verbose_name_plural = '备件库出入库履历'
