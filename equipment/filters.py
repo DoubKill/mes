@@ -4,12 +4,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     EquipSupplier, EquipProperty, EquipPartNew, EquipAreaDefine, EquipComponentType, \
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
-<<<<<<< HEAD
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
-    EquipWarehouseOrderDetail
-=======
-    EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipApplyRepair, EquipApplyOrder
->>>>>>> fcef03e4513acd65a1ee0179d10758b11d7a51f5
+    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -308,7 +304,6 @@ class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
                   'spare_name', 'specification', 'use_flag')
 
 
-<<<<<<< HEAD
 class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
     order_id = django_filters.CharFilter(field_name='order_id', lookup_expr='icontains')
     s_time = django_filters.CharFilter(field_name='created_date', lookup_expr='gte')
@@ -355,7 +350,8 @@ class EquipWarehouseStatisticalFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipWarehouseRecord
         fields = ('spare_name', 'spare_code', 'equip_component_type', 'equip_spare', 'status', 's_time', 'e_time')
-=======
+
+
 class EquipApplyRepairFilter(django_filters.rest_framework.FilterSet):
     plan_id = django_filters.CharFilter(field_name='plan_id', help_text='报修编号', lookup_expr='icontains')
     result_fault_cause = django_filters.CharFilter(field_name='result_fault_cause__fault_name', help_text='故障原因',
@@ -391,4 +387,3 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'accept_user', 'result_accept_result',
                   'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'importance_level',
                   'wait_material', 'wait_outsourcing', 'status')
->>>>>>> fcef03e4513acd65a1ee0179d10758b11d7a51f5
