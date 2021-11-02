@@ -245,9 +245,7 @@ def material_out_barcode(bar_code):
         raise ValueError('网络异常')
     data = json.loads(data)
     ret = data.get('Table')
-    if not ret:
-        raise ValueError('未找到该条码对应物料信息！')
-    return ret
+    return ret[0] if ret else ''
 
 
 # @atomic()

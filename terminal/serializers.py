@@ -111,7 +111,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             unit = unit
             attrs['scan_material'] = material_name
             DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=datetime.now(), pallet_status=2)
-        if bra_code[12] in ['H', 'Z']:
+        if len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:
             start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
             end_time = str(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S') + timedelta(seconds=1))
             location = f'{bra_code[13]}-{bra_code[14]}-{bra_code[15: len(bra_code) - 1]}-{bra_code[-1]}'
