@@ -1,13 +1,16 @@
 import json
+import logging
 from datetime import datetime
 
 import requests
+from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook
 from io import BytesIO
 
+from basics.models import WorkSchedulePlan
 from equipment.models import EquipApplyOrder
-from system.models import User
+from system.models import User, Section
 
 
 def gen_template_response(export_fields_dict, data, file_name):
@@ -122,15 +125,24 @@ if __name__ == '__main__':
     # # a.send_message(['0206046007692894'])
 
 
-def get_staff_status(ding_api, section_name):
+def get_staff_status(ding_api, section_name='维修部', group=''):
     """section_name: 部门"""
     result = []
+    filter_kwargs = {'section_users__repair_group': group} if group else {'section_users__repair_group__isnull': False}
     # 获取部门所有员工信息
-    staffs = User.objects.filter(section__name=section_name)
-    for staff in staffs:
-        staff_dict = {'id': staff.id, 'phone_number': staff.phone_number, 'optional': False, 'username': staff.username}
+    staffs = Section.objects.filter(Q(name=section_name) | Q(parent_section__name=section_name), **filter_kwargs)\
+        .annotate(username=F('section_users__username'), phone_number=F('section_users__phone_number'),
+                  group=F('section_users__repair_group'),
+                  uid=F('section_users__id'), leader=F('in_charge_user__username'),
+                  leader_phone_number=F('in_charge_user__phone_number'))\
+        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group')
+    staffs_detail = [i for i in staffs if i['group'] == group] if group else staffs
+    for staff in staffs_detail:
+        staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
+                      'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
+                      'leader_phone_number': staff.get('leader_phone_number')}
         # 根据手机号获取用户钉钉uid
-        ding_uid = ding_api.get_user_id(staff.phone_number)
+        ding_uid = ding_api.get_user_id(staff.get('phone_number'))
         if ding_uid:
             # # 查询考勤记录
             staff_dict['ding_uid'] = ding_uid
@@ -160,19 +172,43 @@ def get_ding_uids(ding_api, pks=None, names=None):
 class AutoDispatch(object):
     """自动派单"""
     def __init__(self):
-        self.applys = EquipApplyOrder.objects.filter(status='已生成')
+        # self.applys = EquipApplyOrder.objects.filter(status='已生成')
         # self.inspections = EquipInspectionOrder.objects.filter(status='已生成')
+        self.logger = logging.getLogger('send_order')
 
-    def send_order(self, order):
-        # 获取当前班次空闲人员
+    def send_order(self, order, choice_all_user):
+        # 班组
+        group = self.get_group_info()
+        # 维修部门下改班组人员
+        choice_all_user = get_staff_status(DinDinAPI(), group=group)
+        working_persons = [i for i in choice_all_user if i['optional']]
+        if not working_persons:
+            # 发送消息给上级
+            pass
+        for per in working_persons:
+            new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
+            if not new_applyed:
+                self.logger.info('没有新生成的维修单')
+                break
+            processing_order = EquipApplyOrder.objects.filter(Q(result_repair_final_result='等待'), status='已开始',
+                                                              repair_user=per['username'])
+            if processing_order:
+                continue
+
+
         # 分派维修单
-        # 分派包干单
         # 派单成功发送钉钉消息上级和当班人员, 失败发送给上级
         pass
+
+    def get_group_info(self):
+        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        group = '早班' if '08:00:00' < now_date[:10] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[11:], classes__global_name=group,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        return record.group.global_name
 
 
 if __name__ == '__main__':
     auto_dispatch = AutoDispatch()
-    for order in auto_dispatch.applys:
-        auto_dispatch.send_order(order)
+    auto_dispatch.send_order()
 
