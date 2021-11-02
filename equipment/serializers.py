@@ -921,10 +921,11 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
 
 class EquipApplyOrderSerializer(BaseModelSerializer):
     part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称', default='')
-    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准名')
-    equip_maintenance_standard_name = serializers.ReadOnlyField(source='equip_maintenance_standard.standard_name', help_text='维护标准名')
-    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称')
-    result_repair_standard_name = serializers.ReadOnlyField(source='result_repair_standard.standard_name', help_text='实际维修标准名称')
+    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name', help_text='维修标准名', default='')
+    equip_maintenance_standard_name = serializers.ReadOnlyField(source='equip_maintenance_standard.standard_name', help_text='维护标准名', default='')
+    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称', default='')
+    result_repair_standard_name = serializers.ReadOnlyField(source='result_repair_standard.standard_name', help_text='实际维修标准名称', default='')
+    result_maintenance_standard_name = serializers.ReadOnlyField(source='result_maintenance_standard.standard_name', help_text='实际维护标准名称', default='')
     work_persons = serializers.ReadOnlyField(source='equip_repair_standard.cycle_person_num', help_text='作业标准人数', default='')
     equip_barcode = serializers.SerializerMethodField(help_text='设备条码')
 
@@ -944,7 +945,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
             for i in data:
                 work_content.append({'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
                                      'job_item_check_standard': i.job_item_check_standard, 'operation_result': i.operation_result})
-            res['work_content'] = work_content
+        res['work_content'] = work_content
         return res
 
     class Meta:

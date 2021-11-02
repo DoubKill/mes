@@ -796,19 +796,20 @@ class EquipApplyOrder(AbstractEntity):
     """
     plan_id = models.CharField(max_length=64, help_text='报修编号')
     plan_name = models.CharField(max_length=64, help_text='报修名称')
+    work_type = models.CharField(max_length=64, help_text='作业类型', default='维修')
     work_order_no = models.CharField(max_length=64, help_text='工单编号')
     equip_no = models.CharField(max_length=64, help_text='机台')
     equip_part_new = models.ForeignKey(EquipPartNew, help_text='部位名称', on_delete=models.CASCADE, null=True, blank=True)
     equip_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='维修标准', on_delete=models.CASCADE,
                                               null=True, blank=True)
+    equip_maintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='维护标准', on_delete=models.CASCADE,
+                                                   null=True, blank=True)
     planned_repair_date = models.DateField(help_text='计划维修日期', null=True, blank=True)
     equip_condition = models.CharField(max_length=64, help_text='设备条件')
     importance_level = models.CharField(max_length=64, help_text='重要程度', default='高')
     assign_user = models.CharField(max_length=64, help_text='指派人', null=True, blank=True)
     assign_datetime = models.DateTimeField(help_text='指派时间', null=True, blank=True)
     assign_to_user = models.CharField(max_length=64, help_text='被指派人', null=True, blank=True)
-    # input_user = models.CharField(max_length=64, help_text='报修人')
-    # input_datetime = models.DateTimeField(help_text='报修时间')
     receiving_user = models.CharField(max_length=64, help_text='接单人', null=True, blank=True)
     receiving_datetime = models.DateTimeField(help_text='接单时间', null=True, blank=True)
     repair_user = models.CharField(max_length=64, help_text='维修人', null=True, blank=True)
@@ -819,6 +820,8 @@ class EquipApplyOrder(AbstractEntity):
     result_fault_desc = models.CharField(max_length=64, help_text='故障描述', default='')
     result_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='实际维修标准', on_delete=models.CASCADE,
                                                null=True, blank=True, related_name='result_repair')
+    result_maintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='实际维护标准', on_delete=models.CASCADE,
+                                                    null=True, blank=True, related_name='result_maintenance')
     result_fault_cause = models.ForeignKey(EquipFault, help_text='故障原因', on_delete=models.CASCADE,
                                            null=True, blank=True)
     result_repair_desc = models.CharField(max_length=256, help_text='维修备注', default='')
