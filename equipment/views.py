@@ -762,7 +762,8 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
                 equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3], use_flag=True).first()
                 equip_supplier = EquipSupplier.objects.filter(supplier_name=item[6], use_flag=True).first()
                 if item[12]:
-                    leave_factory_date = dt.date(*map(int, item[12].split('-'))) if isinstance(item[12], str) else datetime.date(
+                    leave_factory_date = dt.date(*map(int, item[12].split('-'))) if isinstance(item[12],
+                                                                                               str) else datetime.date(
                         xlrd.xldate.xldate_as_datetime(item[12], 0))
                 else:
                     leave_factory_date = None
