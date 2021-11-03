@@ -756,15 +756,15 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
                 equip_supplier = EquipSupplier.objects.filter(supplier_name=item[6], use_flag=True).first()
                 if not equip_type:
                     raise ValidationError('导入的设备型号{}不存在'.format(item[3]))
-                area_list.append({"property_no": int(item[0]) if isinstance(item[0], float) else item[0],
-                                  "src_no": int(item[1]) if isinstance(item[1], float) else item[1],
-                                  "financial_no": int(item[2]) if isinstance(item[2], float) else item[2],
+                area_list.append({"property_no": item[0] if item[0] else None,
+                                  "src_no": item[1] if item[1] else None,
+                                  "financial_no": item[2] if item[2] else None,
                                   "equip_type": equip_type.id,
                                   "equip_no": item[4],
                                   "equip_name": item[5],
                                   "equip_supplier": equip_supplier.id if equip_supplier else None,
-                                  "capacity": item[7],
-                                  "price": item[8],
+                                  "capacity": item[7] if item[7] else None,
+                                  "price": item[8] if item[8] else None,
                                   "status": status_dict.get(item[9]),
                                   "equip_type_name": item[10],
                                   "leave_factory_no": item[11],
