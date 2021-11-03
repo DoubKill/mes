@@ -2,6 +2,8 @@ import datetime
 
 import math
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
+
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
@@ -66,6 +68,8 @@ class TrainsFeedbacksSerializer(BaseModelSerializer):
 class PalletFeedbacksSerializer(BaseModelSerializer):
     """托盘产出反馈"""
     stage = serializers.SerializerMethodField(read_only=True)
+    lot_no = serializers.CharField(max_length=64, validators=[
+        UniqueValidator(queryset=PalletFeedbacks.objects.all(), message='该收皮条码已存在')])
 
     def get_stage(self, object):
         plan_classes_uid = object.plan_classes_uid if object.plan_classes_uid else 0

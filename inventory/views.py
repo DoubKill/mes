@@ -3747,68 +3747,135 @@ class InOutBoundSummaryView(APIView):
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='3'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count'],
                      "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='3'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '4巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='4'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count'],
                      "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='4'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count']
                      },
                 ]
                 # 出库
-            elif station in ('二层后端', '二层前端'):
+            elif station == '二层前端':
                 ret = [
                     {'tunnel': '1巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='1'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count'],
                      "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='1'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count']
                      },
                     {'tunnel': '2巷',
                      'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='2'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count'],
                      "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
                          start_time__gte=date_begin_time,
                          location__startswith='2'
-                     ).exclude(Q(material_no__icontains='RE') |
-                               Q(material_no__icontains='FM') |
-                               Q(material_no__icontains='RFM')
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count']
+                     },
+                ]
+            elif station == '二层后端':
+                ret = [
+                    {'tunnel': '1巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='1'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count']
+                     },
+                    {'tunnel': '2巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='2'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count']
+                     },
+                    {'tunnel': '3巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='3'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count']
+                     },
+                    {'tunnel': '4巷',
+                     'in_bound_count': MixGumInInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
+                               ).aggregate(count=Sum('qty'))['count'],
+                     "out_bound_count": MixGumOutInventoryLog.objects.using('bz').filter(
+                         start_time__gte=date_begin_time,
+                         location__startswith='4'
+                     ).exclude(Q(material_no__icontains='-RE') |
+                               Q(material_no__icontains='-FM') |
+                               Q(material_no__icontains='-RFM')
                                ).aggregate(count=Sum('qty'))['count']
                      },
                 ]
@@ -3816,22 +3883,22 @@ class InOutBoundSummaryView(APIView):
                 ret = []
             # 混炼胶总入库车数
             total_inbound_count = MixGumInInventoryLog.objects.using('bz').filter(
-                start_time__gte=date_begin_time).exclude(Q(material_no__icontains='RE') |
-                                                         Q(material_no__icontains='FM') |
-                                                         Q(material_no__icontains='RFM')
+                start_time__gte=date_begin_time).exclude(Q(material_no__icontains='-RE') |
+                                                         Q(material_no__icontains='-FM') |
+                                                         Q(material_no__icontains='-RFM')
                                                          ).aggregate(count=Sum('qty'))['count']
             # 混炼胶总出库数量
             total_outbound_count = MixGumOutInventoryLog.objects.using('bz').filter(
-                start_time__gte=date_begin_time).exclude(Q(material_no__icontains='RE') |
-                                                         Q(material_no__icontains='FM') |
-                                                         Q(material_no__icontains='RFM')
+                start_time__gte=date_begin_time).exclude(Q(material_no__icontains='-RE') |
+                                                         Q(material_no__icontains='-FM') |
+                                                         Q(material_no__icontains='-RFM')
                                                          ).aggregate(count=Sum('qty'))['count']
             # 混炼胶总生产车次
             production_count = TrainsFeedbacks.objects.filter(
                 factory_date=date_now).exclude(
-                Q(product_no__icontains='RE') |
-                Q(product_no__icontains='FM') |
-                Q(product_no__icontains='RFM')).count()
+                Q(product_no__icontains='-RE') |
+                Q(product_no__icontains='-FM') |
+                Q(product_no__icontains='-RFM')).count()
         else:
             ret = [
                     {'tunnel': '1巷',
@@ -3872,9 +3939,9 @@ class InOutBoundSummaryView(APIView):
                                                         ).aggregate(count=Sum('qty'))['count']
             # 混炼库区终炼胶入库总车数
             mixin_inbound_count = MixGumInInventoryLog.objects.using('bz').filter(
-                start_time__gte=date_begin_time).filter(Q(material_no__icontains='RE') |
-                                                        Q(material_no__icontains='FM') |
-                                                        Q(material_no__icontains='RFM')
+                start_time__gte=date_begin_time).filter(Q(material_no__icontains='-RE') |
+                                                        Q(material_no__icontains='-FM') |
+                                                        Q(material_no__icontains='-RFM')
                                                         ).aggregate(count=Sum('qty'))['count']
             # 终炼总入库车数
             if not final_inbound_count:
@@ -3892,9 +3959,9 @@ class InOutBoundSummaryView(APIView):
                                                         ).aggregate(count=Sum('qty'))['count']
             # 混炼库区终炼胶出库总车数
             mixin_outbound_count = MixGumOutInventoryLog.objects.using('bz').filter(
-                start_time__gte=date_begin_time).filter(Q(material_no__icontains='RE') |
-                                                        Q(material_no__icontains='FM') |
-                                                        Q(material_no__icontains='RFM')
+                start_time__gte=date_begin_time).filter(Q(material_no__icontains='-RE') |
+                                                        Q(material_no__icontains='-FM') |
+                                                        Q(material_no__icontains='-RFM')
                                                         ).aggregate(count=Sum('qty'))['count']
             # 终炼总出库车数
             if not final_outbound_count:
@@ -3905,9 +3972,9 @@ class InOutBoundSummaryView(APIView):
             # 终炼总车次
             production_count = TrainsFeedbacks.objects.filter(
                 factory_date=date_now).filter(
-                Q(product_no__icontains='RE') |
-                Q(product_no__icontains='FM') |
-                Q(product_no__icontains='RFM')).count()
+                Q(product_no__icontains='-RE') |
+                Q(product_no__icontains='-FM') |
+                Q(product_no__icontains='-RFM')).count()
         return Response({"data": ret,
                          "total_inbound_count": total_inbound_count,
                          "total_outbound_count": total_outbound_count,

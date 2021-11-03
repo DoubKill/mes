@@ -22,7 +22,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting
-from terminal.utils import TankStatusSync, CLSystem
+from terminal.utils import TankStatusSync, CLSystem, material_out_barcode
 
 logger = logging.getLogger('send_log')
 
@@ -69,12 +69,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         is_used = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code)
         if is_used:
             raise serializers.ValidationError('同一计划中不可多次扫同一条码')
+        # 查原材料出库履历查到原材料物料编码
         try:
-            # 查原材料出库履历查到原材料物料编码
-            wms_stock = MaterialOutHistory.objects.using('wms').filter(
-                lot_no=bra_code).values('material_no', 'material_name', 'weight', 'unit')
-        except Exception:
-            raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
+            res = material_out_barcode(bra_code)
+        except Exception as e:
+            raise serializers.ValidationError(e)
 
         pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
         weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
@@ -91,10 +90,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             raise serializers.ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
         materials = detail_infos.keys()
-        if wms_stock:
-            attrs['scan_material'] = wms_stock[0].get('material_name')
+        if res:
+            attrs['scan_material'] = res.get('WLMC')
             material_name_set = set(ERPMESMaterialRelation.objects.filter(
-                zc_material__wlxxid=wms_stock[0]['material_no'],
+                zc_material__wlxxid=res['WLXXID'],
                 use_flag=True
             ).values_list('material__material_name', flat=True))
             if not material_name_set:
@@ -103,8 +102,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             if comm_material:
                 material_name = comm_material[0]
                 material_no = comm_material[0]
-                total_weight = wms_stock[0].get('weight')
-                unit = wms_stock[0].get('unit')
+                total_weight = res.get('ZL')
+                unit = res.get('BZDW')
         if pallet_feedback:
             material_no = pallet_feedback.product_no
             material_name = pallet_feedback.product_no
@@ -112,7 +111,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             unit = unit
             attrs['scan_material'] = material_name
             DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=datetime.now(), pallet_status=2)
-        if bra_code[12] in ['H', 'Z']:
+        if len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:
             start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
             end_time = str(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S') + timedelta(seconds=1))
             location = f'{bra_code[13]}-{bra_code[14]}-{bra_code[15: len(bra_code) - 1]}-{bra_code[-1]}'
@@ -305,20 +304,18 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
         batch_classes = attr['batch_classes']
         batch_group = attr['batch_group']
         location_no = attr['location_no']
+        # 查原材料出库履历查到原材料物料编码
         try:
-            wms_stock = MaterialOutHistory.objects.using('wms').filter(
-                lot_no=attr['bra_code']).values('material_no', 'material_name')
-        except Exception:
+            res = material_out_barcode(bra_code)
+        except Exception as e:
             if settings.DEBUG:
-                wms_stock = None
+                res = None
             else:
-                raise serializers.ValidationError('连接WMS库失败，请联系管理员！')
-        if not wms_stock:
-            raise serializers.ValidationError('该条码信息不存在！')
+                raise serializers.ValidationError(e)
         material_name = material_no = ''
-        attr['scan_material'] = wms_stock[0].get('material_name')
+        attr['scan_material'] = res.get('WLMC')
         material_name_set = set(ERPMESMaterialRelation.objects.filter(
-            zc_material__wlxxid=wms_stock[0]['material_no'],
+            zc_material__wlxxid=res['WLXXID'],
             use_flag=True
         ).values_list('material__material_name', flat=True))
         if not material_name_set:

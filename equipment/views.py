@@ -1724,8 +1724,8 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
 class EquipTargetMTBFMTTRSettingView(APIView):
 
     def get(self, request):
-        return Response(EquipTargetMTBFMTTRSetting.objects.values('id', 'equip', 'equip__equip_no', 'equip__equip_name',
-                                                                  'target_mtb', 'target_mttr'))
+        return Response(EquipTargetMTBFMTTRSetting.objects.order_by('equip__equip_no').values(
+            'id', 'equip', 'equip__equip_no', 'equip__equip_name', 'target_mtb', 'target_mttr'))
 
     def post(self, request):
         data = request.data

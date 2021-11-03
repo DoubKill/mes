@@ -304,6 +304,7 @@ class WeighCntType(models.Model):
     package_cnt = models.PositiveIntegerField('分包数量', default=1)
     package_type = models.PositiveIntegerField('打包类型', choices=PACKAGE_TYPE_CHOICE, default=1)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+    total_standard_error = models.DecimalField(help_text='总误差', decimal_places=2, max_digits=8, default=0)
 
     @property
     def weighting_material_nos(self):
