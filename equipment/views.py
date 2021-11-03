@@ -772,7 +772,7 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
                                   "use_date": item[13] if item[13] else None,
                                   })
         s = EquipPropertySerializer(data=area_list, many=True, context={'request': request})
-        if s.is_valid(raise_exception=True):
+        if s.is_valid(raise_exception=False):
             if len(s.validated_data) < 1:
                 raise ValidationError('没有可导入的数据')
             s.save()
