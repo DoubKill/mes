@@ -2918,6 +2918,7 @@ class EquipRepairMaterialReqViewSet(ModelViewSet):
     """
     queryset = EquipRepairMaterialReq.objects.all()
     serializer_class = EquipRepairMaterialReqSerializer
+    pagination_class = None
     filter_backends = (DjangoFilterBackend,)
 
     def get_queryset(self):
