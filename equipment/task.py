@@ -269,9 +269,9 @@ class AutoDispatch(object):
         return '完成一次定时派单处理'
 
     def get_group_info(self):
-        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        group = '早班' if '08:00:00' < now_date[:10] < '20:00:00' else '夜班'
-        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[11:], classes__global_name=group,
+        now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        group = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=group,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         return record.group.global_name
 
