@@ -845,25 +845,25 @@ class EquipApplyOrder(AbstractEntity):
     repair_end_datetime = models.DateTimeField(help_text='维修结束时间', null=True, blank=True)
     accept_user = models.CharField(max_length=64, help_text='验收人', null=True, blank=True)
     accept_datetime = models.DateTimeField(help_text='验收时间', null=True, blank=True)
-    result_fault_desc = models.CharField(max_length=64, help_text='故障描述', default='')
+    result_fault_desc = models.CharField(max_length=64, help_text='故障描述', null=True, blank=True)
     result_repair_standard = models.ForeignKey(EquipRepairStandard, help_text='实际维修标准', on_delete=models.CASCADE,
                                                null=True, blank=True, related_name='result_repair')
     result_maintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='实际维护标准', on_delete=models.CASCADE,
                                                     null=True, blank=True, related_name='result_maintenance')
     result_fault_cause = models.ForeignKey(EquipFault, help_text='故障原因', on_delete=models.CASCADE,
                                            null=True, blank=True)
-    result_repair_desc = models.CharField(max_length=256, help_text='维修备注', default='')
-    result_repair_graph_url = models.TextField(help_text='维修图片', default='')
-    result_final_fault_cause = models.CharField(max_length=256, help_text='最终故障原因', default='')
+    result_repair_desc = models.CharField(max_length=256, help_text='维修备注', null=True, blank=True)
+    result_repair_graph_url = models.TextField(help_text='维修图片', null=True, blank=True)
+    result_final_fault_cause = models.CharField(max_length=256, help_text='最终故障原因', null=True, blank=True)
     result_material_requisition = models.BooleanField(help_text='是否物料申请', default=False)
     result_need_outsourcing = models.BooleanField(help_text='是否需要外协助', default=False)
     wait_material = models.BooleanField(help_text='是否等待物料', default=False)
     wait_outsourcing = models.BooleanField(help_text='是否等待外协助', default=False)
     result_repair_final_result = models.CharField(max_length=256, help_text='维修结论', null=True, blank=True)
     result_accept_desc = models.CharField(max_length=256, help_text='验收备注', null=True, blank=True)
-    result_accept_result = models.CharField(max_length=256, help_text='验收结果', default='')
-    result_accept_graph_url = models.TextField(help_text='验收图片', default='')
-    status = models.CharField(max_length=64, help_text='状态', default='')
+    result_accept_result = models.CharField(max_length=256, help_text='验收结果', null=True, blank=True)
+    result_accept_graph_url = models.TextField(help_text='验收图片', null=True, blank=True)
+    status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_apply_order'
