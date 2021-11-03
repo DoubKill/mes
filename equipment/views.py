@@ -1724,8 +1724,8 @@ class EquipOrderAssignRuleViewSet(CommonDeleteMixin, ModelViewSet):
 class EquipTargetMTBFMTTRSettingView(APIView):
 
     def get(self, request):
-        return Response(EquipTargetMTBFMTTRSetting.objects.values('id', 'equip', 'equip__equip_no', 'equip__equip_name',
-                                                                  'target_mtb', 'target_mttr'))
+        return Response(EquipTargetMTBFMTTRSetting.objects.order_by('equip__equip_no').values(
+            'id', 'equip', 'equip__equip_no', 'equip__equip_name', 'target_mtb', 'target_mttr'))
 
     def post(self, request):
         data = request.data
@@ -1926,6 +1926,9 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset()).distinct()
+        if self.request.query_params.get('all'):
+            data = self.get_serializer(queryset, many=True).data
+            return Response(data)
         page = self.paginate_queryset(queryset)
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
@@ -2125,6 +2128,9 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset()).distinct()
         page = self.paginate_queryset(queryset)
+        if self.request.query_params.get('all'):
+            data = self.get_serializer(queryset, many=True).data
+            return Response(data)
         if self.request.query_params.get('export'):
             data = self.get_serializer(queryset, many=True).data
             return self.export(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
@@ -2772,12 +2778,59 @@ class EquipApplyOrderViewSet(ModelViewSet):
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyOrderFilter
+    FILE_NAME = '设备维修工单表'
+    EXPORT_FIELDS_DICT = {
+        "计划/报修编号": "plan_id",
+        "计划/报修名称": "plan_name",
+        "工单编号": "work_order_no",
+        "机台": "equip_no",
+        "部位名称": "part_name",
+        "故障描述": "result_fault_desc",
+        "维修备注": "result_repair_desc",
+        "最终故障原因": "result_final_fault_cause",
+        "计划维修日期": "planned_repair_date",
+        "设备条件": "equip_condition",
+        "重要程度": "importance_level",
+        "状态": "status",
+        "维修人": "repair_user",
+        "维修开始时间": "repair_start_datetime",
+        "维修结束时间": "repair_end_datetime",
+        "是否物料申请": "result_material_requisition",
+        "是否需要外协助": "result_need_outsourcing",
+        "是否等待物料": "wait_material",
+        "是否等待外协助": "wait_outsourcing",
+        "指派人": "assign_user",
+        "指派时间": "assign_datetime",
+        "被指派人": "assign_to_user",
+        "接单人": "receiving_user",
+        "接单时间": "receiving_datetime",
+        "报修人": "created_username",
+        "报修时间": "created_date",
+        "验收人": "accept_user",
+        "验收时间": "accept_datetime",
+        "验收结果": "result_accept_result",
+        "验收记录": "result_accept_result",
+    }
 
     def get_queryset(self):
         excuted = self.request.query_params.get('excuted')
         query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=self.request.user.username) |
                                            Q(status='已开始', repair_end_datetime__isnull=True, repair_user=self.request.user.username))) if excuted else self.queryset
         return query_set
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        if self.request.query_params.get('export'):
+            data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
 
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
@@ -2835,6 +2888,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
             if not instance:
                 raise ValidationError('维修或维护标准未找到')
+            EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
             for item in work_content:
                 item.update({'work_type': work_type, 'equip_jobitem_standard_id': instance.equip_job_item_standard_id,
                              'work_order_no': work_order_no})
@@ -2865,6 +2919,11 @@ class EquipRepairMaterialReqViewSet(ModelViewSet):
     queryset = EquipRepairMaterialReq.objects.all()
     serializer_class = EquipRepairMaterialReqSerializer
     filter_backends = (DjangoFilterBackend,)
+
+    def get_queryset(self):
+        warehouse_out_no = self.request.query_params.get('warehouse_out_no')
+        query_set = self.queryset.filter(warehouse_out_no=warehouse_out_no)
+        return query_set
 
 
 @method_decorator([api_recorder], name='dispatch')

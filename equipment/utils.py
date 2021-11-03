@@ -1,5 +1,4 @@
 import json
-import logging
 from datetime import datetime
 
 import requests
@@ -7,8 +6,6 @@ from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook
 from io import BytesIO
-
-from basics.models import WorkSchedulePlan
 from equipment.models import EquipApplyOrder
 from system.models import User, Section
 
@@ -118,11 +115,11 @@ class DinDinAPI(object):
             print('请求错误')
 
 
-if __name__ == '__main__':
-    a = DinDinAPI()
-    # print(a.get_user_id('15607115901'))
-    # # print(a.get_user_attendance(['0206046007692894']))
-    # # a.send_message(['0206046007692894'])
+# if __name__ == '__main__':
+#     a = DinDinAPI()
+#     # print(a.get_user_id('15607115901'))
+#     # # print(a.get_user_attendance(['0206046007692894']))
+#     # # a.send_message(['0206046007692894'])
 
 
 def get_staff_status(ding_api, section_name='维修部', group=''):
@@ -167,48 +164,3 @@ def get_ding_uids(ding_api, pks=None, names=None):
         if res:
             user_ids.append(res)
     return user_ids
-
-
-class AutoDispatch(object):
-    """自动派单"""
-    def __init__(self):
-        # self.applys = EquipApplyOrder.objects.filter(status='已生成')
-        # self.inspections = EquipInspectionOrder.objects.filter(status='已生成')
-        self.logger = logging.getLogger('send_order')
-
-    def send_order(self, order, choice_all_user):
-        # 班组
-        group = self.get_group_info()
-        # 维修部门下改班组人员
-        choice_all_user = get_staff_status(DinDinAPI(), group=group)
-        working_persons = [i for i in choice_all_user if i['optional']]
-        if not working_persons:
-            # 发送消息给上级
-            pass
-        for per in working_persons:
-            new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
-            if not new_applyed:
-                self.logger.info('没有新生成的维修单')
-                break
-            processing_order = EquipApplyOrder.objects.filter(Q(result_repair_final_result='等待'), status='已开始',
-                                                              repair_user=per['username'])
-            if processing_order:
-                continue
-
-
-        # 分派维修单
-        # 派单成功发送钉钉消息上级和当班人员, 失败发送给上级
-        pass
-
-    def get_group_info(self):
-        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        group = '早班' if '08:00:00' < now_date[:10] < '20:00:00' else '夜班'
-        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[11:], classes__global_name=group,
-                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        return record.group.global_name
-
-
-if __name__ == '__main__':
-    auto_dispatch = AutoDispatch()
-    auto_dispatch.send_order()
-

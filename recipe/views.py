@@ -1,5 +1,6 @@
 # Create your views here.
 from django.db.models import Prefetch
+from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, status
@@ -10,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelViewSet
 
-from basics.models import GlobalCode
+from basics.models import GlobalCode, EquipCategoryAttribute
 from basics.views import CommonDeleteMixin
 from mes import settings
 from mes.derorators import api_recorder
@@ -212,7 +213,7 @@ class ProductBatchingViewSet(ModelViewSet):
         delete_flag=False, batching_type=2).select_related(
         "factory", "site", "dev_type", "stage", "product_info"
     ).prefetch_related(
-        Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False)),
+        Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False).order_by('sn')),
         Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
         Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(delete_flag=False)),
     ).order_by('-created_date')
@@ -403,3 +404,84 @@ class GetERPZcMaterialAPiView(APIView):
         zc_materials = ERPMESMaterialRelation.objects.filter(material__material_no=material_no)\
             .values('zc_material__material_name', 'zc_material__wlxxid')
         return Response({'results': list(zc_materials)})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductDevBatchingReceive(APIView):
+
+    @atomic()
+    def post(self, request):
+        # data = {
+        #     'factory__global_no': '安吉',
+        #     'site__global_no': 'C',
+        #     'product_info__product_no': 'C590',
+        #     'stage_product_batch_no': "C-FM-C590-01",
+        #     'dev_type__category_no': "F370",
+        #     'stage__global_no': "FM",
+        #     'versions': "01",
+        #     'used_type': 4,
+        #     'batching_details': [{'sn': 1,
+        #                           'material__material_no': 'aaa',
+        #                           'actual_weight': 121,
+        #                           'standard_error': 12,
+        #                           'auto_flag': 1,
+        #                           'type': 1}]
+        # }
+        data = self.request.data
+        product_batching = ProductBatching.objects.exclude(
+            used_type=6).filter(stage_product_batch_no=data['stage_product_batch_no'],
+                                batching_type=2,
+                                dev_type__category_no=data['dev_type__category_no']).first()
+        if product_batching:
+            return Response('ok')
+        else:
+            try:
+                dev_type = EquipCategoryAttribute.objects.get(category_no=data['dev_type__category_no'])
+                if data['factory__global_no']:
+                    factory = GlobalCode.objects.get(global_no=data['factory__global_no'])
+                else:
+                    factory = None
+                if data['product_info__product_no']:
+                    product_info = ProductInfo.objects.get(product_no=data['product_info__product_no'])
+                else:
+                    product_info = None
+                if data['site__global_no']:
+                    site = GlobalCode.objects.get(global_no=data['site__global_no'])
+                else:
+                    site = None
+                if data['stage__global_no']:
+                    stage = GlobalCode.objects.get(global_no=data['stage__global_no'])
+                else:
+                    stage = None
+                for m in data['batching_details']:
+                    material_no = m.pop('material__material_no')
+                    material = Material.objects.filter(material_no=material_no).first()
+                    if not material:
+                        raise ValidationError('MES原材料:{}不存在！'.format(material_no))
+                    m['material'] = material
+            except EquipCategoryAttribute.DoesNotExist:
+                raise ValidationError('MES机型{}不存在'.format(data.get('dev_type__category_no')))
+            except GlobalCode.DoesNotExist as e:
+                raise ValidationError('MES公共代码{}不存在'.format(e))
+            except ProductInfo.DoesNotExist:
+                raise ValidationError('MES胶料代码{}不存在'.format(data['product_info__product_no']))
+            except Material.DoesNotExist:
+                raise ValidationError('MES原材料不存在！')
+            except Exception as e:
+                raise e
+            product_batching = ProductBatching.objects.create(
+                dev_type=dev_type,
+                factory=factory,
+                site=site,
+                product_info=product_info,
+                stage=stage,
+                batching_type=2,
+                versions=data['versions'],
+                used_type=data['used_type'],
+                stage_product_batch_no=data['stage_product_batch_no']
+            )
+            for item in data['batching_details']:
+                item['product_batching'] = product_batching
+                ProductBatchingDetail.objects.create(**item)
+            product_batching.save()
+            return Response('ok')
