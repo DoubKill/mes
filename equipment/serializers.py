@@ -1132,11 +1132,11 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
             order = super().create(validated_data)
             for equip_spare in equip_spare_list:
                 EquipWarehouseOrderDetail.objects.create(
-                        order_id=validated_data['order_in'],
+                        order_id=validated_data['order_id'],
                         equip_spare_id=equip_spare['id'],
                         order_quantity=equip_spare['quantity'],
                         status=status,
-                        plan_out_quantity=equip_spare['out_quantity'],
+                        plan_out_quantity=equip_spare['quantity'],
                         created_user=self.context["request"].user,
                         equip_warehouse_order=order,
                         )
