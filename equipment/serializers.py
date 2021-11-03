@@ -937,7 +937,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
 
 
 class EquipRepairMaterialReqSerializer(BaseModelSerializer):
-    spare_code = serializers.ReadOnlyField(source='equip_spare.spare_spare', help_text='备件编码')
+    spare_code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
     spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
     equip_component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name', help_text='备件分类')
     specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')

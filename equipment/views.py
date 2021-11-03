@@ -2892,6 +2892,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             image_url_list = data.pop('image_url_list', [])
             work_type = data.pop('work_type')
             work_order_no = data.pop('work_order_no')
+            apply_material_list = data.pop('apply_material_list', [])
             if result_repair_final_result == '等待':
                 data.update({'last_updated_date': datetime.now()})
                 # 申请了物料,需要插入到物料申请表
@@ -2912,6 +2913,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 item.update({'work_type': work_type, 'equip_jobitem_standard_id': instance.equip_job_item_standard_id,
                              'work_order_no': work_order_no})
                 EquipResultDetail.objects.create(**item)
+            for apply_material in apply_material_list:
+                EquipRepairMaterialReq.objects.create(**apply_material)
         elif opera_type == '验收':
             image_url_list = data.pop('image_url_list', [])
             data.update({'accept_user': self.request.user.username, 'accept_datetime': now_date,

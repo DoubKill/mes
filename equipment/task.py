@@ -5,6 +5,8 @@ import sys
 
 import django
 
+import mes.settings
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
@@ -33,6 +35,9 @@ import hashlib
 import base64
 import urllib.parse
 from rest_framework.exceptions import ValidationError
+logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d%I:%M:%S %p',
+                    format='%(asctime)s [%(threadName)s:%(thread)d] [%(name)s:%(lineno)d] [%(module)s:%(funcName)s] [%(levelname)s]- %(message)s',
+                    )
 
 
 def property_template():
@@ -220,7 +225,7 @@ class AutoDispatch(object):
     def __init__(self):
         # self.applys = EquipApplyOrder.objects.filter(status='已生成')
         # self.inspections = EquipInspectionOrder.objects.filter(status='已生成')
-        self.logger = logging.getLogger('send_order')
+        # logging = logging.getLogger()
         self.ding_api = DinDinAPI()
 
     def send_order(self):
@@ -230,7 +235,7 @@ class AutoDispatch(object):
         # 维修部门下改班组人员
         choice_all_user = get_staff_status(DinDinAPI(), group=group)
         if not choice_all_user:
-            self.logger.info(f'维修部下无人员')
+            logging.info(f'维修部下无人员')
             return '维修部下无人员'
         leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
         working_persons = [i for i in choice_all_user if i['optional']]
@@ -240,13 +245,13 @@ class AutoDispatch(object):
                        "form": [{"key": "指派人:", "value": "系统自动"},
                                 {"key": "指派时间:", "value": now_date}]}
             self.ding_api.send_message([leader_ding_uid], content)
-            self.logger.info(f'维修部{group}下无可指派人员')
+            logging.info(f'维修部{group}下无可指派人员')
             return f'维修部{group}下无可指派人员'
         processing_person = []
         for per in working_persons:
             new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
             if not new_applyed:
-                self.logger.info('没有新生成的维修单')
+                logging.info('没有新生成的维修单')
                 break
             processing_order = EquipApplyOrder.objects.filter(Q(result_repair_final_result='等待'), status='已开始',
                                                               repair_user=per['username'])
@@ -265,14 +270,14 @@ class AutoDispatch(object):
                        "form": [{"key": "指派人:", "value": "系统自动"},
                                 {"key": "指派时间:", "value": now_date}]}
             self.ding_api.send_message([per.get('ding_uid'), leader_ding_uid], content)
-            self.logger.info(f'系统自动派单成功: {new_applyed.work_order_no}')
+            logging.info(f'系统自动派单成功: {new_applyed.work_order_no}')
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
             content = {"title": f"{group}所有人员均在进行维修, 系统自动派单失败！",
                        "form": [{"key": "指派人:", "value": "系统自动"},
                                 {"key": "指派时间:", "value": now_date}]}
             self.ding_api.send_message([leader_ding_uid], content)
-            self.logger.info(f'系统自动派单失败')
+            logging.info(f'系统自动派单失败')
             return f'系统自动派单失败'
         return '完成一次定时派单处理'
 
