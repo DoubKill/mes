@@ -767,12 +767,12 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
                                   "price": item[8] if item[8] else None,
                                   "status": status_dict.get(item[9]),
                                   "equip_type_name": item[10],
-                                  "leave_factory_no": item[11],
-                                  "leave_factory_date": item[12],
-                                  "use_date": item[13]
+                                  "leave_factory_no": item[11] if item[11] else None,
+                                  "leave_factory_date": item[12] if item[12] else None,
+                                  "use_date": item[13] if item[13] else None,
                                   })
         s = EquipPropertySerializer(data=area_list, many=True, context={'request': request})
-        if s.is_valid(raise_exception=False):
+        if s.is_valid(raise_exception=True):
             if len(s.validated_data) < 1:
                 raise ValidationError('没有可导入的数据')
             s.save()
