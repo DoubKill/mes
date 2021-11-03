@@ -2559,10 +2559,18 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
         for i in lock_qty:
             dic[i['equip_spare']].update({'lock_qty': i['lock_qty']})
+        if request.query_params.get('all'):
+            serializer = self.get_serializer(queryset, many=True)
+            for i in dic:
+                for j in serializer.data:
+                    if i == j['equip_spare']:
+                        j.update(quantity=dic[i])
+                        results.append(j)
+                        break
+            return Response(results)
 
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-
             for i in dic:
                 for j in serializer.data:
                     if i == j['equip_spare']:
@@ -2570,7 +2578,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                         results.append(j)
                         break
             return self.get_paginated_response(results)
-
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 

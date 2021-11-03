@@ -1180,7 +1180,7 @@ class EquipWarehouseInventorySerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipWarehouseInventory
-        fields = ("spare__code", "spare_name", "component_type_name", "specification", "technical_params", "unit",
+        fields = ("id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params", "unit",
                   "upper_stock", "lower_stock", "equip_spare")
 
 
