@@ -333,8 +333,6 @@ class EquipPropertySerializer(BaseModelSerializer):
     equip_type_no = serializers.ReadOnlyField(source='equip_type.category_no', help_text='设备类型')
     equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True, help_text='设备型号')
     made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商', default='')
-    property_no = serializers.CharField(help_text='固定资产编码', max_length=64, allow_null=True,
-                                        validators=[UniqueValidator(queryset=EquipProperty.objects.all(), message='固定资产名称已存在')])
 
     def get_status_name(self, obj):
         dic = {
