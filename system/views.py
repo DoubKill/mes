@@ -169,6 +169,9 @@ class SectionViewSet(ModelViewSet):
     filter_class = SectionFilter
 
     def list(self, request, *args, **kwargs):
+        if self.request.query_params.get("all"):
+            data = self.get_queryset().filter(parent_section__isnull=False).values('id', 'name')
+            return Response({'results': data})
         data = []
         index_tree = {}
         for section in Section.objects.filter():
