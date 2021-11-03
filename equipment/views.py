@@ -2312,17 +2312,17 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
             return Response(EquipSpareErp.objects.filter(use_flag=True).values('id', 'spare_code', 'spare_name',
                                                                                'equip_component_type__component_type_name',
                                                                                'specification', 'technical_params', 'unit'))
-        elif status == '出库':
-            return Response(EquipWarehouseOrderDetail.objects.filter(delete_flag=False,
-                                                                     status=3).values('id',
-                                                                                      'equip_spare_id',
-                                                                                      'equip_spare__spare_code',
-                                                                                      'equip_spare__spare_name',
-                                                                                      'equip_spare__equip_component_type__component_type_name',
-                                                                                      'equip_spare__specification',
-                                                                                      'equip_spare__technical_params',
-                                                                                      'equip_spare__unit',
-                                                                                      'in_quantity'))
+        # elif status == '出库':
+        #     return Response(EquipWarehouseOrderDetail.objects.filter(delete_flag=False,
+        #                                                              status=3).values('id',
+        #                                                                               'equip_spare_id',
+        #                                                                               'equip_spare__spare_code',
+        #                                                                               'equip_spare__spare_name',
+        #                                                                               'equip_spare__equip_component_type__component_type_name',
+        #                                                                               'equip_spare__specification',
+        #                                                                               'equip_spare__technical_params',
+        #                                                                               'equip_spare__unit',
+        #                                                                               'in_quantity'))
         else:
             if order == 'in':
                 queryset = self.filter_queryset(self.get_queryset().filter(status__in=[1, 2, 3]))
@@ -2452,6 +2452,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 )
             return Response('入库成功')
         if status == 2:
+            inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
+                                                   equip_warehouse_location_id=data['equip_warehouse_location']).first()
+            if not inventory:
+                raise ValidationError(f'该库区下不存在条码为{data["spare_code"]}的物料')
+            if inventory.one_piece < one_piece:
+                raise ValidationError('出库数量大于库存数')
             # 根据出库的数量修改状态
             if data['out_quantity'] > instance.plan_out_quantity:
                 raise ValidationError('超出计划出库数量！')
@@ -2476,19 +2482,14 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                     obj.status = 6
                     obj.save()
             # 减少库存数
-            inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
-                                                   equip_warehouse_location_id=data['equip_warehouse_location']).first()
-
-            if inventory:
-                if inventory.one_piece > one_piece:
-                    inventory.one_piece -= one_piece
-                if inventory.one_piece == one_piece:
-                    inventory.one_piece -= one_piece
-                    inventory.quantity = 0
-                    inventory.status = 2
+            if inventory.one_piece > one_piece:
+                inventory.one_piece -= one_piece
                 inventory.save()
-            else:
-                raise ValidationError('出库数量大于库存数')
+            elif inventory.one_piece == one_piece:
+                inventory.one_piece -= one_piece
+                inventory.quantity = 0
+                inventory.status = 2
+                inventory.save()
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status=2, spare_code=data['spare_code'],
