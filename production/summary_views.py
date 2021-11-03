@@ -480,7 +480,11 @@ class IndexOverview(APIView):
         # 日入库量
         try:
             final_gum_data = FinalGumInInventoryLog.objects.using('lb').filter(
-                start_time__gte=begin_time).aggregate(
+                start_time__gte=begin_time).filter(Q(location__startswith='1') |
+                                                   Q(location__startswith='2') |
+                                                   Q(location__startswith='3') |
+                                                   Q(location__startswith='4')
+                                                   ).aggregate(
                 total_trains=Sum('qty'),
                 total_weight=Sum('weight')/1000)
             final_gum_qyt = final_gum_data['total_trains'] if final_gum_data['total_trains'] else 0

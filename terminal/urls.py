@@ -15,7 +15,8 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     ReportWeightView, XLPlanVIewSet, PackageExpireView, XLPlanCViewSet, XLPromptViewSet, WeightingTankStatus, \
     WeightPackageCViewSet, CarbonTankSetViewSet, FeedCheckOperationViewSet, FeedCapacityPlanView, \
     CarbonFeedingPromptViewSet, PowderTankSettingViewSet, OilTankSettingViewSet, PowderTankBatchingView, \
-    FeedingErrorLampForCarbonView, FeedingOperateResultForCarbonView, CarbonOutCheckView, CarbonOutTaskView
+    FeedingErrorLampForCarbonView, FeedingOperateResultForCarbonView, CarbonOutCheckView, CarbonOutTaskView, \
+    MaterialInfoIssue
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -67,4 +68,6 @@ urlpatterns = [
     path('xl-recipe-material/', RecipeMaterialVIew.as_view()),  # 小料配方原材料列表
     path('xl-report-basic/', ReportBasicView.as_view()),  # 称量车次报表列表
     path('xl-report-weight/', ReportWeightView.as_view()),  # 物料消耗报表
+
+    path('material-info-issue/', MaterialInfoIssue.as_view())
 ]

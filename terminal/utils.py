@@ -234,6 +234,20 @@ def out_task_carbon(task_id, station_no, material_no, material_name, need_weight
     return rep_dict
 
 
+def material_out_barcode(bar_code):
+    """获取出库条码信息"""
+    url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
+    try:
+        client = Client(url)
+        json_data = {"tofac": "AJ1", "tmh": bar_code}
+        data = client.service.FindZcdtmList(json.dumps(json_data))
+    except Exception:
+        raise ValueError('网络异常')
+    data = json.loads(data)
+    ret = data.get('Table')
+    return ret[0] if ret else ''
+
+
 # @atomic()
 def issue_recipe(recipe_no, equip_no):
     recipe = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no=recipe_no,
