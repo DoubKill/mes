@@ -2527,7 +2527,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
     filter_class = EquipWarehouseInventoryFilter
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset().filter(status=1))
+        queryset = self.filter_queryset(self.get_queryset().filter(status=2))
         page = self.paginate_queryset(queryset)
         if self.request.query_params.get('all_qty'):
             data = queryset.values('spare_code', 'one_piece' ,'equip_warehouse_area__area_name', 'equip_warehouse_location__location_name', 'status')
@@ -2544,11 +2544,11 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             return Response(data)
         results = []
         # 所有
-        all_qty = self.queryset.filter(status=1).values('equip_spare').annotate(all_qty=Sum('quantity'))
+        all_qty = self.queryset.filter(status=2).values('equip_spare').annotate(all_qty=Sum('quantity'))
         # 可用
-        use_qty = self.queryset.filter(status=1, lock=0).values('equip_spare').annotate(use_qty=Sum('quantity'))
+        use_qty = self.queryset.filter(status=2, lock=0).values('equip_spare').annotate(use_qty=Sum('quantity'))
         # 锁定
-        lock_qty = self.queryset.filter(status=1, lock=1).values('equip_spare').annotate(lock_qty=Sum('quantity'))
+        lock_qty = self.queryset.filter(status=2, lock=1).values('equip_spare').annotate(lock_qty=Sum('quantity'))
 
         dic = {}
         for i in all_qty:
