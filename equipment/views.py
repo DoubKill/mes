@@ -2294,6 +2294,7 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
     queryset = EquipWarehouseLocation.objects.filter(delete_flag=False)
     serializer_class = EquipWarehouseLocationSerializer
     permission_classes = (IsAuthenticated,)
+    filter_fields = ('equip_warehouse_area_id')
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
