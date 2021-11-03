@@ -749,30 +749,41 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         area_list = []
         for item in data:
-            obj = EquipProperty.objects.filter(property_no=item[0]).first()
+            obj = EquipProperty.objects.filter(equip_no=item[4], equip_name=item[5]).first()
             if not obj:
                 status_dict = {'使用中': 1, '废弃': 2, '限制': 3}
                 equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3], use_flag=True).first()
                 equip_supplier = EquipSupplier.objects.filter(supplier_name=item[6], use_flag=True).first()
+                if item[12]:
+                    leave_factory_date = dt.date(*map(int, item[12].split('-'))) if isinstance(item[12],
+                                                                                               str) else datetime.date(
+                        xlrd.xldate.xldate_as_datetime(item[12], 0))
+                else:
+                    leave_factory_date = None
+                if item[13]:
+                    use_date = dt.date(*map(int, item[13].split('-'))) if isinstance(item[13], str) else datetime.date(
+                        xlrd.xldate.xldate_as_datetime(item[13], 0))
+                else:
+                    use_date = None
                 if not equip_type:
                     raise ValidationError('导入的设备型号{}不存在'.format(item[3]))
-                area_list.append({"property_no": int(item[0]) if isinstance(item[0], float) else item[0],
-                                  "src_no": int(item[1]) if isinstance(item[1], float) else item[1],
-                                  "financial_no": int(item[2]) if isinstance(item[2], float) else item[2],
+                area_list.append({"property_no": item[0] if item[0] else None,
+                                  "src_no": item[1] if item[1] else None,
+                                  "financial_no": item[2] if item[2] else None,
                                   "equip_type": equip_type.id,
                                   "equip_no": item[4],
                                   "equip_name": item[5],
                                   "equip_supplier": equip_supplier.id if equip_supplier else None,
-                                  "capacity": item[7],
-                                  "price": item[8],
+                                  "capacity": item[7] if item[7] else None,
+                                  "price": item[8] if item[8] else None,
                                   "status": status_dict.get(item[9]),
                                   "equip_type_name": item[10],
-                                  "leave_factory_no": item[11],
-                                  "leave_factory_date": item[12],
-                                  "use_date": item[13]
+                                  "leave_factory_no": item[11] if item[11] else None,
+                                  "leave_factory_date": leave_factory_date,
+                                  "use_date": use_date,
                                   })
         s = EquipPropertySerializer(data=area_list, many=True, context={'request': request})
-        if s.is_valid(raise_exception=False):
+        if s.is_valid(raise_exception=True):
             if len(s.validated_data) < 1:
                 raise ValidationError('没有可导入的数据')
             s.save()
