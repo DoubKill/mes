@@ -2832,22 +2832,58 @@ class EquipApplyOrderViewSet(ModelViewSet):
     }
 
     def get_queryset(self):
+        searched = self.request.query_params.get('searched')
         excuted = self.request.query_params.get('excuted')
-        query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=self.request.user.username) |
-                                           Q(status='已开始', repair_end_datetime__isnull=True, repair_user=self.request.user.username))) if excuted else self.queryset
+        user_name = self.request.user.username
+        if excuted == '1':
+            query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+                                               Q(status='已开始', repair_end_datetime__isnull=True, repair_user=user_name)))
+        elif excuted == '2':
+            query_set = self.queryset.filter(
+                Q(Q(status='已接单', repair_user__isnull=True) | Q(status='已开始', repair_end_datetime__isnull=True)))
+        else:
+            if searched == '1':
+                query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                                                 Q(repair_user=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
+            else:
+                query_set = self.queryset
         return query_set
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        excuted = self.request.query_params.get('excuted')
         if self.request.query_params.get('export'):
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
+        if excuted == '1':
+            user_name = self.request.user.username
+            wait_assign = EquipApplyOrder.objects.filter(status='已生成').count()
+            assigned = EquipApplyOrder.objects.filter(status='已指派', assign_to_user__icontains=user_name).count()
+            processing = EquipApplyOrder.objects.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+                                                   Q(status='已开始', repair_end_datetime__isnull=True,
+                                                     repair_user=user_name))).count()
+            finished = EquipApplyOrder.objects.filter(status='已完成', repair_user=user_name).count()
+            accepted = EquipApplyOrder.objects.filter(status='已验收', accept_user=user_name).count()
+        else:
+            wait_assign = EquipApplyOrder.objects.filter(status='已生成').count()
+            assigned = EquipApplyOrder.objects.filter(status='已指派').count()
+            processing = EquipApplyOrder.objects.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                                                          Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            finished = EquipApplyOrder.objects.filter(status='已完成').count()
+            accepted = EquipApplyOrder.objects.filter(status='已验收').count()
+        data = {'wait_assign': wait_assign, 'assigned': assigned, 'processing': processing,
+                'finished': finished, 'accepted': accepted}
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
+            for item in serializer.data:
+                item.update(data)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
+        for item in serializer.data:
+            item.update(data)
         return Response(serializer.data)
 
 
