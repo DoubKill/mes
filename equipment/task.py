@@ -233,7 +233,7 @@ class AutoDispatch(object):
         # 维修部门下改班组人员
         choice_all_user = get_staff_status(DinDinAPI(), group=group)
         if not choice_all_user:
-            logging.info(f'维修部下无人员')
+            logging.info(f'维修部下{group}班组无人员')
             return '维修部下无人员'
         leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
         working_persons = [i for i in choice_all_user if i['optional']]
@@ -245,6 +245,7 @@ class AutoDispatch(object):
             self.ding_api.send_message([leader_ding_uid], content)
             logging.info(f'维修部{group}下无可指派人员')
             return f'维修部{group}下无可指派人员'
+        logging.info(f'维修部{group}当班可选人员:{working_persons}')
         processing_person = []
         for per in working_persons:
             new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
@@ -267,15 +268,15 @@ class AutoDispatch(object):
             content = {"title": "系统自动派发设备维修单成功，请尽快处理！",
                        "form": [{"key": "指派人:", "value": "系统自动"},
                                 {"key": "指派时间:", "value": now_date}]}
-            self.ding_api.send_message([per.get('ding_uid'), leader_ding_uid], content)
-            logging.info(f'系统自动派单成功: {new_applyed.work_order_no}')
+            self.ding_api.send_message([per.get('ding_uid')], content)
+            logging.info(f"系统自动派单成功: {new_applyed.work_order_no}, 被指派人:{per['username']}")
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
             content = {"title": f"{group}所有人员均在进行维修, 系统自动派单失败！",
                        "form": [{"key": "指派人:", "value": "系统自动"},
                                 {"key": "指派时间:", "value": now_date}]}
             self.ding_api.send_message([leader_ding_uid], content)
-            logging.info(f'系统自动派单失败')
+            logging.info(f'系统自动派单失败, {group}可选人员:{working_persons}, 正在维修人员:{processing_person}')
             return f'系统自动派单失败'
         return '完成一次定时派单处理'
 
