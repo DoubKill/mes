@@ -308,6 +308,7 @@ class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
     order_id = django_filters.CharFilter(field_name='order_id', lookup_expr='icontains')
     s_time = django_filters.CharFilter(field_name='created_date', lookup_expr='gte')
     e_time = django_filters.CharFilter(field_name='created_date', lookup_expr='lte')
+    created_user = django_filters.CharFilter(field_name='delete_user__username')
 
     class Meta:
         model = EquipWarehouseOrderDetail

@@ -2285,7 +2285,7 @@ class EquipWarehouseAreaViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if EquipWarehouseOrderDetail.objects.filter(equip_warehouse_area=instance, status=6, delete_flag=False).exists():
+        if EquipWarehouseInventory.objects.filter(equip_warehouse_area=instance, status=1).exists():
             raise ValidationError('库区正在使用')
         return super().destroy(request, *args, **kwargs)
 
@@ -2295,7 +2295,7 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
     queryset = EquipWarehouseLocation.objects.filter(delete_flag=False)
     serializer_class = EquipWarehouseLocationSerializer
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('equip_warehouse_area_id')
+    filter_fields = ('equip_warehouse_area_id',)
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -2311,7 +2311,7 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if EquipWarehouseOrderDetail.objects.filter(equip_warehouse_location=instance, status=6, delete_flag=False).exists():
+        if EquipWarehouseInventory.objects.filter(equip_warehouse_location=instance, status=1).exists():
             raise ValidationError('库位正在使用')
         return super().destroy(request, *args, **kwargs)
 
@@ -2326,10 +2326,19 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         status = self.request.query_params.get('status')
         order = self.request.query_params.get('order', None)
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 5)
         if status == '入库':
-            return Response(EquipSpareErp.objects.filter(use_flag=True).values('id', 'spare_code', 'spare_name',
+            data = EquipSpareErp.objects.filter(use_flag=True).values('id', 'spare_code', 'spare_name',
                                                                                'equip_component_type__component_type_name',
-                                                                               'specification', 'technical_params', 'unit'))
+                                                                               'specification', 'technical_params', 'unit')
+            for i in data:
+                i['spare__code'] = i['spare_code']
+                i['component_type_name'] = i['equip_component_type__component_type_name']
+            st = (int(page) - 1) * int(page_size)
+            et = int(page) * int(page_size)
+            count = len(data)
+            return Response({'results': data[st:et], 'count': count})
         # elif status == '出库':
         #     return Response(EquipWarehouseOrderDetail.objects.filter(delete_flag=False,
         #                                                              status=3).values('id',
