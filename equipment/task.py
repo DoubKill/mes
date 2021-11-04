@@ -251,7 +251,7 @@ class AutoDispatch(object):
             if not new_applyed:
                 logging.info('没有新生成的维修单')
                 break
-            processing_order = EquipApplyOrder.objects.filter(Q(result_repair_final_result='等待'), status='已开始',
+            processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
                                                               repair_user=per['username'])
             if processing_order:
                 processing_person.append(per)
