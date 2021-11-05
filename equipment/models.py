@@ -728,6 +728,7 @@ class EquipWarehouseInventory(AbstractEntity):
     备件库存统计
     """
     STATUS = (
+        (0, '未入库'),
         (1, '入库'),
         (2, '出库'),
     )
@@ -739,9 +740,8 @@ class EquipWarehouseInventory(AbstractEntity):
     one_piece = models.IntegerField(help_text='单价数量', default=1)
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE, null=True, blank=True)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE, null=True, blank=True)
-    status = models.PositiveIntegerField(choices=STATUS, help_text='状态', default=1)
+    status = models.PositiveIntegerField(choices=STATUS, help_text='状态', default=0)
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细', on_delete=models.CASCADE)
-
 
     class Meta:
         db_table = 'equip_warehouse_inventory'
@@ -767,6 +767,9 @@ class EquipWarehouseRecord(AbstractEntity):
     class Meta:
         db_table = 'equip_warehouse_record'
         verbose_name = verbose_name_plural = '备件库出入库履历'
+    @property
+    def _status(self):
+        return self.get_status_display()
 
 
 class EquipPlan(AbstractEntity):
