@@ -921,13 +921,14 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
         work_order_no = validated_data['plan_id'] + '-' + ('%04d' % (int(max_order_code.split('-')[-1] + 1)) if max_order_code else '0001')
         equip_order_data = {'plan_id': validated_data['plan_id'], 'plan_name': validated_data['plan_name'],
                             'work_order_no': work_order_no, 'equip_no': validated_data['equip_no'],
-                            'equip_part_new': validated_data['equip_part_new'], 'status': '已生成',
-                            'equip_condition': validated_data['equip_condition'],
+                            'status': '已生成', 'equip_condition': validated_data['equip_condition'],
                             'importance_level': validated_data.get('importance_level', '高'),
-                            'created_user': self.context['request'].user,
-                            'result_fault_desc': validated_data['result_fault_desc'],
-                            'result_fault_cause': validated_data['result_fault_cause'],
+                            'created_user': self.context['request'].user, 'result_fault_cause': validated_data.get('result_fault_cause'),
                             'planned_repair_date': str(datetime.now().date())}
+        if validated_data.get('equip_part_new'):
+            equip_order_data['equip_part_new'] = validated_data.get('equip_part_new')
+        if validated_data.get('result_fault_desc'):
+            equip_order_data['result_fault_desc'] = validated_data.get('result_fault_desc')
         EquipApplyOrder.objects.create(**equip_order_data)
         return super().create(validated_data)
 
