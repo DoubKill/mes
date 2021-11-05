@@ -1120,7 +1120,7 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
                                                            lock=0,
                                                            equip_spare_id=equip_sapre['id'],
                                                            quantity=1,
-                                                           one_piece=1,
+                                                           one_piece=equip_sapre['one_piece'],
                                                            created_user=self.context["request"].user,
                                                            equip_warehouse_order_detail=detail
                                                            )
@@ -1151,12 +1151,15 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
     component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name', help_text='备件分类名称')
     specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
     technical_params = serializers.ReadOnlyField(source='equip_spare.technical_params', help_text='技术参数')
+    key_parts_flag = serializers.ReadOnlyField(source='equip_spare.key_parts_flag', help_text='是否关键部位')
+    equip_warehouse_order = serializers.ReadOnlyField(source='equip_warehouse_order_id', help_text='出入库单据')
     order_quantity = serializers.IntegerField(help_text='总数量', default=0)
     equip_warehouse_area = serializers.IntegerField(help_text='库区', write_only=True)
     equip_warehouse_location = serializers.IntegerField(help_text='库位', write_only=True)
     unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
     status_name = serializers.SerializerMethodField()
     spare_code_id = serializers.ReadOnlyField(source='equip_spare.id')
+    one_piece = serializers.IntegerField(write_only=True)
     spare_code = serializers.CharField(help_text='备件条码', write_only=True)
 
     class Meta:
@@ -1194,6 +1197,7 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
     unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
     area_name = serializers.ReadOnlyField(source='equip_warehouse_area.area_name', help_text='库区')
     location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
+    _status = serializers.CharField(read_only=True)
 
     class Meta:
         model = EquipWarehouseRecord
