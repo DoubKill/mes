@@ -1026,6 +1026,8 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         validated_data['result_repair_graph_url'] = json.dumps(image_url_list)
         for apply_material in apply_material_list:
             EquipRepairMaterialReq.objects.create(**apply_material)
+        # 更新报修申请工单状态
+        EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
         return super().update(instance, validated_data)
 
     class Meta:

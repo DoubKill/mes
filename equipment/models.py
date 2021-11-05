@@ -870,6 +870,7 @@ class EquipApplyOrder(AbstractEntity):
     result_accept_result = models.CharField(max_length=256, help_text='验收结果', null=True, blank=True)
     result_accept_graph_url = models.TextField(help_text='验收图片', null=True, blank=True)
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
+    timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_apply_order'
