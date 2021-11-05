@@ -4055,10 +4055,18 @@ class LIBRARYINVENTORYView(ListAPIView):
         # 写入数据
             data_row = 1
             for i in result:
+                try:
+                    product_no_split_list = i['material_no'].split('-')
+                    if product_no_split_list[1] in ('RE', 'FM', 'RFM'):
+                        product_no = product_no_split_list[2]
+                    else:
+                        product_no = '-'.join(product_no_split_list[1:3])
+                except Exception:
+                    product_no = i['material_no']
                 sheet.write(data_row, 0, result.index(i) + 1)
                 sheet.write(data_row, 1, i['stage'])
-                sheet.write(data_row, 2, i['material_no'])
-                sheet.write(data_row, 3, i['material_no'])
+                sheet.write(data_row, 2, product_no)
+                sheet.write(data_row, 3, product_no)
                 sheet.write(data_row, 4, i['warehouse_name'])
                 sheet.write(data_row, 5, i['location'])
                 sheet.write(data_row, 6, i['一等品']['qty'] if i.get('一等品') else None)
@@ -4157,13 +4165,14 @@ class LIBRARYINVENTORYView(ListAPIView):
 
         if warehouse_name == '终炼胶库':
             total_goods_num = 1428
-            used_goods_num = len(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库'))
+            used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count()
         elif warehouse_name == '混炼胶库':
             total_goods_num = 1952
-            used_goods_num = len(BzFinalMixingRubberInventory.objects.using('bz').all())
+            used_goods_num = BzFinalMixingRubberInventory.objects.using('bz').all().count()
         else:
             total_goods_num = 1428 + 1952
-            used_goods_num = len(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库')) + len(BzFinalMixingRubberInventory.objects.using('bz').all())
+            used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count() \
+                             + BzFinalMixingRubberInventory.objects.using('bz').all().count()
 
         return Response({'results': result,
                          "total_count": total_qty,
@@ -4240,6 +4249,16 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     serializer_class = OutBoundDeliveryOrderDetailSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderDetailFilter
+
+    def get_queryset(self):
+        queryset = self.queryset
+        statuses = self.request.query_params.get('status')
+        if statuses:
+            try:
+                queryset = queryset.filter(status__in=statuses.split(','))
+            except Exception:
+                raise ValidationError('参数错误')
+        return queryset
 
     def create(self, request, *args, **kwargs):
         data = self.request.data
