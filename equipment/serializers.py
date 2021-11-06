@@ -1088,7 +1088,7 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipWarehouseOrder
-        fields = ('id', 'order_id', 'submission_department', 'created_username', 'created_date', 'status', '_status', 'equip_spare')
+        fields = ('id', 'order_id', 'submission_department', 'created_username', 'created_date', 'status', '_status', 'equip_spare', 'work_order_no')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def create(self, validated_data):
@@ -1199,6 +1199,7 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
     area_name = serializers.ReadOnlyField(source='equip_warehouse_area.area_name', help_text='库区')
     location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
     _status = serializers.CharField(read_only=True)
+    work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no', help_text='工单编号')
 
     class Meta:
         model = EquipWarehouseRecord

@@ -684,6 +684,7 @@ class EquipWarehouseOrder(AbstractEntity):
     order_id = models.CharField(max_length=64, help_text='单据条码')
     submission_department = models.CharField(max_length=64, help_text='提交部门')
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
+    work_order_no = models.CharField(max_length=64, help_text='工单编号', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_order'

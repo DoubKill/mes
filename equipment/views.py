@@ -2330,6 +2330,10 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         page_size = self.request.query_params.get('page_size', 10)
         spare_name = self.request.query_params.get('spare_name', '')
         spare_code = self.request.query_params.get('spare_code', '')
+        work_order_no = self.request.query_params.get('work_order_no')
+        if work_order_no:
+            return Response(EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
+                                                                             'created_date', 'plan_name'))
         if status == '入库':
             data = EquipSpareErp.objects.filter(use_flag=True, spare_name__icontains=spare_name,
                                                 spare_code__icontains=spare_code).values('id', 'spare_code', 'spare_name',
@@ -2342,17 +2346,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
             et = int(page) * int(page_size)
             count = len(data)
             return Response({'results': data[st:et], 'count': count})
-        # elif status == '出库':
-        #     return Response(EquipWarehouseOrderDetail.objects.filter(delete_flag=False,
-        #                                                              status=3).values('id',
-        #                                                                               'equip_spare_id',
-        #                                                                               'equip_spare__spare_code',
-        #                                                                               'equip_spare__spare_name',
-        #                                                                               'equip_spare__equip_component_type__component_type_name',
-        #                                                                               'equip_spare__specification',
-        #                                                                               'equip_spare__technical_params',
-        #                                                                               'equip_spare__unit',
-        #                                                                               'in_quantity'))
+
         else:
             if order == 'in':
                 queryset = self.filter_queryset(self.get_queryset().filter(status__in=[1, 2, 3]))
@@ -2577,6 +2571,46 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "库存上限": "upper_stock",
     }
 
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '备件库存统计'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['备件分类', '备件代码', '备件名称', '规格型号', '技术参数', '总数量', '可用数量', '锁定数量', '标准单位',
+                   '库存下限', '库存上限']
+        # 写入文件标题
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+        # 写入数据
+            data_row = 1
+            for i in result:
+                sheet.write(data_row, 0, i['component_type_name'])
+                sheet.write(data_row, 1, i['spare__code'])
+                sheet.write(data_row, 2, i['spare_name'])
+                sheet.write(data_row, 3, i['specification'])
+                sheet.write(data_row, 4, i['technical_params'])
+                sheet.write(data_row, 5, i['quantity']['all_qty'])
+                sheet.write(data_row, 6, i['quantity']['use_qty'])
+                sheet.write(data_row, 7, i['quantity']['lock_qty'])
+                sheet.write(data_row, 8, i['unit'])
+                sheet.write(data_row, 9, i['upper_stock'])
+                sheet.write(data_row, 10, i['lower_stock'])
+                data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset().filter(status=1))
         page = self.request.query_params.get('page', 1)
@@ -2635,7 +2669,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             et = int(page) * int(page_size)
             count = len(results)
             if self.request.query_params.get('export'):
-                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+                return self.export_xls(results)
             return Response({'results': results[st:et], 'count': count})
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
@@ -2666,6 +2700,7 @@ class EquipWarehouseRecordViewSet(ListModelMixin, GenericViewSet):
     EXPORT_FIELDS_DICT = {
         "出库/入库": "_status",
         "出入库单号": "order_id",
+        "工单编号": "work_order_no",
         "备件条码": "spare_code",
         "备件代码": "spare__code",
         "备件名称": "spare_name",
@@ -2693,6 +2728,16 @@ class EquipWarehouseRecordViewSet(ListModelMixin, GenericViewSet):
         if self.request.query_params.get('export'):
             serializer = self.get_serializer(queryset, many=True)
             return gen_template_response(self.EXPORT_FIELDS_DICT, list(serializer.data), self.FILE_NAME)
+        if self.request.query_params.get('work_order_no'):
+            work_order_no =  self.request.query_params.get('work_order_no')
+            order = EquipApplyOrder.objects.filter(work_order_no=work_order_no).first()
+            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+                order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
+            return Response({'plan_name': order.plan_name,
+                             'work_order_no': order.work_order_no,
+                             'equip_no': order.equip_no,
+                             'fault_name': fault_name,
+                             'result_fault_desc': order.result_fault_desc })
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
