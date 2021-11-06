@@ -883,7 +883,7 @@ class EquipApplyOrder(AbstractEntity):
 
 class UploadImage(AbstractEntity):
     source_type = models.CharField(max_length=64, help_text='上传类型: 维修;巡检')
-    image_file_name = models.ImageField(help_text='上传图片')
+    image_file_name = models.ImageField(help_text='上传图片', upload_to='equipment/%Y/%m/')
 
     class Meta:
         db_table = 'upload_images'

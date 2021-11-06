@@ -1001,6 +1001,9 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
+        # 报修图片
+        instance_apply = EquipApplyRepair.objects.filter(plan_id=res.get('plan_id')).first()
+        res['apply_repair_graph_url'] = json.loads(instance_apply.apply_repair_graph_url) if instance_apply else []
         return res
 
     @atomic
@@ -1027,6 +1030,18 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         for apply_material in apply_material_list:
             EquipRepairMaterialReq.objects.create(**apply_material)
         # 更新报修申请工单状态
+        if validated_data.get('result_repair_final_result') == '等待':
+            validated_data['last_updated_date'] = datetime.now()
+        else:
+            if instance.assign_user == '系统自动':
+                validated_data.update({'repair_end_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                       'last_updated_date': datetime.now(), 'status': '已验收', 'accept_user': '系统自动',
+                                       'accept_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                       'result_accept_desc': '验收通过', 'result_accept_result': '合格'})
+            else:
+                validated_data.update({'repair_end_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                       'last_updated_date': datetime.now(), 'status': '已完成',
+                                       'accept_user': instance.created_user.username})
         EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
         return super().update(instance, validated_data)
 
