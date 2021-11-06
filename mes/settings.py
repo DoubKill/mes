@@ -220,6 +220,15 @@ LOGGING = {
             'formatter': 'standard',
             'interval': 1,
         },
+        'sendMsgFile': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'send_msg.log'),
+            'when': 'midnight',
+            'backupCount': 10,
+            'formatter': 'standard',
+            'interval': 1,
+        },
     },
     'loggers': {
         'django.db.backends': {
@@ -256,6 +265,10 @@ LOGGING = {
             'handlers': ['qualityFile'],
             'level': 'INFO',
         },
+        'send_ding_msg': {
+            'handlers': ['sendMsgFile'],
+            'level': 'INFO',
+        }
     },
 }
 

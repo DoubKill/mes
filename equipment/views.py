@@ -2968,7 +2968,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
     """
     list:设备维修工单列表
     """
-    queryset = EquipApplyOrder.objects.all()
+    queryset = EquipApplyOrder.objects.all().order_by('-id')
     serializer_class = EquipApplyOrderSerializer
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -3137,11 +3137,23 @@ class EquipApplyOrderViewSet(ModelViewSet):
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks)
+        instances = self.get_queryset().filter(id__in=pks)
         # 更新数据
-        self.get_queryset().filter(id__in=pks).update(**data)
+        instances.update(**data)
+        # 更新报修申请状态
+        EquipApplyRepair.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status=self.request.query_params.get('status'))
         # 发送数据
         if isinstance(user_ids, list):
-            ding_api.send_message(user_ids, content)
+            for order_id in pks:
+                new_content = copy.deepcopy(content)
+                instance = self.queryset.filter(id=order_id).first()
+                fault_name = instance.result_fault_cause.fault_name if instance.result_fault_cause else (instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_maintenance_standard.standard_name)
+                new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
+                                       {"key": "机台:", "value": instance.equip_no},
+                                       {"key": "部位名称:", "value": instance.equip_part_new.part_name if instance.equip_part_new else ''},
+                                       {"key": "故障原因:", "value": fault_name},
+                                       {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
+                ding_api.send_message(user_ids, new_content, order_id)
         return Response(f'{opera_type}操作成功')
 
 
