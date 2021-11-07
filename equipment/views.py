@@ -3227,6 +3227,7 @@ class GetStaffsView(APIView):
     def get(self, request):
         ding_api = DinDinAPI()
         section_name = self.request.query_params.get('section_name', '维修部')
+        group = self.request.query_params.get('group', '')
         # 查询各员工考勤状态
-        result = get_staff_status(ding_api, section_name)
+        result = get_staff_status(ding_api, section_name, group)
         return Response({'results': result})
