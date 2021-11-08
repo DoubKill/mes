@@ -903,7 +903,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
         max_code = EquipApplyRepair.objects.aggregate(max_code=Max('plan_id'))['max_code']
         sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
         validated_data.update({
-            'plan_id': f'BX{now_time}{sequence}', 'status': '已做成',
+            'plan_id': f'BX{now_time}{sequence}', 'status': '已生成',
             'apply_repair_graph_url': json.dumps(validated_data.pop('image_url_list')),
             'plan_name': f"{validated_data['plan_department']}{f'BX{now_time}{sequence}'}"
         })
