@@ -777,12 +777,6 @@ class EquipPlan(AbstractEntity):
     """
         设备维护维修计划
     """
-    EXECUTE_STATUS = (
-        (1, '未生成工单'),
-        (2, '已生成工单'),
-        (3, '计划执行中'),
-        (4, '计划已完成')
-    )
     work_type = models.CharField(max_length=64, help_text='作业类型')
     plan_id = models.CharField(max_length=64, help_text='计划编号')
     plan_name = models.CharField(max_length=64, help_text='计划名称')
