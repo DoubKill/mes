@@ -787,7 +787,7 @@ class EquipPlan(AbstractEntity):
                                               null=True, blank=True)
     equip_condition = models.CharField(max_length=64, help_text='设备条件')
     importance_level = models.CharField(max_length=64, help_text='重要程度')
-    plan_source = models.CharField(max_length=64, help_text='来源', default='mes')
+    plan_source = models.CharField(max_length=64, help_text='来源', default='故障报修')
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     planned_maintenance_date = models.DateTimeField(help_text='计划维护日期', null=True, blank=True)
     next_maintenance_date = models.DateTimeField(help_text='下次维护日期', null=True, blank=True)

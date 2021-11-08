@@ -3226,8 +3226,18 @@ class GetStaffsView(APIView):
     # permission_classes = (IsAuthenticated,)
     def get(self, request):
         ding_api = DinDinAPI()
+        # assign_user = self.request.query_params.get('assign_user')
+        # if assign_user:
+        #     now_user = User.objects.filter(username=assign_user).first()
+        #     section_name = now_user.section.name if now_user else ''
+        # else:
+        #     section_name = self.request.query_params.get('section_name', '维修部')
         section_name = self.request.query_params.get('section_name', '维修部')
-        group = self.request.query_params.get('group', '')
+        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        classes = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=classes,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        group = record.group.global_name
         # 查询各员工考勤状态
         result = get_staff_status(ding_api, section_name, group)
         return Response({'results': result})
