@@ -2956,7 +2956,7 @@ class EquipApplyRepairViewSet(ModelViewSet):
     list:报修申请列表
     create:新增报修申请
     """
-    queryset = EquipApplyRepair.objects.all()
+    queryset = EquipApplyRepair.objects.all().order_by('-id')
     serializer_class = EquipApplyRepairSerializer
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
