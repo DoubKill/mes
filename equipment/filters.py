@@ -399,4 +399,5 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
         fields = ('planned_repair_date', 'plan_name', 'equip_no', 'work_order_no', 'equip_condition', 'status',
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'accept_user', 'result_accept_result',
                   'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'importance_level',
-                  'wait_material', 'wait_outsourcing', 'status')
+                  'wait_material', 'wait_outsourcing', 'status', 'created_user', 'result_final_fault_cause',
+                  'assign_user', 'assign_to_user', )

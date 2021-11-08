@@ -903,7 +903,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
         max_code = EquipApplyRepair.objects.aggregate(max_code=Max('plan_id'))['max_code']
         sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
         validated_data.update({
-            'plan_id': f'BX{now_time}{sequence}', 'status': '已做成',
+            'plan_id': f'BX{now_time}{sequence}', 'status': '已生成',
             'apply_repair_graph_url': json.dumps(validated_data.pop('image_url_list')),
             'plan_name': f"{validated_data['plan_department']}{f'BX{now_time}{sequence}'}"
         })
@@ -1033,7 +1033,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         if validated_data.get('result_repair_final_result') == '等待':
             validated_data['last_updated_date'] = datetime.now()
         else:
-            if instance.assign_user == '系统自动':
+            if instance.created_user.username == '系统自动':
                 validated_data.update({'repair_end_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                        'last_updated_date': datetime.now(), 'status': '已验收', 'accept_user': '系统自动',
                                        'accept_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -1052,6 +1052,9 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
 
 
 class UploadImageSerializer(BaseModelSerializer):
+
+    def validate(self, attrs):
+        return attrs
 
     class Meta:
         model = UploadImage

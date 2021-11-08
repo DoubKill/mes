@@ -19,7 +19,7 @@ from io import BytesIO
 from rest_framework.exceptions import ValidationError
 
 from basics.models import WorkSchedulePlan
-from equipment.models import PropertyTypeNode, Property, EquipApplyOrder
+from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair
 from equipment.utils import DinDinAPI, get_staff_status
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
@@ -260,6 +260,12 @@ class AutoDispatch(object):
             new_applyed.status = '已指派'
             new_applyed.last_updated_date = now_date
             new_applyed.save()
+            # 更新设备计划状态
+            repair_instance = EquipApplyRepair.objects.filter(plan_id=new_applyed.plan_id).first()
+            if repair_instance:
+                repair_instance.status = '已指派'
+                repair_instance.last_updated_date = now_date
+                repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
             content = {"title": "系统自动派发设备维修单成功，请尽快处理！",
                        "form": [{"key": "指派人:", "value": "系统自动"},
