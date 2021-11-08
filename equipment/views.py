@@ -2318,7 +2318,7 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseOrderViewSet(ModelViewSet):
-    queryset = EquipWarehouseOrder.objects.all()
+    queryset = EquipWarehouseOrder.objects.order_by('-created_date')
     serializer_class = EquipWarehouseOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_class = EquipWarehouseOrderFilter
@@ -2403,7 +2403,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseOrderDetailViewSet(ModelViewSet):
-    queryset = EquipWarehouseOrderDetail.objects.filter(delete_flag=False)
+    queryset = EquipWarehouseOrderDetail.objects.filter(delete_flag=False).order_by('-created_date')
     serializer_class = EquipWarehouseOrderDetailSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2691,7 +2691,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
 class EquipWarehouseRecordViewSet(ListModelMixin, GenericViewSet):
 
-    queryset = EquipWarehouseRecord.objects.all()
+    queryset = EquipWarehouseRecord.objects.order_by('-created_date')
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
