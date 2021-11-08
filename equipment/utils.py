@@ -8,6 +8,7 @@ from openpyxl import load_workbook
 from io import BytesIO
 from equipment.models import EquipApplyOrder
 from system.models import User, Section
+from mes import settings
 
 
 def gen_template_response(export_fields_dict, data, file_name):
@@ -39,9 +40,14 @@ def gen_template_response(export_fields_dict, data, file_name):
 
 
 class DinDinAPI(object):
-    APP_KEY = 'dingpygx79tszcicv6jb'
-    APP_SECRET = 'LBTg3wzgkDZ5b2l5pqRBrUy8XY8npiaPKYqBk5fCfCKMg_PEB7FJFpYMj8OfiiUu'
-    AGENT_ID = '1336171749'
+    if settings.DEBUG:
+        APP_KEY = 'dingpygx79tszcicv6jb'
+        APP_SECRET = 'LBTg3wzgkDZ5b2l5pqRBrUy8XY8npiaPKYqBk5fCfCKMg_PEB7FJFpYMj8OfiiUu'
+        AGENT_ID = '1336171749'
+    else:
+        APP_KEY = 'dingju0317gj7k9spsw1'
+        APP_SECRET = 'rvARM - cMGq93AKSZWrhEyJez0AvU9TaN - kTiaV78aJIwmQyY3TGmmoPOE3eRybEB'
+        AGENT_ID = '1144203103'
 
     def __init__(self):
         self.access_token = self.get_token()

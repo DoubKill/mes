@@ -1033,7 +1033,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         if validated_data.get('result_repair_final_result') == '等待':
             validated_data['last_updated_date'] = datetime.now()
         else:
-            if instance.assign_user == '系统自动':
+            if instance.created_user.username == '系统自动':
                 validated_data.update({'repair_end_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                        'last_updated_date': datetime.now(), 'status': '已验收', 'accept_user': '系统自动',
                                        'accept_datetime': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -1052,6 +1052,9 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
 
 
 class UploadImageSerializer(BaseModelSerializer):
+
+    def validate(self, attrs):
+        return attrs
 
     class Meta:
         model = UploadImage

@@ -3134,7 +3134,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             else:
                 # 工单完成，设置验收人
                 instance = self.queryset.filter(id__in=pks).first()
-                if instance.assign_user == '系统自动':
+                if instance.created_user.username == '系统自动':
                     data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已验收',
                                  'accept_user': '系统自动', 'accept_datetime': now_date, 'result_accept_desc': '验收通过',
                                  'result_accept_result': '合格'})
