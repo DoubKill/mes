@@ -2349,9 +2349,9 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
 
         else:
             if order == 'in':
-                queryset = self.filter_queryset(self.get_queryset().filter(status__in=[1, 2, 3]))
+                queryset = self.filter_queryset(self.get_queryset().order_by('-created_date').filter(status__in=[1, 2, 3]))
             elif order == 'out':
-                queryset = self.filter_queryset(self.get_queryset().filter(status__in=[4, 5, 6]))
+                queryset = self.filter_queryset(self.get_queryset().order_by('-created_date').filter(status__in=[4, 5, 6]))
             else:
                 queryset = self.filter_queryset(self.get_queryset())
             page = self.paginate_queryset(queryset)
@@ -2446,8 +2446,10 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             # 判断库区类型 和 备件类型是否匹配
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             spare_obj = data['equip_spare']
-            if area_obj.equip_component_type != spare_obj.equip_component_type:
-                raise ValidationError(f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件')
+            component_type = area_obj.equip_component_type
+            if component_type:
+                if component_type != spare_obj.equip_component_type:
+                    raise ValidationError(f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件')
             # 根据入库的数量修改状态
             quantity = in_quantity + instance.in_quantity
             if quantity > instance.order_quantity:
@@ -2691,7 +2693,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
 class EquipWarehouseRecordViewSet(ListModelMixin, GenericViewSet):
 
-    queryset = EquipWarehouseRecord.objects.order_by('-created_date')
+    queryset = EquipWarehouseRecord.objects.all()
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2715,7 +2717,7 @@ class EquipWarehouseRecordViewSet(ListModelMixin, GenericViewSet):
     }
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.filter_queryset(self.get_queryset().order_by('-created_date'))
         if self.request.query_params.get('all'):
             serializer = self.get_serializer(queryset, many=True)
             data = serializer.data
