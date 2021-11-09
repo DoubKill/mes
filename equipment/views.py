@@ -2694,7 +2694,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             for i in dic:
                 for j in serializer.data:
                     if i == j['equip_spare']:
-                        print(j['equip_spare'],111)  # id equip_spare
                         use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
                                                                          equip_spare_id=j['equip_spare'],
                                                                          status=1, lock=0).aggregate(qty=Sum('quantity'))
@@ -2706,7 +2705,10 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                             qty = use_qty.get('qty')
                         j.update(qty=qty)
                         j.update(quantity=dic[i])
-                        if qty != 0:
+                        if self.request.query_params.get('use'):
+                            if qty != 0:
+                                results.append(j)
+                        else:
                             results.append(j)
                         break
             st = (int(page) - 1) * int(page_size)
