@@ -2444,12 +2444,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
         one_piece = data.get('one_piece', 1)
-        spare_code = data.get('spare_code')
-        spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code).first()
-        if not spare_obj:
-            raise ValidationError('所扫描的条码有误')
-        if spare_obj.status == 1:  # 已入库
-            raise ValidationError('该条码已入库')
 
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(order_id=data['order_id'], equip_spare=data['equip_spare']).first()
@@ -2816,7 +2810,7 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
 class EquipAutoPlanView(APIView):
 
     def get(self, request, *args, **kwargs):
-        # 1，入库单据接口
+        # 入库单据接口
         if self.request.query_params.get('in'):
             order = EquipWarehouseOrder.objects.filter(status__in=[1, 2]).values('order_id')
             return Response({"success": True, "message": None, "data": order})
@@ -2835,14 +2829,25 @@ class EquipAutoPlanView(APIView):
                                           'equip_warehouse_location': obj.id,
                                           }})
             return Response({"success": False, "message": "库位不存在", "data": None})
+        if self.request.query_params.get('area'):
+            data = EquipWarehouseArea.objects.filter(delete_flag=False).values('id', 'area_name')
+            return Response({"success": True, "message": None, "data": data})
+        if self.request.query_params.get('location'):
+            area = self.request.query_params.get('location')
+            data = EquipWarehouseLocation.objects.filter(delete_flag=False, equip_warehouse_area_id=area).values('id', 'location_name')
+            return Response({"success": True, "message": None, "data": data})
 
-        # 1，出库单据接口
+        # 出库单据接口
         if self.request.query_params.get('out'):
             order = EquipWarehouseOrder.objects.filter(status__in=[4, 5]).values('order_id')
             return Response({"success": True, "message": None, "data": order})
         if self.request.query_params.get('out_last'):
             order = EquipWarehouseOrder.objects.filter(status=5).last()
             return Response({"success": True, "message": None, "data": order.order_id})
+        if self.request.query_params.get('spare_code'):
+            spare_code =  EquipWarehouseInventory.objects.filter(spare_code=self.request.query_params.get('spare_code')).first()
+            if spare_code:
+                return Response({"success": True, "message": None, "data": spare_code.equip_spare.specification})
 
     def post(self, request, *args, **kwargs):
         data = self.request.data
@@ -2854,12 +2859,14 @@ class EquipAutoPlanView(APIView):
         if not spare_obj:
             return Response({"success": False, "message": "所扫描的条码有误", "data": ""})
         instance = spare_obj.equip_warehouse_order_detail
-        if spare_obj.status == 1:  # 已入库
-            return Response({"success": True, "message": "该备件已入库", "data": spare_obj.equip_spare.specification})
-        area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
 
         if status == 1:
+            if spare_obj.status == 1:  # 已入库
+                return Response({"success": False, "message": "该备件已入库", "data": spare_obj.equip_spare.specification})
+            if spare_obj.status == 2:  # 已出库
+                return Response({"success": False, "message": "该备件已入库", "data": spare_obj.equip_spare.specification})
             # 判断库区类型 和 备件类型是否匹配
+            area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             component_type = area_obj.equip_component_type
             if component_type:
                 if component_type != spare_obj.equip_component_type:
@@ -2912,9 +2919,11 @@ class EquipAutoPlanView(APIView):
                                                 )
             return Response({"success": True, "message": "入库成功", "data": inventory.equip_spare.specification})
         if status == 2:
+            if spare_obj.status == 0:  # 未入库
+                return Response({"success": False, "message": "该备件还未出库", "data": spare_obj.equip_spare.specification})
+            if spare_obj.status == 2:  # 已出库
+                return Response({"success": False, "message": "该备件已出库", "data": spare_obj.equip_spare.specification})
             # 根据出库的数量修改状态
-            if data['out_quantity'] > instance.plan_out_quantity:
-                return Response({"success": False, "message": "超出计划出库数量", "data": None})
 
             if instance.plan_out_quantity == out_quantity:
                 instance.out_quantity += out_quantity
