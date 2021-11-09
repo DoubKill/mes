@@ -3163,23 +3163,30 @@ class EquipApplyOrderViewSet(ModelViewSet):
             else:
                 result_standard = data.get('result_maintenance_standard')
                 instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
-            if not instance:
-                raise ValidationError('维修或维护标准未找到')
-            EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
-            for item in work_content:
-                item.update({'work_type': work_type, 'equip_jobitem_standard_id': instance.equip_job_item_standard_id,
-                             'work_order_no': work_order_no})
-                EquipResultDetail.objects.create(**item)
+            if instance:
+                EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
+                for item in work_content:
+                    item.update({'work_type': work_type, 'work_order_no': work_order_no})
+                    EquipResultDetail.objects.create(**item)
             for apply_material in apply_material_list:
                 EquipRepairMaterialReq.objects.create(**apply_material)
         elif opera_type == '验收':
             image_url_list = data.pop('image_url_list', [])
-            data = {
-                'status': data.get('status'), 'accept_datetime': now_date,
-                'result_accept_result': data.get('result_accept_result'),
-                'result_accept_desc': data.get('result_accept_desc'),
-                'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
-            }
+            result_accept_result = data.get('result_accept_result')
+            if result_accept_result == '合格':
+                data = {
+                    'status': data.get('status'), 'accept_datetime': now_date,
+                    'result_accept_result': result_accept_result,
+                    'result_accept_desc': data.get('result_accept_desc'),
+                    'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
+                }
+            else:
+                data = {
+                    'status': data.get('status'), 'repair_end_datetime': None, 'accept_user': None,
+                    'result_accept_result': result_accept_result,
+                    'result_accept_desc': data.get('result_accept_desc'),
+                    'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
+                }
         else:  # 关闭
             data = {'status': data.get('status'), 'last_updated_date': datetime.now()}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
@@ -3245,8 +3252,14 @@ class GetStaffsView(APIView):
         #     now_user = User.objects.filter(username=assign_user).first()
         #     section_name = now_user.section.name if now_user else ''
         # else:
-        #     section_name = self.request.query_params.get('section_name', '维修部')
-        section_name = self.request.query_params.get('section_name', '维修部')
+        #     section_name = self.request.query_params.get('section_name'')
+        section_name = self.request.query_params.get('section_name')
+        if not section_name:
+            instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1, global_type__use_flag=1).first()
+            if not instance:
+                return Response({'results': []})
+            else:
+                section_name = instance.global_name
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         classes = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=classes,

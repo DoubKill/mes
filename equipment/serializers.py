@@ -843,10 +843,9 @@ class EquipRepairStandardSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        detail_list = []
-        for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
-            seq, content = i.split('、')
-            detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+        # detail_list = []
+        detail_list = EquipJobItemStandardDetail.objects.filter(equip_standard=res.get('equip_job_item_standard'))\
+            .values('id', 'equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
         res['detail_list'] = detail_list
         return res
 
@@ -993,11 +992,12 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         else:
             instance = EquipMaintenanceStandard.objects.filter(id=res.get('result_maintenance_standard')).first()
         if instance:
-            data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'], equip_jobitem_standard=instance.equip_job_item_standard_id)
+            data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'], equip_jobitem_standard=instance.equip_job_item_standard)
             if data:
                 for i in data:
                     work_content.append({'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
-                                         'job_item_check_standard': i.job_item_check_standard, 'operation_result': i.operation_result})
+                                         'job_item_check_standard': i.job_item_check_standard, 'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
+                                         'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
@@ -1014,18 +1014,18 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         apply_material_list = validated_data.pop('apply_material_list')
         # 更新作业内容
         if work_type == "维修":
-            result_standard = validated_data['result_repair_standard'].id
-            instance_standard = EquipRepairStandard.objects.filter(id=result_standard).first()
+            result_standard = validated_data.get('result_repair_standard')
+            result_standard_id = result_standard.id if result_standard else 0
+            instance_standard = EquipRepairStandard.objects.filter(id=result_standard_id).first()
         else:
-            result_standard = validated_data['result_maintenance_standard'].id
-            instance_standard = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
-        if not instance_standard:
-            raise serializers.ValidationError('维修或维护标准未找到')
-        EquipResultDetail.objects.filter(work_order_no=instance.work_order_no).delete()
-        for item in work_content:
-            item.update({'work_type': instance.work_type, 'equip_jobitem_standard_id': instance_standard.equip_job_item_standard_id,
-                         'work_order_no': instance.work_order_no})
-            EquipResultDetail.objects.create(**item)
+            result_standard = validated_data.get('result_maintenance_standard')
+            result_standard_id = result_standard.id if result_standard else 0
+            instance_standard = EquipMaintenanceStandard.objects.filter(id=result_standard_id).first()
+        if instance_standard:
+            EquipResultDetail.objects.filter(work_order_no=instance.work_order_no).delete()
+            for item in work_content:
+                item.update({'work_type': instance.work_type, 'work_order_no': instance.work_order_no})
+                EquipResultDetail.objects.create(**item)
         validated_data['result_repair_graph_url'] = json.dumps(image_url_list)
         for apply_material in apply_material_list:
             EquipRepairMaterialReq.objects.create(**apply_material)

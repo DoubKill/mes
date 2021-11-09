@@ -905,7 +905,8 @@ class EquipResultDetail(AbstractEntity):
     job_item_sequence = models.CharField(max_length=64, help_text='作业次序')
     job_item_content = models.CharField(max_length=64, help_text='作业内容')
     job_item_check_standard = models.CharField(max_length=64, help_text='判断标准及说明', default='')
-    operation_result = models.CharField(max_length=64, help_text='处理结果', default='完成')
+    job_item_check_type = models.CharField(max_length=64, help_text='判断类型', default='')
+    operation_result = models.CharField(max_length=64, help_text='处理结果', default='')
 
     class Meta:
         db_table = 'equip_result_detail'

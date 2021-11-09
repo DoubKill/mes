@@ -18,7 +18,7 @@ from io import BytesIO
 
 from rest_framework.exceptions import ValidationError
 
-from basics.models import WorkSchedulePlan
+from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair
 from equipment.utils import DinDinAPI, get_staff_status
 from quality.utils import get_cur_sheet, get_sheet_data
@@ -226,22 +226,23 @@ class AutoDispatch(object):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         # 班组
         group = self.get_group_info()
-        # 维修部门下改班组人员
-        choice_all_user = get_staff_status(DinDinAPI(), group=group)
+        # 设备部门下改班组人员
+        instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1, global_type__use_flag=1).first()
+        choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
         if not choice_all_user:
-            logger.info(f'系统派单: 维修部下{group}班组无人员')
-            return '系统派单: 维修部下无人员'
+            logger.info(f'系统派单: {group}班组无人员可派单')
+            return f'系统派单: {group}班组无人员可派单'
         leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
         working_persons = [i for i in choice_all_user if i['optional']]
         if not working_persons:
             # 发送消息给上级
-            content = {"title": f"维修部{group}下无可指派人员！",
+            content = {"title": f"{group}下无空闲可指派人员！",
                        "form": [{"key": "指派人:", "value": "系统自动"},
                                 {"key": "指派时间:", "value": now_date}]}
             self.ding_api.send_message([leader_ding_uid], content)
-            logger.info(f'系统派单: 维修部{group}下无可指派人员')
-            return f'系统派单: 维修部{group}下无可指派人员'
-        logger.info(f'系统派单: 维修部{group}当班可选人员:{working_persons}')
+            logger.info(f'系统派单: {group}下无空闲可指派人员')
+            return f'系统派单: {group}下无空闲可指派人员'
+        logger.info(f'系统派单: {group}当班可选人员:{working_persons}')
         processing_person = []
         for per in working_persons:
             new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()

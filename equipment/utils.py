@@ -129,8 +129,8 @@ class DinDinAPI(object):
 #     # # a.send_message(['0206046007692894'])
 
 
-def get_staff_status(ding_api, section_name='维修部', group=''):
-    """section_name: 部门"""
+def get_staff_status(ding_api, section_name, group=''):
+    """section_name: 设备部"""
     result = []
     filter_kwargs = {'section_users__repair_group': group} if group else {'section_users__repair_group__isnull': False}
     # 获取部门所有员工信息
