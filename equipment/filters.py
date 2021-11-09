@@ -191,9 +191,11 @@ class EquipBomFilter(django_filters.rest_framework.FilterSet):
                                                    help_text='设备类型')
     equip_no = django_filters.CharFilter(field_name='equip_info__equip_no', lookup_expr='icontains', help_text='机台')
     part_name = django_filters.CharFilter(field_name='part__part_name', lookup_expr='icontains', help_text='部位名称')
-    component_name = django_filters.CharFilter(field_name='component__component_name', lookup_expr='icontains', help_text='部件名称')
+    component_name = django_filters.CharFilter(field_name='component__component_name', lookup_expr='icontains',
+                                               help_text='部件名称')
     level = django_filters.CharFilter(field_name='level', help_text='层级')
-    part_type = django_filters.CharFilter(field_name='part__global_part_type__global_name', lookup_expr='icontains', help_text='部位分类')
+    part_type = django_filters.CharFilter(field_name='part__global_part_type__global_name', lookup_expr='icontains',
+                                          help_text='部位分类')
     part_code = django_filters.CharFilter(field_name='part__part_code', lookup_expr='icontains', help_text='部位代码')
     equip_type = django_filters.CharFilter(field_name='equip_info__category', help_text='机型id')
 
@@ -286,8 +288,9 @@ class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipMaintenanceStandard
-        fields = ('id', 'work_type', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
-                  'spare_name', 'specification', 'use_flag')
+        fields = (
+            'id', 'work_type', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+            'spare_name', 'specification', 'use_flag')
 
 
 class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
@@ -334,19 +337,22 @@ class EquipWarehouseRecordFilter(django_filters.rest_framework.FilterSet):
     spare__code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
     specification = django_filters.CharFilter(field_name='equip_spare__specification', lookup_expr='icontains')
     order_id = django_filters.CharFilter(field_name='equip_warehouse_order_detail__order_id')
-    equip_component_type = django_filters.CharFilter(field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
+    equip_component_type = django_filters.CharFilter(
+        field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
 
     class Meta:
         model = EquipWarehouseRecord
-        fields = ('equip_warehouse_order_detail', 's_time', 'e_time', 'status', 'spare_name', 'spare_code', 'spare__code',
-                  'specification', 'equip_component_type', 'order_id')
+        fields = (
+            'equip_warehouse_order_detail', 's_time', 'e_time', 'status', 'spare_name', 'spare_code', 'spare__code',
+            'specification', 'equip_component_type', 'order_id')
 
 
 class EquipWarehouseInventoryFilter(django_filters.rest_framework.FilterSet):
     spare_name = django_filters.CharFilter(field_name='equip_spare__spare_name', lookup_expr='icontains')
     spare_code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
     specification = django_filters.CharFilter(field_name='equip_spare__specification', lookup_expr='icontains')
-    equip_component_type = django_filters.CharFilter(field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
+    equip_component_type = django_filters.CharFilter(
+        field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
 
     class Meta:
         model = EquipWarehouseInventory
@@ -358,7 +364,8 @@ class EquipWarehouseStatisticalFilter(django_filters.rest_framework.FilterSet):
     e_time = django_filters.CharFilter(field_name='created_date', lookup_expr='lte')
     spare_name = django_filters.CharFilter(field_name='equip_spare__spare_name', lookup_expr='icontains')
     spare_code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
-    equip_component_type = django_filters.CharFilter(field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
+    equip_component_type = django_filters.CharFilter(
+        field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
 
     class Meta:
         model = EquipWarehouseRecord
@@ -390,7 +397,8 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
     repair_user = django_filters.CharFilter(field_name='repair_user', help_text='维修人', lookup_expr='icontains')
     accept_user = django_filters.CharFilter(field_name='accept_user', help_text='验收人', lookup_expr='icontains')
     receiving_user = django_filters.CharFilter(field_name='receiving_user', help_text='接单人', lookup_expr='icontains')
-    created_user = django_filters.CharFilter(field_name='created_user__username', help_text='报修人', lookup_expr='icontains')
+    created_user = django_filters.CharFilter(field_name='created_user__username', help_text='报修人',
+                                             lookup_expr='icontains')
 
     class Meta:
         model = EquipApplyOrder
@@ -398,4 +406,4 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'accept_user', 'result_accept_result',
                   'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'importance_level',
                   'wait_material', 'wait_outsourcing', 'status', 'created_user', 'result_final_fault_cause',
-                  'assign_user', 'assign_to_user', )
+                  'assign_user', 'assign_to_user',)

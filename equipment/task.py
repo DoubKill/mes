@@ -10,20 +10,16 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
-import xlrd
 import xlwt
 from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
-
-from rest_framework.exceptions import ValidationError
 
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair
 from equipment.utils import DinDinAPI, get_staff_status
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
-from socket import timeout
 from django.db.transaction import atomic
 
 import requests
@@ -219,6 +215,7 @@ def export_xls(export_filed_dict, data, file_name):
 
 class AutoDispatch(object):
     """自动派单"""
+
     def __init__(self):
         self.ding_api = DinDinAPI()
 
@@ -227,7 +224,8 @@ class AutoDispatch(object):
         # 班组
         group = self.get_group_info()
         # 设备部门下改班组人员
-        instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1, global_type__use_flag=1).first()
+        instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
+                                             global_type__use_flag=1).first()
         choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
         if not choice_all_user:
             logger.info(f'系统派单: {group}班组无人员可派单')
