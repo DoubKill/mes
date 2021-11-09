@@ -2670,8 +2670,20 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             for i in dic:
                 for j in serializer.data:
                     if i == j['equip_spare']:
+                        print(j['equip_spare'],111)  # id equip_spare
+                        use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
+                                                                         equip_spare_id=j['equip_spare'],
+                                                                         status=1, lock=0).aggregate(qty=Sum('quantity'))
+                        # 未出库，出库中的数量
+                        plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=j['equip_spare'], status__in=[4, 5]).aggregate(qty=Sum('plan_out_quantity'))
+                        if plan_qty.get('qty'):
+                            qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get('qty')) >= 0 else 0
+                        else:
+                            qty = use_qty.get('qty')
+                        j.update(qty=qty)
                         j.update(quantity=dic[i])
-                        results.append(j)
+                        if qty != 0:
+                            results.append(j)
                         break
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
