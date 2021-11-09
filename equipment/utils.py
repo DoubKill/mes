@@ -1,14 +1,15 @@
 import json
 from datetime import datetime
+from io import BytesIO
 
 import requests
 from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook
-from io import BytesIO
+
 from equipment.models import EquipApplyOrder
-from system.models import User, Section
 from mes import settings
+from system.models import User, Section
 
 
 def gen_template_response(export_fields_dict, data, file_name):
@@ -23,7 +24,7 @@ def gen_template_response(export_fields_dict, data, file_name):
     data_row = 2
     for i in data:
         for col_num, data_key in enumerate(export_fields):
-            sheet.cell(data_row, col_num+1).value = i[data_key]
+            sheet.cell(data_row, col_num + 1).value = i[data_key]
         data_row += 1
 
     wb.remove_sheet(ws)
@@ -122,38 +123,32 @@ class DinDinAPI(object):
             print('请求错误')
 
 
-# if __name__ == '__main__':
-#     a = DinDinAPI()
-#     # print(a.get_user_id('15607115901'))
-#     # # print(a.get_user_attendance(['0206046007692894']))
-#     # # a.send_message(['0206046007692894'])
-
-
 def get_staff_status(ding_api, section_name, group=''):
     """section_name: 设备部"""
     result = []
     filter_kwargs = {'section_users__repair_group': group} if group else {'section_users__repair_group__isnull': False}
     # 获取部门所有员工信息
-    staffs = Section.objects.filter(Q(name=section_name) | Q(parent_section__name=section_name), **filter_kwargs)\
+    staffs = Section.objects.filter(Q(name=section_name) | Q(parent_section__name=section_name), **filter_kwargs) \
         .annotate(username=F('section_users__username'), phone_number=F('section_users__phone_number'),
                   group=F('section_users__repair_group'),
                   uid=F('section_users__id'), leader=F('in_charge_user__username'),
-                  leader_phone_number=F('in_charge_user__phone_number'))\
+                  leader_phone_number=F('in_charge_user__phone_number')) \
         .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group')
-    staffs_detail = [i for i in staffs if i['group'] == group] if group else staffs
-    for staff in staffs_detail:
+    for staff in staffs:
         staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
                       'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
                       'leader_phone_number': staff.get('leader_phone_number')}
         # 根据手机号获取用户钉钉uid
         ding_uid = ding_api.get_user_id(staff.get('phone_number'))
         if ding_uid:
-            # # 查询考勤记录
+            # 查询考勤记录
             staff_dict['ding_uid'] = ding_uid
-            # records = ding_api.get_user_attendance([ding_uid])
-            # if records and not len([i for i in records if i['checkType'] != 'OnDuty']):
-            #     staff_dict['optional'] = True
-            staff_dict['optional'] = True
+            if settings.DEBUG:
+                staff_dict['optional'] = True
+            else:
+                records = ding_api.get_user_attendance([ding_uid])
+                if records and not len([i for i in records if i['checkType'] != 'OnDuty']):
+                    staff_dict['optional'] = True
         result.append(staff_dict)
     return result
 

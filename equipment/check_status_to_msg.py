@@ -1,9 +1,9 @@
+import logging
 import os
 import sys
-import django
-import logging
-from django.db.models import Q
 from datetime import datetime, timedelta
+
+import django
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -27,7 +27,8 @@ def handle(order):
     equip_type = instance.category.equip_type.global_name if instance else ''
     receive_interval = receive_warning_times = start_interval = start_warning_times = accept_interval = accept_warning_times = 0
     # 工单指派规则
-    rule = EquipOrderAssignRule.objects.filter(equip_type__global_name=equip_type, work_type=order.work_type, use_flag=1).first()
+    rule = EquipOrderAssignRule.objects.filter(equip_type__global_name=equip_type, work_type=order.work_type,
+                                               use_flag=1).first()
     if rule:
         receive_interval = rule.receive_interval
         receive_warning_times = rule.receive_warning_times
@@ -80,7 +81,8 @@ def handle(order):
             content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未接单",
                        "form": [{"key": "工单编号:", "value": order.work_order_no},
                                 {"key": "机台:", "value": order.equip_no},
-                                {"key": "部位名称:", "value": order.equip_part_new.part_name if order.equip_part_new else ''},
+                                {"key": "部位名称:",
+                                 "value": order.equip_part_new.part_name if order.equip_part_new else ''},
                                 {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "被指派人:", "value": order.assign_to_user},
@@ -134,7 +136,8 @@ def handle(order):
             content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未执行",
                        "form": [{"key": "工单编号:", "value": order.work_order_no},
                                 {"key": "机台:", "value": order.equip_no},
-                                {"key": "部位名称:", "value": order.equip_part_new.part_name if order.equip_part_new else ''},
+                                {"key": "部位名称:",
+                                 "value": order.equip_part_new.part_name if order.equip_part_new else ''},
                                 {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "接单人:", "value": order.receiving_user},
@@ -191,7 +194,8 @@ def handle(order):
             content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未验收",
                        "form": [{"key": "工单编号:", "value": order.work_order_no},
                                 {"key": "机台:", "value": order.equip_no},
-                                {"key": "部位名称:", "value": order.equip_part_new.part_name if order.equip_part_new else ''},
+                                {"key": "部位名称:",
+                                 "value": order.equip_part_new.part_name if order.equip_part_new else ''},
                                 {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "维修人:", "value": order.repair_user},
@@ -210,13 +214,15 @@ def compare_time(now_datetime, check_time, interval, times):
     """获取比较时间"""
     for i in range(1, times + 1):
         change_minutes = interval * i
-        if check_time + timedelta(minutes=change_minutes) <= now_datetime <= check_time + timedelta(minutes=change_minutes + 1):
+        if check_time + timedelta(minutes=change_minutes) <= now_datetime <= check_time + timedelta(
+                minutes=change_minutes + 1):
             return True, i
     return False, 0
 
 
 def get_ding_uids_by_name(user_name, all_user):
-    maps = {"1": "phone_number", "2": "section__in_charge_user__phone_number", "3": "section__parent_section__in_charge_user__phone_number"}
+    maps = {"1": "phone_number", "2": "section__in_charge_user__phone_number",
+            "3": "section__parent_section__in_charge_user__phone_number"}
     # 获取部门所有员工信息
     phones = User.objects.filter(username__in=user_name.split(",")).values("phone_number",
                                                                            "section__in_charge_user__phone_number",
