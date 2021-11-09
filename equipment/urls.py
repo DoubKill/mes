@@ -125,6 +125,9 @@ router.register('equip-repair-material-req', EquipRepairMaterialReqViewSet)
 # 图片上传
 router.register('upload-images', UploadImageViewSet)
 
+# 条码打印
+path('equip-code-print/', EquipCodePrintView.as_view())
+
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),

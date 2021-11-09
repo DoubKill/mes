@@ -6,6 +6,7 @@ import re
 import uuid
 from io import BytesIO
 
+import requests
 import rest_framework.generics
 import xlrd
 import xlwt
@@ -2510,11 +2511,11 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                    equip_warehouse_location_id=data['equip_warehouse_location']).first()
             if not inventory:
                 raise ValidationError(f'该库区下不存在条码为{data["spare_code"]}的物料')
-            if inventory.one_piece < one_piece:
-                raise ValidationError('出库单件数量大于库存数')
+            # if inventory.one_piece < one_piece:
+            #     raise ValidationError('出库单件数量大于库存数')
             # 根据出库的数量修改状态
-            if data['out_quantity'] > instance.plan_out_quantity:
-                raise ValidationError('超出计划出库数量！')
+            # if data['out_quantity'] > instance.plan_out_quantity:
+            #     raise ValidationError('超出计划出库数量！')
             if instance.plan_out_quantity == out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity
                 instance.status = 6  # 出库完成
@@ -2536,14 +2537,14 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                     obj.status = 6
                     obj.save()
             # 减少库存数
-            if inventory.one_piece > one_piece:
-                inventory.one_piece -= one_piece
-                inventory.save()
-            elif inventory.one_piece == one_piece:
-                inventory.one_piece -= one_piece
-                inventory.quantity = 0
-                inventory.status = 2
-                inventory.save()
+            # if inventory.one_piece > one_piece:
+            #     inventory.one_piece -= one_piece
+            #     inventory.save()
+            # elif inventory.one_piece == one_piece:
+            #     inventory.one_piece -= one_piece
+            inventory.quantity = 0
+            inventory.status = 2
+            inventory.save()
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status=2, spare_code=data['spare_code'],
@@ -2833,8 +2834,18 @@ class EquipAutoPlanView(APIView):
             data = EquipWarehouseArea.objects.filter(delete_flag=False).values('id', 'area_name')
             return Response({"success": True, "message": None, "data": data})
         if self.request.query_params.get('location'):
-            area = self.request.query_params.get('location')
-            data = EquipWarehouseLocation.objects.filter(delete_flag=False, equip_warehouse_area_id=area).values('id', 'location_name')
+            try:
+                location = int(self.request.query_params.get('location'))
+            except:
+                location = 0
+            if location:
+                data = EquipWarehouseLocation.objects.filter(delete_flag=False,
+                                                             equip_warehouse_area_id=location).values('id', 'equip_warehouse_area__area_name', 'location_name', 'location_barcode')
+            else:
+                data = EquipWarehouseLocation.objects.filter(delete_flag=False).values('id',
+                                                                                       'equip_warehouse_area__area_name',
+                                                                                       'location_name',
+                                                                                       'location_barcode')
             return Response({"success": True, "message": None, "data": data})
 
         # 出库单据接口
@@ -3268,3 +3279,22 @@ class GetStaffsView(APIView):
         # 查询各员工考勤状态
         result = get_staff_status(ding_api, section_name, group)
         return Response({'results': result})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipCodePrintView(APIView):
+    def post(self, request):
+        url = {'code1': 'port/printer/print-storehouse/',
+               'code2': 'port/printer/print-spareparts/',
+               'code3': 'port/printer/print-equip/',
+               }
+        status = self.request.query_params.get('status')
+        data = self.request.data
+        if status == 'code1':
+            res = requests.post(url=url.get('status'), json=data).json()
+        if status == 'code2':
+            res = requests.post(url=url.get('status'), json=data).json()
+        if status == 'code3':
+            res = requests.post(url=url.get('status'), json=data).json()
+
+        return Response({'results': res})
