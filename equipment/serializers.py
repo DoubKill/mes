@@ -1111,6 +1111,7 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
         fields = ('id', 'order_id', 'submission_department', 'created_username', 'created_date', 'status', '_status', 'equip_spare', 'work_order_no')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
+    @atomic
     def create(self, validated_data):
         status = validated_data['status']
         if status == 1:  # 入库单据
