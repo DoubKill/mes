@@ -2444,6 +2444,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
         one_piece = data.get('one_piece', 1)
+        spare_code = data.get('spare_code')
+        spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code).first()
+        if not spare_obj:
+            raise ValidationError('所扫描的条码有误')
+        if spare_obj.status == 1:  # 已入库
+            raise ValidationError('该条码已入库')
 
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(order_id=data['order_id'], equip_spare=data['equip_spare']).first()
@@ -2844,16 +2850,22 @@ class EquipAutoPlanView(APIView):
         spare_code = data.get('spare_code')  # 备件条码
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
-        one_piece = data.get('one_piece', 1)
-        area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
         spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code).first()
+        if not spare_obj:
+            return Response({"success": False, "message": "所扫描的条码有误", "data": ""})
         instance = spare_obj.equip_warehouse_order_detail
+        if spare_obj.status == 1:  # 已入库
+            return Response({"success": True, "message": "该备件已入库", "data": spare_obj.equip_spare.specification})
+        area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
+
         if status == 1:
             # 判断库区类型 和 备件类型是否匹配
-            if area_obj.equip_component_type != spare_obj.equip_spare.equip_component_type:
-                return Response({"success": False,
-                                 "message": f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件',
-                                 "data": None})
+            component_type = area_obj.equip_component_type
+            if component_type:
+                if component_type != spare_obj.equip_component_type:
+                    return Response({"success": False,
+                                     "message": f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件',
+                                     "data": None})
 
             # 根据入库的数量修改状态
             quantity = in_quantity + instance.in_quantity
@@ -2880,20 +2892,13 @@ class EquipAutoPlanView(APIView):
                     obj.status = 3
                     obj.save()
             # 添加库存数据
-            inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
-                                                               equip_warehouse_location_id=data['equip_warehouse_location']).first()
-            if inventory:
-                inventory.quantity += in_quantity
-                inventory.save()
-            else:
-                inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code']).update(
-                    quantity=in_quantity,
-                    one_piece=one_piece,
-                    equip_warehouse_area_id=data['equip_warehouse_area'],
-                    equip_warehouse_location_id=data['equip_warehouse_location'],
-                )
-                inventory.one_piece = one_piece
-                inventory.quantity = in_quantity
+            inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code']).update(
+                quantity=in_quantity,
+                status=1,
+                equip_warehouse_area_id=data['equip_warehouse_area'],
+                equip_warehouse_location_id=data['equip_warehouse_location'],
+            )
+            inventory.quantity = in_quantity
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status=1,
@@ -2934,17 +2939,10 @@ class EquipAutoPlanView(APIView):
             # 减少库存数
             inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
                                                    equip_warehouse_location_id=data['equip_warehouse_location']).first()
-
             if inventory:
-                if inventory.one_piece > one_piece:
-                    inventory.one_piece -= one_piece
-                if inventory.one_piece == one_piece:
-                    inventory.one_piece -= one_piece
                     inventory.quantity = 0
                     inventory.status = 2
-                inventory.save()
-            else:
-                return Response({"success": False, "message": "出库数量大于库存数", "data": None})
+                    inventory.save()
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status=2, spare_code=data['spare_code'],
@@ -2955,7 +2953,7 @@ class EquipAutoPlanView(APIView):
                                                 equip_warehouse_order_detail=instance,
                                                 created_user=self.request.user
                                                 )
-            return Response({"success": True, "message": "入库成功", "data": inventory.equip_spare.specification})
+            return Response({"success": True, "message": "出库成功", "data": inventory.equip_spare.specification})
 
 
 class EquipApplyRepairViewSet(ModelViewSet):
