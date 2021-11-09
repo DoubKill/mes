@@ -383,8 +383,6 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
     work_order_no = django_filters.CharFilter(field_name='work_order_no', help_text='工单编号', lookup_expr='icontains')
     equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_name',
                                                       help_text='维修标准', lookup_expr='icontains')
-    result_accept_result = django_filters.CharFilter(field_name='result_accept_result', help_text='验收结果',
-                                                     lookup_expr='icontains')
     result_final_fault_cause = django_filters.CharFilter(field_name='result_final_fault_cause', help_text='最终故障原因',
                                                          lookup_expr='icontains')
     assign_user = django_filters.CharFilter(field_name='assign_user', help_text='指派人', lookup_expr='icontains')
