@@ -2349,9 +2349,9 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
 
         else:
             if order == 'in':
-                queryset = self.filter_queryset(self.get_queryset().order_by('-created_date').filter(status__in=[1, 2, 3]))
+                queryset = self.filter_queryset(self.get_queryset().filter(status__in=[1, 2, 3]))
             elif order == 'out':
-                queryset = self.filter_queryset(self.get_queryset().order_by('-created_date').filter(status__in=[4, 5, 6]))
+                queryset = self.filter_queryset(self.get_queryset().filter(status__in=[4, 5, 6]))
             else:
                 queryset = self.filter_queryset(self.get_queryset())
             page = self.paginate_queryset(queryset)
