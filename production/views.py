@@ -128,6 +128,8 @@ class PalletFeedbacksViewSet(mixins.CreateModelMixin,
         validated_data.pop("factory_date", None)
         if not lot_no:
             raise ValidationError("请传入lot_no")
+        if MaterialTestOrder.objects.filter(lot_no=lot_no).exists():
+            raise ValidationError("该批次数据已绑定快检数据，不可修改！")
         instance, flag = PalletFeedbacks.objects.update_or_create(defaults=validated_data, **{"lot_no": lot_no})
         if flag:
             message = "补充成功"
