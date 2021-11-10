@@ -3122,7 +3122,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
                                                   repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成', repair_user=user_name).count()
+            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
