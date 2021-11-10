@@ -336,7 +336,7 @@ class EquipWarehouseRecordFilter(django_filters.rest_framework.FilterSet):
     spare_name = django_filters.CharFilter(field_name='equip_spare__spare_name', lookup_expr='icontains')
     spare__code = django_filters.CharFilter(field_name='equip_spare__spare_code', lookup_expr='icontains')
     specification = django_filters.CharFilter(field_name='equip_spare__specification', lookup_expr='icontains')
-    order_id = django_filters.CharFilter(field_name='equip_warehouse_order_detail__order_id')
+    order_id = django_filters.CharFilter(field_name='equip_warehouse_order_detail__order_id', lookup_expr='icontains')
     equip_component_type = django_filters.CharFilter(
         field_name='equip_spare__equip_component_type__component_type_name', lookup_expr='icontains')
 
