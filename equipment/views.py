@@ -2348,7 +2348,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         if work_order_no:
             data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
                                                                                  'created_date', 'plan_name')
-            [i.update(created_date=str(i['created_date'])) for i in data]
+            [i.update(created_date=i['created_date'].strftime('%Y-%m-%d %H:%M:%S')) for i in data]
             return Response(data)
         if status == '入库':
             data = EquipSpareErp.objects.filter(use_flag=True, spare_name__icontains=spare_name,
