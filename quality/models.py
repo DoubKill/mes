@@ -231,6 +231,10 @@ class MaterialTestOrder(AbstractEntity):
     class Meta:
         db_table = 'material_test_order'
         verbose_name_plural = verbose_name = '物料检测单'
+        indexes = [models.Index(fields=['product_no']),
+                   models.Index(fields=['lot_no']),
+                   models.Index(fields=['production_factory_date']),
+                   models.Index(fields=['production_equip_no'])]
 
 
 class MaterialTestResult(AbstractEntity):
@@ -323,6 +327,11 @@ class MaterialDealResult(AbstractEntity):
     class Meta:
         db_table = 'material_deal_result'
         verbose_name_plural = verbose_name = '胶料处理结果'
+        indexes = [models.Index(fields=['factory_date']),
+                   models.Index(fields=['equip_no']),
+                   models.Index(fields=['classes']),
+                   models.Index(fields=['product_no']),
+                   models.Index(fields=['lot_no'])]
 
 
 class LevelResult(AbstractEntity):
