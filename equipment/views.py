@@ -3355,9 +3355,12 @@ class EquipCodePrintView(APIView):
             res = requests.post(url=url.get('code2'), json=res).json()
         if status == 3:
             obj = EquipBom.objects.filter(node_id=lot_no).first()
+            if not obj:
+                raise ValidationError('节点编号不存在, 无法打印')
+            code_type = len(lot_no.split('-'))  #  1=机台，2=部位，3=部件
             data = {
-                    "print_type": data.get('print_type'),
-                    "property_type_node": "密炼设备",
+                    "print_type": code_type,
+                    "property_type_node": obj.property_type.global_name,
                     "equip_no": obj.equip_info.equip_no,
                     "equip_name": obj.equip_info.equip_name,
                     "equip_type": obj.equip_info.category.category_name,
