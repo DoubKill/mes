@@ -669,7 +669,7 @@ class EquipWarehouseLocation(AbstractEntity):
     """
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区名称', on_delete=models.CASCADE)
     location_name = models.CharField(max_length=64, help_text='库位名称')
-    desc = models.CharField(max_length=64, help_text='描述', default='')
+    desc = models.CharField(max_length=64, help_text='描述', blank=True, default='')
     location_barcode = models.CharField(max_length=64, help_text='库位条码', default='')
 
     class Meta:

@@ -3335,13 +3335,37 @@ class EquipCodePrintView(APIView):
                'code2': 'port/printer/print-spareparts/',
                'code3': 'port/printer/print-equip/',
                }
-        status = self.request.query_params.get('status')
+        status = self.request.data.get('status')
+        lot_no = self.request.data.get('lot_no', None)
         data = self.request.data
-        if status == 'code1':
-            res = requests.post(url=url.get('status'), json=data).json()
-        if status == 'code2':
-            res = requests.post(url=url.get('status'), json=data).json()
-        if status == 'code3':
-            res = requests.post(url=url.get('status'), json=data).json()
 
+        if status == 1:
+            del data['status']
+            res = requests.post(url=url.get('code1'), json=data).json()
+        if status == 2:
+            res = []
+            for spare_code in data.get('spare_list'):
+                res.append(
+                   {"print_type":1,
+                    "code": spare_code.get('equip_spare__spare_code'),
+                    "name": spare_code.get('equip_spare__spare_name'),
+                    "num": spare_code.get('one_piece'),
+                    "barcode": spare_code.get('spare_code')
+                    })
+            res = requests.post(url=url.get('code2'), json=res).json()
+        if status == 3:
+            obj = EquipBom.objects.filter(node_id=lot_no).first()
+            data = {
+                    "print_type": data.get('print_type'),
+                    "property_type_node": "密炼设备",
+                    "equip_no": obj.equip_info.equip_no,
+                    "equip_name": obj.equip_info.equip_name,
+                    "equip_type": obj.equip_info.category.category_name,
+                    "part_code": obj.part.part_code,
+                    "part_name": obj.part.part_name,
+                    "component_code": obj.component.component_code,
+                    "component_name": obj.component.component_name,
+                    "component_type": obj.component.equip_component_type.component_type_name,
+                    "node_id": lot_no}
+            res = requests.post(url=url.get('code3'), json=data).json()
         return Response({'results': res})
