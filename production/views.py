@@ -627,11 +627,11 @@ class PalletTrainFeedback(APIView):
             begin_trains = pallet_feed_back.begin_trains
             end_trains = pallet_feed_back.end_trains
             for i in range(begin_trains, end_trains + 1):
-                test_order = MaterialTestOrder.objects.filter(product_no=product_no,
-                                                              production_equip_no=equip_no,
-                                                              production_factory_date=factory_date,
-                                                              actual_trains=i,
-                                                              production_class=classes).first()
+                # test_order = MaterialTestOrder.objects.filter(product_no=product_no,
+                #                                               production_equip_no=equip_no,
+                #                                               production_factory_date=factory_date,
+                #                                               actual_trains=i,
+                #                                               production_class=classes).first()
                 data = {
                     'product_no': pallet_feed_back.product_no,
                     'lot_no': pallet_feed_back.lot_no,
@@ -641,7 +641,8 @@ class PalletTrainFeedback(APIView):
                     'plan_classes_uid': pallet_feed_back.plan_classes_uid,
                     # 'factory_date': pallet_feed_back.end_time,
                     'factory_date': pallet_feed_back.factory_date,
-                    'is_tested': 'Y' if test_order else 'N'
+                    'is_tested': 'N'
+                    # 'is_tested': 'Y' if test_order else 'N'
                 }
                 ret.append(data)
         ret.sort(key=lambda x: x.get('actual_trains'))
