@@ -3195,7 +3195,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             work_order_no = data.pop('work_order_no')
             apply_material_list = data.pop('apply_material_list', [])
             if result_repair_final_result == '等待':
-                data.update({'last_updated_date': datetime.now()})
+                data.update({'last_updated_date': datetime.now(), 'status': '已开始'})
                 # 申请了物料,需要插入到物料申请表
             else:
                 # 工单完成，设置验收人
