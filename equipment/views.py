@@ -2346,8 +2346,10 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         spare_code = self.request.query_params.get('spare_code', '')
         work_order_no = self.request.query_params.get('work_order_no')
         if work_order_no:
-            return Response(EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
-                                                                                 'created_date', 'plan_name'))
+            data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
+                                                                                 'created_date', 'plan_name')
+            [i.update(created_date=str(i['created_date'])) for i in data]
+            return Response(data)
         if status == '入库':
             data = EquipSpareErp.objects.filter(use_flag=True, spare_name__icontains=spare_name,
                                                 spare_code__icontains=spare_code).values('id', 'spare_code',
