@@ -2402,13 +2402,13 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         all = request.query_params.get('all')
         stage = request.query_params.get('stage')  # 获取要出库的备件条码
         if all:
-            data = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=order).values(
+            data = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=order, delete_flag=False).values(
                 'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece', 'status')
             return Response({'results': data, 'spare_code': data[0]['equip_spare__spare_code'],
                              'spare_name': data[0]['equip_spare__spare_name']})
         else:
             if stage:
-                data = EquipWarehouseInventory.objects.filter(equip_spare_id=order, status=1).values(
+                data = EquipWarehouseInventory.objects.filter(equip_spare_id=order, status=1, delete_flag=False).values(
                     'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece',
                     'equip_warehouse_order_detail__lot_no',
                     'status', 'equip_warehouse_area', 'equip_warehouse_location', 'equip_warehouse_area__area_name',
@@ -3331,6 +3331,7 @@ class GetStaffsView(APIView):
 @method_decorator([api_recorder], name='dispatch')
 class EquipCodePrintView(APIView):
     def post(self, request):
+        GlobalCode.objects.filter(global_type__type_name='条码打印')
         url = {'code1': 'http://10.20.182.244:6111/printer/print-storehouse/',
                'code2': 'http://10.20.182.244:6111/printer/print-spareparts/',
                'code3': 'http://10.20.182.244:6111/printer/print-equip/',
