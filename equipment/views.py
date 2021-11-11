@@ -3331,9 +3331,9 @@ class GetStaffsView(APIView):
 @method_decorator([api_recorder], name='dispatch')
 class EquipCodePrintView(APIView):
     def post(self, request):
-        url = {'code1': 'http://10.20.181.177:6111/printer/print-storehouse/',
-               'code2': 'http://10.20.181.177:6111/printer/print-spareparts/',
-               'code3': 'http://10.20.181.177:6111/printer/print-equip/',
+        url = {'code1': 'http://10.20.182.244:6111/printer/print-storehouse/',
+               'code2': 'http://10.20.182.244:6111/printer/print-spareparts/',
+               'code3': 'http://10.20.182.244:6111/printer/print-equip/',
                }
         status = self.request.data.get('status')
         lot_no = self.request.data.get('lot_no', None)
