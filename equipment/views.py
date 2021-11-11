@@ -3393,9 +3393,10 @@ class GetStaffsView(APIView):
 class EquipCodePrintView(APIView):
     def post(self, request):
         res = GlobalCode.objects.filter(global_type__type_name='条码打印').first()
-        if not res and len(res.global_name.split('.')) != 4:
+        if not res:
+            raise ValidationError('请在公共代码添加条码打印类型')
+        if len(res.global_name.split('.')) != 4:
             raise ValidationError('ip格式有误')
-
         url = {'code1': f'http://{res.global_name}:6111/printer/print-storehouse/',
                'code2': f'http://{res.global_name}:6111/printer/print-spareparts/',
                'code3': f'http://{res.global_name}:6111/printer/print-equip/', }
