@@ -2645,6 +2645,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         for i in dic:
             obj = EquipSpareErp.objects.filter(id=i).first()
             dic[i].update({
+                'equip_spare': obj.id,
                 'spare__code': obj.spare_code,
                 'spare_name': obj.spare_name,
                 'component_type_name': obj.equip_component_type.component_type_name,
