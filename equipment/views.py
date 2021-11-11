@@ -2599,45 +2599,45 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "库存上限": "upper_stock",
     }
 
-    def export_xls(self, result):
-        response = HttpResponse(content_type='application/vnd.ms-excel')
-        filename = '备件库存统计'
-        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
-            'ISO-8859-1') + '.xls'
-        # 创建一个文件对象
-        wb = xlwt.Workbook(encoding='utf8')
-        # 创建一个sheet对象
-        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
-        style = xlwt.XFStyle()
-        style.alignment.wrap = 1
-
-        columns = ['备件分类', '备件代码', '备件名称', '规格型号', '技术参数', '总数量', '可用数量', '锁定数量', '标准单位',
-                   '库存下限', '库存上限']
-        # 写入文件标题
-        for col_num in range(len(columns)):
-            sheet.write(0, col_num, columns[col_num])
-            # 写入数据
-            data_row = 1
-            for i in result:
-                sheet.write(data_row, 0, i['component_type_name'])
-                sheet.write(data_row, 1, i['spare__code'])
-                sheet.write(data_row, 2, i['spare_name'])
-                sheet.write(data_row, 3, i['specification'])
-                sheet.write(data_row, 4, i['technical_params'])
-                sheet.write(data_row, 5, i['quantity']['all_qty'])
-                sheet.write(data_row, 6, i['quantity']['use_qty'])
-                sheet.write(data_row, 7, i['quantity']['lock_qty'])
-                sheet.write(data_row, 8, i['unit'])
-                sheet.write(data_row, 9, i['upper_stock'])
-                sheet.write(data_row, 10, i['lower_stock'])
-                data_row = data_row + 1
-        # 写出到IO
-        output = BytesIO()
-        wb.save(output)
-        # 重新定位到开始
-        output.seek(0)
-        response.write(output.getvalue())
-        return response
+    # def export_xls(self, result):
+    #     response = HttpResponse(content_type='application/vnd.ms-excel')
+    #     filename = '备件库存统计'
+    #     response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+    #         'ISO-8859-1') + '.xls'
+    #     # 创建一个文件对象
+    #     wb = xlwt.Workbook(encoding='utf8')
+    #     # 创建一个sheet对象
+    #     sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+    #     style = xlwt.XFStyle()
+    #     style.alignment.wrap = 1
+    #
+    #     columns = ['备件分类', '备件代码', '备件名称', '规格型号', '技术参数', '总数量', '可用数量', '锁定数量', '标准单位',
+    #                '库存下限', '库存上限']
+    #     # 写入文件标题
+    #     for col_num in range(len(columns)):
+    #         sheet.write(0, col_num, columns[col_num])
+    #         # 写入数据
+    #         data_row = 1
+    #         for i in result:
+    #             sheet.write(data_row, 0, i['component_type_name'])
+    #             sheet.write(data_row, 1, i['spare__code'])
+    #             sheet.write(data_row, 2, i['spare_name'])
+    #             sheet.write(data_row, 3, i['specification'])
+    #             sheet.write(data_row, 4, i['technical_params'])
+    #             sheet.write(data_row, 5, i['all_qty'])
+    #             sheet.write(data_row, 6, i['use_qty'])
+    #             sheet.write(data_row, 7, i['lock_qty'])
+    #             sheet.write(data_row, 8, i['unit'])
+    #             sheet.write(data_row, 9, i['upper_stock'])
+    #             sheet.write(data_row, 10, i['lower_stock'])
+    #             data_row = data_row + 1
+    #     # 写出到IO
+    #     output = BytesIO()
+    #     wb.save(output)
+    #     # 重新定位到开始
+    #     output.seek(0)
+    #     response.write(output.getvalue())
+    #     return response
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset().filter(status=1))
@@ -2665,11 +2665,11 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             return Response(data)
         results = []
         # 所有
-        all_qty = self.queryset.filter(status=1).values('equip_spare').annotate(all_qty=Sum('quantity'))
+        all_qty = self.filter_queryset(self.queryset).filter(status=1).values('equip_spare').annotate(all_qty=Sum('quantity'))
         # 可用
-        use_qty = self.queryset.filter(status=1, lock=0).values('equip_spare').annotate(use_qty=Sum('quantity'))
+        use_qty = self.filter_queryset(self.queryset).filter(status=1, lock=0).values('equip_spare').annotate(use_qty=Sum('quantity'))
         # 锁定
-        lock_qty = self.queryset.filter(status=1, lock=1).values('equip_spare').annotate(lock_qty=Sum('quantity'))
+        lock_qty = self.filter_queryset(self.queryset).filter(status=1, lock=1).values('equip_spare').annotate(lock_qty=Sum('quantity'))
 
         dic = {}
         for i in all_qty:
@@ -2723,7 +2723,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             et = int(page) * int(page_size)
             count = len(results)
             if self.request.query_params.get('export'):
-                return self.export_xls(results)
+                return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
             return Response({'results': results[st:et], 'count': count})
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
