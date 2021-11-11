@@ -3331,9 +3331,9 @@ class GetStaffsView(APIView):
 @method_decorator([api_recorder], name='dispatch')
 class EquipCodePrintView(APIView):
     def post(self, request):
-        url = {'code1': 'port/printer/print-storehouse/',
-               'code2': 'port/printer/print-spareparts/',
-               'code3': 'port/printer/print-equip/',
+        url = {'code1': 'http://10.20.181.177:6111/printer/print-storehouse/',
+               'code2': 'http://10.20.181.177:6111/printer/print-spareparts/',
+               'code3': 'http://10.20.181.177:6111/port/printer/print-equip/',
                }
         status = self.request.data.get('status')
         lot_no = self.request.data.get('lot_no', None)
@@ -3341,7 +3341,7 @@ class EquipCodePrintView(APIView):
 
         if status == 1:
             del data['status']
-            res = requests.post(url=url.get('code1'), json=data).json()
+            res = requests.post(url=url.get('code1'), json=data, verify=False)
         if status == 2:
             res = []
             for spare_code in data.get('spare_list'):
@@ -3352,7 +3352,7 @@ class EquipCodePrintView(APIView):
                     "num": spare_code.get('one_piece'),
                     "barcode": spare_code.get('spare_code')
                     })
-            res = requests.post(url=url.get('code2'), json=res).json()
+            res = requests.post(url=url.get('code2'), json=res)
         if status == 3:
             obj = EquipBom.objects.filter(node_id=lot_no).first()
             if not obj:
@@ -3370,5 +3370,5 @@ class EquipCodePrintView(APIView):
                     "component_name": obj.component.component_name,
                     "component_type": obj.component.equip_component_type.component_type_name,
                     "node_id": lot_no}
-            res = requests.post(url=url.get('code3'), json=data).json()
-        return Response({'results': res})
+            res = requests.post(url=url.get('code3'), json=data)
+        return Response({'results': res.text})

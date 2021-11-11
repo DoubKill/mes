@@ -125,9 +125,6 @@ router.register('equip-repair-material-req', EquipRepairMaterialReqViewSet)
 # 图片上传
 router.register('upload-images', UploadImageViewSet)
 
-# 条码打印
-path('equip-code-print/', EquipCodePrintView.as_view())
-
 urlpatterns = [
     path('', include(router.urls)),
     path('equip-current-status-list/', EquipCurrentStatusList.as_view()),
@@ -145,7 +142,9 @@ urlpatterns = [
     # 机台目标MTBF/MTTR设定
     path('equip-target-mtbmttr-settings/', EquipTargetMTBFMTTRSettingView.as_view()),
     # 备件PDA出入库
-    path('equip-auto-plan/', EquipAutoPlanView.as_view())
+    path('equip-auto-plan/', EquipAutoPlanView.as_view()),
+    # 条码打印
+    path('equip-code-print/', EquipCodePrintView.as_view())
 ]
 
 
