@@ -2441,7 +2441,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             for j in serializer.data:
                 if stage:
                     obj = EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1).first()
-                    all_qty = len(EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1))
+                    print(j['equip_spare'])
+                    all_qty = len(EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1, delete_flag=False)) # 1, status=1
                 else:
                     obj = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=j['id'],
                                                                  status=0).first()
@@ -2828,7 +2829,7 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
                 if i['status'] == 1:
                     dic.update({i['equip_spare']: {'in_qty': i['quantity'], 'out_qty': 0}})
                 else:
-                    dic.update({i['equip_spare']: {'in_qty': 2, 'out_qty': i['quantity']}})
+                    dic.update({i['equip_spare']: {'in_qty': 0, 'out_qty': i['quantity']}})
         for i in dic:
             for j in serializer.data:
                 if i == j['equip_spare']:
