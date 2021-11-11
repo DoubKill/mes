@@ -2642,6 +2642,35 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
         for i in lock_qty:
             dic[i['equip_spare']].update({'lock_qty': i['lock_qty']})
+        for i in dic:
+            obj = EquipSpareErp.objects.filter(id=i).first()
+            dic[i].update({
+                'spare__code': obj.spare_code,
+                'spare_name': obj.spare_name,
+                'component_type_name': obj.equip_component_type.component_type_name,
+                'specification': obj.specification,
+                'technical_params': obj.technical_params,
+                'unit': obj.unit,
+                'lower_stock': obj.lower_stock,
+                'upper_stock': obj.upper_stock
+            })
+            use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
+                                                             equip_spare_id=i,
+                                                             status=1, lock=0).aggregate(qty=Sum('quantity'))
+            # 未出库，出库中的数量
+            plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=i, status__in=[4, 5]).aggregate(
+                qty=Sum('plan_out_quantity'))
+            if plan_qty.get('qty'):
+                qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get(
+                    'qty')) >= 0 else 0
+            else:
+                qty = use_qty.get('qty')
+            if self.request.query_params.get('use'):
+                if qty != 0:
+                    dic[i].update(qty=qty)
+                    results.append(dic[i])
+            else:
+                results.append(dic[i])
         if request.query_params.get('all'):
             # serializer = self.get_serializer(queryset, many=True)
             # for i in dic:
@@ -2650,62 +2679,36 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             #             j.update(quantity=dic[i])
             #             results.append(j)
             #             break
-            for i in dic:
-                obj = EquipSpareErp.objects.filter(id=i).first()
-                dic[i].update({
-                    'spare__code': obj.spare_code,
-                    'spare_name': obj.spare_name,
-                    'component_type_name': obj.equip_component_type.component_type_name,
-                    'specification': obj.specification,
-                    'technical_params': obj.technical_params,
-                    'unit': obj.unit,
-                    'lower_stock': obj.lower_stock,
-                    'upper_stock': obj.upper_stock
-                })
-                use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
-                                                                     equip_spare_id=i,
-                                                                     status=1, lock=0).aggregate(qty=Sum('quantity'))
-               # 未出库，出库中的数量
-                plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=i, status__in=[4, 5]).aggregate(qty=Sum('plan_out_quantity'))
-                if plan_qty.get('qty'):
-                    qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get('qty')) >= 0 else 0
-                else:
-                    qty = use_qty.get('qty')
-                if self.request.query_params.get('use'):
-                    if qty != 0:
-                            dic[i].update(qty=qty)
-                            results.append(dic[i])
-                else:
-                    results.append(dic[i])
             return Response(results)
         if page:
-            for i in dic:
-                obj = EquipSpareErp.objects.filter(id=i).first()
-                dic[i].update({
-                    'spare__code': obj.spare_code,
-                    'spare_name': obj.spare_name,
-                    'component_type_name': obj.equip_component_type.component_type_name,
-                    'specification': obj.specification,
-                    'technical_params': obj.technical_params,
-                    'unit': obj.unit,
-                    'lower_stock': obj.lower_stock,
-                    'upper_stock': obj.upper_stock
-                })
-                use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
-                                                                     equip_spare_id=i,
-                                                                     status=1, lock=0).aggregate(qty=Sum('quantity'))
-               # 未出库，出库中的数量
-                plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=i, status__in=[4, 5]).aggregate(qty=Sum('plan_out_quantity'))
-                if plan_qty.get('qty'):
-                    qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get('qty')) >= 0 else 0
-                else:
-                    qty = use_qty.get('qty')
-                if self.request.query_params.get('use'):
-                    if qty != 0:
-                            dic[i].update(qty=qty)
-                            results.append(dic[i])
-                else:
-                    results.append(dic[i])
+            # for i in dic:
+            #     obj = EquipSpareErp.objects.filter(id=i).first()
+            #     dic[i].update({
+            #         'spare__code': obj.spare_code,
+            #         'spare_name': obj.spare_name,
+            #         'component_type_name': obj.equip_component_type.component_type_name,
+            #         'specification': obj.specification,
+            #         'technical_params': obj.technical_params,
+            #         'unit': obj.unit,
+            #         'lower_stock': obj.lower_stock,
+            #         'upper_stock': obj.upper_stock
+            #     })
+            #     use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
+            #                                                          equip_spare_id=i,
+            #                                                          status=1, lock=0).aggregate(qty=Sum('quantity'))
+            #    # 未出库，出库中的数量
+            #     plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=i, status__in=[4, 5]).aggregate(qty=Sum('plan_out_quantity'))
+            #     if plan_qty.get('qty'):
+            #         qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get('qty')) >= 0 else 0
+            #     else:
+            #         qty = use_qty.get('qty')
+            #     if self.request.query_params.get('use'):
+            #         if qty != 0:
+            #                 dic[i].update(qty=qty)
+            #                 results.append(dic[i])
+            #     else:
+            #         results.append(dic[i])
+
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             count = len(results)
