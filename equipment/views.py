@@ -2599,46 +2599,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "库存上限": "upper_stock",
     }
 
-    # def export_xls(self, result):
-    #     response = HttpResponse(content_type='application/vnd.ms-excel')
-    #     filename = '备件库存统计'
-    #     response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
-    #         'ISO-8859-1') + '.xls'
-    #     # 创建一个文件对象
-    #     wb = xlwt.Workbook(encoding='utf8')
-    #     # 创建一个sheet对象
-    #     sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
-    #     style = xlwt.XFStyle()
-    #     style.alignment.wrap = 1
-    #
-    #     columns = ['备件分类', '备件代码', '备件名称', '规格型号', '技术参数', '总数量', '可用数量', '锁定数量', '标准单位',
-    #                '库存下限', '库存上限']
-    #     # 写入文件标题
-    #     for col_num in range(len(columns)):
-    #         sheet.write(0, col_num, columns[col_num])
-    #         # 写入数据
-    #         data_row = 1
-    #         for i in result:
-    #             sheet.write(data_row, 0, i['component_type_name'])
-    #             sheet.write(data_row, 1, i['spare__code'])
-    #             sheet.write(data_row, 2, i['spare_name'])
-    #             sheet.write(data_row, 3, i['specification'])
-    #             sheet.write(data_row, 4, i['technical_params'])
-    #             sheet.write(data_row, 5, i['all_qty'])
-    #             sheet.write(data_row, 6, i['use_qty'])
-    #             sheet.write(data_row, 7, i['lock_qty'])
-    #             sheet.write(data_row, 8, i['unit'])
-    #             sheet.write(data_row, 9, i['upper_stock'])
-    #             sheet.write(data_row, 10, i['lower_stock'])
-    #             data_row = data_row + 1
-    #     # 写出到IO
-    #     output = BytesIO()
-    #     wb.save(output)
-    #     # 重新定位到开始
-    #     output.seek(0)
-    #     response.write(output.getvalue())
-    #     return response
-
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset().filter(status=1))
         page = self.request.query_params.get('page', 1)
@@ -2683,13 +2643,40 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         for i in lock_qty:
             dic[i['equip_spare']].update({'lock_qty': i['lock_qty']})
         if request.query_params.get('all'):
-            serializer = self.get_serializer(queryset, many=True)
+            # serializer = self.get_serializer(queryset, many=True)
+            # for i in dic:
+            #     for j in serializer.data:
+            #         if i == j['equip_spare']:
+            #             j.update(quantity=dic[i])
+            #             results.append(j)
+            #             break
             for i in dic:
-                for j in serializer.data:
-                    if i == j['equip_spare']:
-                        j.update(quantity=dic[i])
-                        results.append(j)
-                        break
+                obj = EquipSpareErp.objects.filter(id=i).first()
+                dic[i].update({
+                    'spare__code': obj.spare_code,
+                    'spare_name': obj.spare_name,
+                    'component_type_name': obj.equip_component_type.component_type_name,
+                    'specification': obj.specification,
+                    'technical_params': obj.technical_params,
+                    'unit': obj.unit,
+                    'lower_stock': obj.lower_stock,
+                    'upper_stock': obj.upper_stock
+                })
+                use_qty = EquipWarehouseInventory.objects.filter(delete_flag=False,
+                                                                     equip_spare_id=i,
+                                                                     status=1, lock=0).aggregate(qty=Sum('quantity'))
+               # 未出库，出库中的数量
+                plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=i, status__in=[4, 5]).aggregate(qty=Sum('plan_out_quantity'))
+                if plan_qty.get('qty'):
+                    qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get('qty')) >= 0 else 0
+                else:
+                    qty = use_qty.get('qty')
+                if self.request.query_params.get('use'):
+                    if qty != 0:
+                            dic[i].update(qty=qty)
+                            results.append(dic[i])
+                else:
+                    results.append(dic[i])
             return Response(results)
         if page:
             for i in dic:
