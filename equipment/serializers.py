@@ -1039,6 +1039,9 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         # 报修图片
         instance_apply = EquipApplyRepair.objects.filter(plan_id=res.get('plan_id')).first()
         res['apply_repair_graph_url'] = json.loads(instance_apply.apply_repair_graph_url) if instance_apply else []
+        # 区域位置
+        bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
+        res['are_name'] = bom_obj.equip_area_define.area_name if bom_obj and bom_obj.equip_area_define else ''
         return res
 
     @atomic

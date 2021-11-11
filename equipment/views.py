@@ -3122,7 +3122,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
                                                   repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成', repair_user=user_name).count()
+            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3158,6 +3158,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         content = {}
         if opera_type == '指派':
+            assign_num = EquipApplyOrder.objects.filter(~Q(status='已生成'), id__in=pks).count()
+            if assign_num != 0:
+                raise ValidationError('存在非已生成的订单, 请刷新订单!')
             assign_to_user = data.get('assign_to_user')
             if not assign_to_user:
                 raise ValidationError('未选择被指派人')
@@ -3170,6 +3173,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                      {"key": "指派时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, names=assign_to_user)
         elif opera_type == '接单':
+            assign_to_num = EquipApplyOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
+            if assign_to_num != 0:
+                raise ValidationError('存在未被指派的订单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': user_ids, 'receiving_datetime': now_date,
                 'last_updated_date': datetime.now()
@@ -3181,14 +3187,17 @@ class EquipApplyOrderViewSet(ModelViewSet):
         elif opera_type == '退单':
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None, 'assign_to_user': None,
-                'last_updated_date': datetime.now()
+                'assign_user': None, 'assign_datetime': None,
+                'assign_to_user': None, 'last_updated_date': datetime.now()
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
                                      {"key": "退单时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '开始':
+            receive_num = EquipApplyOrder.objects.filter(~Q(status='已接单'), id__in=pks).count()
+            if receive_num != 0:
+                raise ValidationError('订单未被接单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now()
