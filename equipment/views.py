@@ -1314,8 +1314,8 @@ class EquipBomViewSet(ModelViewSet):
                 equip_component_id = section.component_id
                 equip_component_code = section.component.component_code
             if section.id not in index_tree:
-                index_tree[section.id] = dict({"id": section.id, "factory_id": section.factory_id,
-                                               "level": section.level, "children": [],
+                index_tree[section.id] = dict({"id": section.id, "factory_id": section.factory_id, "children": [],
+                                               "level": section.level, 'location': section.location,
                                                "equip_category_id": equip_category_id,
                                                "equip_component_code": equip_component_code,
                                                "equip_part_code": equip_part_code, "equip_info_name": equip_info_code,
@@ -1332,19 +1332,40 @@ class EquipBomViewSet(ModelViewSet):
                     index_tree[section.parent_flag_id]["children"] = []
 
                 index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
+                index_tree[section.parent_flag_id]["children"].sort(key=lambda x: x['location'])
+
             else:  # 没有节点则加入
                 index_tree[section.parent_flag_id] = dict(
                     {"id": section.parent_flag_id, "factory_id": section.parent_flag.factory_id,
                      "level": section.parent_flag.level, "children": [], "equip_category_id": equip_category_id,
                      "equip_part_id": equip_part_id, "equip_component_id": equip_component_id,
+                     'location': section.location,
                      'equip_info_id': equip_info_id, 'equip_property_type_id': equip_property_type_id,
                      "equip_property_type_name": equip_property_type_name, "equip_component_name": equip_component_code,
                      "equip_part_name": equip_part_code, "equip_info_name": equip_info_code})
                 index_tree[section.parent_flag_id]["children"].append(index_tree[section.id])
+                index_tree[section.parent_flag_id]["children"].sort(key=lambda x: x['location'])
         return Response({'results': data})
 
     @atomic
     def create(self, request, *args, **kwargs):
+
+        def get_location(parent_flag_info):
+            max_location = \
+                self.get_queryset().filter(parent_flag=parent_flag_info.id).aggregate(max_location=Max('location'))[
+                    'max_location']
+            if max_location:
+                if len(max_location) == 1:
+                    location = parent_flag_info.location + str(int(max_location.split('-')[-1]) + 1)
+                else:
+                    location = parent_flag_info.location + '-' + str(int(max_location.split('-')[-1]) + 1)
+            else:
+                if not parent_flag_info.location:
+                    location = '1'
+                else:
+                    location = f'{parent_flag_info.location}-1'
+            return location
+
         def add_parent(instance, children):
             # 当前节点数据
             for child in children:
@@ -1371,6 +1392,7 @@ class EquipBomViewSet(ModelViewSet):
                                                'node_id': f'{instance.node_id}-{equip_component.component_code}'})
                 else:
                     pass
+                child_current_data['location'] = get_location(instance)
                 child_instance = EquipBom.objects.create(**child_current_data)
                 e_chidren = child.pop('children', [])
                 if e_chidren:
@@ -1421,6 +1443,8 @@ class EquipBomViewSet(ModelViewSet):
                                   'equip_info': parent_flag_info.equip_info_id, 'component': curr_label_obj_id,
                                   'level': 5,
                                   'node_id': f'{parent_flag_info.node_id}-{equip_component.component_code}'})
+            # 节点位置
+            curr_data['location'] = get_location(parent_flag_info)
             serializer = self.get_serializer(data=curr_data)
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
@@ -1454,13 +1478,39 @@ class EquipBomViewSet(ModelViewSet):
             current_data.update({'equip_info_id': parent_flag_info.equip_info_id, 'part_id': parent_flag_info.part_id,
                                  'component_id': curr_label_obj_id,
                                  'node_id': f'{parent_flag_info.node_id}-{equip_component.component_code}'})
+        # 节点位置
         current_data.pop('id')
         current_data['factory_id'] = factory_id
+        current_data['location'] = get_location(parent_flag_info)
         current_data['parent_flag_id'] = parent_flag
         instance = EquipBom.objects.create(**current_data)
         if children:
             add_parent(instance, children)
         return Response('添加成功')
+
+    @atomic
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='exchange_location',
+            url_name='exchange_location')
+    def exchange_location(self, request):
+        def exchange_children_location(parent_instance):
+            children_instance = parent_instance.equipbom_set.all()
+            if children_instance:
+                for instance in children_instance:
+                    instance.location = parent_instance.location + instance.location[-2:]
+                    instance.save()
+                    exchange_children_location(instance)
+
+        choice_location = self.request.data.get('choice_location')
+        other_location = self.request.data.get('other_location')
+        choice_instance = self.get_queryset().filter(id=choice_location).first()
+        other_instance = self.get_queryset().filter(id=other_location).first()
+        # 部件层互换位置
+        choice_instance.location, other_instance.location = other_instance.location, choice_instance.location
+        choice_instance.save()
+        other_instance.save()
+        for instance in [choice_instance, other_instance]:
+            exchange_children_location(instance)
+        return Response('操作成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2345,7 +2395,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         work_order_no = self.request.query_params.get('work_order_no')
         if work_order_no:
             data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
-                                                                                 'created_date', 'plan_name')
+                                                                        'created_date', 'plan_name')
             [i.update(created_date=i['created_date'].strftime('%Y-%m-%d %H:%M:%S')) for i in data]
             return Response(data)
         if status == '入库':
@@ -2441,7 +2491,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             for j in serializer.data:
                 if stage:
                     obj = EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1).first()
-                    all_qty = len(EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1, delete_flag=False)) # 1, status=1
+                    all_qty = len(EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1,
+                                                                         delete_flag=False))  # 1, status=1
                 else:
                     obj = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=j['id'],
                                                                  status=0).first()
@@ -2626,11 +2677,14 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             return Response(data)
         results = []
         # 所有
-        all_qty = self.filter_queryset(self.queryset).filter(status=1).values('equip_spare').annotate(all_qty=Sum('quantity'))
+        all_qty = self.filter_queryset(self.queryset).filter(status=1).values('equip_spare').annotate(
+            all_qty=Sum('quantity'))
         # 可用
-        use_qty = self.filter_queryset(self.queryset).filter(status=1, lock=0).values('equip_spare').annotate(use_qty=Sum('quantity'))
+        use_qty = self.filter_queryset(self.queryset).filter(status=1, lock=0).values('equip_spare').annotate(
+            use_qty=Sum('quantity'))
         # 锁定
-        lock_qty = self.filter_queryset(self.queryset).filter(status=1, lock=1).values('equip_spare').annotate(lock_qty=Sum('quantity'))
+        lock_qty = self.filter_queryset(self.queryset).filter(status=1, lock=1).values('equip_spare').annotate(
+            lock_qty=Sum('quantity'))
 
         dic = {}
         for i in all_qty:
@@ -2876,7 +2930,10 @@ class EquipAutoPlanView(APIView):
                 location = 0
             if location:
                 data = EquipWarehouseLocation.objects.filter(delete_flag=False,
-                                                             equip_warehouse_area_id=location).values('id', 'equip_warehouse_area__area_name', 'location_name', 'location_barcode')
+                                                             equip_warehouse_area_id=location).values('id',
+                                                                                                      'equip_warehouse_area__area_name',
+                                                                                                      'location_name',
+                                                                                                      'location_barcode')
             else:
                 data = EquipWarehouseLocation.objects.filter(delete_flag=False).values('id',
                                                                                        'equip_warehouse_area__area_name',
@@ -2892,7 +2949,8 @@ class EquipAutoPlanView(APIView):
             order = EquipWarehouseOrder.objects.filter(status=5).last()
             return Response({"success": True, "message": None, "data": order.order_id})
         if self.request.query_params.get('spare_code'):
-            spare_code =  EquipWarehouseInventory.objects.filter(spare_code=self.request.query_params.get('spare_code')).first()
+            spare_code = EquipWarehouseInventory.objects.filter(
+                spare_code=self.request.query_params.get('spare_code')).first()
             if spare_code:
                 return Response({"success": True, "message": None, "data": spare_code.equip_spare.specification})
 
@@ -3042,7 +3100,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
         "工单编号": "work_order_no",
         "机台": "equip_no",
         "部位名称": "part_name",
-        "故障描述": "result_fault_desc",
+        "维修标准/故障原因": "fault_reason",
+        "故障详情描述": "result_fault_desc",
+        "实际维修标准": "result_fault_reason",
         "维修备注": "result_repair_desc",
         "最终故障原因": "result_final_fault_cause",
         "计划维修日期": "planned_repair_date",
@@ -3104,7 +3164,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         my_order = self.request.query_params.get('my_order')
         if self.request.query_params.get('export'):
-            data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
+            data = EquipApplyOrderExportSerializer(self.filter_queryset(self.get_queryset()), many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
         if my_order == '1':

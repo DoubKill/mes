@@ -1043,7 +1043,8 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
         res['are_name'] = bom_obj.equip_area_define.area_name if bom_obj and bom_obj.equip_area_define else ''
         # 部门
-        prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1, global_type__type_name='设备部门组织名称').first()
+        prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
+                                         global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
         return res
 
@@ -1090,6 +1091,29 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         model = EquipApplyOrder
         fields = '__all__'
         read_only_fields = ['result_repair_graph_url', 'result_accept_graph_url']
+
+
+class EquipApplyOrderExportSerializer(BaseModelSerializer):
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        # 故障原因
+        fault_reason = instance.result_fault_cause.fault_name if instance.result_fault_cause else (
+            instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_maintenance_standard.standard_name)
+        result_fault_reason = instance.result_repair_standard.standard_name if instance.result_repair_standard else (
+            instance.result_maintenance_standard.standard_name if instance.result_maintenance_standard else '')
+        res['fault_reason'] = fault_reason
+        res['result_fault_reason'] = result_fault_reason
+        res['part_name'] = instance.equip_part_new.part_name if instance.equip_part_new else ''
+        res['result_material_requisition'] = 'Y' if res['result_material_requisition'] else 'N'
+        res['result_need_outsourcing'] = 'Y' if res['result_need_outsourcing'] else 'N'
+        res['wait_material'] = 'Y' if res['wait_material'] else 'N'
+        res['wait_outsourcing'] = 'Y' if res['wait_outsourcing'] else 'N'
+        return res
+
+    class Meta:
+        model = EquipApplyOrder
+        fields = '__all__'
 
 
 class UploadImageSerializer(BaseModelSerializer):
@@ -1253,9 +1277,9 @@ class EquipWarehouseInventorySerializer(BaseModelSerializer):
     class Meta:
         model = EquipWarehouseInventory
         fields = (
-        "id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params",
-        "unit",
-        "upper_stock", "lower_stock", "equip_spare")
+            "id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params",
+            "unit",
+            "upper_stock", "lower_stock", "equip_spare")
 
 
 class EquipWarehouseRecordSerializer(BaseModelSerializer):
