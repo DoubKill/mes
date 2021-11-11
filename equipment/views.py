@@ -3181,8 +3181,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         elif opera_type == '退单':
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None, 'assign_to_user': None,
-                'last_updated_date': datetime.now()
+                'assign_to_user': None, 'last_updated_date': datetime.now()
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
