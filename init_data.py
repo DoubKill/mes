@@ -882,7 +882,7 @@ permission_data = [
     {'id': 695, 'code': 'export_equip_repair_standard', 'name': '导出', 'parent_id': 689},
 
     {'id': 696, 'code': 'equip_warehouse', 'name': '备件库区库位管理', 'parent_id': None},
-    {'id': 697, 'code': 'viewArea_equip_warehouse', 'name': '查看库区', 'parent_id': 696},
+    {'id': 697, 'code': 'view_equip_warehouse', 'name': '查看库区', 'parent_id': 696},
     {'id': 698, 'code': 'addArea_equip_warehouse', 'name': '新增库区', 'parent_id': 696},
     {'id': 699, 'code': 'changeArea_equip_warehouse', 'name': '修改库区', 'parent_id': 696},
     {'id': 700, 'code': 'addLocation_equip_warehouse', 'name': '新增库位', 'parent_id': 696},

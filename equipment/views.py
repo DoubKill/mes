@@ -107,7 +107,6 @@ class EquipCurrentStatusList(APIView):
     def get(self, request):
         ecs_set = EquipCurrentStatus.objects.filter(delete_flag=False).select_related()
         temp_dict = {x.equip.category.equip_type.global_name: [] for x in ecs_set}
-        # print(temp_dict)
         for ecs_obj in ecs_set:
             temp_dict[ecs_obj.equip.category.equip_type.global_name].append({'equip_name': ecs_obj.equip.equip_name,
                                                                              'equip_no': ecs_obj.equip.equip_no,
@@ -446,7 +445,6 @@ class EquipErrorMonthStatisticsView(APIView):
                     'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
-        print(data)
         ret = {"equips": data,
                "title": title_set}
         return Response(ret)
@@ -479,7 +477,6 @@ class EquipErrorWeekStatisticsView(APIView):
                     'all_time') else 0})
         for k, v in data.items():
             data[k]["sum"] = sum(v.values())
-        print(data)
         # sorted(data.items(), key=lambda x)
         ret = {"equips": data,
                "title_set": title_set}
@@ -2441,7 +2438,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             for j in serializer.data:
                 if stage:
                     obj = EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1).first()
-                    print(j['equip_spare'])
                     all_qty = len(EquipWarehouseInventory.objects.filter(equip_spare_id=j['equip_spare'], status=1, delete_flag=False)) # 1, status=1
                 else:
                     obj = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=j['id'],
@@ -3372,5 +3368,4 @@ class EquipCodePrintView(APIView):
                     "component_type": obj.component.equip_component_type.component_type_name if obj.component else None,
                     "node_id": lot_no}
             res = requests.post(url=url.get('code3'), json=data, verify=False)
-            print(res.text)
         return Response({'results': res.text})
