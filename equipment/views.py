@@ -1,6 +1,7 @@
 import copy
 import datetime
 import datetime as dt
+import time
 from io import BytesIO
 
 import requests
@@ -3331,45 +3332,50 @@ class GetStaffsView(APIView):
 @method_decorator([api_recorder], name='dispatch')
 class EquipCodePrintView(APIView):
     def post(self, request):
-        GlobalCode.objects.filter(global_type__type_name='条码打印')
-        url = {'code1': 'http://10.20.182.244:6111/printer/print-storehouse/',
-               'code2': 'http://10.20.182.244:6111/printer/print-spareparts/',
-               'code3': 'http://10.20.182.244:6111/printer/print-equip/',
-               }
+        res = GlobalCode.objects.filter(global_type__type_name='条码打印').first()
+        if not res and len(res.global_name.split('.')) != 4:
+            raise ValidationError('ip格式有误')
+
+        url = {'code1': f'http://{res.global_name}:6111/printer/print-storehouse/',
+               'code2': f'http://{res.global_name}:6111/printer/print-spareparts/',
+               'code3': f'http://{res.global_name}:6111/printer/print-equip/', }
         status = self.request.data.get('status')
         lot_no = self.request.data.get('lot_no', None)
         data = self.request.data
 
-        if status == 1:
-            del data['status']
-            res = requests.post(url=url.get('code1'), json=data, verify=False)
-        if status == 2:
-            res = []
-            for spare_code in data.get('spare_list'):
-                res.append(
-                   {"print_type":1,
-                    "code": spare_code.get('equip_spare__spare_code'),
-                    "name": spare_code.get('equip_spare__spare_name'),
-                    "num": spare_code.get('one_piece'),
-                    "barcode": spare_code.get('spare_code')
-                    })
-            res = requests.post(url=url.get('code2'), json=res, verify=False)
-        if status == 3:
-            obj = EquipBom.objects.filter(node_id=lot_no).first()
-            if not obj:
-                raise ValidationError('节点编号不存在, 无法打印')
-            code_type = len(lot_no.split('-'))  #  1=机台，2=部位，3=部件
-            data = {
-                    "print_type": code_type,
-                    "property_type_node": obj.property_type.global_name if obj.property_type else None,
-                    "equip_no": obj.equip_info.equip_no if obj.equip_info else None,
-                    "equip_name": obj.equip_info.equip_name if obj.equip_info else None,
-                    "equip_type": obj.equip_info.category.category_name if obj.equip_info else None,
-                    "part_code": obj.part.part_code if obj.part else None,
-                    "part_name": obj.part.part_name if obj.part else None,
-                    "component_code": obj.component.component_code if obj.component else None,
-                    "component_name": obj.component.component_name if obj.component else None,
-                    "component_type": obj.component.equip_component_type.component_type_name if obj.component else None,
-                    "node_id": lot_no}
-            res = requests.post(url=url.get('code3'), json=data, verify=False)
+        try:
+            if status == 1:
+                del data['status']
+                res = requests.post(url=url.get('code1'), json=data, verify=False, timeout=10)
+            if status == 2:
+                res = []
+                for spare_code in data.get('spare_list'):
+                    res.append(
+                       {"print_type":1,
+                        "code": spare_code.get('equip_spare__spare_code'),
+                        "name": spare_code.get('equip_spare__spare_name'),
+                        "num": spare_code.get('one_piece'),
+                        "barcode": spare_code.get('spare_code')
+                        })
+                res = requests.post(url=url.get('code2'), json=res, verify=False, timeout=10)
+            if status == 3:
+                obj = EquipBom.objects.filter(node_id=lot_no).first()
+                if not obj:
+                    raise ValidationError('节点编号不存在, 无法打印')
+                code_type = len(lot_no.split('-'))  #  1=机台，2=部位，3=部件
+                data = {
+                        "print_type": code_type,
+                        "property_type_node": obj.property_type.global_name if obj.property_type else None,
+                        "equip_no": obj.equip_info.equip_no if obj.equip_info else None,
+                        "equip_name": obj.equip_info.equip_name if obj.equip_info else None,
+                        "equip_type": obj.equip_info.category.category_name if obj.equip_info else None,
+                        "part_code": obj.part.part_code if obj.part else None,
+                        "part_name": obj.part.part_name if obj.part else None,
+                        "component_code": obj.component.component_code if obj.component else None,
+                        "component_name": obj.component.component_name if obj.component else None,
+                        "component_type": obj.component.equip_component_type.component_type_name if obj.component else None,
+                        "node_id": lot_no}
+                res = requests.post(url=url.get('code3'), json=data, verify=False, timeout=10)
+        except:
+            raise ValidationError('打印超时，请检查您的网络或ip配置')
         return Response({'results': res.text})
