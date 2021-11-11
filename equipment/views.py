@@ -2524,6 +2524,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             return Response('入库成功')
         if status == 2:
             inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
+                                                               status=1,
                                                                equip_warehouse_location_id=data[
                                                                    'equip_warehouse_location']).first()
             if not inventory:
