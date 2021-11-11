@@ -2413,12 +2413,14 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
                     'equip_warehouse_order_detail__lot_no',
                     'status', 'equip_warehouse_area', 'equip_warehouse_location', 'equip_warehouse_area__area_name',
                     'equip_warehouse_location__location_name')
-                return Response(data[0])
+                if data:
+                    return Response(data[0])
 
             else:
                 data = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=order, status=0).values(
                     'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece', 'status')
-            return Response(data[0])
+                if data:
+                    return Response(data[0])
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2524,7 +2526,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             return Response('入库成功')
         if status == 2:
             inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
-                                                               status=1,
+                                                               status=1, delete_flag=False,
                                                                equip_warehouse_location_id=data[
                                                                    'equip_warehouse_location']).first()
             if not inventory:
@@ -2659,11 +2661,11 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             # 未出库，出库中的数量
             plan_qty = EquipWarehouseOrderDetail.objects.filter(equip_spare_id=i, status__in=[4, 5]).aggregate(
                 qty=Sum('plan_out_quantity'))
-            if plan_qty.get('qty'):
+            if plan_qty.get('qty') and use_qty.get('qty'):
                 qty = (use_qty.get('qty') - plan_qty.get('qty')) if (use_qty.get('qty') - plan_qty.get(
                     'qty')) >= 0 else 0
             else:
-                qty = use_qty.get('qty')
+                qty = use_qty.get('qty') if use_qty.get('qty') else 0
             if self.request.query_params.get('use'):
                 if qty != 0:
                     dic[i].update(qty=qty)
