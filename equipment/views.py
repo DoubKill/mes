@@ -2594,7 +2594,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         "总数量": "all_qty",
         "可用数量": "use_qty",
         "锁定数量": "lock_qty",
-        "unit": "planned_repair_date",
+        "标准单位": "unit",
         "库存下限": "lower_stock",
         "库存上限": "upper_stock",
     }
