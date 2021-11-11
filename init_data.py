@@ -881,6 +881,40 @@ permission_data = [
     {'id': 694, 'code': 'import_equip_repair_standard', 'name': '导入', 'parent_id': 689},
     {'id': 695, 'code': 'export_equip_repair_standard', 'name': '导出', 'parent_id': 689},
 
+    {'id': 696, 'code': 'equip_warehouse', 'name': '备件库区库位管理', 'parent_id': None},
+    {'id': 697, 'code': 'viewArea_equip_warehouse', 'name': '查看库区', 'parent_id': 696},
+    {'id': 698, 'code': 'addArea_equip_warehouse', 'name': '新增库区', 'parent_id': 696},
+    {'id': 699, 'code': 'changeArea_equip_warehouse', 'name': '修改库区', 'parent_id': 696},
+    {'id': 700, 'code': 'addLocation_equip_warehouse', 'name': '新增库位', 'parent_id': 696},
+    {'id': 701, 'code': 'changeLocation_equip_warehouse', 'name': '修改库位', 'parent_id': 696},
+    {'id': 702, 'code': 'deleteArea_equip_warehouse', 'name': '删除库区', 'parent_id': 696},
+    {'id': 703, 'code': 'deleteLocation_equip_warehouse', 'name': '删除库位', 'parent_id': 696},
+    {'id': 704, 'code': 'printArea_equip_warehouse', 'name': '打印库区条码', 'parent_id': 696},
+    {'id': 705, 'code': 'printLocation_equip_warehouse', 'name': '打印库位条码', 'parent_id': 696},
+
+    {'id': 706, 'code': 'equip_in_warehouse', 'name': '备件入库管理', 'parent_id': None},
+    {'id': 707, 'code': 'view_equip_in_warehouse', 'name': '查看', 'parent_id': 706},
+    {'id': 708, 'code': 'add_equip_in_warehouse', 'name': '添加', 'parent_id': 706},
+    {'id': 709, 'code': 'enter_equip_in_warehouse', 'name': '入库', 'parent_id': 706},
+
+    {'id': 710, 'code': 'equip_out_warehouse', 'name': '备件出库管理', 'parent_id': None},
+    {'id': 711, 'code': 'view_equip_out_warehouse', 'name': '查看', 'parent_id': 710},
+    {'id': 712, 'code': 'add_equip_out_warehouse', 'name': '添加', 'parent_id': 710},
+    {'id': 713, 'code': 'outer_equip_out_warehouse', 'name': '出库', 'parent_id': 710},
+
+    {'id': 714, 'code': 'equip_warehouse_inventory', 'name': '备件库存查询', 'parent_id': None},
+    {'id': 715, 'code': 'view_equip_warehouse_inventory', 'name': '查看', 'parent_id': 714},
+    {'id': 716, 'code': 'export_equip_warehouse_inventory', 'name': '导出', 'parent_id': 714},
+    {'id': 717, 'code': 'feed_equip_warehouse_inventory', 'name': '查询', 'parent_id': 714},
+
+    {'id': 718, 'code': 'equip_warehouse_record', 'name': '备件出入库履历查询', 'parent_id': None},
+    {'id': 719, 'code': 'view_equip_warehouse_record', 'name': '查看', 'parent_id': 718},
+    {'id': 720, 'code': 'export_equip_warehouse_record', 'name': '导出', 'parent_id': 718},
+    {'id': 721, 'code': 'feed_equip_warehouse_record', 'name': '查询', 'parent_id': 718},
+
+    {'id': 722, 'code': 'equip_warehouse_statistical', 'name': '备件出入库统计分析', 'parent_id': None},
+    {'id': 723, 'code': 'view_equip_warehouse_statistical', 'name': '查看', 'parent_id': 722},
+    {'id': 724, 'code': 'export_equip_warehouse_statistical', 'name': '导出', 'parent_id': 722},
 ]
 
 
