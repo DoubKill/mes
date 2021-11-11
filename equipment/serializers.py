@@ -7,7 +7,7 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
-from basics.models import Equip
+from basics.models import Equip, GlobalCode
 from basics.models import WorkSchedulePlan
 from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus, EquipMaintenanceOrder, EquipPart, \
     EquipSupplier, EquipProperty, EquipAreaDefine, EquipPartNew, \
@@ -1042,6 +1042,9 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
         res['are_name'] = bom_obj.equip_area_define.area_name if bom_obj and bom_obj.equip_area_define else ''
+        # 部门
+        prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1, global_type__type_name='设备部门组织名称').first()
+        res['product_name'] = prod.global_name if prod else ''
         return res
 
     @atomic
