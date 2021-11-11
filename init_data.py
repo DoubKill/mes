@@ -915,6 +915,24 @@ permission_data = [
     {'id': 722, 'code': 'equip_warehouse_statistical', 'name': '备件出入库统计分析', 'parent_id': None},
     {'id': 723, 'code': 'view_equip_warehouse_statistical', 'name': '查看', 'parent_id': 722},
     {'id': 724, 'code': 'export_equip_warehouse_statistical', 'name': '导出', 'parent_id': 722},
+
+    {'id': 725, 'code': 'equip_apply_repair', 'name': '报修申请', 'parent_id': None},
+    {'id': 726, 'code': 'view_equip_apply_repair', 'name': '查看', 'parent_id': 725},
+    {'id': 727, 'code': 'add_equip_apply_repair', 'name': '添加', 'parent_id': 725},
+
+    {'id': 728, 'code': 'equip_apply_order', 'name': '设备维修工单', 'parent_id': None},
+    {'id': 729, 'code': 'view_equip_apply_order', 'name': '查看', 'parent_id': 728},
+    {'id': 730, 'code': 'close_equip_apply_order', 'name': '关闭', 'parent_id': 728},
+    {'id': 731, 'code': 'assign_equip_apply_order', 'name': '指派', 'parent_id': 728},
+    {'id': 732, 'code': 'receive_equip_apply_order', 'name': '接单', 'parent_id': 728},
+    {'id': 733, 'code': 'charge_equip_apply_order', 'name': '退单', 'parent_id': 728},
+    {'id': 734, 'code': 'begin_equip_apply_order', 'name': '开始', 'parent_id': 728},
+    {'id': 735, 'code': 'handle_equip_apply_order', 'name': '处理', 'parent_id': 728},
+    {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
+    {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
+
+    {'id': 738, 'code': 'equip_repair_material_req', 'name': '物料申请', 'parent_id': None},
+    {'id': 739, 'code': 'view_equip_repair_material_req', 'name': '查看', 'parent_id': 738},
 ]
 
 
