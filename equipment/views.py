@@ -3333,7 +3333,7 @@ class EquipCodePrintView(APIView):
     def post(self, request):
         url = {'code1': 'http://10.20.181.177:6111/printer/print-storehouse/',
                'code2': 'http://10.20.181.177:6111/printer/print-spareparts/',
-               'code3': 'http://10.20.181.177:6111/port/printer/print-equip/',
+               'code3': 'http://10.20.181.177:6111/printer/print-equip/',
                }
         status = self.request.data.get('status')
         lot_no = self.request.data.get('lot_no', None)
@@ -3352,7 +3352,7 @@ class EquipCodePrintView(APIView):
                     "num": spare_code.get('one_piece'),
                     "barcode": spare_code.get('spare_code')
                     })
-            res = requests.post(url=url.get('code2'), json=res)
+            res = requests.post(url=url.get('code2'), json=res, verify=False)
         if status == 3:
             obj = EquipBom.objects.filter(node_id=lot_no).first()
             if not obj:
@@ -3360,15 +3360,16 @@ class EquipCodePrintView(APIView):
             code_type = len(lot_no.split('-'))  #  1=机台，2=部位，3=部件
             data = {
                     "print_type": code_type,
-                    "property_type_node": obj.property_type.global_name,
-                    "equip_no": obj.equip_info.equip_no,
-                    "equip_name": obj.equip_info.equip_name,
-                    "equip_type": obj.equip_info.category.category_name,
-                    "part_code": obj.part.part_code,
-                    "part_name": obj.part.part_name,
-                    "component_code": obj.component.component_code,
-                    "component_name": obj.component.component_name,
-                    "component_type": obj.component.equip_component_type.component_type_name,
+                    "property_type_node": obj.property_type.global_name if obj.property_type else None,
+                    "equip_no": obj.equip_info.equip_no if obj.equip_info else None,
+                    "equip_name": obj.equip_info.equip_name if obj.equip_info else None,
+                    "equip_type": obj.equip_info.category.category_name if obj.equip_info else None,
+                    "part_code": obj.part.part_code if obj.part else None,
+                    "part_name": obj.part.part_name if obj.part else None,
+                    "component_code": obj.component.component_code if obj.component else None,
+                    "component_name": obj.component.component_name if obj.component else None,
+                    "component_type": obj.component.equip_component_type.component_type_name if obj.component else None,
                     "node_id": lot_no}
-            res = requests.post(url=url.get('code3'), json=data)
+            res = requests.post(url=url.get('code3'), json=data, verify=False)
+            print(res.text)
         return Response({'results': res.text})
