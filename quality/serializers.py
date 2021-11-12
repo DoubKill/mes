@@ -1823,7 +1823,7 @@ class UnqualifiedPalletFeedBackSerializer(serializers.ModelSerializer):
     def get_trains(self, obj):
         pallet = PalletFeedbacks.objects.filter(lot_no=obj.lot_no).first()
         return '{}-{}'.format(pallet.begin_trains, pallet.end_trains) if not \
-            pallet.begin_trains == pallet.end_trains else pallet.begin_trains
+            pallet.begin_trains == pallet.end_trains else str(pallet.begin_trains)
 
     def get_test_data(self, obj):
         last_result_ids = list(MaterialTestResult.objects.filter(
