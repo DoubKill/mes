@@ -1191,6 +1191,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
             for equip_sapre in equip_spare_list:
                 if not isinstance(equip_sapre['quantity'], int):
                     raise serializers.ValidationError('入库数量必须为整数')
+                if not isinstance(equip_sapre['one_piece'], int):
+                    raise serializers.ValidationError('单件个数必须为整数')
                 detail = EquipWarehouseOrderDetail.objects.create(order_id=validated_data['order_id'],
                                                                   equip_spare_id=equip_sapre['id'],
                                                                   order_quantity=equip_sapre['quantity'],
@@ -1223,6 +1225,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
                 raise serializers.ValidationError('请选择您要出库的物料')
             order = super().create(validated_data)
             for equip_spare in equip_spare_list:
+                if not isinstance(equip_spare['quantity'], int):
+                    raise serializers.ValidationError('出库数量必须为整数')
                 EquipWarehouseOrderDetail.objects.create(
                     order_id=validated_data['order_id'],
                     equip_spare_id=equip_spare['id'],
