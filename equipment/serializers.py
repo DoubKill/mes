@@ -1189,6 +1189,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
             validated_data['created_user'] = self.context['request'].user
             order = super().create(validated_data)
             for equip_sapre in equip_spare_list:
+                if not isinstance(equip_sapre['quantity'], int):
+                    raise serializers.ValidationError('入库数量必须为整数')
                 detail = EquipWarehouseOrderDetail.objects.create(order_id=validated_data['order_id'],
                                                                   equip_spare_id=equip_sapre['id'],
                                                                   order_quantity=equip_sapre['quantity'],
