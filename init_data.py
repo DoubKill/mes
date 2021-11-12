@@ -930,9 +930,6 @@ permission_data = [
     {'id': 735, 'code': 'handle_equip_apply_order', 'name': '处理', 'parent_id': 728},
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
-
-    {'id': 738, 'code': 'equip_repair_material_req', 'name': '物料申请', 'parent_id': None},
-    {'id': 739, 'code': 'view_equip_repair_material_req', 'name': '查看', 'parent_id': 738},
 ]
 
 
