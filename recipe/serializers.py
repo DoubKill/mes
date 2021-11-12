@@ -446,12 +446,12 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.used_type = 1
         else:
             if instance.used_type in (4, 5):  # 弃用
-                if instance.used_type == 4:
-                    if instance.dev_type:
-                        # 如果该配方关联的计划不是全部完成（只要有计划是等待、已下达、运行中）都不能废弃的
-                        if ProductClassesPlan.objects.exclude(status='完成').filter(product_batching=instance,
-                                                                                  delete_flag=False).exists():
-                            raise serializers.ValidationError('该配方有关联尚未完成的计划，无法废弃！')
+                # if instance.used_type == 4:
+                #     if instance.dev_type:
+                #         # 如果该配方关联的计划不是全部完成（只要有计划是等待、已下达、运行中）都不能废弃的
+                #         if ProductClassesPlan.objects.exclude(status='完成').filter(product_batching=instance,
+                #                                                                   delete_flag=False).exists():
+                #             raise serializers.ValidationError('该配方有关联尚未完成的计划，无法废弃！')
                         # try:
                         #     ProductObsoleteInterface(instance=instance).request()
                         # except Exception as e:
