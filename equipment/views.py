@@ -2453,13 +2453,13 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         all = request.query_params.get('all')
         stage = request.query_params.get('stage')  # 获取要出库的备件条码
         if all:
-            data = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=order, delete_flag=False).values(
+            data = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=order, delete_flag=False, lock=0).values(
                 'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece', 'status')
             return Response({'results': data, 'spare_code': data[0]['equip_spare__spare_code'],
                              'spare_name': data[0]['equip_spare__spare_name']})
         else:
             if stage:
-                data = EquipWarehouseInventory.objects.filter(equip_spare_id=order, status=1, delete_flag=False).values(
+                data = EquipWarehouseInventory.objects.filter(equip_spare_id=order, status=1, delete_flag=False, lock=0).values(
                     'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece',
                     'equip_warehouse_order_detail__lot_no',
                     'status', 'equip_warehouse_area', 'equip_warehouse_location', 'equip_warehouse_area__area_name',
@@ -2907,7 +2907,9 @@ class EquipAutoPlanView(APIView):
             return Response({"success": True, "message": None, "data": order})
         if self.request.query_params.get('in_last'):
             order = EquipWarehouseOrder.objects.filter(status=2).last()
-            return Response({"success": True, "message": None, "data": order.order_id})
+            if order:
+                return Response({"success": True, "message": None, "data": order.order_id})
+            return Response({"success": True, "message": None, "data": None})
         if self.request.query_params.get('barcode'):
             barcode = self.request.query_params.get('barcode')
             obj = EquipWarehouseLocation.objects.filter(location_barcode=barcode).first()
@@ -2954,6 +2956,7 @@ class EquipAutoPlanView(APIView):
             if spare_code:
                 return Response({"success": True, "message": None, "data": spare_code.equip_spare.specification})
 
+    @atomic
     def post(self, request, *args, **kwargs):
         data = self.request.data
         status = data.get('status')
@@ -2974,7 +2977,7 @@ class EquipAutoPlanView(APIView):
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             component_type = area_obj.equip_component_type
             if component_type:
-                if component_type != spare_obj.equip_component_type:
+                if component_type != spare_obj.equip_spare.equip_component_type:
                     return Response({"success": False,
                                      "message": f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件',
                                      "data": None})
@@ -3010,7 +3013,6 @@ class EquipAutoPlanView(APIView):
                 equip_warehouse_area_id=data['equip_warehouse_area'],
                 equip_warehouse_location_id=data['equip_warehouse_location'],
             )
-            inventory.quantity = in_quantity
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status=1,
