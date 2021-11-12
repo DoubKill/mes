@@ -2455,8 +2455,9 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         if all:
             data = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail_id=order, delete_flag=False, lock=0).values(
                 'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece', 'status')
-            return Response({'results': data, 'spare_code': data[0]['equip_spare__spare_code'],
-                             'spare_name': data[0]['equip_spare__spare_name']})
+            if data:
+                return Response({'results': data, 'spare_code': data[0]['equip_spare__spare_code'],
+                                 'spare_name': data[0]['equip_spare__spare_name']})
         else:
             if stage:
                 data = EquipWarehouseInventory.objects.filter(equip_spare_id=order, status=1, delete_flag=False, lock=0).values(
@@ -2472,6 +2473,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
                     'equip_spare__spare_code', 'equip_spare__spare_name', 'spare_code', 'one_piece', 'status')
                 if data:
                     return Response(data[0])
+        return Response('可出库数量为空')
 
 
 @method_decorator([api_recorder], name='dispatch')
