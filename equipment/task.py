@@ -1,17 +1,25 @@
 import datetime
+import logging
 import os
+import sys
 
-import xlrd
+import django
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
+django.setup()
+
 import xlwt
+from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
 
-from rest_framework.exceptions import ValidationError
-
-from equipment.models import PropertyTypeNode, Property
+from basics.models import WorkSchedulePlan, GlobalCode
+from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair
+from equipment.utils import DinDinAPI, get_staff_status
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
-from socket import timeout
 from django.db.transaction import atomic
 
 import requests
@@ -21,6 +29,8 @@ import hashlib
 import base64
 import urllib.parse
 from rest_framework.exceptions import ValidationError
+
+logger = logging.getLogger('send_ding_msg')
 
 
 def property_template():
@@ -172,7 +182,7 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
 """
 
 
-def export_xls(export_filed_dict, data, file_name ):
+def export_xls(export_filed_dict, data, file_name):
     response = HttpResponse(content_type='application/vnd.ms-excel')
     filename = file_name
     response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
@@ -201,3 +211,84 @@ def export_xls(export_filed_dict, data, file_name ):
     output.seek(0)
     response.write(output.getvalue())
     return response
+
+
+class AutoDispatch(object):
+    """自动派单"""
+
+    def __init__(self):
+        self.ding_api = DinDinAPI()
+
+    def send_order(self):
+        now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 班组
+        group = self.get_group_info()
+        # 设备部门下改班组人员
+        instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
+                                             global_type__use_flag=1).first()
+        choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
+        if not choice_all_user:
+            logger.info(f'系统派单: {group}班组无人员可派单')
+            return f'系统派单: {group}班组无人员可派单'
+        leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
+        working_persons = [i for i in choice_all_user if i['optional']]
+        if not working_persons:
+            # 发送消息给上级
+            content = {"title": f"{group}下无空闲可指派人员！",
+                       "form": [{"key": "指派人:", "value": "系统自动"},
+                                {"key": "指派时间:", "value": now_date}]}
+            self.ding_api.send_message([leader_ding_uid], content)
+            logger.info(f'系统派单: {group}下无空闲可指派人员')
+            return f'系统派单: {group}下无空闲可指派人员'
+        logger.info(f'系统派单: {group}当班可选人员:{working_persons}')
+        processing_person = []
+        for per in working_persons:
+            new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
+            if not new_applyed:
+                logger.info('系统派单: 没有新生成的维修单')
+                break
+            processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
+                                                              repair_user=per['username'])
+            if processing_order:
+                processing_person.append(per)
+                continue
+            # 分派维修单
+            new_applyed.assign_user = '系统自动'
+            new_applyed.assign_datetime = now_date
+            new_applyed.assign_to_user = per['username']
+            new_applyed.status = '已指派'
+            new_applyed.last_updated_date = now_date
+            new_applyed.save()
+            # 更新设备计划状态
+            repair_instance = EquipApplyRepair.objects.filter(plan_id=new_applyed.plan_id).first()
+            if repair_instance:
+                repair_instance.status = '已指派'
+                repair_instance.last_updated_date = now_date
+                repair_instance.save()
+            # 派单成功发送钉钉消息给当班人员
+            content = {"title": "系统自动派发设备维修单成功，请尽快处理！",
+                       "form": [{"key": "指派人:", "value": "系统自动"},
+                                {"key": "指派时间:", "value": now_date}]}
+            self.ding_api.send_message([per.get('ding_uid')], content, order_id=new_applyed.id)
+            logger.info(f"系统派单-系统自动派单成功: {new_applyed.work_order_no}, 被指派人:{per['username']}")
+        if len(processing_person) == len(working_persons):
+            # 所有人都在忙, 派单失败, 钉钉消息推送给上级
+            content = {"title": f"{group}所有人员均在进行维修, 系统自动派单失败！",
+                       "form": [{"key": "指派人:", "value": "系统自动"},
+                                {"key": "指派时间:", "value": now_date}]}
+            self.ding_api.send_message([leader_ding_uid], content)
+            logger.info(f'系统派单: 系统自动派单失败, {group}可选人员:{working_persons}, 正在维修人员:{processing_person}')
+            return f'系统派单: 系统自动派单失败'
+        return '系统派单: 完成一次定时派单处理'
+
+    def get_group_info(self):
+        now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        group = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
+        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=group,
+                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+        return record.group.global_name
+
+
+if __name__ == '__main__':
+    auto_dispatch = AutoDispatch()
+    msg = auto_dispatch.send_order()
