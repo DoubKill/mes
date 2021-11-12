@@ -85,18 +85,45 @@ router.register('equip-maintenance-area-settings', EquipMaintenanceAreaSettingVi
 
 # 设备作业项目标准定义
 router.register('equip-job-item-standard', EquipJobItemStandardViewSet)
-#
-# # 备件库库区
-# router.register('equip-warehouse-area', EquipWarehouseAreaViewSet)
-
-# # 备件库库位
-# router.register('equip-warehouse-location', EquipWarehouseLocationViewSet)
 
 # 设备维护作业标准定义
 router.register('equip_maintenance_standard', EquipMaintenanceStandardViewSet)
 
 # 设备维修作业标准定义
 router.register('equip-repair-standard', EquipRepairStandardViewSet)
+
+# 备件库库区
+router.register('equip-warehouse-area', EquipWarehouseAreaViewSet)
+
+# 备件库库位
+router.register('equip-warehouse-location', EquipWarehouseLocationViewSet)
+
+# 备件入出库单据
+router.register('equip-warehouse-order', EquipWarehouseOrderViewSet)
+
+# 备件库出入库管理
+router.register('equip-warehouse-order-detail', EquipWarehouseOrderDetailViewSet, basename='equip-warehouse-order-detail')
+
+# 备件库库存查询
+router.register('equip-warehouse-inventory', EquipWarehouseInventoryViewSet)
+
+# 备件库出入库履历查询
+router.register('equip-warehouse-record', EquipWarehouseRecordViewSet, basename='equip-warehouse-record')
+
+# 入出库统计分析
+router.register('equip-warehouse-statistical', EquipWarehouseStatisticalViewSet)
+
+# 设备报修申请
+router.register('equip-apply-repair', EquipApplyRepairViewSet)
+
+# 设备维修工单查询
+router.register('equip-apply-order', EquipApplyOrderViewSet)
+
+# 维修物料申请
+router.register('equip-repair-material-req', EquipRepairMaterialReqViewSet)
+
+# 图片上传
+router.register('upload-images', UploadImageViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -109,10 +136,15 @@ urlpatterns = [
     path('month-error-sort/', MonthErrorSortView.as_view()),
     path('overview/', EquipOverview.as_view()),
     path('get-default-code/', GetDefaultCodeView.as_view()),
+    path('get-staff/', GetStaffsView.as_view()),
 
     # **************************2021-10-09最新URL**************************
     # 机台目标MTBF/MTTR设定
-    path('equip-target-mtbmttr-settings/', EquipTargetMTBFMTTRSettingView.as_view())
+    path('equip-target-mtbmttr-settings/', EquipTargetMTBFMTTRSettingView.as_view()),
+    # 备件PDA出入库
+    path('equip-auto-plan/', EquipAutoPlanView.as_view()),
+    # 条码打印
+    path('equip-code-print/', EquipCodePrintView.as_view())
 ]
 
 
