@@ -1323,10 +1323,16 @@ class EquipWarehouseRecordDetailSerializer(BaseModelSerializer):
 class EquipPlanSerializer(BaseModelSerializer):
     plan_name = serializers.CharField(help_text='计划名称', validators=[UniqueValidator(
         queryset=EquipPlan.objects.all(), message='计划名称已存在')])
+    plan_id = serializers.ReadOnlyField()
     equip_no = serializers.ListField(help_text='机台', write_only=True)
+    standard_name = serializers.ReadOnlyField(help_text='维护标准名称', source='equip_manintenance_standard.standard_name')
+    repair_standard_name = serializers.ReadOnlyField(help_text='维修标准名称', source='equip_repair_standard.standard_name')
+    equip_name = serializers.ReadOnlyField(source='equip_no')
+    planned_maintenance_date = serializers.CharField()
+    next_maintenance_date = serializers.CharField(default=None)
 
     class Meta:
-        model = EquipPlan.objects.all()
+        model = EquipPlan
         fields = '__all__'
 
     def create(self, validated_data):
@@ -1338,16 +1344,21 @@ class EquipPlanSerializer(BaseModelSerializer):
             '保养': 'BY',
             '润滑': 'RH',
             '标定': 'BD',
+            '计划维修': 'WX'
         }
         if res:
             plan_id = res[:10] + str('%04d' % (int(res[-4:]) + 1))
         else:
             plan_id = f'{work_type.get(validated_data["work_type"])}{date.today().strftime("%Y%m%d")}0001'
 
-        equip_no = '，'.join([equip['equip_no'] for equip in validated_data['equip_no']])
+        equip_no = '，'.join([equip for equip in validated_data['equip_no']])
         validated_data['plan_id'] = plan_id
         validated_data['equip_no'] = equip_no
         validated_data['plan_source'] = '人工创建'
         validated_data['status'] = '未生成工单'
+        validated_data['planned_maintenance_date'] = datetime.strptime(validated_data["planned_maintenance_date"], '%Y-%m-%d')
+        if validated_data.get('next_maintenance_date'):
+            validated_data['next_maintenance_date'] = datetime.strptime(validated_data["next_maintenance_date"], '%Y-%m-%d')
+
         instance = super().create(validated_data)
         return instance

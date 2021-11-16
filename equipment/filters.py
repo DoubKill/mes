@@ -410,8 +410,8 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
 
 
 class EquipPlanFilter(django_filters.rest_framework.FilterSet):
-    planned_maintenance_date = django_filters.CharFilter(field_name='planned_maintenance_date', help_text='计划日期',
-                                                         lookup_expr='planned_maintenance_date__date')
+    plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
+    planned_maintenance_date = django_filters.CharFilter(field_name='planned_maintenance_date__date', help_text='计划日期')
 
     class Meta:
         model = EquipPlan

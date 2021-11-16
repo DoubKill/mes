@@ -5,7 +5,7 @@ import django
 import datetime
 import logging
 
-from django.db.transaction import atomic
+
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,10 +13,12 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mes.settings')
 django.setup()
 
-from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder
 from django.db.models import Count, Max
-
+from django.db.transaction import atomic
+from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder
 from production.models import TrainsFeedbacks
+from system.models import User
+
 
 
 class MaintenancePlan:
@@ -27,7 +29,7 @@ class MaintenancePlan:
             '润滑': 'RH',
             '标定': 'BD',
         }
-
+        user = User.objects.filter(username='系统自动').first()
         dic = EquipPlan.objects.filter(work_type=obj.work_type, created_date__date=datetime.date.today()).aggregate(
             Max('plan_id'))
         res = dic.get('plan_id__max')
@@ -49,7 +51,7 @@ class MaintenancePlan:
             planned_maintenance_date=plan_date,
             next_maintenance_date=next_date,
             created_date=datetime.datetime.now(),
-            # created_user=
+            created_user=user.id
         )
 
     def maintenance_plan(self):
@@ -142,7 +144,7 @@ class ApplyOrder:
                             max_order_code=Max('work_order_no'))['max_order_code']
                         work_order_no = plan.plan_id + '-' + (
                             '%04d' % (int(max_order_code.split('-')[-1] + 1)) if max_order_code else '0001')
-
+                        user = User.objects.filter(username='系统自动').first()
                         EquipApplyOrder.objects.create(plan_id=plan.plan_id,
                                                    plan_name=plan.plan_name,
                                                    work_type=plan.work_type,
@@ -153,7 +155,7 @@ class ApplyOrder:
                                                    status='已生成',
                                                    equip_condition=plan.equip_condition,
                                                    importance_level=plan.importance_level,
-                                                   # created_user=self.request.user,
+                                                   created_user=user.id
                                                    )
                     plan.status = '已生成工单'
                     plan.save()

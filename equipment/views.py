@@ -3244,8 +3244,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = self.request.data
         results = []
-        for i in data:
-            plan = EquipPlan.objects.filter(id=i.get('id')).first()
+        for i in data.get('ids'):
+            plan = EquipPlan.objects.filter(id=i).first()
             equip_no = plan.equip_no
             equip_list = equip_no.split('，')
             if plan.work_type == '巡检':
@@ -3256,21 +3256,27 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
                     max_order_code=Max('work_order_no'))['max_order_code']
                 work_order_no = plan.plan_id + '-' + (
-                    '%04d' % (int(max_order_code.split('-')[-1] + 1)) if max_order_code else '0001')
-
+                    '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+                if plan.work_type == '计划维修':
+                    equip_repair_standard = plan.equip_repair_standard
+                    equip_manintenance_standard = None
+                else:
+                    equip_repair_standard = None
+                    equip_manintenance_standard = plan.equip_manintenance_standard
                 res = self.queryset.create(plan_id=plan.plan_id,
                                      plan_name=plan.plan_name,
                                      work_type=plan.work_type,
                                      work_order_no=work_order_no,
                                      equip_no=equip,
-                                     equip_maintenance_standard=plan.equip_manintenance_standard,
-                                     planned_repair_date=plan.planned_repair_date,
+                                     equip_maintenance_standard=equip_manintenance_standard,
+                                     equip_repair_standard=equip_repair_standard,
+                                     planned_repair_date=plan.planned_maintenance_date,
                                      status='已生成',
                                      equip_condition=plan.equip_condition,
                                      importance_level=plan.importance_level,
                                      created_user=self.request.user,
                                      )
-                results.append(res)
+                results.append(res.id)
             plan.status = '已生成工单'
             plan.save()
         return Response(results)
@@ -3352,7 +3358,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                  'accept_user': instance.created_user.username})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
             # 更新作业内容
-            if work_type == "维修":
+            if work_type == "维修":  #todo  or '== '计划维修'
                 result_standard = data.get('result_repair_standard')
                 instance = EquipRepairStandard.objects.filter(id=result_standard).first()
             else:
@@ -3520,16 +3526,19 @@ class EquipCodePrintView(APIView):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipPlanViewSet(ModelViewSet):
-    queryset = EquipPlan.objects.order_by('-id')
+    queryset = EquipPlan.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPlanSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPlanFilter
 
-    def create(self, request, *args, **kwargs):
-        if self.request.query_params.get('del'):
-            data = self.request.data
-            for i in data:
-                self.queryset.filter(id=i.get('id')).delete()
-            return Response('删除成功', status=status.HTTP_204_NO_CONTENT)
-        return super().create(request, *args, **kwargs)
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
+                url_path='close-plan', url_name='close-plan')
+    def close_plan(self, request, pk=None):
+        """关闭计划"""
+        ids = self.request.data.get('plan_ids')
+        for id in ids:
+            #todo  判断是否以生成工单， 已生成不能关闭
+            self.queryset.filter(id=id).update(delete_flag=True)
+        return Response('111')
+
