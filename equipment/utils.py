@@ -47,7 +47,7 @@ class DinDinAPI(object):
         AGENT_ID = '1336171749'
     else:
         APP_KEY = 'dingju0317gj7k9spsw1'
-        APP_SECRET = 'rvARM - cMGq93AKSZWrhEyJez0AvU9TaN - kTiaV78aJIwmQyY3TGmmoPOE3eRybEB'
+        APP_SECRET = 'rvARM-cMGq93AKSZWrhEyJez0AvU9TaN-kTiaV78aJIwmQyY3TGmmoPOE3eRybEB'
         AGENT_ID = '1144203103'
 
     def __init__(self):

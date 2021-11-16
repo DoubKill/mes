@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token
 
 from system.views import UserViewSet, UserGroupsViewSet, GroupExtensionViewSet, SectionViewSet, \
-    GroupAddUserViewSet, LoginView, Synchronization, GroupPermissions, PlanReceive, MaterialReceive
+    GroupAddUserViewSet, LoginView, Synchronization, GroupPermissions, PlanReceive, MaterialReceive, ResetPassword
 
 # app_name = 'system'
 router = DefaultRouter()
@@ -26,4 +26,5 @@ urlpatterns = [
     path('group-permissions/', GroupPermissions.as_view()),
     path('plan-receive/', PlanReceive.as_view()),  # 接受上辅机同步来计划的数据
     path('material-receive/', MaterialReceive.as_view()),  # 接受上辅机同步来原材料的数据
+    path('reset-password/', ResetPassword.as_view()),
 ]
