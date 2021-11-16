@@ -294,12 +294,17 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
 
     @atomic()
     def create(self, validated_data):
-        instance = ProductBatchingDetail.objects.filter(product_batching=validated_data['product_batching'],
-                                                        material=validated_data['material'],
-                                                        delete_flag=validated_data['delete_flag'])
-        if instance:
-            instance.update(**validated_data)
+        if validated_data['delete_flag']:
+            ProductBatchingDetail.objects.filter(product_batching=validated_data['product_batching'],
+                                                 material=validated_data['material']
+                                                 ).update(delete_flag=True)
         else:
+            # instance = ProductBatchingDetail.objects.filter(product_batching=validated_data['product_batching'],
+            #                                                 material=validated_data['material'],
+            #                                                 delete_flag=validated_data['delete_flag'])
+            # if instance:
+            #     instance.update(**validated_data)
+            # else:
             super().create(validated_data)
         return validated_data
 

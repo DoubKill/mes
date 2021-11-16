@@ -290,6 +290,10 @@ class RecipeNoticeAPiView(APIView):
             interface.request()
         except Exception as e:
             raise ValidationError(e)
+        for p in ProductBatching.objects.filter(batching_type=1,
+                                                stage_product_batch_no=product_batching.stage_product_batch_no,
+                                                dev_type=product_batching.dev_type):
+            p.batching_details.all().delete()
         return Response(data={'auxiliary_url': settings.AUXILIARY_URL}, status=status.HTTP_200_OK)
 
 
