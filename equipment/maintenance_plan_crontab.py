@@ -55,6 +55,8 @@ class MaintenancePlan:
     def maintenance_plan(self):
         queryset = EquipMaintenanceStandard.objects.filter(use_flag=True).all()
         for obj in queryset:
+            if not obj.start_time:
+                continue
             start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')
             kwargs = {  # 判断条件
                 '日': {'status': datetime.datetime.now() <= start_time + datetime.timedelta(days=obj.maintenance_cycle * obj.cycle_num) and
