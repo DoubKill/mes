@@ -5,7 +5,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
-    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder
+    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder, EquipPlan
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -407,3 +407,12 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
                   'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'importance_level',
                   'wait_material', 'wait_outsourcing', 'status', 'created_user', 'result_final_fault_cause',
                   'assign_user', 'assign_to_user',)
+
+
+class EquipPlanFilter(django_filters.rest_framework.FilterSet):
+    planned_maintenance_date = django_filters.CharFilter(field_name='planned_maintenance_date', help_text='计划日期',
+                                                         lookup_expr='planned_maintenance_date__date')
+
+    class Meta:
+        model = EquipPlan
+        fields = ('work_type', 'plan_name', 'planned_maintenance_date', 'plan_source', 'status', 'equip_condition', 'importance_level')

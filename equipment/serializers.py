@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
 from django.db.models import Max
 from django.db.transaction import atomic
@@ -1318,3 +1318,36 @@ class EquipWarehouseRecordDetailSerializer(BaseModelSerializer):
         model = EquipWarehouseRecord
         fields = ('spare_code', 'area_name', 'location_name', 'quantity', 'created_date', 'created_username')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPlanSerializer(BaseModelSerializer):
+    plan_name = serializers.CharField(help_text='计划名称', validators=[UniqueValidator(
+        queryset=EquipPlan.objects.all(), message='计划名称已存在')])
+    equip_no = serializers.ListField(help_text='机台', write_only=True)
+
+    class Meta:
+        model = EquipPlan.objects.all()
+        fields = '__all__'
+
+    def create(self, validated_data):
+        dic = EquipPlan.objects.filter(work_type=validated_data['work_type'], created_date__date=date.today()).aggregate(
+            Max('plan_id'))
+        res = dic.get('plan_id__max')
+        work_type = {
+            '巡检': 'XJ',
+            '保养': 'BY',
+            '润滑': 'RH',
+            '标定': 'BD',
+        }
+        if res:
+            plan_id = res[:10] + str('%04d' % (int(res[-4:]) + 1))
+        else:
+            plan_id = f'{work_type.get(validated_data["work_type"])}{date.today().strftime("%Y%m%d")}0001'
+
+        equip_no = '，'.join([equip['equip_no'] for equip in validated_data['equip_no']])
+        validated_data['plan_id'] = plan_id
+        validated_data['equip_no'] = equip_no
+        validated_data['plan_source'] = '人工创建'
+        validated_data['status'] = '未生成工单'
+        instance = super().create(validated_data)
+        return instance
