@@ -4,6 +4,7 @@ import sys
 from datetime import datetime, timedelta
 
 import django
+from django.db.models import Q
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -51,7 +52,7 @@ def handle(order):
             all_user = ''
             # 发送消息提醒
             if order.work_type == "维修":
-                if order.created_user.username == "mes":
+                if order.created_user.username != "系统自动":
                     # 报修发消息给被指派人和上级
                     all_user = "1,2"
                     uids = get_ding_uids_by_name(order.assign_to_user, all_user=all_user)
@@ -106,7 +107,7 @@ def handle(order):
             all_user = ''
             # 发送消息提醒
             if order.work_type == "维修":
-                if order.created_user == "mes":
+                if order.created_user.username != "系统自动":
                     # 报修发消息给被指派人和上级
                     all_user = "1,2"
                     uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
@@ -164,7 +165,7 @@ def handle(order):
             all_user = ''
             # 发送消息提醒
             if order.work_type == "维修":
-                if order.created_user == "mes":
+                if order.created_user.username != "系统自动":
                     # 报修发消息给被指派人和上级
                     all_user = "1,2"
                     uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
@@ -238,8 +239,7 @@ def get_ding_uids_by_name(user_name, all_user):
 
 def check_to_msg():
     # 所有维修工单
-    # orders = EquipApplyOrder.objects.filter(~Q(status__in=["已验收", "已关闭"]))
-    orders = EquipApplyOrder.objects.filter(id=1)
+    orders = EquipApplyOrder.objects.filter(~Q(status__in=["已验收", "已关闭"]))
     if not orders:
         logger.info("超时提醒: 所有维修单均已验收")
     for order in orders:
