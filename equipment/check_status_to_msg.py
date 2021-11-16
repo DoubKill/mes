@@ -52,7 +52,7 @@ def handle(order):
             all_user = ''
             # 发送消息提醒
             if order.work_type == "维修":
-                if order.created_user.username != "系统":
+                if order.created_user.username != "系统自动":
                     # 报修发消息给被指派人和上级
                     all_user = "1,2"
                     uids = get_ding_uids_by_name(order.assign_to_user, all_user=all_user)
@@ -107,7 +107,7 @@ def handle(order):
             all_user = ''
             # 发送消息提醒
             if order.work_type == "维修":
-                if order.created_user.username != "系统":
+                if order.created_user.username != "系统自动":
                     # 报修发消息给被指派人和上级
                     all_user = "1,2"
                     uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
@@ -165,7 +165,7 @@ def handle(order):
             all_user = ''
             # 发送消息提醒
             if order.work_type == "维修":
-                if order.created_user.username != "系统":
+                if order.created_user.username != "系统自动":
                     # 报修发消息给被指派人和上级
                     all_user = "1,2"
                     uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
