@@ -357,3 +357,20 @@ class MaterialReceive(CreateAPIView):
 def index(request):
     request.META["CSRF_COOKIE_USED"] = True
     return render(request, 'index.html')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ResetPassword(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        user = self.request.user
+        new_password = self.request.data.get('new_password')
+        old_password = self.request.data.get('old_password')
+        if not all([new_password, old_password]):
+            raise ValidationError('参数缺失！')
+        if not user.check_password(old_password):
+            raise ValidationError('原密码错误！')
+        user.set_password(new_password)
+        user.save()
+        return Response('修改成功')
