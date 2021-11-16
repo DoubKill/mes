@@ -370,7 +370,7 @@ class ResetPassword(APIView):
         if not all([new_password, old_password]):
             raise ValidationError('参数缺失！')
         if not user.check_password(old_password):
-            return Response('原密码错误！')
+            raise ValidationError('原密码错误！')
         user.set_password(new_password)
         user.save()
         return Response('修改成功')
