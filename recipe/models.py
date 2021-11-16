@@ -176,7 +176,8 @@ class ProductBatching(AbstractEntity):
             # 获取配方里物料名称和重量 隐藏细料硫磺
             material_name_weight += list(ProductBatchingDetail.objects.filter(~Q(material__material_name__icontains='-细料'),
                                                                               ~Q(material__material_name__icontains='-硫磺'),
-                                                                              ~Q(material__material_name__in=['掺料', '细料', '硫磺']),
+                                                                              ~Q(material__material_name__icontains='掺料'),
+                                                                              ~Q(material__material_name__in=['细料', '硫磺']),
                                                                               delete_flag=False, type=1,
                                                                               product_batching=product_batch.id)
                                          .values('material__material_name', 'actual_weight'))
