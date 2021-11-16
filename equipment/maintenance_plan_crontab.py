@@ -162,3 +162,5 @@ class ApplyOrder:
 if __name__ == '__main__':
     maintenance_plan = MaintenancePlan()
     maintenance_plan.maintenance_plan()
+    apply_order = ApplyOrder()
+    apply_order.create_order()
