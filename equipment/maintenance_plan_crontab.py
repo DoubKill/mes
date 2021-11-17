@@ -1,11 +1,13 @@
+"""
+根据设备维护维修标准自动生成维护维修计划
+"""
+
 import logging
 import os
 import sys
 import django
 import datetime
 import logging
-
-
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
