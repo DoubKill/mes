@@ -941,7 +941,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
         max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=validated_data['plan_id']).aggregate(
             max_order_code=Max('work_order_no'))['max_order_code']
         work_order_no = validated_data['plan_id'] + '-' + (
-            '%04d' % (int(max_order_code.split('-')[-1] + 1)) if max_order_code else '0001')
+            '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
         equip_order_data = {'plan_id': validated_data['plan_id'], 'plan_name': validated_data['plan_name'],
                             'work_order_no': work_order_no, 'equip_no': validated_data['equip_no'],
                             'status': '已生成', 'equip_condition': validated_data['equip_condition'],
