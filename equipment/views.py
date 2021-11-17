@@ -3745,8 +3745,8 @@ class EquipPlanViewSet(ModelViewSet):
     def close_plan(self, request, pk=None):
         """关闭计划"""
         ids = self.request.data.get('plan_ids')
-        for id in ids:
-            self.queryset.filter(id=id).update(delete_flag=True)
+        for i in ids:
+            self.queryset.filter(id=i).update(delete_flag=True)
         return Response('计划以关闭')
 
     # 生成设备维修工单
