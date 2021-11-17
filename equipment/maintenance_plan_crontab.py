@@ -1,11 +1,13 @@
+"""
+根据设备维护维修标准自动生成维护维修计划
+"""
+
 import logging
 import os
 import sys
 import django
 import datetime
 import logging
-
-
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,10 +17,9 @@ django.setup()
 
 from django.db.models import Count, Max
 from django.db.transaction import atomic
-from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder
+from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder, EquipInspectionOrder
 from production.models import TrainsFeedbacks
 from system.models import User
-
 
 
 class MaintenancePlan:
@@ -28,7 +29,7 @@ class MaintenancePlan:
             '保养': 'BY',
             '润滑': 'RH',
             '标定': 'BD',
-            '计划维修': 'WY',
+            '计划维修': 'WX',
         }
         user = User.objects.filter(username='系统自动').first()
         dic = EquipPlan.objects.filter(work_type=obj.work_type, created_date__date=datetime.date.today()).aggregate(
@@ -136,28 +137,46 @@ class ApplyOrder:
         for plan in queryset:
             equip_list = plan.equip_no.split('，')
             if plan.work_type == '巡检':
-                pass
+                if not EquipInspectionOrder.objects.filter(plan_id=plan.plan_id).exists() and (plan.planned_maintenance_date - datetime.datetime.now()) < datetime.timedelta(days=1):
+                    for equip in equip_list:
+                        max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan.plan_id). \
+                            aggregate(max_order_code=Max('work_order_no'))['max_order_code']
+                        work_order_no = plan.plan_id + '-' + (
+                            '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+                        user = User.objects.filter(username='系统自动').first()
+                        EquipInspectionOrder.objects.create(plan_id=plan.plan_id,
+                                                            plan_name=plan.plan_name,
+                                                            work_type=plan.work_type,
+                                                            work_order_no=work_order_no,
+                                                            equip_no=equip,
+                                                            equip_repair_standard=plan.equip_manintenance_standard,
+                                                            planned_repair_date=plan.planned_maintenance_date,
+                                                            status='已生成',
+                                                            equip_condition=plan.equip_condition,
+                                                            importance_level=plan.importance_level,
+                                                            created_user=user
+                                                   )
+                    plan.status = '已生成工单'
+                    plan.save()
             else:
                 if not EquipApplyOrder.objects.filter(plan_id=plan.plan_id).exists() and (plan.planned_maintenance_date - datetime.datetime.now()) < datetime.timedelta(days=1):
                     for equip in equip_list:
-                        max_order_code = \
-                        EquipApplyOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
-                            max_order_code=Max('work_order_no'))['max_order_code']
+                        max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=plan.plan_id). \
+                            aggregate(max_order_code=Max('work_order_no'))['max_order_code']
                         work_order_no = plan.plan_id + '-' + (
                             '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
                         user = User.objects.filter(username='系统自动').first()
                         EquipApplyOrder.objects.create(plan_id=plan.plan_id,
-                                                   plan_name=plan.plan_name,
-                                                   work_type=plan.work_type,
-                                                   work_order_no=work_order_no,
-                                                   equip_no=equip,
-                                                   equip_maintenance_standard=plan.equip_manintenance_standard,
-                                                   planned_repair_date=plan.planned_maintenance_date,
-                                                   status='已生成',
-                                                   equip_condition=plan.equip_condition,
-                                                   importance_level=plan.importance_level,
-                                                   created_user=user
-                                                   )
+                                                       plan_name=plan.plan_name,
+                                                       work_type=plan.work_type,
+                                                       work_order_no=work_order_no,
+                                                       equip_no=equip,
+                                                       equip_maintenance_standard=plan.equip_manintenance_standard,
+                                                       planned_repair_date=plan.planned_maintenance_date,
+                                                       status='已生成',
+                                                       equip_condition=plan.equip_condition,
+                                                       importance_level=plan.importance_level,
+                                                       created_user=user)
                     plan.status = '已生成工单'
                     plan.save()
 
