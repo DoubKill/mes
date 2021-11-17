@@ -3239,48 +3239,6 @@ class EquipApplyOrderViewSet(ModelViewSet):
             item.update(data)
         return Response(serializer.data)
 
-    # 生成设备维修工单
-    @atomic
-    def create(self, request, *args, **kwargs):
-        data = self.request.data
-        results = []
-        for i in data.get('ids'):
-            plan = EquipPlan.objects.filter(id=i).first()
-            equip_no = plan.equip_no
-            equip_list = equip_no.split('，')
-            if plan.work_type == '巡检':
-                continue
-            if self.queryset.filter(plan_id=plan.plan_id).count() == len(equip_list):
-                raise ValidationError('工单已生成')
-            for equip in equip_list:
-                max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
-                    max_order_code=Max('work_order_no'))['max_order_code']
-                work_order_no = plan.plan_id + '-' + (
-                    '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
-                if plan.work_type == '计划维修':
-                    equip_repair_standard = plan.equip_repair_standard
-                    equip_manintenance_standard = None
-                else:
-                    equip_repair_standard = None
-                    equip_manintenance_standard = plan.equip_manintenance_standard
-                res = self.queryset.create(plan_id=plan.plan_id,
-                                     plan_name=plan.plan_name,
-                                     work_type=plan.work_type,
-                                     work_order_no=work_order_no,
-                                     equip_no=equip,
-                                     equip_maintenance_standard=equip_manintenance_standard,
-                                     equip_repair_standard=equip_repair_standard,
-                                     planned_repair_date=plan.planned_maintenance_date,
-                                     status='已生成',
-                                     equip_condition=plan.equip_condition,
-                                     importance_level=plan.importance_level,
-                                     created_user=self.request.user,
-                                     )
-                results.append(res.id)
-            plan.status = '已生成工单'
-            plan.save()
-        return Response(results)
-
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
     def multi_update(self, request):
@@ -3358,7 +3316,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                  'accept_user': instance.created_user.username})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
             # 更新作业内容
-            if work_type == "维修":  #todo  or '== '计划维修'
+            if work_type == "维修" or work_type =='计划维修':
                 result_standard = data.get('result_repair_standard')
                 instance = EquipRepairStandard.objects.filter(id=result_standard).first()
             else:
@@ -3531,6 +3489,45 @@ class EquipPlanViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPlanFilter
+    FILE_NAME = '设别维护维修计划'
+    EXPORT_FIELDS_DICT = {
+        "作业类型": "work_type",
+        "计划编号": "plan_id",
+        "计划名称": "plan_name",
+        "机台": "equip_name",
+        "维护标准": "standard",
+        "设备条件": "equip_condition",
+        "重要程度": "importance_level",
+        "来源": "plan_source",
+        "状态": "status",
+        "计划维护日期": "planned_maintenance_date",
+        "下次维护日期": "next_maintenance_date",
+        "创建人": "created_username",
+        "创建时间": "created_date",
+    }
+
+    def list(self, request, *args, **kwargs):
+        if self.request.query_params.get('export'):
+            data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if self.request.query_params.get('work_type'):
+            kwargs = {
+                '巡检': 'XJ',
+                '保养': 'BY',
+                '润滑': 'RH',
+                '标定': 'BD',
+                '计划维修': 'WY',
+            }
+            work_type = self.request.query_params.get('work_type')
+            dic = EquipPlan.objects.filter(work_type=work_type, created_date__date=dt.date.today()).aggregate(
+                Max('plan_id'))
+            res = dic.get('plan_id__max')
+            if res:
+                plan_id = res[:10] + str('%04d' % (int(res[-4:]) + 1))
+            else:
+                plan_id = f'{kwargs.get(work_type)}{dt.date.today().strftime("%Y%m%d")}0001'
+            return Response({'plan_name': f'{work_type}{plan_id}'})
+        return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
                 url_path='close-plan', url_name='close-plan')
@@ -3538,7 +3535,50 @@ class EquipPlanViewSet(ModelViewSet):
         """关闭计划"""
         ids = self.request.data.get('plan_ids')
         for id in ids:
-            #todo  判断是否以生成工单， 已生成不能关闭
             self.queryset.filter(id=id).update(delete_flag=True)
-        return Response('111')
+        return Response('计划以关闭')
 
+    # 生成设备维修工单
+    @atomic
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
+            url_path='generate-order', url_name='generate-order')
+    def generate_order(self, request, *args, **kwargs):
+        data = self.request.data
+        results = []
+        for i in data.get('ids'):
+            plan = EquipPlan.objects.filter(id=i).first()
+            equip_no = plan.equip_no
+            equip_list = equip_no.split('，')
+            if plan.work_type == '巡检':
+                continue  #todo
+            else:
+                if EquipApplyOrder.objects.filter(plan_id=plan.plan_id).count() == len(equip_list):
+                    raise ValidationError('工单已生成')
+                for equip in equip_list:
+                    max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
+                        max_order_code=Max('work_order_no'))['max_order_code']
+                    work_order_no = plan.plan_id + '-' + (
+                        '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+                    if plan.work_type == '计划维修':
+                        equip_repair_standard = plan.equip_repair_standard
+                        equip_manintenance_standard = None
+                    else:
+                        equip_repair_standard = None
+                        equip_manintenance_standard = plan.equip_manintenance_standard
+                    res = EquipApplyOrder.objects.create(plan_id=plan.plan_id,
+                                         plan_name=plan.plan_name,
+                                         work_type=plan.work_type,
+                                         work_order_no=work_order_no,
+                                         equip_no=equip,
+                                         equip_maintenance_standard=equip_manintenance_standard,
+                                         equip_repair_standard=equip_repair_standard,
+                                         planned_repair_date=plan.planned_maintenance_date,
+                                         status='已生成',
+                                         equip_condition=plan.equip_condition,
+                                         importance_level=plan.importance_level,
+                                         created_user=self.request.user,
+                                         )
+                    results.append(res.id)
+            plan.status = '已生成工单'
+            plan.save()
+        return Response(results)
