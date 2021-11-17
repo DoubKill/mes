@@ -1330,10 +1330,15 @@ class EquipPlanSerializer(BaseModelSerializer):
     equip_name = serializers.ReadOnlyField(source='equip_no')
     planned_maintenance_date = serializers.CharField()
     next_maintenance_date = serializers.CharField(default=None)
+    standard = serializers.SerializerMethodField()
 
     class Meta:
         model = EquipPlan
         fields = '__all__'
+
+    def get_standard(self, instance):
+        standard = instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_manintenance_standard.standard_name
+        return standard
 
     def create(self, validated_data):
         dic = EquipPlan.objects.filter(work_type=validated_data['work_type'], created_date__date=date.today()).aggregate(
