@@ -76,7 +76,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             raise serializers.ValidationError(e)
 
         pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
-        weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
+        # 隐藏细料硫磺
+        # weight_package = WeightPackageLog.objects.filter(bra_code=bra_code).first()
         material_no = material_name = None
         total_weight = 0
         unit = 'KG'
@@ -84,8 +85,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
         # 获取配方信息
-        product_batch_info = ProductBatching.objects.filter(id=classes_plan.product_batching_id).first()
-        material_name_weight = product_batch_info.get_product_batch
+        material_name_weight = classes_plan.product_batching.get_product_batch
         if not material_name_weight:
             raise serializers.ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
@@ -125,12 +125,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             total_weight = instance.weight
             unit = unit
             attrs['scan_material'] = material_name
-        if weight_package:
-            material_no = weight_package.material_no
-            material_name = weight_package.material_name
-            total_weight = weight_package.package_count
-            unit = '包'
-            attrs['scan_material'] = material_name
+        # 隐藏细料硫磺
+        # if weight_package:
+        #     material_no = weight_package.material_no
+        #     material_name = weight_package.material_name
+        #     total_weight = weight_package.package_count
+        #     unit = '包'
+        #     attrs['scan_material'] = material_name
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         attrs['equip_no'] = classes_plan.equip.equip_no

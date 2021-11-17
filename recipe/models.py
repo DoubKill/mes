@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Q
 
 from basics.models import GlobalCode, Equip, EquipCategoryAttribute
 from system.models import AbstractEntity, User
@@ -166,19 +166,43 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
+    # 留存
+    # @property
+    # def get_product_batch(self):
+    #     material_name_weight = []
+    #     # 获取机型配方
+    #     product_batch = ProductBatching.objects.filter(stage_product_batch_no=self.stage_product_batch_no, used_type=4,
+    #                                                    dev_type__category_no=self.dev_type.category_no, batching_type=2).first()
+    #     if product_batch:
+    #         # 获取配方里物料名称和重量 隐藏细料硫磺
+    #         material_name_weight += list(ProductBatchingDetail.objects.filter(~Q(material__material_name__icontains='-细料'),
+    #                                                                           ~Q(material__material_name__icontains='-硫磺'),
+    #                                                                           ~Q(material__material_name__icontains='掺料'),
+    #                                                                           ~Q(material__material_name__in=['细料', '硫磺']),
+    #                                                                           delete_flag=False, type=1,
+    #                                                                           product_batching=product_batch.id)
+    #                                      .values('material__material_name', 'actual_weight'))
+    #         # 隐藏细料硫磺
+    #         # material_name_weight += list(WeighCntType.objects.filter(delete_flag=False, product_batching=product_batch.id)
+    #         #                              .values(material__material_name=F('name'), actual_weight=F('package_cnt')))
+    #
+    #     return material_name_weight
+
     @property
     def get_product_batch(self):
         material_name_weight = []
-        # 获取机型配方
-        product_batch = ProductBatching.objects.filter(stage_product_batch_no=self.stage_product_batch_no, used_type=4,
-                                                       dev_type__category_no=self.dev_type.category_no, batching_type=2).first()
-        if product_batch:
-            # 获取配方里物料名称和重量
-            material_name_weight += list(ProductBatchingDetail.objects.filter(delete_flag=False, type=1,
-                                                                              product_batching=product_batch.id)
-                                         .values('material__material_name', 'actual_weight'))
-            material_name_weight += list(WeighCntType.objects.filter(delete_flag=False, product_batching=product_batch.id)
-                                         .values(material__material_name=F('name'), actual_weight=F('package_cnt')))
+        # 获取配方里物料名称和重量 隐藏细料硫磺
+        material_name_weight += list(
+            ProductBatchingDetail.objects.filter(~Q(material__material_name__icontains='-细料'),
+                                                 ~Q(material__material_name__icontains='-硫磺'),
+                                                 ~Q(material__material_name__icontains='掺料'),
+                                                 ~Q(material__material_name__in=['细料', '硫磺']),
+                                                 delete_flag=False, type=1,
+                                                 product_batching=self.id)
+            .values('material__material_name', 'actual_weight'))
+        # 隐藏细料硫磺
+        # material_name_weight += list(WeighCntType.objects.filter(delete_flag=False, product_batching=product_batch.id)
+        #                              .values(material__material_name=F('name'), actual_weight=F('package_cnt')))
 
         return material_name_weight
 
