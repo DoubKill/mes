@@ -1337,7 +1337,11 @@ class EquipPlanSerializer(BaseModelSerializer):
         fields = '__all__'
 
     def get_standard(self, instance):
-        standard = instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_manintenance_standard.standard_name
+        standard = None
+        if instance.equip_repair_standard:
+            standard = instance.equip_repair_standard.standard_name
+        elif instance.equip_manintenance_standard:
+            standard = instance.equip_manintenance_standard.standard_name
         return standard
 
     def create(self, validated_data):
