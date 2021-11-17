@@ -656,12 +656,22 @@ class EquipWarehouseArea(AbstractEntity):
     area_name = models.CharField(max_length=64, help_text='库区名称')
     desc = models.CharField(max_length=64, help_text='描述', blank=True, default='')
     area_barcode = models.CharField(max_length=64, help_text='库区条码', blank=True, default='')
-    equip_component_type = models.ForeignKey(EquipComponentType, help_text='备件分类', on_delete=models.CASCADE, null=True,
-                                             blank=True)
+    equip_component_type = models.ManyToManyField(EquipComponentType, help_text='备件分类',
+                                                  related_name='equip_component_type',
+                                                  through='EquipWarehouseAreaComponent')
 
     class Meta:
         db_table = 'equip_warehouse_area'
         verbose_name = verbose_name_plural = '备件库库区'
+
+
+class EquipWarehouseAreaComponent(models.Model):
+    equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='设备部件', on_delete=models.CASCADE)
+    equip_component_type = models.ForeignKey(EquipComponentType, help_text='备件分类', on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = 'equip_warehouse_area_component'
+        verbose_name_plural = verbose_name = '备件库区分类'
 
 
 class EquipWarehouseLocation(AbstractEntity):
