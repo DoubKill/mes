@@ -119,6 +119,9 @@ router.register('equip-apply-repair', EquipApplyRepairViewSet)
 # 设备维修工单查询
 router.register('equip-apply-order', EquipApplyOrderViewSet)
 
+# 设备巡检工单查询
+router.register('equip-inspection-order', EquipInspectionOrderViewSet)
+
 # 维修物料申请
 router.register('equip-repair-material-req', EquipRepairMaterialReqViewSet)
 

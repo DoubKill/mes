@@ -1,7 +1,6 @@
 import copy
 import datetime
 import datetime as dt
-import time
 from io import BytesIO
 
 import requests
@@ -21,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from basics.models import GlobalCode, EquipCategoryAttribute
+from basics.models import EquipCategoryAttribute
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
     EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter, \
@@ -30,7 +29,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipBomFilter, EquipJobItemStandardFilter, EquipMaintenanceStandardFilter, EquipRepairStandardFilter, \
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
-    EquipPlanFilter
+    EquipPlanFilter, EquipInspectionOrderFilter
 from equipment.models import EquipTargetMTBFMTTRSetting
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
@@ -3277,6 +3276,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                      {"key": "接单时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '退单':
+            receive_num = EquipApplyOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
+            if receive_num != 0:
+                raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
                 'assign_user': None, 'assign_datetime': None,
@@ -3295,6 +3297,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 'last_updated_date': datetime.now()
             }
         elif opera_type == '处理':
+            repair_num = EquipInspectionOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
+            if repair_num != 0:
+                raise ValidationError('未开始订单无法进行处理操作, 请刷新订单!')
             result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
@@ -3330,6 +3335,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
             for apply_material in apply_material_list:
                 EquipRepairMaterialReq.objects.create(**apply_material)
         elif opera_type == '验收':
+            accept_num = EquipInspectionOrder.objects.filter(~Q(status='已完成'), id__in=pks).count()
+            if accept_num != 0:
+                raise ValidationError('已完成订单才可验收, 请刷新订单!')
             image_url_list = data.pop('image_url_list', [])
             result_accept_result = data.get('result_accept_result')
             if result_accept_result == '合格':
@@ -3347,6 +3355,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
         else:  # 关闭
+            close_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
+            if close_num != 0:
+                raise ValidationError('存在已经关闭的订单, 请刷新订单!')
             data = {'status': data.get('status'), 'last_updated_date': datetime.now()}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
@@ -3359,7 +3370,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         EquipApplyRepair.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(
             status=data.get('status'))
         # 发送数据
-        if isinstance(user_ids, list):
+        if user_ids and isinstance(user_ids, list):
             for order_id in pks:
                 new_content = copy.deepcopy(content)
                 instance = self.queryset.filter(id=order_id).first()
@@ -3370,6 +3381,206 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                        {"key": "部位名称:",
                                         "value": instance.equip_part_new.part_name if instance.equip_part_new else ''},
                                        {"key": "故障原因:", "value": fault_name},
+                                       {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
+                ding_api.send_message(user_ids, new_content, order_id)
+        return Response(f'{opera_type}操作成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipInspectionOrderViewSet(ModelViewSet):
+    """
+    list:设备维修工单列表
+    """
+    queryset = EquipInspectionOrder.objects.all().order_by('-id')
+    serializer_class = EquipInspectionOrderSerializer
+    # permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = EquipInspectionOrderFilter
+    FILE_NAME = '设备巡检工单表'
+    EXPORT_FIELDS_DICT = {
+        "计划/报修编号": "plan_id",
+        "计划/报修名称": "plan_name",
+        "工单编号": "work_order_no",
+        "机台": "equip_no",
+        "巡检标准": "equip_repair_standard_name",
+        "计划巡检日期": "planned_repair_date",
+        "设备条件": "equip_condition",
+        "重要程度": "importance_level",
+        "状态": "status",
+        "指派人": "assign_user",
+        "指派时间": "assign_datetime",
+        "被指派人": "assign_to_user",
+        "接单人": "receiving_user",
+        "接单时间": "receiving_datetime",
+        "巡检人": "repair_user",
+        "巡检开始时间": "repair_start_datetime",
+        "巡检结束时间": "repair_end_datetime",
+        "录入人": "created_username",
+        "录入时间": "created_date"
+    }
+
+    def get_queryset(self):
+        my_order = self.request.query_params.get('my_order')
+        status = self.request.query_params.get('status')
+        searched = self.request.query_params.get('searched')
+        user_name = self.request.user.username
+        if my_order == '1':
+            if not status:
+                if not searched:
+                    query_set = self.queryset.filter(
+                        Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user=user_name)))
+                else:
+                    query_set = self.queryset.filter(
+                        Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                        Q(repair_user=user_name) | Q(status='已生成'))
+            else:
+                query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                                                 Q(repair_user=user_name) | Q(status='已生成'))
+        elif my_order == '2':
+            if not status:
+                if not searched:
+                    query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                                                       Q(status='已开始', repair_end_datetime__isnull=True)))
+                else:
+                    query_set = self.queryset
+            else:
+                query_set = self.queryset
+        else:
+            query_set = self.queryset
+        return query_set
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        my_order = self.request.query_params.get('my_order')
+        if self.request.query_params.get('export'):
+            data = EquipInspectionOrderSerializer(self.filter_queryset(self.get_queryset()), many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        # 小程序获取数量 带指派 带接单 进行中 已完成 已验收
+        if my_order == '1':
+            user_name = self.request.user.username
+            wait_assign = self.queryset.filter(status='已生成').count()
+            assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
+            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+                                                Q(status='已开始', repair_end_datetime__isnull=True,
+                                                  repair_user=user_name))).count()
+            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
+        else:
+            wait_assign = self.queryset.filter(status='已生成').count()
+            assigned = self.queryset.filter(status='已指派').count()
+            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                                                Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            finished = self.queryset.filter(status='已完成').count()
+        data = {'wait_assign': wait_assign, 'assigned': assigned, 'processing': processing, 'finished': finished}
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            for item in serializer.data:
+                item.update(data)
+            response = self.get_paginated_response(serializer.data)
+            response.data.update({'index': data})
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        for item in serializer.data:
+            item.update(data)
+        return Response(serializer.data)
+
+    @atomic
+    @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
+    def multi_update(self, request):
+        data = copy.deepcopy(self.request.data)
+        pks = data.pop('pks')
+        opera_type = data.pop('opera_type')
+        user_ids = self.request.user.username
+        ding_api = DinDinAPI()
+        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        content = {}
+        if opera_type == '指派':
+            assign_num = EquipInspectionOrder.objects.filter(~Q(status='已生成'), id__in=pks).count()
+            if assign_num != 0:
+                raise ValidationError('存在非已生成的订单, 请刷新订单!')
+            assign_to_user = data.get('assign_to_user')
+            if not assign_to_user:
+                raise ValidationError('未选择被指派人')
+            data = {
+                'status': data.get('status'), 'assign_to_user': ','.join(assign_to_user), 'assign_user': user_ids,
+                'assign_datetime': now_date, 'last_updated_date': datetime.now()
+            }
+            content.update({"title": "您有新的设备巡检单到达，请尽快处理！",
+                            "form": [{"key": "指派人:", "value": self.request.user.username},
+                                     {"key": "指派时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, names=assign_to_user)
+        elif opera_type == '接单':
+            assign_to_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
+            if assign_to_num != 0:
+                raise ValidationError('存在未被指派的订单, 请刷新订单!')
+            data = {
+                'status': data.get('status'), 'receiving_user': user_ids, 'receiving_datetime': now_date,
+                'last_updated_date': datetime.now()
+            }
+            content.update({"title": f"您指派的设备巡检单已被{user_ids}接单",
+                            "form": [{"key": "接单人:", "value": user_ids},
+                                     {"key": "接单时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, pks)
+        elif opera_type == '退单':
+            receive_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
+            if receive_num != 0:
+                raise ValidationError('未指派订单无法退单, 请刷新订单!')
+            data = {
+                'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
+                'assign_user': None, 'assign_datetime': None,
+                'assign_to_user': None, 'last_updated_date': datetime.now()
+            }
+            content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
+                            "form": [{"key": "退单人:", "value": user_ids},
+                                     {"key": "退单时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, pks)
+        elif opera_type == '开始':
+            receive_num = EquipInspectionOrder.objects.filter(~Q(status='已接单'), id__in=pks).count()
+            if receive_num != 0:
+                raise ValidationError('订单未被接单, 请刷新订单!')
+            data = {
+                'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
+                'last_updated_date': datetime.now()
+            }
+        elif opera_type == '处理':
+            repair_num = EquipInspectionOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
+            if repair_num != 0:
+                raise ValidationError('未开始订单无法进行处理操作, 请刷新订单!')
+            work_content = data.pop('work_content', [])
+            image_url_list = data.pop('image_url_list', [])
+            work_order_no = data.pop('work_order_no')
+            data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
+                         'result_repair_graph_url': json.dumps(image_url_list)})
+            # 更新作业内容
+            result_standard = data.get('equip_repair_standard')
+            instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
+            if instance:
+                EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
+                for item in work_content:
+                    item.update({'work_type': '巡检', 'work_order_no': work_order_no})
+                    EquipResultDetail.objects.create(**item)
+        else:  # 关闭
+            accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
+            if accept_num != 0:
+                raise ValidationError('存在已经关闭的订单, 请刷新订单!')
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now()}
+            content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
+                            "form": [{"key": "闭单人:", "value": user_ids},
+                                     {"key": "关闭时间:", "value": now_date}]})
+            user_ids = get_ding_uids(ding_api, pks)
+        # 更新数据
+        self.get_queryset().filter(id__in=pks).update(**data)
+        # 发送数据
+        if user_ids and isinstance(user_ids, list):
+            for order_id in pks:
+                new_content = copy.deepcopy(content)
+                instance = self.queryset.filter(id=order_id).first()
+                fault_name = instance.equip_repair_standard.standard_name if instance.equip_repair_standard else ''
+                new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
+                                       {"key": "机台:", "value": instance.equip_no},
+                                       {"key": "巡检标准:", "value": fault_name},
                                        {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
                 ding_api.send_message(user_ids, new_content, order_id)
         return Response(f'{opera_type}操作成功')

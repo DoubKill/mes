@@ -17,7 +17,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
-    EquipRepairMaterialReq
+    EquipRepairMaterialReq, EquipInspectionOrder
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -1114,6 +1114,75 @@ class EquipApplyOrderExportSerializer(BaseModelSerializer):
     class Meta:
         model = EquipApplyOrder
         fields = '__all__'
+
+
+class EquipInspectionOrderSerializer(BaseModelSerializer):
+    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name',
+                                                           help_text='维护标准名', default='')
+    work_persons = serializers.ReadOnlyField(source='equip_maintenance_standard.cycle_person_num', help_text='作业标准人数',
+                                             default='')
+    equip_type = serializers.SerializerMethodField(help_text='设备机型')
+    work_content = serializers.ListField(help_text='实际巡检标准列表', write_only=True, default=[])
+    image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
+    plan_name = serializers.CharField(max_length=64, help_text='巡检计划名称', validators=[
+        UniqueValidator(queryset=EquipInspectionOrder.objects.all(), message='巡检计划名称已存在')
+    ])
+
+    def get_equip_type(self, obj):
+        instance = Equip.objects.filter(equip_no=obj.equip_no).first()
+        return instance.category_id if instance else ''
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        work_content = []
+        result_repair_graph_url = res.get('result_repair_graph_url') if res.get('result_repair_graph_url') else '[]'
+        res.update({'result_repair_graph_url': json.loads(result_repair_graph_url)})
+        instance = EquipMaintenanceStandard.objects.filter(id=res.get('equip_repair_standard')).first()
+        if instance:
+            data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'],
+                                                    equip_jobitem_standard=instance.equip_job_item_standard)
+            if data:
+                for i in data:
+                    work_content.append(
+                        {'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
+                         'job_item_check_standard': i.job_item_check_standard,
+                         'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
+                         'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+        res['work_content'] = work_content
+        # 区域位置
+        bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
+        res['are_name'] = bom_obj.equip_area_define.area_name if bom_obj and bom_obj.equip_area_define else ''
+        # 部门
+        prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
+                                         global_type__type_name='设备部门组织名称').first()
+        res['product_name'] = prod.global_name if prod else ''
+        return res
+
+    @atomic
+    def create(self, validated_data):
+        work_content = validated_data.pop('work_content')
+        image_url_list = validated_data.pop('image_url_list')
+        # 生成巡检计划号
+        now_time = ''.join(str(datetime.now().date()).split('-'))
+        max_code = EquipInspectionOrder.objects.aggregate(max_code=Max('plan_id'))['max_code']
+        sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
+        plan_id = f'XJ{now_time}{sequence}'
+        # 生成巡检工单编号
+        max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan_id).aggregate(
+            max_order_code=Max('work_order_no'))['max_order_code']
+        work_order_no = plan_id + '-' + ('%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+        # 获取条码
+        instance = EquipBom.objects.filter(equip_info__equip_no=validated_data['equip_no']).first()
+        equip_barcode = instance.node_id if instance else ''
+        validated_data.update({
+            'plan_id': plan_id, 'status': '已生成', 'work_order_no': work_order_no, 'equip_barcode': equip_barcode
+        })
+        return super().create(validated_data)
+
+    class Meta:
+        model = EquipInspectionOrder
+        fields = '__all__'
+        read_only_fields = ['inspection_graph_url']
 
 
 class UploadImageSerializer(BaseModelSerializer):
