@@ -85,8 +85,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
         # 获取配方信息
-        product_batch_info = ProductBatching.objects.filter(id=classes_plan.product_batching_id).first()
-        material_name_weight = product_batch_info.get_product_batch
+        material_name_weight = classes_plan.product_batching.get_product_batch
         if not material_name_weight:
             raise serializers.ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
