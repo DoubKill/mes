@@ -28,6 +28,7 @@ class MaintenancePlan:
             '保养': 'BY',
             '润滑': 'RH',
             '标定': 'BD',
+            '计划维修': 'WY',
         }
         user = User.objects.filter(username='系统自动').first()
         dic = EquipPlan.objects.filter(work_type=obj.work_type, created_date__date=datetime.date.today()).aggregate(

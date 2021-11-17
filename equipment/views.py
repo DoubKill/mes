@@ -3510,6 +3510,23 @@ class EquipPlanViewSet(ModelViewSet):
         if self.request.query_params.get('export'):
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if self.request.query_params.get('work_type'):
+            kwargs = {
+                '巡检': 'XJ',
+                '保养': 'BY',
+                '润滑': 'RH',
+                '标定': 'BD',
+                '计划维修': 'WY',
+            }
+            work_type = self.request.query_params.get('work_type')
+            dic = EquipPlan.objects.filter(work_type=work_type, created_date__date=dt.date.today()).aggregate(
+                Max('plan_id'))
+            res = dic.get('plan_id__max')
+            if res:
+                plan_id = res[:10] + str('%04d' % (int(res[-4:]) + 1))
+            else:
+                plan_id = f'{kwargs.get(work_type)}{dt.date.today().strftime("%Y%m%d")}0001'
+            return Response({'plan_name': f'{work_type}{plan_id}'})
         return super().list(request, *args, **kwargs)
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
