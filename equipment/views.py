@@ -3727,7 +3727,7 @@ class EquipPlanViewSet(ModelViewSet):
                 '保养': 'BY',
                 '润滑': 'RH',
                 '标定': 'BD',
-                '计划维修': 'WY',
+                '计划维修': 'WX',
             }
             work_type = self.request.query_params.get('work_type')
             dic = EquipPlan.objects.filter(work_type=work_type, created_date__date=dt.date.today()).aggregate(
@@ -3761,7 +3761,25 @@ class EquipPlanViewSet(ModelViewSet):
             equip_no = plan.equip_no
             equip_list = equip_no.split('，')
             if plan.work_type == '巡检':
-                continue  #todo
+                if EquipInspectionOrder.objects.filter(plan_id=plan.plan_id).count() == len(equip_list):
+                    raise ValidationError('工单已生成')
+                for equip in equip_list:
+                    max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
+                        max_order_code=Max('work_order_no'))['max_order_code']
+                    work_order_no = plan.plan_id + '-' + (
+                        '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+                    res = EquipInspectionOrder.objects.create(plan_id=plan.plan_id,
+                                                              plan_name=plan.plan_name,
+                                                              work_type=plan.work_type,
+                                                              work_order_no=work_order_no,
+                                                              equip_no=equip,
+                                                              equip_repair_standard=plan.equip_manintenance_standard,
+                                                              planned_repair_date=plan.planned_maintenance_date,
+                                                              status='已生成',
+                                                              equip_condition=plan.equip_condition,
+                                                              importance_level=plan.importance_level,
+                                                              created_user=self.request.user)
+                    results.append(res.id)
             else:
                 if EquipApplyOrder.objects.filter(plan_id=plan.plan_id).count() == len(equip_list):
                     raise ValidationError('工单已生成')
@@ -3777,18 +3795,17 @@ class EquipPlanViewSet(ModelViewSet):
                         equip_repair_standard = None
                         equip_manintenance_standard = plan.equip_manintenance_standard
                     res = EquipApplyOrder.objects.create(plan_id=plan.plan_id,
-                                         plan_name=plan.plan_name,
-                                         work_type=plan.work_type,
-                                         work_order_no=work_order_no,
-                                         equip_no=equip,
-                                         equip_maintenance_standard=equip_manintenance_standard,
-                                         equip_repair_standard=equip_repair_standard,
-                                         planned_repair_date=plan.planned_maintenance_date,
-                                         status='已生成',
-                                         equip_condition=plan.equip_condition,
-                                         importance_level=plan.importance_level,
-                                         created_user=self.request.user,
-                                         )
+                                                         plan_name=plan.plan_name,
+                                                         work_type=plan.work_type,
+                                                         work_order_no=work_order_no,
+                                                         equip_no=equip,
+                                                         equip_maintenance_standard=equip_manintenance_standard,
+                                                         equip_repair_standard=equip_repair_standard,
+                                                         planned_repair_date=plan.planned_maintenance_date,
+                                                         status='已生成',
+                                                         equip_condition=plan.equip_condition,
+                                                         importance_level=plan.importance_level,
+                                                         created_user=self.request.user)
                     results.append(res.id)
             plan.status = '已生成工单'
             plan.save()
