@@ -2988,9 +2988,9 @@ class EquipAutoPlanView(APIView):
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             # spare_obj = data['equip_spare']
             if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
-                                                              equip_component_type=spare_obj.equip_component_type).exists():
+                                                              equip_component_type=spare_obj.equip_spare.equip_component_type).exists():
                 return Response({"success": False,
-                                 "message": f'此库区不能存放{spare_obj.equip_component_type.component_type_name}类型的备件',
+                                 "message": f'此库区不能存放{spare_obj.equip_spare.equip_component_type.component_type_name}类型的备件',
                                  "data": None})
 
             # area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
