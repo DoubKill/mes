@@ -2986,12 +2986,20 @@ class EquipAutoPlanView(APIView):
                 }})
             # 判断库区类型 和 备件类型是否匹配
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
-            component_type = area_obj.equip_component_type
-            if component_type:
-                if component_type != spare_obj.equip_spare.equip_component_type:
-                    return Response({"success": False,
-                                     "message": f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件',
-                                     "data": None})
+            spare_obj = data['equip_spare']
+            if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
+                                                              equip_component_type=spare_obj.equip_component_type).exists():
+                return Response({"success": False,
+                                 "message": f'此库区不能存放{spare_obj.equip_component_type.component_type_name}类型的备件',
+                                 "data": None})
+
+            # area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
+            # component_type = area_obj.equip_component_type
+            # if component_type:
+            #     if component_type != spare_obj.equip_spare.equip_component_type:
+            #         return Response({"success": False,
+            #                          "message": f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件',
+            #                          "data": None})
 
             # 根据入库的数量修改状态
             quantity = in_quantity + instance.in_quantity
@@ -3043,7 +3051,7 @@ class EquipAutoPlanView(APIView):
                 }})
         if status == 2:
             if spare_obj.status == 0:  # 未入库
-                return Response({"success": False, "message": "该备件还未出库", "data": {
+                return Response({"success": False, "message": "该备件还未入库", "data": {
                     'specification': spare_obj.equip_spare.specification,
                     'equip_warehouse_area': None,
                     'equip_warehouse_location': None,
