@@ -2986,7 +2986,7 @@ class EquipAutoPlanView(APIView):
                 }})
             # 判断库区类型 和 备件类型是否匹配
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
-            spare_obj = data['equip_spare']
+            # spare_obj = data['equip_spare']
             if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
                                                               equip_component_type=spare_obj.equip_component_type).exists():
                 return Response({"success": False,
