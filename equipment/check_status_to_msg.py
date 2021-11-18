@@ -87,7 +87,8 @@ def handle(order):
                                 {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "被指派人:", "value": order.assign_to_user},
-                                {"key": "指派时间:", "value": str(order.assign_datetime)}]}
+                                {"key": "指派时间:", "value": str(order.assign_datetime)},
+                                {"key": "提醒时间:", "value": str(now_date)}]}
             if "1" in all_user:
                 ding_api.send_message(uids[:1], content, order_id=order.id)
                 if len(uids) > 2:
@@ -142,7 +143,8 @@ def handle(order):
                                 {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "接单人:", "value": order.receiving_user},
-                                {"key": "接单时间:", "value": str(order.receiving_datetime)}]}
+                                {"key": "接单时间:", "value": str(order.receiving_datetime)},
+                                {"key": "提醒时间:", "value": str(now_date)}]}
             if "1" in all_user:
                 ding_api.send_message(uids[:1], content, order_id=order.id)
                 if len(uids) > 2:
@@ -157,7 +159,7 @@ def handle(order):
         if not accept_interval or not accept_warning_times:
             logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
             return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
-        record_time = order.receiving_datetime
+        record_time = order.repair_end_datetime
         check_result, times = compare_time(now_date, record_time, accept_interval, accept_warning_times)
         if check_result:
             order.timeout_color = "red"
@@ -186,7 +188,7 @@ def handle(order):
                     all_user += "2"
                 if order.equip_maintenance_standard.remind_flag3:
                     all_user += "3"
-                uids = get_ding_uids_by_name(order.receiving_user, all_user)
+                uids = get_ding_uids_by_name(order.created_user.username, all_user)
             if not all_user:
                 logger.info(f"本单据{order.work_order_no}标准中未设置提醒")
                 return "本单据{order.work_order_no}标准中未设置提醒"
@@ -200,7 +202,8 @@ def handle(order):
                                 {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "维修人:", "value": order.repair_user},
-                                {"key": "维修完成时间:", "value": str(order.repair_end_datetime)}]}
+                                {"key": "维修完成时间:", "value": str(order.repair_end_datetime)},
+                                {"key": "提醒时间:", "value": str(now_date)}]}
             if "1" in all_user:
                 ding_api.send_message(uids[:1], content, order_id=order.id)
                 if len(uids) > 2:

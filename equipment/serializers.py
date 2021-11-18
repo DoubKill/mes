@@ -1148,6 +1148,15 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+            else:
+                data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard_id) \
+                    .values('equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+                for i in data:
+                    work_content.append(
+                        {'job_item_sequence': i.get('sequence'), 'job_item_content': i.get('content'),
+                         'job_item_check_standard': i.get('check_standard_desc'),
+                         'equip_jobitem_standard_id': i.get('equip_standard'),
+                         'job_item_check_type': i.get('check_standard_type')})
         res['work_content'] = work_content
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
@@ -1175,7 +1184,8 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         instance = EquipBom.objects.filter(equip_info__equip_no=validated_data['equip_no']).first()
         equip_barcode = instance.node_id if instance else ''
         validated_data.update({
-            'plan_id': plan_id, 'status': '已生成', 'work_order_no': work_order_no, 'equip_barcode': equip_barcode
+            'plan_id': plan_id, 'status': '已生成', 'work_order_no': work_order_no, 'equip_barcode': equip_barcode,
+            'planned_repair_date': datetime.now().date()
         })
         return super().create(validated_data)
 

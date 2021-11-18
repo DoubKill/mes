@@ -162,9 +162,8 @@ class BatchProductBatchingVIew(APIView):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             raise ValidationError('该计划不存在')
-        product_batch_info = ProductBatching.objects.filter(id=classes_plan.product_batching_id).first()
         # 配方信息
-        ret = product_batch_info.get_product_batch
+        ret = classes_plan.product_batching.get_product_batch
         if not ret:
             raise ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         # 加载物料标准信息
