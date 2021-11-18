@@ -3321,7 +3321,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                  'accept_user': instance.created_user.username})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
             # 更新作业内容
-            if work_type == "维修" or work_type =='计划维修':
+            if work_type == "维修":
                 result_standard = data.get('result_repair_standard')
                 instance = EquipRepairStandard.objects.filter(id=result_standard).first()
             else:
@@ -3727,7 +3727,7 @@ class EquipPlanViewSet(ModelViewSet):
                 '保养': 'BY',
                 '润滑': 'RH',
                 '标定': 'BD',
-                '计划维修': 'WX',
+                '维修': 'BX',
             }
             work_type = self.request.query_params.get('work_type')
             dic = EquipPlan.objects.filter(work_type=work_type, created_date__date=dt.date.today()).aggregate(
@@ -3788,7 +3788,7 @@ class EquipPlanViewSet(ModelViewSet):
                         max_order_code=Max('work_order_no'))['max_order_code']
                     work_order_no = plan.plan_id + '-' + (
                         '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
-                    if plan.work_type == '计划维修':
+                    if plan.work_type == '维修':
                         equip_repair_standard = plan.equip_repair_standard
                         equip_manintenance_standard = None
                     else:
