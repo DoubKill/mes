@@ -2523,10 +2523,9 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             # 判断库区类型 和 备件类型是否匹配
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             spare_obj = data['equip_spare']
-            component_type = area_obj.equip_component_type
-            if component_type:
-                if component_type != spare_obj.equip_component_type:
-                    raise ValidationError(f'此库区只能存放{area_obj.equip_component_type.component_type_name}类型的备件')
+            if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
+                                                              equip_component_type=spare_obj.equip_component_type).exists():
+                raise ValidationError(f'此库区不能存放{spare_obj.equip_component_type.component_type_name}类型的备件')
             # 根据入库的数量修改状态
             quantity = in_quantity + instance.in_quantity
             if quantity > instance.order_quantity:

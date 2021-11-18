@@ -59,7 +59,7 @@ class MaintenancePlan:
     def maintenance_plan(self):
         queryset = EquipMaintenanceStandard.objects.filter(use_flag=True).all()
         for obj in queryset:
-            if not obj.start_time:
+            if not obj.start_time or not obj.cycle_unit or not obj.maintenance_cycle or not obj.cycle_num:
                 continue
             start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')
             kwargs = {  # 判断条件
