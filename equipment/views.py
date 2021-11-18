@@ -121,7 +121,7 @@ class EquipCurrentStatusViewSet(ModelViewSet):
     """设备现况"""
     queryset = EquipCurrentStatus.objects.filter(delete_flag=False).all()
     serializer_class = EquipCurrentStatusSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
 
     filter_class = EquipCurrentStatusFilter
@@ -162,7 +162,7 @@ class EquipPartViewSet(ModelViewSet):
     """设备部位"""
     queryset = EquipPart.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipPartSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartFilter
 
@@ -203,7 +203,7 @@ class EquipMaintenanceOrderViewSet(ModelViewSet):
 class EquipMaintenanceOrderOtherView(GenericAPIView):
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('-id')
     serializer_class = EquipMaintenanceOrderUpdateSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderFilter
 
@@ -306,7 +306,7 @@ class EquipMaintenanceOrderLogViewSet(ModelViewSet):
     """#设备维修履历"""
     queryset = EquipMaintenanceOrder.objects.filter(delete_flag=False).order_by('equip_part__equip')
     serializer_class = EquipMaintenanceOrderLogSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipMaintenanceOrderLogFilter
     pagination_class = SinglePageNumberPagination
@@ -1242,7 +1242,7 @@ class EquipBomViewSet(ModelViewSet):
             节点详情
         """
     queryset = EquipBom.objects.all()
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     pagination_class = None
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipBomFilter
@@ -1527,7 +1527,7 @@ class EquipFaultTypeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = EquipFaultType.objects.filter(delete_flag=False).order_by("id")
     serializer_class = EquipFaultTypeSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFaultTypeFilter
 
@@ -1544,7 +1544,7 @@ class EquipFaultCodeViewSet(CommonDeleteMixin, ModelViewSet):
     """
     queryset = EquipFault.objects.filter(delete_flag=False, equip_fault_type__use_flag=1).order_by("id")
     serializer_class = EquipFaultCodeSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     pagination_class = None
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipFaultCodeFilter
@@ -1806,7 +1806,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
     delete: 停用设备作业项目标准定义
     """
     queryset = EquipJobItemStandard.objects.filter(delete_flag=False).order_by("-created_date")
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipJobItemStandardFilter
     FILE_NAME = '设备作业项目标准定义'
@@ -2288,7 +2288,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class GetDefaultCodeView(APIView):
-    # permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         work_type = self.request.query_params.get('work_type')
@@ -2523,9 +2523,10 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             # 判断库区类型 和 备件类型是否匹配
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             spare_obj = data['equip_spare']
-            if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
-                                                              equip_component_type=spare_obj.equip_component_type).exists():
-                raise ValidationError(f'此库区不能存放{spare_obj.equip_component_type.component_type_name}类型的备件')
+            if EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj).count() != 0:
+                if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
+                                                                  equip_component_type=spare_obj.equip_component_type).exists():
+                    raise ValidationError(f'此库区不能存放{spare_obj.equip_component_type.component_type_name}类型的备件')
             # 根据入库的数量修改状态
             quantity = in_quantity + instance.in_quantity
             if quantity > instance.order_quantity:
@@ -2900,6 +2901,7 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
 
 
 class EquipAutoPlanView(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         # 入库单据接口
@@ -2987,11 +2989,12 @@ class EquipAutoPlanView(APIView):
             # 判断库区类型 和 备件类型是否匹配
             area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             # spare_obj = data['equip_spare']
-            if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
-                                                              equip_component_type=spare_obj.equip_spare.equip_component_type).exists():
-                return Response({"success": False,
-                                 "message": f'此库区不能存放{spare_obj.equip_spare.equip_component_type.component_type_name}类型的备件',
-                                 "data": None})
+            if EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj).count() != 0:
+                if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
+                                                                  equip_component_type=spare_obj.equip_spare.equip_component_type).exists():
+                    return Response({"success": False,
+                                     "message": f'此库区不能存放{spare_obj.equip_spare.equip_component_type.component_type_name}类型的备件',
+                                     "data": None})
 
             # area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
             # component_type = area_obj.equip_component_type
@@ -3124,7 +3127,7 @@ class EquipApplyRepairViewSet(ModelViewSet):
     """
     queryset = EquipApplyRepair.objects.all().order_by('-id')
     serializer_class = EquipApplyRepairSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyRepairFilter
 
@@ -3136,7 +3139,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
     """
     queryset = EquipApplyOrder.objects.all().order_by('-id')
     serializer_class = EquipApplyOrderSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipApplyOrderFilter
     FILE_NAME = '设备维修工单表'
@@ -3400,7 +3403,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
     """
     queryset = EquipInspectionOrder.objects.all().order_by('-id')
     serializer_class = EquipInspectionOrderSerializer
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipInspectionOrderFilter
     FILE_NAME = '设备巡检工单表'
