@@ -3720,6 +3720,20 @@ class EquipPlanViewSet(ModelViewSet):
         if self.request.query_params.get('export'):
             data = self.get_serializer(self.filter_queryset(self.get_queryset()), many=True).data
             return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        return super().list(request, *args, **kwargs)
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
+                url_path='close-plan', url_name='close-plan')
+    def close_plan(self, request, pk=None):
+        """关闭计划"""
+        ids = self.request.data.get('plan_ids')
+        for i in ids:
+            self.queryset.filter(id=i).update(delete_flag=True)
+        return Response('计划以关闭')
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated],
+                url_path='get-plan-name', url_name='get-plan-name')
+    def get_plan_name(self, request):
         if self.request.query_params.get('work_type'):
             kwargs = {
                 '巡检': 'XJ',
@@ -3737,16 +3751,6 @@ class EquipPlanViewSet(ModelViewSet):
             else:
                 plan_id = f'{kwargs.get(work_type)}{dt.date.today().strftime("%Y%m%d")}0001'
             return Response({'plan_name': f'{work_type}{plan_id}'})
-        return super().list(request, *args, **kwargs)
-
-    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated],
-                url_path='close-plan', url_name='close-plan')
-    def close_plan(self, request, pk=None):
-        """关闭计划"""
-        ids = self.request.data.get('plan_ids')
-        for i in ids:
-            self.queryset.filter(id=i).update(delete_flag=True)
-        return Response('计划以关闭')
 
     # 生成设备维修工单
     @atomic
