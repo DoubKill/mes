@@ -40,8 +40,8 @@ def handle(order):
     now_date = datetime.now().replace(microsecond=0)
     if order.status == "已指派":
         if not receive_interval or not receive_warning_times:
-            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
-            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
+            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}")
+            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}"
         record_time = order.assign_datetime
         check_result, times = compare_time(now_date, record_time, receive_interval, receive_warning_times)
         if check_result:
@@ -102,8 +102,8 @@ def handle(order):
             logger.info(f"超时提醒: 超期未接单提醒已经发送")
     elif order.status == "已接单":
         if not start_interval or not start_warning_times:
-            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
-            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
+            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}")
+            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}"
         record_time = order.receiving_datetime
         check_result, times = compare_time(now_date, record_time, start_interval, start_warning_times)
         if check_result:
@@ -166,8 +166,8 @@ def handle(order):
     else:
         # 已完成
         if not accept_interval or not accept_warning_times:
-            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
-            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
+            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}")
+            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}"
         record_time = order.repair_end_datetime
         check_result, times = compare_time(now_date, record_time, accept_interval, accept_warning_times)
         if check_result:
@@ -186,175 +186,6 @@ def handle(order):
             ding_api.send_message(uids[:1], content, order_id=order.id)
             logger.info(f"超时提醒: 超期未验收提醒已经发送")
     return "超时提醒: 单据提醒处理完成"
-
-
-def inspect_handle(order):
-    # 获取规则
-    instance = Equip.objects.filter(equip_no=order.equip_no).first()
-    # 设备类型
-    equip_type = instance.category.equip_type.global_name if instance else ''
-    receive_interval = receive_warning_times = start_interval = start_warning_times = accept_interval = accept_warning_times = 0
-    # 工单指派规则
-    rule = EquipOrderAssignRule.objects.filter(equip_type__global_name=equip_type, work_type=order.work_type,
-                                               use_flag=1).first()
-    if rule:
-        receive_interval = rule.receive_interval
-        receive_warning_times = rule.receive_warning_times
-        start_interval = rule.start_interval
-        start_warning_times = rule.start_warning_times
-        accept_interval = rule.accept_interval
-        accept_warning_times = rule.accept_warning_times
-    now_date = datetime.now().replace(microsecond=0)
-    if order.status == "已指派":
-        if not receive_interval or not receive_warning_times:
-            logger.info(f"超时提醒-巡检: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
-            return f"超时提醒-巡检: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
-        record_time = order.assign_datetime
-        check_result, times = compare_time(now_date, record_time, receive_interval, receive_warning_times)
-        if check_result:
-            order.timeout_color = "粉红色"
-            order.save()
-            all_user = ''
-            # 发送消息提醒
-            if order.equip_repair_standard.remind_flag1:
-                all_user += "1"
-            if order.equip_repair_standard.remind_flag2:
-                all_user += "2"
-            if order.equip_repair_standard.remind_flag3:
-                all_user += "3"
-            if not all_user:
-                logger.info(f"超时提醒-巡检: 本单据{order.work_order_no}标准中未设置提醒")
-                return "超时提醒-巡检: 本单据{order.work_order_no}标准中未设置提醒"
-            uids = get_ding_uids_by_name(order.assign_to_user, all_user)
-            content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未接单",
-                       "form": [{"key": "工单编号:", "value": order.work_order_no},
-                                {"key": "机台:", "value": order.equip_no},
-                                {"key": "巡检标准:", "value": order.equip_repair_standard.standard_name},
-                                {"key": "重要程度:", "value": order.importance_level},
-                                {"key": "被指派人:", "value": order.assign_to_user},
-                                {"key": "指派时间:", "value": str(order.assign_datetime)},
-                                {"key": "提醒时间:", "value": str(now_date)}]}
-            if "1" in all_user:
-                ding_api.send_message(uids[:1], content, order_id=order.id)
-                if len(uids) > 2:
-                    ding_api.send_message(uids[1:], content)
-            else:
-                ding_api.send_message(uids, content)
-            logger.info(f"超时提醒-巡检: 超期未接单提醒已经发送")
-    elif order.status == "已接单":
-        if not start_interval or not start_warning_times:
-            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
-            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
-        record_time = order.receiving_datetime
-        check_result, times = compare_time(now_date, record_time, start_interval, start_warning_times)
-        if check_result:
-            order.timeout_color = "酱红色"
-            order.save()
-            all_user = ''
-            # 发送消息提醒
-            if order.work_type == "维修":
-                if order.created_user.username != "系统自动":
-                    # 报修发消息给被指派人和上级
-                    all_user = "1,2"
-                    uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
-                else:
-                    # 系统自动生成维修单, 根据维修标准里提示
-                    if order.equip_repair_standard.remind_flag1:
-                        all_user += "1"
-                    if order.equip_repair_standard.remind_flag2:
-                        all_user += "2"
-                    if order.equip_repair_standard.remind_flag3:
-                        all_user += "3"
-                    uids = get_ding_uids_by_name(order.receiving_user, all_user)
-            else:
-                # 根据维护标准提示(保养/润滑/标定)
-                if order.equip_maintenance_standard.remind_flag1:
-                    all_user += "1"
-                if order.equip_maintenance_standard.remind_flag2:
-                    all_user += "2"
-                if order.equip_maintenance_standard.remind_flag3:
-                    all_user += "3"
-                uids = get_ding_uids_by_name(order.receiving_user, all_user)
-            if not all_user:
-                logger.info(f"超时提醒: 本单据{order.work_order_no}标准中未设置提醒")
-                return "超时提醒: 本单据{order.work_order_no}标准中未设置提醒"
-            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
-                order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
-            content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未执行",
-                       "form": [{"key": "工单编号:", "value": order.work_order_no},
-                                {"key": "机台:", "value": order.equip_no},
-                                {"key": "部位名称:",
-                                 "value": order.equip_part_new.part_name if order.equip_part_new else ''},
-                                {"key": "故障原因:", "value": fault_name},
-                                {"key": "重要程度:", "value": order.importance_level},
-                                {"key": "接单人:", "value": order.receiving_user},
-                                {"key": "接单时间:", "value": str(order.receiving_datetime)},
-                                {"key": "提醒时间:", "value": str(now_date)}]}
-            if "1" in all_user:
-                ding_api.send_message(uids[:1], content, order_id=order.id)
-                if len(uids) > 2:
-                    ding_api.send_message(uids[1:], content)
-            else:
-                ding_api.send_message(uids, content)
-            logger.info(f"超时提醒: 超期未执行提醒已经发送")
-    else:
-        # 已完成
-        if not accept_interval or not accept_warning_times:
-            logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}")
-            return f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}"
-        record_time = order.repair_end_datetime
-        check_result, times = compare_time(now_date, record_time, accept_interval, accept_warning_times)
-        if check_result:
-            order.timeout_color = "red"
-            order.save()
-            all_user = ''
-            # 发送消息提醒
-            if order.work_type == "维修":
-                if order.created_user.username != "系统自动":
-                    # 报修发消息给被指派人和上级
-                    all_user = "1,2"
-                    uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
-                else:
-                    # 系统自动生成维修单, 根据维修标准里提示
-                    if order.equip_repair_standard.remind_flag1:
-                        all_user += "1"
-                    if order.equip_repair_standard.remind_flag2:
-                        all_user += "2"
-                    if order.equip_repair_standard.remind_flag3:
-                        all_user += "3"
-                    uids = get_ding_uids_by_name(order.receiving_user, all_user)
-            else:
-                # 根据维护标准提示(保养/润滑/标定)
-                if order.equip_maintenance_standard.remind_flag1:
-                    all_user += "1"
-                if order.equip_maintenance_standard.remind_flag2:
-                    all_user += "2"
-                if order.equip_maintenance_standard.remind_flag3:
-                    all_user += "3"
-                uids = get_ding_uids_by_name(order.created_user.username, all_user)
-            if not all_user:
-                logger.info(f"本单据{order.work_order_no}标准中未设置提醒")
-                return "本单据{order.work_order_no}标准中未设置提醒"
-            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
-                order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
-            content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未验收",
-                       "form": [{"key": "工单编号:", "value": order.work_order_no},
-                                {"key": "机台:", "value": order.equip_no},
-                                {"key": "部位名称:",
-                                 "value": order.equip_part_new.part_name if order.equip_part_new else ''},
-                                {"key": "故障原因:", "value": fault_name},
-                                {"key": "重要程度:", "value": order.importance_level},
-                                {"key": "维修人:", "value": order.repair_user},
-                                {"key": "维修完成时间:", "value": str(order.repair_end_datetime)},
-                                {"key": "提醒时间:", "value": str(now_date)}]}
-            if "1" in all_user:
-                ding_api.send_message(uids[:1], content, order_id=order.id)
-                if len(uids) > 2:
-                    ding_api.send_message(uids[1:], content)
-            else:
-                ding_api.send_message(uids, content)
-            logger.info(f"超时提醒: 超期未验收提醒已经发送")
-    return "超时提醒-巡检: 单据提醒处理完成"
 
 
 def compare_time(now_datetime, check_time, interval, times):
