@@ -240,7 +240,6 @@ class AutoDispatch(object):
             self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单: {group}下无空闲可指派人员')
             return f'系统派单: {group}下无空闲可指派人员'
-        logger.info(f'系统派单: {group}当班可选人员:{working_persons}')
         processing_person = []
         for per in working_persons:
             new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
@@ -284,6 +283,9 @@ class AutoDispatch(object):
     def send_inspection_order(self):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         order_list = EquipInspectionOrder.objects.filter(status='已生成')
+        if not order_list:
+            logger.info('系统派单-巡检: 没有新生成的巡检单')
+            return '系统派单-巡检: 没有新生成的巡检单'
         for order in order_list:
             # 查询工单对应的包干人员[上班并且有空]
             maintenances = get_maintenance_status(self.ding_api, order.equip_no)
@@ -300,7 +302,6 @@ class AutoDispatch(object):
                 self.ding_api.send_message([leader_ding_uid], content)
                 logger.info(f'系统派单-巡检: {order.equip_no}下无空闲包干人员可指派')
                 continue
-            logger.info(f'系统派单-巡检: {order.equip_no}当班可选人员:{working_persons}')
             processing_person = []
             # 派单并提醒
             for per in working_persons:
