@@ -16,8 +16,8 @@ from django.http import HttpResponse
 from io import BytesIO
 
 from basics.models import WorkSchedulePlan, GlobalCode
-from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair
-from equipment.utils import DinDinAPI, get_staff_status
+from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
+from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
 from django.db.transaction import atomic
@@ -281,6 +281,56 @@ class AutoDispatch(object):
             return f'系统派单: 系统自动派单失败'
         return '系统派单: 完成一次定时派单处理'
 
+    def send_inspection_order(self):
+        now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        order_list = EquipInspectionOrder.objects.filter(status='已生成')
+        for order in order_list:
+            # 查询工单对应的包干人员[上班并且有空]
+            maintenances = get_maintenance_status(self.ding_api, order.equip_no)
+            if not maintenances:
+                logger.info(f'系统派单-巡检: {order.equip_no}无包干人员可派单')
+                continue
+            working_persons = [i for i in maintenances if i['optional']]
+            leader_ding_uid = self.ding_api.get_user_id(maintenances[0].get('leader_phone_number'))
+            if not working_persons:
+                # 发送消息给上级
+                content = {"title": f"{order.equip_no}下无空闲包干人员可指派！",
+                           "form": [{"key": "指派人:", "value": "系统自动"},
+                                    {"key": "指派时间:", "value": now_date}]}
+                self.ding_api.send_message([leader_ding_uid], content)
+                logger.info(f'系统派单-巡检: {order.equip_no}下无空闲包干人员可指派')
+                continue
+            logger.info(f'系统派单-巡检: {order.equip_no}当班可选人员:{working_persons}')
+            processing_person = []
+            # 派单并提醒
+            for per in working_persons:
+                processing_order = EquipInspectionOrder.objects.filter(status='已开始', repair_user=per['username'])
+                if processing_order:
+                    processing_person.append(per)
+                    continue
+                # 分派巡检单
+                order.assign_user = '系统自动'
+                order.assign_datetime = now_date
+                order.assign_to_user = per['username']
+                order.status = '已指派'
+                order.last_updated_date = now_date
+                order.save()
+                # 派单成功发送钉钉消息给当班人员
+                content = {"title": "系统自动派发设备巡检单成功，请尽快处理！",
+                           "form": [{"key": "指派人:", "value": "系统自动"},
+                                    {"key": "指派时间:", "value": now_date}]}
+                self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id)
+                logger.info(f"系统派单-巡检-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
+                break
+            if len(processing_person) == len(working_persons):
+                # 所有人都在忙, 派单失败, 钉钉消息推送给上级
+                content = {"title": f"{order.equip_no}所有包干人员均在进行维修, 系统自动派单失败！",
+                           "form": [{"key": "指派人:", "value": "系统自动"},
+                                    {"key": "指派时间:", "value": now_date}]}
+                self.ding_api.send_message([leader_ding_uid], content)
+                logger.info(f'系统派单-巡检: 系统自动派单失败, {order.equip_no}可选人员:{working_persons}, 正在维修人员:{processing_person}')
+        return '系统派单-巡检: 完成一次定时派单处理'
+
     def get_group_info(self):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         group = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
@@ -292,3 +342,4 @@ class AutoDispatch(object):
 if __name__ == '__main__':
     auto_dispatch = AutoDispatch()
     msg = auto_dispatch.send_order()
+    msg1 = auto_dispatch.send_inspection_order()
