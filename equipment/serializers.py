@@ -1197,8 +1197,10 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
 
 class UploadImageSerializer(BaseModelSerializer):
 
-    def validate(self, attrs):
-        return attrs
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        res['image_file_name'] = instance.image_file_name.url
+        return res
 
     class Meta:
         model = UploadImage
