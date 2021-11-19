@@ -1884,7 +1884,7 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
-    queryset = EquipMaintenanceStandard.objects.order_by('id')
+    queryset = EquipMaintenanceStandard.objects.order_by('-created_date')
     serializer_class = EquipMaintenanceStandardSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2096,7 +2096,7 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
-    queryset = EquipRepairStandard.objects.order_by('id')
+    queryset = EquipRepairStandard.objects.order_by('-created_date')
     serializer_class = EquipRepairStandardSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2354,7 +2354,7 @@ class EquipWarehouseAreaViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseLocationViewSet(ModelViewSet):
-    queryset = EquipWarehouseLocation.objects.filter(delete_flag=False)
+    queryset = EquipWarehouseLocation.objects.filter(delete_flag=False).order_by('location_name')
     serializer_class = EquipWarehouseLocationSerializer
     permission_classes = (IsAuthenticated,)
     filter_fields = ('equip_warehouse_area_id',)
@@ -2968,7 +2968,7 @@ class EquipAutoPlanView(APIView):
         out_quantity = data.get('out_quantity', 1)
         spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code).first()
         if not spare_obj:
-            return Response({"success": False, "message": "所扫描的条码有误", "data": ""})
+            return Response({"success": False, "message": "所扫描的条码有误", "data": None})
         instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id']).first()
 
         if status == 1:
