@@ -2969,11 +2969,17 @@ class EquipAutoPlanView(APIView):
         if status == 1:
             spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code, order_id=data['order_id']).first()
         else:
-            instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id']).first()
-            spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code, equip_spare=instance.equip_spare).first()
+            instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'])
+            if instance.count() == 0:
+                return Response({"success": False, "message": "所扫描的条码有误", "data": None})
+            for obj in instance:
+                spare_obj = 0
+                if EquipWarehouseInventory.objects.filter(spare_code=spare_code, equip_spare=obj.equip_spare).exists():
+                    spare_obj =1
+                    break
         if not spare_obj:
             return Response({"success": False, "message": "所扫描的条码有误", "data": None})
-        instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id']).first()
+        instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'], status__in=[1, 2, 4, 5]).first()
 
         if status == 1:
             if spare_obj.status == 1:  # 已入库
