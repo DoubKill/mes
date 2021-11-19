@@ -2980,6 +2980,8 @@ class EquipAutoPlanView(APIView):
         if not spare_obj:
             return Response({"success": False, "message": "所扫描的条码有误", "data": None})
         instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'], status__in=[1, 2, 4, 5]).first()
+        if EquipWarehouseOrder.objects.filter(order_id=data['order_id'], status=6).exists():
+            return Response({"success": False, "message": "该单据已出库完成", "data": None})
 
         if status == 1:
             if spare_obj.status == 1:  # 已入库
