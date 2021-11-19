@@ -3057,6 +3057,13 @@ class EquipAutoPlanView(APIView):
                     'location_barcode': None
                 }})
         if status == 2:
+            if spare_obj.lock == 1:  # 已锁定
+                return Response({"success": False, "message": "该备件已锁定不能出库", "data": {
+                    'specification': spare_obj.equip_spare.specification,
+                    'equip_warehouse_area': None,
+                    'equip_warehouse_location': None,
+                    'location_barcode': None
+                }})
             if spare_obj.status == 0:  # 未入库
                 return Response({"success": False, "message": "该备件还未入库", "data": {
                     'specification': spare_obj.equip_spare.specification,
