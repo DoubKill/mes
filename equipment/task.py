@@ -299,7 +299,7 @@ if __name__ == '__main__':
     inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成'))
     orders = repair_orders + inspect_order
     if not orders:
-        logger.info("超时提醒: 不存在需要超时提醒的工单")
+        logger.info("系统派单: 没有新生成的工单可派")
     for order in orders:
         res = auto_dispatch.send_order(order)
 
