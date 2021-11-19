@@ -192,18 +192,13 @@ class ProductBatching(AbstractEntity):
     def get_product_batch(self):
         material_name_weight = []
         # 获取配方里物料名称和重量 隐藏细料硫磺
-        material_name_weight += list(
-            ProductBatchingDetail.objects.filter(~Q(material__material_name__icontains='-细料'),
-                                                 ~Q(material__material_name__icontains='-硫磺'),
-                                                 ~Q(material__material_name__icontains='掺料'),
-                                                 ~Q(material__material_name__in=['细料', '硫磺']),
-                                                 delete_flag=False, type=1,
-                                                 product_batching=self.id)
-            .values('material__material_name', 'actual_weight'))
-        # 隐藏细料硫磺
-        # material_name_weight += list(WeighCntType.objects.filter(delete_flag=False, product_batching=product_batch.id)
-        #                              .values(material__material_name=F('name'), actual_weight=F('package_cnt')))
-
+        hide_materials = GlobalCode.objects.filter(delete_flag=False, use_flag=True, global_type__type_name='投料屏蔽物料',
+                                                   global_type__use_flag=True).values_list('global_name', flat=True)
+        query_set = self.batching_details.filter(delete_flag=False, type=1)
+        if hide_materials:
+            for h_material in hide_materials:
+                query_set = query_set.exclude(material__material_name__icontains=h_material)
+        material_name_weight += list(query_set.values('material__material_name', 'actual_weight'))
         return material_name_weight
 
     class Meta:
