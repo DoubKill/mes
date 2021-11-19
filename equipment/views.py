@@ -2972,11 +2972,11 @@ class EquipAutoPlanView(APIView):
             instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'])
             if instance.count() == 0:
                 return Response({"success": False, "message": "所扫描的条码有误", "data": None})
+            spare_obj = False
             for obj in instance:
-                spare_obj = 0
-                if EquipWarehouseInventory.objects.filter(spare_code=spare_code, equip_spare=obj.equip_spare).exists():
-                    spare_obj =1
-                    break
+                spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code, equip_spare=obj.equip_spare).first()
+                if spare_obj:
+                        break
         if not spare_obj:
             return Response({"success": False, "message": "所扫描的条码有误", "data": None})
         instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'], status__in=[1, 2, 4, 5]).first()
