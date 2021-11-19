@@ -384,20 +384,13 @@ def get_ding_uids_by_name(user_name, all_user):
 
 
 def check_to_msg():
-    orders = []
     # 所有维修工单
     repair_orders = list(EquipApplyOrder.objects.filter(~Q(status__in=["已生成", "已验收", "已关闭", "已开始"])))
-    if not repair_orders:
-        logger.info("超时提醒: 所有维修单均已验收")
-    else:
-        orders += repair_orders
     # 所有巡检工单
-    inspect_orders = EquipInspectionOrder.objects.filter(~Q(status__in=["已生成", "已关闭", "已开始", "已完成"]))
-    if not inspect_orders:
-        logger.info("超时提醒: 不存在需要超时提醒的巡检单")
-    else:
-        orders += inspect_orders
-
+    inspect_orders = list(EquipInspectionOrder.objects.filter(~Q(status__in=["已生成", "已关闭", "已开始", "已完成"])))
+    orders = repair_orders + inspect_orders
+    if not orders:
+        logger.info("超时提醒: 不存在需要超时提醒的工单")
     for order in orders:
         res = handle(order)
 
