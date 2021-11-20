@@ -75,17 +75,18 @@ def handle(order):
             if order.work_type != '巡检':
                 fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
                     order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
-                content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未接单",
+                content = {"title": f"第{times}次催办\r\n您名下单据超期未接单",
                            "form": [{"key": "工单编号:", "value": order.work_order_no},
                                     {"key": "机台:", "value": order.equip_no},
-                                    {"key": "部位名称:", "value": order.equip_part_new.part_name if order.equip_part_new else ''},
+                                    {"key": "部位名称:",
+                                     "value": order.equip_part_new.part_name if order.equip_part_new else ''},
                                     {"key": "故障原因:", "value": fault_name},
                                     {"key": "重要程度:", "value": order.importance_level},
                                     {"key": "被指派人:", "value": order.assign_to_user},
                                     {"key": "指派时间:", "value": str(order.assign_datetime)},
                                     {"key": "提醒时间:", "value": str(now_date)}]}
             else:
-                content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未接单",
+                content = {"title": f"第{times}次催办\r\n您名下单据超期未接单",
                            "form": [{"key": "工单编号:", "value": order.work_order_no},
                                     {"key": "机台:", "value": order.equip_no},
                                     {"key": "巡检标准:", "value": order.equip_repair_standard.standard_name},
@@ -99,7 +100,7 @@ def handle(order):
                     ding_api.send_message(uids[1:], content)
             else:
                 ding_api.send_message(uids, content)
-            logger.info(f"超时提醒: 超期未接单提醒已经发送")
+            logger.info(f"超时提醒: 超期未接单提醒已经发送-{order.work_order_no}")
     elif order.status == "已接单":
         if not start_interval or not start_warning_times:
             logger.info(f"超时提醒: 规则不存在或未设置提醒间隔或次数:设备类型{equip_type},作业类型{order.work_type}-{order.work_order_no}")
@@ -137,7 +138,7 @@ def handle(order):
             if order.work_type != '巡检':
                 fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
                     order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
-                content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未执行",
+                content = {"title": f"第{times}次催办\r\n您名下单据超期未执行",
                            "form": [{"key": "工单编号:", "value": order.work_order_no},
                                     {"key": "机台:", "value": order.equip_no},
                                     {"key": "部位名称:",
@@ -148,7 +149,7 @@ def handle(order):
                                     {"key": "接单时间:", "value": str(order.receiving_datetime)},
                                     {"key": "提醒时间:", "value": str(now_date)}]}
             else:
-                content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未接单",
+                content = {"title": f"第{times}次催办\r\n您名下单据超期未执行",
                            "form": [{"key": "工单编号:", "value": order.work_order_no},
                                     {"key": "机台:", "value": order.equip_no},
                                     {"key": "巡检标准:", "value": order.equip_repair_standard.standard_name},
@@ -162,7 +163,7 @@ def handle(order):
                     ding_api.send_message(uids[1:], content)
             else:
                 ding_api.send_message(uids, content)
-            logger.info(f"超时提醒: 超期未执行提醒已经发送")
+            logger.info(f"超时提醒: 超期未执行提醒已经发送-{order.work_order_no}")
     else:
         # 已完成
         if not accept_interval or not accept_warning_times:
@@ -174,17 +175,18 @@ def handle(order):
             order.timeout_color = "红色"
             order.save()
             uids = get_ding_uids_by_name(order.created_user.username, all_user='1,2')
-            content = {"title": f"第{times}次催办\r\n您名下单据{order.work_order_no}超期未验收",
+            content = {"title": f"第{times}次催办\r\n您名下单据超期未验收",
                        "form": [{"key": "工单编号:", "value": order.work_order_no},
                                 {"key": "机台:", "value": order.equip_no},
-                                {"key": "部位名称:", "value": order.equip_part_new.part_name if order.equip_part_new else ''},
+                                {"key": "部位名称:",
+                                 "value": order.equip_part_new.part_name if order.equip_part_new else ''},
                                 {"key": "故障原因:", "value": order.equip_repair_standard.standard_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "维修人:", "value": order.repair_user},
                                 {"key": "维修完成时间:", "value": str(order.repair_end_datetime)},
                                 {"key": "提醒时间:", "value": str(now_date)}]}
             ding_api.send_message(uids[:1], content, order_id=order.id)
-            logger.info(f"超时提醒: 超期未验收提醒已经发送")
+            logger.info(f"超时提醒: 超期未验收提醒已经发送-{order.work_order_no}")
     return "超时提醒: 单据提醒处理完成"
 
 
@@ -224,4 +226,3 @@ if __name__ == "__main__":
         logger.info("超时提醒: 不存在需要超时提醒的工单")
     for order in orders:
         res = handle(order)
-

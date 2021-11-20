@@ -235,22 +235,22 @@ class AutoDispatch(object):
             choice_all_user = get_maintenance_status(self.ding_api, order.equip_no)
             fault_name = order.equip_repair_standard.standard_name
         if not choice_all_user:
-            logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}无人员可派单')
-            return f'系统派单[{order.work_type}]: {order.work_order_no}无人员可派单'
+            logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')
+            return f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单'
         working_persons = [i for i in choice_all_user if i['optional']]
         leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
         # 消息模板
         content = {
             "title": "",
             "form": [{"key": "工单编号:", "value": order.work_order_no},
-                    {"key": "机台:", "value": order.equip_no},
-                    {"key": "故障原因:", "value": fault_name},
-                    {"key": "重要程度:", "value": order.importance_level},
-                    {"key": "指派人:", "value": "系统自动"},
-                    {"key": "指派时间:", "value": now_date}]}
+                     {"key": "机台:", "value": order.equip_no},
+                     {"key": "故障原因:", "value": fault_name},
+                     {"key": "重要程度:", "value": order.importance_level},
+                     {"key": "指派人:", "value": "系统自动"},
+                     {"key": "指派时间:", "value": now_date}]}
         if not working_persons:
             # 发送消息给上级
-            content.update({'title': f"{order.work_order_no}-无空闲可指派人员！"})
+            content.update({'title': f"系统派单: 无空闲可指派人员！"})
             self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员')
             return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
