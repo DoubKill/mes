@@ -35,7 +35,7 @@ from equipment.models import EquipTargetMTBFMTTRSetting
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
-from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI
+from equipment.utils import gen_template_response, get_staff_status, get_ding_uids, DinDinAPI, get_maintenance_status
 from mes.common_code import OMin, OMax, OSum, CommonDeleteMixin
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -3105,6 +3105,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         status = self.request.query_params.get('status')
         searched = self.request.query_params.get('searched')
         user_name = self.request.user.username
+        # my_order: '1'个人工单页面、'2'工单大厅; status空表示进行中或工单搜索; searched空名下进行中工单,反之在所有工单中检索
         if my_order == '1':
             if not status:
                 if not searched:
@@ -3396,7 +3397,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
                                                   repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成').count()
+            finished = self.queryset.filter(status='已完成', repair_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()
@@ -3454,7 +3455,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             content.update({"title": f"您指派的设备巡检单已被{user_ids}接单",
                             "form": [{"key": "接单人:", "value": user_ids},
                                      {"key": "接单时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks)
+            user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         elif opera_type == '退单':
             receive_num = EquipInspectionOrder.objects.filter(~Q(status='已指派'), id__in=pks).count()
             if receive_num != 0:
@@ -3467,7 +3468,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
                                      {"key": "退单时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks)
+            user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         elif opera_type == '开始':
             receive_num = EquipInspectionOrder.objects.filter(~Q(status='已接单'), id__in=pks).count()
             if receive_num != 0:
@@ -3501,7 +3502,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
-            user_ids = get_ding_uids(ding_api, pks)
+            user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         # 更新数据
         self.get_queryset().filter(id__in=pks).update(**data)
         # 发送数据
@@ -3554,21 +3555,25 @@ class GetStaffsView(APIView):
 
     def get(self, request):
         ding_api = DinDinAPI()
-        section_name = self.request.query_params.get('section_name')
-        if not section_name:
-            instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
-                                                 global_type__use_flag=1).first()
-            if not instance:
-                return Response({'results': []})
-            else:
-                section_name = instance.global_name
-        now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        classes = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
-        record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=classes,
-                                                 plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        group = record.group.global_name
-        # 查询各员工考勤状态
-        result = get_staff_status(ding_api, section_name, group)
+        equip_no = self.request.query_params.get('equip_no')
+        if not equip_no:
+            section_name = self.request.query_params.get('section_name')
+            if not section_name:
+                instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
+                                                     global_type__use_flag=1).first()
+                if not instance:
+                    return Response({'results': []})
+                else:
+                    section_name = instance.global_name
+            now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            classes = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
+            record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=classes,
+                                                     plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+            group = record.group.global_name
+            # 查询各员工考勤状态
+            result = get_staff_status(ding_api, section_name, group)
+        else:
+            result = get_maintenance_status(ding_api, equip_no)
         return Response({'results': result})
 
 
