@@ -2666,6 +2666,22 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             'equip_spare__technical_params',
             'equip_spare__unit', 'equip_spare__lower_stock', 'equip_spare__upper_stock'
         )
+        for item in results:
+            print(item)
+            item['spare__code'] = item['equip_spare__spare_code']
+            item['component_type_name'] = item['equip_spare__equip_component_type__component_type_name']
+            item['spare_name'] = item['equip_spare__spare_name']
+            item['specification'] = item['equip_spare__specification']
+            item['technical_params'] = item['equip_spare__technical_params']
+            item['unit'] = item['equip_spare__unit']
+            item['upper_stock'] = item['equip_spare__upper_stock']
+            item['lower_stock'] = item['equip_spare__lower_stock']
+            item['all_qty'] = item['all_qty'] if item['all_qty'] else 0
+            item['use_qty'] = item['use_qty'] if item['use_qty'] else 0
+            item['lock_qty'] = item['lock_qty'] if item['lock_qty'] else 0
+            item['qty'] = item['use_qty'] if item['use_qty'] else 0
+        if self.request.query_params.get('use'):
+            results = [i for i in results if i['qty']]
 
         if request.query_params.get('all'):
             return Response(results)
