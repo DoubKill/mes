@@ -3202,6 +3202,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         status = self.request.query_params.get('status')
         searched = self.request.query_params.get('searched')
         user_name = self.request.user.username
+        # my_order: '1'个人工单页面、'2'工单大厅; status空表示进行中或工单搜索; searched空名下进行中工单,反之在所有工单中检索
         if my_order == '1':
             if not status:
                 if not searched:

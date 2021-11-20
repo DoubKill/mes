@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 import django
 from django.db.models import Q
+from multiprocessing import Pool
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -222,8 +223,11 @@ def check_to_msg():
     orders = repair_orders + inspect_orders
     if not orders:
         logger.info("超时提醒: 不存在需要超时提醒的工单")
+    pool = Pool(4)
     for order in orders:
-        res = handle(order)
+        res = pool.apply_async(handle, args=(order,))
+    pool.close()
+    pool.join()
 
 
 if __name__ == "__main__":

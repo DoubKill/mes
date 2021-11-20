@@ -14,6 +14,7 @@ import xlwt
 from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
+from multiprocessing import Pool
 
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
@@ -228,19 +229,29 @@ class AutoDispatch(object):
             instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
                                                  global_type__use_flag=1).first()
             choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
+            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+                order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
             # 查询工单对应的包干人员[上班并且有空]
             choice_all_user = get_maintenance_status(self.ding_api, order.equip_no)
+            fault_name = order.equip_repair_standard.standard_name
         if not choice_all_user:
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}无人员可派单')
             return f'系统派单[{order.work_type}]: {order.work_order_no}无人员可派单'
         working_persons = [i for i in choice_all_user if i['optional']]
         leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
+        # 消息模板
+        content = {
+            "title": "",
+            "form": [{"key": "工单编号:", "value": order.work_order_no},
+                    {"key": "机台:", "value": order.equip_no},
+                    {"key": "故障原因:", "value": fault_name},
+                    {"key": "重要程度:", "value": order.importance_level},
+                    {"key": "指派人:", "value": "系统自动"},
+                    {"key": "指派时间:", "value": now_date}]}
         if not working_persons:
             # 发送消息给上级
-            content = {"title": f"{order.work_order_no}-无空闲可指派人员！",
-                       "form": [{"key": "指派人:", "value": "系统自动"},
-                                {"key": "指派时间:", "value": now_date}]}
+            content.update({'title': f"{order.work_order_no}-无空闲可指派人员！"})
             self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员')
             return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
@@ -269,17 +280,13 @@ class AutoDispatch(object):
                     repair_instance.last_updated_date = now_date
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
-            content = {"title": "系统自动派发设备工单成功，请尽快处理！",
-                       "form": [{"key": "指派人:", "value": "系统自动"},
-                                {"key": "指派时间:", "value": now_date}]}
+            content.update({'title': f"系统自动派发设备工单成功，请尽快处理！"})
             self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
 
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
-            content = {"title": f"所有人员均有工单在处理, 系统自动派单失败！",
-                       "form": [{"key": "指派人:", "value": "系统自动"},
-                                {"key": "指派时间:", "value": now_date}]}
+            content.update({'title': f"所有人员均有工单在处理, 系统自动派单失败！"})
             self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: 系统自动派单失败, 可选人员:{working_persons}, 正在维修人员:{processing_person}')
             return f'系统派单[{order.work_type}]: 系统自动派单失败'
@@ -300,6 +307,10 @@ if __name__ == '__main__':
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")
+    pool = Pool(4)
     for order in orders:
-        res = auto_dispatch.send_order(order)
+        res = pool.apply_async(auto_dispatch.send_order, args=(order,))
+    pool.close()
+    pool.join()
+
 
