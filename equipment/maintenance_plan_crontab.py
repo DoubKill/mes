@@ -117,7 +117,7 @@ class MaintenancePlan:
                                                      planned_maintenance_date__lte=kwargs.get(obj.cycle_unit)['et']).exists()
                             now_time = (kwargs.get(obj.cycle_unit)['first'] < datetime.datetime.now() < kwargs.get(obj.cycle_unit)['et'])
                             if not plan and now_time:
-                                self.create_plan(obj, equip, kwargs.get(obj.cycle_unit)['first'], kwargs.get(obj.cycle_unit)['et'])
+                                self.create_plan(obj, equip, start_time, kwargs.get(obj.cycle_unit)['et'])
                         else:
                             plan = EquipPlan.objects.filter(equip_manintenance_standard=obj,
                                                      planned_maintenance_date__gte=kwargs.get(obj.cycle_unit)['st'],

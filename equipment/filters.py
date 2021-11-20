@@ -326,7 +326,7 @@ class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipWarehouseOrderDetail
-        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user')
+        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user', 'equip_warehouse_order')
 
 
 class EquipWarehouseRecordFilter(django_filters.rest_framework.FilterSet):

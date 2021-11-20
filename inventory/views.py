@@ -11,7 +11,7 @@ import requests
 import xlwt
 from itertools import chain
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, F
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -59,7 +59,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
-from mes.common_code import SqlClient
+from mes.common_code import SqlClient, OSum
 from mes.conf import WMS_CONF, TH_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
