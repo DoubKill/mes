@@ -14,7 +14,6 @@ import xlwt
 from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
-from multiprocessing import Pool
 
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
@@ -307,10 +306,5 @@ if __name__ == '__main__':
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")
-    pool = Pool(4)
     for order in orders:
-        res = pool.apply_async(auto_dispatch.send_order, args=(order,))
-    pool.close()
-    pool.join()
-
-
+        res = auto_dispatch.send_order(order)

@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 import django
 from django.db.models import Q
-from multiprocessing import Pool
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -215,7 +214,7 @@ def get_ding_uids_by_name(user_name, all_user):
     return list(set(uids))
 
 
-def check_to_msg():
+if __name__ == "__main__":
     # 所有维修工单
     repair_orders = list(EquipApplyOrder.objects.filter(~Q(status__in=["已生成", "已验收", "已关闭", "已开始"])))
     # 所有巡检工单
@@ -223,12 +222,6 @@ def check_to_msg():
     orders = repair_orders + inspect_orders
     if not orders:
         logger.info("超时提醒: 不存在需要超时提醒的工单")
-    pool = Pool(4)
     for order in orders:
-        res = pool.apply_async(handle, args=(order,))
-    pool.close()
-    pool.join()
+        res = handle(order)
 
-
-if __name__ == "__main__":
-    check_to_msg()
