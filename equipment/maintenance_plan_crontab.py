@@ -1,11 +1,13 @@
+"""
+根据设备维护维修标准自动生成维护维修计划
+"""
+
 import logging
 import os
 import sys
 import django
 import datetime
 import logging
-
-
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,7 +29,7 @@ class MaintenancePlan:
             '保养': 'BY',
             '润滑': 'RH',
             '标定': 'BD',
-            '计划维修': 'WX',
+            '维修': 'BX',
         }
         user = User.objects.filter(username='系统自动').first()
         dic = EquipPlan.objects.filter(work_type=obj.work_type, created_date__date=datetime.date.today()).aggregate(
@@ -57,7 +59,7 @@ class MaintenancePlan:
     def maintenance_plan(self):
         queryset = EquipMaintenanceStandard.objects.filter(use_flag=True).all()
         for obj in queryset:
-            if not obj.start_time:
+            if not obj.start_time or not obj.cycle_unit or not obj.maintenance_cycle or not obj.cycle_num:
                 continue
             start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')
             kwargs = {  # 判断条件
@@ -99,13 +101,13 @@ class MaintenancePlan:
                             '日': {'first': (start_time - datetime.timedelta(days=3)),
                                   'st': (start_time + datetime.timedelta(days=obj.maintenance_cycle * (i - 1))),
                                   'et': (start_time + datetime.timedelta(days=obj.maintenance_cycle * i))},
-                            '小时': {'first': (start_time - datetime.timedelta(hours=3)),
+                            '小时': {'first': (start_time - datetime.timedelta(days=3)),
                                    'st': (start_time + datetime.timedelta(hours=obj.maintenance_cycle * (i - 1))),
                                    'et': (start_time + datetime.timedelta(hours=obj.maintenance_cycle * i))},
-                            '分钟': {'first': (start_time - datetime.timedelta(minutes=3)),
+                            '分钟': {'first': (start_time - datetime.timedelta(days=3)),
                                    'st': (start_time + datetime.timedelta(minutes=obj.maintenance_cycle * (i - 1))),
                                    'et': (start_time + datetime.timedelta(minutes=obj.maintenance_cycle * i))},
-                            '秒': {'first': (start_time - datetime.timedelta(seconds=3)),
+                            '秒': {'first': (start_time - datetime.timedelta(days=3)),
                                   'st': (start_time + datetime.timedelta(seconds=obj.maintenance_cycle * (i - 1))),
                                   'et': (start_time + datetime.timedelta(seconds=obj.maintenance_cycle * i))},
                         }
@@ -115,7 +117,7 @@ class MaintenancePlan:
                                                      planned_maintenance_date__lte=kwargs.get(obj.cycle_unit)['et']).exists()
                             now_time = (kwargs.get(obj.cycle_unit)['first'] < datetime.datetime.now() < kwargs.get(obj.cycle_unit)['et'])
                             if not plan and now_time:
-                                self.create_plan(obj, equip, kwargs.get(obj.cycle_unit)['first'], kwargs.get(obj.cycle_unit)['et'])
+                                self.create_plan(obj, equip, start_time, kwargs.get(obj.cycle_unit)['et'])
                         else:
                             plan = EquipPlan.objects.filter(equip_manintenance_standard=obj,
                                                      planned_maintenance_date__gte=kwargs.get(obj.cycle_unit)['st'],

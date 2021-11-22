@@ -17,7 +17,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
-    EquipRepairMaterialReq, EquipInspectionOrder
+    EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -1148,6 +1148,15 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+            else:
+                data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard_id) \
+                    .values('equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+                for i in data:
+                    work_content.append(
+                        {'job_item_sequence': i.get('sequence'), 'job_item_content': i.get('content'),
+                         'job_item_check_standard': i.get('check_standard_desc'),
+                         'equip_jobitem_standard_id': i.get('equip_standard'),
+                         'job_item_check_type': i.get('check_standard_type')})
         res['work_content'] = work_content
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
@@ -1175,7 +1184,8 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         instance = EquipBom.objects.filter(equip_info__equip_no=validated_data['equip_no']).first()
         equip_barcode = instance.node_id if instance else ''
         validated_data.update({
-            'plan_id': plan_id, 'status': '已生成', 'work_order_no': work_order_no, 'equip_barcode': equip_barcode
+            'plan_id': plan_id, 'status': '已生成', 'work_order_no': work_order_no, 'equip_barcode': equip_barcode,
+            'planned_repair_date': datetime.now().date()
         })
         return super().create(validated_data)
 
@@ -1187,8 +1197,10 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
 
 class UploadImageSerializer(BaseModelSerializer):
 
-    def validate(self, attrs):
-        return attrs
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        res['image_file_name'] = instance.image_file_name.url
+        return res
 
     class Meta:
         model = UploadImage
@@ -1199,19 +1211,43 @@ class EquipWarehouseAreaSerializer(BaseModelSerializer):
     area_name = serializers.CharField(help_text='库区名称', validators=[
         UniqueValidator(EquipWarehouseArea.objects.filter(delete_flag=False), message='该库区已存在')
     ])
-    equip_component_type_name = serializers.ReadOnlyField(source='equip_component_type.component_type_name')
+    equip_component_type = serializers.ListField(write_only=True, default=[])
+    equip_component_type_name = serializers.SerializerMethodField()
+    equip_component_type_id = serializers.SerializerMethodField()
 
     class Meta:
         model = EquipWarehouseArea
-        fields = ('id', 'area_name', 'desc', 'equip_component_type', 'equip_component_type_name', 'area_barcode')
+        fields = ('id', 'area_name', 'desc', 'equip_component_type', 'equip_component_type_name', 'area_barcode', 'equip_component_type_id')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
+    def get_equip_component_type_name(self, instance):
+        equip_component_type_name = '，'.join([i.get('equip_component_type__component_type_name')  for i in EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=instance).values(
+                'equip_component_type__component_type_name')])
+        return equip_component_type_name
+
+    def get_equip_component_type_id(self, instance):
+        equip_component_type_id = [i.get('equip_component_type__id')  for i in EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=instance).values(
+                'equip_component_type__id')]
+        return equip_component_type_id
+
+    @atomic
     def create(self, validated_data):
+        component_type_list = validated_data.pop('equip_component_type')
         barcode = EquipWarehouseArea.objects.aggregate(area_barcode=Max('area_barcode'))
         area_barcode = str('%03d' % (int(barcode['area_barcode'][2:]) + 1)) if barcode.get('area_barcode') else '001'
         validated_data.update(area_barcode='KQ' + area_barcode)
         instance = super().create(validated_data)
+        for component_type in component_type_list:
+            EquipWarehouseAreaComponent.objects.create(equip_warehouse_area=instance, equip_component_type_id=component_type)
         return instance
+
+    @atomic
+    def update(self, instance, validated_data):
+        component_type_list = validated_data.pop('equip_component_type')
+        EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=instance).delete()
+        for component_type in component_type_list:
+            EquipWarehouseAreaComponent.objects.create(equip_warehouse_area=instance, equip_component_type_id=component_type)
+        return super().update(instance, validated_data)
 
 
 class EquipWarehouseLocationSerializer(BaseModelSerializer):

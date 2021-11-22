@@ -16,8 +16,8 @@ from django.http import HttpResponse
 from io import BytesIO
 
 from basics.models import WorkSchedulePlan, GlobalCode
-from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair
-from equipment.utils import DinDinAPI, get_staff_status
+from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
+from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
 from quality.utils import get_cur_sheet, get_sheet_data
 import json
 from django.db.transaction import atomic
@@ -219,67 +219,77 @@ class AutoDispatch(object):
     def __init__(self):
         self.ding_api = DinDinAPI()
 
-    def send_order(self):
+    def send_order(self, order):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        # 班组
-        group = self.get_group_info()
-        # 设备部门下改班组人员
-        instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
-                                             global_type__use_flag=1).first()
-        choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
+        if order.work_type != '巡检':
+            # 班组
+            group = self.get_group_info()
+            # 设备部门下改班组人员
+            instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
+                                                 global_type__use_flag=1).first()
+            choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
+            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+                order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
+        else:
+            # 查询工单对应的包干人员[上班并且有空]
+            choice_all_user = get_maintenance_status(self.ding_api, order.equip_no)
+            fault_name = order.equip_repair_standard.standard_name
         if not choice_all_user:
-            logger.info(f'系统派单: {group}班组无人员可派单')
-            return f'系统派单: {group}班组无人员可派单'
-        leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
+            logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')
+            return f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单'
         working_persons = [i for i in choice_all_user if i['optional']]
+        leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
+        # 消息模板
+        content = {
+            "title": "",
+            "form": [{"key": "工单编号:", "value": order.work_order_no},
+                     {"key": "机台:", "value": order.equip_no},
+                     {"key": "故障原因:", "value": fault_name},
+                     {"key": "重要程度:", "value": order.importance_level},
+                     {"key": "指派人:", "value": "系统自动"},
+                     {"key": "指派时间:", "value": now_date}]}
         if not working_persons:
             # 发送消息给上级
-            content = {"title": f"{group}下无空闲可指派人员！",
-                       "form": [{"key": "指派人:", "value": "系统自动"},
-                                {"key": "指派时间:", "value": now_date}]}
+            content.update({'title': f"系统派单: 无空闲可指派人员！"})
             self.ding_api.send_message([leader_ding_uid], content)
-            logger.info(f'系统派单: {group}下无空闲可指派人员')
-            return f'系统派单: {group}下无空闲可指派人员'
-        logger.info(f'系统派单: {group}当班可选人员:{working_persons}')
+            logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员')
+            return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
         processing_person = []
         for per in working_persons:
-            new_applyed = EquipApplyOrder.objects.filter(status='已生成').first()
-            if not new_applyed:
-                logger.info('系统派单: 没有新生成的维修单')
-                break
-            processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
-                                                              repair_user=per['username'])
+            if order.work_type != '巡检':
+                processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
+                                                                  repair_user=per['username'])
+            else:
+                processing_order = EquipInspectionOrder.objects.filter(status='已开始', repair_user=per['username'])
             if processing_order:
                 processing_person.append(per)
                 continue
             # 分派维修单
-            new_applyed.assign_user = '系统自动'
-            new_applyed.assign_datetime = now_date
-            new_applyed.assign_to_user = per['username']
-            new_applyed.status = '已指派'
-            new_applyed.last_updated_date = now_date
-            new_applyed.save()
+            order.assign_user = '系统自动'
+            order.assign_datetime = now_date
+            order.assign_to_user = per['username']
+            order.status = '已指派'
+            order.last_updated_date = now_date
+            order.save()
             # 更新设备计划状态
-            repair_instance = EquipApplyRepair.objects.filter(plan_id=new_applyed.plan_id).first()
-            if repair_instance:
-                repair_instance.status = '已指派'
-                repair_instance.last_updated_date = now_date
-                repair_instance.save()
+            if order.work_type == '维修':
+                repair_instance = EquipApplyRepair.objects.filter(plan_id=order.plan_id).first()
+                if repair_instance:
+                    repair_instance.status = '已指派'
+                    repair_instance.last_updated_date = now_date
+                    repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
-            content = {"title": "系统自动派发设备维修单成功，请尽快处理！",
-                       "form": [{"key": "指派人:", "value": "系统自动"},
-                                {"key": "指派时间:", "value": now_date}]}
-            self.ding_api.send_message([per.get('ding_uid')], content, order_id=new_applyed.id)
-            logger.info(f"系统派单-系统自动派单成功: {new_applyed.work_order_no}, 被指派人:{per['username']}")
+            content.update({'title': f"系统自动派发设备工单成功，请尽快处理！"})
+            self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id)
+            logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
+
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
-            content = {"title": f"{group}所有人员均在进行维修, 系统自动派单失败！",
-                       "form": [{"key": "指派人:", "value": "系统自动"},
-                                {"key": "指派时间:", "value": now_date}]}
+            content.update({'title': f"所有人员均有工单在处理, 系统自动派单失败！"})
             self.ding_api.send_message([leader_ding_uid], content)
-            logger.info(f'系统派单: 系统自动派单失败, {group}可选人员:{working_persons}, 正在维修人员:{processing_person}')
-            return f'系统派单: 系统自动派单失败'
-        return '系统派单: 完成一次定时派单处理'
+            logger.info(f'系统派单[{order.work_type}]: 系统自动派单失败, 可选人员:{working_persons}, 正在维修人员:{processing_person}')
+            return f'系统派单[{order.work_type}]: 系统自动派单失败'
+        return '系统派单[{order.work_type}]: 完成一次定时派单处理'
 
     def get_group_info(self):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -291,4 +301,10 @@ class AutoDispatch(object):
 
 if __name__ == '__main__':
     auto_dispatch = AutoDispatch()
-    msg = auto_dispatch.send_order()
+    repair_orders = list(EquipApplyOrder.objects.filter(status='已生成'))
+    inspect_order = list(EquipInspectionOrder.objects.filter(status='已生成'))
+    orders = repair_orders + inspect_order
+    if not orders:
+        logger.info("系统派单: 没有新生成的工单可派")
+    for order in orders:
+        res = auto_dispatch.send_order(order)
