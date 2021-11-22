@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import datetime, date
 
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
@@ -1085,7 +1085,11 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                        'last_updated_date': datetime.now(), 'status': '已完成',
                                        'accept_user': instance.created_user.username})
         EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
-        return super().update(instance, validated_data)
+        response = super().update(instance, validated_data)
+        # 更新维护计划状态
+        if not EquipApplyOrder.objects.filter(Q(plan_id=instance.plan_id) & ~Q(status__in=['已完成', '已验收'])).exists():
+            EquipPlan.objects.filter(plan_id=instance.plan_id).update(status='计划已完成')
+        return response
 
     class Meta:
         model = EquipApplyOrder

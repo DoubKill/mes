@@ -3272,9 +3272,6 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                                  'accept_user': instance.created_user.username})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
-            # 更新维护计划状态
-            equip_plan = EquipApplyOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
-            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划已完成')
             # 更新作业内容
             if work_type == "维修":
                 result_standard = data.get('result_repair_standard')
@@ -3512,8 +3509,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                          'result_repair_graph_url': json.dumps(image_url_list)})
             # 更新维护计划状态
-            equip_plan = EquipInspectionOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
-            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划已完成')
+            instances = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+            if not instances.exists():
+                EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
             # 更新作业内容
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
