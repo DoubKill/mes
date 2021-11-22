@@ -3245,6 +3245,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now()
             }
+            # 更新维护计划状态
+            equip_plan = EquipApplyOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
+            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划执行中')
         elif opera_type == '处理':
             repair_num = EquipInspectionOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
             if repair_num != 0:
@@ -3269,6 +3272,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                                  'accept_user': instance.created_user.username})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
+            # 更新维护计划状态
+            equip_plan = EquipApplyOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
+            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划已完成')
             # 更新作业内容
             if work_type == "维修":
                 result_standard = data.get('result_repair_standard')
@@ -3493,6 +3499,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now()
             }
+            # 更新维护计划状态
+            equip_plan = EquipInspectionOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
+            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划执行中')
         elif opera_type == '处理':
             repair_num = EquipInspectionOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
             if repair_num != 0:
@@ -3502,6 +3511,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             work_order_no = data.pop('work_order_no')
             data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                          'result_repair_graph_url': json.dumps(image_url_list)})
+            # 更新维护计划状态
+            equip_plan = EquipInspectionOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
+            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划已完成')
             # 更新作业内容
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
