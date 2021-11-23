@@ -1086,9 +1086,6 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                        'accept_user': instance.created_user.username})
         EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
         response = super().update(instance, validated_data)
-        # 更新维护计划状态
-        if not EquipApplyOrder.objects.filter(Q(plan_id=instance.plan_id) & ~Q(status__in=['已完成', '已验收'])).exists():
-            EquipPlan.objects.filter(plan_id=instance.plan_id).update(status='计划已完成')
         return response
 
     class Meta:

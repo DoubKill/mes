@@ -3306,6 +3306,10 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
+            # 更新维护计划状态
+            instances = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+            if not instances.exists():
+                EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         else:  # 关闭
             close_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
