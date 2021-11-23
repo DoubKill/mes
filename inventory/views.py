@@ -2932,26 +2932,12 @@ class DepotPalltModelViewSet(ModelViewSet):
     filter_class = DepotDataFilter
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        try:
-            lst = []
-            for i in serializer.data:
-                lst.append({'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains'] + 1), 'num': 1, 'actual_weight': float(i['actual_weight'])})
-            c = {i['product_no']: {} for i in lst}
-
-            for i in lst:
-
-                if not c[i['product_no']]:
-                    i.update({"num": 1})
-                    c[i['product_no']].update(i)
-                else:
-                    c[i['product_no']]['num'] += 1
-                    c[i['product_no']]['trains'] += i['trains']
-                    c[i['product_no']]['actual_weight'] += i['actual_weight']
-            return Response({'results': c.values()})
-        except:
-            raise ValidationError('没有数据')
+        results = PalletFeedbacks.objects.filter(palletfeedbacks__pallet_status=1).values('product_no').annotate(
+            num=Count('product_no'),
+            trains=OSum(F('end_trains') - F('begin_trains') + 1),
+            actual_weight=OSum('actual_weight')
+        )
+        return Response({'results': results})
 
 
 @method_decorator([api_recorder], name="dispatch")

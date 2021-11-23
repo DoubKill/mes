@@ -3245,8 +3245,11 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now()
             }
+            # 更新维护计划状态
+            equip_plan = EquipApplyOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
+            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划执行中')
         elif opera_type == '处理':
-            repair_num = EquipInspectionOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
+            repair_num = EquipApplyOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
             if repair_num != 0:
                 raise ValidationError('未开始订单无法进行处理操作, 请刷新订单!')
             result_repair_final_result = data.get('result_repair_final_result')  # 维修结论
@@ -3284,7 +3287,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             for apply_material in apply_material_list:
                 EquipRepairMaterialReq.objects.create(**apply_material)
         elif opera_type == '验收':
-            accept_num = EquipInspectionOrder.objects.filter(~Q(status='已完成'), id__in=pks).count()
+            accept_num = EquipApplyOrder.objects.filter(~Q(status='已完成'), id__in=pks).count()
             if accept_num != 0:
                 raise ValidationError('已完成订单才可验收, 请刷新订单!')
             image_url_list = data.pop('image_url_list', [])
@@ -3303,8 +3306,12 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
+            # 更新维护计划状态
+            instances = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+            if not instances.exists():
+                EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         else:  # 关闭
-            close_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
+            close_num = EquipApplyOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
             data = {'status': data.get('status'), 'last_updated_date': datetime.now()}
@@ -3493,6 +3500,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now()
             }
+            # 更新维护计划状态
+            equip_plan = EquipInspectionOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
+            EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划执行中')
         elif opera_type == '处理':
             repair_num = EquipInspectionOrder.objects.filter(~Q(status='已开始'), id__in=pks).count()
             if repair_num != 0:
@@ -3502,6 +3512,10 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             work_order_no = data.pop('work_order_no')
             data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                          'result_repair_graph_url': json.dumps(image_url_list)})
+            # 更新维护计划状态
+            instances = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+            if not instances.exists():
+                EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
             # 更新作业内容
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
