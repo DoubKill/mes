@@ -3306,10 +3306,6 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
-            # 更新维护计划状态
-            instances = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
-            if not instances.exists():
-                EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         else:  # 关闭
             close_num = EquipApplyOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
@@ -3322,6 +3318,12 @@ class EquipApplyOrderViewSet(ModelViewSet):
         instances = self.get_queryset().filter(id__in=pks)
         # 更新数据
         instances.update(**data)
+        # 更新维护计划状态
+        res = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+        print(res, '111')
+        print(pks, '222')
+        if not res.exists():
+            EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         # 更新报修申请状态
         EquipApplyRepair.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(
             status=data.get('status'))
@@ -3512,10 +3514,6 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             work_order_no = data.pop('work_order_no')
             data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                          'result_repair_graph_url': json.dumps(image_url_list)})
-            # 更新维护计划状态
-            instances = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
-            if not instances.exists():
-                EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
             # 更新作业内容
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
@@ -3534,7 +3532,12 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                                      {"key": "关闭时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks, check_type='巡检')
         # 更新数据
-        self.get_queryset().filter(id__in=pks).update(**data)
+        instances = self.get_queryset().filter(id__in=pks)
+        instances.update(**data)
+        # 更新维护计划状态
+        res = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+        if not res.exists():
+            EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         # 发送数据
         if user_ids and isinstance(user_ids, list):
             for order_id in pks:
