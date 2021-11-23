@@ -43,7 +43,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
-    OutBoundDeliveryOrderDetail
+    OutBoundDeliveryOrderDetail, WMSReleaseLog
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -2492,7 +2492,10 @@ class WmsStorageSummaryView(APIView):
                  a.WeightUnit,
                  a.StockDetailState
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(inventory_where_str, extra_where_str)
+        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode 
+        {}
+        order by m.MaterialCode
+        """.format(inventory_where_str, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         count = len(temp)
@@ -2721,6 +2724,7 @@ class WmsInStockView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class WMSRelease(APIView):
+    permission_classes = (IsAuthenticated, )
     REQUEST_URL = WMS_URL
 
     def post(self, request):
@@ -2734,11 +2738,17 @@ class WMSRelease(APIView):
             "TestingType": 1,
             "AllCheckDetailList": []
         }
+        release_log_list = []
         for tracking_num in tracking_nums:
+            if not tracking_num:
+                continue
             data['AllCheckDetailList'].append({
                 "TrackingNumber": tracking_num,
-                "CheckResult": 2
+                "CheckResult": 1
             })
+            release_log_list.append(WMSReleaseLog(**{'tracking_num': tracking_num,
+                                                     'operation_type': operation_type,
+                                                     'created_user': self.request.user}))
         headers = {"Content-Type": "application/json ;charset=utf-8"}
         try:
             r = requests.post(self.REQUEST_URL + '/MESApi/UpdateTestingResult', json=data, headers=headers,
@@ -2749,6 +2759,7 @@ class WMSRelease(APIView):
         resp_status = r.get('state')
         if not resp_status == 1:
             raise ValidationError('请求失败！{}'.format(r.get('msg')))
+        WMSReleaseLog.objects.bulk_create(release_log_list)
         return Response('更新成功！')
 
 
@@ -2776,7 +2787,8 @@ class WmsInventoryWeightStockView(APIView):
                  c.MaterialCode,
                  c.Name AS MaterialName,
                  SUM ( a.WeightOfActual ) AS WeightOfActual,
-                 SUM ( a.Quantity ) AS quantity
+                 SUM ( a.Quantity ) AS quantity,
+                 Min ( a.WeightOfActual ) AS min_quantity
                 FROM
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -2801,12 +2813,16 @@ class WmsInventoryWeightStockView(APIView):
         count = len(temp)
         result = []
         for item in temp:
+            if item[3] <= 1:
+                avg_weight = round(item[2] / item[3], 2)
+            else:
+                avg_weight = round((item[2] - item[4]) / (item[3] - 1), 2)
             result.append(
                 {'MaterialCode': item[0],
                  'MaterialName': item[1],
                  'WeightOfActual': item[2],
                  'quantity': item[3],
-                 'avg_weight': round(item[2] / item[3], 2)
+                 'avg_weight': avg_weight
                  })
         sc.close()
         return Response({'results': result, "count": count})

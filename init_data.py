@@ -591,6 +591,7 @@ permission_data = [
     {'id': 453, 'code': 'space_material_outbound_record', 'name': '指定库位出库', 'parent_id': 451},
     {'id': 454, 'code': 'weight_material_outbound_record', 'name': '指定重量出库', 'parent_id': 451},
     {'id': 738, 'code': 'unqualified_material_outbound_record', 'name': '不合格品出库', 'parent_id': 451},
+    {'id': 739, 'code': 'untested_material_outbound_record', 'name': '待检品出库', 'parent_id': 451},
 
     {'id': 455, 'code': 'material_outbound_task', 'name': '原材料出库任务', 'parent_id': None},
     {'id': 456, 'code': 'view_material_outbound_task', 'name': '查看', 'parent_id': 455},
@@ -613,11 +614,16 @@ permission_data = [
     {'id': 550, 'code': 'material_inout_history', 'name': '原材料出入库履历查询', 'parent_id': None},
     {'id': 551, 'code': 'view_material_inout_history', 'name': '查看', 'parent_id': 550},
 
+    {'id': 740, 'code': 'material_quality_setting', 'name': '原材料质检信息设定', 'parent_id': None},
+    {'id': 741, 'code': 'view_material_quality_setting', 'name': '查看', 'parent_id': 740},
+    {'id': 742, 'code': 'release_material_quality_setting', 'name': '合格/放行', 'parent_id': 740},
+
     {'id': 463, 'code': 'th_outbound_record', 'name': '炭黑库出库单据', 'parent_id': None},
     {'id': 464, 'code': 'view_th_outbound_record', 'name': '查看', 'parent_id': 463},
     {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
     {'id': 466, 'code': 'weight_th_outbound_record', 'name': '指定重量出库', 'parent_id': 463},
-    {'id': 739, 'code': 'unqualified_th_outbound_record', 'name': '不合格品出库', 'parent_id': 463},
+    {'id': 743, 'code': 'unqualified_th_outbound_record', 'name': '不合格品出库', 'parent_id': 463},
+    {'id': 744, 'code': 'untested_th_outbound_record', 'name': '待检品出库', 'parent_id': 463},
 
     {'id': 467, 'code': 'th_outbound_task', 'name': '炭黑库出库任务', 'parent_id': None},
     {'id': 468, 'code': 'view_th_outbound_task', 'name': '查看', 'parent_id': 467},
@@ -639,6 +645,10 @@ permission_data = [
 
     {'id': 554, 'code': 'th_inout_history', 'name': '炭黑库出入库履历查询', 'parent_id': None},
     {'id': 555, 'code': 'view_th_inout_history', 'name': '查看', 'parent_id': 554},
+
+    {'id': 745, 'code': 'th_quality_setting', 'name': '炭黑质检信息设定', 'parent_id': None},
+    {'id': 746, 'code': 'view_th_quality_setting', 'name': '查看', 'parent_id': 745},
+    {'id': 747, 'code': 'release_th_quality_setting', 'name': '合格/放行', 'parent_id': 745},
 
     {'id': 475, 'code': 'material_report_equip', 'name': '原材料上报设备管理', 'parent_id': None},
     {'id': 476, 'code': 'view_material_report_equip', 'name': '查看', 'parent_id': 475},
@@ -933,7 +943,7 @@ permission_data = [
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
 
-    # 下一个权限id从740开始
+    # 下一个权限id从748开始
 ]
 
 
