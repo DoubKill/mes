@@ -1385,13 +1385,20 @@ class EquipWarehouseInventorySerializer(BaseModelSerializer):
     unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
     upper_stock = serializers.ReadOnlyField(source='equip_spare.upper_stock', help_text='库存上限')
     lower_stock = serializers.ReadOnlyField(source='equip_spare.lower_stock', help_text='库存下限')
+    equip_spare = serializers.CharField(default='')
+    spare_code = serializers.CharField(default='')
 
     class Meta:
         model = EquipWarehouseInventory
         fields = (
             "id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params",
-            "unit",
+            "unit", "one_piece",
             "upper_stock", "lower_stock", "equip_spare")
+
+    def update(self, instance, validated_data):
+        instance.one_piece = validated_data['one_piece']
+        instance.save()
+        return instance
 
 
 class EquipWarehouseRecordSerializer(BaseModelSerializer):

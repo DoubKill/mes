@@ -2667,7 +2667,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
             'equip_spare__unit', 'equip_spare__lower_stock', 'equip_spare__upper_stock'
         )
         for item in results:
-            print(item)
             item['spare__code'] = item['equip_spare__spare_code']
             item['component_type_name'] = item['equip_spare__equip_component_type__component_type_name']
             item['spare_name'] = item['equip_spare__spare_name']
@@ -2864,6 +2863,18 @@ class EquipAutoPlanView(APIView):
                                                                                        'location_name',
                                                                                        'location_barcode')
             return Response({"success": True, "message": None, "data": data})
+        if self.request.query_params.get('location_barcode'):
+            data = EquipWarehouseInventory.objects.filter(equip_warehouse_location__location_barcode=
+                                                   self.request.query_params.get('location_barcode')).\
+                values('equip_spare').annotate(quantity=Sum('quantity')).values('equip_spare__spare_code',
+                                                                                'equip_spare__spare_name',
+                                                                                'equip_spare__equip_component_type__component_type_name',
+                                                                                'equip_spare__unit',
+                                                                                'quantity')
+            return Response({"success": True, "message": None, "data": data})
+            """
+            该库区下所有的
+            """
 
         # 出库单据接口
         if self.request.query_params.get('out'):
@@ -3319,9 +3330,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         # 更新数据
         instances.update(**data)
         # 更新维护计划状态
-        res = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
-        print(res, '111')
-        print(pks, '222')
+        res = self.queryset.filter(Q(plan_id__in=instances.values_list('plan_id', flat=True)) & ~Q(status__in=['已完成', '已验收']))
         if not res.exists():
             EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         # 更新报修申请状态
@@ -3535,7 +3544,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         instances = self.get_queryset().filter(id__in=pks)
         instances.update(**data)
         # 更新维护计划状态
-        res = self.queryset.filter(Q(id__in=pks) & ~Q(status__in=['已完成', '已验收']))
+        res = self.queryset.filter(Q(plan_id__in=instances.values_list('plan_id', flat=True)) & ~Q(status__in=['已完成', '已验收']))
         if not res.exists():
             EquipPlan.objects.filter(plan_id__in=instances.values_list('plan_id', flat=True)).update(status='计划已完成')
         # 发送数据
@@ -3784,3 +3793,40 @@ class EquipPlanViewSet(ModelViewSet):
             plan.status = '已生成工单'
             plan.save()
         return Response(results)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipOrderListView(APIView):
+    """
+    根据机台和部位条码进行查询
+    """
+    def get(self, request):
+        lot_no = self.request.query_params.get('lot_no')  # 扫描的条码
+        search = self.request.query_params.get('search')
+        my_order = self.request.query_params.get('my_order')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 10)
+        kwargs = {}
+        if my_order:
+            kwargs = {'assign_to_user': self.request.user.username}
+        if lot_no:
+            queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=search) | Q(equip_no=search))
+            queryset2 = EquipInspectionOrder.objects.filter(equip_no=search)
+        else:
+            queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code__icontains=search) | Q(equip_no__icontains=search))
+            queryset2 = EquipInspectionOrder.objects.filter(equip_no__icontains=search)
+        if my_order:
+            queryset1 = queryset1.filter(Q(assign_user=self.request.user.username) |
+                                    Q(assign_to_user=self.request.user.username) |
+                                    Q(receiving_user=self.request.user.username) |
+                                    Q(accept_user=self.request.user.username))
+            queryset2 = queryset2.filter(Q(assign_user=self.request.user.username) |
+                                    Q(assign_to_user=self.request.user.username) |
+                                    Q(receiving_user=self.request.user.username))
+
+        serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True).data
+        serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True).data
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        data = sorted(serializer1 + serializer2, key=lambda x: x['created_date'], reverse=True)
+        return Response({'results': data[st:et], 'count': len(data)})
