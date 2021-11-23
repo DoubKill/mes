@@ -2864,17 +2864,23 @@ class EquipAutoPlanView(APIView):
                                                                                        'location_barcode')
             return Response({"success": True, "message": None, "data": data})
         if self.request.query_params.get('location_barcode'):
-            data = EquipWarehouseInventory.objects.filter(equip_warehouse_location__location_barcode=
-                                                   self.request.query_params.get('location_barcode')).\
-                values('equip_spare').annotate(quantity=Sum('quantity')).values('equip_spare__spare_code',
-                                                                                'equip_spare__spare_name',
-                                                                                'equip_spare__equip_component_type__component_type_name',
-                                                                                'equip_spare__unit',
-                                                                                'quantity')
+            """PDA盘库列表"""
+            spare_code = self.request.query_params.get('spare_detail')
+            location_barcode = self.request.query_params.get('location_barcode')
+            if spare_code:
+                data = EquipWarehouseInventory.objects.filter(equip_warehouse_location__location_barcode=location_barcode,
+                                                           equip_spare_id=int(spare_code)).values('id', 'one_piece', 'spare_code', 'lock')
+                for item in data:
+                    item['lock'] = '锁定' if item['lock'] else '正常'
+            else:
+                data = EquipWarehouseInventory.objects.filter(equip_warehouse_location__location_barcode=
+                                                       self.request.query_params.get('location_barcode')).\
+                    values('equip_spare').annotate(quantity=Sum('quantity')).values('equip_spare__spare_code',
+                                                                                    'equip_spare__spare_name',
+                                                                                    'equip_spare__equip_component_type__component_type_name',
+                                                                                    'equip_spare__unit',
+                                                                                    'quantity', 'equip_spare_id')
             return Response({"success": True, "message": None, "data": data})
-            """
-            该库区下所有的
-            """
 
         # 出库单据接口
         if self.request.query_params.get('out'):
@@ -2896,6 +2902,23 @@ class EquipAutoPlanView(APIView):
         spare_code = data.get('spare_code')  # 备件条码
         in_quantity = data.get('in_quantity', 1)
         out_quantity = data.get('out_quantity', 1)
+        id = data.get('id')
+        if id:
+            instance = EquipWarehouseInventory.objects.filter(id=id).first()
+            if status == 'del':
+                instance.delete_flag = True
+            elif status == 'lock':
+                instance.lock = True
+            elif status == 'unlock':
+                instance.lock = False
+            elif status == 'edit':
+                if isinstance(data.get('one_piece'), int):
+                    instance.one_piece = data.get('one_piece')
+            instance.save()
+            return Response({"success": True, "message": "执行成功", "data": {'one_piece': instance.one_piece,
+                                                                          'spare_code': instance.spare_code,
+                                                                          'lock': '锁定' if instance.lock else '正常'}})
+
         if status == 1:
             spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code, order_id=data['order_id']).first()
         else:
