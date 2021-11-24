@@ -2789,33 +2789,29 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             data = self.filter_queryset(self.queryset)
             serializer = EquipWarehouseRecordDetailSerializer(data, many=True)
             return Response(serializer.data)
+        results = self.filter_queryset(self.queryset).values('equip_spare').annotate(
+            in_qty=Sum('quantity', distinct=True, filter=Q(status=1)),
+            out_qty=Sum('quantity', distinct=True, filter=Q(status=2))).values(
+            'in_qty', 'out_qty', 'equip_spare', 'equip_spare__spare_code',
+            'equip_spare__spare_name',
+            'equip_spare__equip_component_type__component_type_name',
+            'equip_spare__specification', 'equip_spare__unit')
 
-        res = self.filter_queryset(self.queryset).values('equip_spare', 'status').annotate(quantity=Sum('quantity'))
-        serializer = self.serializer_class(self.filter_queryset(self.queryset), many=True)
-        dic = {}
-        for i in res:
-            if dic.get(i['equip_spare']):
-                if i['status'] == 1:
-                    dic[i['equip_spare']]['in_qty'] += i['quantity']
-                else:
-                    dic[i['equip_spare']]['out_qty'] += i['quantity']
-            else:
-                if i['status'] == 1:
-                    dic.update({i['equip_spare']: {'in_qty': i['quantity'], 'out_qty': 0}})
-                else:
-                    dic.update({i['equip_spare']: {'in_qty': 0, 'out_qty': i['quantity']}})
-        for i in dic:
-            for j in serializer.data:
-                if i == j['equip_spare']:
-                    dic[i].update(**j)
-                    break
+        for item in results:
+            item['spare__code'] = item['equip_spare__spare_code']
+            item['component_type_name'] = item['equip_spare__equip_component_type__component_type_name']
+            item['spare_name'] = item['equip_spare__spare_name']
+            item['specification'] = item['equip_spare__specification']
+            item['unit'] = item['equip_spare__unit']
+            item['in_qty'] = item['in_qty'] if item['in_qty'] else 0
+            item['out_qty'] = item['out_qty'] if item['out_qty'] else 0
+
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
-        data = list(dic.values())
         if self.request.query_params.get('export'):
-            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
-        count = len(data)
-        return Response({'results': data[st:et], 'count': count})
+            return gen_template_response(self.EXPORT_FIELDS_DICT, results, self.FILE_NAME)
+        count = len(results)
+        return Response({'results': results[st:et], 'count': count})
 
 
 class EquipAutoPlanView(APIView):
@@ -3829,9 +3825,6 @@ class EquipOrderListView(APIView):
         my_order = self.request.query_params.get('my_order')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
-        kwargs = {}
-        if my_order:
-            kwargs = {'assign_to_user': self.request.user.username}
         if lot_no:
             queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=search) | Q(equip_no=search))
             queryset2 = EquipInspectionOrder.objects.filter(equip_no=search)
