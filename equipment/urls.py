@@ -151,7 +151,9 @@ urlpatterns = [
     # 备件PDA出入库
     path('equip-auto-plan/', EquipAutoPlanView.as_view()),
     # 条码打印
-    path('equip-code-print/', EquipCodePrintView.as_view())
+    path('equip-code-print/', EquipCodePrintView.as_view()),
+    # 钉钉工单查询
+    path('equip-order-list/', EquipOrderListView.as_view())
 ]
 
 

@@ -906,6 +906,7 @@ permission_data = [
     {'id': 715, 'code': 'view_equip_warehouse_inventory', 'name': '查看', 'parent_id': 714},
     {'id': 716, 'code': 'export_equip_warehouse_inventory', 'name': '导出', 'parent_id': 714},
     {'id': 717, 'code': 'feed_equip_warehouse_inventory', 'name': '查询', 'parent_id': 714},
+    {'id': 748, 'code': 'change_equip_warehouse_inventory', 'name': '盘库', 'parent_id': 714},
 
     {'id': 718, 'code': 'equip_warehouse_record', 'name': '备件出入库履历查询', 'parent_id': None},
     {'id': 719, 'code': 'view_equip_warehouse_record', 'name': '查看', 'parent_id': 718},
@@ -930,6 +931,15 @@ permission_data = [
     {'id': 735, 'code': 'handle_equip_apply_order', 'name': '处理', 'parent_id': 728},
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
+
+    # {'id': 748, 'code': 'inventory_verification', 'name': '备件库存盘点', 'parent_id': None},
+    # {'id': 749, 'code': 'view_inventory_verification', 'name': '查看', 'parent_id': 748},
+    # {'id': 750, 'code': 'change_inventory_verification', 'name': '编辑', 'parent_id': 748},
+    # {'id': 751, 'code': 'delete_inventory_verification', 'name': '删除', 'parent_id': 748},
+    # {'id': 752, 'code': 'lock_inventory_verification', 'name': '锁定', 'parent_id': 748},
+    # {'id': 753, 'code': 'unlock_inventory_verification', 'name': '解锁', 'parent_id': 748},
+
+    # 下一个权限id从749开始
 ]
 
 

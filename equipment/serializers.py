@@ -1385,13 +1385,20 @@ class EquipWarehouseInventorySerializer(BaseModelSerializer):
     unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
     upper_stock = serializers.ReadOnlyField(source='equip_spare.upper_stock', help_text='库存上限')
     lower_stock = serializers.ReadOnlyField(source='equip_spare.lower_stock', help_text='库存下限')
+    equip_spare = serializers.CharField(default='')
+    spare_code = serializers.CharField(default='')
 
     class Meta:
         model = EquipWarehouseInventory
         fields = (
             "id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params",
-            "unit",
+            "unit", "one_piece",
             "upper_stock", "lower_stock", "equip_spare")
+
+    def update(self, instance, validated_data):
+        instance.one_piece = validated_data['one_piece']
+        instance.save()
+        return instance
 
 
 class EquipWarehouseRecordSerializer(BaseModelSerializer):
@@ -1437,6 +1444,7 @@ class EquipPlanSerializer(BaseModelSerializer):
     planned_maintenance_date = serializers.CharField()
     next_maintenance_date = serializers.CharField(default=None)
     standard = serializers.SerializerMethodField()
+    timeout_color = serializers.SerializerMethodField()
 
     class Meta:
         model = EquipPlan
@@ -1449,6 +1457,14 @@ class EquipPlanSerializer(BaseModelSerializer):
         elif instance.equip_manintenance_standard:
             standard = instance.equip_manintenance_standard.standard_name
         return standard
+
+    def get_timeout_color(self, instance):
+        if instance.work_type == '巡检':
+           if '红色' in EquipInspectionOrder.objects.filter(plan_id=instance.plan_id).values_list('timeout_color', flat=True):
+                return '红色'
+        else:
+           if '红色' in EquipApplyOrder.objects.filter(plan_id=instance.plan_id).values_list('timeout_color', flat=True):
+            return '红色'
 
     def create(self, validated_data):
         dic = EquipPlan.objects.filter(work_type=validated_data['work_type'], created_date__date=date.today()).aggregate(
