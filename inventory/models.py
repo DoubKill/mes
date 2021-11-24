@@ -1121,3 +1121,12 @@ class Sulfur(models.Model):
     @property
     def depot_site_name(self):
         return self.depot_site.depot_site_name
+
+
+class WMSReleaseLog(AbstractEntity):
+    tracking_num = models.CharField(max_length=128, help_text='追踪码')
+    operation_type = models.CharField(max_length=10, help_text='放行/合格')
+
+    class Meta:
+        db_table = 'wms_release_log'
+        verbose_name_plural = verbose_name = '原材料立库放行记录'

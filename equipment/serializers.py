@@ -18,6 +18,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
     EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent
+
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
