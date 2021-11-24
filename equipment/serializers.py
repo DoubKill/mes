@@ -1444,6 +1444,7 @@ class EquipPlanSerializer(BaseModelSerializer):
     planned_maintenance_date = serializers.CharField()
     next_maintenance_date = serializers.CharField(default=None)
     standard = serializers.SerializerMethodField()
+    timeout_color = serializers.SerializerMethodField()
 
     class Meta:
         model = EquipPlan
@@ -1456,6 +1457,14 @@ class EquipPlanSerializer(BaseModelSerializer):
         elif instance.equip_manintenance_standard:
             standard = instance.equip_manintenance_standard.standard_name
         return standard
+
+    def get_timeout_color(self, instance):
+        if instance.work_type == '巡检':
+           if '红色' in EquipInspectionOrder.objects.filter(plan_id=instance.plan_id).values_list('timeout_color', flat=True):
+                return '红色'
+        else:
+           if '红色' in EquipApplyOrder.objects.filter(plan_id=instance.plan_id).values_list('timeout_color', flat=True):
+            return '红色'
 
     def create(self, validated_data):
         dic = EquipPlan.objects.filter(work_type=validated_data['work_type'], created_date__date=date.today()).aggregate(
