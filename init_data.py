@@ -590,6 +590,8 @@ permission_data = [
     {'id': 452, 'code': 'view_material_outbound_record', 'name': '查看', 'parent_id': 451},
     {'id': 453, 'code': 'space_material_outbound_record', 'name': '指定库位出库', 'parent_id': 451},
     {'id': 454, 'code': 'weight_material_outbound_record', 'name': '指定重量出库', 'parent_id': 451},
+    {'id': 738, 'code': 'unqualified_material_outbound_record', 'name': '不合格品出库', 'parent_id': 451},
+    {'id': 739, 'code': 'untested_material_outbound_record', 'name': '待检品出库', 'parent_id': 451},
 
     {'id': 455, 'code': 'material_outbound_task', 'name': '原材料出库任务', 'parent_id': None},
     {'id': 456, 'code': 'view_material_outbound_task', 'name': '查看', 'parent_id': 455},
@@ -612,10 +614,16 @@ permission_data = [
     {'id': 550, 'code': 'material_inout_history', 'name': '原材料出入库履历查询', 'parent_id': None},
     {'id': 551, 'code': 'view_material_inout_history', 'name': '查看', 'parent_id': 550},
 
+    {'id': 740, 'code': 'material_quality_setting', 'name': '原材料质检信息设定', 'parent_id': None},
+    {'id': 741, 'code': 'view_material_quality_setting', 'name': '查看', 'parent_id': 740},
+    {'id': 742, 'code': 'release_material_quality_setting', 'name': '合格/放行', 'parent_id': 740},
+
     {'id': 463, 'code': 'th_outbound_record', 'name': '炭黑库出库单据', 'parent_id': None},
     {'id': 464, 'code': 'view_th_outbound_record', 'name': '查看', 'parent_id': 463},
     {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
     {'id': 466, 'code': 'weight_th_outbound_record', 'name': '指定重量出库', 'parent_id': 463},
+    {'id': 743, 'code': 'unqualified_th_outbound_record', 'name': '不合格品出库', 'parent_id': 463},
+    {'id': 744, 'code': 'untested_th_outbound_record', 'name': '待检品出库', 'parent_id': 463},
 
     {'id': 467, 'code': 'th_outbound_task', 'name': '炭黑库出库任务', 'parent_id': None},
     {'id': 468, 'code': 'view_th_outbound_task', 'name': '查看', 'parent_id': 467},
@@ -637,6 +645,10 @@ permission_data = [
 
     {'id': 554, 'code': 'th_inout_history', 'name': '炭黑库出入库履历查询', 'parent_id': None},
     {'id': 555, 'code': 'view_th_inout_history', 'name': '查看', 'parent_id': 554},
+
+    {'id': 745, 'code': 'th_quality_setting', 'name': '炭黑质检信息设定', 'parent_id': None},
+    {'id': 746, 'code': 'view_th_quality_setting', 'name': '查看', 'parent_id': 745},
+    {'id': 747, 'code': 'release_th_quality_setting', 'name': '合格/放行', 'parent_id': 745},
 
     {'id': 475, 'code': 'material_report_equip', 'name': '原材料上报设备管理', 'parent_id': None},
     {'id': 476, 'code': 'view_material_report_equip', 'name': '查看', 'parent_id': 475},
@@ -932,23 +944,23 @@ permission_data = [
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
 
-    {'id': 738, 'code': 'equip_inspection_order', 'name': '设备巡检工单', 'parent_id': None},
-    {'id': 739, 'code': 'view_equip_inspection_order', 'name': '查看', 'parent_id': 738},
-    {'id': 740, 'code': 'close_equip_inspection_order', 'name': '关闭', 'parent_id': 738},
-    {'id': 741, 'code': 'assign_equip_inspection_order', 'name': '指派', 'parent_id': 738},
-    {'id': 742, 'code': 'receive_equip_inspection_order', 'name': '接单', 'parent_id': 738},
-    {'id': 743, 'code': 'charge_equip_inspection_order', 'name': '退单', 'parent_id': 738},
-    {'id': 744, 'code': 'begin_equip_inspection_order', 'name': '开始', 'parent_id': 738},
-    {'id': 745, 'code': 'handle_equip_inspection_order', 'name': '处理', 'parent_id': 738},
-    {'id': 746, 'code': 'export_equip_inspection_order', 'name': '导出', 'parent_id': 738},
+    {'id': 749, 'code': 'equip_inspection_order', 'name': '设备巡检工单', 'parent_id': None},
+    {'id': 750, 'code': 'view_equip_inspection_order', 'name': '查看', 'parent_id': 749},
+    {'id': 751, 'code': 'close_equip_inspection_order', 'name': '关闭', 'parent_id': 749},
+    {'id': 752, 'code': 'assign_equip_inspection_order', 'name': '指派', 'parent_id': 749},
+    {'id': 753, 'code': 'receive_equip_inspection_order', 'name': '接单', 'parent_id': 749},
+    {'id': 754, 'code': 'charge_equip_inspection_order', 'name': '退单', 'parent_id': 749},
+    {'id': 755, 'code': 'begin_equip_inspection_order', 'name': '开始', 'parent_id': 749},
+    {'id': 756, 'code': 'handle_equip_inspection_order', 'name': '处理', 'parent_id': 749},
+    {'id': 757, 'code': 'export_equip_inspection_order', 'name': '导出', 'parent_id': 749},
 
-    {'id': 747, 'code': 'equip_plan', 'name': '设备维护计划', 'parent_id': None},
-    {'id': 748, 'code': 'view_equip_plan', 'name': '查看', 'parent_id': 747},
-    {'id': 749, 'code': 'close_equip_plan', 'name': '关闭', 'parent_id': 747},
-    {'id': 750, 'code': 'build_equip_plan', 'name': '生成', 'parent_id': 747},
-    {'id': 751, 'code': 'add_equip_plan', 'name': '新建', 'parent_id': 747},
-    {'id': 752, 'code': 'export_equip_plan', 'name': '导出', 'parent_id': 747},
-    {'id': 753, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 747},
+    {'id': 758, 'code': 'equip_plan', 'name': '设备维护计划', 'parent_id': None},
+    {'id': 759, 'code': 'view_equip_plan', 'name': '查看', 'parent_id': 758},
+    {'id': 760, 'code': 'close_equip_plan', 'name': '关闭', 'parent_id': 758},
+    {'id': 761, 'code': 'build_equip_plan', 'name': '生成', 'parent_id': 758},
+    {'id': 762, 'code': 'add_equip_plan', 'name': '新建', 'parent_id': 758},
+    {'id': 763, 'code': 'export_equip_plan', 'name': '导出', 'parent_id': 758},
+    {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
 
     # 下一个权限id从754开始

@@ -172,6 +172,7 @@ class ApplyOrder:
                                                        work_order_no=work_order_no,
                                                        equip_no=equip,
                                                        equip_maintenance_standard=plan.equip_manintenance_standard,
+                                                       equip_repair_standard=plan.equip_repair_standard,
                                                        planned_repair_date=plan.planned_maintenance_date,
                                                        status='已生成',
                                                        equip_condition=plan.equip_condition,

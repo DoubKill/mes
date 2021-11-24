@@ -3826,8 +3826,8 @@ class EquipOrderListView(APIView):
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
         if lot_no:
-            queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=search) | Q(equip_no=search))
-            queryset2 = EquipInspectionOrder.objects.filter(equip_no=search)
+            queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code=lot_no) | Q(equip_no=lot_no))
+            queryset2 = EquipInspectionOrder.objects.filter(equip_no=lot_no)
         else:
             queryset1 = EquipApplyOrder.objects.filter(Q(equip_part_new__part_code__icontains=search) | Q(equip_no__icontains=search))
             queryset2 = EquipInspectionOrder.objects.filter(equip_no__icontains=search)
