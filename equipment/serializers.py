@@ -922,7 +922,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
     def create(self, validated_data):
         # 生成报修编号
         now_time = ''.join(str(datetime.now().date()).split('-'))
-        max_code = EquipApplyRepair.objects.aggregate(max_code=Max('plan_id'))['max_code']
+        max_code = EquipPlan.objects.filter(plan_id__startswith=f'BX{now_time}').aggregate(max_code=Max('plan_id'))['max_code']
         sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
         validated_data.update({
             'plan_id': f'BX{now_time}{sequence}', 'status': '已生成',
