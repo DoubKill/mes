@@ -932,14 +932,26 @@ permission_data = [
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
 
-    # {'id': 748, 'code': 'inventory_verification', 'name': '备件库存盘点', 'parent_id': None},
-    # {'id': 749, 'code': 'view_inventory_verification', 'name': '查看', 'parent_id': 748},
-    # {'id': 750, 'code': 'change_inventory_verification', 'name': '编辑', 'parent_id': 748},
-    # {'id': 751, 'code': 'delete_inventory_verification', 'name': '删除', 'parent_id': 748},
-    # {'id': 752, 'code': 'lock_inventory_verification', 'name': '锁定', 'parent_id': 748},
-    # {'id': 753, 'code': 'unlock_inventory_verification', 'name': '解锁', 'parent_id': 748},
+    {'id': 738, 'code': 'equip_inspection_order', 'name': '设备巡检工单', 'parent_id': None},
+    {'id': 739, 'code': 'view_equip_inspection_order', 'name': '查看', 'parent_id': 738},
+    {'id': 740, 'code': 'close_equip_inspection_order', 'name': '关闭', 'parent_id': 738},
+    {'id': 741, 'code': 'assign_equip_inspection_order', 'name': '指派', 'parent_id': 738},
+    {'id': 742, 'code': 'receive_equip_inspection_order', 'name': '接单', 'parent_id': 738},
+    {'id': 743, 'code': 'charge_equip_inspection_order', 'name': '退单', 'parent_id': 738},
+    {'id': 744, 'code': 'begin_equip_inspection_order', 'name': '开始', 'parent_id': 738},
+    {'id': 745, 'code': 'handle_equip_inspection_order', 'name': '处理', 'parent_id': 738},
+    {'id': 746, 'code': 'export_equip_inspection_order', 'name': '导出', 'parent_id': 738},
 
-    # 下一个权限id从749开始
+    {'id': 747, 'code': 'equip_plan', 'name': '设备维护计划', 'parent_id': None},
+    {'id': 748, 'code': 'view_equip_plan', 'name': '查看', 'parent_id': 747},
+    {'id': 749, 'code': 'close_equip_plan', 'name': '关闭', 'parent_id': 747},
+    {'id': 750, 'code': 'build_equip_plan', 'name': '生成', 'parent_id': 747},
+    {'id': 751, 'code': 'add_equip_plan', 'name': '新建', 'parent_id': 747},
+    {'id': 752, 'code': 'export_equip_plan', 'name': '导出', 'parent_id': 747},
+    {'id': 753, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 747},
+
+
+    # 下一个权限id从754开始
 ]
 
 

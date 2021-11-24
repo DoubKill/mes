@@ -1475,7 +1475,7 @@ class EquipPlanSerializer(BaseModelSerializer):
             '保养': 'BY',
             '润滑': 'RH',
             '标定': 'BD',
-            '计划维修': 'WX'
+            '维修': 'BX'
         }
         if res:
             plan_id = res[:10] + str('%04d' % (int(res[-4:]) + 1))
