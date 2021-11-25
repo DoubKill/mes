@@ -941,6 +941,7 @@ permission_data = [
     {'id': 733, 'code': 'charge_equip_apply_order', 'name': '退单', 'parent_id': 728},
     {'id': 734, 'code': 'begin_equip_apply_order', 'name': '开始', 'parent_id': 728},
     {'id': 735, 'code': 'handle_equip_apply_order', 'name': '处理', 'parent_id': 728},
+    {'id': 765, 'code': 'regulation_equip_apply_order', 'name': '增减人员', 'parent_id': 728},
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
 
@@ -963,7 +964,7 @@ permission_data = [
     {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
 
-    # 下一个权限id从754开始
+    # 下一个权限id从766开始
 ]
 
 

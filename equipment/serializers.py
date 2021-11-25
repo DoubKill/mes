@@ -1001,6 +1001,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     work_content = serializers.ListField(help_text='实际维修标准列表', write_only=True, default=[])
     image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
     apply_material_list = EquipRepairMaterialReqSerializer(help_text='申请物料列表', write_only=True, many=True, default=[])
+    repair_users = serializers.SerializerMethodField(help_text='维修人')
 
     def get_equip_type(self, obj):
         instance = Equip.objects.filter(equip_no=obj.equip_no).first()
@@ -1009,6 +1010,10 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     def get_equip_barcode(self, obj):
         instance = EquipApplyRepair.objects.filter(plan_id=obj.plan_id).first()
         return instance.equip_barcode if instance else ''
+
+    def get_repair_users(self, obj):
+        user = obj.repair_user
+        return user.split('，') if user else None
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
