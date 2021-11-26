@@ -23,7 +23,7 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingRetrieveSerializer, ProductBatchingUpdateSerializer, \
     ProductBatchingPartialUpdateSerializer, MaterialSupplierSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
-    ERPMaterialUpdateSerializer, ZCMaterialSerializer
+    ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
     ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation
 
@@ -436,43 +436,43 @@ class ProductDevBatchingReceive(APIView):
             used_type=6).filter(stage_product_batch_no=data['stage_product_batch_no'],
                                 batching_type=2,
                                 dev_type__category_no=data['dev_type__category_no']).first()
+        try:
+            dev_type = EquipCategoryAttribute.objects.get(category_no=data['dev_type__category_no'])
+            if data['factory__global_no']:
+                factory = GlobalCode.objects.get(global_no=data['factory__global_no'])
+            else:
+                factory = None
+            if data['product_info__product_no']:
+                product_info = ProductInfo.objects.get(product_no=data['product_info__product_no'])
+            else:
+                product_info = None
+            if data['site__global_no']:
+                site = GlobalCode.objects.get(global_no=data['site__global_no'])
+            else:
+                site = None
+            if data['stage__global_no']:
+                stage = GlobalCode.objects.get(global_no=data['stage__global_no'])
+            else:
+                stage = None
+            for m in data['batching_details']:
+                material_no = m.pop('material__material_no')
+                material = Material.objects.filter(material_no=material_no).first()
+                if not material:
+                    raise ValidationError('MES原材料:{}不存在！'.format(material_no))
+                m['material'] = material
+        except EquipCategoryAttribute.DoesNotExist:
+            raise ValidationError('MES机型{}不存在'.format(data.get('dev_type__category_no')))
+        except GlobalCode.DoesNotExist as e:
+            raise ValidationError('MES公共代码{}不存在'.format(e))
+        except ProductInfo.DoesNotExist:
+            raise ValidationError('MES胶料代码{}不存在'.format(data['product_info__product_no']))
+        except Material.DoesNotExist:
+            raise ValidationError('MES原材料不存在！')
+        except Exception as e:
+            raise e
         if product_batching:
-            return Response('ok')
+            product_batching.batching_details.all().delete()
         else:
-            try:
-                dev_type = EquipCategoryAttribute.objects.get(category_no=data['dev_type__category_no'])
-                if data['factory__global_no']:
-                    factory = GlobalCode.objects.get(global_no=data['factory__global_no'])
-                else:
-                    factory = None
-                if data['product_info__product_no']:
-                    product_info = ProductInfo.objects.get(product_no=data['product_info__product_no'])
-                else:
-                    product_info = None
-                if data['site__global_no']:
-                    site = GlobalCode.objects.get(global_no=data['site__global_no'])
-                else:
-                    site = None
-                if data['stage__global_no']:
-                    stage = GlobalCode.objects.get(global_no=data['stage__global_no'])
-                else:
-                    stage = None
-                for m in data['batching_details']:
-                    material_no = m.pop('material__material_no')
-                    material = Material.objects.filter(material_no=material_no).first()
-                    if not material:
-                        raise ValidationError('MES原材料:{}不存在！'.format(material_no))
-                    m['material'] = material
-            except EquipCategoryAttribute.DoesNotExist:
-                raise ValidationError('MES机型{}不存在'.format(data.get('dev_type__category_no')))
-            except GlobalCode.DoesNotExist as e:
-                raise ValidationError('MES公共代码{}不存在'.format(e))
-            except ProductInfo.DoesNotExist:
-                raise ValidationError('MES胶料代码{}不存在'.format(data['product_info__product_no']))
-            except Material.DoesNotExist:
-                raise ValidationError('MES原材料不存在！')
-            except Exception as e:
-                raise e
             product_batching = ProductBatching.objects.create(
                 dev_type=dev_type,
                 factory=factory,
@@ -484,8 +484,29 @@ class ProductDevBatchingReceive(APIView):
                 used_type=data['used_type'],
                 stage_product_batch_no=data['stage_product_batch_no']
             )
-            for item in data['batching_details']:
-                item['product_batching'] = product_batching
-                ProductBatchingDetail.objects.create(**item)
-            product_batching.save()
-            return Response('ok')
+        for item in data['batching_details']:
+            item['product_batching'] = product_batching
+            ProductBatchingDetail.objects.create(**item)
+        product_batching.save()
+        return Response('ok')
+
+
+class DevTypeProductBatching(APIView):
+
+    def get(self, request):
+        dev_type = self.request.query_params.get('dev_type')
+        product_no = self.request.query_params.get('product_no')
+        if not all([dev_type, product_no]):
+            raise ValidationError('参数不足')
+        instance = ProductBatching.objects.exclude(
+            used_type=6).filter(
+            dev_type__category_no=dev_type,
+            stage_product_batch_no=product_no,
+            batching_type=2
+        ).first()
+        if instance:
+            s = ProductBatchingDetailRetrieveSerializer(
+                instance=instance.batching_details.filter(delete_flag=False), many=True)
+            return Response(s.data)
+        else:
+            return Response({})

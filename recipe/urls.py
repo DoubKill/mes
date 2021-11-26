@@ -5,7 +5,7 @@ from recipe.views import MaterialViewSet, ProductInfoViewSet, \
     ProductBatchingViewSet, MaterialAttributeViewSet, \
     ValidateProductVersionsView, RecipeNoticeAPiView, MaterialSupplierViewSet, \
     WeighCntTypeViewSet, ProductBatchingDetailListView, ERPMaterialViewSet, ZCMaterialListView, GetERPZcMaterialAPiView, \
-    ProductDevBatchingReceive
+    ProductDevBatchingReceive, DevTypeProductBatching
 
 router = DefaultRouter()
 
@@ -37,5 +37,6 @@ urlpatterns = [
     path('recipe-notice/', RecipeNoticeAPiView.as_view()),  # 配方下发至上辅机
     path('validate-versions/', ValidateProductVersionsView.as_view()),  # 验证版本号，创建胶料工艺信息前调用
     path('zc-materials-though-mes/', GetERPZcMaterialAPiView.as_view()),  # 通过mes物料名获取绑定关系的中策物料信息
-    path('product-dev-batching-receive/', ProductDevBatchingReceive.as_view())
+    path('product-dev-batching-receive/', ProductDevBatchingReceive.as_view()),
+    path('dev-type-batching/', DevTypeProductBatching.as_view())
     ]

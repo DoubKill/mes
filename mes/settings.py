@@ -222,7 +222,7 @@ LOGGING = {
         },
         'sendMsgFile': {
             'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'mes.custom_log.CommonTimedRotatingFileHandler',
             'filename': os.path.join(LOGGING_DIR, 'send_msg.log'),
             'when': 'midnight',
             'backupCount': 10,
