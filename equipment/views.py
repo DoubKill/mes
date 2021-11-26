@@ -3426,7 +3426,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 if not searched:
                     query_set = self.queryset.filter(
                         Q(Q(status='已接单', repair_user__icontains=user_name) |
-                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontians=user_name)))
+                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
