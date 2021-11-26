@@ -11,7 +11,7 @@ import requests
 import xlwt
 from itertools import chain
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, F
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -59,7 +59,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
-from mes.common_code import SqlClient
+from mes.common_code import SqlClient, OSum
 from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -3148,28 +3148,12 @@ class DepotPalltModelViewSet(ModelViewSet):
     filter_class = DepotDataFilter
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        try:
-            lst = []
-            for i in serializer.data:
-                lst.append(
-                    {'product_no': i['product_no'], 'trains': (i['end_trains'] - i['begin_trains'] + 1), 'num': 1,
-                     'actual_weight': float(i['actual_weight'])})
-            c = {i['product_no']: {} for i in lst}
-
-            for i in lst:
-
-                if not c[i['product_no']]:
-                    i.update({"num": 1})
-                    c[i['product_no']].update(i)
-                else:
-                    c[i['product_no']]['num'] += 1
-                    c[i['product_no']]['trains'] += i['trains']
-                    c[i['product_no']]['actual_weight'] += i['actual_weight']
-            return Response({'results': c.values()})
-        except:
-            raise ValidationError('没有数据')
+        results = PalletFeedbacks.objects.filter(palletfeedbacks__pallet_status=1).values('product_no').annotate(
+            num=Count('product_no'),
+            trains=OSum(F('end_trains') - F('begin_trains') + 1),
+            actual_weight=OSum('actual_weight')
+        )
+        return Response({'results': results})
 
 
 @method_decorator([api_recorder], name="dispatch")

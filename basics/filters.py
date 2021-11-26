@@ -14,7 +14,7 @@ class EquipFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = Equip
-        fields = ('equip_level', 'equip_name', 'equip_process', 'category_name')
+        fields = ('equip_level', 'equip_name', 'equip_process', 'category_name', 'category')
 
 
 class GlobalCodeTypeFilter(django_filters.rest_framework.FilterSet):

@@ -901,6 +901,39 @@ class EquipApplyOrder(AbstractEntity):
         verbose_name_plural = verbose_name = '设备维修工单'
 
 
+class EquipInspectionOrder(AbstractEntity):
+    """
+        设备巡检工单
+    """
+    plan_id = models.CharField(max_length=64, help_text='计划编号', null=True, blank=True)
+    plan_name = models.CharField(max_length=64, help_text='计划名称')
+    work_type = models.CharField(max_length=64, help_text='作业类型', default='巡检')
+    work_order_no = models.CharField(max_length=64, help_text='工单编号', null=True, blank=True)
+    equip_no = models.CharField(max_length=64, help_text='机台')
+    equip_barcode = models.CharField(max_length=64, help_text='条码', null=True, blank=True)
+    equip_repair_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='巡检标准', on_delete=models.CASCADE)
+    planned_repair_date = models.DateField(help_text='计划巡检日期', null=True, blank=True)
+    equip_condition = models.CharField(max_length=64, help_text='设备条件')
+    importance_level = models.CharField(max_length=64, help_text='重要程度')
+    assign_user = models.CharField(max_length=64, help_text='指派人', null=True, blank=True)
+    assign_datetime = models.DateTimeField(help_text='指派时间', null=True, blank=True)
+    assign_to_user = models.CharField(max_length=64, help_text='被指派人', null=True, blank=True)
+    receiving_user = models.CharField(max_length=64, help_text='接单人', null=True, blank=True)
+    receiving_datetime = models.DateTimeField(help_text='接单时间', null=True, blank=True)
+    repair_user = models.CharField(max_length=64, help_text='巡检人', null=True, blank=True)
+    repair_start_datetime = models.DateTimeField(help_text='巡检开始时间', null=True, blank=True)
+    repair_end_datetime = models.DateTimeField(help_text='巡检结束时间', null=True, blank=True)
+    result_repair_desc = models.CharField(max_length=256, help_text='巡检备注', null=True, blank=True)
+    result_repair_graph_url = models.TextField(help_text='巡检图片', null=True, blank=True)
+    result_repair_final_result = models.CharField(max_length=256, help_text='巡检结论', null=True, blank=True)
+    status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
+    timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
+
+    class Meta:
+        db_table = 'equip_inspection_order'
+        verbose_name_plural = verbose_name = '设备巡检工单'
+
+
 class UploadImage(AbstractEntity):
     source_type = models.CharField(max_length=64, help_text='上传类型: 维修;巡检')
     image_file_name = models.ImageField(help_text='上传图片', upload_to='equipment/%Y/%m/')

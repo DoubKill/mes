@@ -7,7 +7,7 @@ from django.db.models import Q, F
 from django.http import HttpResponse
 from openpyxl import load_workbook
 
-from equipment.models import EquipApplyOrder
+from equipment.models import EquipApplyOrder, EquipMaintenanceAreaSetting, EquipInspectionOrder
 from mes import settings
 from system.models import User, Section
 
@@ -94,13 +94,15 @@ class DinDinAPI(object):
         data = json.loads(ret.text)
         return data.get('recordresult')
 
-    def send_message(self, user_ids, content, order_id=0):
+    def send_message(self, user_ids, content, order_id=0, inspection=False):
         """
             发送钉钉工作消息给用户
         @param user_ids:
         """
         url = "https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2"
-        message_url = "eapp://pages/workOrderList/workOrderList" if not order_id else f"eapp://pages/repairOrder/repairOrder?id={order_id}"
+        message_url = "eapp://pages/workOrderList/workOrderList"
+        if order_id:
+            message_url = f"eapp://pages/repairOrder/repairOrder?id={order_id}" + ("&isInspection=true" if inspection else "")
         data = {
             "msg": {
                 "msgtype": "oa",
@@ -153,11 +155,42 @@ def get_staff_status(ding_api, section_name, group=''):
     return result
 
 
-def get_ding_uids(ding_api, pks=None, names=None):
+def get_maintenance_status(ding_api, equip_no):
+    result = []
+    """获取包干人员信息"""
+    maintenances = EquipMaintenanceAreaSetting.objects.filter(equip__equip_no=equip_no)\
+        .annotate(username=F('maintenance_user__username'), phone_number=F('maintenance_user__phone_number'),
+                  group=F('maintenance_user__repair_group'), uid=F('maintenance_user__id'),
+                  leader=F('maintenance_user__section__in_charge_user__username'),
+                  leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
+        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group')
+    for staff in maintenances:
+        staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
+                      'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
+                      'leader_phone_number': staff.get('leader_phone_number')}
+        # 根据手机号获取用户钉钉uid
+        ding_uid = ding_api.get_user_id(staff.get('phone_number'))
+        if ding_uid:
+            # 查询考勤记录
+            staff_dict['ding_uid'] = ding_uid
+            if settings.DEBUG:
+                staff_dict['optional'] = True
+            else:
+                records = ding_api.get_user_attendance([ding_uid])
+                if records and not len([i for i in records if i['checkType'] != 'OnDuty']):
+                    staff_dict['optional'] = True
+        result.append(staff_dict)
+    return result
+
+
+def get_ding_uids(ding_api, pks=None, names=None, check_type=None):
     """pks：维修单id列表"""
     user_ids, assign_user_list = [], []
     if pks:
-        assign_user_list = EquipApplyOrder.objects.filter(id__in=pks).values_list('assign_user').distinct()
+        if not check_type:
+            assign_user_list = EquipApplyOrder.objects.filter(id__in=pks).values_list('assign_user').distinct()
+        else:
+            assign_user_list = EquipInspectionOrder.objects.filter(id__in=pks).values_list('assign_user').distinct()
     if names:
         assign_user_list = names
     phone_numbers = User.objects.filter(username__in=assign_user_list).values_list('phone_number')

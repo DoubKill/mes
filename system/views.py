@@ -172,6 +172,9 @@ class SectionViewSet(ModelViewSet):
         if self.request.query_params.get("all"):
             data = self.get_queryset().filter(parent_section__isnull=False).values('id', 'name')
             return Response({'results': data})
+        if self.request.query_params.get('section_users'):
+            section = self.queryset.filter(section_users=self.request.user).first()
+            return Response({'section': section.name if section else None})
         data = []
         index_tree = {}
         for section in Section.objects.filter():
