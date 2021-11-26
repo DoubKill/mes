@@ -2763,6 +2763,160 @@ class WMSRelease(APIView):
         return Response('更新成功！')
 
 
+class WMSExpireListView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        sql = """select
+       m.MaterialCode,
+       m.Name,
+       sum(a.WeightOfActual) as weight,
+       count(a.Quantity) as quality,
+       a.StockDetailState,
+       m.StandardUnit
+from t_inventory_stock a
+inner join t_inventory_material m on m.MaterialCode=a.MaterialCode
+where m.Validity>0 and m.Validity - datediff(day ,a.CreaterTime, getdate()) <={}
+group by m.MaterialCode,
+         m.Name,
+         m.StandardUnit,
+         a.StockDetailState
+order by m.MaterialCode;""".format(expire_days)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        count = len(temp)
+        result = []
+        data = temp[st:et]
+        total_weight = sum([i[2] for i in temp])
+        total_quantity = sum([i[3] for i in temp])
+        for item in data:
+            result.append(
+                {'MaterialCode': item[0],
+                 'MaterialName': item[1],
+                 'WeightOfActual': item[2],
+                 'quantity': item[3],
+                 'quality_status': item[4],
+                 'unit': item[5]
+                 })
+        sc.close()
+        return Response({'results': result, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
+class WMSExpireDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = WMS_CONF
+    FILE_NAME = '库位明细'
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = self.FILE_NAME
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('出入库信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        columns = ['序号', '物料名称', '物料编码', '质检条码', '托盘号', '库存位', '库存数',
+                   '单位', '单位重量', '总重量', '品质状态', '入库时间', '有效期至', '剩余有效天数']
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i[0])
+            sheet.write(data_row, 2, i[1])
+            sheet.write(data_row, 3, i[2])
+            sheet.write(data_row, 4, i[3])
+            sheet.write(data_row, 5, i[4])
+            sheet.write(data_row, 6, i[5])
+            sheet.write(data_row, 7, i[6])
+            sheet.write(data_row, 8, i[7])
+            sheet.write(data_row, 9, i[7])
+            sheet.write(data_row, 10, i[8])
+            sheet.write(data_row, 11, i[9].strftime('%Y-%m-%d'))
+            sheet.write(data_row, 12, i[10].strftime('%Y-%m-%d'))
+            sheet.write(data_row, 13, i[11])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        quality_status = self.request.query_params.get('quality_status')
+        material_code = self.request.query_params.get('material_code')
+        export = self.request.query_params.get('export')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        if not all([expire_days, quality_status, material_code]):
+            raise ValidationError('参数不足！')
+        sql = """select
+       a.MaterialName,
+       a.MaterialCode,
+       a.TrackingNumber,
+       a.LadenToolNumber,
+       a.SpaceId,
+       a.Quantity,
+       a.WeightUnit,
+       a.WeightOfActual,
+       a.StockDetailState,
+       a.CreaterTime,
+       dateadd(dd,m.Validity,a.CreaterTime) as expire_time,
+       m.Validity - datediff(day ,a.CreaterTime, getdate()) as left_days
+from t_inventory_stock a
+inner join t_inventory_material m on m.MaterialCode=a.MaterialCode
+where m.Validity>0
+  and m.Validity - datediff(day ,a.CreaterTime, getdate()) <= {}
+  and m.MaterialCode='{}'
+  and a.StockDetailState={}
+order by left_days;""".format(expire_days, material_code, quality_status)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        if export == '2':
+            return self.export_xls(list(temp))
+        elif export == '1':
+            return self.export_xls(list(temp[st:et]))
+
+        count = len(temp)
+        result = []
+        data = temp[st:et]
+        total_weight = sum([i[7] for i in temp])
+        total_quantity = sum([i[5] for i in temp])
+        for item in data:
+            result.append(
+                {
+                 'material_name': item[0],
+                 'material_no': item[1],
+                 'lot_no': item[2],
+                 'container_no': item[3],
+                 'location': item[4],
+                 'qty': item[5],
+                 'unit': item[6],
+                 'total_weight': item[7],
+                 'quality_status': item[8],
+                 'in_storage_time': item[9],
+                 'expire_time': item[10],
+                 'left_days': item[11],
+                 })
+        sc.close()
+        return Response({'results': result, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
 @method_decorator([api_recorder], name="dispatch")
 class WmsInventoryWeightStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
@@ -3080,6 +3234,16 @@ class THInventoryView(WMSInventoryView):
 @method_decorator([api_recorder], name="dispatch")
 class THRelease(WMSRelease):
     REQUEST_URL = TH_URL
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THExpireListView(WMSExpireListView):
+    DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THExpireDetailView(WMSExpireDetailView):
+    DATABASE_CONF = TH_CONF
 
 
 @method_decorator([api_recorder], name="dispatch")
