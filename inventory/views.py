@@ -59,7 +59,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
-from mes.common_code import SqlClient
+from mes.common_code import SqlClient, OSum
 from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
@@ -2788,7 +2788,8 @@ class WmsInventoryWeightStockView(APIView):
                  c.Name AS MaterialName,
                  SUM ( a.WeightOfActual ) AS WeightOfActual,
                  SUM ( a.Quantity ) AS quantity,
-                 Min ( a.WeightOfActual ) AS min_quantity
+                 Min ( a.WeightOfActual ) AS min_quantity,
+                 a.StockDetailState
                 FROM
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -2807,7 +2808,9 @@ class WmsInventoryWeightStockView(APIView):
                  {}
                 GROUP BY
                  c.MaterialCode,
-                 c.Name;""".format(entrance_name, extra_where_str)
+                 c.Name,
+                 a.StockDetailState
+                 order by c.MaterialCode;""".format(entrance_name, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         count = len(temp)
@@ -2822,7 +2825,8 @@ class WmsInventoryWeightStockView(APIView):
                  'MaterialName': item[1],
                  'WeightOfActual': item[2],
                  'quantity': item[3],
-                 'avg_weight': avg_weight
+                 'avg_weight': avg_weight,
+                 'quality_status': item[5]
                  })
         sc.close()
         return Response({'results': result, "count": count})

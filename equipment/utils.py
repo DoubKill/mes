@@ -94,13 +94,15 @@ class DinDinAPI(object):
         data = json.loads(ret.text)
         return data.get('recordresult')
 
-    def send_message(self, user_ids, content, order_id=0):
+    def send_message(self, user_ids, content, order_id=0, inspection=False):
         """
             发送钉钉工作消息给用户
         @param user_ids:
         """
         url = "https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2"
-        message_url = "eapp://pages/workOrderList/workOrderList" if not order_id else f"eapp://pages/repairOrder/repairOrder?id={order_id}"
+        message_url = "eapp://pages/workOrderList/workOrderList"
+        if order_id:
+            message_url = f"eapp://pages/repairOrder/repairOrder?id={order_id}" + ("&isInspection=true" if inspection else "")
         data = {
             "msg": {
                 "msgtype": "oa",

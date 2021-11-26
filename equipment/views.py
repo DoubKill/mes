@@ -31,7 +31,8 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseInventoryFilter, EquipWarehouseStatisticalFilter, EquipWarehouseOrderDetailFilter, \
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter
-from equipment.models import EquipTargetMTBFMTTRSetting
+from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
+    EquipInspectionOrder
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -3155,20 +3156,20 @@ class EquipApplyOrderViewSet(ModelViewSet):
         if my_order == '1':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(
-                        Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
-                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user=user_name)))
+                    query_set = self.queryset.filter(  # repair_user
+                        Q(Q(status='已接单', repair_user__icontains=user_name) |
+                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                        Q(repair_user=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
+                        Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
                 query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                                                 Q(repair_user=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
+                                                 Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
         elif my_order == '2':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                    query_set = self.queryset.filter(Q(Q(status='已接单') |
                                                        Q(status='已开始', repair_end_datetime__isnull=True)))
                 else:
                     query_set = self.queryset
@@ -3189,15 +3190,15 @@ class EquipApplyOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+            processing = self.queryset.filter(Q(Q(status='已接单', receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
-                                                  repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
+                                                  repair_user__icontains=user_name))).count()
+            finished = self.queryset.filter(status='已完成', repair_user__icontains=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+            processing = self.queryset.filter(Q(Q(status='已接单') |
                                                 Q(status='已开始', repair_end_datetime__isnull=True))).count()
             finished = self.queryset.filter(status='已完成').count()
             accepted = self.queryset.filter(status='已验收').count()
@@ -3216,6 +3217,15 @@ class EquipApplyOrderViewSet(ModelViewSet):
         for item in serializer.data:
             item.update(data)
         return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        # 增减维修人员
+        if self.request.data.get('order_id'):
+            data = self.request.data
+            users = '，'.join(data.get('users'))
+            self.queryset.filter(id=data.get('order_id')).update(repair_user=users)
+            return Response('修改完成')
+        return super().create(request, *args, **kwargs)
 
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
@@ -3247,8 +3257,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if assign_to_num != 0:
                 raise ValidationError('存在未被指派的订单, 请刷新订单!')
             data = {
-                'status': data.get('status'), 'receiving_user': user_ids, 'receiving_datetime': now_date,
-                'last_updated_date': datetime.now()
+                'status': data.get('status'), 'receiving_user': user_ids, 'repair_user': user_ids,
+                'receiving_datetime': now_date, 'last_updated_date': datetime.now(), 'timeout_color': None
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}接单",
                             "form": [{"key": "接单人:", "value": user_ids},
@@ -3260,7 +3270,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None,
+                'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
                 'assign_to_user': None, 'last_updated_date': datetime.now()
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
@@ -3268,12 +3278,13 @@ class EquipApplyOrderViewSet(ModelViewSet):
                                      {"key": "退单时间:", "value": now_date}]})
             user_ids = get_ding_uids(ding_api, pks)
         elif opera_type == '开始':
+            # 修改
             receive_num = EquipApplyOrder.objects.filter(~Q(status='已接单'), id__in=pks).count()
             if receive_num != 0:
                 raise ValidationError('订单未被接单, 请刷新订单!')
             data = {
-                'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
-                'last_updated_date': datetime.now()
+                'status': data.get('status'), 'repair_start_datetime': now_date,
+                'last_updated_date': datetime.now(), 'timeout_color': None
             }
             # 更新维护计划状态
             equip_plan = EquipApplyOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
@@ -3325,13 +3336,13 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if result_accept_result == '合格':
                 data = {
                     'status': data.get('status'), 'accept_datetime': now_date,
-                    'result_accept_result': result_accept_result,
+                    'result_accept_result': result_accept_result, 'timeout_color': None,
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
                 }
             else:
                 data = {
-                    'status': data.get('status'), 'repair_end_datetime': None, 'accept_user': None,
+                    'status': data.get('status'), 'repair_end_datetime': None, 'accept_datetime': now_date,
                     'result_accept_result': result_accept_result,
                     'result_accept_desc': data.get('result_accept_desc'),
                     'result_accept_graph_url': json.dumps(image_url_list), 'last_updated_date': datetime.now()
@@ -3340,7 +3351,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             close_num = EquipApplyOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
-            data = {'status': data.get('status'), 'last_updated_date': datetime.now()}
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -3414,19 +3425,19 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     query_set = self.queryset.filter(
-                        Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
-                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user=user_name)))
+                        Q(Q(status='已接单', repair_user__icontains=user_name) |
+                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                        Q(repair_user=user_name) | Q(status='已生成'))
+                        Q(repair_user__icontains=user_name) | Q(status='已生成'))
             else:
                 query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                                                 Q(repair_user=user_name) | Q(status='已生成'))
+                                                 Q(repair_user__icontains=user_name) | Q(status='已生成'))
         elif my_order == '2':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                    query_set = self.queryset.filter(Q(Q(status='已接单') |
                                                        Q(status='已开始', repair_end_datetime__isnull=True)))
                 else:
                     query_set = self.queryset
@@ -3447,14 +3458,14 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+            processing = self.queryset.filter(Q(Q(status='已接单', receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
-                                                  repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成', repair_user=user_name).count()
+                                                  repair_user__icontains=user_name))).count()
+            finished = self.queryset.filter(status='已完成', repair_user__icontains=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+            processing = self.queryset.filter(Q(Q(status='已接单') |
                                                 Q(status='已开始', repair_end_datetime__isnull=True))).count()
             finished = self.queryset.filter(status='已完成').count()
         data = {'wait_assign': wait_assign, 'assigned': assigned, 'processing': processing, 'finished': finished}
@@ -3471,6 +3482,15 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         for item in serializer.data:
             item.update(data)
         return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        # 增减巡检人员
+        if self.request.data.get('order_id'):
+            data = self.request.data
+            users = '，'.join(data.get('users'))
+            self.queryset.filter(id=data.get('order_id')).update(repair_user=users)
+            return Response('修改完成')
+        return super().create(request, *args, **kwargs)
 
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
@@ -3502,8 +3522,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if assign_to_num != 0:
                 raise ValidationError('存在未被指派的订单, 请刷新订单!')
             data = {
-                'status': data.get('status'), 'receiving_user': user_ids, 'receiving_datetime': now_date,
-                'last_updated_date': datetime.now()
+                'status': data.get('status'), 'receiving_user': user_ids, 'repair_user': user_ids, 'receiving_datetime': now_date,
+                'last_updated_date': datetime.now(), 'timeout_color': None
             }
             content.update({"title": f"您指派的设备巡检单已被{user_ids}接单",
                             "form": [{"key": "接单人:", "value": user_ids},
@@ -3515,7 +3535,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None,
+                'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
                 'assign_to_user': None, 'last_updated_date': datetime.now()
             }
             content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
@@ -3527,8 +3547,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if receive_num != 0:
                 raise ValidationError('订单未被接单, 请刷新订单!')
             data = {
-                'status': data.get('status'), 'repair_user': user_ids, 'repair_start_datetime': now_date,
-                'last_updated_date': datetime.now()
+                'status': data.get('status'), 'repair_start_datetime': now_date,
+                'last_updated_date': datetime.now(), 'timeout_color': None
             }
             # 更新维护计划状态
             equip_plan = EquipInspectionOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
@@ -3554,7 +3574,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
-            data = {'status': data.get('status'), 'last_updated_date': datetime.now()}
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -3576,7 +3596,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                                        {"key": "机台:", "value": instance.equip_no},
                                        {"key": "巡检标准:", "value": fault_name},
                                        {"key": "重要程度:", "value": instance.importance_level}] + new_content['form']
-                ding_api.send_message(user_ids, new_content, order_id)
+                ding_api.send_message(user_ids, new_content, order_id, inspection=True)
         return Response(f'{opera_type}操作成功')
 
 

@@ -220,6 +220,8 @@ class AutoDispatch(object):
         self.ding_api = DinDinAPI()
 
     def send_order(self, order):
+        # 提醒消息里的链接类型 False 非巡检  True 巡检
+        inspection = False
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if order.work_type != '巡检':
             # 班组
@@ -231,6 +233,7 @@ class AutoDispatch(object):
             fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
+            inspection = True
             # 查询工单对应的包干人员[上班并且有空]
             choice_all_user = get_maintenance_status(self.ding_api, order.equip_no)
             fault_name = order.equip_repair_standard.standard_name
@@ -258,9 +261,9 @@ class AutoDispatch(object):
         for per in working_persons:
             if order.work_type != '巡检':
                 processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
-                                                                  repair_user=per['username'])
+                                                                  repair_user__icontains=per['username'])
             else:
-                processing_order = EquipInspectionOrder.objects.filter(status='已开始', repair_user=per['username'])
+                processing_order = EquipInspectionOrder.objects.filter(status='已开始', repair_user__icontains=per['username'])
             if processing_order:
                 processing_person.append(per)
                 continue
@@ -280,7 +283,7 @@ class AutoDispatch(object):
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
             content.update({'title': f"系统自动派发设备工单成功，请尽快处理！"})
-            self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id)
+            self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
 
         if len(processing_person) == len(working_persons):

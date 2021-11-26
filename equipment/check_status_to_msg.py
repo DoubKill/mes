@@ -22,6 +22,8 @@ ding_api = DinDinAPI()
 
 
 def handle(order):
+    # 提醒消息里的链接类型 False 非巡检  True 巡检
+    inspection = False if order.work_type != '巡检' else True
     # 获取规则
     instance = Equip.objects.filter(equip_no=order.equip_no).first()
     # 设备类型
@@ -95,7 +97,7 @@ def handle(order):
                                     {"key": "指派时间:", "value": str(order.assign_datetime)},
                                     {"key": "提醒时间:", "value": str(now_date)}]}
             if "1" in all_user:
-                ding_api.send_message(uids[:1], content, order_id=order.id)
+                ding_api.send_message(uids[:1], content, order_id=order.id, inspection=inspection)
                 if len(uids) > 2:
                     ding_api.send_message(uids[1:], content)
             else:
@@ -158,7 +160,7 @@ def handle(order):
                                     {"key": "接单时间:", "value": str(order.receiving_datetime)},
                                     {"key": "提醒时间:", "value": str(now_date)}]}
             if "1" in all_user:
-                ding_api.send_message(uids[:1], content, order_id=order.id)
+                ding_api.send_message(uids[:1], content, order_id=order.id, inspection=inspection)
                 if len(uids) > 2:
                     ding_api.send_message(uids[1:], content)
             else:
@@ -185,7 +187,7 @@ def handle(order):
                                 {"key": "维修人:", "value": order.repair_user},
                                 {"key": "维修完成时间:", "value": str(order.repair_end_datetime)},
                                 {"key": "提醒时间:", "value": str(now_date)}]}
-            ding_api.send_message(uids[:1], content, order_id=order.id)
+            ding_api.send_message(uids[:1], content, order_id=order.id, inspection=inspection)
             logger.info(f"超时提醒: 超期未验收提醒已经发送-{order.work_order_no}")
     return "超时提醒: 单据提醒处理完成"
 

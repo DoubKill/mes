@@ -1001,6 +1001,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     work_content = serializers.ListField(help_text='实际维修标准列表', write_only=True, default=[])
     image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
     apply_material_list = EquipRepairMaterialReqSerializer(help_text='申请物料列表', write_only=True, many=True, default=[])
+    repair_users = serializers.SerializerMethodField(help_text='维修人')
 
     def get_equip_type(self, obj):
         instance = Equip.objects.filter(equip_no=obj.equip_no).first()
@@ -1009,6 +1010,10 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     def get_equip_barcode(self, obj):
         instance = EquipApplyRepair.objects.filter(plan_id=obj.plan_id).first()
         return instance.equip_barcode if instance else ''
+
+    def get_repair_users(self, obj):
+        user = obj.repair_user
+        return user.split('，') if user else None
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -1034,6 +1039,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+                work_content.sort(key=lambda x: x['job_item_sequence'])
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
@@ -1129,10 +1135,15 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
     plan_name = serializers.CharField(max_length=64, help_text='巡检计划名称', validators=[
         UniqueValidator(queryset=EquipInspectionOrder.objects.all(), message='巡检计划名称已存在')
     ])
+    repair_users = serializers.SerializerMethodField(help_text='巡检人')
 
     def get_equip_type(self, obj):
         instance = Equip.objects.filter(equip_no=obj.equip_no).first()
         return instance.category_id if instance else ''
+
+    def get_repair_users(self, obj):
+        user = obj.repair_user
+        return user.split('，') if user else None
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -1159,6 +1170,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.get('check_standard_desc'),
                          'equip_jobitem_standard_id': i.get('equip_standard'),
                          'job_item_check_type': i.get('check_standard_type')})
+            work_content.sort(key=lambda x: x['job_item_sequence'])
         res['work_content'] = work_content
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
