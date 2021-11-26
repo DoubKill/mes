@@ -2788,12 +2788,8 @@ class WmsInventoryWeightStockView(APIView):
                  c.Name AS MaterialName,
                  SUM ( a.WeightOfActual ) AS WeightOfActual,
                  SUM ( a.Quantity ) AS quantity,
-<<<<<<< Updated upstream
-                 Min ( a.WeightOfActual ) AS min_quantity
-=======
                  Min ( a.WeightOfActual ) AS min_quantity,
                  a.StockDetailState
->>>>>>> Stashed changes
                 FROM
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
