@@ -953,6 +953,7 @@ permission_data = [
     {'id': 754, 'code': 'charge_equip_inspection_order', 'name': '退单', 'parent_id': 749},
     {'id': 755, 'code': 'begin_equip_inspection_order', 'name': '开始', 'parent_id': 749},
     {'id': 756, 'code': 'handle_equip_inspection_order', 'name': '处理', 'parent_id': 749},
+    {'id': 766, 'code': 'regulation_equip_apply_order', 'name': '增减人员', 'parent_id': 749},
     {'id': 757, 'code': 'export_equip_inspection_order', 'name': '导出', 'parent_id': 749},
 
     {'id': 758, 'code': 'equip_plan', 'name': '设备维护计划', 'parent_id': None},
