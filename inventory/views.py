@@ -3150,7 +3150,7 @@ class DepotPalltModelViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         results = PalletFeedbacks.objects.filter(palletfeedbacks__pallet_status=1).values('product_no').annotate(
             num=Count('product_no'),
-            trains=OSum(F('end_trains') - F('begin_trains') + 1),
+            trains=OSum((F('end_trains') - F('begin_trains')) + 1),
             actual_weight=OSum('actual_weight')
         )
         return Response({'results': results})
