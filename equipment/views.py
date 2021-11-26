@@ -3157,8 +3157,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     query_set = self.queryset.filter(  # repair_user
-                        Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
-                          Q(status='已接单', repair_user__icontains=user_name) |
+                        Q(Q(status='已接单', repair_user__icontains=user_name) |
                           Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
                 else:
                     query_set = self.queryset.filter(
@@ -3170,7 +3169,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         elif my_order == '2':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                    query_set = self.queryset.filter(Q(Q(status='已接单') |
                                                        Q(status='已开始', repair_end_datetime__isnull=True)))
                 else:
                     query_set = self.queryset
@@ -3191,15 +3190,15 @@ class EquipApplyOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+            processing = self.queryset.filter(Q(Q(status='已接单', receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
-                                                  repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
+                                                  repair_user__icontians=user_name))).count()
+            finished = self.queryset.filter(status='已完成', repair_user__icontians=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+            processing = self.queryset.filter(Q(Q(status='已接单') |
                                                 Q(status='已开始', repair_end_datetime__isnull=True))).count()
             finished = self.queryset.filter(status='已完成').count()
             accepted = self.queryset.filter(status='已验收').count()
@@ -3426,19 +3425,19 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     query_set = self.queryset.filter(
-                        Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
-                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user=user_name)))
+                        Q(Q(status='已接单', repair_user__icontains=user_name) |
+                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontians=user_name)))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                        Q(repair_user=user_name) | Q(status='已生成'))
+                        Q(repair_user__icontains=user_name) | Q(status='已生成'))
             else:
                 query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                                                 Q(repair_user=user_name) | Q(status='已生成'))
+                                                 Q(repair_user__icontains=user_name) | Q(status='已生成'))
         elif my_order == '2':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+                    query_set = self.queryset.filter(Q(Q(status='已接单') |
                                                        Q(status='已开始', repair_end_datetime__isnull=True)))
                 else:
                     query_set = self.queryset
@@ -3459,14 +3458,14 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True, receiving_user=user_name) |
+            processing = self.queryset.filter(Q(Q(status='已接单', receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
-                                                  repair_user=user_name))).count()
-            finished = self.queryset.filter(status='已完成', repair_user=user_name).count()
+                                                  repair_user__icontains=user_name))).count()
+            finished = self.queryset.filter(status='已完成', repair_user__icontains=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()
-            processing = self.queryset.filter(Q(Q(status='已接单', repair_user__isnull=True) |
+            processing = self.queryset.filter(Q(Q(status='已接单') |
                                                 Q(status='已开始', repair_end_datetime__isnull=True))).count()
             finished = self.queryset.filter(status='已完成').count()
         data = {'wait_assign': wait_assign, 'assigned': assigned, 'processing': processing, 'finished': finished}

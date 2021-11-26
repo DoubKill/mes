@@ -261,9 +261,9 @@ class AutoDispatch(object):
         for per in working_persons:
             if order.work_type != '巡检':
                 processing_order = EquipApplyOrder.objects.filter(~Q(result_repair_final_result='等待'), status='已开始',
-                                                                  repair_user=per['username'])
+                                                                  repair_user__icontains=per['username'])
             else:
-                processing_order = EquipInspectionOrder.objects.filter(status='已开始', repair_user=per['username'])
+                processing_order = EquipInspectionOrder.objects.filter(status='已开始', repair_user__icontains=per['username'])
             if processing_order:
                 processing_person.append(per)
                 continue
