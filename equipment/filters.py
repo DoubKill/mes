@@ -5,7 +5,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipPart, EquipMai
     ERPSpareComponentRelation, EquipSpareErp, EquipFault, EquipFaultType, \
     EquipCurrentStatus, EquipFaultSignal, EquipMachineHaltType, EquipMachineHaltReason, EquipOrderAssignRule, EquipBom, \
     EquipJobItemStandard, EquipMaintenanceStandard, EquipRepairStandard, EquipWarehouseInventory, EquipWarehouseRecord, \
-    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder
+    EquipWarehouseOrderDetail, EquipApplyRepair, EquipApplyOrder, EquipWarehouseOrder, EquipPlan, EquipInspectionOrder
 
 
 class EquipDownTypeFilter(django_filters.rest_framework.FilterSet):
@@ -326,7 +326,7 @@ class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipWarehouseOrderDetail
-        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user')
+        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user', 'equip_warehouse_order')
 
 
 class EquipWarehouseRecordFilter(django_filters.rest_framework.FilterSet):
@@ -404,6 +404,36 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
         model = EquipApplyOrder
         fields = ('planned_repair_date', 'plan_name', 'equip_no', 'work_order_no', 'equip_condition', 'status',
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'accept_user', 'result_accept_result',
-                  'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'importance_level',
-                  'wait_material', 'wait_outsourcing', 'status', 'created_user', 'result_final_fault_cause',
-                  'assign_user', 'assign_to_user',)
+                  'result_material_requisition', 'result_need_outsourcing', 'importance_level', 'assign_to_user',
+                  'wait_material', 'wait_outsourcing', 'created_user', 'result_final_fault_cause', 'assign_user',
+                  'receiving_user')
+
+
+class EquipPlanFilter(django_filters.rest_framework.FilterSet):
+    plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
+    planned_maintenance_date = django_filters.CharFilter(field_name='planned_maintenance_date__date', help_text='计划日期')
+
+    class Meta:
+        model = EquipPlan
+        fields = ('work_type', 'plan_name', 'planned_maintenance_date', 'plan_source', 'status', 'equip_condition', 'importance_level')
+
+
+class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
+    planned_repair_date = django_filters.DateFromToRangeFilter(field_name='planned_repair_date',
+                                                               help_text='计划巡检时间', lookup_expr='range')
+    plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
+    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机台', lookup_expr='icontains')
+    work_order_no = django_filters.CharFilter(field_name='work_order_no', help_text='工单编号', lookup_expr='icontains')
+    equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_name',
+                                                      help_text='巡检标准', lookup_expr='icontains')
+    assign_user = django_filters.CharFilter(field_name='assign_user', help_text='指派人', lookup_expr='icontains')
+    assign_to_user = django_filters.CharFilter(field_name='assign_to_user', help_text='被指派人', lookup_expr='icontains')
+    repair_user = django_filters.CharFilter(field_name='repair_user', help_text='巡检人', lookup_expr='icontains')
+    receiving_user = django_filters.CharFilter(field_name='receiving_user', help_text='接单人', lookup_expr='icontains')
+
+    class Meta:
+        model = EquipInspectionOrder
+        fields = ('planned_repair_date', 'plan_name', 'equip_no', 'work_order_no', 'equip_condition', 'status',
+                  'equip_repair_standard', 'equip_condition', 'repair_user', 'importance_level',
+                  'assign_user', 'assign_to_user', 'receiving_user')
+

@@ -918,6 +918,7 @@ permission_data = [
     {'id': 715, 'code': 'view_equip_warehouse_inventory', 'name': '查看', 'parent_id': 714},
     {'id': 716, 'code': 'export_equip_warehouse_inventory', 'name': '导出', 'parent_id': 714},
     {'id': 717, 'code': 'feed_equip_warehouse_inventory', 'name': '查询', 'parent_id': 714},
+    {'id': 748, 'code': 'change_equip_warehouse_inventory', 'name': '盘库', 'parent_id': 714},
 
     {'id': 718, 'code': 'equip_warehouse_record', 'name': '备件出入库履历查询', 'parent_id': None},
     {'id': 719, 'code': 'view_equip_warehouse_record', 'name': '查看', 'parent_id': 718},
@@ -940,10 +941,31 @@ permission_data = [
     {'id': 733, 'code': 'charge_equip_apply_order', 'name': '退单', 'parent_id': 728},
     {'id': 734, 'code': 'begin_equip_apply_order', 'name': '开始', 'parent_id': 728},
     {'id': 735, 'code': 'handle_equip_apply_order', 'name': '处理', 'parent_id': 728},
+    {'id': 765, 'code': 'regulation_equip_apply_order', 'name': '增减人员', 'parent_id': 728},
     {'id': 736, 'code': 'accept_equip_apply_order', 'name': '验收', 'parent_id': 728},
     {'id': 737, 'code': 'export_equip_apply_order', 'name': '导出', 'parent_id': 728},
 
-    # 下一个权限id从748开始
+    {'id': 749, 'code': 'equip_inspection_order', 'name': '设备巡检工单', 'parent_id': None},
+    {'id': 750, 'code': 'view_equip_inspection_order', 'name': '查看', 'parent_id': 749},
+    {'id': 751, 'code': 'close_equip_inspection_order', 'name': '关闭', 'parent_id': 749},
+    {'id': 752, 'code': 'assign_equip_inspection_order', 'name': '指派', 'parent_id': 749},
+    {'id': 753, 'code': 'receive_equip_inspection_order', 'name': '接单', 'parent_id': 749},
+    {'id': 754, 'code': 'charge_equip_inspection_order', 'name': '退单', 'parent_id': 749},
+    {'id': 755, 'code': 'begin_equip_inspection_order', 'name': '开始', 'parent_id': 749},
+    {'id': 756, 'code': 'handle_equip_inspection_order', 'name': '处理', 'parent_id': 749},
+    {'id': 766, 'code': 'regulation_equip_inspection_order', 'name': '增减人员', 'parent_id': 749},
+    {'id': 757, 'code': 'export_equip_inspection_order', 'name': '导出', 'parent_id': 749},
+
+    {'id': 758, 'code': 'equip_plan', 'name': '设备维护计划', 'parent_id': None},
+    {'id': 759, 'code': 'view_equip_plan', 'name': '查看', 'parent_id': 758},
+    {'id': 760, 'code': 'close_equip_plan', 'name': '关闭', 'parent_id': 758},
+    {'id': 761, 'code': 'build_equip_plan', 'name': '生成', 'parent_id': 758},
+    {'id': 762, 'code': 'add_equip_plan', 'name': '新建', 'parent_id': 758},
+    {'id': 763, 'code': 'export_equip_plan', 'name': '导出', 'parent_id': 758},
+    {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
+
+
+    # 下一个权限id从766开始
 ]
 
 
