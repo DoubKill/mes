@@ -721,12 +721,12 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         batch_group = record.group.global_name
         # 条码
-        prefix = f"M{batching_equip}{now_date.date().strftime('%Y%m%d')}"
+        prefix = f"M{batching_equip}{now_date.date().strftime('%Y%m%d')}{map_list.get(batch_class)}"
         max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        bra_code = prefix + map_list.get(batch_class) + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
+        bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         total_weight = 0
         for item in manual_details:
-            total_weight += item.get('plan_weight')
+            total_weight += item.get('standard_weight', 0)
         # 根据重量查询公差
         distinguish_name, project_name = ["细料称量", "整包细料重量"] if batching_equip.startswith('F') else ["硫磺称量", "整包硫磺重量"]
         rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name, project__keyword_name=project_name,
@@ -773,9 +773,9 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         batch_group = record.group.global_name
         # 条码
-        prefix = f"MS{now_date.date().strftime('%Y%m%d')}"
-        max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        bra_code = prefix + map_list.get(batch_class) + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
+        prefix = f"MC{now_date.date().strftime('%Y%m%d')}{map_list.get(batch_class)}"
+        max_code = WeightPackageSingle.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
+        bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         # 单物料所有量程公差
         rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""

@@ -667,7 +667,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         if not merge_flag:
             raise ValidationError('称量计划未设置合包, 不可扫码')
         # 通用物料/配方物料
-        if bra_code.startswith('MS'):
+        if bra_code.startswith('MC'):
             manual_single = WeightPackageSingle.objects.filter(bra_code=bra_code).first()
             if manual_single.batching_type == '配方':
                 # 判断物料配方是否一致
@@ -708,9 +708,15 @@ class WeightPackageManualViewSet(ModelViewSet):
     """
     queryset = WeightPackageManual.objects.all().order_by('-created_date')
     serializer_class = WeightPackageManualSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = ()
     filter_backends = [DjangoFilterBackend]
     filter_class = WeightPackageManualFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('client'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
@@ -732,6 +738,12 @@ class WeightPackageSingleViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
     filter_class = WeightPackageSingleFilter
+
+    def get_permissions(self):
+        if self.request.query_params.get('client'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
@@ -769,9 +781,9 @@ class GetManualInfo(APIView):
 
     def get(self, request):
         data = self.request.query_params
-        product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type_name'), data.get('batching_equip')
+        product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type'), data.get('batching_equip')
         record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
-                                                delete_flag=False, dev_type__category_name=dev_type).first()
+                                                delete_flag=False, dev_type_id=dev_type).first()
         if not record:
             raise ValidationError(f"未找到{product_no}信息, 机型: {dev_type}")
         # weigh_type 1 硫磺 2 细料
