@@ -44,6 +44,7 @@ from quality.utils import get_cur_sheet, get_sheet_data
 
 
 # Create your views here.
+from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2336,6 +2337,16 @@ class GetDefaultCodeView(APIView):
                 EquipPartNew.objects.filter(part_code__startswith='BW').aggregate(max_code=Max('part_code'))['max_code']
             next_standard_code = max_standard_code[:2] + '%04d' % (
                     int(max_standard_code[2:]) + 1) if max_standard_code else 'BW0001'
+        elif work_type in ['区分', '项目', '处理']:
+            map_dict = {'区分': 'GCQF', '项目': 'GCXM', '处理': 'CLKW'}
+            prefix = map_dict.get(work_type)
+            model_name = ToleranceDistinguish if work_type == '区分' else (
+                ToleranceProject if work_type == '项目' else ToleranceHandle)
+            max_standard_code = model_name.objects.all().aggregate(max_code=Max('keyword_code'))['max_code']
+            next_standard_code = prefix + ('%04d' % (int(max_standard_code[4:]) + 1) if max_standard_code else '0001')
+        elif work_type == '公差规则':
+            max_standard_code = ToleranceRule.objects.all().aggregate(max_code=Max('rule_code'))['max_code']
+            next_standard_code = 'GCBZ' + ('%04d' % (int(max_standard_code[4:]) + 1) if max_standard_code else '0001')
         else:
             raise ValidationError('该类型默认编码暂未提供')
         return Response(next_standard_code)

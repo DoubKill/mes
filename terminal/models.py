@@ -116,6 +116,7 @@ class WeightPackageLog(AbstractEntity):
     print_count = models.IntegerField(help_text='打印数量', default=1)
     expire_days = models.IntegerField(help_text='有效期')
     record = models.IntegerField(help_text='plan表数据id', null=True)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
 
     class Meta:
         db_table = 'weight_package_log'
@@ -228,6 +229,43 @@ class LoadTankMaterialLog(AbstractEntity):
     class Meta:
         db_table = 'load_tank_material_log'
         verbose_name_plural = verbose_name = '料框物料信息'
+
+
+class ReplaceMaterial(AbstractEntity):
+    plan_classes_uid = models.CharField(max_length=64, help_text='计划号')
+    equip_no = models.CharField(max_length=64, help_text='机台')
+    product_no = models.CharField(max_length=64, help_text='胶料配方')
+    recipe_material_no = models.CharField(max_length=64, help_text='配方投入编码', null=True, blank=True)
+    recipe_material = models.CharField(max_length=64, help_text='配方物料名', null=True, blank=True)
+    real_material_no = models.CharField(max_length=64, help_text='实际投入编码')
+    real_material = models.CharField(max_length=64, help_text='实际投入物料名')
+    material_type = models.CharField(max_length=64, help_text='扫码物料类别')
+    bra_code = models.CharField(max_length=64, help_text='实际投入物料条码')
+    status = models.CharField(max_length=8, help_text='状态:已处理,未处理')
+    result = models.BooleanField(help_text='处理结果', null=True, blank=True)
+
+    class Meta:
+        db_table = 'replace_material'
+        verbose_name_plural = verbose_name = '密炼投料替换物料表'
+
+
+class ReturnRubber(AbstractEntity):
+    bra_code = models.CharField(max_length=64, help_text='卡片条码')
+    batch_group = models.CharField(max_length=64, help_text='班组')
+    batch_class = models.CharField(max_length=64, help_text='班次')
+    print_type = models.CharField(max_length=64, help_text='类别: 加硫/无硫')
+    product_no = models.CharField(max_length=64, help_text='胶料配方')
+    begin_trains = models.IntegerField(help_text='起始车次')
+    end_trains = models.IntegerField(help_text='结束车次')
+    desc = models.CharField(max_length=64, help_text='异常描述', null=True, blank=True)
+    msg = models.CharField(max_length=64, help_text='处理意见', null=True, blank=True)
+    recipe_user = models.CharField(max_length=64, help_text='工艺员')
+    status = models.IntegerField(help_text='打印状态:0生成, 1待打印', default=0)
+    print_count = models.IntegerField(help_text='打印张数', default=1)
+
+    class Meta:
+        db_table = 'return_rubber'
+        verbose_name_plural = verbose_name = '退回胶料补打卡片'
 
 
 class MaterialChangeLog(models.Model):
@@ -412,6 +450,7 @@ class Plan(models.Model):
     order_by = models.IntegerField(blank=True, help_text='写1', null=True)
     date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
     addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
 
     class Meta:
         managed = False
@@ -494,7 +533,124 @@ class ReportWeight(models.Model):
         managed = False
         db_table = 'report_weight'
 
-# class TempPlan(models.Model):
+
+class ToleranceDistinguish(AbstractEntity):
+    """公差标准-区分关键字定义"""
+    keyword_code = models.CharField(max_length=64, help_text='区分关键字编号')
+    keyword_name = models.CharField(max_length=64, help_text='区分关键字名称')
+    re_str = models.CharField(max_length=64, help_text='匹配字符', null=True, blank=True)
+    desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
+
+    class Meta:
+        db_table = 'tolerance_distinguish'
+        verbose_name_plural = verbose_name = '公差标准-区分关键字定义'
+
+
+class ToleranceProject(AbstractEntity):
+    """公差标准-项目关键字定义"""
+    keyword_code = models.CharField(max_length=64, help_text='项目关键字编号')
+    keyword_name = models.CharField(max_length=64, help_text='项目关键字名称')
+    special_standard = models.CharField(max_length=64, help_text='指定规格', null=True, blank=True)
+    desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
+
+    class Meta:
+        db_table = 'tolerance_project'
+        verbose_name_plural = verbose_name = '公差标准-项目关键字定义'
+
+
+class ToleranceHandle(AbstractEntity):
+    """公差标准-处理关键字定义"""
+    keyword_code = models.CharField(max_length=64, help_text='处理关键字编号')
+    keyword_name = models.CharField(max_length=64, help_text='处理关键字名称')
+    desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
+
+    class Meta:
+        db_table = 'tolerance_handle'
+        verbose_name_plural = verbose_name = '公差标准-处理关键字定义'
+
+
+class ToleranceRule(AbstractEntity):
+    """技术标准-公差规则"""
+    rule_code = models.CharField(max_length=64, help_text='规则编号')
+    rule_name = models.CharField(max_length=64, help_text='规则名称')
+    distinguish = models.ForeignKey(ToleranceDistinguish, help_text='公差标准-区分关键字定义', on_delete=models.CASCADE)
+    project = models.ForeignKey(ToleranceProject, help_text='公差标准-项目关键字定义', on_delete=models.CASCADE)
+    handle = models.ForeignKey(ToleranceHandle, help_text='公差标准-处理关键字定义', on_delete=models.CASCADE)
+    standard_error = models.DecimalField(max_digits=6, decimal_places=3)
+    unit = models.CharField(max_length=64, help_text='单位: %或者kg')
+    small_num = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    small_handle = models.ForeignKey(ToleranceHandle, help_text='公差标准-处理关键字定义',
+                                     on_delete=models.CASCADE, null=True, blank=True,
+                                     related_name='small_handle_set')
+    big_num = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    big_handle = models.ForeignKey(ToleranceHandle, help_text='公差标准-处理关键字定义',
+                                   on_delete=models.CASCADE, null=True, blank=True,
+                                   related_name='big_handle_set')
+    desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
+    use_flag = models.BooleanField(help_text='是否停用', default=True)
+
+    class Meta:
+        db_table = 'tolerance_rule'
+        verbose_name_plural = verbose_name = '技术标准-公差规则'
+
+
+class WeightPackageManual(AbstractEntity):
+    bra_code = models.CharField(max_length=64, help_text='卡片条码')
+    product_no = models.CharField(max_length=64, help_text='配方名称')
+    dev_type = models.CharField(max_length=64, help_text='机型')
+    single_weight = models.CharField(max_length=64, help_text='单配重量')
+    batch_class = models.CharField(max_length=64, help_text='班次')
+    batch_group = models.CharField(max_length=64, help_text='班组')
+    print_datetime = models.DateTimeField(help_text='打印时间', null=True, blank=True)
+    begin_trains = models.IntegerField(help_text='起始车次')
+    end_trains = models.IntegerField(help_text='结束车次')
+    batching_equip = models.CharField(max_length=64, help_text='配料机台')
+    split_num = models.IntegerField(help_text='分包数')
+    print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
+    print_flag = models.IntegerField(help_text='打印状态', default=False)
+    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_manual')
+
+    class Meta:
+        db_table = 'weight_package_manual'
+        verbose_name_plural = verbose_name = '人工(配方)配料'
+
+
+class WeightPackageManualDetails(AbstractEntity):
+    material_name = models.CharField(max_length=64, help_text='物料名称')
+    standard_weight = models.DecimalField(max_digits=6, decimal_places=3, help_text='重量:kg')
+    batch_type = models.CharField(max_length=64, help_text='配料方式')
+    tolerance = models.CharField(max_length=16, help_text='公差')
+    manual_details = models.ForeignKey(WeightPackageManual, help_text='单配id', on_delete=models.CASCADE, related_name='package_details')
+
+    class Meta:
+        db_table = 'weight_package_manual_details'
+        verbose_name_plural = verbose_name = '人工(配方)配料物料详情'
+
+
+class WeightPackageSingle(AbstractEntity):
+    """人工单配(单一物料:配方和通用)"""
+    bra_code = models.CharField(max_length=64, help_text='卡片条码')
+    batching_type = models.CharField(max_length=64, help_text='类别: 配方或通用')
+    product_no = models.CharField(max_length=64, help_text='配方名称', null=True, blank=True)
+    dev_type = models.CharField(max_length=64, help_text='机型', null=True, blank=True)
+    split_num = models.IntegerField(help_text='分包数', null=True, blank=True)
+    material_name = models.CharField(max_length=64, help_text='物料名称')
+    single_weight = models.CharField(max_length=64, help_text='单配重量')
+    batch_class = models.CharField(max_length=64, help_text='班次')
+    batch_group = models.CharField(max_length=64, help_text='班组')
+    print_datetime = models.DateTimeField(help_text='打印时间', null=True, blank=True)
+    begin_trains = models.IntegerField(help_text='起始车次')
+    end_trains = models.IntegerField(help_text='结束车次')
+    expire_day = models.IntegerField(help_text='有效期')
+    print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
+    print_flag = models.IntegerField(help_text='打印状态', default=False)
+    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_single')
+
+    class Meta:
+        db_table = 'weight_package_single'
+        verbose_name_plural = verbose_name = '人工单配(单一物料:配方和通用)'
+
+    # class TempPlan(models.Model):
 #     id = models.BigIntegerField(db_column='ID')  # Field name made lowercase.
 #     planid = models.CharField(max_length=14, blank=True, null=True)
 #     recipe = models.CharField(max_length=50, blank=True, null=True)

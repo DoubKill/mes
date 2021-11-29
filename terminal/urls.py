@@ -16,13 +16,18 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     WeightPackageCViewSet, CarbonTankSetViewSet, FeedCheckOperationViewSet, FeedCapacityPlanView, \
     CarbonFeedingPromptViewSet, PowderTankSettingViewSet, OilTankSettingViewSet, PowderTankBatchingView, \
     FeedingErrorLampForCarbonView, FeedingOperateResultForCarbonView, CarbonOutCheckView, CarbonOutTaskView, \
-    MaterialInfoIssue
+    MaterialInfoIssue, ReplaceMaterialViewSet, ReturnRubberViewSet, ToleranceKeyword, ToleranceRuleViewSet, \
+    WeightPackageManualViewSet, GetManualInfo, WeightPackageSingleViewSet, GetMaterialTolerance
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
+router.register('replace-material', ReplaceMaterialViewSet)  # 密炼投料替换物料
+router.register('return-rubber', ReturnRubberViewSet)  # 退回胶卡片打印
 router.register('feeding-log', FeedingLogViewSet)  # PDA投料履历
 router.register('weighting-log', WeightBatchingLogViewSet)  # 称量履历管理
 router.register('weighting-package-log', WeightPackageLogViewSet)  # 称量打包履历
+router.register('weighting-package-manual', WeightPackageManualViewSet)  # 人工单配(配方)
+router.register('weighting-package-single', WeightPackageSingleViewSet)  # 人工单配(单一物料:配方和通用)
 router.register('weighting-tack-status', WeightTankStatusViewSet)  # 料管信息
 router.register('weighting-package-c', WeightPackageCViewSet)  # 打印数据获取以及状态更新(C#端)
 router.register('carbon-tank-set', CarbonTankSetViewSet)  # 炭黑罐投料重量设定
@@ -37,6 +42,7 @@ router.register('xl-bin', XLBinVIewSet)  # 料仓
 router.register('xl-plan', XLPlanVIewSet)  # 小料计划
 router.register('xl-plan-c', XLPlanCViewSet)  # 小料计划(C#端)
 router.register('xl-prompt', XLPromptViewSet)  # 扫码投料与提示(C#端)
+router.register('tolerance-rule', ToleranceRuleViewSet)  # 技术标准-公差录入规则
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -53,6 +59,9 @@ urlpatterns = [
     path('product-exchange/', ProductExchange.as_view()),
     path('weighting-package-expire/', PackageExpireView.as_view()),  # 料包有效期
     path('weighting-tank-status/', WeightingTankStatus.as_view()),  # 料罐信息(C#端)
+    path('tolerance-keyword/', ToleranceKeyword.as_view()),  # 公差标准[处理关键字定义、项目关键字定义、区分关键字定义]
+    path('get-manual-info/', GetManualInfo.as_view()),  # 获取配方小料中需要人工配的物料种类详细信息
+    path('get-material-tolerance/', GetMaterialTolerance.as_view()),  # 获取单个物料重量对应公差
     path('feed-capacity-plan/', FeedCapacityPlanView.as_view()),  # 炭黑投料提示-计划显示
     path('carbon-out-check/', CarbonOutCheckView.as_view()),  # 炭黑投料提示-出库确认
     path('power-tank-batching/', PowderTankBatchingView.as_view()),  # 粉料投料(PDA)
