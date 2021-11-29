@@ -1,8 +1,8 @@
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
@@ -17,7 +17,8 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
-    EquipRepairMaterialReq, EquipWarehouseAreaComponent
+    EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent
+
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
@@ -921,7 +922,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
     def create(self, validated_data):
         # 生成报修编号
         now_time = ''.join(str(datetime.now().date()).split('-'))
-        max_code = EquipApplyRepair.objects.aggregate(max_code=Max('plan_id'))['max_code']
+        max_code = EquipPlan.objects.filter(plan_id__startswith=f'BX{now_time}').aggregate(max_code=Max('plan_id'))['max_code']
         sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
         validated_data.update({
             'plan_id': f'BX{now_time}{sequence}', 'status': '已生成',
@@ -941,7 +942,7 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
         max_order_code = EquipApplyOrder.objects.filter(work_order_no__startswith=validated_data['plan_id']).aggregate(
             max_order_code=Max('work_order_no'))['max_order_code']
         work_order_no = validated_data['plan_id'] + '-' + (
-            '%04d' % (int(max_order_code.split('-')[-1] + 1)) if max_order_code else '0001')
+            '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
         equip_order_data = {'plan_id': validated_data['plan_id'], 'plan_name': validated_data['plan_name'],
                             'work_order_no': work_order_no, 'equip_no': validated_data['equip_no'],
                             'status': '已生成', 'equip_condition': validated_data['equip_condition'],
@@ -1000,6 +1001,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     work_content = serializers.ListField(help_text='实际维修标准列表', write_only=True, default=[])
     image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
     apply_material_list = EquipRepairMaterialReqSerializer(help_text='申请物料列表', write_only=True, many=True, default=[])
+    repair_users = serializers.SerializerMethodField(help_text='维修人')
 
     def get_equip_type(self, obj):
         instance = Equip.objects.filter(equip_no=obj.equip_no).first()
@@ -1008,6 +1010,10 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
     def get_equip_barcode(self, obj):
         instance = EquipApplyRepair.objects.filter(plan_id=obj.plan_id).first()
         return instance.equip_barcode if instance else ''
+
+    def get_repair_users(self, obj):
+        user = obj.repair_user
+        return user.split('，') if user else None
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -1033,6 +1039,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+                work_content.sort(key=lambda x: x['job_item_sequence'])
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
@@ -1085,7 +1092,8 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                        'last_updated_date': datetime.now(), 'status': '已完成',
                                        'accept_user': instance.created_user.username})
         EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
-        return super().update(instance, validated_data)
+        response = super().update(instance, validated_data)
+        return response
 
     class Meta:
         model = EquipApplyOrder
@@ -1116,10 +1124,97 @@ class EquipApplyOrderExportSerializer(BaseModelSerializer):
         fields = '__all__'
 
 
+class EquipInspectionOrderSerializer(BaseModelSerializer):
+    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name',
+                                                           help_text='维护标准名', default='')
+    work_persons = serializers.ReadOnlyField(source='equip_maintenance_standard.cycle_person_num', help_text='作业标准人数',
+                                             default='')
+    equip_type = serializers.SerializerMethodField(help_text='设备机型')
+    work_content = serializers.ListField(help_text='实际巡检标准列表', write_only=True, default=[])
+    image_url_list = serializers.ListField(help_text='图片列表', write_only=True, default=[])
+    plan_name = serializers.CharField(max_length=64, help_text='巡检计划名称', validators=[
+        UniqueValidator(queryset=EquipInspectionOrder.objects.all(), message='巡检计划名称已存在')
+    ])
+    repair_users = serializers.SerializerMethodField(help_text='巡检人')
+
+    def get_equip_type(self, obj):
+        instance = Equip.objects.filter(equip_no=obj.equip_no).first()
+        return instance.category_id if instance else ''
+
+    def get_repair_users(self, obj):
+        user = obj.repair_user
+        return user.split('，') if user else None
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        work_content = []
+        result_repair_graph_url = res.get('result_repair_graph_url') if res.get('result_repair_graph_url') else '[]'
+        res.update({'result_repair_graph_url': json.loads(result_repair_graph_url)})
+        instance = EquipMaintenanceStandard.objects.filter(id=res.get('equip_repair_standard')).first()
+        if instance:
+            data = EquipResultDetail.objects.filter(work_order_no=res['work_order_no'],
+                                                    equip_jobitem_standard=instance.equip_job_item_standard)
+            if data:
+                for i in data:
+                    work_content.append(
+                        {'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
+                         'job_item_check_standard': i.job_item_check_standard,
+                         'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
+                         'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+            else:
+                data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard_id) \
+                    .values('equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+                for i in data:
+                    work_content.append(
+                        {'job_item_sequence': i.get('sequence'), 'job_item_content': i.get('content'),
+                         'job_item_check_standard': i.get('check_standard_desc'),
+                         'equip_jobitem_standard_id': i.get('equip_standard'),
+                         'job_item_check_type': i.get('check_standard_type')})
+            work_content.sort(key=lambda x: x['job_item_sequence'])
+        res['work_content'] = work_content
+        # 区域位置
+        bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
+        res['are_name'] = bom_obj.equip_area_define.area_name if bom_obj and bom_obj.equip_area_define else ''
+        # 部门
+        prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
+                                         global_type__type_name='设备部门组织名称').first()
+        res['product_name'] = prod.global_name if prod else ''
+        return res
+
+    @atomic
+    def create(self, validated_data):
+        work_content = validated_data.pop('work_content')
+        image_url_list = validated_data.pop('image_url_list')
+        # 生成巡检计划号
+        now_time = ''.join(str(datetime.now().date()).split('-'))
+        max_code = EquipInspectionOrder.objects.aggregate(max_code=Max('plan_id'))['max_code']
+        sequence = '%04d' % (int(max_code[-4:]) + 1) if max_code else '0001'
+        plan_id = f'XJ{now_time}{sequence}'
+        # 生成巡检工单编号
+        max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan_id).aggregate(
+            max_order_code=Max('work_order_no'))['max_order_code']
+        work_order_no = plan_id + '-' + ('%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+        # 获取条码
+        instance = EquipBom.objects.filter(equip_info__equip_no=validated_data['equip_no']).first()
+        equip_barcode = instance.node_id if instance else ''
+        validated_data.update({
+            'plan_id': plan_id, 'status': '已生成', 'work_order_no': work_order_no, 'equip_barcode': equip_barcode,
+            'planned_repair_date': datetime.now().date()
+        })
+        return super().create(validated_data)
+
+    class Meta:
+        model = EquipInspectionOrder
+        fields = '__all__'
+        read_only_fields = ['inspection_graph_url']
+
+
 class UploadImageSerializer(BaseModelSerializer):
 
-    def validate(self, attrs):
-        return attrs
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        res['image_file_name'] = instance.image_file_name.url
+        return res
 
     class Meta:
         model = UploadImage
@@ -1303,13 +1398,20 @@ class EquipWarehouseInventorySerializer(BaseModelSerializer):
     unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
     upper_stock = serializers.ReadOnlyField(source='equip_spare.upper_stock', help_text='库存上限')
     lower_stock = serializers.ReadOnlyField(source='equip_spare.lower_stock', help_text='库存下限')
+    equip_spare = serializers.CharField(default='')
+    spare_code = serializers.CharField(default='')
 
     class Meta:
         model = EquipWarehouseInventory
         fields = (
             "id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params",
-            "unit",
+            "unit", "one_piece",
             "upper_stock", "lower_stock", "equip_spare")
+
+    def update(self, instance, validated_data):
+        instance.one_piece = validated_data['one_piece']
+        instance.save()
+        return instance
 
 
 class EquipWarehouseRecordSerializer(BaseModelSerializer):
@@ -1342,3 +1444,65 @@ class EquipWarehouseRecordDetailSerializer(BaseModelSerializer):
         model = EquipWarehouseRecord
         fields = ('spare_code', 'area_name', 'location_name', 'quantity', 'created_date', 'created_username')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPlanSerializer(BaseModelSerializer):
+    plan_name = serializers.CharField(help_text='计划名称', validators=[UniqueValidator(
+        queryset=EquipPlan.objects.all(), message='计划名称已存在')])
+    plan_id = serializers.ReadOnlyField()
+    equip_no = serializers.ListField(help_text='机台', write_only=True)
+    standard_name = serializers.ReadOnlyField(help_text='维护标准名称', source='equip_manintenance_standard.standard_name')
+    repair_standard_name = serializers.ReadOnlyField(help_text='维修标准名称', source='equip_repair_standard.standard_name')
+    equip_name = serializers.ReadOnlyField(source='equip_no')
+    planned_maintenance_date = serializers.CharField()
+    next_maintenance_date = serializers.CharField(default=None)
+    standard = serializers.SerializerMethodField()
+    timeout_color = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EquipPlan
+        fields = '__all__'
+
+    def get_standard(self, instance):
+        standard = None
+        if instance.equip_repair_standard:
+            standard = instance.equip_repair_standard.standard_name
+        elif instance.equip_manintenance_standard:
+            standard = instance.equip_manintenance_standard.standard_name
+        return standard
+
+    def get_timeout_color(self, instance):
+        if instance.work_type == '巡检':
+           if '红色' in EquipInspectionOrder.objects.filter(plan_id=instance.plan_id).values_list('timeout_color', flat=True):
+                return '红色'
+        else:
+           if '红色' in EquipApplyOrder.objects.filter(plan_id=instance.plan_id).values_list('timeout_color', flat=True):
+            return '红色'
+
+    def create(self, validated_data):
+        dic = EquipPlan.objects.filter(work_type=validated_data['work_type'], created_date__date=date.today()).aggregate(
+            Max('plan_id'))
+        res = dic.get('plan_id__max')
+        work_type = {
+            '巡检': 'XJ',
+            '保养': 'BY',
+            '润滑': 'RH',
+            '标定': 'BD',
+            '维修': 'BX'
+        }
+        if res:
+            plan_id = res[:10] + str('%04d' % (int(res[-4:]) + 1))
+        else:
+            plan_id = f'{work_type.get(validated_data["work_type"])}{date.today().strftime("%Y%m%d")}0001'
+
+        equip_no = '，'.join([equip for equip in validated_data['equip_no']])
+        validated_data['plan_id'] = plan_id
+        validated_data['equip_no'] = equip_no
+        validated_data['plan_source'] = '人工创建'
+        validated_data['status'] = '未生成工单'
+        validated_data['planned_maintenance_date'] = datetime.strptime(validated_data["planned_maintenance_date"], '%Y-%m-%d')
+        if validated_data.get('next_maintenance_date'):
+            validated_data['next_maintenance_date'] = datetime.strptime(validated_data["next_maintenance_date"], '%Y-%m-%d')
+
+        instance = super().create(validated_data)
+        return instance
