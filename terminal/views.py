@@ -671,7 +671,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             manual_single = WeightPackageSingle.objects.filter(bra_code=bra_code).first()
             if manual_single.batching_type == '配方':
                 # 判断物料配方是否一致
-                if manual_single.product_no != material_name or manual_single.dev_type != dev_type:
+                if manual_single.product_no != material_name or manual_single.dev_type.category_name != dev_type:
                     raise ValidationError('单种手工配料机型或配方不符合')
                 # 返回人工配料id，关联使用
                 manual_type = 'manual_single'
@@ -684,7 +684,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         else:
             manual = WeightPackageManual.objects.filter(bra_code=bra_code).first()
             # 判断物料配方是否一致
-            if manual.product_no != material_name or manual.dev_type != dev_type:
+            if manual.product_no != material_name or manual.dev_type.category_name != dev_type:
                 raise ValidationError('单种手工配料机型或配方不符合')
             # 返回人工配料id，关联使用
             manual_type = 'manual'
@@ -769,7 +769,7 @@ class GetManualInfo(APIView):
 
     def get(self, request):
         data = self.request.query_params
-        product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type'), data.get('batching_equip')
+        product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type_name'), data.get('batching_equip')
         record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
                                                 delete_flag=False, dev_type__category_name=dev_type).first()
         if not record:
@@ -779,7 +779,7 @@ class GetManualInfo(APIView):
         if not instance:
             raise ValidationError(f"{product_no}无料包信息")
         # 机配物料
-        machine_material = RecipeMaterial.objects.using(batching_equip).filter(recipe_name=f'{product_no}({dev_type})').values_list('name', flat=True)
+        machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=f'{product_no}({dev_type})').values_list('name', flat=True))
         # 人工配物料信息
         manual_material = instance.weight_details.exclude(material__material_name__in=machine_material).\
             annotate(material_name=F("material__material_name"), tolerance=F("standard_error"))\

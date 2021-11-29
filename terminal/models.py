@@ -1,6 +1,6 @@
 from django.db import models
 
-from basics.models import Equip, GlobalCode, Location
+from basics.models import Equip, GlobalCode, Location, EquipCategoryAttribute
 from recipe.models import Material
 from system.models import AbstractEntity
 
@@ -450,7 +450,7 @@ class Plan(models.Model):
     order_by = models.IntegerField(blank=True, help_text='写1', null=True)
     date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
     addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
-    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    # merge_flag = models.BooleanField(help_text='是否合包', default=False)
 
     class Meta:
         managed = False
@@ -597,7 +597,7 @@ class ToleranceRule(AbstractEntity):
 class WeightPackageManual(AbstractEntity):
     bra_code = models.CharField(max_length=64, help_text='卡片条码')
     product_no = models.CharField(max_length=64, help_text='配方名称')
-    dev_type = models.CharField(max_length=64, help_text='机型')
+    dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型')
     single_weight = models.CharField(max_length=64, help_text='单配重量')
     batch_class = models.CharField(max_length=64, help_text='班次')
     batch_group = models.CharField(max_length=64, help_text='班组')
@@ -632,7 +632,7 @@ class WeightPackageSingle(AbstractEntity):
     bra_code = models.CharField(max_length=64, help_text='卡片条码')
     batching_type = models.CharField(max_length=64, help_text='类别: 配方或通用')
     product_no = models.CharField(max_length=64, help_text='配方名称', null=True, blank=True)
-    dev_type = models.CharField(max_length=64, help_text='机型', null=True, blank=True)
+    dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型', null=True, blank=True)
     split_num = models.IntegerField(help_text='分包数', null=True, blank=True)
     material_name = models.CharField(max_length=64, help_text='物料名称')
     single_weight = models.CharField(max_length=64, help_text='单配重量')
@@ -642,6 +642,7 @@ class WeightPackageSingle(AbstractEntity):
     begin_trains = models.IntegerField(help_text='起始车次')
     end_trains = models.IntegerField(help_text='结束车次')
     expire_day = models.IntegerField(help_text='有效期')
+    package_count = models.IntegerField(help_text='配置数量')
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
     weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_single')
