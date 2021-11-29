@@ -572,7 +572,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         plan_weight = attrs['plan_weight']
         batch_group = attrs['batch_group']
         package_plan_count = attrs['package_plan_count']
-        merge_flag = attrs['merge_flag']
+        merge_flag = attrs.get('merge_flag', False)
         status = attrs['status']
         manual_infos = attrs.get('manual_infos')
         # 需要合包但没有扫入手工配料
@@ -661,7 +661,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         model = WeightPackageLog
         fields = ['plan_weight_uid', 'product_no', 'plan_weight', 'dev_type', 'id', 'record', 'print_flag',
                   'package_count', 'print_begin_trains', 'noprint_count', 'package_fufil', 'package_plan_count',
-                  'equip_no', 'batch_group', 'batch_classes', 'status', 'print_count', 'merge_flag']
+                  'equip_no', 'batch_group', 'batch_classes', 'status', 'print_count', 'merge_flag', 'manual_infos']
 
 
 class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
@@ -694,6 +694,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
 
 
 class WeightPackageManualSerializer(BaseModelSerializer):
+    dev_type_name = serializers.ReadOnlyField(source='dev_type.category_name', help_text='机型名称')
     manual_details = serializers.ListField(help_text='单配物料详情列表', write_only=True, default=[])
 
     def to_representation(self, instance):
@@ -704,7 +705,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         if expire_datetime:
             expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
             expire_datetime = expire_datetime if expire_day == 0 else str(instance.created_date + timedelta(days=expire_day))
-        res.update({'manual_details': list(instance.weightpackagemanualdetails_set.all().annotate(batch_time=F('manual_details__created_date')).values('material_name', 'standard_weight', 'tolerance', 'batch_type', 'batch_time')), 'expire_datetime': expire_datetime})
+        res.update({'manual_details': list(instance.package_details.all().annotate(batch_time=F('manual_details__created_date')).values('material_name', 'standard_weight', 'tolerance', 'batch_type', 'batch_time')), 'expire_datetime': expire_datetime})
         return res
 
     @atomic
@@ -722,7 +723,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         # 条码
         prefix = f"M{batching_equip}{now_date.date().strftime('%Y%m%d')}"
         max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        bra_code = prefix + map_list.get('') + (int(max_code[-4:]) + 1 if max_code else '0001')
+        bra_code = prefix + map_list.get(batch_class) + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         total_weight = 0
         for item in manual_details:
             total_weight += item.get('plan_weight')
@@ -743,15 +744,17 @@ class WeightPackageManualSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
-                               'last_updated_user': self.context['request'].user})
+                               'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
     class Meta:
         model = WeightPackageManual
         fields = '__all__'
+        read_only_fields = ['bra_code', 'single_weight', 'batch_group', 'batch_class']
 
 
 class WeightPackageSingleSerializer(BaseModelSerializer):
+    dev_type_name = serializers.ReadOnlyField(source='dev_type.category_name', help_text='机型名称')
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -772,7 +775,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         # 条码
         prefix = f"MS{now_date.date().strftime('%Y%m%d')}"
         max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        bra_code = prefix + map_list.get('') + (int(max_code[-4:]) + 1 if max_code else '0001')
+        bra_code = prefix + map_list.get(batch_class) + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         # 单物料所有量程公差
         rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
@@ -783,12 +786,13 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
 
     def update(self, instance, validated_data):
         validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
-                               'last_updated_user': self.context['request'].user})
+                               'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
         return super().update(instance, validated_data)
 
     class Meta:
         model = WeightPackageSingle
         fields = '__all__'
+        read_only_fields = ['bra_code', 'batch_group', 'batch_class']
 
 
 class WeightPackagePlanSerializer(BaseModelSerializer):
