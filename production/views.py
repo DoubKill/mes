@@ -1471,8 +1471,8 @@ class RuntimeRecordView(APIView):
                 if plan_data.get(_.get("equip_no") + _.get("product_no")) else None
             equip_no = _.get("equip_no")
             if classes:
-                users = ProductionPersonnelRecords.objects.get(production_daily__factory_date=factory_date,
-                                                           production_daily__classes=classes, equip_no=equip_no)
+                users = ProductionPersonnelRecords.objects.filter(production_daily__factory_date=factory_date,
+                                                           production_daily__classes=classes, equip_no=equip_no).first()
             else:
                 users = None
             temp_dict = {"id": users.id if users else None,
