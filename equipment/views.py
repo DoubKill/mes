@@ -32,7 +32,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder
+    EquipInspectionOrder, EquipRegulationRecord
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -44,6 +44,7 @@ from quality.utils import get_cur_sheet, get_sheet_data
 
 
 # Create your views here.
+from system.models import Section
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3156,9 +3157,15 @@ class EquipApplyOrderViewSet(ModelViewSet):
         if my_order == '1':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(  # repair_user
-                        Q(Q(status='已接单', repair_user__icontains=user_name) |
-                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
+                    # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
+                    if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                        query_set = self.queryset.filter(
+                            Q(Q(status='已接单') |
+                              Q(status='已开始', repair_end_datetime__isnull=True)))
+                    else:
+                        query_set = self.queryset.filter(  # repair_user
+                            Q(Q(status='已接单', repair_user__icontains=user_name) |
+                              Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
@@ -3223,6 +3230,39 @@ class EquipApplyOrderViewSet(ModelViewSet):
         if self.request.data.get('order_id'):
             data = self.request.data
             users = '，'.join(data.get('users'))
+            # 记录到增减人员履历中
+            obj = self.queryset.filter(id=data.get('order_id')).first()
+            new_users = data.get('users')
+            actual_users = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='增').values_list('user', flat=True)
+            print(actual_users, 'actual_users')
+            #  新增的
+            add_user = list(set(new_users).difference(set(actual_users)))
+            print(add_user, 'add_user')
+            # 要删除的
+            del_user = list(set(actual_users).difference(set(new_users)))
+            for user in add_user:  # 增加人员
+                regulation = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='减', user=user)
+                if obj.status == '已接单':
+                    if regulation.exists():
+                        regulation.update(status='增')
+                    elif not regulation.exists():
+                        EquipRegulationRecord.objects.create(plan_id=obj.plan_id, status='增', user=user)
+                elif obj.status == '已开始':
+                    if regulation.exists():
+                        regulation.update(begin_time=datetime.now(), status='增', end_time=None)
+                    elif not regulation.exists():
+                        EquipRegulationRecord.objects.create(plan_id=obj.plan_id, status='增', user=user, begin_time=datetime.now())
+            for user in del_user:  # 删除人员     没有     增的有
+                regulation = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='增', user=user)
+                if obj.status == '已接单':
+                    if regulation.exists():
+                        regulation.update(status='减')
+                elif obj.status == '已开始':
+                    if regulation.exists():
+                        use_time = regulation.first().use_time + float('%.2f' % ((datetime.now() - regulation.first().begin_time).total_seconds() / 60))
+                        regulation.update(status='减', end_time=datetime.now(), use_time=use_time)
+            # 不变的
+            # list(set(actual_users).intersection(set(new_users)))
             self.queryset.filter(id=data.get('order_id')).update(repair_user=users)
             return Response('修改完成')
         return super().create(request, *args, **kwargs)
@@ -3236,6 +3276,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         user_ids = self.request.user.username
         ding_api = DinDinAPI()
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
         if opera_type == '指派':
             assign_num = EquipApplyOrder.objects.filter(~Q(status='已生成'), id__in=pks).count()
@@ -3260,6 +3301,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'receiving_user': user_ids, 'repair_user': user_ids,
                 'receiving_datetime': now_date, 'last_updated_date': datetime.now(), 'timeout_color': None
             }
+            # 记录到增减人员履历中
+            for plan_id in plan_ids:
+                EquipRegulationRecord.objects.create(user=user_ids, plan_id=plan_id, status='增')
             content.update({"title": f"您指派的设备维修单已被{user_ids}接单",
                             "form": [{"key": "接单人:", "value": user_ids},
                                      {"key": "接单时间:", "value": now_date}]})
@@ -3286,6 +3330,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now(), 'timeout_color': None
             }
+            # 记录到增减人员履历中
+            for plan_id in plan_ids:
+                EquipRegulationRecord.objects.filter(plan_id=plan_id).update(begin_time=datetime.now())
             # 更新维护计划状态
             equip_plan = EquipApplyOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
             EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划执行中')
@@ -3313,6 +3360,13 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                                  'accept_user': instance.created_user.username})
             data['result_repair_graph_url'] = json.dumps(image_url_list)
+            # 记录到增减人员履历中
+            for plan_id in plan_ids:
+                queryset = EquipRegulationRecord.objects.filter(plan_id=plan_id, status='增')
+                for obj in queryset:
+                    obj.end_time = datetime.now()
+                    obj.use_time += float('%.2f' %((datetime.now() - obj.begin_time).total_seconds() / 60))
+                    obj.save()
             # 更新作业内容
             if work_type == "维修":
                 result_standard = data.get('result_repair_standard')
@@ -3424,9 +3478,15 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         if my_order == '1':
             if not status:
                 if not searched:
-                    query_set = self.queryset.filter(
-                        Q(Q(status='已接单', repair_user__icontains=user_name) |
-                          Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
+                    # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
+                    if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
+                        query_set = self.queryset.filter(
+                            Q(Q(status='已接单') |
+                              Q(status='已开始', repair_end_datetime__isnull=True)))
+                    else:
+                        query_set = self.queryset.filter(  # repair_user
+                            Q(Q(status='已接单', repair_user__icontains=user_name) |
+                              Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
@@ -3488,6 +3548,37 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         if self.request.data.get('order_id'):
             data = self.request.data
             users = '，'.join(data.get('users'))
+            # 记录到增减人员履历中
+            obj = self.queryset.filter(id=data.get('order_id')).first()
+            new_users = data.get('users')
+            actual_users = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='增').values_list('user', flat=True)
+            #  新增的
+            add_user = list(set(new_users).difference(set(actual_users)))
+            # 要删除的
+            del_user = list(set(actual_users).difference(set(new_users)))
+            for user in add_user:  # 增加人员
+                regulation = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='减', user=user)
+                if obj.status == '已接单':
+                    if regulation.exists():
+                        regulation.update(status='增')
+                    elif not regulation.exists():
+                        EquipRegulationRecord.objects.create(plan_id=obj.plan_id, status='增', user=user)
+                elif obj.status == '已开始':
+                    if regulation.exists():
+                        regulation.update(begin_time=datetime.now(), status='增', end_time=None)
+                    elif not regulation.exists():
+                        EquipRegulationRecord.objects.create(plan_id=obj.plan_id, status='增', user=user, begin_time=datetime.now())
+            for user in del_user:  # 删除人员     没有     增的有
+                regulation = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='增', user=user)
+                if obj.status == '已接单':
+                    if regulation.exists():
+                        regulation.update(status='减')
+                elif obj.status == '已开始':
+                    if regulation.exists():
+                        use_time = regulation.first().use_time + float('%.2f' % ((datetime.now() - regulation.first().begin_time).total_seconds() / 60))
+                        regulation.update(status='减', end_time=datetime.now(), use_time=use_time)
+            # 不变的
+            # list(set(actual_users).intersection(set(new_users)))
             self.queryset.filter(id=data.get('order_id')).update(repair_user=users)
             return Response('修改完成')
         return super().create(request, *args, **kwargs)
@@ -3501,6 +3592,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         user_ids = self.request.user.username
         ding_api = DinDinAPI()
         now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        plan_ids = self.get_queryset().filter(id__in=pks).values_list('plan_id', flat=True)
         content = {}
         if opera_type == '指派':
             assign_num = EquipInspectionOrder.objects.filter(~Q(status='已生成'), id__in=pks).count()
@@ -3525,6 +3617,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'receiving_user': user_ids, 'repair_user': user_ids, 'receiving_datetime': now_date,
                 'last_updated_date': datetime.now(), 'timeout_color': None
             }
+            # 记录到增减人员履历中
+            for plan_id in plan_ids:
+                EquipRegulationRecord.objects.create(user=user_ids, plan_id=plan_id, status='增')
             content.update({"title": f"您指派的设备巡检单已被{user_ids}接单",
                             "form": [{"key": "接单人:", "value": user_ids},
                                      {"key": "接单时间:", "value": now_date}]})
@@ -3550,6 +3645,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 'status': data.get('status'), 'repair_start_datetime': now_date,
                 'last_updated_date': datetime.now(), 'timeout_color': None
             }
+            # 记录到增减人员履历中
+            for plan_id in plan_ids:
+                EquipRegulationRecord.objects.filter(plan_id=plan_id).update(begin_time=datetime.now())
             # 更新维护计划状态
             equip_plan = EquipInspectionOrder.objects.filter(id__in=pks).values_list('plan_id', flat=True)
             EquipPlan.objects.filter(plan_id__in=equip_plan).update(status='计划执行中')
@@ -3562,6 +3660,13 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             work_order_no = data.pop('work_order_no')
             data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
                          'result_repair_graph_url': json.dumps(image_url_list)})
+            # 记录到增减人员履历中
+            for plan_id in plan_ids:
+                queryset = EquipRegulationRecord.objects.filter(plan_id=plan_id, status='增')
+                for obj in queryset:
+                    obj.end_time = datetime.now()
+                    obj.use_time += float('%.2f' %((datetime.now() - obj.begin_time).total_seconds() / 60))
+                    obj.save()
             # 更新作业内容
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()

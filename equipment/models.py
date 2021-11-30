@@ -934,6 +934,20 @@ class EquipInspectionOrder(AbstractEntity):
         verbose_name_plural = verbose_name = '设备巡检工单'
 
 
+class EquipRegulationRecord(AbstractEntity):
+    # 设备维护增减人员履历
+    plan_id = models.CharField(max_length=64, help_text='工单编号')
+    user = models.CharField(max_length=64, help_text='人员姓名')
+    status = models.CharField(max_length=64, help_text='增/减')
+    begin_time = models.DateTimeField(help_text='开始时间', null=True, blank=True)
+    end_time = models.DateTimeField(help_text='结束时间', null=True, blank=True)
+    use_time = models.FloatField(help_text='花费时间(分钟)', default=0)
+
+    class Meta:
+        db_table = 'equip_regulation_record'
+        verbose_name_plural = verbose_name = '设备维护人员履历'
+
+
 class UploadImage(AbstractEntity):
     source_type = models.CharField(max_length=64, help_text='上传类型: 维修;巡检')
     image_file_name = models.ImageField(help_text='上传图片', upload_to='equipment/%Y/%m/')

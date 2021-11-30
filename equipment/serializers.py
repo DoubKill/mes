@@ -17,7 +17,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
-    EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent
+    EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent, EquipRegulationRecord
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -1092,6 +1092,12 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                        'last_updated_date': datetime.now(), 'status': '已完成',
                                        'accept_user': instance.created_user.username})
         EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
+        # 记录到增减人员履历中
+        queryset = EquipRegulationRecord.objects.filter(plan_id=instance.plan_id, status='增')
+        for obj in queryset:
+            obj.end_time = datetime.now()
+            obj.use_time += float('%.2f' % ((datetime.now() - obj.begin_time).total_seconds() / 60))
+            obj.save()
         response = super().update(instance, validated_data)
         return response
 
