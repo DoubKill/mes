@@ -2792,7 +2792,7 @@ class WMSExpireListView(APIView):
        m.StandardUnit
 from t_inventory_stock a
 inner join t_inventory_material m on m.MaterialCode=a.MaterialCode
-where m.Validity>0 and m.Validity - datediff(day ,a.CreaterTime, getdate()) <={}
+where m.IsValidity=1 and m.Validity - datediff(day ,a.CreaterTime, getdate()) <={}
 group by m.MaterialCode,
          m.Name,
          m.StandardUnit,
@@ -2890,7 +2890,7 @@ class WMSExpireDetailView(APIView):
        m.Validity - datediff(day ,a.CreaterTime, getdate()) as left_days
 from t_inventory_stock a
 inner join t_inventory_material m on m.MaterialCode=a.MaterialCode
-where m.Validity>0
+where m.IsValidity=1
   and m.Validity - datediff(day ,a.CreaterTime, getdate()) <= {}
   and m.MaterialCode='{}'
   and a.StockDetailState={}
