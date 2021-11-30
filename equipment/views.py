@@ -3193,7 +3193,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             processing = self.queryset.filter(Q(Q(status='已接单', receiving_user=user_name) |
                                                 Q(status='已开始', repair_end_datetime__isnull=True,
                                                   repair_user__icontains=user_name))).count()
-            finished = self.queryset.filter(status='已完成', repair_user__icontains=user_name).count()
+            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3637,6 +3637,7 @@ class GetStaffsView(APIView):
     def get(self, request):
         ding_api = DinDinAPI()
         equip_no = self.request.query_params.get('equip_no')
+        have_classes = self.request.query_params.get('have_classes')
         if not equip_no:
             section_name = self.request.query_params.get('section_name')
             if not section_name:
@@ -3646,13 +3647,17 @@ class GetStaffsView(APIView):
                     return Response({'results': []})
                 else:
                     section_name = instance.global_name
-            now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            classes = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
-            record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=classes,
-                                                     plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-            group = record.group.global_name
-            # 查询各员工考勤状态
-            result = get_staff_status(ding_api, section_name, group)
+            if not have_classes:
+                now_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                classes = '早班' if '08:00:00' < now_date[11:] < '20:00:00' else '夜班'
+                record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=classes,
+                                                         plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
+                group = record.group.global_name
+                # 查询各员工考勤状态
+                result = get_staff_status(ding_api, section_name, group)
+            else:
+                # 查询各员工考勤状态
+                result = get_staff_status(ding_api, section_name)
         else:
             result = get_maintenance_status(ding_api, equip_no)
         return Response({'results': result})
