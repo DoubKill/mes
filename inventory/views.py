@@ -422,12 +422,9 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InventoryLogSerializer
     permission_classes = (permissions.IsAuthenticated,)
 
-    # filter_backends = (InventoryFilterBackend,)
-
-    def get_queryset(self, order_type):
+    def get_queryset(self):
         filter_dict = {}
-        store_name = self.request.query_params.get("warehouse_name")
-        order_type = order_type
+        store_name = self.request.query_params.get("warehouse_name", '混炼胶库')
         start_time = self.request.query_params.get("start_time")
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
@@ -435,6 +432,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         order_no = self.request.query_params.get("order_no")
         lot_no = self.request.query_params.get("lot_no")
         pallet_no = self.request.query_params.get("pallet_no")
+        order_type = self.request.query_params.get("order_type")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -532,41 +530,19 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 return MaterialOutHistory.objects.using('cb').filter(**filter_dict)
             else:
                 return MaterialInHistory.objects.using('cb').filter(**filter_dict)
-
         else:
-            if start_time:
-                filter_dict.update(start_time__gte=start_time)
-            if end_time:
-                filter_dict.update(start_time__lte=end_time)
-            if order_type == "出库":
-                if self.request.query_params.get("type") == "正常出库":
-                    actual_type = "生产出库"
-                    filter_dict.update(inout_num_type=actual_type)
-                elif self.request.query_params.get("type") == "指定出库":
-                    actual_type = "快检出库"
-                    filter_dict.update(inout_num_type=actual_type)
-                else:
-                    actual_type = "生产出库"
-                bz_set = list(MixGumOutInventoryLog.objects.using('bz').filter(**filter_dict).order_by('-start_time'))
-                lb_set = list(MixGumOutInventoryLog.objects.using('lb').filter(**filter_dict).filter(
-                    material_no__icontains="M").order_by('-start_time'))
-                return list(bz_set) + list(lb_set)
-            else:
-                bz_set = MixGumInInventoryLog.objects.using('bz').filter(**filter_dict)
-                lb_set = MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).filter(
-                    material_no__icontains="M")
-                return list(bz_set) + list(lb_set)
+            return []
 
     def get_serializer_class(self):
         store_name = self.request.query_params.get("warehouse_name", "混炼胶库")
-        order_type = self.request.query_params.get("order_type", "出库")
         serializer_dispatch = {
             "混炼胶库": InventoryLogSerializer,
             "终炼胶库": InventoryLogSerializer,
             "原材料库": InOutCommonSerializer,
             "炭黑库": InOutCommonSerializer,
+            "帘布库": InventoryLogSerializer
         }
-        return serializer_dispatch.get(store_name, InventoryLogSerializer)
+        return serializer_dispatch.get(store_name)
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -614,29 +590,63 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         response.write(output.getvalue())
         return response
 
+    def export_xls2(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '物料出入库履历'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('出入库信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '类型', '出入库单号', '质检条码', '托盘号', '物料编码', '出入库数', '单位', '重量', '发起人', '发起时间', '完成时间']
+        # 写入文件标题
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['order_type'])
+            sheet.write(data_row, 2, i['order_no'])
+            sheet.write(data_row, 3, i['lot_no'])
+            sheet.write(data_row, 4, i['pallet_no'])
+            sheet.write(data_row, 5, i['material_no'])
+            sheet.write(data_row, 6, i['qty'])
+            sheet.write(data_row, 7, i['unit'])
+            sheet.write(data_row, 8, i['weight'])
+            sheet.write(data_row, 9, i['initiator'])
+            sheet.write(data_row, 10, i['start_time'])
+            sheet.write(data_row, 11, i['fin_time'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
     def list(self, request, *args, **kwargs):
         export = self.request.query_params.get('export', None)
-        order_type = self.request.query_params.get('order_type', None)
-        store_name = self.request.query_params.get("warehouse_name")
-        if order_type == '出库':
-            queryset = self.get_queryset('出库')
-        elif order_type == '入库':
-            queryset = self.get_queryset('入库')
-        else:
-            queryset = list(chain(self.get_queryset('出库'), self.get_queryset('入库')))  # 出库 19098  入库 19572
-
-        page = self.paginate_queryset(queryset)
-
+        store_name = self.request.query_params.get("warehouse_name", "混炼胶库")
+        queryset = self.filter_queryset(self.get_queryset())
         if export:
-            serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
-            serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
-            return self.export_xls(list(serializer1.data) + list(serializer2.data))
+            serializer = self.get_serializer(self.get_queryset(), many=True)
+            if store_name in ('混炼胶库', '终炼胶库', '帘布库'):
+                return self.export_xls(serializer.data)
+            else:
+                return self.export_xls2(serializer.data)
+        page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-        serializer1 = self.get_serializer(self.get_queryset('出库'), many=True)
-        serializer2 = self.get_serializer(self.get_queryset('入库'), many=True)
-        return Response({'results': list(serializer1.data) + list(serializer2.data)})
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2763,6 +2773,160 @@ class WMSRelease(APIView):
         return Response('更新成功！')
 
 
+class WMSExpireListView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        sql = """select
+       m.MaterialCode,
+       m.Name,
+       sum(a.WeightOfActual) as weight,
+       count(a.Quantity) as quality,
+       a.StockDetailState,
+       m.StandardUnit
+from t_inventory_stock a
+inner join t_inventory_material m on m.MaterialCode=a.MaterialCode
+where m.IsValidity=1 and m.Validity - datediff(day ,a.CreaterTime, getdate()) <={}
+group by m.MaterialCode,
+         m.Name,
+         m.StandardUnit,
+         a.StockDetailState
+order by m.MaterialCode;""".format(expire_days)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        count = len(temp)
+        result = []
+        data = temp[st:et]
+        total_weight = sum([i[2] for i in temp])
+        total_quantity = sum([i[3] for i in temp])
+        for item in data:
+            result.append(
+                {'MaterialCode': item[0],
+                 'MaterialName': item[1],
+                 'WeightOfActual': item[2],
+                 'quantity': item[3],
+                 'quality_status': item[4],
+                 'unit': item[5]
+                 })
+        sc.close()
+        return Response({'results': result, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
+class WMSExpireDetailView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = WMS_CONF
+    FILE_NAME = '库位明细'
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = self.FILE_NAME
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('出入库信息', cell_overwrite_ok=True)
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+        columns = ['序号', '物料名称', '物料编码', '质检条码', '托盘号', '库存位', '库存数',
+                   '单位', '单位重量', '总重量', '品质状态', '入库时间', '有效期至', '剩余有效天数']
+        for col_num in range(len(columns)):
+            sheet.write(0, col_num, columns[col_num])
+            # 写入数据
+        data_row = 1
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i[0])
+            sheet.write(data_row, 2, i[1])
+            sheet.write(data_row, 3, i[2])
+            sheet.write(data_row, 4, i[3])
+            sheet.write(data_row, 5, i[4])
+            sheet.write(data_row, 6, i[5])
+            sheet.write(data_row, 7, i[6])
+            sheet.write(data_row, 8, i[7])
+            sheet.write(data_row, 9, i[7])
+            sheet.write(data_row, 10, i[8])
+            sheet.write(data_row, 11, i[9].strftime('%Y-%m-%d %H:%M:%S'))
+            sheet.write(data_row, 12, i[10].strftime('%Y-%m-%d %H:%M:%S'))
+            sheet.write(data_row, 13, i[11])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def get(self, request):
+        expire_days = self.request.query_params.get('expire_days', 30)
+        quality_status = self.request.query_params.get('quality_status')
+        material_code = self.request.query_params.get('material_code')
+        export = self.request.query_params.get('export')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        if not all([expire_days, quality_status, material_code]):
+            raise ValidationError('参数不足！')
+        sql = """select
+       a.MaterialName,
+       a.MaterialCode,
+       a.TrackingNumber,
+       a.LadenToolNumber,
+       a.SpaceId,
+       a.Quantity,
+       a.WeightUnit,
+       a.WeightOfActual,
+       a.StockDetailState,
+       a.CreaterTime,
+       dateadd(dd,m.Validity,a.CreaterTime) as expire_time,
+       m.Validity - datediff(day ,a.CreaterTime, getdate()) as left_days
+from t_inventory_stock a
+inner join t_inventory_material m on m.MaterialCode=a.MaterialCode
+where m.IsValidity=1
+  and m.Validity - datediff(day ,a.CreaterTime, getdate()) <= {}
+  and m.MaterialCode='{}'
+  and a.StockDetailState={}
+order by left_days;""".format(expire_days, material_code, quality_status)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        if export == '2':
+            return self.export_xls(list(temp))
+        elif export == '1':
+            return self.export_xls(list(temp[st:et]))
+
+        count = len(temp)
+        result = []
+        data = temp[st:et]
+        total_weight = sum([i[7] for i in temp])
+        total_quantity = sum([i[5] for i in temp])
+        for item in data:
+            result.append(
+                {
+                 'material_name': item[0],
+                 'material_no': item[1],
+                 'lot_no': item[2],
+                 'container_no': item[3],
+                 'location': item[4],
+                 'qty': item[5],
+                 'unit': item[6],
+                 'total_weight': item[7],
+                 'quality_status': item[8],
+                 'in_storage_time': item[9].strftime('%Y-%m-%d %H:%M:%S'),
+                 'expire_time': item[10].strftime('%Y-%m-%d %H:%M:%S'),
+                 'left_days': item[11],
+                 })
+        sc.close()
+        return Response({'results': result, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
+
+
 @method_decorator([api_recorder], name="dispatch")
 class WmsInventoryWeightStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
@@ -3080,6 +3244,16 @@ class THInventoryView(WMSInventoryView):
 @method_decorator([api_recorder], name="dispatch")
 class THRelease(WMSRelease):
     REQUEST_URL = TH_URL
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THExpireListView(WMSExpireListView):
+    DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THExpireDetailView(WMSExpireDetailView):
+    DATABASE_CONF = TH_CONF
 
 
 @method_decorator([api_recorder], name="dispatch")
