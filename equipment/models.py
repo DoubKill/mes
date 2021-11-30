@@ -833,7 +833,7 @@ class EquipApplyRepair(AbstractEntity):
     factory_name = models.CharField(max_length=64, help_text='设备名称', null=True, blank=True)
     equip_barcode = models.CharField(max_length=64, help_text='设备条码', null=True, blank=True)
     equip_part_new = models.ForeignKey(EquipPartNew, help_text='部位编号', on_delete=models.CASCADE, null=True, blank=True)
-    result_fault_cause = models.ForeignKey(EquipFault, help_text='故障原因', on_delete=models.CASCADE)
+    result_fault_cause = models.TextField(help_text='故障原因')
     result_fault_desc = models.CharField(max_length=64, help_text='故障描述', default='')
     fault_datetime = models.DateTimeField(help_text='故障发生时间', null=True, blank=True)
     equip_condition = models.CharField(max_length=64, help_text='设备条件')
@@ -880,8 +880,7 @@ class EquipApplyOrder(AbstractEntity):
     result_maintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='实际维护标准',
                                                     on_delete=models.CASCADE,
                                                     null=True, blank=True, related_name='result_maintenance')
-    result_fault_cause = models.ForeignKey(EquipFault, help_text='故障原因', on_delete=models.CASCADE,
-                                           null=True, blank=True)
+    result_fault_cause = models.TextField(help_text='故障原因', null=True, blank=True)
     result_repair_desc = models.CharField(max_length=256, help_text='维修备注', null=True, blank=True)
     result_repair_graph_url = models.TextField(help_text='维修图片', null=True, blank=True)
     result_final_fault_cause = models.CharField(max_length=256, help_text='最终故障原因', null=True, blank=True)

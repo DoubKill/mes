@@ -2752,7 +2752,7 @@ class EquipWarehouseRecordViewSet(ListModelMixin, GenericViewSet):
         if self.request.query_params.get('work_order_no'):
             work_order_no = self.request.query_params.get('work_order_no')
             order = EquipApplyOrder.objects.filter(work_order_no=work_order_no).first()
-            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+            fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
             return Response({'plan_name': order.plan_name,
                              'work_order_no': order.work_order_no,
@@ -3429,7 +3429,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             for order_id in pks:
                 new_content = copy.deepcopy(content)
                 instance = self.queryset.filter(id=order_id).first()
-                fault_name = instance.result_fault_cause.fault_name if instance.result_fault_cause else (
+                fault_name = instance.result_fault_cause if instance.result_fault_cause else (
                     instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_maintenance_standard.standard_name)
                 new_content['form'] = [{"key": "工单编号:", "value": instance.work_order_no},
                                        {"key": "机台:", "value": instance.equip_no},
