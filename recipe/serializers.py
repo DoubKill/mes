@@ -178,7 +178,7 @@ class WeighCntTypeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WeighCntType
-        exclude = ('product_batching', )
+        exclude = ('product_batching', 'name', 'weigh_type', 'package_cnt', 'package_type')
 
 
 class ProductBatchingCreateSerializer(BaseModelSerializer):
@@ -295,7 +295,7 @@ class WeighCntTypeRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WeighCntType
-        exclude = ('product_batching', 'name')
+        exclude = ('product_batching', 'name', 'weigh_type', 'package_cnt', 'package_type')
         extra_kwargs = {'id': {'read_only': False, 'allow_null': True, 'required': False}}
 
 
