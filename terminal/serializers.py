@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
-from django.db.models import Q, Sum, Max, F
+from django.db.models import Q, Sum, Max, F, Min
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
@@ -25,7 +25,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle
-from terminal.utils import TankStatusSync, CLSystem, material_out_barcode
+from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance
 
 logger = logging.getLogger('send_log')
 
@@ -687,17 +687,97 @@ class WeightPackageLogSerializer(BaseModelSerializer):
     # batch_time = serializers.DateTimeField(format='%Y-%m-%d', help_text='配料日期')
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        weight_package_manual_list = WeightPackageManualSerializer(instance.weight_package_manual, many=True).data
-        weight_package_single_list = WeightPackageSingleSerializer(instance.weight_package_single, many=True).data
-        manual_details = list(weight_package_manual_list) + list(weight_package_single_list)
-        res['machine_manual_details'] = manual_details
+        manual_headers, manual_body, batching_type = {}, [], '机配'
+        # 机配公差查询
+        machine_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=res['plan_weight'])
+        # 查询有效期
+        expire_datetime = res['batch_time'] + timedelta(days=res['expire_days']) if res['expire_days'] != 0 else '9999-99-99 00:00:00'
+        machine_manual_tolerance = ''
+        # 拼接手工配信息
+        if instance.merge_flag:
+            batching_type = '机配+人工配'
+            # 查询人工配料信息
+            weight_package_manual = instance.weight_package_manual.all()
+            weight_package_single = instance.weight_package_single.all()
+            manual_headers = {'product_no': res['product_no'], 'dev_type': res['dev_type'],
+                              'total_nums': weight_package_manual.count() + weight_package_single.count()}
+            manual_body = []
+            total_manual_weight = 0
+            if weight_package_manual and not weight_package_single:
+                # 最早一条人工配料数据
+                min_date = weight_package_manual.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
+                first_record = weight_package_manual.filter(id=min_date['id']).first()
+                manual_data = WeightPackageManualSerializer(weight_package_manual, many=True).data
+                for item in manual_data:
+                    total_manual_weight += Decimal(item['single_weight'].split('±')[0])
+                    manual_body += item['manual_details']
+                # 获取公差
+                tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=total_manual_weight)
+                manual_headers.update({'print_datetime': first_record.last_updated_date.date,
+                                       'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
+                                       'single_weight': f'{str(total_manual_weight)}{tolerance}'})
+                # 总公差
+                machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=res['plan_weight'] + total_manual_weight)
+            elif not weight_package_manual and weight_package_single:
+                # 最早一条人工配料数据
+                min_date = weight_package_single.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
+                first_record = weight_package_single.filter(id=min_date['id']).first()
+                manual_data = WeightPackageSingleSerializer(weight_package_single, many=True).data
+                for item in manual_data:
+                    weight_tolerance = item['single_weight'].split('±')
+                    total_manual_weight += Decimal(weight_tolerance[0])
+                    manual_body.append({'material_name': item['material_name'],
+                                        'single_weight': Decimal(weight_tolerance[0]),
+                                        'tolerance': f'±{weight_tolerance[-1]}' if len(weight_tolerance) > 1 else '',
+                                        'batching_type': '手工配',
+                                        'batch_time': item['created_date']})
+                # 获取公差
+                tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=total_manual_weight)
+                manual_headers.update({'print_datetime': first_record.last_updated_date,
+                                       'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
+                                       'single_weight': f'{str(total_manual_weight)}{tolerance}'})
+                # 总公差
+                machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=res['plan_weight'] + total_manual_weight)
+            else:
+                # 最早人工配信息
+                min_date_manual = weight_package_manual.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
+                # 最早一条人工配料（配方或通用）数据
+                min_date_single = weight_package_single.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
+                if min_date_manual['first_date'] <= min_date_single['first_date']:
+                    first_record = weight_package_manual.filter(id=min_date_manual['id']).first()
+                else:
+                    first_record = weight_package_single.filter(id=min_date_single['id']).first()
+                manual_data = WeightPackageManualSerializer(weight_package_manual, many=True).data
+                manual_single_data = WeightPackageSingleSerializer(weight_package_single, many=True).data
+                for item in manual_data:
+                    total_manual_weight += Decimal(item['single_weight'].split('±')[0])
+                    manual_body += item['manual_details']
+                for item in manual_single_data:
+                    weight_tolerance = item['single_weight'].split('±')
+                    total_manual_weight += Decimal(weight_tolerance[0])
+                    manual_body.append({'material_name': item['material_name'],
+                                        'single_weight': Decimal(weight_tolerance[0]),
+                                        'tolerance': f'±{weight_tolerance[-1]}' if len(weight_tolerance) > 1 else '',
+                                        'batching_type': '手工配',
+                                        'batch_time': item['created_date']})
+                # 获取公差
+                tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=total_manual_weight)
+                manual_headers.update({'print_datetime': first_record.last_updated_date,
+                                       'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
+                                       'single_weight': f'{str(total_manual_weight)}{tolerance}'})
+                # 总公差
+                machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=res['plan_weight'] + total_manual_weight)
+        res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
+                    'total_weight': instance.total_weight, 'machine_manual_tolerance': machine_manual_tolerance,
+                    'machine_tolerance': machine_tolerance, 'expire_datetime': expire_datetime})
         return res
 
     class Meta:
         model = WeightPackageLog
         fields = ['id', 'plan_weight_uid', 'product_no', 'plan_weight', 'dev_type', 'batch_time', 'bra_code', 'record',
                   'package_count', 'print_begin_trains', 'noprint_count', 'package_fufil', 'package_plan_count',
-                  'equip_no', 'print_flag', 'batch_group', 'status', 'begin_trains', 'end_trains', 'batch_classes']
+                  'equip_no', 'print_flag', 'batch_group', 'status', 'begin_trains', 'end_trains', 'batch_classes',
+                  'batch_user', 'expire_days', 'last_updated_date']
 
 
 class WeightPackageManualSerializer(BaseModelSerializer):
@@ -837,7 +917,7 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
         model = Plan
         fields = ['id', 'plan_weight_uid', 'product_no', 'plan_weight', 'batch_time', 'noprint_count', 'package_fufil',
                   'print_flag', 'package_plan_count', 'dev_type', 'bra_code', 'record', 'package_count', 'status',
-                  'print_begin_trains', 'equip_no', 'batch_group', 'begin_trains', 'end_trains', 'batch_classes']
+                  'print_begin_trains', 'equip_no', 'batch_group', 'begin_trains', 'end_trains', 'batch_classes', 'oper']
 
 
 class WeightPackageRetrieveLogSerializer(BaseModelSerializer):

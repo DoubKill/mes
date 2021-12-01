@@ -17,7 +17,7 @@ from inventory.utils import wms_out
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching
-from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin
+from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule
 
 
 class INWeighSystem(object):
@@ -440,3 +440,19 @@ class CLSystem(object):
             </soapenv:Envelope>""".format(plan_no, number)
         ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
         return ret
+
+
+def get_tolerance(batching_equip, standard_weight, material_name=None):
+    # 人工单配细料硫磺包
+    if batching_equip:
+        # 根据重量查询公差
+        distinguish_name, project_name = ["细料称量", "单个化工重量"] if batching_equip.startswith('F') else ["硫磺称量",
+                                                                                                    "单个化工重量"]
+        rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name,
+                                            project__keyword_name=project_name,
+                                            small_num__lt=standard_weight, big_num__gte=standard_weight).first()
+    # 人工单配配方或通用(所有量程)
+    else:
+        rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
+    tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
+    return tolerance

@@ -53,7 +53,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer
-from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon
+from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -442,6 +442,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             datetime.datetime.now().strftime('%Y-%m-%d')
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
+        now_date = datetime.datetime.now().replace(microsecond=0)
         db_config = [k for k, v in DATABASES.items() if v['NAME'].startswith('YK_XL')]
         if equip_no not in db_config:
             return Response([])
@@ -469,8 +470,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         # 配料时间
                         actual_batch_time = equip_plan_info.filter(planid=i['plan_weight_uid']).first().starttime
+                        # 公差查询
+                        machine_tolerance = get_tolerance(batching_equip=i['equip_no'], standard_weight=plan_weight)
+                        # 计算有效期
+                        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+                        if not single_expire_record:
+                            single_date = PackageExpire.objects.create(**{'product_no': product_no, 'product_name': product_no, 'update_user': 'system', 'update_date': str(now_date)})
+                        else:
+                            single_date = single_expire_record.first()
+                        days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+                        expire_datetime = actual_batch_time + timedelta(days=days) if days != 0 else '9999-99-99 00:00:00'
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
-                                  'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0]})
+                                  'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
+                                  'batching_type': '机配', 'machine_weight_tolerance': f"{plan_weight}{machine_tolerance}",
+                                  'batch_user': i['oper'], 'print_datetime': str(now_date), 'expire_datetime': expire_datetime,
+                                  'total_tolerance': ''})
                     return self.get_paginated_response(serializer.data)
                 return Response([])
         # 履历表不为空
@@ -501,8 +515,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = equip_plan_info.filter(planid=serializer['plan_weight_uid']).first().starttime
+                        # 公差查询
+                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
+                        # 计算有效期
+                        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+                        if not single_expire_record:
+                            single_date = PackageExpire.objects.create(**{'product_no': product_no, 'product_name': product_no, 'update_user': 'system', 'update_date': str(now_date)})
+                        else:
+                            single_date = single_expire_record.first()
+                        days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+                        expire_datetime = actual_batch_time + timedelta(days=days) if days != 0 else '9999-99-99 00:00:00'
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
-                                           'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0]})
+                                           'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
+                                           'batching_type': '机配', 'machine_weight_tolerance': f"{plan_weight}{machine_tolerance}",
+                                           'batch_user': serializer['oper'], 'print_datetime': str(now_date),
+                                           'expire_datetime': expire_datetime, 'total_tolerance': ''})
                         data.append(serializer)
                 return self.get_paginated_response(data)
             return Response([])
@@ -535,8 +562,27 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         actual_batch_time = equip_plan_info.filter(planid=serializer['plan_weight_uid']).first().starttime
+                        # 公差查询
+                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
+                        # 计算有效期
+                        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+                        if not single_expire_record:
+                            single_date = PackageExpire.objects.create(
+                                **{'product_no': product_no, 'product_name': product_no, 'update_user': 'system',
+                                   'update_date': str(now_date)})
+                        else:
+                            single_date = single_expire_record.first()
+                        days = single_date.package_fine_usefullife if equip_no.startswith(
+                            'F') else single_date.package_sulfur_usefullife
+                        expire_datetime = actual_batch_time + timedelta(
+                            days=days) if days != 0 else '9999-99-99 00:00:00'
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
-                                           'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0]})
+                                           'batch_time': actual_batch_time,
+                                           'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
+                                           'batching_type': '机配',
+                                           'machine_weight_tolerance': f"{plan_weight}{machine_tolerance}",
+                                           'batch_user': serializer['oper'], 'print_datetime': str(now_date),
+                                           'expire_datetime': expire_datetime, 'total_tolerance': ''})
                         data.append(serializer)
                 return self.get_paginated_response(data)
             return Response([])
@@ -577,7 +623,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     'end_trains': single_print_record.end_trains, 'print_count': 1, 'batching_type': '机配',
                     'print_datetime': str(now_date)}
             # 机配公差
-            machine_tolerance = self.get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
+            machine_tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
             data['machine_weight_tolerance'] = f"{data['plan_weight']}{machine_tolerance}"
             # 判断是否有合包
             if merge_flag:
@@ -598,7 +644,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         total_manual_weight += Decimal(item['single_weight'].split('±')[0])
                         manual_body += item['manual_details']
                     # 获取公差
-                    tolerance = self.get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
+                    tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
                     manual_headers.update({'print_datetime': first_record.last_updated_date,
                                            'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
                                            'single_weight': f'{str(total_manual_weight)}{tolerance}'})
@@ -618,7 +664,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                             'batching_type': '手工配',
                                             'batch_time': item['created_date']})
                     # 获取公差
-                    tolerance = self.get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
+                    tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
                     manual_headers.update({'print_datetime': first_record.last_updated_date,
                                            'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
                                            'single_weight': f'{str(total_manual_weight)}{tolerance}'})
@@ -647,7 +693,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                             'batching_type': '手工配',
                                             'batch_time': item['created_date']})
                     # 获取公差
-                    tolerance = self.get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
+                    tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
                     manual_headers.update({'print_datetime': first_record.last_updated_date,
                                            'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
                                            'single_weight': f'{str(total_manual_weight)}{tolerance}'})
@@ -655,7 +701,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     data['plan_weight'] = data['plan_weight'] + total_manual_weight
                 data.update({'manual_headers': manual_headers, 'manual_body': manual_body})
             # 总重量和公差
-            tolerance = self.get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
+            tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
             data['plan_weight'] = f"{data['plan_weight']}{tolerance}"
             return Response(data)
         # 生产计划表中未打印数据详情
@@ -669,7 +715,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                                       product_no=plan_obj.recipe)  # 删除status='Y'判断
 
         # 获取公差
-        tolerance = self.get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
+        tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
         # 同批次第一次打印
         if not same_batch_print:
             data = {'print_begin_trains': 1, 'package_count': '',
@@ -690,21 +736,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 'end_trains': end_trains, 'print_count': 1, 'batching_type': '机配',
                 'print_datetime': str(now_date)}
         return Response(data)
-
-    def get_tolerance(self, batching_equip, standard_weight, material_name=None):
-        # 人工单配细料硫磺包
-        if batching_equip:
-            # 根据重量查询公差
-            distinguish_name, project_name = ["细料称量", "单个化工重量"] if batching_equip.startswith('F') else ["硫磺称量",
-                                                                                                        "单个化工重量"]
-            rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name,
-                                                project__keyword_name=project_name,
-                                                small_num__lt=standard_weight, big_num__gte=standard_weight).first()
-        # 人工单配配方或通用(所有量程)
-        else:
-            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
-        tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
-        return tolerance
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='manual_post', url_name='manual_post')
     def manual_post(self, request):

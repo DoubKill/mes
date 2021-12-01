@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 
 from basics.models import Equip, GlobalCode, Location, EquipCategoryAttribute
@@ -103,6 +105,7 @@ class WeightPackageLog(AbstractEntity):
     batch_time = models.DateTimeField(max_length=10, help_text='配料日期')
     batch_classes = models.CharField(max_length=8, help_text='配料班次')
     batch_group = models.CharField(max_length=8, help_text='配料班组')
+    batch_user = models.CharField(max_length=8, help_text='配料员', null=True, blank=True)
     location_no = models.CharField(max_length=64, help_text='产线', null=True)
     dev_type = models.CharField(max_length=64, help_text='机型名称')
     begin_trains = models.IntegerField(help_text='开始包')
@@ -117,6 +120,17 @@ class WeightPackageLog(AbstractEntity):
     expire_days = models.IntegerField(help_text='有效期')
     record = models.IntegerField(help_text='plan表数据id', null=True)
     merge_flag = models.BooleanField(help_text='是否合包', default=False)
+
+    @property
+    def total_weight(self):
+        total_weight = self.plan_weight
+        manual = self.weight_package_manual
+        manual_single = self.weight_package_single
+        for i in manual:
+            total_weight += Decimal(i.plan_weight.split('±0')[0])
+        for j in manual_single:
+            total_weight += Decimal(j.plan_weight.split('±0')[0])
+        return total_weight
 
     class Meta:
         db_table = 'weight_package_log'
