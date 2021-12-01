@@ -685,6 +685,13 @@ class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
 
 class WeightPackageLogSerializer(BaseModelSerializer):
     # batch_time = serializers.DateTimeField(format='%Y-%m-%d', help_text='配料日期')
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        weight_package_manual_list = WeightPackageManualSerializer(instance.weight_package_manual, many=True).data
+        weight_package_single_list = WeightPackageSingleSerializer(instance.weight_package_single, many=True).data
+        manual_details = list(weight_package_manual_list) + list(weight_package_single_list)
+        res['machine_manual_details'] = manual_details
+        return res
 
     class Meta:
         model = WeightPackageLog
@@ -734,12 +741,15 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{str(total_weight)}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
-                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight})
+                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
+                               'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})
         instance = super().create(validated_data)
         # 添加单配物料详情
         for item in manual_details:
-            item['manual_details_id'] = instance.id
-            WeightPackageManualDetails.objects.create(**item)
+            create_data = {'manual_details_id': instance.id, 'material_name': item.get('material_name'),
+                           'standard_weight': item.get('standard_weight'), 'batch_type': item.get('batch_type'),
+                           'tolerance': item.get('tolerance')}
+            WeightPackageManualDetails.objects.create(**create_data)
         return instance
 
     def update(self, instance, validated_data):
@@ -781,7 +791,8 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{single_weight}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
-                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight})
+                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
+                               'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
