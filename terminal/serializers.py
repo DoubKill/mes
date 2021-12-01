@@ -105,11 +105,18 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 total_weight = res.get('ZL')
                 unit = res.get('BZDW')
         if pallet_feedback:
-            material_no = pallet_feedback.product_no
-            material_name = pallet_feedback.product_no
+            # 配方中含有种子胶
+            seed = [i for i in materials if '种子胶' in i]
+            if seed and pallet_feedback.product_no == classes_plan.product_batching.stage_product_batch_no:
+                material_no = seed[0]
+                material_name = seed[0]
+                attrs['scan_material'] = pallet_feedback.product_no
+            else:
+                material_no = pallet_feedback.product_no
+                material_name = pallet_feedback.product_no
+                attrs['scan_material'] = material_name
             total_weight = pallet_feedback.actual_weight
             unit = unit
-            attrs['scan_material'] = material_name
             DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=datetime.now(), pallet_status=2)
         if len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:
             start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
