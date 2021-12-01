@@ -685,6 +685,13 @@ class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
 
 class WeightPackageLogSerializer(BaseModelSerializer):
     # batch_time = serializers.DateTimeField(format='%Y-%m-%d', help_text='配料日期')
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        weight_package_manual_list = WeightPackageManualSerializer(instance.weight_package_manual, many=True).data
+        weight_package_single_list = WeightPackageSingleSerializer(instance.weight_package_single, many=True).data
+        manual_details = list(weight_package_manual_list) + list(weight_package_single_list)
+        res['machine_manual_details'] = manual_details
+        return res
 
     class Meta:
         model = WeightPackageLog
@@ -721,12 +728,12 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         batch_group = record.group.global_name
         # 条码
-        prefix = f"M{batching_equip}{now_date.date().strftime('%Y%m%d')}"
+        prefix = f"M{batching_equip}{now_date.date().strftime('%Y%m%d')}{map_list.get(batch_class)}"
         max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        bra_code = prefix + map_list.get(batch_class) + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
+        bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         total_weight = 0
         for item in manual_details:
-            total_weight += item.get('plan_weight')
+            total_weight += item.get('standard_weight', 0)
         # 根据重量查询公差
         distinguish_name, project_name = ["细料称量", "整包细料重量"] if batching_equip.startswith('F') else ["硫磺称量", "整包硫磺重量"]
         rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name, project__keyword_name=project_name,
@@ -734,12 +741,15 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{str(total_weight)}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
-                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight})
+                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
+                               'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})
         instance = super().create(validated_data)
         # 添加单配物料详情
         for item in manual_details:
-            item['manual_details_id'] = instance.id
-            WeightPackageManualDetails.objects.create(**item)
+            create_data = {'manual_details_id': instance.id, 'material_name': item.get('material_name'),
+                           'standard_weight': item.get('standard_weight'), 'batch_type': item.get('batch_type'),
+                           'tolerance': item.get('tolerance')}
+            WeightPackageManualDetails.objects.create(**create_data)
         return instance
 
     def update(self, instance, validated_data):
@@ -773,15 +783,16 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         batch_group = record.group.global_name
         # 条码
-        prefix = f"MS{now_date.date().strftime('%Y%m%d')}"
-        max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        bra_code = prefix + map_list.get(batch_class) + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
+        prefix = f"MC{now_date.date().strftime('%Y%m%d')}{map_list.get(batch_class)}"
+        max_code = WeightPackageSingle.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
+        bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         # 单物料所有量程公差
         rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{single_weight}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
-                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight})
+                               'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
+                               'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
