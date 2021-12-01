@@ -308,20 +308,20 @@ class SMRecipeMaterial(models.Model):
 
 class WeighCntType(models.Model):
     """小料包"""
-    # WEIGH_TYPE_CHOICE = (
-    #     (1, '硫磺包'),
-    #     (2, '细料包'),
-    # )
-    # PACKAGE_TYPE_CHOICE = (
-    #     (1, '自动'),
-    #     (2, '手动'),
-    # )
+    WEIGH_TYPE_CHOICE = (
+        (1, '硫磺包'),
+        (2, '细料包'),
+    )
+    PACKAGE_TYPE_CHOICE = (
+        (1, '自动'),
+        (2, '手动'),
+    )
     name = models.CharField(max_length=64, help_text='料包名称', default='')
     product_batching = models.ForeignKey(ProductBatching, verbose_name='小料称量配方标准', on_delete=models.CASCADE,
                                          related_name='weight_cnt_types', null=True)
-    # weigh_type = models.PositiveIntegerField('料包类型', choices=WEIGH_TYPE_CHOICE, default=1)
-    # package_cnt = models.PositiveIntegerField('分包数量', default=1)
-    # package_type = models.PositiveIntegerField('打包类型', choices=PACKAGE_TYPE_CHOICE, default=1)
+    weigh_type = models.PositiveIntegerField('料包类型', choices=WEIGH_TYPE_CHOICE, default=1)
+    package_cnt = models.PositiveIntegerField('分包数量', default=1)
+    package_type = models.PositiveIntegerField('打包类型', choices=PACKAGE_TYPE_CHOICE, default=1)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
     total_standard_error = models.DecimalField(help_text='总误差', decimal_places=2, max_digits=8, default=0)
 
