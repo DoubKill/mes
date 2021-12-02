@@ -120,16 +120,17 @@ class WeightPackageLog(AbstractEntity):
     expire_days = models.IntegerField(help_text='有效期')
     record = models.IntegerField(help_text='plan表数据id', null=True)
     merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    split_count = models.IntegerField(help_text='机配分包数', default=1)
 
     @property
     def total_weight(self):
         total_weight = self.plan_weight
-        manual = self.weight_package_manual
-        manual_single = self.weight_package_single
+        manual = self.weight_package_manual.all()
+        manual_single = self.weight_package_single.all()
         for i in manual:
-            total_weight += Decimal(i.plan_weight.split('±0')[0])
+            total_weight += Decimal(i.single_weight.split('±')[0])
         for j in manual_single:
-            total_weight += Decimal(j.plan_weight.split('±0')[0])
+            total_weight += Decimal(j.single_weight.split('±')[0])
         return total_weight
 
     class Meta:
@@ -464,7 +465,8 @@ class Plan(models.Model):
     order_by = models.IntegerField(blank=True, help_text='写1', null=True)
     date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
     addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
-    # merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    split_count = models.IntegerField(help_text='机配分包数', default=1)
 
     class Meta:
         managed = False

@@ -443,7 +443,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
         now_date = datetime.datetime.now().replace(microsecond=0)
-        db_config = [k for k, v in DATABASES.items() if v['NAME'].startswith('YK_XL')]
+        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
         if equip_no not in db_config:
             return Response([])
         # mes网页请求
@@ -473,18 +473,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=i['equip_no'], standard_weight=plan_weight)
                         # 计算有效期
-                        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+                        single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
                         if not single_expire_record:
-                            single_date = PackageExpire.objects.create(**{'product_no': product_no, 'product_name': product_no, 'update_user': 'system', 'update_date': str(now_date)})
+                            single_date = PackageExpire.objects.create(**{'product_no': i['product_no'],
+                                                                          'product_name': i['product_no'],
+                                                                          'update_user': 'system',
+                                                                          'update_date': str(now_date.date())})
                         else:
                             single_date = single_expire_record.first()
-                        days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
-                        expire_datetime = actual_batch_time + timedelta(days=days) if days != 0 else '9999-99-99 00:00:00'
+                        expire_days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-99-99 00:00:00'
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
-                                  'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
-                                  'batching_type': '机配', 'machine_weight_tolerance': f"{plan_weight}{machine_tolerance}",
-                                  'batch_user': i['oper'], 'print_datetime': str(now_date), 'expire_datetime': expire_datetime,
-                                  'total_tolerance': ''})
+                                  'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', i['product_no'])[0],
+                                  'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
+                                  'batch_user': i['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime,
+                                  'machine_manual_weight': plan_weight, 'machine_manual_tolerance': machine_tolerance,'expire_days': expire_days})
                     return self.get_paginated_response(serializer.data)
                 return Response([])
         # 履历表不为空
@@ -501,13 +504,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     try:
                         # 已打印数据
                         y_or_n = k.status
-                        # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                        if k.package_fufil != k.package_plan_count:
-                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
-                            k.package_fufil = get_status.actno
-                            k.noprint_count = get_status.actno - k.package_count
-                            k.save()
-                        data.append(WeightPackageLogSerializer(k).data)
                     except:
                         # 计划表中未打印数据
                         serializer = WeightPackagePlanSerializer(k).data
@@ -518,19 +514,31 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
                         # 计算有效期
-                        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+                        single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
-                            single_date = PackageExpire.objects.create(**{'product_no': product_no, 'product_name': product_no, 'update_user': 'system', 'update_date': str(now_date)})
+                            single_date = PackageExpire.objects.create(**{'product_no': serializer['product_no'],
+                                                                          'product_name': serializer['product_no'],
+                                                                          'update_user': 'system',
+                                                                          'update_date': str(now_date.date())})
                         else:
                             single_date = single_expire_record.first()
-                        days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
-                        expire_datetime = actual_batch_time + timedelta(days=days) if days != 0 else '9999-99-99 00:00:00'
+                        expire_days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-99-99 00:00:00'
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
-                                           'batching_type': '机配', 'machine_weight_tolerance': f"{plan_weight}{machine_tolerance}",
-                                           'batch_user': serializer['oper'], 'print_datetime': str(now_date),
-                                           'expire_datetime': expire_datetime, 'total_tolerance': ''})
+                                           'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
+                                           'batch_user': serializer['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                           'expire_datetime': expire_datetime, 'expire_days': expire_days,
+                                           'machine_manual_weight': plan_weight, 'machine_manual_tolerance': machine_tolerance})
                         data.append(serializer)
+                    else:
+                        # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
+                        if k.package_fufil != k.package_plan_count:
+                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                            k.package_fufil = get_status.actno
+                            k.noprint_count = get_status.actno - k.package_count
+                            k.save()
+                        data.append(WeightPackageLogSerializer(k).data)
                 return self.get_paginated_response(data)
             return Response([])
         # 未打印(剔除已打印)
@@ -548,13 +556,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     try:
                         # 已打印数据
                         y_or_n = k.status
-                        # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
-                        if k.package_fufil != k.package_plan_count:
-                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
-                            k.package_fufil = get_status.actno
-                            k.noprint_count = get_status.actno - k.package_count
-                            k.save()
-                        data.append(WeightPackageLogSerializer(k).data)
                     except:
                         # 计划表中未打印数据
                         serializer = WeightPackagePlanSerializer(k).data
@@ -565,25 +566,32 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
                         # 计算有效期
-                        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+                        single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
-                            single_date = PackageExpire.objects.create(
-                                **{'product_no': product_no, 'product_name': product_no, 'update_user': 'system',
-                                   'update_date': str(now_date)})
+                            single_date = PackageExpire.objects.create(**{'product_no': serializer['product_no'],
+                                                                          'product_name': serializer['product_no'],
+                                                                          'update_user': 'system',
+                                                                          'update_date': str(now_date.date())})
                         else:
                             single_date = single_expire_record.first()
-                        days = single_date.package_fine_usefullife if equip_no.startswith(
-                            'F') else single_date.package_sulfur_usefullife
-                        expire_datetime = actual_batch_time + timedelta(
-                            days=days) if days != 0 else '9999-99-99 00:00:00'
+                        expire_days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-99-99 00:00:00'
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time,
                                            'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
-                                           'batching_type': '机配',
-                                           'machine_weight_tolerance': f"{plan_weight}{machine_tolerance}",
-                                           'batch_user': serializer['oper'], 'print_datetime': str(now_date),
-                                           'expire_datetime': expire_datetime, 'total_tolerance': ''})
+                                           'batching_type': '机配', 'expire_days': expire_days,
+                                           'machine_weight': plan_weight, 'manual_weight': 0,
+                                           'batch_user': serializer['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                           'expire_datetime': expire_datetime, 'machine_manual_weight': plan_weight, 'machine_manual_tolerance': machine_tolerance})
                         data.append(serializer)
+                    else:
+                        # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
+                        if k.package_fufil != k.package_plan_count:
+                            get_status = Plan.objects.using(equip_no).filter(planid=k.plan_weight_uid).first()
+                            k.package_fufil = get_status.actno
+                            k.noprint_count = get_status.actno - k.package_count
+                            k.save()
+                        data.append(WeightPackageLogSerializer(k).data)
                 return self.get_paginated_response(data)
             return Response([])
         # 已打印
@@ -621,7 +629,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     'batch_time': single_print_record.batch_time, 'batch_group': single_print_record.batch_group,
                     'batch_classes': single_print_record.batch_classes, 'begin_trains': single_print_record.begin_trains,
                     'end_trains': single_print_record.end_trains, 'print_count': 1, 'batching_type': '机配',
-                    'print_datetime': str(now_date)}
+                    'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S')}
             # 机配公差
             machine_tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
             data['machine_weight_tolerance'] = f"{data['plan_weight']}{machine_tolerance}"
@@ -724,7 +732,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     'batch_time': batch_time, 'batch_group': batch_group,
                     'batch_classes': plan_obj.grouptime, 'begin_trains': begin_trains,
                     'end_trains': end_trains, 'print_count': 1, 'batching_type': '机配',
-                    'print_datetime': str(now_date)}
+                    'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S')}
             return Response(data)
         # 同批次非第一次打印
         last_same_batch = same_batch_print.first()
@@ -734,28 +742,42 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 'batch_time': last_same_batch.batch_time, 'batch_group': batch_group,
                 'batch_classes': last_same_batch.batch_classes, 'begin_trains': begin_trains,
                 'end_trains': end_trains, 'print_count': 1, 'batching_type': '机配',
-                'print_datetime': str(now_date)}
+                'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S')}
         return Response(data)
+
+    def get_tolerance(self, batching_equip, standard_weight, material_name=None):
+        # 人工单配细料硫磺包
+        if batching_equip:
+            # 根据重量查询公差
+            distinguish_name, project_name = ["细料称量", "单个化工重量"] if batching_equip.startswith('F') else ["硫磺称量",
+                                                                                                        "单个化工重量"]
+            rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name,
+                                                project__keyword_name=project_name,
+                                                small_num__lt=standard_weight, big_num__gte=standard_weight).first()
+        # 人工单配配方或通用(所有量程)
+        else:
+            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
+        tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
+        return tolerance
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='manual_post', url_name='manual_post')
     def manual_post(self, request):
         """人工单配物料是否能扫入"""
         data = self.request.data
         merge_flag = data.get('merge_flag')
-        status = data.get('status')
         product_no = data.get('product_no')
         dev_type = data.get('dev_type')
-        bra_code = data.get('bra_code')
-        if status == 'Y':
-            raise ValidationError('已经打印过的标签不可扫码')
+        scan_bra_code = data.get('scan_bra_code')
         if not merge_flag:
             raise ValidationError('称量计划未设置合包, 不可扫码')
         # 通用物料/配方物料
-        if bra_code.startswith('MC'):
-            manual_single = WeightPackageSingle.objects.filter(bra_code=bra_code).first()
+        if scan_bra_code.startswith('MC'):
+            manual_single = WeightPackageSingle.objects.filter(bra_code=scan_bra_code).first()
+            if not manual_single:
+                raise ValidationError('未找到该人工配料条码')
             if manual_single.batching_type == '配方':
                 # 判断物料配方是否一致
-                if manual_single.product_no != product_no or manual_single.dev_type.id != dev_type:
+                if manual_single.product_no != product_no or manual_single.dev_type.category_name != dev_type:
                     raise ValidationError('单种手工配料机型或配方不符合')
             # 返回人工配料id，关联使用
             manual_type = 'manual_single'
@@ -763,14 +785,22 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             details = WeightPackageSingleSerializer(manual_single).data
         # 手工配料(配方)
         else:
-            manual = WeightPackageManual.objects.filter(bra_code=bra_code).first()
+            manual = WeightPackageManual.objects.filter(bra_code=scan_bra_code).first()
+            if not manual:
+                raise ValidationError('未找到该人工配料条码')
             # 判断物料配方是否一致
-            if manual.product_no != product_no or manual.dev_type.id != dev_type:
+            if manual.product_no != product_no or manual.dev_type.category_name != dev_type:
                 raise ValidationError('单种手工配料机型或配方不符合')
             # 返回人工配料id，关联使用
             manual_type = 'manual'
             manual_id = manual.id
             details = WeightPackageManualSerializer(manual).data
+        single_weight = Decimal(details['single_weight'].split('±')[0])
+        # 手工配料总重
+        detail_manual = sum([i['standard_weight'] for i in details['manual_details'] if i['batch_type'] == '人工配']) if 'manual_details' in details else single_weight
+        # 手工配料详情中的机配总重
+        detail_machine = single_weight - detail_manual
+        details.update({'detail_manual': detail_manual, 'detail_machine': detail_machine})
         results = {'manual_type': manual_type, 'manual_id': manual_id, 'details': details}
         return Response({'results': results})
 
@@ -831,7 +861,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
         data = self.request.data
-        self.get_queryset().filter(id=data.get('id')).update({'print_flag': data.get('print_flag', False)})
+        self.get_queryset().filter(id=data.get('id')).update(**{'print_flag': data.get('print_flag', False)})
         return response(success=True, message='重置打印状态成功')
 
 
@@ -874,7 +904,7 @@ class GetManualInfo(APIView):
         if not instance:
             raise ValidationError(f"{product_no}无料包信息")
         # 机配物料
-        machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=f'{product_no}({dev_type})').values_list('name', flat=True))
+        machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=f'{product_no}({record.dev_type.category_name})').values_list('name', flat=True))
         # 人工配物料信息
         manual_material = instance.weight_details.exclude(material__material_name__in=machine_material).\
             annotate(material_name=F("material__material_name"), tolerance=F("standard_error"))\
@@ -925,7 +955,7 @@ class PackageExpireView(APIView):
         package_expire_recipe = PackageExpire.objects.all().values_list('product_name', flat=True).distinct()
         all_product_no = []
         # 获取所有称量系统配方号
-        equip_list = [k for k, v in DATABASES.items() if v.get('NAME') == 'YK_XL']
+        equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME')]
         for equip in equip_list:
             try:
                 single_equip_recipe = list(Plan.objects.using(equip).all().values_list('recipe', flat=True).distinct())
