@@ -796,11 +796,16 @@ class EquipMaintenanceStandardSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        detail_list = []
-        for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
-            seq, content = i.split('、')
-            detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+
+        detail_list = EquipJobItemStandardDetail.objects.filter(equip_standard=res.get('equip_job_item_standard')) \
+            .values('id', 'equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
         res['detail_list'] = detail_list
+
+        # detail_list = []
+        # for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
+        #     seq, content = i.split('、')
+        #     detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+        # res['detail_list'] = detail_list
         return res
 
     def get_spare_list(self, obj):
