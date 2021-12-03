@@ -499,6 +499,7 @@ class ProductTestPlanDetail(models.Model):
     actual_trains = models.PositiveIntegerField(help_text='生产车次')
     value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True)
     raw_value = models.TextField(null=True, help_text='检测原数据')
+    test_time = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'product_test_plan_detail'

@@ -1782,7 +1782,6 @@ class ProductTestPlanSerializer(BaseModelSerializer):
 class ProductTEstResumeSerializer(BaseModelSerializer):
     plan_uid = serializers.ReadOnlyField(source='test_plan.plan_uid')
     test_equip = serializers.ReadOnlyField(source='test_plan.test_equip.no')
-    test_time = serializers.SerializerMethodField()
     test_classes = serializers.ReadOnlyField(source='test_plan.test_classes')
     test_group = serializers.ReadOnlyField(source='test_plan.test_group')
     test_indicator_name = serializers.ReadOnlyField(source='test_plan.test_indicator_name')

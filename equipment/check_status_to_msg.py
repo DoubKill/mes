@@ -75,7 +75,7 @@ def handle(order):
                 return "超时提醒: 本单据{order.work_order_no}标准中未设置提醒"
             uids = get_ding_uids_by_name(order.assign_to_user, all_user=all_user)
             if order.work_type != '巡检':
-                fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+                fault_name = order.result_fault_cause if order.result_fault_cause else (
                     order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
                 content = {"title": f"第{times}次催办\r\n您名下单据超期未接单",
                            "form": [{"key": "工单编号:", "value": order.work_order_no},
@@ -138,7 +138,7 @@ def handle(order):
                 return "超时提醒: 本单据{order.work_order_no}标准中未设置提醒"
             uids = get_ding_uids_by_name(order.receiving_user, all_user=all_user)
             if order.work_type != '巡检':
-                fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+                fault_name = order.result_fault_cause if order.result_fault_cause else (
                     order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
                 content = {"title": f"第{times}次催办\r\n您名下单据超期未执行",
                            "form": [{"key": "工单编号:", "value": order.work_order_no},
