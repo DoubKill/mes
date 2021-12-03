@@ -28,17 +28,6 @@ class FeedingLogFilter(django_filters.rest_framework.FilterSet):
         fields = ("date", "feeding_port")
 
 
-class WeightPackageLogFilter(django_filters.rest_framework.FilterSet):
-    equip_no = django_filters.CharFilter(field_name='equip_no', help_text='配料机台', lookup_expr='icontains')
-    batch_time = django_filters.DateTimeFilter(field_name='batch_time__date', help_text='配料时间')
-    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料名称-配方号', lookup_expr='icontains')
-    status = django_filters.CharFilter(field_name='status', help_text='打印状态')
-
-    class Meta:
-        model = WeightPackageLog
-        fields = ('equip_no', 'batch_time', 'product_no', 'status')
-
-
 class WeightPackageManualFilter(django_filters.rest_framework.FilterSet):
     product_no = django_filters.CharFilter(field_name='product_no', help_text='配方名称', lookup_expr='icontains')
     bra_code = django_filters.CharFilter(field_name='bra_code', help_text='物料条码', lookup_expr='icontains')

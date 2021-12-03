@@ -17,7 +17,7 @@ from equipment.models import EquipDownType, EquipDownReason, EquipCurrentStatus,
     EquipMaintenanceStandard, EquipMaintenanceStandardMaterials, EquipRepairStandard, EquipRepairStandardMaterials, \
     EquipWarehouseLocation, EquipWarehouseArea, EquipWarehouseOrderDetail, EquipWarehouseOrder, EquipWarehouseInventory, \
     EquipWarehouseRecord, EquipApplyRepair, EquipPlan, EquipApplyOrder, EquipResultDetail, UploadImage, \
-    EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent
+    EquipRepairMaterialReq, EquipInspectionOrder, EquipWarehouseAreaComponent, EquipRegulationRecord
 
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
@@ -796,11 +796,16 @@ class EquipMaintenanceStandardSerializer(BaseModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        detail_list = []
-        for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
-            seq, content = i.split('、')
-            detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+
+        detail_list = EquipJobItemStandardDetail.objects.filter(equip_standard=res.get('equip_job_item_standard')) \
+            .values('id', 'equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
         res['detail_list'] = detail_list
+
+        # detail_list = []
+        # for i in res['equip_job_item_standard_detail'].split('；')[:-1]:
+        #     seq, content = i.split('、')
+        #     detail_list.append({'job_item_sequence': seq, 'job_item_content': content})
+        # res['detail_list'] = detail_list
         return res
 
     def get_spare_list(self, obj):
@@ -909,7 +914,7 @@ class EquipRepairStandardImportSerializer(BaseModelSerializer):
 
 class EquipApplyRepairSerializer(BaseModelSerializer):
     part_name = serializers.ReadOnlyField(source='equip_part_new.part_name', help_text='部位名称')
-    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称')
+    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause', help_text='故障原因名称')
     image_url_list = serializers.ListField(help_text='报修图片地址列表', write_only=True, default=[])
 
     def to_representation(self, instance):
@@ -988,7 +993,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                                            help_text='维修标准名', default='')
     equip_maintenance_standard_name = serializers.ReadOnlyField(source='equip_maintenance_standard.standard_name',
                                                                 help_text='维护标准名', default='')
-    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause.fault_name', help_text='故障原因名称',
+    result_fault_cause_name = serializers.ReadOnlyField(source='result_fault_cause', help_text='故障原因名称',
                                                         default='')
     result_repair_standard_name = serializers.ReadOnlyField(source='result_repair_standard.standard_name',
                                                             help_text='实际维修标准名称', default='')
@@ -1092,6 +1097,12 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                                        'last_updated_date': datetime.now(), 'status': '已完成',
                                        'accept_user': instance.created_user.username})
         EquipApplyRepair.objects.filter(plan_id=instance.plan_id).update(status=validated_data.get('status'))
+        # 记录到增减人员履历中
+        queryset = EquipRegulationRecord.objects.filter(plan_id=instance.plan_id, status='增')
+        for obj in queryset:
+            obj.end_time = datetime.now()
+            obj.use_time += float('%.2f' % ((datetime.now() - obj.begin_time).total_seconds() / 60))
+            obj.save()
         response = super().update(instance, validated_data)
         return response
 
@@ -1106,7 +1117,7 @@ class EquipApplyOrderExportSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         # 故障原因
-        fault_reason = instance.result_fault_cause.fault_name if instance.result_fault_cause else (
+        fault_reason = instance.result_fault_cause if instance.result_fault_cause else (
             instance.equip_repair_standard.standard_name if instance.equip_repair_standard else instance.equip_maintenance_standard.standard_name)
         result_fault_reason = instance.result_repair_standard.standard_name if instance.result_repair_standard else (
             instance.result_maintenance_standard.standard_name if instance.result_maintenance_standard else '')

@@ -442,13 +442,14 @@ class CLSystem(object):
         return ret
 
 
-def get_tolerance(batching_equip, standard_weight, material_name=None):
+def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量'):
+    # 人工单配细料硫磺包
+    type_name = '硫磺' if batching_equip.startswith('S') else '细料'
     # 人工单配细料硫磺包
     if batching_equip:
-        # 根据重量查询公差
-        distinguish_name, project_name = ["细料称量", "单个化工重量"] if batching_equip.startswith('F') else ["硫磺称量",
-                                                                                                    "单个化工重量"]
-        rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name,
+        if '单个' not in project_name:
+            project_name = f"整包{type_name}重量"
+        rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
                                             project__keyword_name=project_name,
                                             small_num__lt=standard_weight, big_num__gte=standard_weight).first()
     # 人工单配配方或通用(所有量程)

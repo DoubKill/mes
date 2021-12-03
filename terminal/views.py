@@ -4,7 +4,7 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Max, Sum, Q, F, Min
+from django.db.models import Max, Sum, Q, F
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
@@ -21,7 +21,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip
-from inventory.models import MaterialOutHistory, WmsInventoryStock
+from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF
 from mes.derorators import api_recorder
@@ -30,8 +30,8 @@ from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClasses
 from production.models import PlanStatus, MaterialTankStatus
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
     WeighBatchingDetail
-from terminal.filters import FeedingLogFilter, WeightPackageLogFilter, \
-    WeightTankStatusFilter, WeightBatchingLogListFilter, BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
+from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
+    BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
     FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter, WeightPackageManualFilter, \
     WeightPackageSingleFilter
 from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingLog, FeedingLog, \
@@ -52,7 +52,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonTankSetUpdateSerializer, FeedingOperationLogSerializer, CarbonFeedingPromptSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
-    WeightPackageSingleSerializer
+    WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance
 
 
@@ -415,6 +415,7 @@ class WeightTankStatusViewSet(CommonDeleteMixin, ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class WeightPackageLogViewSet(TerminalCreateAPIView,
                               mixins.ListModelMixin,
+                              mixins.UpdateModelMixin,
                               mixins.RetrieveModelMixin,
                               GenericViewSet):
     """
@@ -427,8 +428,15 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
     """
     queryset = WeightPackageLog.objects.all().order_by('-created_date')
     permission_classes = (IsAuthenticated,)
-    filter_class = WeightPackageLogFilter
     filter_backends = [DjangoFilterBackend]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return WeightPackageLogCreateSerializer
+        elif self.action == 'update':
+            return WeightPackageLogUpdateSerializer
+        else:
+            return WeightPackageLogSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -450,7 +458,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         plan_filter_kwargs = {'date_time': batch_time, 'actno__gte': 1}
         weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
         if product_no:
-            weight_filter_kwargs.update({'product_no': product_no})
+            weight_filter_kwargs.update({'product_no': re.split(r'\(|\（|\[', product_no)[0]})
             plan_filter_kwargs.update({'recipe': product_no})
         # 获取称量系统生产计划数据
         equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
@@ -612,153 +620,14 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             serializer = self.WeightPackageLogSerializer(already_print, many=True)
             return Response(serializer.data)
 
-    def retrieve(self, request, *args, **kwargs):
-        bra_code = self.request.query_params.get('bra_code')
-        plan_weight = self.request.query_params.get('plan_weight')
-        begin_trains = self.request.query_params.get('begin_trains')
-        end_trains = self.request.query_params.get('end_trains')
-        batch_time = self.request.query_params.get('batch_time')
-        merge_flag = self.request.query_params.get('merge_flag', False)
-        now_date = datetime.datetime.now().replace(microsecond=0)
-        # 履历表中数据详情
-        if bra_code:
-            single_print_record = self.get_queryset().get(bra_code=bra_code)
-            data = {'print_begin_trains': single_print_record.print_begin_trains, 'package_count': single_print_record.package_count,
-                    'product_no': single_print_record.material_name, 'dev_type': single_print_record.dev_type,
-                    'plan_weight': single_print_record.plan_weight, 'equip_no': single_print_record.equip_no,
-                    'batch_time': single_print_record.batch_time, 'batch_group': single_print_record.batch_group,
-                    'batch_classes': single_print_record.batch_classes, 'begin_trains': single_print_record.begin_trains,
-                    'end_trains': single_print_record.end_trains, 'print_count': 1, 'batching_type': '机配',
-                    'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S')}
-            # 机配公差
-            machine_tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
-            data['machine_weight_tolerance'] = f"{data['plan_weight']}{machine_tolerance}"
-            # 判断是否有合包
-            if merge_flag:
-                data['batching_type'] = '机配+人工配'
-                # 查询人工配料信息
-                weight_package_manual = single_print_record.weight_package_manual.all()
-                weight_package_single = single_print_record.weight_package_single.all()
-                manual_headers = {'product_no': data['product_no'], 'dev_type': data['dev_type'],
-                                  'total_nums': weight_package_manual.count() + weight_package_single.count()}
-                manual_body = []
-                total_manual_weight = 0
-                if weight_package_manual and not weight_package_single:
-                    # 最早一条人工配料数据
-                    min_date = weight_package_manual.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
-                    first_record = weight_package_manual.filter(id=min_date['id']).first()
-                    manual_data = WeightPackageManualSerializer(weight_package_manual, many=True).data
-                    for item in manual_data:
-                        total_manual_weight += Decimal(item['single_weight'].split('±')[0])
-                        manual_body += item['manual_details']
-                    # 获取公差
-                    tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
-                    manual_headers.update({'print_datetime': first_record.last_updated_date,
-                                           'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
-                                           'single_weight': f'{str(total_manual_weight)}{tolerance}'})
-                    # 更新总重量
-                    data['plan_weight'] = data['plan_weight'] + total_manual_weight
-                elif not weight_package_manual and weight_package_single:
-                    # 最早一条人工配料数据
-                    min_date = weight_package_single.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
-                    first_record = weight_package_single.filter(id=min_date['id']).first()
-                    manual_data = WeightPackageSingleSerializer(weight_package_single, many=True).data
-                    for item in manual_data:
-                        weight_tolerance = item['single_weight'].split('±')
-                        total_manual_weight += Decimal(weight_tolerance[0])
-                        manual_body.append({'material_name': item['material_name'],
-                                            'single_weight': Decimal(weight_tolerance[0]),
-                                            'tolerance': f'±{weight_tolerance[-1]}' if len(weight_tolerance) > 1 else '',
-                                            'batching_type': '手工配',
-                                            'batch_time': item['created_date']})
-                    # 获取公差
-                    tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
-                    manual_headers.update({'print_datetime': first_record.last_updated_date,
-                                           'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
-                                           'single_weight': f'{str(total_manual_weight)}{tolerance}'})
-                    # 更新总重量
-                    data['plan_weight'] = data['plan_weight'] + total_manual_weight
-                else:
-                    # 最早人工配信息
-                    min_date_manual = weight_package_manual.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
-                    # 最早一条人工配料（配方或通用）数据
-                    min_date_single = weight_package_single.aggregate(first_date=Min('last_updated_date'), id=Min('id'))
-                    if min_date_manual['first_date'] <= min_date_single['first_date']:
-                        first_record = weight_package_manual.filter(id=min_date_manual['id']).first()
-                    else:
-                        first_record = weight_package_single.filter(id=min_date_single['id']).first()
-                    manual_data = WeightPackageManualSerializer(weight_package_manual, many=True).data
-                    manual_single_data = WeightPackageSingleSerializer(weight_package_single, many=True).data
-                    for item in manual_data:
-                        total_manual_weight += Decimal(item['single_weight'].split('±')[0])
-                        manual_body += item['manual_details']
-                    for item in manual_single_data:
-                        weight_tolerance = item['single_weight'].split('±')
-                        total_manual_weight += Decimal(weight_tolerance[0])
-                        manual_body.append({'material_name': item['material_name'],
-                                            'single_weight': Decimal(weight_tolerance[0]),
-                                            'tolerance': f'±{weight_tolerance[-1]}' if len(weight_tolerance) > 1 else '',
-                                            'batching_type': '手工配',
-                                            'batch_time': item['created_date']})
-                    # 获取公差
-                    tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=total_manual_weight)
-                    manual_headers.update({'print_datetime': first_record.last_updated_date,
-                                           'class_group': f'{first_record.batch_class}/{first_record.batch_group}',
-                                           'single_weight': f'{str(total_manual_weight)}{tolerance}'})
-                    # 更新总重量
-                    data['plan_weight'] = data['plan_weight'] + total_manual_weight
-                data.update({'manual_headers': manual_headers, 'manual_body': manual_body})
-            # 总重量和公差
-            tolerance = get_tolerance(batching_equip=data['equip_no'], standard_weight=data['plan_weight'])
-            data['plan_weight'] = f"{data['plan_weight']}{tolerance}"
-            return Response(data)
-        # 生产计划表中未打印数据详情
-        id = self.request.query_params.get('id')
-        equip_no = self.request.query_params.get('equip_no')
-        plan_obj = Plan.objects.using(equip_no).get(id=id)
-        recipe_pre = RecipePre.objects.using(equip_no).filter(name=plan_obj.recipe)
-        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
-        batch_group = self.request.query_params.get('batch_group')
-        same_batch_print = self.get_queryset().filter(plan_weight_uid=plan_obj.planid, equip_no=equip_no,
-                                                      product_no=plan_obj.recipe)  # 删除status='Y'判断
-
-        # 获取公差
-        tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
-        # 同批次第一次打印
-        if not same_batch_print:
-            data = {'print_begin_trains': 1, 'package_count': '',
-                    'product_no': plan_obj.recipe, 'dev_type': dev_type,
-                    'plan_weight': plan_weight, 'equip_no': equip_no,
-                    'batch_time': batch_time, 'batch_group': batch_group,
-                    'batch_classes': plan_obj.grouptime, 'begin_trains': begin_trains,
-                    'end_trains': end_trains, 'print_count': 1, 'batching_type': '机配',
-                    'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S')}
-            return Response(data)
-        # 同批次非第一次打印
-        last_same_batch = same_batch_print.first()
-        data = {'print_begin_trains': last_same_batch.print_begin_trains + last_same_batch.package_count,
-                'package_count': last_same_batch.package_count, 'product_no': last_same_batch.product_no,
-                'dev_type': dev_type, 'plan_weight': plan_weight, 'equip_no': equip_no,
-                'batch_time': last_same_batch.batch_time, 'batch_group': batch_group,
-                'batch_classes': last_same_batch.batch_classes, 'begin_trains': begin_trains,
-                'end_trains': end_trains, 'print_count': 1, 'batching_type': '机配',
-                'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S')}
-        return Response(data)
-
-    def get_tolerance(self, batching_equip, standard_weight, material_name=None):
-        # 人工单配细料硫磺包
-        if batching_equip:
-            # 根据重量查询公差
-            distinguish_name, project_name = ["细料称量", "单个化工重量"] if batching_equip.startswith('F') else ["硫磺称量",
-                                                                                                        "单个化工重量"]
-            rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name,
-                                                project__keyword_name=project_name,
-                                                small_num__lt=standard_weight, big_num__gte=standard_weight).first()
-        # 人工单配配方或通用(所有量程)
-        else:
-            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
-        tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
-        return tolerance
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.print_flag not in [2, 3]:
+            raise ValidationError('标签打印尚未完成, 请稍后重试')
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='manual_post', url_name='manual_post')
     def manual_post(self, request):
@@ -775,6 +644,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             manual_single = WeightPackageSingle.objects.filter(bra_code=scan_bra_code).first()
             if not manual_single:
                 raise ValidationError('未找到该人工配料条码')
+            if manual_single.weight_package:
+                raise ValidationError(f'该条码已被使用,关联计划号:{manual_single.weight_package.plan_weight_uid}')
             if manual_single.batching_type == '配方':
                 # 判断物料配方是否一致
                 if manual_single.product_no != product_no or manual_single.dev_type.category_name != dev_type:
@@ -788,6 +659,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             manual = WeightPackageManual.objects.filter(bra_code=scan_bra_code).first()
             if not manual:
                 raise ValidationError('未找到该人工配料条码')
+            if manual.weight_package:
+                raise ValidationError(f'该条码已被使用,关联计划号:{manual.weight_package.plan_weight_uid}')
             # 判断物料配方是否一致
             if manual.product_no != product_no or manual.dev_type.category_name != dev_type:
                 raise ValidationError('单种手工配料机型或配方不符合')
@@ -803,12 +676,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         details.update({'detail_manual': detail_manual, 'detail_machine': detail_machine})
         results = {'manual_type': manual_type, 'manual_id': manual_id, 'details': details}
         return Response({'results': results})
-
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return WeightPackageLogCreateSerializer
-        else:
-            return WeightPackageLogSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -872,12 +739,16 @@ class GetMaterialTolerance(APIView):
 
     def get(self, request):
         data = self.request.query_params
-        batching_equip, material_name, standard_weight = data.get('batching_equip'), data.get('material_name'), data.get('standard_weight')
+        batching_equip = data.get('batching_equip')
+        material_name = data.get('material_name')
+        standard_weight = data.get('standard_weight')
+        project_name = data.get('project_name', '单个化工重量')
+        type_name = '硫磺' if batching_equip.startswith('S') else '细料'
         # 人工单配细料硫磺包
         if batching_equip:
-        # 根据重量查询公差
-            distinguish_name, project_name = ["细料称量", "单个化工重量"] if batching_equip.startswith('F') else ["硫磺称量", "单个化工重量"]
-            rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name,
+            if '单个' not in project_name:
+                project_name = f"整包{type_name}重量"
+            rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
                                                 project__keyword_name=project_name,
                                                 small_num__lt=standard_weight, big_num__gte=standard_weight).first()
         # 人工单配配方或通用(所有量程)
@@ -915,7 +786,7 @@ class GetManualInfo(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
     queryset = WeightPackageLog.objects.all().order_by('-created_date')
-    serializer_class = WeightPackageLogUpdateSerializer
+    serializer_class = WeightPackageLogCUpdateSerializer
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')

@@ -144,6 +144,8 @@ urlpatterns = [
     path('wms-inventory/', WMSInventoryView.as_view()),  # 按物料、批次、航道统计原材料库存
     path('wms-instock/', WmsInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
     path('wms-release/', WMSRelease.as_view()),  # 原材料库质量放行处理
+    path('wms-expire-list/', WMSExpireListView.as_view()),
+    path('wms-expire-details/', WMSExpireDetailView.as_view()),
 
     # 炭黑出库
     path('th-storage-summary/', THStorageSummaryView.as_view()),  # 炭黑所有库存统计
@@ -156,6 +158,8 @@ urlpatterns = [
     path('th-inventory/', THInventoryView.as_view()),  # 按物料、批次、航道统计炭黑库存
     path('th-instock/', THInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
     path('th-release/', THRelease.as_view()),  # 炭黑库质量放行处理
+    path('th-expire-list/', THExpireListView.as_view()),
+    path('th-expire-details/', THExpireDetailView.as_view()),
 
     path('outbound-history/', OutBoundHistory.as_view()),
     # 胶料库内库存统计
