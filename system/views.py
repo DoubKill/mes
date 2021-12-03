@@ -175,6 +175,11 @@ class SectionViewSet(ModelViewSet):
         if self.request.query_params.get('section_users'):
             section = self.queryset.filter(section_users=self.request.user).first()
             return Response({'section': section.name if section else None})
+        if self.request.query_params.get('section_name'):
+            # 根据部门获取部门负责人
+            name = self.request.query_params.get('section_name')
+            section = self.queryset.filter(name=name).first()
+            return Response({'in_charge_user': section.in_charge_user.username if section else None})
         data = []
         index_tree = {}
         for section in Section.objects.filter():

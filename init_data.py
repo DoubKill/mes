@@ -618,6 +618,9 @@ permission_data = [
     {'id': 741, 'code': 'view_material_quality_setting', 'name': '查看', 'parent_id': 740},
     {'id': 742, 'code': 'release_material_quality_setting', 'name': '合格/放行', 'parent_id': 740},
 
+    {'id': 767, 'code': 'material_expire_query', 'name': '原材料超期物料查询', 'parent_id': None},
+    {'id': 768, 'code': 'view_material_expire_query', 'name': '查看', 'parent_id': 767},
+
     {'id': 463, 'code': 'th_outbound_record', 'name': '炭黑库出库单据', 'parent_id': None},
     {'id': 464, 'code': 'view_th_outbound_record', 'name': '查看', 'parent_id': 463},
     {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
@@ -649,6 +652,9 @@ permission_data = [
     {'id': 745, 'code': 'th_quality_setting', 'name': '炭黑质检信息设定', 'parent_id': None},
     {'id': 746, 'code': 'view_th_quality_setting', 'name': '查看', 'parent_id': 745},
     {'id': 747, 'code': 'release_th_quality_setting', 'name': '合格/放行', 'parent_id': 745},
+
+    {'id': 769, 'code': 'th_expire_query', 'name': '炭黑超期物料查询', 'parent_id': None},
+    {'id': 770, 'code': 'view_th_expire_query', 'name': '查看', 'parent_id': 769},
 
     {'id': 475, 'code': 'material_report_equip', 'name': '原材料上报设备管理', 'parent_id': None},
     {'id': 476, 'code': 'view_material_report_equip', 'name': '查看', 'parent_id': 475},
@@ -965,7 +971,7 @@ permission_data = [
     {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
 
-    # 下一个权限id从766开始
+    # 下一个权限id从771开始
 ]
 
 

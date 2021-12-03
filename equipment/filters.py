@@ -374,7 +374,7 @@ class EquipWarehouseStatisticalFilter(django_filters.rest_framework.FilterSet):
 
 class EquipApplyRepairFilter(django_filters.rest_framework.FilterSet):
     plan_id = django_filters.CharFilter(field_name='plan_id', help_text='报修编号', lookup_expr='icontains')
-    result_fault_cause = django_filters.CharFilter(field_name='result_fault_cause__fault_name', help_text='故障原因',
+    result_fault_cause = django_filters.CharFilter(field_name='result_fault_cause', help_text='故障原因',
                                                    lookup_expr='icontains')
 
     class Meta:

@@ -327,7 +327,7 @@ class WeighCntType(models.Model):
 
     @property
     def weighting_material_nos(self):
-        return list(self.weight_details.values_list('material__material_no', flat=True))
+        return list(self.weight_details.filter(delete_flag=0).values_list('material__material_no', flat=True))
 
     @property
     def total_weight(self):
