@@ -490,7 +490,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         else:
                             single_date = single_expire_record.first()
                         expire_days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-99-99 00:00:00'
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
                                   'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', i['product_no'])[0],
                                   'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
@@ -531,7 +531,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         else:
                             single_date = single_expire_record.first()
                         expire_days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-99-99 00:00:00'
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],
                                            'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
@@ -583,7 +583,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         else:
                             single_date = single_expire_record.first()
                         expire_days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-99-99 00:00:00'
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time,
                                            'product_no': re.split(r'\(|\（|\[', serializer['product_no'])[0],

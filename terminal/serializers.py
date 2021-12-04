@@ -639,7 +639,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         manual_headers, manual_body, batching_type = {}, [], '机配'
-        expire_datetime = str(instance.batch_time + timedelta(days=res['expire_days'])) if res['expire_days'] != 0 else '9999-99-99 00:00:00'
+        expire_datetime = str(instance.batch_time + timedelta(days=res['expire_days'])) if res['expire_days'] != 0 else '9999-09-09 00:00:00'
         machine_manual_tolerance, total_manual_weight = '', 0
         # 拼接手工配信息
         if instance.merge_flag:
@@ -751,7 +751,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         # 获取有效期
-        expire_datetime = '9999-99-99 00:00:00'
+        expire_datetime = '9999-09-09 00:00:00'
         expire_record = PackageExpire.objects.filter(product_no=f"{instance.product_no}({instance.dev_type})").first()
         if expire_record:
             expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
