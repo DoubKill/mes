@@ -199,7 +199,7 @@ def compare_time(now_datetime, check_time, interval, times):
     for i in range(1, times + 1):
         change_minutes = interval * i
         if check_time + timedelta(minutes=change_minutes) <= now_datetime <= check_time + timedelta(
-                minutes=change_minutes + 0.5):
+                minutes=change_minutes + 1):
             return True, i
     return False, 0
 
