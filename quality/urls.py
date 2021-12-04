@@ -123,7 +123,7 @@ urlpatterns = [
     path('material-examine-result-curve/', ExamineResultCurveView.as_view()),
     path('show-qualified-range/', ShowQualifiedRange.as_view()),  # 全局配置快检卡片打印显示合格区间
     path('wms-material-search/', WMSMaterialSearchView.as_view()),
-    path('report-value/', ReportValueView.as_view()),
+    path('report-value/', ReportValueView.as_view()),  # 数据检测值上报（胶料、原材料）
     path('equip-test-data/', TestDataView.as_view()),  # 设备监控数据
     path('check-equip/', CheckEquip.as_view()),  # 检测机台的转态
 
