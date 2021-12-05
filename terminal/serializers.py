@@ -152,35 +152,42 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             attrs['scan_material'] = material_name
         # 细料
         if weight_package:
+            flag = False
             material_in_flag = False
-            # 添加到工艺放行表中的数据
-            replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": weight_package.equip_no,
-                                     "product_no": classes_plan.product_batching.stage_product_batch_no,
-                                     "real_material": material_name, "bra_code": bra_code, "status": "未处理",
-                                     "created_user": self.context['request'].user, 'material_no': material_no,
-                                     "last_updated_date": datetime.now(),
-                                     'material_type': '料包' if weight_package else '胶块'}
-            if weight_package.dev_type != classes_plan.product_batching.dev_type.category_name:
-                raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
-            elif re.split(r'\(|\（|\[', weight_package.product_no)[
-                0] != classes_plan.product_batching.stage_product_batch_no:
-                material_error_msg = '配方名不一致, 请工艺确认'
-                ReplaceMaterial.objects.create(**replace_material_data)
-            elif weight_package.plan_weight != detail_infos.get(
-                    [i for i in materials if re.findall('-细料|-硫磺', i)][0]):
-                material_error_msg = '料包重量与配方不一致, 请工艺确认'
-                ReplaceMaterial.objects.create(**replace_material_data)
-            elif weight_package.expire_days != 0 and datetime.now().replace(
-                    microsecond=False) - weight_package.batch_time > timedelta(days=weight_package.expire_days):
-                material_error_msg = '料包已过期, 请工艺确认'
-                ReplaceMaterial.objects.create(**replace_material_data)
-            else:
-                # 条件都匹配, 转换名称记入料框表
+            material_no = material_name = weight_package.material_no
+            # 查找物料替代表
+            replace_record = ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, status='已处理',
+                                                            real_material=material_name, result=1).first()
+            if replace_record and replace_record.result:
+                # 转换物料名
                 flag = True
-                material_no = material_name = classes_plan.product_batching.weight_cnt_types.first().name
-                total_weight = weight_package.total_weight
-                unit = '包'
-                attrs['scan_material'] = weight_package.product_no
+                material_no = material_name = replace_record.recipe_material
+            else:
+                # 添加到工艺放行表中的数据
+                replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": weight_package.equip_no,
+                                         "product_no": classes_plan.product_batching.stage_product_batch_no,
+                                         "real_material": material_name, "bra_code": bra_code, "status": "未处理",
+                                         "created_user": self.context['request'].user, 'material_no': material_no,
+                                         "last_updated_date": datetime.now(),
+                                         'material_type': '料包'}
+                if weight_package.dev_type != classes_plan.product_batching.dev_type.category_name:
+                    raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
+                elif re.split(r'\(|\（|\[', weight_package.product_no)[0] != classes_plan.product_batching.stage_product_batch_no:
+                    material_error_msg = '配方名不一致, 请工艺确认'
+                    ReplaceMaterial.objects.create(**replace_material_data)
+                elif weight_package.total_weight != detail_infos.get([i for i in materials if re.findall('-细料|-硫磺', i)][0]):
+                    material_error_msg = '料包重量与配方不一致, 请工艺确认'
+                    ReplaceMaterial.objects.create(**replace_material_data)
+                elif weight_package.expire_days != 0 and datetime.now().replace(microsecond=False) - weight_package.batch_time > timedelta(days=weight_package.expire_days):
+                    material_error_msg = '料包已过期, 请工艺确认'
+                    ReplaceMaterial.objects.create(**replace_material_data)
+                else:
+                    # 条件都匹配, 转换名称记入料框表
+                    flag = True
+                    material_no = material_name = classes_plan.product_batching.weight_cnt_types.first().name
+                    total_weight = weight_package.total_weight
+                    unit = '包'
+                    attrs['scan_material'] = weight_package.product_no
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         attrs['equip_no'] = classes_plan.equip.equip_no
@@ -238,6 +245,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     flag = True
                     material_no = material_name = replace_record.recipe_material
                 else:
+                    # 添加到工艺放行表中的数据
+                    replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": classes_plan.equip.equip_no,
+                                             "product_no": classes_plan.product_batching.stage_product_batch_no,
+                                             "real_material": material_name, "bra_code": bra_code, "status": "未处理",
+                                             "created_user": self.context['request'].user, 'material_no': material_no,
+                                             "last_updated_date": datetime.now(),
+                                             'material_type': '胶块'}
                     # 胶块
                     material_error_msg = '胶块不在配方中, 请工艺确认'
                     ReplaceMaterial.objects.create(**replace_material_data)
