@@ -3322,7 +3322,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
                 'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
-                'assign_to_user': None, 'last_updated_date': datetime.now()
+                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_order': True
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
@@ -3648,7 +3648,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
                 'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
-                'assign_to_user': None, 'last_updated_date': datetime.now()
+                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_order': True
             }
             content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
