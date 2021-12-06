@@ -2773,6 +2773,7 @@ class WMSRelease(APIView):
         return Response('更新成功！')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WMSExpireListView(APIView):
     permission_classes = (IsAuthenticated,)
     DATABASE_CONF = WMS_CONF
@@ -2818,6 +2819,7 @@ order by m.MaterialCode;""".format(expire_days)
         return Response({'results': result, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WMSExpireDetailView(APIView):
     permission_classes = (IsAuthenticated,)
     DATABASE_CONF = WMS_CONF
@@ -2852,8 +2854,8 @@ class WMSExpireDetailView(APIView):
             sheet.write(data_row, 8, i[7])
             sheet.write(data_row, 9, i[7])
             sheet.write(data_row, 10, i[8])
-            sheet.write(data_row, 11, i[9].strftime('%Y-%m-%d %H:%M:%S'))
-            sheet.write(data_row, 12, i[10].strftime('%Y-%m-%d %H:%M:%S'))
+            sheet.write(data_row, 11, i[9])
+            sheet.write(data_row, 12, i[10])
             sheet.write(data_row, 13, i[11])
             data_row = data_row + 1
         # 写出到IO
@@ -2919,8 +2921,8 @@ order by left_days;""".format(expire_days, material_code, quality_status)
                  'unit': item[6],
                  'total_weight': item[7],
                  'quality_status': item[8],
-                 'in_storage_time': item[9].strftime('%Y-%m-%d %H:%M:%S'),
-                 'expire_time': item[10].strftime('%Y-%m-%d %H:%M:%S'),
+                 'in_storage_time': item[9],
+                 'expire_time': item[10],
                  'left_days': item[11],
                  })
         sc.close()
