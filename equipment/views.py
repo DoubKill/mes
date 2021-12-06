@@ -3243,10 +3243,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
             obj = self.queryset.filter(id=data.get('order_id')).first()
             new_users = data.get('users')
             actual_users = EquipRegulationRecord.objects.filter(plan_id=obj.plan_id, status='增').values_list('user', flat=True)
-            print(actual_users, 'actual_users')
             #  新增的
             add_user = list(set(new_users).difference(set(actual_users)))
-            print(add_user, 'add_user')
             # 要删除的
             del_user = list(set(actual_users).difference(set(new_users)))
             for user in add_user:  # 增加人员
@@ -4035,7 +4033,6 @@ class EquipMTBFMTTPStatementView(APIView):
             time=OSum((F('repair_end_datetime') - F('fault_datetime')) / 1000000), count=Count('id'))
 
         for item in query:
-            print(query)
             #  当前月总时长
             total_time = calendar.monthrange(item["fault_datetime__year"], item["fault_datetime__month"])[1] * 24
             year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
