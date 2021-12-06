@@ -877,6 +877,14 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
     end_trains = serializers.ReadOnlyField(default='')
     batch_classes = serializers.ReadOnlyField(source='grouptime')
 
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        if instance.merge_flag is None:
+            res['merge_flag'] = False
+        if instance.split_count is None:
+            res['split_count'] = 1
+        return res
+
     def get_batch_group(self, obj):
         group = obj.grouptime if obj.grouptime != '中班' else ('早班' if '08:00:00' < obj.addtime[-8:] < '20:00:00' else '夜班')
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=obj.date_time, classes__global_name=group,
@@ -1017,6 +1025,14 @@ class BinSerializer(serializers.ModelSerializer):
 class PlanSerializer(serializers.ModelSerializer):
     equip_no = serializers.CharField(write_only=True, help_text='称量机台')
 
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        if instance.merge_flag is None:
+            res['merge_flag'] = False
+        if instance.split_count is None:
+            res['split_count'] = 1
+        return res
+
     def create(self, validated_data):
         equip_no = validated_data.pop('equip_no')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
@@ -1078,6 +1094,14 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
 
 
 class RecipePreSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        if instance.merge_flag is None:
+            res['merge_flag'] = False
+        if instance.split_count is None:
+            res['split_count'] = 1
+        return res
 
     class Meta:
         model = RecipePre
