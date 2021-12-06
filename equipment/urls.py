@@ -153,7 +153,15 @@ urlpatterns = [
     # 条码打印
     path('equip-code-print/', EquipCodePrintView.as_view()),
     # 钉钉工单查询
-    path('equip-order-list/', EquipOrderListView.as_view())
+    path('equip-order-list/', EquipOrderListView.as_view()),
+    # MTBF/MTTR分析报表
+    path('equip-mtbfmttp-statement/', EquipMTBFMTTPStatementView.as_view()),
+    # 工单别 处理时间分析报表
+    path('equip-workorder-statement/', EquipWorkOrderStatementView.as_view()),
+    # 机台别 处理时间分析报表
+    path('equip-statement/', EquipStatementView.as_view()),
+    # 人员别 处理时间分析报表
+    path('equip-user-statement/', EquipUserStatementView.as_view()),
 ]
 
 
