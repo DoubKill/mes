@@ -178,7 +178,7 @@ class WeighCntTypeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WeighCntType
-        exclude = ('product_batching', )
+        exclude = ('product_batching', 'name', 'weigh_type', 'package_cnt', 'package_type')
 
 
 class ProductBatchingCreateSerializer(BaseModelSerializer):
@@ -241,6 +241,10 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             for weight_cnt_type in weight_cnt_types:
                 weight_details = weight_cnt_type.pop('weight_details', None)
                 weight_cnt_type['product_batching'] = instance
+                if '-FM' in stage_product_batch_no:
+                    weight_cnt_type['name'] = '硫磺'
+                else:
+                    weight_cnt_type['name'] = '细料'
                 cnt_type_instance = WeighCntType.objects.create(**weight_cnt_type)
                 if weight_details:
                     # 新建小料包详情
@@ -278,6 +282,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
 class WeighCntTypeDetailRetrieveSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
+    material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
 
     class Meta:
         model = WeighBatchingDetail
@@ -290,7 +295,7 @@ class WeighCntTypeRetrieveSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WeighCntType
-        exclude = ('product_batching', )
+        exclude = ('product_batching', 'name', 'weigh_type', 'package_cnt', 'package_type')
         extra_kwargs = {'id': {'read_only': False, 'allow_null': True, 'required': False}}
 
 
@@ -388,6 +393,10 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                 else:
                     # 否则新建
                     weight_cnt_type['product_batching'] = instance
+                    if '-FM' in instance.stage_product_batch_no:
+                        weight_cnt_type['name'] = '硫磺'
+                    else:
+                        weight_cnt_type['name'] = '细料'
                     cnt_type_instance = WeighCntType.objects.create(**weight_cnt_type)
                 if weight_details:
                     # 更新小料包详情

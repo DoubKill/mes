@@ -230,7 +230,7 @@ class AutoDispatch(object):
             instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
                                                  global_type__use_flag=1).first()
             choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
-            fault_name = order.result_fault_cause.fault_name if order.result_fault_cause else (
+            fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
             inspection = True
