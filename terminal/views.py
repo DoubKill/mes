@@ -701,7 +701,7 @@ class WeightPackageManualViewSet(ModelViewSet):
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
         data = self.request.data
-        self.get_queryset().filter(id=data.get('id')).update({'print_flag': data.get('print_flag', False)})
+        self.get_queryset().filter(id=data.get('id')).update(**{'print_flag': data.get('print_flag', False)})
         return response(success=True, message='重置打印状态成功')
 
 
@@ -791,16 +791,11 @@ class WeightPackageCViewSet(ListModelMixin, UpdateModelMixin, GenericViewSet):
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         equip_no_list = equip_no.split(',')
-        print_data = self.get_queryset().filter(equip_no__in=equip_no_list, print_flag=1).values(
-            'id', 'product_no', 'dev_type', 'plan_weight', 'equip_no', 'package_count', 'print_begin_trains', 'print_count',
-            'batch_time', 'expire_days', 'batch_group', 'batch_classes', 'begin_trains', 'end_trains', 'bra_code')
-        for data in print_data:
-            expire_date = datetime.datetime.strftime(data['batch_time'] + timedelta(days=data['expire_days']),
-                                                     '%Y-%m-%d %H:%M:%S') \
-                if data['expire_days'] != 0 else '9999' + str(data['batch_time'])[4:]
-            batch_time = data['batch_time'].strftime('%Y-%m-%d')
-            data.update({'expire_days': expire_date, 'batch_time': batch_time})
-        return Response(print_data)
+        print_data = self.get_queryset().filter(equip_no__in=equip_no_list, print_flag=1)
+        serializer = []
+        if print_data:
+            serializer = WeightPackageLogSerializer(print_data, many=True).data
+        return Response({"results": serializer})
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -1375,6 +1370,30 @@ class ReportBasicView(ListAPIView):
         except Exception:
             raise
         return self.get_paginated_response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class UpdateFlagCountView(APIView):
+
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        rid = self.request.data.get('id')
+        oper_type = self.request.data.get('oper_type')
+        equip_no = self.request.data.get('equip_no')
+        merge_flag = self.request.data.get('merge_flag')
+        split_count = self.request.data.get('split_count')
+        filter_kwargs = {}
+        if merge_flag:
+            filter_kwargs['merge_flag'] = merge_flag
+        if split_count:
+            filter_kwargs['split_count'] = split_count
+        db_name = Plan if oper_type == '计划' else RecipePre
+        instance = db_name.objects.using(equip_no).filter(id=rid)
+        if not instance:
+            raise ValidationError('未找到编号对应的数据')
+        instance.update(merge_flag=merge_flag, split_count=split_count)
+        return Response('操作成功')
 
 
 @method_decorator([api_recorder], name="dispatch")

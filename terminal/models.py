@@ -498,6 +498,8 @@ class RecipePre(models.Model):
     error = models.DecimalField(max_digits=5, help_text='总误差，界面写入', decimal_places=3, blank=True, null=True)
     time = models.CharField(max_length=19, help_text='修改时间', blank=True, null=True)
     use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    split_count = models.IntegerField(help_text='机配分包数', default=1)
 
     class Meta:
         managed = False
