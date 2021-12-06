@@ -870,6 +870,7 @@ class EquipApplyOrder(AbstractEntity):
     receiving_user = models.CharField(max_length=64, help_text='接单人', null=True, blank=True)
     receiving_datetime = models.DateTimeField(help_text='接单时间', null=True, blank=True)
     repair_user = models.CharField(max_length=64, help_text='维修人', null=True, blank=True)
+    fault_datetime = models.DateTimeField(help_text='故障发生时间', null=True, blank=True)
     repair_start_datetime = models.DateTimeField(help_text='维修开始时间', null=True, blank=True)
     repair_end_datetime = models.DateTimeField(help_text='维修结束时间', null=True, blank=True)
     accept_user = models.CharField(max_length=64, help_text='验收人', null=True, blank=True)
