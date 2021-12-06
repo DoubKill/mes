@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import sys
 from datetime import datetime, timedelta
@@ -196,11 +197,10 @@ def handle(order):
 
 def compare_time(now_datetime, check_time, interval, times):
     """获取比较时间"""
-    for i in range(1, times + 1):
-        change_minutes = interval * i
-        if check_time + timedelta(minutes=change_minutes) <= now_datetime <= check_time + timedelta(
-                minutes=change_minutes + 1):
-            return True, i
+    alarm_time = [i * interval for i in range(1, times + 1)]
+    num = math.ceil((now_datetime - check_time).seconds / 60)
+    if num in alarm_time:
+        return True, int(num / interval)
     return False, 0
 
 
