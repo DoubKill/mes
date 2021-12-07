@@ -740,13 +740,15 @@ class IntervalOutputStatisticsView(APIView):
 
         if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
             return Response({})
+        day_start_time = datetime.datetime.strptime(factory_date + ' 08:00:00', "%Y-%m-%d %H:%M:%S")
+        factory_end_time = day_start_time + datetime.timedelta(days=1)
 
-        day_start_end_times = TrainsFeedbacks.objects \
-            .filter(factory_date=factory_date) \
-            .aggregate(day_end_time=Max('end_time'),
-                       day_start_time=Min('end_time'))
-        day_start_time = day_start_end_times.get('day_start_time')
-        day_end_time = day_start_end_times.get('day_end_time')
+        day_end_time = (datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        day_end_time = day_end_time[:14] + '00:00'
+        day_end_time = datetime.datetime.strptime(day_end_time, "%Y-%m-%d %H:%M:%S")
+        if day_end_time > factory_end_time:
+            day_end_time = factory_end_time
+
         time_spans = []
         end_time = day_start_time
         while end_time < day_end_time:
