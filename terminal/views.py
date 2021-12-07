@@ -806,7 +806,7 @@ class GetManualInfo(APIView):
         # 人工配物料信息
         manual_material = instance.weight_details.exclude(material__material_name__in=machine_material). \
             annotate(material_name=F("material__material_name"), tolerance=F("standard_error")) \
-            .values('material_name', 'standard_weight', 'tolerance')
+            .values('material_name', 'standard_weight')
         return Response({'results': list(manual_material)})
 
 
