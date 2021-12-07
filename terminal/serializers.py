@@ -1027,9 +1027,9 @@ class PlanSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
-        if instance.merge_flag is None:
+        if res.get('merge_flag') is None:
             res['merge_flag'] = False
-        if instance.split_count is None:
+        if instance.get('split_count') is None:
             res['split_count'] = 1
         return res
 
