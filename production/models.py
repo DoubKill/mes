@@ -180,8 +180,7 @@ class ExpendMaterial(AbstractEntity):
         indexes = [
             models.Index(fields=['equip_no']),
             models.Index(fields=['product_no']),
-            models.Index(fields=['material_type']),
-            models.Index(fields=['product_time']), ]
+            models.Index(fields=['material_type'])]
 
 
 class OperationLog(AbstractEntity):
@@ -273,6 +272,11 @@ class ProcessFeedback(AbstractEntity):
     class Meta:
         db_table = 'process_feedback'
         verbose_name_plural = verbose_name = '步序反馈报表'
+        indexes = [
+            models.Index(fields=['plan_classes_uid']),
+            models.Index(fields=['equip_no']),
+            models.Index(fields=['product_no'])
+        ]
 
 
 class AlarmLog(AbstractEntity):
