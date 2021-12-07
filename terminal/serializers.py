@@ -733,7 +733,7 @@ class WeightPackageLogSerializer(BaseModelSerializer):
         fields = ['id', 'plan_weight_uid', 'product_no', 'plan_weight', 'dev_type', 'batch_time', 'bra_code', 'record',
                   'package_count', 'print_begin_trains', 'noprint_count', 'package_fufil', 'package_plan_count',
                   'equip_no', 'print_flag', 'batch_group', 'status', 'begin_trains', 'end_trains', 'batch_classes',
-                  'batch_user', 'expire_days', 'last_updated_date', 'merge_flag', 'split_count']
+                  'batch_user', 'expire_days', 'last_updated_date', 'merge_flag', 'split_count', 'print_count']
 
 
 class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
