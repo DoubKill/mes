@@ -135,4 +135,6 @@ urlpatterns = [
     path('product-test-statics/', ProductTestStaticsView.as_view()),  # 胶料别不合格率统计
     path('class-test-statics/', ClassTestStaticsView.as_view()),  # 班次别不合格率统计
     path('unqialified-equip/', UnqialifiedEquipView.as_view()),  # 机台别 不合格率统计
+
+    path('label-print-logs/', LabelPrintLogView.as_view())
 ]
