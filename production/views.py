@@ -1719,5 +1719,7 @@ class ProductPlanRealView(ListAPIView):
         for classes in ['早班', '中班', '夜班']:
             page = queryset.filter(work_schedule_plan__classes__global_name=classes)
             data = self.get_serializer(page, many=True).data
+            data = list(filter(lambda x: x['begin_time'] is not None, data))
+            data.sort(key=lambda x: x['begin_time'])
             ret[classes] = data
         return Response(ret)
