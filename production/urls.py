@@ -86,4 +86,7 @@ urlpatterns = [
 
     # 生产运行记录
     path('runtime-record-detail/', RuntimeRecordDetailView.as_view()),
+
+    # 生产管理-生产记录（计划对比实际）
+    path('product-classes-plan-real/', ProductPlanRealView.as_view())
 ]

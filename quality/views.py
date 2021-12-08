@@ -46,7 +46,8 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
-    ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult
+    ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
+    LabelPrintLog
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -61,8 +62,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
     MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
-    ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer,\
-    UnqualifiedPalletFeedBackSerializer
+    ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer, \
+    UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -589,6 +590,12 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
         for lot_no in lot_no_list:
             data = receive_deal_result(lot_no)
             LabelPrint.objects.create(label_type=2, lot_no=lot_no, status=0, data=data)
+            try:
+                LabelPrintLog.objects.create(result=MaterialDealResult.objects.filter(lot_no=lot_no).first(),
+                                             created_user=self.request.user.username,
+                                             location='快检')
+            except Exception:
+                pass
         return Response('打印任务已下发')
 
     def list(self, request, *args, **kwargs):
@@ -632,6 +639,17 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             instance._prefetched_objects_cache = {}
         MaterialDealResult.objects.filter(lot_no=instance.lot_no).update(print_time=datetime.datetime.now())
         return Response("打印完成")
+
+
+@method_decorator([api_recorder], name="dispatch")
+class LabelPrintLogView(ListAPIView):
+    """打印履历"""
+    queryset = LabelPrintLog.objects.all()
+    serializer_class = LabelPrintLogSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_fields = ('result_id',)
+    pagination_class = None
 
 
 @method_decorator([api_recorder], name="dispatch")

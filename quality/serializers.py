@@ -27,7 +27,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult
+    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
+    LabelPrintLog
 from recipe.models import MaterialAttribute
 
 
@@ -1179,6 +1180,10 @@ class BatchProductNoClassZhPassSerializer(serializers.ModelSerializer):
 
 
 class MaterialDealResultListSerializer1(serializers.ModelSerializer):
+    print_times = serializers.SerializerMethodField()
+
+    def get_print_times(self, obj):
+        return obj.print_logs.count()
 
     def to_representation(self, instance):
         ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
@@ -1892,4 +1897,11 @@ class UnqualifiedPalletFeedBackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MaterialDealResult
+        fields = '__all__'
+
+
+class LabelPrintLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = LabelPrintLog
         fields = '__all__'
