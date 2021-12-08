@@ -28,6 +28,7 @@ from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
+from plan.filters import ProductClassesPlanFilter
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
@@ -38,7 +39,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -1700,3 +1701,22 @@ class PalletTrainsBatchFixView(ListAPIView, UpdateAPIView):
             MaterialTestOrder.objects.filter(lot_no=instance.lot_no).delete()
             MaterialDealResult.objects.filter(lot_no=instance.lot_no).delete()
         return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductPlanRealView(ListAPIView):
+    queryset = ProductClassesPlan.objects.filter(delete_flag=False).order_by('id')
+    serializer_class = ProductPlanRealViewSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend, ]
+    filter_class = ProductClassesPlanFilter
+    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        ret = {}
+        queryset = self.filter_queryset(self.get_queryset())
+        for classes in ['早班', '中班', '夜班']:
+            page = queryset.filter(work_schedule_plan__classes__global_name=classes)
+            data = self.get_serializer(page, many=True).data
+            ret[classes] = data
+        return Response(ret)
