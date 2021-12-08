@@ -94,7 +94,7 @@ permission_data = [
     {'id': 65, 'code': 'product_actual', 'name': '密炼实绩', 'parent_id': None},
     {'id': 66, 'code': 'view_product_actual', 'name': '查看', 'parent_id': 65},
 
-    {'id': 67, 'code': 'plan_reality', 'name': '密炼机台别计划对比', 'parent_id': None},
+    {'id': 67, 'code': 'plan_reality', 'name': '生产记录表', 'parent_id': None},
     {'id': 68, 'code': 'view_plan_reality', 'name': '查看', 'parent_id': 67},
 
     {'id': 69, 'code': 'product_record', 'name': '密炼生产履历', 'parent_id': None},
