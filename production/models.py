@@ -180,7 +180,7 @@ class ExpendMaterial(AbstractEntity):
         indexes = [
             models.Index(fields=['equip_no']),
             models.Index(fields=['product_no']),
-            models.Index(fields=['material_type'])]
+            models.Index(fields=['plan_classes_uid'])]
 
 
 class OperationLog(AbstractEntity):
