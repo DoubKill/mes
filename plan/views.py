@@ -23,7 +23,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
 from mes.sync import ProductClassesPlanSyncInterface
-from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, PalletFeedbacksFilter, BatchingClassesPlanFilter
+from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductClassesPlanFilter, BatchingClassesPlanFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
     BatchingClassesEquipPlan
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
@@ -323,7 +323,7 @@ class ProductClassesPlanList(mixins.ListModelMixin, GenericViewSet):
     permission_classes = (IsAuthenticatedOrReadOnly,)
     pagination_class = SinglePageNumberPagination
     filter_backends = (DjangoFilterBackend,)
-    filter_class = PalletFeedbacksFilter
+    filter_class = ProductClassesPlanFilter
 
 
 @method_decorator([api_recorder], name="dispatch")

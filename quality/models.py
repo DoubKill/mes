@@ -12,6 +12,7 @@ class ZCKJConfig(models.Model):
     user = models.CharField(max_length=64, help_text='数据库用户名')
     password = models.CharField(max_length=64, help_text='数据库用户密码')
     name = models.CharField(max_length=64, help_text='数据库名称')
+    use_flag = models.BooleanField(help_text='是否启用', default=True)
 
     def __str__(self):
         return self.server
@@ -332,6 +333,16 @@ class MaterialDealResult(AbstractEntity):
                    models.Index(fields=['classes']),
                    models.Index(fields=['product_no']),
                    models.Index(fields=['lot_no'])]
+
+
+class LabelPrintLog(models.Model):
+    result = models.ForeignKey(MaterialDealResult, on_delete=models.CASCADE, related_name='print_logs')
+    location = models.CharField(max_length=64, help_text='打印位置', null=True)
+    created_user = models.CharField(max_length=64, help_text='打印人', null=True)
+    created_date = models.DateTimeField(verbose_name='打印时间', auto_now_add=True)
+
+    class Meta:
+        db_table = 'label_print_log'
 
 
 class LevelResult(AbstractEntity):

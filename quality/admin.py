@@ -12,4 +12,4 @@ admin.site.register(
 
 @admin.register(ZCKJConfig)
 class ZCKJConfigAdmin(admin.ModelAdmin):
-    list_display = ['id', 'server', 'user', 'password', 'name']
+    list_display = ['id', 'server', 'user', 'password', 'name', 'use_flag']

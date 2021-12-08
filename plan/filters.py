@@ -31,7 +31,7 @@ class MaterialDemandedFilter(django_filters.rest_framework.FilterSet):
         fields = ('plan_date', 'material_type', 'material_name', 'classes')
 
 
-class PalletFeedbacksFilter(django_filters.rest_framework.FilterSet):
+class ProductClassesPlanFilter(django_filters.rest_framework.FilterSet):
     """计划管理"""
     classes = django_filters.CharFilter(field_name='work_schedule_plan__classes__global_name', help_text='班次')
     product_no = django_filters.CharFilter(field_name='product_batching__stage_product_batch_no',

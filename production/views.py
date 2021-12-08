@@ -28,6 +28,7 @@ from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
+from plan.filters import ProductClassesPlanFilter
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
@@ -38,7 +39,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -733,6 +734,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
 
 
 # 区间产量统计
+@method_decorator([api_recorder], name="dispatch")
 class IntervalOutputStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -740,13 +742,15 @@ class IntervalOutputStatisticsView(APIView):
 
         if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
             return Response({})
+        day_start_time = datetime.datetime.strptime(factory_date + ' 08:00:00', "%Y-%m-%d %H:%M:%S")
+        factory_end_time = day_start_time + datetime.timedelta(days=1)
 
-        day_start_end_times = TrainsFeedbacks.objects \
-            .filter(factory_date=factory_date) \
-            .aggregate(day_end_time=Max('end_time'),
-                       day_start_time=Min('end_time'))
-        day_start_time = day_start_end_times.get('day_start_time')
-        day_end_time = day_start_end_times.get('day_end_time')
+        day_end_time = (datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        day_end_time = day_end_time[:14] + '00:00'
+        day_end_time = datetime.datetime.strptime(day_end_time, "%Y-%m-%d %H:%M:%S")
+        if day_end_time > factory_end_time:
+            day_end_time = factory_end_time
+
         time_spans = []
         end_time = day_start_time
         while end_time < day_end_time:
@@ -755,9 +759,9 @@ class IntervalOutputStatisticsView(APIView):
         time_spans.append(day_end_time)
 
         data = {
-            'equips': sorted(
-                TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(),
-                key=lambda e: int(e.lower()[1:]))
+            'equips': list(Equip.objects.filter(
+                category__equip_type__global_name='密炼设备'
+            ).order_by('equip_no').values_list('equip_no', flat=True))
         }
 
         for class_ in classes:
@@ -1698,3 +1702,22 @@ class PalletTrainsBatchFixView(ListAPIView, UpdateAPIView):
             MaterialTestOrder.objects.filter(lot_no=instance.lot_no).delete()
             MaterialDealResult.objects.filter(lot_no=instance.lot_no).delete()
         return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductPlanRealView(ListAPIView):
+    queryset = ProductClassesPlan.objects.filter(delete_flag=False).order_by('id')
+    serializer_class = ProductPlanRealViewSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend, ]
+    filter_class = ProductClassesPlanFilter
+    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        ret = {}
+        queryset = self.filter_queryset(self.get_queryset())
+        for classes in ['早班', '中班', '夜班']:
+            page = queryset.filter(work_schedule_plan__classes__global_name=classes)
+            data = self.get_serializer(page, many=True).data
+            ret[classes] = data
+        return Response(ret)

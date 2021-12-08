@@ -71,7 +71,7 @@ from mes.settings import DEBUG
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train, MaterialDealResult
+from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog
 from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
 from system.models import User
@@ -298,6 +298,13 @@ class OutWorkFeedBack(APIView):
                     if label:
                         LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0,
                                                   data=label)
+                        try:
+                            LabelPrintLog.objects.create(
+                                result=MaterialDealResult.objects.filter(lot_no=lot_no).first(),
+                                created_user=dp_obj.outbound_delivery_order.created_user.username,
+                                location=station)
+                        except Exception:
+                            pass
                 except AttributeError as a:
                     logger.error(f"条码错误{a}")
                 except Exception as e:
