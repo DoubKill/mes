@@ -734,6 +734,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
 
 
 # 区间产量统计
+@method_decorator([api_recorder], name="dispatch")
 class IntervalOutputStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -758,9 +759,9 @@ class IntervalOutputStatisticsView(APIView):
         time_spans.append(day_end_time)
 
         data = {
-            'equips': sorted(
-                TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(),
-                key=lambda e: int(e.lower()[1:]))
+            'equips': list(Equip.objects.filter(
+                category__equip_type__global_name='密炼设备'
+            ).order_by('equip_no').values_list('equip_no', flat=True))
         }
 
         for class_ in classes:
