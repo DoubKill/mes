@@ -126,16 +126,30 @@ class WeightPackageLog(AbstractEntity):
     def total_weight(self):
         total_weight = self.plan_weight
         manual = self.weight_package_manual.all()
-        manual_single = self.weight_package_single.all()
+        manual_wms = self.weight_package_wms.all()
         for i in manual:
             total_weight += Decimal(i.single_weight.split('±')[0])
-        for j in manual_single:
+        for j in manual_wms:
             total_weight += Decimal(j.single_weight.split('±')[0])
         return total_weight
 
     class Meta:
         db_table = 'weight_package_log'
         verbose_name_plural = verbose_name = '称量打包履历'
+
+
+class OtherMaterialLog(models.Model):
+    plan_classes_uid = models.CharField(max_length=64, help_text='密炼计划号')
+    product_no = models.CharField(max_length=64, help_text='胶料名称-配方号')
+    material_name = models.CharField(max_length=64, help_text='物料名称', null=True)
+    plan_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='单重', default=0)
+    bra_code = models.CharField(max_length=64, help_text='条形码')
+    status = models.BooleanField(help_text='使用状态', default='N')
+    other_type = models.CharField(max_length=64, help_text='物料类别: 细料, 硫磺, 炭黑, 油料', null=True, blank=True)
+
+    class Meta:
+        db_table = 'other_material_log'
+        verbose_name_plural = verbose_name = '其他物料信息扫码上料暂存表'
 
 
 class PackageExpire(models.Model):
@@ -466,7 +480,6 @@ class Plan(models.Model):
     date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
     addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
     merge_flag = models.BooleanField(help_text='是否合包', default=False)
-    split_count = models.IntegerField(help_text='机配分包数', default=1)
 
     class Meta:
         managed = False
@@ -669,6 +682,23 @@ class WeightPackageSingle(AbstractEntity):
     class Meta:
         db_table = 'weight_package_single'
         verbose_name_plural = verbose_name = '人工单配(单一物料:配方和通用)'
+
+
+class WeightPackageWms(AbstractEntity):
+    """wms扫码原材料合包"""
+    bra_code = models.CharField(max_length=64, help_text='卡片条码')
+    material_name = models.CharField(max_length=64, help_text='物料名称')
+    single_weight = models.CharField(max_length=64, help_text='单配重量')
+    batching_type = models.CharField(max_length=64, help_text='配料方式', default='人工配')
+    batch_user = models.CharField(max_length=64, help_text='配料员', default='原材料')
+    batch_time = models.DateTimeField(help_text='配料时间', null=True, blank=True)
+    tolerance = models.CharField(max_length=64, help_text='公差', default='')
+    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True,
+                                       blank=True, related_name='weight_package_wms')
+
+    class Meta:
+        db_table = 'weight_package_wms'
+        verbose_name_plural = verbose_name = 'wms扫码原材料合包'
 
     # class TempPlan(models.Model):
 #     id = models.BigIntegerField(db_column='ID')  # Field name made lowercase.
