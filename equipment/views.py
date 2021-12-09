@@ -4105,19 +4105,21 @@ class EquipStatementView(APIView):
         time_range = {}
         if s_time:
             time_range = {'created_date__range': [s_time, e_time]}
-        queryset1 = EquipApplyOrder.objects.filter(**time_range, status='已验收', equip_no__icontains=equip_no, work_type__icontains=work_type).annotate(
+        queryset1 = EquipApplyOrder.objects.filter(**time_range, status='已验收', equip_no__icontains=equip_no, work_type__icontains=work_type)
+        data1 = queryset1.values('equip_no', 'work_type').annotate(
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
             验收时间=OSum(F('accept_datetime') - F('repair_end_datetime'))
         ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
-        queryset2 = EquipInspectionOrder.objects.filter(**time_range, status='已完成', equip_no__icontains=equip_no, work_type__icontains=work_type).annotate(
+        queryset2 = EquipInspectionOrder.objects.filter(**time_range, status='已完成', equip_no__icontains=equip_no,  work_type__icontains=work_type)
+        data2 = queryset2.values('equip_no', 'work_type').annotate(
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
             验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime'))
         ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
-        queryset = chain(queryset1, queryset2)
+        queryset = chain(data1, data2)
 
         res = [{
             'equip_no': item['equip_no'],
