@@ -2777,7 +2777,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
 
 
 class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
-    queryset = EquipWarehouseRecord.objects.all()
+    queryset = EquipWarehouseRecord.objects.order_by('-created_date')
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)

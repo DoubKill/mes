@@ -1455,7 +1455,9 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def get_money(self, instance):
-        return round(instance.equip_spare.cost * instance.quantity, 2)
+        if instance.equip_spare.cost:
+            return round(instance.equip_spare.cost * instance.quantity, 2)
+        return 0
 
 
 class EquipWarehouseRecordDetailSerializer(BaseModelSerializer):
