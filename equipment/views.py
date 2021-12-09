@@ -2746,6 +2746,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         return super().list(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):  # 撤销
+        revocation_desc = self.request.data.get('revocation_desc')
         instance = self.get_object()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
@@ -2768,7 +2769,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 inventory.quantity += instance.quantity
                 inventory.save()
             instance.revocation = 'Y'
-            instance.revocation_desc = self.request.data.get('revocation_desc')
+            instance.revocation_desc = revocation_desc if revocation_desc else None
             instance.save()
             order_detail.save()
             return Response('撤销成功')
