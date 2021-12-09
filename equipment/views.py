@@ -2368,7 +2368,10 @@ class EquipWarehouseAreaViewSet(ModelViewSet):
                                                          'area_name': first.equip_warehouse_area.area_name,
                                                          'location_id': first.equip_warehouse_location.id,
                                                          'location_name': first.equip_warehouse_location.location_name}}})
-            return Response({"success": True, "message": None, "data": {'results': results}})
+            return Response({"success": True, "message": None, "data": {'results': results, 'first': {
+                'area_id': results[0]['id'] if results else None,
+                'area_name': results[0]['area_name'] if results else None,
+            }}})
         return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
