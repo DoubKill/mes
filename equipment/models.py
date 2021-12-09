@@ -788,7 +788,7 @@ class EquipWarehouseRecord(AbstractEntity):
     equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
     quantity = models.IntegerField(help_text='数量', default=1)
     revocation = models.CharField(max_length=12, help_text='是否撤销(Y/N)', default='N')
-    revocation_desc = models.TextField(help_text='撤销说明')
+    revocation_desc = models.TextField(help_text='撤销说明', null=True, blank=True)
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细',
                                                      on_delete=models.CASCADE)
     status = models.CharField(max_length=12, help_text='入库/出库', default='入库')

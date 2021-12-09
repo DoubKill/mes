@@ -1336,6 +1336,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
     @atomic
     def create(self, validated_data):
         equip_spare_list = validated_data.pop('equip_spare')
+        desc = validated_data.get('desc') if validated_data.get('desc') else None
+        validated_data.update({'desc': desc})
         order = super().create(validated_data)
         status = validated_data['status']
         for equip_sapre in equip_spare_list:
@@ -1363,7 +1365,8 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
     @atomic
     def update(self, instance, validated_data):
         equip_spare_list = validated_data.pop('equip_spare')
-
+        desc = validated_data.get('desc') if validated_data.get('desc') else None
+        validated_data.update({'desc': desc})
         # 备件列表
         queryset = EquipWarehouseOrderDetail.objects.filter(equip_warehouse_order=instance)
         dic = {}  # 提交过来的备件数组
