@@ -1336,7 +1336,6 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
     @atomic
     def create(self, validated_data):
         equip_spare_list = validated_data.pop('equip_spare')
-        validated_data['created_user'] = self.context['request'].user
         order = super().create(validated_data)
         status = validated_data['status']
         for equip_sapre in equip_spare_list:
