@@ -2689,8 +2689,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 desc=data.get('desc'),
                 equip_warehouse_area=data.get('equip_warehouse_area__id'),
                 equip_warehouse_location=data.get('equip_warehouse_location__id'),
-                move_equip_warehouse_area=data['move_equip_warehouse_area'] if data.get('move_equip_warehouse_area') else None,
-                move_equip_warehouse_location=data['move_equip_warehouse_location'] if data.get('move_equip_warehouse_location') else None,
+                move_equip_warehouse_area=data['move_equip_warehouse_area__id'] if data.get('move_equip_warehouse_area__id') else None,
+                move_equip_warehouse_location=data['move_equip_warehouse_location__id'] if data.get('move_equip_warehouse_location__id') else None,
                 quantity=quantity if handle == '删除' else data.get('quantity'),
                 equip_spare_id=data.get('equip_spare'))
             return Response('操作成功')
@@ -2744,7 +2744,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                              'result_fault_desc': order.result_fault_desc})
 
         return super().list(request, *args, **kwargs)
-
 
     def update(self, request, *args, **kwargs):  # 撤销
         instance = self.get_object()
