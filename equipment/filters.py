@@ -198,6 +198,7 @@ class EquipBomFilter(django_filters.rest_framework.FilterSet):
                                           help_text='部位分类')
     part_code = django_filters.CharFilter(field_name='part__part_code', lookup_expr='icontains', help_text='部位代码')
     equip_type = django_filters.CharFilter(field_name='equip_info__category', help_text='机型id')
+    node_id = django_filters.CharFilter(field_name='node_id', lookup_expr='icontains', help_text='部位代码')
 
     class Meta:
         model = EquipBom
