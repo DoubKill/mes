@@ -2376,9 +2376,12 @@ class EquipWarehouseAreaViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if EquipWarehouseInventory.objects.filter(equip_warehouse_area=instance, status=1).exists():
+        if EquipWarehouseInventory.objects.filter(equip_warehouse_area=instance, quantity__gt=0).exists():
             raise ValidationError('库区正在使用')
-        return super().destroy(request, *args, **kwargs)
+        instance.delete_flag = True
+        instance.save()
+        EquipWarehouseLocation.objects.filter(equip_warehouse_area=instance).update(delete_flag=True)
+        return Response('删除成功')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2396,9 +2399,11 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if EquipWarehouseInventory.objects.filter(equip_warehouse_location=instance, status=1).exists():
+        if EquipWarehouseInventory.objects.filter(equip_warehouse_location=instance, quantity__gt=0).exists():
             raise ValidationError('库位正在使用')
-        return super().destroy(request, *args, **kwargs)
+        instance.delete_flag = True
+        instance.save()
+        return Response('删除成功')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2671,7 +2676,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                     new.quantity += data['quantity']
                     new.save()
                 else:
-                    self.queryset.create(quantity=data['quantity'], equip_spare=data['equip_spare'],
+                    self.queryset.create(quantity=data['quantity'], equip_spare_id=data['equip_spare'],
                                          equip_warehouse_area_id=data['move_equip_warehouse_area__id'],
                                          equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
 
@@ -2745,26 +2750,28 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         instance = self.get_object()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
-            inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=instance.equip_warehouse_order_detail).first()
             if instance.status == '入库':
+                inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=instance.equip_warehouse_order_detail).first()
                 order_detail.in_quantity -= instance.quantity
                 if order_detail.in_quantity == instance.quantity:
                     order_detail.status = 1
                 else:
                     order_detail.status = 2
                 inventory.quantity -= instance.quantity
+                inventory.save()
             if instance.status == '出库':
+                inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_location=instance.equip_warehouse_location, equip_spare=instance.equip_spare).first()
                 order_detail.out_quantity -= instance.quantity
                 if order_detail.out_quantity == instance.quantity:
                     order_detail.status = 4
                 else:
                     order_detail.status = 5
                 inventory.quantity += instance.quantity
+                inventory.save()
             instance.revocation = 'Y'
             instance.revocation_desc = self.request.data.get('revocation_desc')
             instance.save()
             order_detail.save()
-            inventory.save()
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
 
