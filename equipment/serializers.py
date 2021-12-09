@@ -1326,7 +1326,6 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
     order_detail = EquipWarehouseOrderDetailSerializer(many=True, read_only=True)
-    desc = serializers.CharField(help_text='描述', allow_null=True)
 
     class Meta:
         model = EquipWarehouseOrder
