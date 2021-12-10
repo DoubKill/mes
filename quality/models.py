@@ -22,6 +22,17 @@ class ZCKJConfig(models.Model):
         verbose_name_plural = verbose_name = '中策诺甲快检数据库配置'
 
 
+class SubMachine(models.Model):
+    nj_machine = models.ForeignKey(ZCKJConfig, on_delete=models.CASCADE, related_name='sub_machines')
+    max_rid = models.IntegerField(help_text='当前记录最大rid', default=1)
+    nj_machine_no = models.CharField(max_length=64, help_text='诺甲系统设备编号')
+    machine_no = models.CharField(max_length=64, help_text='MES设备编号')
+
+    class Meta:
+        db_table = 'zckj_sub_machine'
+        verbose_name_plural = verbose_name = '中策诺甲机台数据'
+
+
 class TestIndicator(AbstractEntity):
     """检测指标"""
     no = models.CharField(max_length=64, help_text='指标编号', unique=True)
