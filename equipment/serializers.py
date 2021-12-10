@@ -1425,6 +1425,10 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
 
 
 class EquipWarehouseInventorySerializer(BaseModelSerializer):
+    order_id = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.order_id', help_text='出入库单号')
+
+    work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no',
+                                              help_text='工单编号')
 
     class Meta:
         model = EquipWarehouseInventory

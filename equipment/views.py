@@ -2524,6 +2524,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 obj.save()
             else:
                 EquipWarehouseInventory.objects.create(
+                    created_user=self.request.user,
                     equip_spare=instance.equip_spare,
                     quantity=in_quantity,
                     equip_warehouse_order_detail=instance,
