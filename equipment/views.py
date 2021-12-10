@@ -2499,11 +2499,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
 
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
-        query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
-                                                       equip_warehouse_order_detail__equip_warehouse_order_id=data['equip_warehouse_order'],
-                                                       equip_warehouse_location_id=data['equip_warehouse_location'])
         if status == 1:
             # 判断库区类型 和 备件类型是否匹配
+            query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
+                                                           equip_warehouse_order_detail__equip_warehouse_order_id=data[
+                                                               'equip_warehouse_order'],
+                                                           equip_warehouse_location_id=data['equip_warehouse_location'])
             queryset = EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area_id=data['equip_warehouse_area'])
             if queryset.exists():
                 if not queryset.filter(equip_component_type=instance.equip_spare.equip_component_type).exists():
@@ -2548,6 +2549,8 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             return Response({"success": True, "message": '入库成功', "data": data})
 
         if status == 2:
+            query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
+                                                           equip_warehouse_location_id=data['equip_warehouse_location'])
             # 出库的时候，根据出库的数量，判断库区中数量够不够
             if instance.plan_out_quantity == out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity
@@ -2749,6 +2752,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
 
         return super().list(request, *args, **kwargs)
 
+    @atomic
     def update(self, request, *args, **kwargs):  # 撤销
         revocation_desc = self.request.data.get('revocation_desc')
         instance = self.get_object()
