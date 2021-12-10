@@ -2761,11 +2761,11 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
             order = instance.equip_warehouse_order_detail.equip_warehouse_order
             if instance.status == '入库':
                 inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=order_detail).first()
-                order_detail.in_quantity -= instance.quantity
                 if order_detail.in_quantity == instance.quantity:
                     order_detail.status = 1
                 else:
                     order_detail.status = 2
+                order_detail.in_quantity -= instance.quantity
                 order.status = 2
                 if inventory.quantity <= instance.quantity:
                     inventory.quantity = 0
