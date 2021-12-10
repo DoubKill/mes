@@ -2777,7 +2777,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
 
 
 class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
-    queryset = EquipWarehouseRecord.objects.order_by('-created_date')
+    queryset = EquipWarehouseRecord.objects.all()
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -2804,7 +2804,7 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             results = self.serializer_class(self.filter_queryset(self.queryset), many=True).data
             return Response({'results': results})
         else:
-            results = self.filter_queryset(self.queryset).values('equip_spare').annotate(
+            results = self.filter_queryset(self.get_queryset()).values('equip_spare').annotate(
                 in_qty=Sum('quantity', distinct=True, filter=Q(status='入库')),
                 out_qty=Sum('quantity', distinct=True, filter=Q(status='出库'))).values(
                 'in_qty', 'out_qty', 'equip_spare', 'equip_spare__spare_code',
