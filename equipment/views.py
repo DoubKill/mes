@@ -2500,6 +2500,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
         query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'],
+                                                       equip_warehouse_order_detail__equip_warehouse_order_id=data['equip_warehouse_order'],
                                                        equip_warehouse_location_id=data['equip_warehouse_location'])
         if status == 1:
             # 判断库区类型 和 备件类型是否匹配
@@ -2728,9 +2729,8 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
     }
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.queryset).order_by('-created_date')
         if self.request.query_params.get('export'):
-            serializer = self.get_serializer(queryset, many=True)
+            serializer = self.get_serializer(self.filter_queryset(self.queryset), many=True)
             return gen_template_response(self.EXPORT_FIELDS_DICT, list(serializer.data), self.FILE_NAME)
         if self.request.query_params.get('work_order_no'):
             work_order_no = self.request.query_params.get('work_order_no')
@@ -2750,13 +2750,15 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         instance = self.get_object()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
+            order = instance.equip_warehouse_order_detail.equip_warehouse_order
             if instance.status == '入库':
-                inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=instance.equip_warehouse_order_detail).first()
+                inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=order_detail).first()
                 order_detail.in_quantity -= instance.quantity
                 if order_detail.in_quantity == instance.quantity:
                     order_detail.status = 1
                 else:
                     order_detail.status = 2
+                order.status = 2
                 inventory.quantity -= instance.quantity
                 inventory.save()
             if instance.status == '出库':
@@ -2766,18 +2768,20 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     order_detail.status = 4
                 else:
                     order_detail.status = 5
+                order.status = 4
                 inventory.quantity += instance.quantity
                 inventory.save()
             instance.revocation = 'Y'
             instance.revocation_desc = revocation_desc if revocation_desc else None
             instance.save()
             order_detail.save()
+            order.save()
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
 
 
 class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
-    queryset = EquipWarehouseRecord.objects.all()
+    queryset = EquipWarehouseRecord.objects.filter(revocation='N')
     serializer_class = EquipWarehouseRecordSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
