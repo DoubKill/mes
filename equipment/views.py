@@ -2499,7 +2499,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
 
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
-        query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'],
+        query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
                                                        equip_warehouse_order_detail__equip_warehouse_order_id=data['equip_warehouse_order'],
                                                        equip_warehouse_location_id=data['equip_warehouse_location'])
         if status == 1:
@@ -2602,6 +2602,9 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
         equip_spare = self.request.query_params.get('equip_spare')
+        if self.request.query_params.get("detail"):
+            results = self.serializer_class(self.filter_queryset(self.queryset), many=True).data
+            return Response({'results': results})
         if equip_spare:  # 获取库存中备件的库区和库位
             first = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).first()  # 默认显示的库区和库位
             area = self.queryset.filter(equip_spare_id=equip_spare).values('equip_warehouse_area__area_name', 'equip_warehouse_area__id').distinct()
