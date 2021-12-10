@@ -2000,7 +2000,7 @@ class ReportValueView(APIView):
                 if ordering == equip_test_plan.count:
                     values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
                     values.update({'钢拔': round(values['钢拔'], 3)})
-                    current_test_detail.value = values
+                    current_test_detail.value = json.dumps(values, ensure_ascii=False)
                     current_test_detail.save()
                 else:
                     return Response('ok')
@@ -2037,12 +2037,12 @@ class ReportValueView(APIView):
                     values.update({'扯断强度': round(values['扯断强度'], 3)})
                     values.update({'伸长率%': round(values['伸长率%'], 3)})
                     values.update({'M300': round(values['M300'], 3)})
-                    current_test_detail.value = values
+                    current_test_detail.value = json.dumps(values, ensure_ascii=False)
                     current_test_detail.save()
                 else:
                     return Response('ok')
         else:
-            current_test_detail.value = data['value']
+            current_test_detail.value = json.dumps(data['value'])
             current_test_detail.raw_value = data['raw_value']
             current_test_detail.save()
 
@@ -2113,9 +2113,9 @@ class ReportValueView(APIView):
                 data_point_name = data_point
                 try:
                     if equip_test_plan.test_indicator_name == '门尼':
-                        test_value = Decimal(list(current_test_detail.value.values())[0]).quantize(Decimal('0.000'))
+                        test_value = Decimal(list(json.loads(current_test_detail.value).values())[0]).quantize(Decimal('0.000'))
                     else:
-                        test_value = dict(current_test_detail.value)[data_point_name]
+                        test_value = json.loads(current_test_detail.value)[data_point_name]
                 except Exception:
                     raise ValidationError('检测值数据错误')
 
