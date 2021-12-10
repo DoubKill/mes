@@ -2613,7 +2613,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 'location_id': first.equip_warehouse_location.id,
             }})
         if self.request.query_params.get('use'):
-            data = self.filter_queryset(self.queryset).values('equip_spare').annotate(qty=Sum('quantity')).values(
+            data = self.filter_queryset(self.queryset.filter(quantity__gt=0)).values('equip_spare').annotate(qty=Sum('quantity')).values(
                                             'equip_spare__equip_component_type__component_type_name',
                                             'equip_spare__spare_code',
                                             'equip_spare__spare_name',
@@ -2759,7 +2759,10 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 else:
                     order_detail.status = 2
                 order.status = 2
-                inventory.quantity -= instance.quantity
+                if inventory.quantity <= instance.quantity:
+                    inventory.quantity = 0
+                else:
+                    inventory.quantity -= instance.quantity
                 inventory.save()
             if instance.status == '出库':
                 inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_location=instance.equip_warehouse_location, equip_spare=instance.equip_spare).first()
