@@ -2543,7 +2543,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_warehouse_order_detail=instance,
                                                 created_user=self.request.user
                                                 )
-            return Response('入库成功')
+            return Response({"success": True, "message": '入库成功', "data": data})
 
         if status == 2:
             # 出库的时候，根据出库的数量，判断库区中数量够不够
@@ -2573,7 +2573,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 equip_warehouse_order_detail=instance,
                                                 created_user=self.request.user
                                                 )
-            return Response('出库成功')
+            return Response({"success": True, "message": '出库成功', "data": data})
 
 
 class EquipWarehouseInventoryViewSet(ModelViewSet):
@@ -2682,18 +2682,18 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
 
             elif handle == '删除':
                 quantity = queryset.first().quantity
-                queryset.delete()
+                queryset.update(delete_flag=True)
             # 记录履历
             EquipSpareMoveRecord.objects.create(
                 status=handle,
                 desc=data.get('desc'),
-                equip_warehouse_area=data.get('equip_warehouse_area__id'),
-                equip_warehouse_location=data.get('equip_warehouse_location__id'),
-                move_equip_warehouse_area=data['move_equip_warehouse_area__id'] if data.get('move_equip_warehouse_area__id') else None,
-                move_equip_warehouse_location=data['move_equip_warehouse_location__id'] if data.get('move_equip_warehouse_location__id') else None,
+                equip_warehouse_area=data.get('equip_warehouse_area__area_name'),
+                equip_warehouse_location=data.get('equip_warehouse_location__location_name'),
+                move_equip_warehouse_area=data['move_equip_warehouse_area__area_name'] if data.get('move_equip_warehouse_area__area_name') else None,
+                move_equip_warehouse_location=data['move_equip_warehouse_location__location_name'] if data.get('move_equip_warehouse_location__location_name') else None,
                 quantity=quantity if handle == '删除' else data.get('quantity'),
                 equip_spare_id=data.get('equip_spare'))
-            return Response('操作成功')
+            return Response({"success": True, "message": '操作成功', "data": data})
 
         else:
             return super().update(request, *args, **kwargs)
@@ -2835,266 +2835,65 @@ class EquipAutoPlanView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
-        # 入库单据接口
-        if self.request.query_params.get('in'):
-            order = EquipWarehouseOrder.objects.filter(status__in=[1, 2]).values('order_id')
-            return Response({"success": True, "message": None, "data": order})
-        if self.request.query_params.get('in_last'):
-            order = EquipWarehouseOrder.objects.filter(status=2).last()
-            if order:
-                return Response({"success": True, "message": None, "data": order.order_id})
-            return Response({"success": True, "message": None, "data": None})
-        if self.request.query_params.get('barcode'):
-            barcode = self.request.query_params.get('barcode')
-            obj = EquipWarehouseLocation.objects.filter(location_barcode=barcode).first()
-            if obj:
-                return Response({"success": True,
-                                 "message": None,
-                                 "data": {'area_name': obj.equip_warehouse_area.area_name,
-                                          'location_name': obj.location_name,
-                                          'equip_warehouse_area': obj.equip_warehouse_area.id,
-                                          'equip_warehouse_location': obj.id,
-                                          }})
-            return Response({"success": False, "message": "库位不存在", "data": None})
-        if self.request.query_params.get('area'):
-            data = EquipWarehouseArea.objects.filter(delete_flag=False).values('id', 'area_name')
-            return Response({"success": True, "message": None, "data": data})
-        if self.request.query_params.get('location'):
-            try:
-                location = int(self.request.query_params.get('location'))
-            except:
-                location = 0
-            if location:
-                data = EquipWarehouseLocation.objects.filter(delete_flag=False,
-                                                             equip_warehouse_area_id=location).values('id',
-                                                                                                      'equip_warehouse_area__area_name',
-                                                                                                      'location_name',
-                                                                                                      'location_barcode')
+
+        get_code = self.request.query_params.get('get_code')
+        # 扫描条码
+        spare_code = self.request.query_params.get('spare_code')
+        order_id = self.request.query_params.get('order_id')
+        if get_code:  # 获取入出库单据接口  1, 入库单据   2, 出库单据
+            if get_code == 1:
+                order = EquipWarehouseOrder.objects.filter(status__in=[1, 2]).values('id', 'order_id')
             else:
-                data = EquipWarehouseLocation.objects.filter(delete_flag=False).values('id',
-                                                                                       'equip_warehouse_area__area_name',
-                                                                                       'location_name',
-                                                                                       'location_barcode')
-            return Response({"success": True, "message": None, "data": data})
-        if self.request.query_params.get('location_barcode'):
-            """PDA盘库列表"""
-            spare_code = self.request.query_params.get('spare_detail')
-            location_barcode = self.request.query_params.get('location_barcode')
-            if spare_code:
-                data = EquipWarehouseInventory.objects.filter(equip_warehouse_location__location_barcode=location_barcode,
-                                                           equip_spare_id=int(spare_code)).values('id', 'one_piece', 'spare_code', 'lock')
-                for item in data:
-                    item['lock'] = '锁定' if item['lock'] else '正常'
-            else:
-                data = EquipWarehouseInventory.objects.filter(equip_warehouse_location__location_barcode=
-                                                       self.request.query_params.get('location_barcode')).\
-                    values('equip_spare').annotate(quantity=Sum('quantity')).values('equip_spare__spare_code',
-                                                                                    'equip_spare__spare_name',
-                                                                                    'equip_spare__equip_component_type__component_type_name',
-                                                                                    'equip_spare__unit',
-                                                                                    'quantity', 'equip_spare_id')
-            return Response({"success": True, "message": None, "data": data})
-
-        # 出库单据接口
-        if self.request.query_params.get('out'):
-            order = EquipWarehouseOrder.objects.filter(status__in=[4, 5]).values('order_id')
+                order = EquipWarehouseOrder.objects.filter(status__in=[4, 5]).values('id', 'order_id')
             return Response({"success": True, "message": None, "data": order})
-        if self.request.query_params.get('out_last'):
-            order = EquipWarehouseOrder.objects.filter(status=5).last()
-            return Response({"success": True, "message": None, "data": order.order_id})
-        if self.request.query_params.get('spare_code'):
-            spare_code = EquipWarehouseInventory.objects.filter(
-                spare_code=self.request.query_params.get('spare_code')).first()
-            if spare_code:
-                return Response({"success": True, "message": None, "data": spare_code.equip_spare.specification})
-
-    @atomic
-    def post(self, request, *args, **kwargs):
-        data = self.request.data
-        status = data.get('status')
-        spare_code = data.get('spare_code')  # 备件条码
-        in_quantity = data.get('in_quantity', 1)
-        out_quantity = data.get('out_quantity', 1)
-        id = data.get('id')
-        if id:
-            instance = EquipWarehouseInventory.objects.filter(id=id).first()
-            if status == 'del':
-                instance.delete_flag = True
-            elif status == 'lock':
-                instance.lock = True
-            elif status == 'unlock':
-                instance.lock = False
-            elif status == 'edit':
-                if isinstance(data.get('one_piece'), int):
-                    instance.one_piece = data.get('one_piece')
-            instance.save()
-            return Response({"success": True, "message": "执行成功", "data": {'one_piece': instance.one_piece,
-                                                                          'spare_code': instance.spare_code,
-                                                                          'lock': '锁定' if instance.lock else '正常'}})
-
-        if status == 1:
-            spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code, order_id=data['order_id']).first()
         else:
-            instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'])
-            if instance.count() == 0:
-                return Response({"success": False, "message": "所扫描的条码有误", "data": None})
-            spare_obj = False
-            for obj in instance:
-                spare_obj = EquipWarehouseInventory.objects.filter(spare_code=spare_code, equip_spare=obj.equip_spare).first()
-                if spare_obj:
-                        break
-        if not spare_obj:
-            return Response({"success": False, "message": "所扫描的条码有误", "data": None})
-        instance = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id'], status__in=[1, 2, 4, 5]).first()
-        if EquipWarehouseOrder.objects.filter(order_id=data['order_id'], status=6).exists():
-            return Response({"success": False, "message": "该单据已出库完成", "data": None})
+            if spare_code:  # 备件条码
+                order = EquipWarehouseOrderDetail.objects.filter(equip_spare__spare_code=spare_code,
+                                                                 equip_warehouse_order__order_id=order_id, delete_flag=False).first()
 
-        if status == 1:
-            if spare_obj.status == 1:  # 已入库
-                return Response({"success": False, "message": "该备件已入库", "data": {
-                    'specification': spare_obj.equip_spare.specification,
-                    'equip_warehouse_area': None,
-                    'equip_warehouse_location': None,
-                    'location_barcode': None
-                }})
-            if spare_obj.status == 2:  # 已出库
-                return Response({"success": False, "message": "该备件已出库", "data": {
-                    'specification': spare_obj.equip_spare.specification,
-                    'equip_warehouse_area': None,
-                    'equip_warehouse_location': None,
-                    'location_barcode': None
-                }})
-            # 判断库区类型 和 备件类型是否匹配
-            area_obj = EquipWarehouseArea.objects.filter(id=data['equip_warehouse_area']).first()
-            # spare_obj = data['equip_spare']
-            if EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj).count() != 0:
-                if not EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area=area_obj,
-                                                                  equip_component_type=spare_obj.equip_spare.equip_component_type).exists():
-                    return Response({"success": False,
-                                     "message": f'此库区不能存放{spare_obj.equip_spare.equip_component_type.component_type_name}类型的备件',
-                                     "data": None})
-
-
-            # 根据入库的数量修改状态
-            quantity = in_quantity + instance.in_quantity
-            if quantity > instance.order_quantity:
-                return Response({"success": False, "message": "超出单据中的可入库数量", "data": None})
-            if instance.order_quantity == quantity:
-                instance.in_quantity += in_quantity
-                instance.status = 3  # 入库完成
-            else:
-                instance.in_quantity += in_quantity
-                instance.status = 2  # 入库中
-            instance.save()
-
-            # 判断入库单据是否完成
-            order_list = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id']).all()
-            obj = EquipWarehouseOrder.objects.filter(order_id=data['order_id']).first()
-            for order in order_list:
-                if order.status != 3:
-                    obj.status = 2
-                    obj.save()
-                    break
+                obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
+                if order.status in [1, 2, 3]:
+                    quantity = order.plan_in_quantity
+                    #   获取库区和库位
+                    # 入库
+                    default = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0).first()
+                    area = EquipWarehouseArea.objects.filter(
+                        Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(
+                            warehouse_area__isnull=True)).values('id', 'area_name')
+                    location = None
+                    # 该备件可以存放的库区和库位
+                    if default:  # 默认显示的库区
+                        default = {'area_id': area[0]['id'] if area else None,
+                                 'area_name': area[0]['area_name'] if area else None}
+                    else:
+                        default = {'area_id': default.equip_warehouse_area.id,
+                                 'area_name': default.equip_warehouse_area.area_name,
+                                 'location_id': default.equip_warehouse_location.id,
+                                 'location_name': default.equip_warehouse_location.location_name}
                 else:
-                    obj.status = 3
-                    obj.save()
-            # 添加库存数据
-            EquipWarehouseInventory.objects.filter(spare_code=data['spare_code']).update(
-                quantity=in_quantity,
-                status=1,
-                equip_warehouse_area_id=data['equip_warehouse_area'],
-                equip_warehouse_location_id=data['equip_warehouse_location'],
-            )
-            # 记录履历
-            obj = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code']).first()
-            EquipWarehouseRecord.objects.create(status=1,
-                                                spare_code=data['spare_code'],
-                                                equip_warehouse_area_id=data['equip_warehouse_area'],
-                                                equip_warehouse_location_id=data['equip_warehouse_location'],
-                                                equip_spare=obj.equip_spare,
-                                                quantity=in_quantity,
-                                                equip_warehouse_order_detail=instance,
-                                                created_user=self.request.user
-                                                )
-            return Response({"success": True, "message": "入库成功", "data": {
-                    'specification': obj.equip_spare.specification,
-                    'equip_warehouse_area': None,
-                    'equip_warehouse_location': None,
-                    'location_barcode': None
-                }})
-        if status == 2:
-            if spare_obj.lock == 1:  # 已锁定
-                return Response({"success": False, "message": "该备件已锁定不能出库", "data": {
-                    'specification': spare_obj.equip_spare.specification,
-                    'equip_warehouse_area': None,
-                    'equip_warehouse_location': None,
-                    'location_barcode': None
-                }})
-            if spare_obj.status == 0:  # 未入库
-                return Response({"success": False, "message": "该备件还未入库", "data": {
-                    'specification': spare_obj.equip_spare.specification,
-                    'equip_warehouse_area': None,
-                    'equip_warehouse_location': None,
-                    'location_barcode': None
-                }})
-            if spare_obj.status == 2:  # 已出库
-                return Response({"success": False, "message": "该备件已出库", "data": {
-                    'specification': spare_obj.equip_spare.specification,
-                    'equip_warehouse_area': None,
-                    'equip_warehouse_location': None,
-                    'location_barcode': None
-                }})
-            # 根据出库的数量修改状态
-            if instance.plan_out_quantity == out_quantity + instance.out_quantity:
-                instance.out_quantity += out_quantity
-                instance.status = 6  # 出库完成
-            else:
-                instance.out_quantity += out_quantity
-                instance.status = 5  # 出库中
-            instance.lot_no = f'LOT{dt.date.today().strftime("%Y%m%d")}'
-            instance.save()
+                    quantity = order.plan_out_quantity
+                    # 出库时
+                    queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)
+                    default = queryset.filter(quantity__gt=0).first()
+                    area = queryset.values('equip_warehouse_area__area_name', 'equip_warehouse_area__id').distinct()
+                    location = queryset.values('equip_warehouse_location__location_name', 'equip_warehouse_location__id', 'equip_warehouse_area__id').distinct()
+                    default = {'area_id': default.equip_warehouse_area.id,
+                               'area_name': default.equip_warehouse_area.area_name,
+                               'location_id': default.equip_warehouse_location.id,
+                               'location_name': default.equip_warehouse_location.location_name}
 
-            # 判断出库单据是否完成
-            order_list = EquipWarehouseOrderDetail.objects.filter(order_id=data['order_id']).all()
-            obj = EquipWarehouseOrder.objects.filter(order_id=data['order_id']).first()
-            for order in order_list:
-                if order.status != 6:
-                    obj.status = 5
-                    obj.save()
-                    break
-                else:
-                    obj.status = 6
-                    obj.save()
-            # 减少库存数
-            inventory = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code'],
-                                                               status=1, delete_flag=False, lock=0,
-                                                               # equip_warehouse_location_id=data['equip_warehouse_location']
-                                                                   ).first()
-            if not inventory:
-                return Response({"success": False, "message": f'该库区下不存在条码为{data["spare_code"]}的物料', "data": None})
-            if inventory:
-                inventory.quantity = 0
-                inventory.status = 2
-                inventory.save()
-
-            # 记录履历
-            obj = EquipWarehouseInventory.objects.filter(spare_code=data['spare_code']).first()
-            EquipWarehouseRecord.objects.create(status=2, spare_code=data['spare_code'],
-                                                # equip_warehouse_area_id=data['equip_warehouse_area'],
-                                                # equip_warehouse_location_id=data['equip_warehouse_location'],
-                                                equip_warehouse_area=inventory.equip_warehouse_area,
-                                                equip_warehouse_location=inventory.equip_warehouse_location,
-                                                equip_spare=obj.equip_spare,
-                                                quantity=out_quantity,
-                                                equip_warehouse_order_detail=instance,
-                                                created_user=self.request.user
-                                                )
-            return Response({"success": True, "message": "出库成功", "data": {
-                'specification': inventory.equip_spare.specification,
-                'equip_warehouse_area': inventory.equip_warehouse_area.area_name,
-                'equip_warehouse_location': inventory.equip_warehouse_location.location_name,
-                'location_barcode': inventory.equip_warehouse_location.location_barcode
-            }})
+                data = {
+                    'id': order.id,
+                    "equip_warehouse_order": order.equip_warehouse_order,
+                    'spare_code': order.equip_spare.spare_code,
+                    'spare_name': order.equip_spare.spare_name,
+                    'quantity': quantity,
+                    'area': area,
+                    'location': location,
+                    'first': default,
+                    'equip_spare': order.equip_spare
+                }
+                return Response({"success": True, "message": None, "data": data})
 
 
 class EquipApplyRepairViewSet(ModelViewSet):
