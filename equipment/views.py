@@ -2539,7 +2539,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
 
             # if in_quantity > instance.plan_in_quantity - instance.in_quantity:
             #     return Response({"success": False, "message": '超过单据中的可入库数量', "data": None})
-            if instance.plan_in_quantity >= instance.in_quantity:
+            if instance.plan_in_quantity <= instance.in_quantity:
                 return Response({"success": False, "message": '该单据已入库完成', "data": None})
             if instance.in_quantity + in_quantity >= instance.plan_in_quantity:
                 instance.status = 3  # 已完成
