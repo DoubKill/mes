@@ -2852,14 +2852,14 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
 
             EquipWarehouseRecord.objects.create(
                 status='撤销',
-                revocation_desc=instance.revocation_desc,
                 equip_warehouse_area=instance.equip_warehouse_area,
                 equip_warehouse_location=instance.equip_warehouse_location,
                 equip_warehouse_order_detail=instance.equip_warehouse_order_detail,
                 now_quantity=now_quantity,
                 quantity=quantity,
                 equip_spare=instance.equip_spare,
-                created_user=self.request.user)
+                created_user=self.request.user,
+                revocation_desc=instance.revocation_desc,)
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
 
@@ -2963,7 +2963,7 @@ class EquipAutoPlanView(APIView):
 
                 else:  # 出库单据
                     quantity = order.plan_out_quantity
-                    queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code).first()
+                    queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)
                     default = queryset.filter(quantity__gt=0).first()
                     if not default:
                         return Response({"success": False, "message": '库存中不存在该备件', "data": None})
