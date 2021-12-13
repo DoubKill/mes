@@ -4789,11 +4789,50 @@ class WmsInventoryMaterialViewSet(GenericAPIView):
 class WMSStockSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
 
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '库存统计'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组', '数量', '重量/kg']
+
+        for col_num in range(len(columns)):
+            sheet.write(1, col_num, columns[col_num])
+            # 写入数据
+        data_row = 2
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['name'])
+            sheet.write(data_row, 2, i['code'])
+            sheet.write(data_row, 3, i['zc_material_code'])
+            sheet.write(data_row, 4, i['unit'])
+            sheet.write(data_row, 5, i['pdm'])
+            sheet.write(data_row, 6, i['group_name'])
+            sheet.write(data_row, 7, i['quantity'])
+            sheet.write(data_row, 8, i['weight'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
     def get(self, request):
         material_name = self.request.query_params.get('material_name')
         material_no = self.request.query_params.get('material_no')
         material_group_name = self.request.query_params.get('material_group_name')
         lower_only_flag = self.request.query_params.get('lower_only_flag')
+        export = self.request.query_params.get('export')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
@@ -4828,7 +4867,6 @@ class WMSStockSummaryView(APIView):
                 SUM ( a.WeightOfActual ) AS WeightOfActual,
                 SUM ( a.Quantity ) AS quantity
             from dbo.t_inventory_stock AS a
-            INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId
             group by
                  a.MaterialCode
             ) temp
@@ -4867,6 +4905,12 @@ class WMSStockSummaryView(APIView):
             result = list(filter(lambda x: x['flag'] == 'L', result))
         count = len(result)
         ret = result[st:et]
+        if export:
+            if export == '1':
+                data = ret
+            else:
+                data = result
+            return self.export_xls(data)
         return Response(
             {'results': ret, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
 
