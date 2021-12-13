@@ -2536,18 +2536,12 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                            equip_warehouse_order_detail__equip_warehouse_order_id=data[
                                                                'equip_warehouse_order'],
                                                            equip_warehouse_location_id=data['equip_warehouse_location']).first()
-            # queryset = EquipWarehouseAreaComponent.objects.filter(equip_warehouse_area_id=data['equip_warehouse_area'])
-            # if queryset.exists():
-            #     component_type = instance.equip_spare.equip_component_type
-            #     if not queryset.filter(equip_component_type=component_type).exists():
-            #         return Response({"success": False,
-            #                          "message": f"此库区不能存放{component_type.component_type_name}类型的备件",
-            #                          "data": None})
 
-            if in_quantity > instance.plan_in_quantity - instance.in_quantity:
-                return Response({"success": False, "message": '超过单据中的可入库数量', "data": None})
-
-            if instance.in_quantity + in_quantity == instance.plan_in_quantity:
+            # if in_quantity > instance.plan_in_quantity - instance.in_quantity:
+            #     return Response({"success": False, "message": '超过单据中的可入库数量', "data": None})
+            if instance.plan_in_quantity >= instance.in_quantity:
+                return Response({"success": False, "message": '该单据已入库完成', "data": None})
+            if instance.in_quantity + in_quantity >= instance.plan_in_quantity:
                 instance.status = 3  # 已完成
             elif instance.in_quantity + in_quantity < instance.plan_in_quantity:
                 instance.status = 2  # 入库中
@@ -2850,7 +2844,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
-            instance.revocation_desc = revocation_desc if revocation_desc else None
+            instance.revocation_desc = revocation_desc
             instance.save()
             order_detail.save()
             order.save()
@@ -2942,6 +2936,8 @@ class EquipAutoPlanView(APIView):
         if spare_code and order_id:  # 获取入库/出库备件信息
                 order = EquipWarehouseOrderDetail.objects.filter(equip_spare__spare_code=spare_code,
                                                                  equip_warehouse_order__order_id=order_id, delete_flag=False).first()
+                if not order:
+                    return Response({"success": False, "message": '条码扫描有误', "data": None})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
                 if order.status in [1, 2, 3]:  # 入库单据
                     quantity = order.plan_in_quantity
