@@ -744,24 +744,6 @@ class EquipWarehouseOrderDetail(AbstractEntity):
         return self.get_status_display()
 
 
-class EquipSpareMoveRecord(AbstractEntity):
-    """
-    盘库移库履历
-    """
-    status = models.CharField(max_length=12, help_text='盘库/移库/删除')
-    desc = models.TextField(help_text='描述', null=True, blank=True)
-    equip_warehouse_area = models.CharField(max_length=64, help_text='库区',null=True, blank=True)
-    equip_warehouse_location = models.CharField(max_length=64, help_text='库位',null=True, blank=True)
-    move_equip_warehouse_area = models.CharField(max_length=64, help_text='库区',null=True, blank=True)
-    move_equip_warehouse_location = models.CharField(max_length=64, help_text='库位',null=True, blank=True)
-    quantity = models.IntegerField(help_text='数量', default=0)
-    equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
-
-    class Meta:
-        db_table = 'equip_spare_move_record'
-        verbose_name = verbose_name_plural = '盘库移库履历'
-
-
 class EquipWarehouseInventory(AbstractEntity):
     """
     备件库存统计
@@ -781,22 +763,22 @@ class EquipWarehouseInventory(AbstractEntity):
 
 class EquipWarehouseRecord(AbstractEntity):
     """
-        备件库出入库履历
+        备件库操作履历
     """
     equip_warehouse_area = models.ForeignKey(EquipWarehouseArea, help_text='库区', on_delete=models.CASCADE)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE)
     equip_spare = models.ForeignKey(EquipSpareErp, help_text='备件代码', on_delete=models.CASCADE)
-    quantity = models.IntegerField(help_text='数量', default=1)
+    now_quantity = models.IntegerField(help_text='现存数量', default=0)
+    quantity = models.CharField(max_length=64, help_text='变更数量', default='0')
     revocation = models.CharField(max_length=12, help_text='是否撤销(Y/N)', default='N')
-    revocation_desc = models.TextField(help_text='撤销说明', null=True, blank=True)
+    revocation_desc = models.TextField(help_text='操作描述', null=True, blank=True)
     equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细',
-                                                     on_delete=models.CASCADE)
-    status = models.CharField(max_length=12, help_text='入库/出库', default='入库')
+                                                     on_delete=models.CASCADE, null=True, blank=True)
+    status = models.CharField(max_length=12, help_text='入库/出库/盘库/撤销/移库', default='入库')
 
     class Meta:
         db_table = 'equip_warehouse_record'
         verbose_name = verbose_name_plural = '备件库出入库履历'
-
 
 
 class EquipPlan(AbstractEntity):

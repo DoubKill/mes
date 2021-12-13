@@ -1318,7 +1318,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
 
     def get_all_qty(self, instance):
         res = EquipWarehouseInventory.objects.filter(equip_spare=instance.equip_spare, delete_flag=False).aggregate(all_qty=Sum('quantity'))
-        return res.get('all_qty')
+        return res.get('all_qty') if res.get('all_qty') else 0
 
 
 class EquipWarehouseOrderSerializer(BaseModelSerializer):
@@ -1459,19 +1459,9 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     def get_money(self, instance):
-        if instance.equip_spare.cost:
-            return round(instance.equip_spare.cost * instance.quantity, 2)
+        if instance.equip_spare.cost and instance.status in ['出库', '入库']:
+            return round(instance.equip_spare.cost * int(instance.quantity), 2)
         return 0
-
-
-class EquipWarehouseRecordDetailSerializer(BaseModelSerializer):
-    area_name = serializers.ReadOnlyField(source='equip_warehouse_area.area_name', help_text='库区')
-    location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
-
-    class Meta:
-        model = EquipWarehouseRecord
-        fields = ('spare_code', 'area_name', 'location_name', 'quantity', 'created_date', 'created_username')
-        read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class EquipPlanSerializer(BaseModelSerializer):
