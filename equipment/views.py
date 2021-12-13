@@ -2818,7 +2818,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         quantity = int(instance.quantity)
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
-            order = instance.equip_warehouse_order_detail.equip_warehouse_order
             if instance.status == '入库':
                 now_quantity = instance.now_quantity - quantity
                 inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=order_detail).first()
@@ -2827,7 +2826,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 else:
                     order_detail.status = 2
                 order_detail.in_quantity -= quantity
-                order.status = 2
+                EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=2)
                 if inventory.quantity <= quantity:
                     inventory.quantity = 0
                 else:
@@ -2841,14 +2840,13 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     order_detail.status = 4
                 else:
                     order_detail.status = 5
-                order.status = 4
+                EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=4)
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
-            # instance.revocation_desc = revocation_desc if revocation_desc else None
+            instance.revocation_desc = revocation_desc
             instance.save()
             order_detail.save()
-            order.save()
             # 记录履历
 
             EquipWarehouseRecord.objects.create(
@@ -2860,7 +2858,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 quantity=quantity,
                 equip_spare=instance.equip_spare,
                 created_user=self.request.user,
-                # revocation_desc=revocation_desc if revocation_desc else None
+                revocation_desc=revocation_desc
             )
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
