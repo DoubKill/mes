@@ -2845,23 +2845,23 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
-            # instance.revocation_desc = revocation_desc
+            instance.revocation_desc = revocation_desc
             instance.save()
             order_detail.save()
             order.save()
             # 记录履历
 
-            # EquipWarehouseRecord.objects.create(
-            #     status='撤销',
-            #     equip_warehouse_area=instance.equip_warehouse_area,
-            #     equip_warehouse_location=instance.equip_warehouse_location,
-            #     equip_warehouse_order_detail=instance.equip_warehouse_order_detail,
-            #     now_quantity=now_quantity,
-            #     quantity=quantity,
-            #     equip_spare=instance.equip_spare,
-            #     created_user=self.request.user,
-            #     revocation_desc=revocation_desc
-            # )
+            EquipWarehouseRecord.objects.create(
+                status='撤销',
+                equip_warehouse_area=instance.equip_warehouse_area,
+                equip_warehouse_location=instance.equip_warehouse_location,
+                equip_warehouse_order_detail=instance.equip_warehouse_order_detail,
+                now_quantity=now_quantity,
+                quantity=quantity,
+                equip_spare=instance.equip_spare,
+                created_user=self.request.user,
+                revocation_desc=revocation_desc
+            )
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
 
