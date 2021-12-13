@@ -2845,7 +2845,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
-            instance.revocation_desc = revocation_desc if revocation_desc else None
+            # instance.revocation_desc = revocation_desc if revocation_desc else None
             instance.save()
             order_detail.save()
             order.save()
@@ -2860,7 +2860,8 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 quantity=quantity,
                 equip_spare=instance.equip_spare,
                 created_user=self.request.user,
-                revocation_desc=revocation_desc if revocation_desc else None)
+                # revocation_desc=revocation_desc if revocation_desc else None
+            )
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
 
