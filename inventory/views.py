@@ -43,7 +43,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
-    OutBoundDeliveryOrderDetail, WMSReleaseLog
+    OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -55,7 +55,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer
+    OutBoundTasksSerializer, WmsInventoryMaterialSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -4743,3 +4743,139 @@ class OutBoundHistory(APIView):
         else:
             data = {}
         return Response(data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WmsInventoryMaterialViewSet(GenericAPIView):
+    DB = 'wms'
+    queryset = WmsInventoryMaterial.objects.all()
+    serializer_class = WmsInventoryMaterialSerializer
+
+    def get(self, request, *args, **kwargs):
+        queryset = WmsInventoryMaterial.objects.using(self.DB).all()
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
+        if material_name:
+            queryset = queryset.filter(material_name__icontains=material_name)
+        page = self.paginate_queryset(queryset)
+        serializer = WmsInventoryMaterialSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    def post(self, request):
+        material_nos = self.request.data.get('material_nos')
+        avg_consuming_weight = self.request.data.get('avg_consuming_weight')
+        avg_setting_weight = self.request.data.get('avg_setting_weight')
+        warning_days = self.request.data.get('warning_days')
+        if avg_consuming_weight:
+            defaults = {'avg_consuming_weight': avg_consuming_weight,
+                        'type': 1,
+                        'created_user': self.request.user}
+        elif avg_setting_weight:
+            defaults = {'avg_setting_weight': avg_setting_weight,
+                        'type': 2,
+                        'created_user': self.request.user}
+        else:
+            defaults = {'warning_days': warning_days,
+                        'created_user': self.request.user}
+        for material_no in material_nos:
+            obj, _ = WMSMaterialSafetySettings.objects.update_or_create(defaults=defaults, wms_material_code=material_no)
+            obj.save()
+        return Response('设置成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSStockSummaryView(APIView):
+    DATABASE_CONF = WMS_CONF
+
+    def get(self, request):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        material_group_name = self.request.query_params.get('material_group_name')
+        lower_only_flag = self.request.query_params.get('lower_only_flag')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+        if material_no:
+            if extra_where_str:
+                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+            else:
+                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+        if material_group_name:
+            if extra_where_str:
+                extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
+            else:
+                extra_where_str += "where m.MaterialGroupName='{}'".format(material_group_name)
+
+        sql = """
+                select
+            m.Name AS MaterialName,
+            m.MaterialCode,
+            m.ZCMaterialCode,
+            m.StandardUnit,
+            m.Pdm,
+            m.MaterialGroupName,
+            temp.quantity,
+            temp.WeightOfActual
+        from (
+            select
+                a.MaterialCode,
+                SUM ( a.WeightOfActual ) AS WeightOfActual,
+                SUM ( a.Quantity ) AS quantity
+            from dbo.t_inventory_stock AS a
+            INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId
+            group by
+                 a.MaterialCode
+            ) temp
+        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+
+        safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
+            F('wms_material_code'), F('warning_weight') * 1000))
+
+        total_quantity = total_weight = 0
+        result = []
+        for item in temp:
+            total_quantity += item[6]
+            total_weight += item[7]
+            data = {'name': item[0],
+                    'code': item[1],
+                    'zc_material_code': item[2],
+                    'unit': item[3],
+                    'pdm': item[4],
+                    'group_name': item[5],
+                    'quantity': item[6],
+                    'weight': item[7],
+                    }
+            weighting = safety_data.get(item[1])
+            if weighting:
+                if weighting < item[7]:
+                    data['flag'] = 'H'
+                else:
+                    data['flag'] = 'L'
+            else:
+                data['flag'] = None
+            result.append(data)
+        sc.close()
+        if lower_only_flag:
+            result = list(filter(lambda x: x['flag'] == 'L', result))
+        count = len(result)
+        ret = result[st:et]
+        return Response(
+            {'results': ret, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THInventoryMaterialViewSet(WmsInventoryMaterialViewSet):
+    DB = 'cb'
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THStockSummaryView(WMSStockSummaryView):
+    DATABASE_CONF = TH_CONF
