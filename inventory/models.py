@@ -215,9 +215,11 @@ class WmsInventoryMaterial(models.Model):
     # 原材料库分类表
     id = models.PositiveIntegerField(db_column='id', primary_key=True)
     material_no = models.CharField(max_length=64, db_column='MaterialCode')
+    material_name = models.CharField(max_length=128, db_column='Name')
     material_type = models.CharField(max_length=64, db_column='MaterialGroupName')
     pdm_no = models.CharField(max_length=64, db_column='Pdm')
     erp_material_no = models.CharField(max_length=64, db_column='ZCMaterialCode')
+    unit = models.CharField(max_length=64, db_column='StandardUnit')
 
     class Meta:
         db_table = 't_inventory_material'
@@ -1130,3 +1132,27 @@ class WMSReleaseLog(AbstractEntity):
     class Meta:
         db_table = 'wms_release_log'
         verbose_name_plural = verbose_name = '原材料立库放行记录'
+
+
+class WMSMaterialSafetySettings(AbstractEntity):
+    TYPE_CHOICE = (
+        (1, '日均用量计算值（吨）'),
+        (2, '日均用量设定值（吨）')
+    )
+    type = models.IntegerField(help_text='设定类别', choices=TYPE_CHOICE, default=1)
+    avg_consuming_weight = models.FloatField(help_text='日均用量计算值（吨）', default=0)
+    avg_setting_weight = models.FloatField(help_text='日均用量设定值（吨）', default=0)
+    wms_material_code = models.CharField(max_length=128, help_text='WMS物料编码')
+    warning_days = models.FloatField(help_text='预警天数', default=0)
+    warning_weight = models.FloatField(help_text='预警重量（吨）', default=0)
+
+    def save(self, *args, **kwargs):
+        if self.type == 1:
+            self.warning_weight = self.avg_consuming_weight * self.warning_days
+        else:
+            self.warning_weight = self.avg_setting_weight * self.warning_days
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = 'wms_material_safety'
+        verbose_name_plural = verbose_name = '原材料立库安全预警设置'

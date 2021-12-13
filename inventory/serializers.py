@@ -22,7 +22,7 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
-    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail
+    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1731,4 +1731,32 @@ class OutBoundTasksSerializer(BaseModelSerializer):
 
     class Meta:
         model = OutBoundDeliveryOrderDetail
+        fields = '__all__'
+
+
+class WmsInventoryMaterialSerializer(serializers.ModelSerializer):
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        ins = WMSMaterialSafetySettings.objects.filter(wms_material_code=data['material_no']).first()
+        if ins:
+            data['avg_consuming_weight'] = ins.avg_consuming_weight
+            data['avg_setting_weight'] = ins.avg_setting_weight
+            data['type'] = ins.type
+            data['warning_days'] = ins.warning_days
+            data['created_username'] = ins.created_user.username
+            data['created_time'] = ins.created_date
+            data['warning_weight'] = ins.warning_weight
+        else:
+            data['avg_consuming_weight'] = None
+            data['avg_setting_weight'] = None
+            data['type'] = None
+            data['warning_days'] = None
+            data['created_username'] = None
+            data['created_time'] = None
+            data['warning_weight'] = None
+        return data
+
+    class Meta:
+        model = WmsInventoryMaterial
         fields = '__all__'

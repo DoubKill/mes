@@ -119,6 +119,7 @@ router.register(r'sulfur-resume', SulfurResumeModelViewSet)
 # 硫磺PDA出入库
 router.register(r'sulfur-auto-plan', SulfurAutoPlanViewSet)
 
+
 urlpatterns = [
     path('', include(router.urls)),
     path('material-trace/', MaterialTraceView.as_view()),  # 原材料条码追溯
@@ -146,6 +147,8 @@ urlpatterns = [
     path('wms-release/', WMSRelease.as_view()),  # 原材料库质量放行处理
     path('wms-expire-list/', WMSExpireListView.as_view()),
     path('wms-expire-details/', WMSExpireDetailView.as_view()),
+    path('wms-safety-settings/', WmsInventoryMaterialViewSet.as_view()),
+    path('wms-stock-summsry/', WMSStockSummaryView.as_view()),
 
     # 炭黑出库
     path('th-storage-summary/', THStorageSummaryView.as_view()),  # 炭黑所有库存统计
@@ -160,6 +163,8 @@ urlpatterns = [
     path('th-release/', THRelease.as_view()),  # 炭黑库质量放行处理
     path('th-expire-list/', THExpireListView.as_view()),
     path('th-expire-details/', THExpireDetailView.as_view()),
+    path('th-safety-settings/', THInventoryMaterialViewSet.as_view()),
+    path('th-stock-summsry/', THStockSummaryView.as_view()),
 
     path('outbound-history/', OutBoundHistory.as_view()),
     # 胶料库内库存统计
