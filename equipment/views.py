@@ -2813,6 +2813,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
     @atomic
     def update(self, request, *args, **kwargs):  # 撤销
         revocation_desc = self.request.data.get('revocation_desc')
+
         instance = self.get_object()
         quantity = int(instance.quantity)
         if instance.created_user == self.request.user:
@@ -2844,7 +2845,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
-            instance.revocation_desc = revocation_desc
+            instance.revocation_desc = revocation_desc if revocation_desc else None
             instance.save()
             order_detail.save()
             order.save()
@@ -2859,7 +2860,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 quantity=quantity,
                 equip_spare=instance.equip_spare,
                 created_user=self.request.user,
-                revocation_desc=instance.revocation_desc,)
+                revocation_desc=revocation_desc if revocation_desc else None)
             return Response('撤销成功')
         return Response('只能撤销自己的单据')
 
