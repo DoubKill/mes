@@ -915,12 +915,14 @@ permission_data = [
     {'id': 708, 'code': 'add_equip_in_warehouse', 'name': '添加', 'parent_id': 706},
     {'id': 709, 'code': 'enter_equip_in_warehouse', 'name': '入库', 'parent_id': 706},
     {'id': 771, 'code': 'delete_equip_in_warehouse', 'name': '删除', 'parent_id': 706},
+    {'id': 775, 'code': 'change_equip_in_warehouse', 'name': '编辑', 'parent_id': 706},
 
     {'id': 710, 'code': 'equip_out_warehouse', 'name': '备件出库管理', 'parent_id': None},
     {'id': 711, 'code': 'view_equip_out_warehouse', 'name': '查看', 'parent_id': 710},
     {'id': 712, 'code': 'add_equip_out_warehouse', 'name': '添加', 'parent_id': 710},
     {'id': 713, 'code': 'outer_equip_out_warehouse', 'name': '出库', 'parent_id': 710},
     {'id': 772, 'code': 'delete_equip_out_warehouse', 'name': '删除', 'parent_id': 710},
+    {'id': 776, 'code': 'change_equip_out_warehouse', 'name': '编辑', 'parent_id': 710},
 
     {'id': 714, 'code': 'equip_warehouse_inventory', 'name': '备件库存查询', 'parent_id': None},
     {'id': 715, 'code': 'view_equip_warehouse_inventory', 'name': '查看', 'parent_id': 714},
@@ -975,7 +977,7 @@ permission_data = [
     {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
 
-    # 下一个权限id从771开始
+    # 下一个权限id从777开始
 ]
 
 
