@@ -2511,7 +2511,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
             if res:
                 return Response(res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1)))
             else:
-                return Response('CK' + str(dt.date.today().strftime('%Y%m%d')) + '00001')
+                return Response('CK' + str(dt.date.today().strftime('%Y%m%d')) + '0001')
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2645,7 +2645,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         equip_warehouse_location = self.request.query_params.get('equip_warehouse_location')
         if self.request.query_params.get("detail"):
             data = EquipWarehouseRecord.objects.filter(equip_spare_id=equip_spare,
-                                                          equip_warehouse_location_id=equip_warehouse_location)
+                                                          equip_warehouse_location_id=equip_warehouse_location).order_by('id')
             results = EquipWarehouseRecordSerializer(data, many=True).data
             return Response({'results': results})
         if equip_spare:  # 获取库存中备件的库区和库位
@@ -2840,7 +2840,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     order_detail.status = 4
                 else:
                     order_detail.status = 5
-                EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=4)
+                EquipWarehouseOrder.objects.filter(order_detail=order_detail).update(status=5)
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
@@ -2864,6 +2864,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         return Response('只能撤销自己的单据')
 
 
+@method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
     queryset = EquipWarehouseRecord.objects.filter(revocation='N')
     serializer_class = EquipWarehouseRecordSerializer
@@ -2962,7 +2963,7 @@ class EquipAutoPlanView(APIView):
                         de_location_id = location[0].get('id')
 
                 else:  # 出库单据
-                    quantity = order.plan_out_quantity
+                    quantity = order.plan_out_quantity - order.out_quantity
                     queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)
                     default = queryset.filter(quantity__gt=0).first()
                     if not default:
@@ -2996,16 +2997,10 @@ class EquipAutoPlanView(APIView):
                 'equip_warehouse_area__area_name',
                 'equip_warehouse_location__id',
                 'equip_warehouse_location__location_name',
-                'equip_spare__equip_component_type__component_type_name',
                 'equip_spare__spare_code',
                 'equip_spare__spare_name',
-                'equip_spare__specification',
-                'equip_spare__technical_params',
                 'quantity',
-                'equip_spare',
-                'equip_spare__unit',
-                'equip_spare__upper_stock',
-                'equip_spare__lower_stock').distinct()
+                'equip_spare').distinct()
             return Response({"success": True, "message": None, "data": data})
 
 
