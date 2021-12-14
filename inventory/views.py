@@ -4877,11 +4877,8 @@ class WMSStockSummaryView(APIView):
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
             F('wms_material_code'), F('warning_weight') * 1000))
 
-        total_quantity = total_weight = 0
         result = []
         for item in temp:
-            total_quantity += item[6]
-            total_weight += item[7]
             data = {'name': item[0],
                     'code': item[1],
                     'zc_material_code': item[2],
@@ -4903,6 +4900,8 @@ class WMSStockSummaryView(APIView):
         sc.close()
         if lower_only_flag:
             result = list(filter(lambda x: x['flag'] == 'L', result))
+        total_quantity = sum([item['quantity'] for item in result])
+        total_weight = sum([item['weight'] for item in result])
         count = len(result)
         ret = result[st:et]
         if export:
