@@ -914,22 +914,28 @@ permission_data = [
     {'id': 707, 'code': 'view_equip_in_warehouse', 'name': '查看', 'parent_id': 706},
     {'id': 708, 'code': 'add_equip_in_warehouse', 'name': '添加', 'parent_id': 706},
     {'id': 709, 'code': 'enter_equip_in_warehouse', 'name': '入库', 'parent_id': 706},
+    {'id': 771, 'code': 'delete_equip_in_warehouse', 'name': '删除', 'parent_id': 706},
+    {'id': 775, 'code': 'change_equip_in_warehouse', 'name': '编辑', 'parent_id': 706},
 
     {'id': 710, 'code': 'equip_out_warehouse', 'name': '备件出库管理', 'parent_id': None},
     {'id': 711, 'code': 'view_equip_out_warehouse', 'name': '查看', 'parent_id': 710},
     {'id': 712, 'code': 'add_equip_out_warehouse', 'name': '添加', 'parent_id': 710},
     {'id': 713, 'code': 'outer_equip_out_warehouse', 'name': '出库', 'parent_id': 710},
+    {'id': 772, 'code': 'delete_equip_out_warehouse', 'name': '删除', 'parent_id': 710},
+    {'id': 776, 'code': 'change_equip_out_warehouse', 'name': '编辑', 'parent_id': 710},
 
     {'id': 714, 'code': 'equip_warehouse_inventory', 'name': '备件库存查询', 'parent_id': None},
     {'id': 715, 'code': 'view_equip_warehouse_inventory', 'name': '查看', 'parent_id': 714},
     {'id': 716, 'code': 'export_equip_warehouse_inventory', 'name': '导出', 'parent_id': 714},
     {'id': 717, 'code': 'feed_equip_warehouse_inventory', 'name': '查询', 'parent_id': 714},
     {'id': 748, 'code': 'change_equip_warehouse_inventory', 'name': '盘库', 'parent_id': 714},
+    {'id': 773, 'code': 'move_equip_warehouse_inventory', 'name': '移库', 'parent_id': 714},
 
     {'id': 718, 'code': 'equip_warehouse_record', 'name': '备件出入库履历查询', 'parent_id': None},
     {'id': 719, 'code': 'view_equip_warehouse_record', 'name': '查看', 'parent_id': 718},
     {'id': 720, 'code': 'export_equip_warehouse_record', 'name': '导出', 'parent_id': 718},
     {'id': 721, 'code': 'feed_equip_warehouse_record', 'name': '查询', 'parent_id': 718},
+    {'id': 774, 'code': 'revocation_equip_warehouse_record', 'name': '撤销', 'parent_id': 718},
 
     {'id': 722, 'code': 'equip_warehouse_statistical', 'name': '备件出入库统计分析', 'parent_id': None},
     {'id': 723, 'code': 'view_equip_warehouse_statistical', 'name': '查看', 'parent_id': 722},
@@ -971,7 +977,7 @@ permission_data = [
     {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
 
-    # 下一个权限id从771开始
+    # 下一个权限id从777开始
 ]
 
 

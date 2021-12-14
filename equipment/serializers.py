@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import datetime, date
 
-from django.db.models import Max, Q
+from django.db.models import Max, Q, Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
@@ -1290,154 +1290,166 @@ class EquipWarehouseLocationSerializer(BaseModelSerializer):
         barcode = EquipWarehouseLocation.objects.filter(
             equip_warehouse_area=validated_data['equip_warehouse_area']).aggregate(
             location_barcode=Max('location_barcode'))
-        location_barcode = str('%04d' % (int(barcode['location_barcode'][5:]) + 1)) if barcode.get(
-            'location_barcode') else '0001'
+        location_barcode = str('%05d' % (int(barcode['location_barcode'][5:]) + 1)) if barcode.get(
+            'location_barcode') else '00001'
         area_barcode = validated_data['equip_warehouse_area'].area_barcode[2:]
         validated_data.update(location_barcode='KW' + area_barcode + location_barcode)
         instance = super().create(validated_data)
         return instance
 
 
+class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
+
+    spare_code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
+    spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
+    component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name',
+                                                    help_text='备件分类名称')
+    specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
+    technical_params = serializers.ReadOnlyField(source='equip_spare.technical_params', help_text='用途')
+    key_parts_flag = serializers.ReadOnlyField(source='equip_spare.key_parts_flag', help_text='是否关键部位')
+    unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
+    all_qty = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EquipWarehouseOrderDetail
+        fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification",
+            "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity",
+            "plan_out_quantity", "status", "status_name", "equip_warehouse_order", "equip_spare", "all_qty", "key_parts_flag")
+
+    def get_all_qty(self, instance):
+        res = EquipWarehouseInventory.objects.filter(equip_spare=instance.equip_spare, delete_flag=False).aggregate(all_qty=Sum('quantity'))
+        return res.get('all_qty') if res.get('all_qty') else 0
+
+
 class EquipWarehouseOrderSerializer(BaseModelSerializer):
-    equip_spare = serializers.ListField(help_text='备件列表', write_only=True)
+    equip_spare = serializers.ListField(default=[], write_only=True)
     order_id = serializers.CharField(help_text='单据条码', validators=[
         UniqueValidator(EquipWarehouseOrder.objects.all(), message='该条码已存在')])
+    order_detail = EquipWarehouseOrderDetailSerializer(many=True, read_only=True)
 
     class Meta:
         model = EquipWarehouseOrder
-        fields = ('id', 'order_id', 'submission_department', 'created_username', 'created_date', 'status', '_status',
-                  'equip_spare', 'work_order_no')
+        fields = ("id", "created_username", "order_id", "order_detail", "submission_department",
+        "status", "desc", "work_order_no", 'status_name', 'equip_spare', 'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
     @atomic
     def create(self, validated_data):
+        equip_spare_list = validated_data.pop('equip_spare')
+        desc = validated_data.get('desc') if validated_data.get('desc') else None
+        validated_data.update({'desc': desc})
+        order = super().create(validated_data)
         status = validated_data['status']
-        if status == 1:  # 入库单据
-            equip_spare_list = validated_data.pop('equip_spare')
-            if len(equip_spare_list) < 1:
-                raise serializers.ValidationError('请选择您要入库的物料')
-            validated_data['created_user'] = self.context['request'].user
-            order = super().create(validated_data)
-            for equip_sapre in equip_spare_list:
-                if not isinstance(equip_sapre['quantity'], int):
-                    raise serializers.ValidationError('入库数量必须为整数')
-                if not isinstance(equip_sapre['one_piece'], int):
-                    raise serializers.ValidationError('单件个数必须为整数')
-                detail = EquipWarehouseOrderDetail.objects.create(order_id=validated_data['order_id'],
-                                                                  equip_spare_id=equip_sapre['id'],
-                                                                  order_quantity=equip_sapre['quantity'],
-                                                                  status=status,
-                                                                  plan_out_quantity=0,
-                                                                  created_user=self.context["request"].user,
-                                                                  equip_warehouse_order=order,
-                                                                  )
-                # 自动生成备件条码
-                for i in range(equip_sapre['quantity']):
-                    begin_str = detail.equip_spare.spare_code + str(datetime.now().strftime('%Y%m%d'))
-                    obj = EquipWarehouseInventory.objects.filter(spare_code__startswith=begin_str).last()
-                    if obj:
-                        spare_code = obj.spare_code[:-4] + str('%04d' % (int(obj.spare_code[-4:]) + 1))
-                    else:
-                        spare_code = begin_str + '0001'
-                    EquipWarehouseInventory.objects.create(spare_code=spare_code,
-                                                           order_id=validated_data['order_id'],
-                                                           lock=0,
-                                                           equip_spare_id=equip_sapre['id'],
-                                                           quantity=1,
-                                                           one_piece=equip_sapre['one_piece'],
-                                                           created_user=self.context["request"].user,
-                                                           equip_warehouse_order_detail=detail
-                                                           )
+        for equip_sapre in equip_spare_list:
+            if not isinstance(equip_sapre['quantity'], int):
+                raise serializers.ValidationError('入库数量必须为整数')
+            if status == 1:  # 入库单据
+                kwargs = {
+                    'equip_spare_id': equip_sapre['id'],
+                    'plan_in_quantity': equip_sapre['quantity'],
+                    'status': status,
+                    'created_user': self.context["request"].user,
+                    'equip_warehouse_order': order
+                }
+            else:  # status == 4:  出库单据
+                kwargs = {
+                    'equip_spare_id': equip_sapre['id'],
+                    'plan_out_quantity': equip_sapre['quantity'],
+                    'status': status,
+                    'created_user': self.context["request"].user,
+                    'equip_warehouse_order': order
+                }
+            EquipWarehouseOrderDetail.objects.create(**kwargs)
+        return validated_data
 
-        if status == 4:  # 出库单据
-            equip_spare_list = validated_data.pop('equip_spare')
-            if len(equip_spare_list) < 1:
-                raise serializers.ValidationError('请选择您要出库的物料')
-            order = super().create(validated_data)
-            for equip_spare in equip_spare_list:
-                if not isinstance(equip_spare['quantity'], int):
-                    raise serializers.ValidationError('出库数量必须为整数')
-                EquipWarehouseOrderDetail.objects.create(
-                    order_id=validated_data['order_id'],
-                    equip_spare_id=equip_spare['id'],
-                    order_quantity=equip_spare['quantity'],
-                    status=status,
-                    plan_out_quantity=equip_spare['quantity'],
-                    created_user=self.context["request"].user,
-                    equip_warehouse_order=order,
-                )
+    @atomic
+    def update(self, instance, validated_data):
+        equip_spare_list = validated_data.pop('equip_spare')
+        desc = validated_data.get('desc') if validated_data.get('desc') else None
+        validated_data.update({'desc': desc})
+        # 备件列表
+        queryset = EquipWarehouseOrderDetail.objects.filter(equip_warehouse_order=instance)
+        dic = {}  # 提交过来的备件数组
+        state_lst = []  # 判断单据的状态
+        for equip_spare in equip_spare_list:
+            dic.update({equip_spare['id']: equip_spare['quantity']})
+            # 单据中新添加的备件
+            if not queryset.filter(equip_spare_id=equip_spare['id']).exists():
+                if instance.status in [1, 2, 3]:
+                    state_lst.append(1)
+                    EquipWarehouseOrderDetail.objects.create(equip_warehouse_order=instance,
+                                                             equip_spare_id=equip_spare['id'],
+                                                             plan_in_quantity=equip_spare['quantity'],
+                                                             created_user=self.context["request"].user,
+                                                             status=1)
+                else:
+                    state_lst.append(4)
+                    EquipWarehouseOrderDetail.objects.create(equip_warehouse_order=instance,
+                                                             equip_spare_id=equip_spare['id'],
+                                                             plan_out_quantity=equip_spare['quantity'],
+                                                             created_user=self.context["request"].user,
+                                                             status=4)
+
+        for obj in queryset:
+            if obj.equip_spare_id not in dic.keys():
+                obj.delete()
+            else:
+                if obj.status in [1, 2, 3]:  # 入库完成的也可以再次修改计划入库数量
+                    obj.plan_in_quantity = dic[obj.equip_spare_id]
+                    if dic[obj.equip_spare_id] == obj.in_quantity:
+                        obj.status = 3  # 已入库
+                        state_lst.append(3)
+                    elif dic[obj.equip_spare_id] > obj.in_quantity and obj.in_quantity:  # 计划入库数量 > 已入库的数量
+                        obj.status = 2  # 入库中
+                        state_lst.append(2)
+                    obj.save()
+                elif obj.status in [4, 5, 6]:
+                    obj.plan_out_quantity = dic[obj.equip_spare_id]
+                    if dic[obj.equip_spare_id] == obj.out_quantity:
+                        obj.status = 6  # 已出库
+                        state_lst.append(6)
+                    elif dic[obj.equip_spare_id] > obj.out_quantity and obj.out_quantity:  # 计划出库数量 > 已出库的数量
+                        obj.status = 5  # 出库中
+                        state_lst.append(5)
+                    obj.save()
+        if 2 in state_lst:
+            validated_data['status'] = 2
+        elif 3 in state_lst and 2 not in state_lst:
+            validated_data['status'] = 3
+        elif 5 in state_lst:
+            validated_data['status'] = 5
+        elif 6 in state_lst and 5 not in state_lst:
+            validated_data['status'] = 6
+        super().update(instance, validated_data)
         return validated_data
 
 
-class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
-    order_id = serializers.CharField(help_text='单据条码')
-    submission_department = serializers.ReadOnlyField(source='equip_warehouse_order.submission_department',
-                                                      help_text='提交部门')
-    spare__code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件代码')
-    spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
-    component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name',
-                                                    help_text='备件分类名称')
-    specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
-    technical_params = serializers.ReadOnlyField(source='equip_spare.technical_params', help_text='技术参数')
-    key_parts_flag = serializers.ReadOnlyField(source='equip_spare.key_parts_flag', help_text='是否关键部位')
-    equip_warehouse_order = serializers.ReadOnlyField(source='equip_warehouse_order_id', help_text='出入库单据')
-    order_quantity = serializers.IntegerField(help_text='总数量', default=0)
-    equip_warehouse_area = serializers.IntegerField(help_text='库区', write_only=True)
-    equip_warehouse_location = serializers.IntegerField(help_text='库位', write_only=True)
-    unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
-    status_name = serializers.SerializerMethodField()
-    spare_code_id = serializers.ReadOnlyField(source='equip_spare.id')
-    one_piece = serializers.IntegerField(write_only=True)
-    spare_code = serializers.CharField(help_text='备件条码', write_only=True)
-
-    class Meta:
-        model = EquipWarehouseOrderDetail
-        fields = '__all__'
-        read_only_fields = COMMON_READ_ONLY_FIELDS
-
-    def get_status_name(self, obj):
-        return obj.get_status_display()
-
-
 class EquipWarehouseInventorySerializer(BaseModelSerializer):
-    spare__code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件代码')
-    spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
-    component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name',
-                                                    help_text='备件分类名称')
-    specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
-    technical_params = serializers.ReadOnlyField(source='equip_spare.technical_params', help_text='技术参数')
-    unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
-    upper_stock = serializers.ReadOnlyField(source='equip_spare.upper_stock', help_text='库存上限')
-    lower_stock = serializers.ReadOnlyField(source='equip_spare.lower_stock', help_text='库存下限')
-    equip_spare = serializers.CharField(default='')
-    spare_code = serializers.CharField(default='')
+    order_id = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.order_id', help_text='出入库单号')
+
+    work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no',
+                                              help_text='工单编号')
 
     class Meta:
         model = EquipWarehouseInventory
-        fields = (
-            "id", "spare__code", "spare_code", "spare_name", "component_type_name", "specification", "technical_params",
-            "unit", "one_piece",
-            "upper_stock", "lower_stock", "equip_spare")
-
-    def update(self, instance, validated_data):
-        instance.one_piece = validated_data['one_piece']
-        instance.save()
-        return instance
+        fields = '__all__'
 
 
 class EquipWarehouseRecordSerializer(BaseModelSerializer):
-    order_id = serializers.ReadOnlyField(source='equip_warehouse_order_detail.order_id', help_text='单据条码')
+    order_id = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.order_id', help_text='出入库单号')
     submission_department = serializers.ReadOnlyField(
         source='equip_warehouse_order_detail.equip_warehouse_order.submission_department', help_text='提交部门')
-    spare__code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
+    spare_code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
     spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
     component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name',
                                                     help_text='备件分类名称')
     specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
+    technical_params = serializers.ReadOnlyField(source='equip_spare.technical_params', help_text='用途')
+    cost = serializers.ReadOnlyField(source='equip_spare.cost', help_text='单价')
     unit = serializers.ReadOnlyField(source='equip_spare.unit', help_text='单位')
+    money = serializers.SerializerMethodField()
     area_name = serializers.ReadOnlyField(source='equip_warehouse_area.area_name', help_text='库区')
     location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
-    _status = serializers.CharField(read_only=True)
     work_order_no = serializers.ReadOnlyField(source='equip_warehouse_order_detail.equip_warehouse_order.work_order_no',
                                               help_text='工单编号')
 
@@ -1446,15 +1458,10 @@ class EquipWarehouseRecordSerializer(BaseModelSerializer):
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
-
-class EquipWarehouseRecordDetailSerializer(BaseModelSerializer):
-    area_name = serializers.ReadOnlyField(source='equip_warehouse_area.area_name', help_text='库区')
-    location_name = serializers.ReadOnlyField(source='equip_warehouse_location.location_name', help_text='库位')
-
-    class Meta:
-        model = EquipWarehouseRecord
-        fields = ('spare_code', 'area_name', 'location_name', 'quantity', 'created_date', 'created_username')
-        read_only_fields = COMMON_READ_ONLY_FIELDS
+    def get_money(self, instance):
+        if instance.equip_spare.cost and instance.status in ['出库', '入库']:
+            return round(instance.equip_spare.cost * int(instance.quantity), 2)
+        return 0
 
 
 class EquipPlanSerializer(BaseModelSerializer):
