@@ -2299,8 +2299,10 @@ class MaterialDetailsAux(APIView):
 
     def get(self, request):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        from_mes = self.request.query_params.get('from_mes')
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
         recipe_info = classes_plan.product_batching.get_product_batch.get('material_name_weight')
-        return Response(recipe_info)
+        res = [item.get('material__material_name') for item in recipe_info] if from_mes else recipe_info
+        return Response(res)
