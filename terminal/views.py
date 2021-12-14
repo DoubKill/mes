@@ -22,12 +22,13 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip
 from inventory.models import MaterialOutHistory
+from mes import settings
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF
 from mes.derorators import api_recorder
 from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
-from production.models import PlanStatus, MaterialTankStatus
+from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
     WeighBatchingDetail
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
@@ -118,16 +119,17 @@ class BatchProductionInfoView(APIView):
         if classes:
             classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
-            last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
-                                                                           feed_end_time__isnull=False).last()
-            if last_feed_log:
-                actual_trains = last_feed_log.trains
-            else:
-                actual_trains = 0
             # 任务状态
             plan_status_info = PlanStatus.objects.using("SFJ").filter(
                 plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
+            if plan_status not in ['运行中', '等待']:
+                continue
+            actual_trains = 0
+            if plan_status == '运行中':
+                max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
+                current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
+                actual_trains = actual_trains if not max_trains else max_trains
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
@@ -138,22 +140,6 @@ class BatchProductionInfoView(APIView):
                     'classes': plan.work_schedule_plan.classes.global_name
                 }
             )
-            if plan_status == '运行中':
-                max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
-                    feed_log__plan_classes_uid=plan.plan_classes_uid).aggregate(
-                    max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
-                if max_feed_log_id:
-                    max_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(id=max_feed_log_id).first()
-                    if max_feed_log.feed_begin_time:
-                        trains = max_feed_log.trains + 1
-                    else:
-                        trains = max_feed_log.trains
-                else:
-                    trains = 1
-                current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
-                current_product_data['weight'] = 0
-                current_product_data['trains'] = trains
-
         return Response({'plan_actual_data': plan_actual_data,
                          'current_product_data': current_product_data})
 
@@ -170,7 +156,8 @@ class BatchProductBatchingVIew(APIView):
         if not classes_plan:
             raise ValidationError('该计划不存在')
         # 配方信息
-        ret = classes_plan.product_batching.get_product_batch
+        ret_info = classes_plan.product_batching.get_product_batch
+        ret = ret_info['material_name_weight']
         if not ret:
             raise ValidationError(f'mes中未找到该机型配方:{classes_plan.product_batching.stage_product_batch_no}')
         # 加载物料标准信息
@@ -267,36 +254,39 @@ class LoadMaterialLogViewSet(TerminalCreateAPIView,
         else:
             return LoadMaterialLogCreateSerializer
 
+    @atomic
     def update(self, request, *args, **kwargs):
         self.queryset = LoadTankMaterialLog.objects.all()
         left_weight = request.data.get('adjust_left_weight')
         batch_material = self.get_object()
         # 修改数量机台和使用机台不相同时, 不可修改
-        last_bra_code_info = LoadTankMaterialLog.objects.filter(bra_code=batch_material.bra_code).last()
-        if last_bra_code_info.plan_classes_uid != batch_material.plan_classes_uid:
+        last_bra_code_info = LoadTankMaterialLog.objects.filter(bra_code=batch_material.bra_code)
+        if last_bra_code_info.last().plan_classes_uid != batch_material.plan_classes_uid:
             return response(success=False, message='该物料(条码)已在其他计划中使用, 本计划不可修改')
         if batch_material.unit == '包' and int(left_weight) != left_weight:
             return response(success=False, message='包数应为整数')
-        serializer = self.get_serializer(batch_material, data=request.data)
-        if not serializer.is_valid():
-            return response(success=False, message=list(serializer.errors.values())[0][0])
-        # 获得本次修正量,修改真正计算的总量
-        change_num = float(batch_material.adjust_left_weight) - left_weight
-        variety = float(batch_material.variety) - change_num
-        # 数量变换取值[累加](包数：[负整框:10], 重量：[负整框:100])
-        beyond = 10 if batch_material.unit == '包' else 100
-        if variety > beyond or variety + float(batch_material.init_weight) < 0:
-            return response(success=False, message='修改值达到上限,不可修改')
-        batch_material.variety = float(batch_material.variety) - change_num
-        batch_material.real_weight = float(batch_material.real_weight) - change_num
-        batch_material.adjust_left_weight = batch_material.real_weight
-        batch_material.useup_time = datetime.datetime.now() if left_weight == 0 else '1970-01-01 00:00:00'
-        batch_material.save()
-        # 增加修改履历
-        MaterialChangeLog.objects.create(**{'bra_code': batch_material.bra_code,
-                                            'material_name': batch_material.material_name,
-                                            'created_time': datetime.datetime.now(),
-                                            'qty_change': -change_num})
+        update_records = last_bra_code_info.filter(plan_classes_uid=batch_material.plan_classes_uid)
+        for records in update_records:
+            serializer = self.get_serializer(records, data=request.data)
+            if not serializer.is_valid():
+                return response(success=False, message=list(serializer.errors.values())[0][0])
+            # 获得本次修正量,修改真正计算的总量
+            change_num = float(records.adjust_left_weight) - left_weight
+            variety = float(records.variety) - change_num
+            # 数量变换取值[累加](包数：[负整框:10], 重量：[负整框:100])
+            beyond = 10 if records.unit == '包' else 100
+            if variety > beyond or variety + float(records.init_weight) < 0:
+                return response(success=False, message='修改值达到上限,不可修改')
+            records.variety = float(records.variety) - change_num
+            records.real_weight = float(records.real_weight) - change_num
+            records.adjust_left_weight = records.real_weight
+            records.useup_time = datetime.datetime.now() if left_weight == 0 else '1970-01-01 00:00:00'
+            records.save()
+            # 增加修改履历
+            MaterialChangeLog.objects.create(**{'bra_code': records.bra_code,
+                                                'material_name': records.material_name,
+                                                'created_time': datetime.datetime.now(),
+                                                'qty_change': -change_num})
         return response(success=True, message='修正成功')
 
 
@@ -706,7 +696,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             details = WeightPackageManualSerializer(manual).data
         else:  # 原材料扫码
             try:
-                res = material_out_barcode(scan_bra_code)
+                res = material_out_barcode(scan_bra_code) if not settings.DEBUG else None
             except Exception as e:
                 raise ValidationError(e)
             if res:
@@ -2301,3 +2291,16 @@ class ToleranceRuleViewSet(CommonDeleteMixin, ModelViewSet):
     pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class MaterialDetailsAux(APIView):
+    """提供一个接口返回mes配方详情"""
+
+    def get(self, request):
+        plan_classes_uid = self.request.query_params.get('plan_classes_uid')
+        classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
+        if not classes_plan:
+            return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
+        recipe_info = classes_plan.product_batching.get_product_batch.get('material_name_weight')
+        return Response(recipe_info)

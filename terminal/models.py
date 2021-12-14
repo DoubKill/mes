@@ -144,8 +144,8 @@ class OtherMaterialLog(models.Model):
     material_name = models.CharField(max_length=64, help_text='物料名称', null=True)
     plan_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='单重', default=0)
     bra_code = models.CharField(max_length=64, help_text='条形码')
-    status = models.BooleanField(help_text='使用状态', default='N')
-    other_type = models.CharField(max_length=64, help_text='物料类别: 细料, 硫磺, 炭黑, 油料', null=True, blank=True)
+    status = models.BooleanField(help_text='使用状态', default=False)
+    other_type = models.CharField(max_length=64, help_text='物料类别: 胶皮、胶块、人工配、机配、待处理料、掺料', null=True, blank=True)
 
     class Meta:
         db_table = 'other_material_log'
@@ -254,6 +254,7 @@ class LoadTankMaterialLog(AbstractEntity):
     adjust_left_weight = models.DecimalField(decimal_places=2, max_digits=8, help_text='调整剩余重量', default=0)
     single_need = models.DecimalField(decimal_places=2, max_digits=8, help_text='单车需要物料数量', null=True, blank=True)
     variety = models.DecimalField(decimal_places=2, max_digits=8, help_text='物料修改变化量', null=True, blank=True, default=0)
+    scan_material_type = models.CharField(max_length=64, help_text='上料物料所属类别', null=True, blank=True)
 
     class Meta:
         db_table = 'load_tank_material_log'
@@ -271,7 +272,7 @@ class ReplaceMaterial(AbstractEntity):
     material_type = models.CharField(max_length=64, help_text='扫码物料类别')
     bra_code = models.CharField(max_length=64, help_text='实际投入物料条码')
     status = models.CharField(max_length=8, help_text='状态:已处理,未处理')
-    result = models.BooleanField(help_text='处理结果', null=True, blank=True)
+    result = models.BooleanField(help_text='处理结果', default=False)
 
     class Meta:
         db_table = 'replace_material'
@@ -479,7 +480,7 @@ class Plan(models.Model):
     order_by = models.IntegerField(blank=True, help_text='写1', null=True)
     date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
     addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
-    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    merge_flag = models.BinaryField(help_text='是否合包', default=False)
 
     class Meta:
         managed = False
@@ -511,7 +512,7 @@ class RecipePre(models.Model):
     error = models.DecimalField(max_digits=5, help_text='总误差，界面写入', decimal_places=3, blank=True, null=True)
     time = models.CharField(max_length=19, help_text='修改时间', blank=True, null=True)
     use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
-    merge_flag = models.BooleanField(help_text='是否合包', default=False)
+    merge_flag = models.BinaryField(help_text='是否合包', default=False)
     split_count = models.IntegerField(help_text='机配分包数', default=1)
 
     class Meta:
@@ -641,6 +642,17 @@ class WeightPackageManual(AbstractEntity):
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
     weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_manual')
+
+    @property
+    def manual_weight_names(self):
+        data = {}
+        for item in self.package_details.values('material_name', 'standard_weight'):
+            data[item['material_name']+'人工配'] = item['standard_weight']
+        return data
+
+    @property
+    def detail_material_names(self):
+        return self.package_details.all().values_list('material_name', flat=True)
 
     class Meta:
         db_table = 'weight_package_manual'

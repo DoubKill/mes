@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Sum, F, Q
 
 from basics.models import GlobalCode, Equip, EquipCategoryAttribute
+from mes import settings
 from system.models import AbstractEntity, User
 
 
@@ -166,40 +167,61 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
-    # 留存
-    # @property
-    # def get_product_batch(self):
-    #     material_name_weight = []
-    #     # 获取机型配方
-    #     product_batch = ProductBatching.objects.filter(stage_product_batch_no=self.stage_product_batch_no, used_type=4,
-    #                                                    dev_type__category_no=self.dev_type.category_no, batching_type=2).first()
-    #     if product_batch:
-    #         # 获取配方里物料名称和重量 隐藏细料硫磺
-    #         material_name_weight += list(ProductBatchingDetail.objects.filter(~Q(material__material_name__icontains='-细料'),
-    #                                                                           ~Q(material__material_name__icontains='-硫磺'),
-    #                                                                           ~Q(material__material_name__icontains='掺料'),
-    #                                                                           ~Q(material__material_name__in=['细料', '硫磺']),
-    #                                                                           delete_flag=False, type=1,
-    #                                                                           product_batching=product_batch.id)
-    #                                      .values('material__material_name', 'actual_weight'))
-    #         # 隐藏细料硫磺
-    #         # material_name_weight += list(WeighCntType.objects.filter(delete_flag=False, product_batching=product_batch.id)
-    #         #                              .values(material__material_name=F('name'), actual_weight=F('package_cnt')))
-    #
-    #     return material_name_weight
-
     @property
     def get_product_batch(self):
-        material_name_weight = []
-        # 获取配方里物料名称和重量 隐藏细料硫磺
-        hide_materials = GlobalCode.objects.filter(delete_flag=False, use_flag=True, global_type__type_name='投料屏蔽物料',
-                                                   global_type__use_flag=True).values_list('global_name', flat=True)
-        query_set = self.batching_details.filter(delete_flag=False, type=1)
-        if hide_materials:
-            for h_material in hide_materials:
-                query_set = query_set.exclude(material__material_name__icontains=h_material)
-        material_name_weight += list(query_set.values('material__material_name', 'actual_weight'))
-        return material_name_weight
+        from terminal.models import Plan, RecipePre, RecipeMaterial, WeightPackageManual, WeightPackageLog, LoadTankMaterialLog
+        # 胶料
+        material_name_weight = list(self.batching_details.filter(delete_flag=False, type=1).values('material__material_name', 'actual_weight'))
+        # 料包
+        weight_cnt = self.weight_cnt_types.first()
+        # 计划、机台、合包、全手工、全机配
+        xl_plan, batching_equip, merge_flag, only_manual, only_machine = None, None, None, False, False
+        # 机配分包数、手工配分包数、机配物料
+        split_machine, split_manual, machine_material = 1, 1, []
+        if weight_cnt:
+            # 细料/硫磺
+            prefix = 'S' if weight_cnt.weigh_type == 1 else 'F'
+            batching_equip_list = [k for k, v in settings.DATABASES.items() if 'YK_XL' in v['NAME'] and k.startswith(prefix)]
+            if not batching_equip_list:
+                raise ValueError(f'称量系统{prefix}数据库连接未配置')
+            for batching_equip in batching_equip_list:
+                xl_plan = Plan.objects.using(batching_equip).filter(recipe__startswith=self.stage_product_batch_no, recipe__icontains=self.dev_type.category_name).last()
+                if xl_plan:
+                    batching_equip = batching_equip
+                    break
+            if not xl_plan:  # 全部人工配
+                use_code = LoadTankMaterialLog.objects.filter(bra_code__startswith=f'MM').values_list('bra_code', flat=True)
+                old_code = WeightPackageManual.objects.filter(~Q(bra_code__in=use_code), product_no=self.stage_product_batch_no, dev_type=self.dev_type).first()  # 最旧一条未使用机配物料
+                only_manual = True
+                split_manual = split_manual if not old_code else old_code.split_num
+            else:
+                machine_material = RecipeMaterial.objects.using(batching_equip).filter(recipe_name__startswith=self.stage_product_batch_no, recipe_name__icontains=self.dev_type.category_name)
+                if machine_material.count() == len(weight_cnt.weighting_material_nos):  # 全机配物料
+                    recipe_now = RecipePre.objects.filter(name=xl_plan.recipe).first()
+                    only_machine, split_machine = True, recipe_now.split_count
+                else:
+                    use_machine = LoadTankMaterialLog.objects.filter(bra_code__startswith=f'M{prefix}').values_list('bra_code', flat=True)
+                    old_machine = WeightPackageLog.objects.filter(~Q(bra_code__in=use_machine), product_no__startswith=self.stage_product_batch_no, dev_type=self.dev_type.category_name).first()  # 最旧一条未使用机配物料
+                    use_manual = LoadTankMaterialLog.objects.filter(bra_code__startswith=f'MM').values_list('bra_code', flat=True)
+                    old_manual = WeightPackageManual.objects.filter(~Q(bra_code__in=use_manual), product_no=self.stage_product_batch_no, dev_type=self.dev_type).first()  # 最旧一条未使用机配物料
+                    merge_flag = False if not old_machine else old_machine.merge_flag
+                    split_manual = split_manual if not old_manual else old_manual.split_num
+                    split_machine = split_machine if not old_machine else old_machine.split_count
+            if merge_flag:  # 合包显示总细料包
+                material_name_weight.append({'material__material_name': weight_cnt.name, 'actual_weight': split_machine})
+            else:  # 不合包
+                if only_manual:  # 全人工配
+                    for item in weight_cnt.weighting_material_nos:
+                        material_name_weight.append({'material__material_name': item + '人工配', 'actual_weight': split_manual})
+                elif only_machine:  # 全机配
+                    material_name_weight.append({'material__material_name': self.stage_product_batch_no + '机配', 'actual_weight': split_machine})
+                else:  # 手工+机配
+                    material_name_weight.append({'material__material_name': self.stage_product_batch_no + '机配', 'actual_weight': split_machine})
+                    manual_materials = set(weight_cnt.weighting_material_nos) - set(machine_material.values_list('name', flat=True))
+                    for manual in manual_materials:
+                        material_name_weight.append({'material__material_name': manual + '人工配', 'actual_weight': split_manual})
+        return {'material_name_weight': material_name_weight, 'merge_flag': merge_flag, 'only_manual': only_manual,
+                'only_machine': only_machine, 'batching_equip': batching_equip, 'xl_plan': xl_plan, 'machine_material': machine_material}
 
     class Meta:
         db_table = 'product_batching'

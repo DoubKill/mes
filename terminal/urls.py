@@ -17,7 +17,8 @@ from terminal.views import BatchBasicInfoView, BatchProductionInfoView, BatchPro
     CarbonFeedingPromptViewSet, PowderTankSettingViewSet, OilTankSettingViewSet, PowderTankBatchingView, \
     FeedingErrorLampForCarbonView, FeedingOperateResultForCarbonView, CarbonOutCheckView, CarbonOutTaskView, \
     MaterialInfoIssue, ReplaceMaterialViewSet, ReturnRubberViewSet, ToleranceKeyword, ToleranceRuleViewSet, \
-    WeightPackageManualViewSet, GetManualInfo, WeightPackageSingleViewSet, GetMaterialTolerance, UpdateFlagCountView
+    WeightPackageManualViewSet, GetManualInfo, WeightPackageSingleViewSet, GetMaterialTolerance, UpdateFlagCountView, \
+    MaterialDetailsAux
 
 router = DefaultRouter()
 router.register('batch-log', LoadMaterialLogViewSet)  # 终端投料履历管理
@@ -79,5 +80,6 @@ urlpatterns = [
     path('xl-report-basic/', ReportBasicView.as_view()),  # 称量车次报表列表
     path('xl-report-weight/', ReportWeightView.as_view()),  # 物料消耗报表
 
-    path('material-info-issue/', MaterialInfoIssue.as_view())
+    path('material-info-issue/', MaterialInfoIssue.as_view()),
+    path('material-details-aux/', MaterialDetailsAux.as_view())  # mes提供一个接口返回配方详情给群控
 ]
