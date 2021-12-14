@@ -2530,15 +2530,10 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         out_quantity = data.get('out_quantity', 1)
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
+        query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
+                                                       equip_warehouse_location_id=data[
+                                                           'equip_warehouse_location']).first()
         if status == 1:
-            # 判断库区类型 和 备件类型是否匹配
-            query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
-                                                           equip_warehouse_order_detail__equip_warehouse_order_id=data[
-                                                               'equip_warehouse_order'],
-                                                           equip_warehouse_location_id=data['equip_warehouse_location']).first()
-
-            # if in_quantity > instance.plan_in_quantity - instance.in_quantity:
-            #     return Response({"success": False, "message": '超过单据中的可入库数量', "data": None})
             if instance.plan_in_quantity <= instance.in_quantity:
                 return Response({"success": False, "message": '该单据已入库完成', "data": None})
             if instance.in_quantity + in_quantity >= instance.plan_in_quantity:
@@ -2549,16 +2544,13 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             instance.save()
 
             if query:
-                now_quantity = query.quantity + in_quantity
                 query.quantity += in_quantity
                 query.save()
             else:
-                now_quantity = in_quantity
-                EquipWarehouseInventory.objects.create(
+                query = EquipWarehouseInventory.objects.create(
                     created_user=self.request.user,
                     equip_spare=instance.equip_spare,
                     quantity=in_quantity,
-                    equip_warehouse_order_detail=instance,
                     equip_warehouse_area_id=data['equip_warehouse_area'],
                     equip_warehouse_location_id=data['equip_warehouse_location']
                 )
@@ -2569,7 +2561,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 EquipWarehouseOrder.objects.filter(order_detail=instance).update(status=3)
             # 记录履历
             EquipWarehouseRecord.objects.create(status='入库',
-                                                now_quantity=now_quantity,
+                                                now_quantity=query.quantity,
                                                 equip_warehouse_area_id=data['equip_warehouse_area'],
                                                 equip_warehouse_location_id=data['equip_warehouse_location'],
                                                 equip_spare=instance.equip_spare,
@@ -2579,8 +2571,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 )
             return Response({"success": True, "message": '入库成功', "data": data})
         if status == 2:
-            query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
-                                                           equip_warehouse_location_id=data['equip_warehouse_location']).first()
             # 出库的时候，根据出库的数量，判断库区中数量够不够
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
@@ -2592,7 +2582,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             else:
                 instance.out_quantity += out_quantity
                 instance.status = 5  # 出库中
-            now_quantity = query.quantity - out_quantity
             query.quantity -= out_quantity
             query.save()
             instance.save()
@@ -2605,7 +2594,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status='出库',
-                                                now_quantity=now_quantity,
+                                                now_quantity=query.quantity,
                                                 equip_warehouse_area_id=data['equip_warehouse_area'],
                                                 equip_warehouse_location_id=data['equip_warehouse_location'],
                                                 equip_spare=instance.equip_spare,
@@ -2716,19 +2705,15 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
         handle = self.request.data.get('handle')
         data = self.request.data
-        queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id'])
+        inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id']).first()
         if handle:
             # 盘库
             if handle == '盘库':
                 quantity = data.get('quantity')
-                now_quantity = data.get('quantity')
-                queryset.update(quantity=data['quantity'])
+                inventory.quantity = data['quantity']
             elif handle == '移库':
                 quantity = f"-{data.get('quantity')}"
-                old = queryset.first()
-                now_quantity = old.quantity - data['quantity']
-                old.quantity -= data['quantity']
-                old.save()
+                inventory.quantity -= data['quantity']
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
                     new = new_queryset.first()
@@ -2751,10 +2736,12 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                     equip_spare_id=data.get('equip_spare'),
                     created_user=self.request.user),
             elif handle == '删除':
-                now_quantity = 0
-                quantity = queryset.first().quantity
-                queryset.update(delete_flag=True)
+                inventory.quantity = 0
+                quantity = inventory.quantity
+                inventory.delete_flag = True
             # 记录履历
+            inventory.save()
+            now_quantity = inventory.quantity
             EquipWarehouseRecord.objects.create(
                 status=handle,
                 revocation_desc=data.get('desc'),
@@ -2827,7 +2814,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
             if instance.status == '入库':
-                now_quantity = instance.now_quantity - quantity
                 if order_detail.in_quantity == quantity:
                     order_detail.status = 1
                 else:
@@ -2840,7 +2826,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     inventory.quantity -= quantity
                 inventory.save()
             if instance.status == '出库':
-                now_quantity = inventory.quantity + quantity
                 order_detail.out_quantity -= quantity
                 if order_detail.out_quantity == quantity:
                     order_detail.status = 4
@@ -2852,13 +2837,12 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
             EquipWarehouseRecord.objects.filter(id=instance.id).update(revocation='Y')
             order_detail.save()
             # 记录履历
-
             EquipWarehouseRecord.objects.create(
                 status='撤销',
                 equip_warehouse_area=instance.equip_warehouse_area,
                 equip_warehouse_location=instance.equip_warehouse_location,
                 equip_warehouse_order_detail=instance.equip_warehouse_order_detail,
-                now_quantity=now_quantity,
+                now_quantity=inventory.quantity,
                 quantity=quantity,
                 equip_spare=instance.equip_spare,
                 created_user=self.request.user,

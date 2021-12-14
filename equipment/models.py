@@ -754,7 +754,6 @@ class EquipWarehouseInventory(AbstractEntity):
                                              blank=True)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE,
                                                  null=True, blank=True)
-    equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_inventory'
