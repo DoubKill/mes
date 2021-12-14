@@ -2703,8 +2703,6 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         count = len(data)
-        if self.request.query_params.get('pda'):
-            return Response({"success": True, "message": None, "data": data})
         return Response({'results': data[st:et], 'count': count})
 
     @atomic
