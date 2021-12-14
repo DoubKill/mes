@@ -2644,8 +2644,15 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         equip_spare = self.request.query_params.get('equip_spare')
         equip_warehouse_location = self.request.query_params.get('equip_warehouse_location')
         if self.request.query_params.get("detail"):
-            data = EquipWarehouseRecord.objects.filter(equip_spare_id=equip_spare,
+            queryset = EquipWarehouseRecord.objects.filter(equip_spare_id=equip_spare,
                                                           equip_warehouse_location_id=equip_warehouse_location).order_by('id')
+
+            if queryset.filter(status='盘库').exists():
+                last_date = queryset.filter(status='盘库').last().last_updated_date
+                data = queryset.filter(last_updated_date__gte=last_date).order_by('id')
+            else:
+                data = queryset
+            # 只显示最后一次盘库到当前时间的记录
             results = EquipWarehouseRecordSerializer(data, many=True).data
             return Response({'results': results})
         if equip_spare:  # 获取库存中备件的库区和库位
@@ -2843,7 +2850,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                 inventory.quantity += quantity
                 inventory.save()
             instance.revocation = 'Y'
-            instance.revocation_desc = revocation_desc if revocation_desc else None
             instance.save()
             order_detail.save()
             # 记录履历
@@ -2892,7 +2898,7 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
             results = self.serializer_class(self.filter_queryset(self.queryset), many=True).data
             return Response({'results': results})
         else:
-            results = self.filter_queryset(self.get_queryset()).values('equip_spare').annotate(
+            results = self.filter_queryset(self.queryset.filter(status__in=['入库', '出库'])).values('equip_spare').annotate(
                 in_qty=Sum('quantity', distinct=True, filter=Q(status='入库')),
                 out_qty=Sum('quantity', distinct=True, filter=Q(status='出库'))).values(
                 'in_qty', 'out_qty', 'equip_spare', 'equip_spare__spare_code',
@@ -2909,8 +2915,8 @@ class EquipWarehouseStatisticalViewSet(ListModelMixin, GenericViewSet):
                 item['unit'] = item['equip_spare__unit']
                 item['in_qty'] = item['in_qty'] if item['in_qty'] else 0
                 item['out_qty'] = item['out_qty'] if item['out_qty'] else 0
-                item['in_money'] = (item['in_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item ['in_qty'] else 0
-                item['out_money'] = (item['out_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item ['out_qty'] else 0
+                item['in_money'] = (item['in_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item['in_qty'] else 0
+                item['out_money'] = (item['out_qty'] * item['equip_spare__cost']) if item['equip_spare__cost'] and item['out_qty'] else 0
             st = (int(page) - 1) * int(page_size)
             et = int(page) * int(page_size)
             if self.request.query_params.get('export'):
