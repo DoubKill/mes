@@ -2713,6 +2713,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 inventory.quantity = data['quantity']
             elif handle == '移库':
                 quantity = f"-{data.get('quantity')}"
+                if inventory.quantity < data['quantity']:
+                    return Response({"success": False, "message": '当前库存数量不足', "data": None})
                 inventory.quantity -= data['quantity']
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
@@ -3003,7 +3005,8 @@ class EquipAutoPlanView(APIView):
                     'location': location,
                     'spare_code': data[0]['equip_spare__spare_code'],
                     'spare_name': data[0]['equip_spare__spare_name'],
-                    'move_location': move_location
+                    'move_location': move_location,
+                    'equip_spare': data[0]['equip_spare']
                 })
             return Response({"success": True, "message": None, "data": dic})
 
