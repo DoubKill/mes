@@ -1745,7 +1745,7 @@ class WmsInventoryMaterialSerializer(serializers.ModelSerializer):
             data['type'] = ins.type
             data['warning_days'] = ins.warning_days
             data['created_username'] = ins.created_user.username
-            data['created_time'] = ins.created_date
+            data['created_time'] = ins.created_date.strftime('%Y-%m-%d %H:%M:%S')
             data['warning_weight'] = ins.warning_weight
         else:
             data['avg_consuming_weight'] = None
