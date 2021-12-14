@@ -2813,14 +2813,16 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
     @atomic
     def update(self, request, *args, **kwargs):  # 撤销
         revocation_desc = self.request.data.get('revocation_desc')
-
+        equip_warehouse_location = self.request.data.get('equip_warehouse_location')
+        equip_spare = self.request.data.get('equip_spare')
         instance = self.get_object()
         quantity = int(instance.quantity)
+        inventory = EquipWarehouseInventory.objects.filter(equip_spare_id=equip_spare,
+                                                          equip_warehouse_location_id=equip_warehouse_location).first()
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
             if instance.status == '入库':
                 now_quantity = instance.now_quantity - quantity
-                inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_order_detail=order_detail).first()
                 if order_detail.in_quantity == quantity:
                     order_detail.status = 1
                 else:
@@ -2833,8 +2835,7 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     inventory.quantity -= quantity
                 inventory.save()
             if instance.status == '出库':
-                now_quantity = instance.now_quantity + quantity
-                inventory = EquipWarehouseInventory.objects.filter(equip_warehouse_location=instance.equip_warehouse_location, equip_spare=instance.equip_spare).first()
+                now_quantity = inventory.quantity + quantity
                 order_detail.out_quantity -= quantity
                 if order_detail.out_quantity == quantity:
                     order_detail.status = 4
@@ -3001,7 +3002,23 @@ class EquipAutoPlanView(APIView):
                 'equip_spare__spare_name',
                 'quantity',
                 'equip_spare').distinct()
-            return Response({"success": True, "message": None, "data": data})
+            dic = {}
+            if data:
+                location = [{'id': item['equip_warehouse_location__id'],
+                             'location_name': item['equip_warehouse_location__location_name'],
+                             'quantity': item['quantity']
+                             } for item in data]
+                move_location = EquipWarehouseLocation.objects.filter(equip_warehouse_area_id=data[0]['equip_warehouse_area__id'],
+                                                                      delete_flag=False).values('id', 'location_name')
+                dic.update({
+                    'area_id': data[0]['equip_warehouse_area__id'],
+                    'area_name': data[0]['equip_warehouse_area__area_name'],
+                    'location': location,
+                    'spare_code': data[0]['equip_spare__spare_code'],
+                    'spare_name': data[0]['equip_spare__spare_name'],
+                    'move_location': move_location
+                })
+            return Response({"success": True, "message": None, "data": dic})
 
 
 @method_decorator([api_recorder], name='dispatch')
