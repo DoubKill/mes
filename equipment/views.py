@@ -2647,7 +2647,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         if equip_spare:  # 获取库存中备件的库区和库位
             first = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).first()  # 默认显示的库区和库位
             area = self.queryset.filter(equip_spare_id=equip_spare).values('equip_warehouse_area__area_name', 'equip_warehouse_area__id').distinct()
-            location = self.queryset.filter(equip_spare_id=equip_spare).values('equip_warehouse_location__location_name', 'equip_warehouse_location__id', 'equip_warehouse_area__id').distinct()
+            location = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).values('equip_warehouse_location__location_name', 'equip_warehouse_location__id', 'equip_warehouse_area__id').distinct()
             if not first:
                 return Response({"success": False, "message": '库存中不存在该备件', "data": None})
             return Response({'area': area, 'location': location, 'first': {
