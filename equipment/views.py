@@ -2712,6 +2712,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                 quantity = data.get('quantity')
                 inventory.quantity = data['quantity']
             elif handle == '移库':
+                if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
+                    return Response({"success": False, "message": '不能移动到当前库区', "data": None})
                 quantity = f"-{data.get('quantity')}"
                 if inventory.quantity < data['quantity']:
                     return Response({"success": False, "message": '当前库存数量不足', "data": None})
