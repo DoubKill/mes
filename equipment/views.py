@@ -10,8 +10,6 @@ import xlwt
 from suds.client import Client
 from io import BytesIO
 from itertools import chain
-from dateutil.parser import parse
-from dateutil.relativedelta import relativedelta
 from django.db.models.functions import TruncMonth
 from django.db.models import F, Q, Sum, Count
 from django.http import HttpResponse
@@ -3914,55 +3912,55 @@ class EquipOrderListView(APIView):
         return Response({'results': data[st:et], 'count': len(data)})
 
 
-@method_decorator([api_recorder], name='dispatch')
-class EquipMTBFMTTPStatementView(APIView):
-    permission_classes = (IsAuthenticated,)
-
-    def get(self, request):
-        # 统计自然日生产时间
-        s_time = self.request.query_params.get('s_time', None)  # 2021-12
-        equip_list = [f'Z{"%.2d" % i}' for i in range(1, 16)]
-        if s_time:
-            begin_time = s_time + '-01'
-            end_year = (parse(''.join(s_time.split('-')) + "01") + relativedelta(months=11)).strftime("%Y-%m")
-            end_time = end_year + f'-{calendar.monthrange(int(end_year.split("-")[0]),  int(end_year.split("-")[1]))[1]}'
-            time_range = [begin_time, end_time]
-            time_list = [(parse(''.join(s_time.split('-')) + "01") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
-        else:
-            end_year = date.today().year
-            begin_time = f'{date.today().year}-01-01'
-            end_time = f'{date.today().year}-12-31'
-            time_range = [begin_time, end_time]
-            time_list = [(parse(str(end_year) + "0101") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
-        dic = {}
-        for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
-            dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-            dic[equip_list[i] + '2'] = {'equip_no': equip_list[i], 'content': '故障时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-            dic[equip_list[i] + '3'] = {'equip_no': equip_list[i], 'content': '故障次数', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-            dic[equip_list[i] + '4'] = {'equip_no': equip_list[i], 'content': 'MTBF', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-            dic[equip_list[i] + '5'] = {'equip_no': equip_list[i], 'content': 'MTTR', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-            dic[equip_list[i] + '6'] = {'equip_no': equip_list[i], 'content': '故障率', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-
-        # 统计机台的故障用时
-        # 已完成
-        queryset = EquipApplyOrder.objects.filter(repair_start_datetime__date__range=time_range, status__in=['已完成', '已验收'], equip_condition='停机', equip_no__in=equip_list)
-        query = queryset.annotate(month=TruncMonth('fault_datetime')).values('fault_datetime__year',
-                                                                                    'fault_datetime__month',
-                                                                                    'equip_no').annotate(
-            time=OSum((F('repair_end_datetime') - F('fault_datetime'))), count=Count('id'))
-
-        for item in query:
-            #  当前月总时长
-            total_time = calendar.monthrange(item["fault_datetime__year"], item["fault_datetime__month"])[1] * 24
-            year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
-            if item['equip_no'] in equip_list:
-                dic[item['equip_no'] + '1'][year_month] = total_time
-                dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 60, 2),
-                dic[item['equip_no'] + '3'][year_month] = item['count']
-                dic[item['equip_no'] + '4'][year_month] = total_time / item['count']
-                dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 60) / item['count'], 2)
-                dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / total_time, 2)
-        return Response(dic.values())
+# @method_decorator([api_recorder], name='dispatch')
+# class EquipMTBFMTTPStatementView(APIView):
+#     permission_classes = (IsAuthenticated,)
+#
+#     def get(self, request):
+#         # 统计自然日生产时间
+#         s_time = self.request.query_params.get('s_time', None)  # 2021-12
+#         equip_list = [f'Z{"%.2d" % i}' for i in range(1, 16)]
+#         if s_time:
+#             begin_time = s_time + '-01'
+#             end_year = (parse(''.join(s_time.split('-')) + "01") + relativedelta(months=11)).strftime("%Y-%m")
+#             end_time = end_year + f'-{calendar.monthrange(int(end_year.split("-")[0]),  int(end_year.split("-")[1]))[1]}'
+#             time_range = [begin_time, end_time]
+#             time_list = [(parse(''.join(s_time.split('-')) + "01") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
+#         else:
+#             end_year = date.today().year
+#             begin_time = f'{date.today().year}-01-01'
+#             end_time = f'{date.today().year}-12-31'
+#             time_range = [begin_time, end_time]
+#             time_list = [(parse(str(end_year) + "0101") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
+#         dic = {}
+#         for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
+#             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+#             dic[equip_list[i] + '2'] = {'equip_no': equip_list[i], 'content': '故障时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+#             dic[equip_list[i] + '3'] = {'equip_no': equip_list[i], 'content': '故障次数', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+#             dic[equip_list[i] + '4'] = {'equip_no': equip_list[i], 'content': 'MTBF', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+#             dic[equip_list[i] + '5'] = {'equip_no': equip_list[i], 'content': 'MTTR', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+#             dic[equip_list[i] + '6'] = {'equip_no': equip_list[i], 'content': '故障率', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+#
+#         # 统计机台的故障用时
+#         # 已完成
+#         queryset = EquipApplyOrder.objects.filter(repair_start_datetime__date__range=time_range, status__in=['已完成', '已验收'], equip_condition='停机', equip_no__in=equip_list)
+#         query = queryset.annotate(month=TruncMonth('fault_datetime')).values('fault_datetime__year',
+#                                                                                     'fault_datetime__month',
+#                                                                                     'equip_no').annotate(
+#             time=OSum((F('repair_end_datetime') - F('fault_datetime'))), count=Count('id'))
+#
+#         for item in query:
+#             #  当前月总时长
+#             total_time = calendar.monthrange(item["fault_datetime__year"], item["fault_datetime__month"])[1] * 24
+#             year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
+#             if item['equip_no'] in equip_list:
+#                 dic[item['equip_no'] + '1'][year_month] = total_time
+#                 dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 60, 2),
+#                 dic[item['equip_no'] + '3'][year_month] = item['count']
+#                 dic[item['equip_no'] + '4'][year_month] = total_time / item['count']
+#                 dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 60) / item['count'], 2)
+#                 dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / total_time, 2)
+#         return Response(dic.values())
 
 
 @method_decorator([api_recorder], name='dispatch')
