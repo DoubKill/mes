@@ -155,7 +155,7 @@ urlpatterns = [
     # 钉钉工单查询
     path('equip-order-list/', EquipOrderListView.as_view()),
     # MTBF/MTTR分析报表
-    path('equip-mtbfmttp-statement/', EquipMTBFMTTPStatementView.as_view()),
+    # path('equip-mtbfmttp-statement/', EquipMTBFMTTPStatementView.as_view()),
     # 工单别 处理时间分析报表
     path('equip-workorder-statement/', EquipWorkOrderStatementView.as_view()),
     # 机台别 处理时间分析报表
