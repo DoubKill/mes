@@ -94,7 +94,7 @@ permission_data = [
     {'id': 65, 'code': 'product_actual', 'name': '密炼实绩', 'parent_id': None},
     {'id': 66, 'code': 'view_product_actual', 'name': '查看', 'parent_id': 65},
 
-    {'id': 67, 'code': 'plan_reality', 'name': '密炼机台别计划对比', 'parent_id': None},
+    {'id': 67, 'code': 'plan_reality', 'name': '生产记录表', 'parent_id': None},
     {'id': 68, 'code': 'view_plan_reality', 'name': '查看', 'parent_id': 67},
 
     {'id': 69, 'code': 'product_record', 'name': '密炼生产履历', 'parent_id': None},
@@ -489,16 +489,7 @@ permission_data = [
     {'id': 373, 'code': 'view_examine_material', 'name': '查看', 'parent_id': 372},
     {'id': 374, 'code': 'deal_examine_material', 'name': '不合格处理', 'parent_id': 372},
     # {'id': 375, 'code': 'deal_examine_material', 'name': '不合格处理', 'parent_id': 372},
-    #
-    # {'id': 376, 'code': 'raw_evaluating', 'name': '原料判断基准录入', 'parent_id': None},
-    # {'id': 377, 'code': 'view_raw_evaluating', 'name': '查看', 'parent_id': 376},
-    # {'id': 378, 'code': 'add_raw_evaluating', 'name': '新增', 'parent_id': 376},
-    # {'id': 379, 'code': 'change_raw_evaluating', 'name': '修改', 'parent_id': 376},
-    #
-    # {'id': 380, 'code': 'raw_test_result', 'name': '原料检测数据录入', 'parent_id': None},
-    # {'id': 381, 'code': 'view_raw_test_result', 'name': '查看', 'parent_id': 380},
-    # {'id': 382, 'code': 'add_raw_test_result', 'name': '新增', 'parent_id': 380},
-    #
+
     # {'id': 383, 'code': 'raw_result_info', 'name': '原料快检结果详细信息', 'parent_id': None},
     # {'id': 384, 'code': 'view_raw_result_info', 'name': '查看', 'parent_id': 383},
     # {'id': 385, 'code': 'change_raw_result_info', 'name': '修改', 'parent_id': 383},
@@ -590,8 +581,8 @@ permission_data = [
     {'id': 452, 'code': 'view_material_outbound_record', 'name': '查看', 'parent_id': 451},
     {'id': 453, 'code': 'space_material_outbound_record', 'name': '指定库位出库', 'parent_id': 451},
     {'id': 454, 'code': 'weight_material_outbound_record', 'name': '指定重量出库', 'parent_id': 451},
-    {'id': 738, 'code': 'unqualified_material_outbound_record', 'name': '不合格品出库', 'parent_id': 451},
-    {'id': 739, 'code': 'untested_material_outbound_record', 'name': '待检品出库', 'parent_id': 451},
+    {'id': 738, 'code': 'unqualified_material_outbound_record', 'name': '非合格品出库', 'parent_id': 451},
+    # {'id': 739, 'code': 'untested_material_outbound_record', 'name': '待检品出库', 'parent_id': 451},
 
     {'id': 455, 'code': 'material_outbound_task', 'name': '原材料出库任务', 'parent_id': None},
     {'id': 456, 'code': 'view_material_outbound_task', 'name': '查看', 'parent_id': 455},
@@ -621,12 +612,16 @@ permission_data = [
     {'id': 767, 'code': 'material_expire_query', 'name': '原材料超期物料查询', 'parent_id': None},
     {'id': 768, 'code': 'view_material_expire_query', 'name': '查看', 'parent_id': 767},
 
+    {'id': 376, 'code': 'material_warning_setting', 'name': '原材料库存预警设置', 'parent_id': None},
+    {'id': 377, 'code': 'view_material_warning_setting', 'name': '查看', 'parent_id': 376},
+    {'id': 378, 'code': 'set_material_warning_setting', 'name': '参数设定', 'parent_id': 376},
+
     {'id': 463, 'code': 'th_outbound_record', 'name': '炭黑库出库单据', 'parent_id': None},
     {'id': 464, 'code': 'view_th_outbound_record', 'name': '查看', 'parent_id': 463},
     {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
     {'id': 466, 'code': 'weight_th_outbound_record', 'name': '指定重量出库', 'parent_id': 463},
-    {'id': 743, 'code': 'unqualified_th_outbound_record', 'name': '不合格品出库', 'parent_id': 463},
-    {'id': 744, 'code': 'untested_th_outbound_record', 'name': '待检品出库', 'parent_id': 463},
+    {'id': 743, 'code': 'unqualified_th_outbound_record', 'name': '非合格品出库', 'parent_id': 463},
+    # {'id': 744, 'code': 'untested_th_outbound_record', 'name': '待检品出库', 'parent_id': 463},
 
     {'id': 467, 'code': 'th_outbound_task', 'name': '炭黑库出库任务', 'parent_id': None},
     {'id': 468, 'code': 'view_th_outbound_task', 'name': '查看', 'parent_id': 467},
@@ -655,6 +650,10 @@ permission_data = [
 
     {'id': 769, 'code': 'th_expire_query', 'name': '炭黑超期物料查询', 'parent_id': None},
     {'id': 770, 'code': 'view_th_expire_query', 'name': '查看', 'parent_id': 769},
+
+    {'id': 380, 'code': 'th_warning_setting', 'name': '炭黑库存预警设置', 'parent_id': None},
+    {'id': 381, 'code': 'view_th_warning_setting', 'name': '查看', 'parent_id': 380},
+    {'id': 382, 'code': 'set_th_warning_setting', 'name': '参数设定', 'parent_id': 380},
 
     {'id': 475, 'code': 'material_report_equip', 'name': '原材料上报设备管理', 'parent_id': None},
     {'id': 476, 'code': 'view_material_report_equip', 'name': '查看', 'parent_id': 475},

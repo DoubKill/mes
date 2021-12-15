@@ -325,3 +325,28 @@ class PalletFeedbacksBatchModifySerializer(serializers.ModelSerializer):
         model = PalletFeedbacks
         fields = ('id', 'begin_trains', 'end_trains', 'lot_no', 'product_no', 'actual_weight')
         extra_kwargs = {'id': {'read_only': False}}
+
+
+class ProductPlanRealViewSerializer(serializers.ModelSerializer):
+    actual_trains = serializers.SerializerMethodField(read_only=True, help_text='实际车次')
+    classes = serializers.CharField(source='work_schedule_plan.classes.global_name', read_only=True, help_text='班次')
+    product_no = serializers.CharField(source='product_batching.stage_product_batch_no', read_only=True)
+    begin_time = serializers.SerializerMethodField(read_only=True, help_text='开始时间')
+
+    def get_begin_time(self, obj):
+        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('id').first()
+        if tfb_obj:
+            return tfb_obj.begin_time.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            return None
+
+    def get_actual_trains(self, obj):
+        tfb_obj = TrainsFeedbacks.objects.filter(plan_classes_uid=obj.plan_classes_uid).order_by('created_date').last()
+        if tfb_obj:
+            return tfb_obj.actual_trains
+        else:
+            return 0
+
+    class Meta:
+        model = ProductClassesPlan
+        fields = ('classes', 'plan_trains', 'actual_trains', 'product_no', 'begin_time')

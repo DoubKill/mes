@@ -46,8 +46,7 @@ class MaterialDataPointIndicatorFilter(django_filters.rest_framework.FilterSet):
 
 
 class MaterialTestMethodFilter(django_filters.rest_framework.FilterSet):
-    material_no = django_filters.CharFilter(field_name="material__material_no", lookup_expr='icontains',
-                                            help_text='胶料编码')
+    material_no = django_filters.CharFilter(field_name="material__material_no", help_text='胶料编码')
     test_type_id = django_filters.NumberFilter(field_name='test_method__test_type_id',
                                                help_text='试验类型id')
     test_indicator_id = django_filters.NumberFilter(field_name='test_method__test_type__test_indicator_id',

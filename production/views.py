@@ -28,6 +28,7 @@ from mes.conf import EQUIP_LIST
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from mes.permissions import PermissionClass
+from plan.filters import ProductClassesPlanFilter
 from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
@@ -38,13 +39,13 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
 
 from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear, MaterialTestOrder, \
-    MaterialDealResult, MaterialTestResult
+    MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
@@ -733,6 +734,7 @@ class ProductionPlanRealityAnalysisView(ListAPIView):
 
 
 # 区间产量统计
+@method_decorator([api_recorder], name="dispatch")
 class IntervalOutputStatisticsView(APIView):
 
     def get(self, request, *args, **kwargs):
@@ -740,13 +742,15 @@ class IntervalOutputStatisticsView(APIView):
 
         if not TrainsFeedbacks.objects.filter(factory_date=factory_date).exists():
             return Response({})
+        day_start_time = datetime.datetime.strptime(factory_date + ' 08:00:00', "%Y-%m-%d %H:%M:%S")
+        factory_end_time = day_start_time + datetime.timedelta(days=1)
 
-        day_start_end_times = TrainsFeedbacks.objects \
-            .filter(factory_date=factory_date) \
-            .aggregate(day_end_time=Max('end_time'),
-                       day_start_time=Min('end_time'))
-        day_start_time = day_start_end_times.get('day_start_time')
-        day_end_time = day_start_end_times.get('day_end_time')
+        day_end_time = (datetime.datetime.now() + datetime.timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+        day_end_time = day_end_time[:14] + '00:00'
+        day_end_time = datetime.datetime.strptime(day_end_time, "%Y-%m-%d %H:%M:%S")
+        if day_end_time > factory_end_time:
+            day_end_time = factory_end_time
+
         time_spans = []
         end_time = day_start_time
         while end_time < day_end_time:
@@ -755,9 +759,9 @@ class IntervalOutputStatisticsView(APIView):
         time_spans.append(day_end_time)
 
         data = {
-            'equips': sorted(
-                TrainsFeedbacks.objects.filter(factory_date=factory_date).values_list('equip_no', flat=True).distinct(),
-                key=lambda e: int(e.lower()[1:]))
+            'equips': list(Equip.objects.filter(
+                category__equip_type__global_name='密炼设备'
+            ).order_by('equip_no').values_list('equip_no', flat=True))
         }
 
         for class_ in classes:
@@ -1698,3 +1702,130 @@ class PalletTrainsBatchFixView(ListAPIView, UpdateAPIView):
             MaterialTestOrder.objects.filter(lot_no=instance.lot_no).delete()
             MaterialDealResult.objects.filter(lot_no=instance.lot_no).delete()
         return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductPlanRealView(ListAPIView):
+    queryset = ProductClassesPlan.objects.filter(delete_flag=False).order_by('id')
+    serializer_class = ProductPlanRealViewSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = [DjangoFilterBackend, ]
+    filter_class = ProductClassesPlanFilter
+    pagination_class = None
+
+    def list(self, request, *args, **kwargs):
+        ret = {}
+        queryset = self.filter_queryset(self.get_queryset())
+        for classes in ['早班', '中班', '夜班']:
+            page = queryset.filter(work_schedule_plan__classes__global_name=classes)
+            data = self.get_serializer(page, many=True).data
+            data = list(filter(lambda x: x['begin_time'] is not None, data))
+            data.sort(key=lambda x: x['begin_time'])
+            ret[classes] = data
+        return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductBatchInfo(APIView):
+
+    def get(self, request):
+        lot_no = self.request.query_params.get('lot_no')
+        if not lot_no:
+            return Response({'success': False, 'data': {}, 'message': '请携带正确的条码号查询！'})
+        pallet_feedback = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+        if not pallet_feedback:
+            return Response({'success': False, 'data': {}, 'message': '未找到该条码信息！'})
+
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
+        if not plan:
+            group = ''
+        else:
+            group = plan.work_schedule_plan.group.global_name
+
+        ins = MaterialDealResult.objects.filter(lot_no=lot_no).first()
+        if not ins:
+            data = {
+                'product_no': pallet_data.product_no,
+                'equip_no': pallet_data.equip_no,
+                'classes': pallet_data.classes,
+                'group': group,
+                'factory_date': pallet_data.factory_date,
+                'weight': pallet_feedback.actual_weight,
+                'trains': '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]),
+                'test_result': '未检测',
+            }
+            return Response({'success': True, 'data': data, 'message': '查询成功！'})
+
+        data = {
+            'product_no': pallet_data.product_no,
+            'equip_no': pallet_data.equip_no,
+            'classes': pallet_data.classes,
+            'group': group,
+            'factory_date': pallet_data.factory_date,
+            'weight': pallet_feedback.actual_weight,
+            'trains': '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]),
+            'test_result': ins.test_result,
+        }
+
+        table_head_top = {}
+        ret = {}
+        test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                       product_no=ins.product_no
+                                                       ).order_by('actual_trains')
+        for test_order in test_orders:
+            ret[test_order.actual_trains] = []
+            max_result_ids = list(test_order.order_results.values(
+                'test_indicator_name', 'data_point_name'
+            ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids,
+                                                             is_judged=True).order_by('test_indicator_name',
+                                                                                      'data_point_name')
+            for test_result in test_results:
+                if test_result.level == 1:
+                    result = '合格'
+                elif test_result.is_passed:
+                    result = 'pass'
+                else:
+                    result = '不合格'
+                ret[test_order.actual_trains].append(
+                    {
+                        'data_point_name': test_result.data_point_name,
+                        'result': result,
+                        'value': test_result.value,
+                        'test_indicator_name': test_result.test_indicator_name
+                    }
+                )
+                test_indicator_name = test_result.test_indicator_name
+                if test_indicator_name in table_head_top:
+                    table_head_top[test_indicator_name].add(test_result.data_point_name)
+                else:
+                    table_head_top[test_indicator_name] = {test_result.data_point_name}
+
+        data_point_range_data = {}
+        indicators = []
+        for indicator_name, points in table_head_top.items():
+            point_head = []
+            for point in points:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    data_point__name=point,
+                    material_test_method__material__material_name=ins.product_no,
+                    level=1).first()
+                if indicator:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": indicator.upper_limit,
+                         "lower_limit": indicator.lower_limit}
+                    )
+                    data_point_range_data[point] = [indicator.lower_limit, indicator.upper_limit]
+                else:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": None,
+                         "lower_limit": None}
+                    )
+            indicators.append({'point': indicator_name, 'point_head': point_head})
+
+        ret['table_head'] = indicators
+        data['test_info'] = ret
+        return Response({'success': True, 'data': data, 'message': '查询成功！'})

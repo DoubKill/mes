@@ -43,7 +43,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
-    OutBoundDeliveryOrderDetail, WMSReleaseLog
+    OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -55,7 +55,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer
+    OutBoundTasksSerializer, WmsInventoryMaterialSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -71,7 +71,7 @@ from mes.settings import DEBUG
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train, MaterialDealResult
+from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog
 from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
 from system.models import User
@@ -298,6 +298,13 @@ class OutWorkFeedBack(APIView):
                     if label:
                         LabelPrint.objects.create(label_type=station_dict.get(station), lot_no=lot_no, status=0,
                                                   data=label)
+                        try:
+                            LabelPrintLog.objects.create(
+                                result=MaterialDealResult.objects.filter(lot_no=lot_no).first(),
+                                created_user=dp_obj.outbound_delivery_order.created_user.username,
+                                location=station)
+                        except Exception:
+                            pass
                 except AttributeError as a:
                     logger.error(f"条码错误{a}")
                 except Exception as e:
@@ -2773,6 +2780,7 @@ class WMSRelease(APIView):
         return Response('更新成功！')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WMSExpireListView(APIView):
     permission_classes = (IsAuthenticated,)
     DATABASE_CONF = WMS_CONF
@@ -2818,6 +2826,7 @@ order by m.MaterialCode;""".format(expire_days)
         return Response({'results': result, "count": count, 'total_weight': total_weight, 'total_quantity': total_quantity})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WMSExpireDetailView(APIView):
     permission_classes = (IsAuthenticated,)
     DATABASE_CONF = WMS_CONF
@@ -2852,8 +2861,8 @@ class WMSExpireDetailView(APIView):
             sheet.write(data_row, 8, i[7])
             sheet.write(data_row, 9, i[7])
             sheet.write(data_row, 10, i[8])
-            sheet.write(data_row, 11, i[9].strftime('%Y-%m-%d %H:%M:%S'))
-            sheet.write(data_row, 12, i[10].strftime('%Y-%m-%d %H:%M:%S'))
+            sheet.write(data_row, 11, i[9])
+            sheet.write(data_row, 12, i[10])
             sheet.write(data_row, 13, i[11])
             data_row = data_row + 1
         # 写出到IO
@@ -2919,8 +2928,8 @@ order by left_days;""".format(expire_days, material_code, quality_status)
                  'unit': item[6],
                  'total_weight': item[7],
                  'quality_status': item[8],
-                 'in_storage_time': item[9].strftime('%Y-%m-%d %H:%M:%S'),
-                 'expire_time': item[10].strftime('%Y-%m-%d %H:%M:%S'),
+                 'in_storage_time': item[9],
+                 'expire_time': item[10],
                  'left_days': item[11],
                  })
         sc.close()
@@ -4734,3 +4743,182 @@ class OutBoundHistory(APIView):
         else:
             data = {}
         return Response(data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WmsInventoryMaterialViewSet(GenericAPIView):
+    DB = 'wms'
+    queryset = WmsInventoryMaterial.objects.all()
+    serializer_class = WmsInventoryMaterialSerializer
+
+    def get(self, request, *args, **kwargs):
+        queryset = WmsInventoryMaterial.objects.using(self.DB).all()
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        if material_no:
+            queryset = queryset.filter(material_no__icontains=material_no)
+        if material_name:
+            queryset = queryset.filter(material_name__icontains=material_name)
+        page = self.paginate_queryset(queryset)
+        serializer = WmsInventoryMaterialSerializer(page, many=True)
+        return self.get_paginated_response(serializer.data)
+
+    def post(self, request):
+        material_nos = self.request.data.get('material_nos')
+        avg_consuming_weight = self.request.data.get('avg_consuming_weight')
+        avg_setting_weight = self.request.data.get('avg_setting_weight')
+        warning_days = self.request.data.get('warning_days')
+        if avg_consuming_weight:
+            defaults = {'avg_consuming_weight': avg_consuming_weight,
+                        'type': 1,
+                        'created_user': self.request.user}
+        elif avg_setting_weight:
+            defaults = {'avg_setting_weight': avg_setting_weight,
+                        'type': 2,
+                        'created_user': self.request.user}
+        else:
+            defaults = {'warning_days': warning_days,
+                        'created_user': self.request.user}
+        for material_no in material_nos:
+            obj, _ = WMSMaterialSafetySettings.objects.update_or_create(defaults=defaults, wms_material_code=material_no)
+            obj.save()
+        return Response('设置成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSStockSummaryView(APIView):
+    DATABASE_CONF = WMS_CONF
+
+    def export_xls(self, result):
+        response = HttpResponse(content_type='application/vnd.ms-excel')
+        filename = '库存统计'
+        response['Content-Disposition'] = u'attachment;filename= ' + filename.encode('gbk').decode(
+            'ISO-8859-1') + '.xls'
+        # 创建一个文件对象
+        wb = xlwt.Workbook(encoding='utf8')
+        # 创建一个sheet对象
+        sheet = wb.add_sheet('库存信息', cell_overwrite_ok=True)
+
+        style = xlwt.XFStyle()
+        style.alignment.wrap = 1
+
+        columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组', '数量', '重量/kg']
+
+        for col_num in range(len(columns)):
+            sheet.write(1, col_num, columns[col_num])
+            # 写入数据
+        data_row = 2
+        for i in result:
+            sheet.write(data_row, 0, result.index(i) + 1)
+            sheet.write(data_row, 1, i['name'])
+            sheet.write(data_row, 2, i['code'])
+            sheet.write(data_row, 3, i['zc_material_code'])
+            sheet.write(data_row, 4, i['unit'])
+            sheet.write(data_row, 5, i['pdm'])
+            sheet.write(data_row, 6, i['group_name'])
+            sheet.write(data_row, 7, i['quantity'])
+            sheet.write(data_row, 8, i['weight'])
+            data_row = data_row + 1
+        # 写出到IO
+        output = BytesIO()
+        wb.save(output)
+        # 重新定位到开始
+        output.seek(0)
+        response.write(output.getvalue())
+        return response
+
+    def get(self, request):
+        material_name = self.request.query_params.get('material_name')
+        material_no = self.request.query_params.get('material_no')
+        material_group_name = self.request.query_params.get('material_group_name')
+        lower_only_flag = self.request.query_params.get('lower_only_flag')
+        export = self.request.query_params.get('export')
+        page = self.request.query_params.get('page', 1)
+        page_size = self.request.query_params.get('page_size', 15)
+        st = (int(page) - 1) * int(page_size)
+        et = int(page) * int(page_size)
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+        if material_no:
+            if extra_where_str:
+                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+            else:
+                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+        if material_group_name:
+            if extra_where_str:
+                extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
+            else:
+                extra_where_str += "where m.MaterialGroupName='{}'".format(material_group_name)
+
+        sql = """
+                select
+            m.Name AS MaterialName,
+            m.MaterialCode,
+            m.ZCMaterialCode,
+            m.StandardUnit,
+            m.Pdm,
+            m.MaterialGroupName,
+            temp.quantity,
+            temp.WeightOfActual
+        from (
+            select
+                a.MaterialCode,
+                SUM ( a.WeightOfActual ) AS WeightOfActual,
+                SUM ( a.Quantity ) AS quantity
+            from dbo.t_inventory_stock AS a
+            group by
+                 a.MaterialCode
+            ) temp
+        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+
+        safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
+            F('wms_material_code'), F('warning_weight') * 1000))
+
+        result = []
+        for item in temp:
+            data = {'name': item[0],
+                    'code': item[1],
+                    'zc_material_code': item[2],
+                    'unit': item[3],
+                    'pdm': item[4],
+                    'group_name': item[5],
+                    'quantity': item[6],
+                    'weight': item[7],
+                    }
+            weighting = safety_data.get(item[1])
+            if weighting:
+                if weighting < item[7]:
+                    data['flag'] = 'H'
+                else:
+                    data['flag'] = 'L'
+            else:
+                data['flag'] = None
+            result.append(data)
+        sc.close()
+        if lower_only_flag:
+            result = list(filter(lambda x: x['flag'] == 'L', result))
+        total_quantity = sum([item['quantity'] for item in result])
+        total_weight = sum([item['weight'] for item in result])
+        count = len(result)
+        ret = result[st:et]
+        if export:
+            if export == '1':
+                data = ret
+            else:
+                data = result
+            return self.export_xls(data)
+        return Response(
+            {'results': ret, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THInventoryMaterialViewSet(WmsInventoryMaterialViewSet):
+    DB = 'cb'
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THStockSummaryView(WMSStockSummaryView):
+    DATABASE_CONF = TH_CONF

@@ -27,7 +27,8 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
-    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult
+    ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
+    LabelPrintLog
 from recipe.models import MaterialAttribute
 
 
@@ -404,7 +405,7 @@ class MaterialTestResultListSerializer(BaseModelSerializer):
 
     class Meta:
         model = MaterialTestResult
-        fields = ('test_times', 'value', 'data_point_name', 'test_method_name',
+        fields = ('id', 'test_times', 'value', 'data_point_name', 'test_method_name',
                   'test_indicator_name', 'mes_result', 'result', 'machine_name', 'level', 'upper_lower')
 
 
@@ -425,7 +426,7 @@ class MaterialTestOrderListSerializer(BaseModelSerializer):
                 if data_point not in ret[indicator]:
                     ret[indicator][data_point] = item
                 else:
-                    if ret[indicator][data_point]['test_times'] < item['test_times']:
+                    if ret[indicator][data_point]['id'] < item['id']:
                         ret[indicator][data_point] = item
         data['order_results'] = ret
         return data
@@ -1179,6 +1180,10 @@ class BatchProductNoClassZhPassSerializer(serializers.ModelSerializer):
 
 
 class MaterialDealResultListSerializer1(serializers.ModelSerializer):
+    print_times = serializers.SerializerMethodField()
+
+    def get_print_times(self, obj):
+        return obj.print_logs.count()
 
     def to_representation(self, instance):
         ret = super(MaterialDealResultListSerializer1, self).to_representation(instance)
@@ -1759,24 +1764,77 @@ class MaterialReportValueCreateSerializer(serializers.ModelSerializer):
 
 
 class ProductTestPlanDetailSerializer(BaseModelSerializer):
-    classes = serializers.CharField()
-    id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ProductTestPlanDetail
-        fields = ['factory_date', 'product_no', 'actual_trains', 'equip_no',
-                  'lot_no', 'classes', 'values', 'id', 'value']
+        fields = '__all__'
+        read_only_fields = ('test_plan', 'production_group', 'value', 'raw_value', 'test_time')
 
 
 class ProductTestPlanSerializer(BaseModelSerializer):
-    test_equip = serializers.CharField(source='test_equip.no')
+    test_equip_no = serializers.ReadOnlyField(source='test_equip.no')
     product_test_plan_detail = ProductTestPlanDetailSerializer(many=True)
+
+    @atomic()
+    def create(self, validated_data):
+        product_test_plan_details = validated_data.pop('product_test_plan_detail')
+        test_indicator_name = validated_data['test_indicator_name']
+        if test_indicator_name == '门尼':
+            s = 'M'
+        elif test_indicator_name == '流变':
+            s = 'L'
+        elif test_indicator_name == '物性':
+            s = 'W'
+        elif test_indicator_name == '钢拔':
+            s = 'G'
+        else:
+            raise serializers.ValidationError('不支持该指标检测！')
+
+        # 判断该机台是否有正在进行中的检测计划
+        equip_test_plan = ProductTestPlan.objects.filter(
+            status=1, test_equip=validated_data['test_equip']).first()
+        if equip_test_plan:
+            raise serializers.ValidationError('当前有计划正在执行，请结束后再开始检测！')
+
+        # 后端补充字段，新建test_plan主表数据
+        plan_uid = f"{s}{validated_data['test_equip'].no}{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        validated_data['plan_uid'] = plan_uid
+        validated_data['test_user'] = self.context['request'].user
+        validated_data['test_time'] = datetime.now()
+        instance = super().create(validated_data)
+
+        # 新建检测任务
+        for product_test_plan_detail in product_test_plan_details:
+            if 'lot_no' in product_test_plan_detail:
+                pallet_data = PalletFeedbacks.objects.filter(lot_no=product_test_plan_detail['lot_no']).first()
+            else:
+                pallet_data = PalletFeedbacks.objects.filter(
+                    equip_no=product_test_plan_detail['equip_no'],
+                    product_no=product_test_plan_detail['product_no'],
+                    classes=product_test_plan_detail['production_classes'],
+                    factory_date=product_test_plan_detail['factory_date'],
+                    begin_trains__lte=product_test_plan_detail['actual_trains'],
+                    end_trains__gte=product_test_plan_detail['actual_trains']).first()
+            # 补充生产班组字段
+            if pallet_data:
+                s = ProductClassesPlan.objects.filter(
+                    plan_classes_uid=pallet_data.plan_classes_uid
+                ).values('work_schedule_plan__group__global_name').first()
+                if not s:
+                    product_test_plan_detail['production_group'] = validated_data['test_group']
+                else:
+                    product_test_plan_detail['production_group'] = s['work_schedule_plan__group__global_name']
+            else:
+                raise serializers.ValidationError('第{}车生产批次数据不存在'.format(product_test_plan_detail['actual_trains']))
+            product_test_plan_detail['lot_no'] = pallet_data.lot_no
+            product_test_plan_detail['test_plan'] = instance
+            ProductTestPlanDetail.objects.create(**product_test_plan_detail)
+        return instance
 
     class Meta:
         model = ProductTestPlan
-        fields = ['status', 'plan_uid', 'test_equip', 'test_time', 'test_classes', 'test_group', 'test_indicator_name', 'test_method_name',
-                  'test_times', 'test_interval', 'product_test_plan_detail', 'count']
-        read_only_fields = ['plan_uid', 'test_time', 'status']
+        fields = '__all__'
+        read_only_fields = ['plan_uid', 'test_time', 'test_user', 'status']
 
 
 class ProductTEstResumeSerializer(BaseModelSerializer):
@@ -1839,4 +1897,11 @@ class UnqualifiedPalletFeedBackSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MaterialDealResult
+        fields = '__all__'
+
+
+class LabelPrintLogSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = LabelPrintLog
         fields = '__all__'
