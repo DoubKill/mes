@@ -2446,12 +2446,12 @@ class WmsStorageSummaryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = inventory_where_str = ""
         if material_name:
-            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
-                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
             else:
-                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += "where temp.MaterialCode like '%{}%'".format(material_no)
         if zc_material_code:
             if extra_where_str:
                 extra_where_str += " and m.ZCMaterialCode='{}'".format(zc_material_code)
@@ -2484,8 +2484,8 @@ class WmsStorageSummaryView(APIView):
                 inventory_where_str += "where a.CreaterTime<='{}'".format(inventory_et)
         sql = """
                 select
-            m.Name AS MaterialName,
-            m.MaterialCode,
+            temp.MaterialName,
+            temp.MaterialCode,
             m.ZCMaterialCode,
             temp.WeightUnit,
             m.Pdm,
@@ -2499,17 +2499,19 @@ class WmsStorageSummaryView(APIView):
                 a.BatchNo,
                 a.WeightUnit,
                 a.StockDetailState,
+                a.MaterialName,
                 SUM ( a.WeightOfActual ) AS WeightOfActual,
                 SUM ( a.Quantity ) AS quantity
             from dbo.t_inventory_stock AS a
             {}
             group by
                  a.MaterialCode,
+                 a.MaterialName,
                  a.BatchNo,
                  a.WeightUnit,
                  a.StockDetailState
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode 
+        left join t_inventory_material m on m.MaterialCode=temp.MaterialCode 
         {}
         order by m.MaterialCode
         """.format(inventory_where_str, extra_where_str)
@@ -3114,12 +3116,12 @@ class WMSInventoryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = ""
         if material_name:
-            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
-                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
             else:
-                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += "where temp.MaterialCode like '%{}%'".format(material_no)
         if material_group_name:
             if extra_where_str:
                 extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
@@ -3132,8 +3134,8 @@ class WMSInventoryView(APIView):
                 extra_where_str += "where temp.TunnelName='{}'".format(tunnel_name)
         sql = """
                 select
-            m.Name AS MaterialName,
-            m.MaterialCode,
+            temp.MaterialName,
+            temp.MaterialCode,
             m.ZCMaterialCode,
             temp.WeightUnit,
             m.Pdm,
@@ -3145,6 +3147,7 @@ class WMSInventoryView(APIView):
         from (
             select
                 a.MaterialCode,
+                a.MaterialName,
                 a.BatchNo,
                 d.TunnelName,
                 a.WeightUnit,
@@ -3154,11 +3157,12 @@ class WMSInventoryView(APIView):
             INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId
             group by
                  a.MaterialCode,
+                 a.MaterialName,
                  d.TunnelName,
                  a.BatchNo,
                  a.WeightUnit
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        left join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
 
