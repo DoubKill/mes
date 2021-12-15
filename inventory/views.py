@@ -4802,7 +4802,9 @@ class WMSStockSummaryView(APIView):
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
 
-        columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组', '数量', '重量/kg']
+        columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组',
+                   '有效库存数量', '有效库存重量（kg）', '合格品数量', '合格品重量（kg）',
+                   '待检品数量', '待检品重量（kg）', '不合格品数量', '不合格品重量（kg）', '总数量', '总重量（kg）', ]
 
         for col_num in range(len(columns)):
             sheet.write(1, col_num, columns[col_num])
@@ -4816,8 +4818,16 @@ class WMSStockSummaryView(APIView):
             sheet.write(data_row, 4, i['unit'])
             sheet.write(data_row, 5, i['pdm'])
             sheet.write(data_row, 6, i['group_name'])
-            sheet.write(data_row, 7, i['quantity'])
-            sheet.write(data_row, 8, i['weight'])
+            sheet.write(data_row, 7, i['quantity_1']+i['quantity_5'])
+            sheet.write(data_row, 8, i['weight_1']+i['weight_5'])
+            sheet.write(data_row, 9, i['quantity_1'])
+            sheet.write(data_row, 10, i['weight_1'])
+            sheet.write(data_row, 11, i['quantity_5'])
+            sheet.write(data_row, 12, i['weight_5'])
+            sheet.write(data_row, 13, i['quantity_3'])
+            sheet.write(data_row, 14, i['weight_3'])
+            sheet.write(data_row, 15, i['total_quantity'])
+            sheet.write(data_row, 16, i['total_weight'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -4860,15 +4870,18 @@ class WMSStockSummaryView(APIView):
             m.Pdm,
             m.MaterialGroupName,
             temp.quantity,
-            temp.WeightOfActual
+            temp.WeightOfActual,
+            temp.StockDetailState
         from (
             select
                 a.MaterialCode,
-                SUM ( a.WeightOfActual ) AS WeightOfActual,
-                SUM ( a.Quantity ) AS quantity
-            from dbo.t_inventory_stock AS a
+                a.StockDetailState,
+                SUM(a.WeightOfActual) AS WeightOfActual,
+                SUM(a.Quantity ) AS quantity
+            from t_inventory_stock AS a
             group by
-                 a.MaterialCode
+                 a.MaterialCode,
+                 a.StockDetailState
             ) temp
         inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
@@ -4877,31 +4890,60 @@ class WMSStockSummaryView(APIView):
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
             F('wms_material_code'), F('warning_weight') * 1000))
 
-        result = []
+        data_dict = {}
+
         for item in temp:
-            data = {'name': item[0],
-                    'code': item[1],
-                    'zc_material_code': item[2],
-                    'unit': item[3],
-                    'pdm': item[4],
-                    'group_name': item[5],
-                    'quantity': item[6],
-                    'weight': item[7],
-                    }
-            weighting = safety_data.get(item[1])
-            if weighting:
-                if weighting < item[7]:
-                    data['flag'] = 'H'
-                else:
-                    data['flag'] = 'L'
+            quality_status = item[8]
+            if quality_status == 2:
+                quality_status = 5
+            if item[1] not in data_dict:
+                data = {'name': item[0],
+                        'code': item[1],
+                        'zc_material_code': item[2],
+                        'unit': item[3],
+                        'pdm': item[4],
+                        'group_name': item[5],
+                        'total_quantity': item[6],
+                        'total_weight': item[7],
+                        'quantity_1': 0,
+                        'weight_1': 0,
+                        'quantity_3': 0,
+                        'weight_3': 0,
+                        'quantity_4': 0,
+                        'weight_4': 0,
+                        'quantity_5': 0,
+                        'weight_5': 0
+                        }
+                data['quantity_{}'.format(quality_status)] = item[6]
+                data['weight_{}'.format(quality_status)] = item[7]
+                data_dict[item[1]] = data
             else:
-                data['flag'] = None
-            result.append(data)
+                data_dict[item[1]]['total_quantity'] += item[6]
+                data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
+                data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
+        result = []
+        for item in data_dict.values():
+            weighting = safety_data.get(item['code'])
+            if weighting:
+                if weighting < item['weight_1'] + item['weight_5']:
+                    item['flag'] = 'H'
+                else:
+                    item['flag'] = 'L'
+            else:
+                item['flag'] = None
+            result.append(item)
         sc.close()
         if lower_only_flag:
             result = list(filter(lambda x: x['flag'] == 'L', result))
-        total_quantity = sum([item['quantity'] for item in result])
-        total_weight = sum([item['weight'] for item in result])
+        total_quantity = sum([item['total_quantity'] for item in result])
+        total_weight = sum([item['total_weight'] for item in result])
+        total_quantity1 = sum([item['quantity_1'] for item in result])
+        total_weight1 = sum([item['weight_1'] for item in result])
+        total_quantity3 = sum([item['quantity_3'] for item in result])
+        total_weight3 = sum([item['weight_3'] for item in result])
+        total_quantity5 = sum([item['quantity_5'] for item in result])
+        total_weight5 = sum([item['weight_5'] for item in result])
         count = len(result)
         ret = result[st:et]
         if export:
@@ -4911,7 +4953,12 @@ class WMSStockSummaryView(APIView):
                 data = result
             return self.export_xls(data)
         return Response(
-            {'results': ret, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
+            {'results': ret, "count": count,
+             'total_quantity': total_quantity, 'total_weight': total_weight,
+             'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
+             'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
+             'total_quantity5': total_quantity5, 'total_weight5': total_weight5
+             })
 
 
 @method_decorator([api_recorder], name="dispatch")

@@ -596,7 +596,7 @@ permission_data = [
     {'id': 461, 'code': 'material_yearly_summary', 'name': '原材料出库年报', 'parent_id': None},
     {'id': 462, 'code': 'view_material_yearly_summary', 'name': '查看', 'parent_id': 461},
 
-    {'id': 489, 'code': 'material_inventory_summary', 'name': '原材料库存统计', 'parent_id': None},
+    {'id': 489, 'code': 'material_inventory_summary', 'name': '原材料巷道别批次库存统计', 'parent_id': None},
     {'id': 490, 'code': 'view_material_inventory_summary', 'name': '查看', 'parent_id': 489},
 
     {'id': 548, 'code': 'material_stock_detail', 'name': '原材料库存明细', 'parent_id': None},
@@ -612,7 +612,7 @@ permission_data = [
     {'id': 767, 'code': 'material_expire_query', 'name': '原材料超期物料查询', 'parent_id': None},
     {'id': 768, 'code': 'view_material_expire_query', 'name': '查看', 'parent_id': 767},
 
-    {'id': 376, 'code': 'material_warning_setting', 'name': '原材料库存预警设置', 'parent_id': None},
+    {'id': 376, 'code': 'material_warning_setting', 'name': '原材料库存统计', 'parent_id': None},
     {'id': 377, 'code': 'view_material_warning_setting', 'name': '查看', 'parent_id': 376},
     {'id': 378, 'code': 'set_material_warning_setting', 'name': '参数设定', 'parent_id': 376},
 
@@ -635,7 +635,7 @@ permission_data = [
     {'id': 473, 'code': 'th_yearly_summary', 'name': '炭黑库出库年报', 'parent_id': None},
     {'id': 474, 'code': 'view_th_yearly_summary', 'name': '查看', 'parent_id': 473},
 
-    {'id': 491, 'code': 'th_inventory_summary', 'name': '炭黑库存统计', 'parent_id': None},
+    {'id': 491, 'code': 'th_inventory_summary', 'name': '炭黑巷道别批次库存统计', 'parent_id': None},
     {'id': 492, 'code': 'view_th_inventory_summary', 'name': '查看', 'parent_id': 491},
 
     {'id': 552, 'code': 'th_stock_detail', 'name': '炭黑库存明细', 'parent_id': None},
@@ -651,7 +651,7 @@ permission_data = [
     {'id': 769, 'code': 'th_expire_query', 'name': '炭黑超期物料查询', 'parent_id': None},
     {'id': 770, 'code': 'view_th_expire_query', 'name': '查看', 'parent_id': 769},
 
-    {'id': 380, 'code': 'th_warning_setting', 'name': '炭黑库存预警设置', 'parent_id': None},
+    {'id': 380, 'code': 'th_warning_setting', 'name': '炭黑库存统计', 'parent_id': None},
     {'id': 381, 'code': 'view_th_warning_setting', 'name': '查看', 'parent_id': 380},
     {'id': 382, 'code': 'set_th_warning_setting', 'name': '参数设定', 'parent_id': 380},
 

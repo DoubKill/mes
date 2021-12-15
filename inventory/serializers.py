@@ -769,7 +769,6 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.SerializerMethodField(read_only=True)
 
-
     def get_unit_weight(self, object):
         try:
             unit_weight = object.total_weight / object.qty
@@ -778,7 +777,7 @@ class WmsInventoryStockSerializer(serializers.ModelSerializer):
         return unit_weight
 
     def get_quality_status(self, object):
-        status_map = {1: "合格品", 2: "不合格品"}
+        status_map = {1: "合格品", 2: "抽检中", 3: "不合格品", 4: "过期", 5: "待检"}
         return status_map.get(object.quality_status, "不合格品")
 
     class Meta:

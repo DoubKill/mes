@@ -223,6 +223,9 @@ class ProductBatchingViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        exclude_used_type = self.request.query_params.get('exclude_used_type')
+        if exclude_used_type:
+            queryset = queryset.exclude(used_type=exclude_used_type)
         if self.request.query_params.get('all'):
             data = queryset.values('id', 'stage_product_batch_no',
                                    'batching_weight',
