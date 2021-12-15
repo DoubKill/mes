@@ -45,7 +45,7 @@ from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIVi
 from datetime import timedelta
 
 from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYear, MaterialTestOrder, \
-    MaterialDealResult, MaterialTestResult
+    MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 
 
@@ -1723,3 +1723,109 @@ class ProductPlanRealView(ListAPIView):
             data.sort(key=lambda x: x['begin_time'])
             ret[classes] = data
         return Response(ret)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductBatchInfo(APIView):
+
+    def get(self, request):
+        lot_no = self.request.query_params.get('lot_no')
+        if not lot_no:
+            return Response({'success': False, 'data': {}, 'message': '请携带正确的条码号查询！'})
+        pallet_feedback = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+        if not pallet_feedback:
+            return Response({'success': False, 'data': {}, 'message': '未找到该条码信息！'})
+
+        pallet_data = PalletFeedbacks.objects.filter(lot_no=lot_no).first()
+        plan = ProductClassesPlan.objects.filter(plan_classes_uid=pallet_data.plan_classes_uid).first()
+        if not plan:
+            group = ''
+        else:
+            group = plan.work_schedule_plan.group.global_name
+
+        ins = MaterialDealResult.objects.filter(lot_no=lot_no).first()
+        if not ins:
+            data = {
+                'product_no': pallet_data.product_no,
+                'equip_no': pallet_data.equip_no,
+                'classes': pallet_data.classes,
+                'group': group,
+                'factory_date': pallet_data.factory_date,
+                'weight': pallet_feedback.actual_weight,
+                'trains': '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]),
+                'test_result': '未检测',
+            }
+            return Response({'success': True, 'data': data, 'message': '查询成功！'})
+
+        data = {
+            'product_no': pallet_data.product_no,
+            'equip_no': pallet_data.equip_no,
+            'classes': pallet_data.classes,
+            'group': group,
+            'factory_date': pallet_data.factory_date,
+            'weight': pallet_feedback.actual_weight,
+            'trains': '/'.join([str(i) for i in range(pallet_data.begin_trains, pallet_data.end_trains + 1)]),
+            'test_result': ins.test_result,
+        }
+
+        table_head_top = {}
+        ret = {}
+        test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
+                                                       product_no=ins.product_no
+                                                       ).order_by('actual_trains')
+        for test_order in test_orders:
+            ret[test_order.actual_trains] = []
+            max_result_ids = list(test_order.order_results.values(
+                'test_indicator_name', 'data_point_name'
+            ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
+            test_results = MaterialTestResult.objects.filter(id__in=max_result_ids,
+                                                             is_judged=True).order_by('test_indicator_name',
+                                                                                      'data_point_name')
+            for test_result in test_results:
+                if test_result.level == 1:
+                    result = '合格'
+                elif test_result.is_passed:
+                    result = 'pass'
+                else:
+                    result = '不合格'
+                ret[test_order.actual_trains].append(
+                    {
+                        'data_point_name': test_result.data_point_name,
+                        'result': result,
+                        'value': test_result.value,
+                        'test_indicator_name': test_result.test_indicator_name
+                    }
+                )
+                test_indicator_name = test_result.test_indicator_name
+                if test_indicator_name in table_head_top:
+                    table_head_top[test_indicator_name].add(test_result.data_point_name)
+                else:
+                    table_head_top[test_indicator_name] = {test_result.data_point_name}
+
+        data_point_range_data = {}
+        indicators = []
+        for indicator_name, points in table_head_top.items():
+            point_head = []
+            for point in points:
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    data_point__name=point,
+                    material_test_method__material__material_name=ins.product_no,
+                    level=1).first()
+                if indicator:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": indicator.upper_limit,
+                         "lower_limit": indicator.lower_limit}
+                    )
+                    data_point_range_data[point] = [indicator.lower_limit, indicator.upper_limit]
+                else:
+                    point_head.append(
+                        {"point": point,
+                         "upper_limit": None,
+                         "lower_limit": None}
+                    )
+            indicators.append({'point': indicator_name, 'point_head': point_head})
+
+        ret['table_head'] = indicators
+        data['test_info'] = ret
+        return Response({'success': True, 'data': data, 'message': '查询成功！'})

@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import sys
 from datetime import datetime, timedelta
@@ -177,12 +178,14 @@ def handle(order):
             order.timeout_color = "红色"
             order.save()
             uids = get_ding_uids_by_name(order.created_user.username, all_user='1,2')
+            fault_name = order.result_fault_cause if order.result_fault_cause else (
+                order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
             content = {"title": f"第{times}次催办\r\n您名下单据超期未验收",
                        "form": [{"key": "工单编号:", "value": order.work_order_no},
                                 {"key": "机台:", "value": order.equip_no},
                                 {"key": "部位名称:",
                                  "value": order.equip_part_new.part_name if order.equip_part_new else ''},
-                                {"key": "故障原因:", "value": order.equip_repair_standard.standard_name},
+                                {"key": "故障原因:", "value": fault_name},
                                 {"key": "重要程度:", "value": order.importance_level},
                                 {"key": "维修人:", "value": order.repair_user},
                                 {"key": "维修完成时间:", "value": str(order.repair_end_datetime)},
@@ -194,11 +197,10 @@ def handle(order):
 
 def compare_time(now_datetime, check_time, interval, times):
     """获取比较时间"""
-    for i in range(1, times + 1):
-        change_minutes = interval * i
-        if check_time + timedelta(minutes=change_minutes) <= now_datetime <= check_time + timedelta(
-                minutes=change_minutes + 0.5):
-            return True, i
+    alarm_time = [i * interval for i in range(1, times + 1)]
+    num = math.ceil((now_datetime - check_time).seconds / 60)
+    if num in alarm_time:
+        return True, int(num / interval)
     return False, 0
 
 
