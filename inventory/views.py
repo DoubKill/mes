@@ -4849,12 +4849,12 @@ class WMSStockSummaryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = ""
         if material_name:
-            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
-                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
             else:
-                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += "where temp.MaterialCode like '%{}%'".format(material_no)
         if material_group_name:
             if extra_where_str:
                 extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
@@ -4863,8 +4863,8 @@ class WMSStockSummaryView(APIView):
 
         sql = """
                 select
-            m.Name AS MaterialName,
-            m.MaterialCode,
+            temp.MaterialName,
+            temp.MaterialCode,
             m.ZCMaterialCode,
             m.StandardUnit,
             m.Pdm,
@@ -4875,15 +4875,17 @@ class WMSStockSummaryView(APIView):
         from (
             select
                 a.MaterialCode,
+                a.MaterialName,
                 a.StockDetailState,
                 SUM(a.WeightOfActual) AS WeightOfActual,
                 SUM(a.Quantity ) AS quantity
             from t_inventory_stock AS a
             group by
                  a.MaterialCode,
+                 a.MaterialName,
                  a.StockDetailState
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        left join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
 
