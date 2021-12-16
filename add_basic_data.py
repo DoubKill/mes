@@ -1293,25 +1293,6 @@ def add_product_batching():
                 auto_flag=1
             )
 
-        for i in range(2):
-            wct = WeighCntType.objects.create(
-                name=pb.stage_product_batch_no + '-' + pb.dev_type.category_name + '硫磺包{}'.format(i+1),
-                product_batching=pb,
-                weigh_type=i + 1,
-                package_cnt=random.randint(1, 5)
-            )
-            for j in range(2):
-                detail_id = random.choice(list(wct.product_batching.batching_details.values_list(
-                    'id', flat=True)))
-                try:
-                    WeighBatchingDetail.objects.create(
-                        weigh_cnt_type=wct,
-                        material_id=ProductBatchingDetail.objects.get(id=detail_id).material_id,
-                        standard_weight=ProductBatchingDetail.objects.get(id=detail_id).actual_weight
-                    )
-                except Exception:
-                    continue
-
         data = {
             '门尼': {'门尼粘度': {'160*3': ['ML1+4']}},
             '流变': {'标准硫化': {'250*4': ['MH', 'TC10', 'TC50', 'TC90']}},

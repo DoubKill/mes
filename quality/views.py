@@ -1397,7 +1397,7 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
                                 mixins.ListModelMixin,
                                 viewsets.GenericViewSet):
     """胶料上报设备管理"""
-    queryset = ProductReportEquip.objects.all()
+    queryset = ProductReportEquip.objects.order_by('no')
     serializer_class = ProductReportEquipSerializer
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
