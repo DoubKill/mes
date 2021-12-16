@@ -71,7 +71,7 @@ from mes.settings import DEBUG
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog
+from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog, ExamineMaterial
 from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
 from system.models import User
@@ -436,6 +436,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
+        material_name = self.request.query_params.get("material_name")
+        quality_status = self.request.query_params.get("quality_status")
         order_no = self.request.query_params.get("order_no")
         lot_no = self.request.query_params.get("lot_no")
         pallet_no = self.request.query_params.get("pallet_no")
@@ -519,24 +521,28 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).exclude(
                     material_no__icontains="M")
-        elif store_name == "原材料库":
+        elif store_name in ("原材料库", '炭黑库'):
+            database = 'wms' if store_name == '原材料库' else 'cb'
+            if order_type == "出库":
+                queryset = MaterialOutHistory.objects.using(database).all()
+            else:
+                queryset = MaterialInHistory.objects.using(database).all()
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
                 filter_dict.update(task__start_time__lte=end_time)
-            if order_type == "出库":
-                return MaterialOutHistory.objects.using('wms').filter(**filter_dict)
-            else:
-                return MaterialInHistory.objects.using('wms').filter(**filter_dict)
-        elif store_name == "炭黑库":
-            if start_time:
-                filter_dict.update(task__start_time__gte=start_time)
-            if end_time:
-                filter_dict.update(task__start_time__lte=end_time)
-            if order_type == "出库":
-                return MaterialOutHistory.objects.using('cb').filter(**filter_dict)
-            else:
-                return MaterialInHistory.objects.using('cb').filter(**filter_dict)
+            if material_name:
+                filter_dict.update(material_name__icontains=material_name)
+            if quality_status:
+                if quality_status == '1':
+                    batch_nos = list(ExamineMaterial.objects.filter(qualified=True).values_list('batch', flat=True))
+                elif quality_status == '3':
+                    batch_nos = list(ExamineMaterial.objects.filter(qualified=False).values_list('batch', flat=True))
+                else:
+                    batch_nos = list(ExamineMaterial.objects.values_list('batch', flat=True))
+                    return queryset.exclude(batch_no__in=batch_nos).filter(**filter_dict)
+                filter_dict.update(batch_no__in=batch_nos)
+            return queryset.filter(**filter_dict)
         else:
             return []
 
@@ -650,6 +656,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
+            if store_name in ('原材料库', '炭黑库'):
+                test_data = dict(ExamineMaterial.objects.values_list('batch', 'qualified'))
+                for item in serializer.data:
+                    item['is_qualified'] = test_data.get(item['batch_no'], None)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)

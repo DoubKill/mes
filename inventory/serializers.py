@@ -1339,6 +1339,7 @@ class InOutCommonSerializer(serializers.Serializer):
     start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
     order_type = serializers.SerializerMethodField()
+    batch_no = serializers.CharField(max_length=64, read_only=True)
 
     def get_order_type(self, obj):
         if obj.inout_type == 1:
