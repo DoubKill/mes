@@ -487,6 +487,16 @@ class ProductDevBatchingReceive(APIView):
                 used_type=data['used_type'],
                 stage_product_batch_no=data['stage_product_batch_no']
             )
+        try:
+            material_type = GlobalCode.objects.filter(global_type__type_name='原材料类别',
+                                                      global_name=product_batching.stage.global_name).first()
+            Material.objects.get_or_create(
+                material_no=product_batching.stage_product_batch_no,
+                material_name=product_batching.stage_product_batch_no,
+                material_type=material_type
+            )
+        except Exception as e:
+            pass
         for item in data['batching_details']:
             item['product_batching'] = product_batching
             ProductBatchingDetail.objects.create(**item)
