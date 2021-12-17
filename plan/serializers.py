@@ -248,7 +248,8 @@ class ProductBatchingSerializer(BaseModelSerializer):
         if instance:
             instance.update(**validated_data)
         else:
-            super().create(validated_data)
+            instance = super().create(validated_data)
+            ProductBatching.objects.filter(id=instance.id).update(batching_weight=validated_data['batching_weight'])
         return validated_data
 
     class Meta:
