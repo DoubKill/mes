@@ -1235,37 +1235,6 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
             raise ValidationError('导入的数据类型有误')
         return Response(f'成功导入{len(s.validated_data)}条数据')
 
-    @atomic
-    def create(self, request, *args, **kwargs):
-        if self.request.data.get('add_erp'):  # 同步erp
-            time = '2021-11-11 09:00:00'
-            url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
-
-            try:
-                client = Client(url)
-                json_data = {"syncDate": time}
-                data = client.service.FindZcdtmList(json.dumps(json_data))
-            except Exception:
-                return self.results(False, '网络异常')
-            data = json.loads(data)
-            ret = data.get('obj')
-            if ret:
-                for item in ret:
-                    equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
-                    if not equip_component_type:
-                        raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
-                    if item['state'] != '启用':
-                        continue
-                    self.queryset.create(
-                        spare_code=item['wlbh'],
-                        spare_name=item['wlmc'],
-                        equip_component_type=equip_component_type,
-                        specification=item['gg'],
-                        unit=item['bzdwmc'],
-
-                    )
-            return Response('同步完成')
-        return super().create(request, *args, **kwargs)
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipBomViewSet(ModelViewSet):
@@ -3912,55 +3881,72 @@ class EquipOrderListView(APIView):
         return Response({'results': data[st:et], 'count': len(data)})
 
 
-# @method_decorator([api_recorder], name='dispatch')
-# class EquipMTBFMTTPStatementView(APIView):
-#     permission_classes = (IsAuthenticated,)
-#
-#     def get(self, request):
-#         # 统计自然日生产时间
-#         s_time = self.request.query_params.get('s_time', None)  # 2021-12
-#         equip_list = [f'Z{"%.2d" % i}' for i in range(1, 16)]
-#         if s_time:
-#             begin_time = s_time + '-01'
-#             end_year = (parse(''.join(s_time.split('-')) + "01") + relativedelta(months=11)).strftime("%Y-%m")
-#             end_time = end_year + f'-{calendar.monthrange(int(end_year.split("-")[0]),  int(end_year.split("-")[1]))[1]}'
-#             time_range = [begin_time, end_time]
-#             time_list = [(parse(''.join(s_time.split('-')) + "01") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
-#         else:
-#             end_year = date.today().year
-#             begin_time = f'{date.today().year}-01-01'
-#             end_time = f'{date.today().year}-12-31'
-#             time_range = [begin_time, end_time]
-#             time_list = [(parse(str(end_year) + "0101") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
-#         dic = {}
-#         for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
-#             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-#             dic[equip_list[i] + '2'] = {'equip_no': equip_list[i], 'content': '故障时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-#             dic[equip_list[i] + '3'] = {'equip_no': equip_list[i], 'content': '故障次数', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-#             dic[equip_list[i] + '4'] = {'equip_no': equip_list[i], 'content': 'MTBF', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-#             dic[equip_list[i] + '5'] = {'equip_no': equip_list[i], 'content': 'MTTR', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-#             dic[equip_list[i] + '6'] = {'equip_no': equip_list[i], 'content': '故障率', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
-#
-#         # 统计机台的故障用时
-#         # 已完成
-#         queryset = EquipApplyOrder.objects.filter(repair_start_datetime__date__range=time_range, status__in=['已完成', '已验收'], equip_condition='停机', equip_no__in=equip_list)
-#         query = queryset.annotate(month=TruncMonth('fault_datetime')).values('fault_datetime__year',
-#                                                                                     'fault_datetime__month',
-#                                                                                     'equip_no').annotate(
-#             time=OSum((F('repair_end_datetime') - F('fault_datetime'))), count=Count('id'))
-#
-#         for item in query:
-#             #  当前月总时长
-#             total_time = calendar.monthrange(item["fault_datetime__year"], item["fault_datetime__month"])[1] * 24
-#             year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
-#             if item['equip_no'] in equip_list:
-#                 dic[item['equip_no'] + '1'][year_month] = total_time
-#                 dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 60, 2),
-#                 dic[item['equip_no'] + '3'][year_month] = item['count']
-#                 dic[item['equip_no'] + '4'][year_month] = total_time / item['count']
-#                 dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 60) / item['count'], 2)
-#                 dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / total_time, 2)
-#         return Response(dic.values())
+@method_decorator([api_recorder], name='dispatch')
+class EquipMTBFMTTPStatementView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        # 统计自然日生产时间
+        s_time = self.request.query_params.get('s_time', None)  # 2021-12
+        equip_list = [f'Z{"%.2d" % i}' for i in range(1, 16)]
+        if s_time:
+            year = s_time.split('-')[0]
+            month = s_time.split('-')[-1]
+            begin_time = s_time + '-01'
+            if month == '1':
+                end_time = s_time + '-12-31'
+            else:
+                day = calendar._monthlen(int(year), int(month))
+                end_time = f"{ int(year) + 1}-{int(month) - 1}-{day}"
+        else:
+            end_year = date.today().year
+            begin_time = f'{date.today().year}-01-01'
+            end_time = f'{date.today().year}-12-31'
+        time_range = [begin_time, end_time]
+        a = begin_time.split('-')
+        b = end_time.split('-')
+        time_list = []
+        for year in [a[0], b[0]]:
+            if a[0] == b[0]:
+                for month in range(1, 13):
+                    time_list.append(f'{a[0]}年{month}月')
+            else:
+                if year == a[0]:
+                    for month in range(int(a[1]), 13):
+                        time_list.append(f'{a[0]}年{month}月')
+                elif year == b[0]:
+                    for month in range(1, int(b[1]) + 1):
+                        time_list.append(f'{b[0]}年{month}月')
+        time_list = []
+        dic = {}
+        for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
+            dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+            dic[equip_list[i] + '2'] = {'equip_no': equip_list[i], 'content': '故障时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+            dic[equip_list[i] + '3'] = {'equip_no': equip_list[i], 'content': '故障次数', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+            dic[equip_list[i] + '4'] = {'equip_no': equip_list[i], 'content': 'MTBF', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+            dic[equip_list[i] + '5'] = {'equip_no': equip_list[i], 'content': 'MTTR', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+            dic[equip_list[i] + '6'] = {'equip_no': equip_list[i], 'content': '故障率', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
+
+        # 统计机台的故障用时
+        # 已完成
+        queryset = EquipApplyOrder.objects.filter(repair_start_datetime__date__range=time_range, status__in=['已完成', '已验收'], equip_condition='停机', equip_no__in=equip_list)
+        query = queryset.annotate(month=TruncMonth('fault_datetime')).values('fault_datetime__year',
+                                                                                    'fault_datetime__month',
+                                                                                    'equip_no').annotate(
+            time=OSum((F('repair_end_datetime') - F('fault_datetime'))), count=Count('id'))
+
+        for item in query:
+            #  当前月总时长
+            total_time = calendar.monthrange(item["fault_datetime__year"], item["fault_datetime__month"])[1] * 24
+            year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
+            if item['equip_no'] in equip_list:
+                dic[item['equip_no'] + '1'][year_month] = total_time
+                dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 60, 2),
+                dic[item['equip_no'] + '3'][year_month] = item['count']
+                dic[item['equip_no'] + '4'][year_month] = total_time / item['count']
+                dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 60) / item['count'], 2)
+                dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / total_time, 2)
+        return Response(dic.values())
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -4092,3 +4078,90 @@ class EquipUserStatementView(APIView):
             '验收时间': round(item['验收时间'].total_seconds() / 60, 2),
         } for item in queryset]
         return Response(res)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GetSpare(APIView):
+    @atomic
+    def get(self, request, *args, **kwargs):
+        if self.request.query_params.get('spare'):  # 同步erp
+            last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
+            last_time = (last.sync_date + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+            url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
+            try:
+                res = requests.post(url=url, json={"syncDate": last_time})
+            except Exception:
+                raise ValidationError("网络异常")
+            if res.status_code != 200:
+                raise ValidationError("请求失败")
+            data = json.loads(res.content)
+            if not data.get('flag'):
+                raise ValidationError(data.get('message'))
+            ret = data.get('obj')
+            for item in ret:
+                equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
+                if not equip_component_type:
+                    raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
+                if item['state'] != '启用':
+                    continue
+                EquipSpareErp.objects.create(
+                    spare_code=item['wlbh'],
+                    spare_name=item['wlmc'],
+                    equip_component_type=equip_component_type,
+                    specification=item['gg'],
+                    unit=item['bzdwmc'],
+                    unique_id=item['wlxxid']
+                )
+        return Response('同步完成')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GetSpareOrder(APIView):
+    @atomic
+    def get(self, request):
+        order = self.request.query_params.get('order')
+        if order == 'get_code':  # 获取指定时间后的单据
+            # 获取最新的单据
+            last = EquipWarehouseOrder.objects.filter(processing_time__isnull=False).order_by('processing_time').last()  # 第一次先在数据库插入一条假数据
+            last_time = (last.processing_time + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+            json_data = {"ztmc": "zcaj", "clsj": last_time}
+        else:  # 根据单据编号获取指定的单据
+            json_data = {"ztmc": "zcaj", "djbh": order}
+        # 获取数据
+        url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getkclld.io'
+        try:
+            res = requests.post(url=url, json=json_data)
+        except Exception:
+            raise ValidationError("网络异常")
+        if res.status_code != 200:
+            raise ValidationError("请求失败")
+        data = json.loads(res.content)
+        if not data.get('flag'):
+            raise ValidationError(data.get('message'))
+        lst = data.get('obj')
+        for dic in lst:
+            order = dic.get('lld')
+            order_detail = dic.get('lldmx')  # list
+            if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
+                continue
+            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).order_by('id')
+            if res:
+                order_id = res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1))
+            else:
+               order_id = 'RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001'
+            order = EquipWarehouseOrder.objects.create(
+                order_id=order_id,
+                submission_department='设备科',
+                status=1,
+                barcode=order.get('djbh'),
+                processing_time=order.get('clsj')
+            )
+            for spare in order_detail:
+                equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
+                if not equip_spare:
+                    raise ValidationError('调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件')
+                kwargs = {'equip_warehouse_order': order,
+                          'equip_spare': equip_spare,
+                          'plan_in_quantity': spare.get('cksl')}
+                EquipWarehouseOrderDetail.objects.create(**kwargs)
+        return Response('请求成功')
