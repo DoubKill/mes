@@ -1105,7 +1105,7 @@ class UnqualifiedDealOrderViewSet(ModelViewSet):
     filter_class = UnqualifiedDealOrderFilter
 
     def get_queryset(self):
-        queryset = UnqualifiedDealOrder.objects.all()
+        queryset = UnqualifiedDealOrder.objects.order_by('-id')
         t_deal = self.request.query_params.get('t_solved')
         c_deal = self.request.query_params.get('c_solved')
         if t_deal == 'Y':  # 技术部门已处理
@@ -1397,7 +1397,7 @@ class ProductReportEquipViewSet(mixins.CreateModelMixin,
                                 mixins.ListModelMixin,
                                 viewsets.GenericViewSet):
     """胶料上报设备管理"""
-    queryset = ProductReportEquip.objects.all()
+    queryset = ProductReportEquip.objects.order_by('no')
     serializer_class = ProductReportEquipSerializer
     # permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)

@@ -71,7 +71,7 @@ from mes.settings import DEBUG
 from plan.models import ProductClassesPlan, ProductBatchingClassesPlan, BatchingClassesPlan
 from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
-from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog
+from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog, ExamineMaterial
 from quality.serializers import MaterialDealResultListSerializer
 from recipe.models import Material, MaterialAttribute
 from system.models import User
@@ -436,6 +436,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
+        material_name = self.request.query_params.get("material_name")
+        quality_status = self.request.query_params.get("quality_status")
         order_no = self.request.query_params.get("order_no")
         lot_no = self.request.query_params.get("lot_no")
         pallet_no = self.request.query_params.get("pallet_no")
@@ -519,24 +521,28 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 return MixGumInInventoryLog.objects.using('lb').filter(**filter_dict).exclude(
                     material_no__icontains="M")
-        elif store_name == "原材料库":
+        elif store_name in ("原材料库", '炭黑库'):
+            database = 'wms' if store_name == '原材料库' else 'cb'
+            if order_type == "出库":
+                queryset = MaterialOutHistory.objects.using(database).all()
+            else:
+                queryset = MaterialInHistory.objects.using(database).all()
             if start_time:
                 filter_dict.update(task__start_time__gte=start_time)
             if end_time:
                 filter_dict.update(task__start_time__lte=end_time)
-            if order_type == "出库":
-                return MaterialOutHistory.objects.using('wms').filter(**filter_dict)
-            else:
-                return MaterialInHistory.objects.using('wms').filter(**filter_dict)
-        elif store_name == "炭黑库":
-            if start_time:
-                filter_dict.update(task__start_time__gte=start_time)
-            if end_time:
-                filter_dict.update(task__start_time__lte=end_time)
-            if order_type == "出库":
-                return MaterialOutHistory.objects.using('cb').filter(**filter_dict)
-            else:
-                return MaterialInHistory.objects.using('cb').filter(**filter_dict)
+            if material_name:
+                filter_dict.update(material_name__icontains=material_name)
+            if quality_status:
+                if quality_status == '1':
+                    batch_nos = list(ExamineMaterial.objects.filter(qualified=True).values_list('batch', flat=True))
+                elif quality_status == '3':
+                    batch_nos = list(ExamineMaterial.objects.filter(qualified=False).values_list('batch', flat=True))
+                else:
+                    batch_nos = list(ExamineMaterial.objects.values_list('batch', flat=True))
+                    return queryset.filter(~Q(batch_no__in=batch_nos) | Q(batch_no__isnull=True)).filter(**filter_dict)
+                filter_dict.update(batch_no__in=batch_nos)
+            return queryset.filter(**filter_dict)
         else:
             return []
 
@@ -650,6 +656,10 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
+            if store_name in ('原材料库', '炭黑库'):
+                test_data = dict(ExamineMaterial.objects.values_list('batch', 'qualified'))
+                for item in serializer.data:
+                    item['is_qualified'] = test_data.get(item['batch_no'], None)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
@@ -2446,12 +2456,12 @@ class WmsStorageSummaryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = inventory_where_str = ""
         if material_name:
-            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
-                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
             else:
-                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += "where temp.MaterialCode like '%{}%'".format(material_no)
         if zc_material_code:
             if extra_where_str:
                 extra_where_str += " and m.ZCMaterialCode='{}'".format(zc_material_code)
@@ -2484,8 +2494,8 @@ class WmsStorageSummaryView(APIView):
                 inventory_where_str += "where a.CreaterTime<='{}'".format(inventory_et)
         sql = """
                 select
-            m.Name AS MaterialName,
-            m.MaterialCode,
+            temp.MaterialName,
+            temp.MaterialCode,
             m.ZCMaterialCode,
             temp.WeightUnit,
             m.Pdm,
@@ -2499,17 +2509,19 @@ class WmsStorageSummaryView(APIView):
                 a.BatchNo,
                 a.WeightUnit,
                 a.StockDetailState,
+                a.MaterialName,
                 SUM ( a.WeightOfActual ) AS WeightOfActual,
                 SUM ( a.Quantity ) AS quantity
             from dbo.t_inventory_stock AS a
             {}
             group by
                  a.MaterialCode,
+                 a.MaterialName,
                  a.BatchNo,
                  a.WeightUnit,
                  a.StockDetailState
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode 
+        left join t_inventory_material m on m.MaterialCode=temp.MaterialCode 
         {}
         order by m.MaterialCode
         """.format(inventory_where_str, extra_where_str)
@@ -3114,12 +3126,12 @@ class WMSInventoryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = ""
         if material_name:
-            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
-                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
             else:
-                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += "where temp.MaterialCode like '%{}%'".format(material_no)
         if material_group_name:
             if extra_where_str:
                 extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
@@ -3132,8 +3144,8 @@ class WMSInventoryView(APIView):
                 extra_where_str += "where temp.TunnelName='{}'".format(tunnel_name)
         sql = """
                 select
-            m.Name AS MaterialName,
-            m.MaterialCode,
+            temp.MaterialName,
+            temp.MaterialCode,
             m.ZCMaterialCode,
             temp.WeightUnit,
             m.Pdm,
@@ -3145,6 +3157,7 @@ class WMSInventoryView(APIView):
         from (
             select
                 a.MaterialCode,
+                a.MaterialName,
                 a.BatchNo,
                 d.TunnelName,
                 a.WeightUnit,
@@ -3154,11 +3167,12 @@ class WMSInventoryView(APIView):
             INNER JOIN t_inventory_tunnel d ON d.TunnelCode= a.TunnelId
             group by
                  a.MaterialCode,
+                 a.MaterialName,
                  d.TunnelName,
                  a.BatchNo,
                  a.WeightUnit
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        left join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
 
@@ -4802,7 +4816,9 @@ class WMSStockSummaryView(APIView):
         style = xlwt.XFStyle()
         style.alignment.wrap = 1
 
-        columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组', '数量', '重量/kg']
+        columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组',
+                   '有效库存数量', '有效库存重量（kg）', '合格品数量', '合格品重量（kg）',
+                   '待检品数量', '待检品重量（kg）', '不合格品数量', '不合格品重量（kg）', '总数量', '总重量（kg）', ]
 
         for col_num in range(len(columns)):
             sheet.write(1, col_num, columns[col_num])
@@ -4816,8 +4832,16 @@ class WMSStockSummaryView(APIView):
             sheet.write(data_row, 4, i['unit'])
             sheet.write(data_row, 5, i['pdm'])
             sheet.write(data_row, 6, i['group_name'])
-            sheet.write(data_row, 7, i['quantity'])
-            sheet.write(data_row, 8, i['weight'])
+            sheet.write(data_row, 7, i['quantity_1']+i['quantity_5'])
+            sheet.write(data_row, 8, i['weight_1']+i['weight_5'])
+            sheet.write(data_row, 9, i['quantity_1'])
+            sheet.write(data_row, 10, i['weight_1'])
+            sheet.write(data_row, 11, i['quantity_5'])
+            sheet.write(data_row, 12, i['weight_5'])
+            sheet.write(data_row, 13, i['quantity_3'])
+            sheet.write(data_row, 14, i['weight_3'])
+            sheet.write(data_row, 15, i['total_quantity'])
+            sheet.write(data_row, 16, i['total_weight'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -4839,12 +4863,12 @@ class WMSStockSummaryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = ""
         if material_name:
-            extra_where_str += "where m.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
-                extra_where_str += " and m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
             else:
-                extra_where_str += "where m.MaterialCode like '%{}%'".format(material_no)
+                extra_where_str += "where temp.MaterialCode like '%{}%'".format(material_no)
         if material_group_name:
             if extra_where_str:
                 extra_where_str += " and m.MaterialGroupName='{}'".format(material_group_name)
@@ -4853,55 +4877,89 @@ class WMSStockSummaryView(APIView):
 
         sql = """
                 select
-            m.Name AS MaterialName,
-            m.MaterialCode,
+            temp.MaterialName,
+            temp.MaterialCode,
             m.ZCMaterialCode,
             m.StandardUnit,
             m.Pdm,
             m.MaterialGroupName,
             temp.quantity,
-            temp.WeightOfActual
+            temp.WeightOfActual,
+            temp.StockDetailState
         from (
             select
                 a.MaterialCode,
-                SUM ( a.WeightOfActual ) AS WeightOfActual,
-                SUM ( a.Quantity ) AS quantity
-            from dbo.t_inventory_stock AS a
+                a.MaterialName,
+                a.StockDetailState,
+                SUM(a.WeightOfActual) AS WeightOfActual,
+                SUM(a.Quantity ) AS quantity
+            from t_inventory_stock AS a
             group by
-                 a.MaterialCode
+                 a.MaterialCode,
+                 a.MaterialName,
+                 a.StockDetailState
             ) temp
-        inner join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
+        left join t_inventory_material m on m.MaterialCode=temp.MaterialCode {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
 
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
             F('wms_material_code'), F('warning_weight') * 1000))
 
-        result = []
+        data_dict = {}
+
         for item in temp:
-            data = {'name': item[0],
-                    'code': item[1],
-                    'zc_material_code': item[2],
-                    'unit': item[3],
-                    'pdm': item[4],
-                    'group_name': item[5],
-                    'quantity': item[6],
-                    'weight': item[7],
-                    }
-            weighting = safety_data.get(item[1])
-            if weighting:
-                if weighting < item[7]:
-                    data['flag'] = 'H'
-                else:
-                    data['flag'] = 'L'
+            quality_status = item[8]
+            if quality_status == 2:
+                quality_status = 5
+            if item[1] not in data_dict:
+                data = {'name': item[0],
+                        'code': item[1],
+                        'zc_material_code': item[2],
+                        'unit': item[3],
+                        'pdm': item[4],
+                        'group_name': item[5],
+                        'total_quantity': item[6],
+                        'total_weight': item[7],
+                        'quantity_1': 0,
+                        'weight_1': 0,
+                        'quantity_3': 0,
+                        'weight_3': 0,
+                        'quantity_4': 0,
+                        'weight_4': 0,
+                        'quantity_5': 0,
+                        'weight_5': 0
+                        }
+                data['quantity_{}'.format(quality_status)] = item[6]
+                data['weight_{}'.format(quality_status)] = item[7]
+                data_dict[item[1]] = data
             else:
-                data['flag'] = None
-            result.append(data)
+                data_dict[item[1]]['total_quantity'] += item[6]
+                data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
+                data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
+        result = []
+        for item in data_dict.values():
+            weighting = safety_data.get(item['code'])
+            if weighting:
+                if weighting < item['weight_1'] + item['weight_5']:
+                    item['flag'] = 'H'
+                else:
+                    item['flag'] = 'L'
+            else:
+                item['flag'] = None
+            result.append(item)
         sc.close()
         if lower_only_flag:
             result = list(filter(lambda x: x['flag'] == 'L', result))
-        total_quantity = sum([item['quantity'] for item in result])
-        total_weight = sum([item['weight'] for item in result])
+        total_quantity = sum([item['total_quantity'] for item in result])
+        total_weight = sum([item['total_weight'] for item in result])
+        total_quantity1 = sum([item['quantity_1'] for item in result])
+        total_weight1 = sum([item['weight_1'] for item in result])
+        total_quantity3 = sum([item['quantity_3'] for item in result])
+        total_weight3 = sum([item['weight_3'] for item in result])
+        total_quantity5 = sum([item['quantity_5'] for item in result])
+        total_weight5 = sum([item['weight_5'] for item in result])
         count = len(result)
         ret = result[st:et]
         if export:
@@ -4911,7 +4969,12 @@ class WMSStockSummaryView(APIView):
                 data = result
             return self.export_xls(data)
         return Response(
-            {'results': ret, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
+            {'results': ret, "count": count,
+             'total_quantity': total_quantity, 'total_weight': total_weight,
+             'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
+             'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
+             'total_quantity5': total_quantity5, 'total_weight5': total_weight5
+             })
 
 
 @method_decorator([api_recorder], name="dispatch")
