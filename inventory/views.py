@@ -540,7 +540,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                     batch_nos = list(ExamineMaterial.objects.filter(qualified=False).values_list('batch', flat=True))
                 else:
                     batch_nos = list(ExamineMaterial.objects.values_list('batch', flat=True))
-                    return queryset.exclude(batch_no__in=batch_nos).filter(**filter_dict)
+                    return queryset.filter(~Q(batch_no__in=batch_nos) | Q(batch_no__isnull=True)).filter(**filter_dict)
                 filter_dict.update(batch_no__in=batch_nos)
             return queryset.filter(**filter_dict)
         else:
