@@ -10,8 +10,6 @@ import xlwt
 from suds.client import Client
 from io import BytesIO
 from itertools import chain
-from dateutil.parser import parse
-from dateutil.relativedelta import relativedelta
 from django.db.models.functions import TruncMonth
 from django.db.models import F, Q, Sum, Count
 from django.http import HttpResponse
@@ -1235,37 +1233,6 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
             raise ValidationError('导入的数据类型有误')
         return Response(f'成功导入{len(s.validated_data)}条数据')
 
-    @atomic
-    def create(self, request, *args, **kwargs):
-        if self.request.data.get('add_erp'):  # 同步erp
-            time = '2021-11-11 09:00:00'
-            url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
-
-            try:
-                client = Client(url)
-                json_data = {"syncDate": time}
-                data = client.service.FindZcdtmList(json.dumps(json_data))
-            except Exception:
-                return self.results(False, '网络异常')
-            data = json.loads(data)
-            ret = data.get('obj')
-            if ret:
-                for item in ret:
-                    equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
-                    if not equip_component_type:
-                        raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
-                    if item['state'] != '启用':
-                        continue
-                    self.queryset.create(
-                        spare_code=item['wlbh'],
-                        spare_name=item['wlmc'],
-                        equip_component_type=equip_component_type,
-                        specification=item['gg'],
-                        unit=item['bzdwmc'],
-
-                    )
-            return Response('同步完成')
-        return super().create(request, *args, **kwargs)
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipBomViewSet(ModelViewSet):
@@ -2538,15 +2505,10 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
         out_quantity = data.get('out_quantity', 1)
         status = data.get('status')  # 1 入库 2 出库
         instance = self.queryset.filter(equip_warehouse_order_id=data['equip_warehouse_order'], equip_spare_id=data['equip_spare']).first()
+        query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
+                                                       equip_warehouse_location_id=data[
+                                                           'equip_warehouse_location']).first()
         if status == 1:
-            # 判断库区类型 和 备件类型是否匹配
-            query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
-                                                           equip_warehouse_order_detail__equip_warehouse_order_id=data[
-                                                               'equip_warehouse_order'],
-                                                           equip_warehouse_location_id=data['equip_warehouse_location']).first()
-
-            # if in_quantity > instance.plan_in_quantity - instance.in_quantity:
-            #     return Response({"success": False, "message": '超过单据中的可入库数量', "data": None})
             if instance.plan_in_quantity <= instance.in_quantity:
                 return Response({"success": False, "message": '该单据已入库完成', "data": None})
             if instance.in_quantity + in_quantity >= instance.plan_in_quantity:
@@ -2557,16 +2519,13 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             instance.save()
 
             if query:
-                now_quantity = query.quantity + in_quantity
                 query.quantity += in_quantity
                 query.save()
             else:
-                now_quantity = in_quantity
-                EquipWarehouseInventory.objects.create(
+                query = EquipWarehouseInventory.objects.create(
                     created_user=self.request.user,
                     equip_spare=instance.equip_spare,
                     quantity=in_quantity,
-                    equip_warehouse_order_detail=instance,
                     equip_warehouse_area_id=data['equip_warehouse_area'],
                     equip_warehouse_location_id=data['equip_warehouse_location']
                 )
@@ -2577,7 +2536,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 EquipWarehouseOrder.objects.filter(order_detail=instance).update(status=3)
             # 记录履历
             EquipWarehouseRecord.objects.create(status='入库',
-                                                now_quantity=now_quantity,
+                                                now_quantity=query.quantity,
                                                 equip_warehouse_area_id=data['equip_warehouse_area'],
                                                 equip_warehouse_location_id=data['equip_warehouse_location'],
                                                 equip_spare=instance.equip_spare,
@@ -2587,8 +2546,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                                                 )
             return Response({"success": True, "message": '入库成功', "data": data})
         if status == 2:
-            query = EquipWarehouseInventory.objects.filter(equip_spare_id=data['equip_spare'], delete_flag=False,
-                                                           equip_warehouse_location_id=data['equip_warehouse_location']).first()
             # 出库的时候，根据出库的数量，判断库区中数量够不够
             if query.quantity < out_quantity:
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
@@ -2600,7 +2557,6 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
             else:
                 instance.out_quantity += out_quantity
                 instance.status = 5  # 出库中
-            now_quantity = query.quantity - out_quantity
             query.quantity -= out_quantity
             query.save()
             instance.save()
@@ -2613,7 +2569,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
 
             # 记录履历
             EquipWarehouseRecord.objects.create(status='出库',
-                                                now_quantity=now_quantity,
+                                                now_quantity=query.quantity,
                                                 equip_warehouse_area_id=data['equip_warehouse_area'],
                                                 equip_warehouse_location_id=data['equip_warehouse_location'],
                                                 equip_spare=instance.equip_spare,
@@ -2666,7 +2622,7 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         if equip_spare:  # 获取库存中备件的库区和库位
             first = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).first()  # 默认显示的库区和库位
             area = self.queryset.filter(equip_spare_id=equip_spare).values('equip_warehouse_area__area_name', 'equip_warehouse_area__id').distinct()
-            location = self.queryset.filter(equip_spare_id=equip_spare).values('equip_warehouse_location__location_name', 'equip_warehouse_location__id', 'equip_warehouse_area__id').distinct()
+            location = self.queryset.filter(equip_spare_id=equip_spare, quantity__gt=0).values('equip_warehouse_location__location_name', 'equip_warehouse_location__id', 'equip_warehouse_area__id').distinct()
             if not first:
                 return Response({"success": False, "message": '库存中不存在该备件', "data": None})
             return Response({'area': area, 'location': location, 'first': {
@@ -2724,19 +2680,19 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
         handle = self.request.data.get('handle')
         data = self.request.data
-        queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id'])
+        inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id']).first()
         if handle:
             # 盘库
             if handle == '盘库':
                 quantity = data.get('quantity')
-                now_quantity = data.get('quantity')
-                queryset.update(quantity=data['quantity'])
+                inventory.quantity = data['quantity']
             elif handle == '移库':
+                if data['move_equip_warehouse_location__id'] == data['equip_warehouse_location__id']:
+                    return Response({"success": False, "message": '不能移动到当前库区', "data": None})
                 quantity = f"-{data.get('quantity')}"
-                old = queryset.first()
-                now_quantity = old.quantity - data['quantity']
-                old.quantity -= data['quantity']
-                old.save()
+                if inventory.quantity < data['quantity']:
+                    return Response({"success": False, "message": '当前库存数量不足', "data": None})
+                inventory.quantity -= data['quantity']
                 new_queryset = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['move_equip_warehouse_location__id'])
                 if new_queryset.exists():
                     new = new_queryset.first()
@@ -2759,10 +2715,12 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
                     equip_spare_id=data.get('equip_spare'),
                     created_user=self.request.user),
             elif handle == '删除':
-                now_quantity = 0
-                quantity = queryset.first().quantity
-                queryset.update(delete_flag=True)
+                inventory.quantity = 0
+                quantity = inventory.quantity
+                inventory.delete_flag = True
             # 记录履历
+            inventory.save()
+            now_quantity = inventory.quantity
             EquipWarehouseRecord.objects.create(
                 status=handle,
                 revocation_desc=data.get('desc'),
@@ -2835,7 +2793,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
         if instance.created_user == self.request.user:
             order_detail = instance.equip_warehouse_order_detail
             if instance.status == '入库':
-                now_quantity = instance.now_quantity - quantity
                 if order_detail.in_quantity == quantity:
                     order_detail.status = 1
                 else:
@@ -2848,7 +2805,6 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
                     inventory.quantity -= quantity
                 inventory.save()
             if instance.status == '出库':
-                now_quantity = inventory.quantity + quantity
                 order_detail.out_quantity -= quantity
                 if order_detail.out_quantity == quantity:
                     order_detail.status = 4
@@ -2860,13 +2816,12 @@ class EquipWarehouseRecordViewSet(ModelViewSet):
             EquipWarehouseRecord.objects.filter(id=instance.id).update(revocation='Y')
             order_detail.save()
             # 记录履历
-
             EquipWarehouseRecord.objects.create(
                 status='撤销',
                 equip_warehouse_area=instance.equip_warehouse_area,
                 equip_warehouse_location=instance.equip_warehouse_location,
                 equip_warehouse_order_detail=instance.equip_warehouse_order_detail,
-                now_quantity=now_quantity,
+                now_quantity=inventory.quantity,
                 quantity=quantity,
                 equip_spare=instance.equip_spare,
                 created_user=self.request.user,
@@ -3027,7 +2982,8 @@ class EquipAutoPlanView(APIView):
                     'location': location,
                     'spare_code': data[0]['equip_spare__spare_code'],
                     'spare_name': data[0]['equip_spare__spare_name'],
-                    'move_location': move_location
+                    'move_location': move_location,
+                    'equip_spare': data[0]['equip_spare']
                 })
             return Response({"success": True, "message": None, "data": dic})
 
@@ -3942,17 +3898,34 @@ class EquipMTBFMTTPStatementView(APIView):
         s_time = self.request.query_params.get('s_time', None)  # 2021-12
         equip_list = [f'Z{"%.2d" % i}' for i in range(1, 16)]
         if s_time:
+            year = s_time.split('-')[0]
+            month = s_time.split('-')[-1]
             begin_time = s_time + '-01'
-            end_year = (parse(''.join(s_time.split('-')) + "01") + relativedelta(months=11)).strftime("%Y-%m")
-            end_time = end_year + f'-{calendar.monthrange(int(end_year.split("-")[0]),  int(end_year.split("-")[1]))[1]}'
-            time_range = [begin_time, end_time]
-            time_list = [(parse(''.join(s_time.split('-')) + "01") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
+            if month == '1':
+                end_time = s_time + '-12-31'
+            else:
+                day = calendar._monthlen(int(year), int(month))
+                end_time = f"{ int(year) + 1}-{int(month) - 1}-{day}"
         else:
             end_year = date.today().year
             begin_time = f'{date.today().year}-01-01'
             end_time = f'{date.today().year}-12-31'
-            time_range = [begin_time, end_time]
-            time_list = [(parse(str(end_year) + "0101") + relativedelta(months=i - 1)).strftime("%Y年%m月") for i in range(1, 13)]
+        time_range = [begin_time, end_time]
+        a = begin_time.split('-')
+        b = end_time.split('-')
+        time_list = []
+        for year in [a[0], b[0]]:
+            if a[0] == b[0]:
+                for month in range(1, 13):
+                    time_list.append(f'{a[0]}年{month}月')
+            else:
+                if year == a[0]:
+                    for month in range(int(a[1]), 13):
+                        time_list.append(f'{a[0]}年{month}月')
+                elif year == b[0]:
+                    for month in range(1, int(b[1]) + 1):
+                        time_list.append(f'{b[0]}年{month}月')
+        time_list = []
         dic = {}
         for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
@@ -4113,3 +4086,90 @@ class EquipUserStatementView(APIView):
             '验收时间': round(item['验收时间'].total_seconds() / 60, 2),
         } for item in queryset]
         return Response(res)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GetSpare(APIView):
+    @atomic
+    def get(self, request, *args, **kwargs):
+        if self.request.query_params.get('spare'):  # 同步erp
+            last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
+            last_time = (last.sync_date + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+            url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
+            try:
+                res = requests.post(url=url, json={"syncDate": last_time})
+            except Exception:
+                raise ValidationError("网络异常")
+            if res.status_code != 200:
+                raise ValidationError("请求失败")
+            data = json.loads(res.content)
+            if not data.get('flag'):
+                raise ValidationError(data.get('message'))
+            ret = data.get('obj')
+            for item in ret:
+                equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
+                if not equip_component_type:
+                    raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
+                if item['state'] != '启用':
+                    continue
+                EquipSpareErp.objects.create(
+                    spare_code=item['wlbh'],
+                    spare_name=item['wlmc'],
+                    equip_component_type=equip_component_type,
+                    specification=item['gg'],
+                    unit=item['bzdwmc'],
+                    unique_id=item['wlxxid']
+                )
+        return Response('同步完成')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class GetSpareOrder(APIView):
+    @atomic
+    def get(self, request):
+        order = self.request.query_params.get('order')
+        if order == 'get_code':  # 获取指定时间后的单据
+            # 获取最新的单据
+            last = EquipWarehouseOrder.objects.filter(processing_time__isnull=False).order_by('processing_time').last()  # 第一次先在数据库插入一条假数据
+            last_time = (last.processing_time + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+            json_data = {"ztmc": "zcaj", "clsj": last_time}
+        else:  # 根据单据编号获取指定的单据
+            json_data = {"ztmc": "zcaj", "djbh": order}
+        # 获取数据
+        url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getkclld.io'
+        try:
+            res = requests.post(url=url, json=json_data)
+        except Exception:
+            raise ValidationError("网络异常")
+        if res.status_code != 200:
+            raise ValidationError("请求失败")
+        data = json.loads(res.content)
+        if not data.get('flag'):
+            raise ValidationError(data.get('message'))
+        lst = data.get('obj')
+        for dic in lst:
+            order = dic.get('lld')
+            order_detail = dic.get('lldmx')  # list
+            if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
+                continue
+            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).order_by('id')
+            if res:
+                order_id = res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1))
+            else:
+               order_id = 'RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001'
+            order = EquipWarehouseOrder.objects.create(
+                order_id=order_id,
+                submission_department='设备科',
+                status=1,
+                barcode=order.get('djbh'),
+                processing_time=order.get('clsj')
+            )
+            for spare in order_detail:
+                equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
+                if not equip_spare:
+                    raise ValidationError('调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件')
+                kwargs = {'equip_warehouse_order': order,
+                          'equip_spare': equip_spare,
+                          'plan_in_quantity': spare.get('cksl')}
+                EquipWarehouseOrderDetail.objects.create(**kwargs)
+        return Response('请求成功')

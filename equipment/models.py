@@ -304,7 +304,7 @@ class EquipSpareErp(AbstractEntity):
         erp备件物料
     """
     spare_code = models.CharField(max_length=64, help_text='erp备件编码')
-    spare_name = models.CharField(max_length=64, help_text='erp备件名称')
+    spare_name = models.CharField(max_length=150, help_text='erp备件名称')
     equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
                                              help_text='部件分类')
     supplier_name = models.CharField(max_length=64, help_text='供应商名称', blank=True, null=True)
@@ -319,6 +319,8 @@ class EquipSpareErp(AbstractEntity):
     period_validity = models.IntegerField(help_text='有效期', blank=True, null=True)
     use_flag = models.BooleanField(help_text='是否启用', default=True)
     info_source = models.CharField(max_length=64, help_text='来源', blank=True, null=True, default='MES')
+    unique_id = models.CharField(max_length=64, help_text='备件唯一id', blank=True, null=True)
+    sync_date = models.DateTimeField(help_text='变更时间', null=True, blank=True)
     equip_component = models.ManyToManyField(EquipComponent, help_text='设备部件', related_name='equip_components',
                                              through='ERPSpareComponentRelation')
 
@@ -536,7 +538,7 @@ class EquipJobItemStandardDetail(AbstractEntity):
 
 class EquipMaintenanceStandard(AbstractEntity):
     standard_code = models.CharField(max_length=64, help_text='标准编号')
-    standard_name = models.CharField(max_length=64, help_text='标准名称')
+    standard_name = models.CharField(max_length=64, help_text='标准名称', null=True, blank=True)
     work_type = models.CharField(max_length=64, help_text='作业类型')
     equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
@@ -576,7 +578,7 @@ class EquipMaintenanceStandardMaterials(AbstractEntity):
 
 class EquipRepairStandard(AbstractEntity):
     standard_code = models.CharField(max_length=64, help_text='标准编号')
-    standard_name = models.CharField(max_length=64, help_text='标准名称')
+    standard_name = models.CharField(max_length=64, help_text='标准名称', null=True, blank=True)
     # work_type = models.CharField(max_length=64, help_text='作业类型')
     equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
@@ -705,6 +707,8 @@ class EquipWarehouseOrder(AbstractEntity):
     status = models.PositiveIntegerField(choices=ORDER_STATUS, help_text='状态', default=1)
     desc = models.TextField(help_text='描述', null=True, blank=True)
     work_order_no = models.CharField(max_length=64, help_text='工单编号', null=True, blank=True)
+    barcode = models.CharField(max_length=64, help_text='领料单据', null=True, blank=True)
+    processing_time = models.DateTimeField(help_text='处理时间', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_order'
@@ -754,7 +758,6 @@ class EquipWarehouseInventory(AbstractEntity):
                                              blank=True)
     equip_warehouse_location = models.ForeignKey(EquipWarehouseLocation, help_text='库位', on_delete=models.CASCADE,
                                                  null=True, blank=True)
-    equip_warehouse_order_detail = models.ForeignKey(EquipWarehouseOrderDetail, help_text='出入库单据明细', on_delete=models.CASCADE, null=True, blank=True)
 
     class Meta:
         db_table = 'equip_warehouse_inventory'
