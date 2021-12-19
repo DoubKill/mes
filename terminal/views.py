@@ -54,7 +54,8 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     CarbonFeedingPromptCreateSerializer, PowderTankSettingSerializer, OilTankSettingSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
-from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode
+from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
+    get_manual_materials
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -473,8 +474,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
                         # 配料时间
                         actual_batch_time = equip_plan_info.filter(planid=i['plan_weight_uid']).first().starttime
-                        # 公差查询
-                        machine_tolerance = get_tolerance(batching_equip=i['equip_no'], standard_weight=plan_weight)
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
                         if not single_expire_record:
@@ -498,9 +497,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                                                   dev_type__category_name=dev_type).first()
                             if prod and prod.weight_cnt_types.first():
                                 total_weight = prod.weight_cnt_types.first().total_weight
+                        # 公差查询
+                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
                                   'batch_time': actual_batch_time, 'product_no': product_no_dev,
-                                  'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
+                                  'batching_type': '机配', 'machine_weight': round(plan_weight / split_count, 3), 'manual_weight': 0,
                                   'batch_user': i['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                   'expire_datetime': expire_datetime, 'split_count': split_count,
                                   'machine_manual_weight': total_weight, 'machine_manual_tolerance': machine_tolerance,
@@ -530,8 +531,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
                         actual_batch_time = equip_plan_info.filter(
                             planid=serializer['plan_weight_uid']).first().starttime
-                        # 公差查询
-                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
@@ -555,10 +554,12 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                                                   dev_type__category_name=dev_type).first()
                             if prod and prod.weight_cnt_types.first():
                                 total_weight = prod.weight_cnt_types.first().total_weight
+                        # 公差查询
+                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': product_no_dev,
-                                           'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
-                                           'batch_user': serializer['oper'],
+                                           'batching_type': '机配', 'machine_weight': round(plan_weight / split_count, 3),
+                                           'manual_weight': 0, 'batch_user': serializer['oper'],
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                            'expire_datetime': expire_datetime, 'expire_days': expire_days,
                                            'machine_manual_weight': total_weight, 'split_count': split_count,
@@ -598,8 +599,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
                         actual_batch_time = equip_plan_info.filter(
                             planid=serializer['plan_weight_uid']).first().starttime
-                        # 公差查询
-                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=plan_weight)
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
@@ -623,10 +622,12 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                                                   dev_type__category_name=dev_type).first()
                             if prod and prod.weight_cnt_types.first():
                                 total_weight = prod.weight_cnt_types.first().total_weight
+                        # 公差查询
+                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': product_no_dev,
                                            'batching_type': '机配', 'expire_days': expire_days,
-                                           'machine_weight': plan_weight, 'manual_weight': 0,
+                                           'machine_weight': round(plan_weight / split_count, 3), 'manual_weight': 0,
                                            'batch_user': serializer['oper'], 'split_count': split_count,
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                            'expire_datetime': expire_datetime, 'machine_manual_weight': total_weight,
@@ -669,6 +670,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         self.perform_update(serializer)
         return Response(serializer.data)
 
+    @atomic
     @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated], url_path='manual_post',
             url_name='manual_post')
     def manual_post(self, request):
@@ -678,6 +680,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         product_no = data.get('product_no')
         dev_type = data.get('dev_type')
         scan_bra_code = data.get('scan_bra_code')
+        machine_split_count = data.get('split_count')
+        batching_equip = data.get('batching_equip', 'S01')
+        machine_package_count = data.get('package_count')
+        already_scan_info = data.get('manual_infos', [])
         if not merge_flag:
             raise ValidationError('称量计划未设置合包, 不可扫码')
         # 手工配料(配方)
@@ -685,31 +691,29 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             manual = WeightPackageManual.objects.filter(bra_code=scan_bra_code).first()
             if not manual:
                 raise ValidationError('未找到该人工配料条码')
-            if manual.weight_package:
-                raise ValidationError(f'该条码已被使用,关联计划号:{manual.weight_package.plan_weight_uid}')
+            if manual.split_num != machine_split_count:
+                raise ValidationError('分包数不一致, 无法合入')
+            if manual.real_count == 0:
+                raise ValidationError('该人工配料条码配置数量已经用完')
             # 判断物料配方是否一致
             if manual.product_no != product_no or manual.dev_type.category_name != dev_type:
                 raise ValidationError('单种手工配料机型或配方不符合')
             # 返回人工配料id，关联使用
-            manual_type = 'manual'
-            manual_id = manual.id
+            try:
+                manual_type, manual_id = self.scan_check(product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info)
+            except Exception as e:
+                raise ValidationError(e)
             details = WeightPackageManualSerializer(manual).data
         else:  # 原材料扫码
             try:
-                res = material_out_barcode(scan_bra_code) if not settings.DEBUG else None
+                res = material_out_barcode(scan_bra_code)
             except Exception as e:
                 raise ValidationError(e)
+            # res = {'ZL': 25, 'SM_CREATE': '2021-11-29 14:55:03', 'SL': 100, 'WLXXID': 'WLXX20100210111511609'} 测试数据
             if res:
-                # 查询配方中物料
-                record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
-                                                        delete_flag=False, dev_type__category_name=dev_type).first()
-                if not record:
-                    raise ValidationError(f"未找到{product_no}信息, 机型: {dev_type}")
-                # weigh_type 1 硫磺 2 细料
-                instance = record.weight_cnt_types.first()
-                if not instance:
-                    raise ValidationError(f"{product_no}无料包信息")
-                materials = instance.weight_details.all().values_list('material__material_name', flat=True).distinct()
+                # 查询配方中人工配物料
+                recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+                materials = set(recipe_manual.values_list('material_name', flat=True))
                 # ERP绑定关系
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
@@ -717,16 +721,49 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 comm_material = list(material_name_set & materials)
                 if not comm_material:
                     raise ValidationError('未找到该物料在mes配方中对应的名称')
-                manual_type = 'manual_single'
+                # 获取配方中该物料重量
+                detail = WeighBatchingDetail.objects.filter(material__material_name=comm_material[0]).first()
+                if not detail:
+                    raise ValidationError('配方中不存在该物料')
+                standard_weight = detail.standard_weight
                 # 新建记录
-                record = WeightPackageWms.objects.filter(bra_code=scan_bra_code).first()
+                record = WeightPackageWms.objects.filter(bra_code=scan_bra_code).last()
+                single_weight = str(round(standard_weight / machine_split_count, 3))
                 if not record:
                     record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
-                                                                'single_weight': str(res.get('ZL'))})
-                manual_id = record.id
-                details = {'material_name': comm_material[0], "single_weight": str(res.get('ZL')), 'batch_class': '',
+                                                                'single_weight': single_weight, 'split_num': machine_split_count,
+                                                                'package_count': machine_package_count,
+                                                                'batch_time': res.get('SM_CREATE'),
+                                                                'real_count': machine_package_count, 'now_package': res.get('SL')})
+                    obj = record  # 原材料条码实例
+                else:
+                    obj = record
+                    ids = [i['manual_id'] for i in already_scan_info if i['manual_type'] == 'manual_single' and {comm_material[0]} == set(i['names'])]
+                    if record.id in ids:
+                        raise ValueError('该条码已经扫过')
+                    if record.now_package == 0:
+                        raise ValidationError('该人工配料条码配置数量已经用完')
+                    if record.package_count != machine_package_count:
+                        new_record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
+                                                                        'single_weight': single_weight, 'split_num': machine_split_count,
+                                                                        'package_count': machine_package_count,
+                                                                        'batch_time': res.get('SM_CREATE'),
+                                                                        'real_count': machine_package_count, 'now_package': record.now_package})
+                        record.now_package = 0
+                        record.save()
+                        obj = new_record
+                    # 判断是否足量
+                    counts = WeightPackageWms.objects.filter(id__in=ids).aggregate(packages=Sum('now_package'))['packages']
+                    already_count = 0 if not counts else counts
+                    # 已经扫码的物料配置数量大于机配，不可扫码
+                    if already_count >= machine_package_count * machine_split_count:
+                        raise ValidationError('该人工条码内的物料配置数量已经足够')
+                manual_type = 'manual_single'
+                manual_id = obj.id
+                details = {'material_name': comm_material[0], "single_weight": single_weight, 'batch_class': '',
                            'batch_group': '', 'created_username': '原材料', 'created_date': res.get('SM_CREATE')[:10],
-                           'batch_type': '人工配', 'split_num': 1, 'batch_time': res.get('SM_CREATE')[:10]}
+                           'batch_type': '人工配', 'split_num': machine_split_count, 'package_count': machine_package_count,
+                           'batch_time': res.get('SM_CREATE')[:10]}
             else:
                 raise ValidationError('条码未找到对应信息')
         single_weight = Decimal(details['single_weight'].split('±')[0])
@@ -738,6 +775,30 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         details.update({'detail_manual': detail_manual, 'detail_machine': detail_machine})
         results = {'manual_type': manual_type, 'manual_id': manual_id, 'details': details}
         return Response({'results': results})
+
+    def scan_check(self, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
+        recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+        recipe_manual_names = recipe_manual.values_list('material_name', flat=True)
+        scan_info = list(manual.package_details.all().values_list('material_name', flat=True))
+        if set(scan_info) - set(recipe_manual_names):
+            raise ValueError('手工条码内部分物料不在配方中')
+        # 重量比较
+        for item in manual.package_details.all():
+            name, weight = item.material_name, item.standard_weight * manual.split_num
+            info = recipe_manual.filter(material_name=name).first()
+            if info.get('standard_weight') != weight:
+                raise ValueError(f'手工条码中物料重量与配方不符:{name}')
+        # 查找已经扫码物料中配料内容一致的总配置数量
+        already_count = 0
+        for i in already_scan_info:
+            if i['manual_type'] == check_type and set(scan_info) == set(i['names']):
+                if i['manual_id'] == manual.id:
+                    raise ValueError('该条码已经扫过')
+                already_count += i['package_count']
+        # 已经扫码的物料配置数量大于机配，不可扫码
+        if already_count >= machine_package_count:
+            raise ValidationError('该人工条码内的物料配置数量已经足够')
+        return check_type, manual.id
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -828,23 +889,8 @@ class GetManualInfo(APIView):
     def get(self, request):
         data = self.request.query_params
         product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type'), data.get('batching_equip')
-        record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
-                                                delete_flag=False, dev_type_id=dev_type).first()
-        if not record:
-            raise ValidationError(f"未找到{product_no}信息, 机型: {dev_type}")
-        # weigh_type 1 硫磺 2 细料
-        instance = record.weight_cnt_types.filter(weigh_type=2).first() if batching_equip.startswith(
-            'F') else record.weight_cnt_types.filter(weigh_type=1).first()
-        if not instance:
-            raise ValidationError(f"{product_no}无料包信息")
-        # 机配物料
-        machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(
-            recipe_name=f'{product_no}({record.dev_type.category_name})').values_list('name', flat=True))
-        # 人工配物料信息
-        manual_material = instance.weight_details.exclude(material__material_name__in=machine_material). \
-            annotate(material_name=F("material__material_name"), tolerance=F("standard_error")) \
-            .values('material_name', 'standard_weight')
-        return Response({'results': list(manual_material)})
+        results = get_manual_materials(product_no, int(dev_type), batching_equip)
+        return Response({'results': list(results)})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1450,7 +1496,7 @@ class UpdateFlagCountView(APIView):
         merge_flag = self.request.data.get('merge_flag')
         split_count = self.request.data.get('split_count')
         filter_kwargs = {}
-        if merge_flag:
+        if merge_flag is not None:
             filter_kwargs['merge_flag'] = merge_flag
         if split_count:
             filter_kwargs['split_count'] = split_count
@@ -1458,7 +1504,7 @@ class UpdateFlagCountView(APIView):
         instance = db_name.objects.using(equip_no).filter(id=rid)
         if not instance:
             raise ValidationError('未找到编号对应的数据')
-        instance.update(merge_flag=merge_flag, split_count=split_count)
+        instance.update(**filter_kwargs)
         return Response('操作成功')
 
 

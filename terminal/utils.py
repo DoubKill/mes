@@ -8,7 +8,7 @@ import time
 import requests
 from datetime import datetime
 
-from django.db.models import Sum
+from django.db.models import Sum, F
 from django.db.transaction import atomic
 from suds.client import Client
 
@@ -457,3 +457,28 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
         rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
     tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
     return tolerance
+
+
+def get_manual_materials(product_no, dev_type, batching_equip):
+    filter_kwargs = {}
+    if isinstance(dev_type, int):
+        filter_kwargs['dev_type_id'] = dev_type
+    else:
+        filter_kwargs['dev_type__category_name'] = dev_type
+    record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
+                                            delete_flag=False, **filter_kwargs).first()
+    if not record:
+        raise ValueError(f"未找到mes配方{product_no}信息")
+    # weigh_type 1 硫磺 2 细料
+    instance = record.weight_cnt_types.filter(weigh_type=2).first() if batching_equip.startswith(
+        'F') else record.weight_cnt_types.filter(weigh_type=1).first()
+    if not instance:
+        raise ValueError(f"{product_no}无料包信息")
+    # 机配物料
+    machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(
+        recipe_name=f'{product_no}({record.dev_type.category_name})').values_list('name', flat=True))
+    # 人工配物料信息
+    manual_material = instance.weight_details.exclude(material__material_name__in=machine_material). \
+        annotate(material_name=F("material__material_name"), tolerance=F("standard_error")) \
+        .values('material_name', 'standard_weight')
+    return manual_material

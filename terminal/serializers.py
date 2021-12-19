@@ -26,7 +26,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
-    WeightPackageWms
+    WeightPackageWms, MachineManualRelation
 from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance
 
 logger = logging.getLogger('send_log')
@@ -135,11 +135,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 scan_material = weight_package.product_no
         elif bra_code.startswith('MM'):  # 人工配
             manual = WeightPackageManual.objects.filter(bra_code=bra_code).first()
-            if manual:
+            if manual and manual.real_count != 0:
                 material_no = material_name = manual.manual_weight_names
                 material_name.update({'single_weight': manual.split_num})
                 scan_material_type = '人工配'
-                total_weight = manual.split_num * manual.package_count
+                total_weight = manual.split_num * manual.real_count
                 unit = '包'
                 scan_material = manual.product_no
         elif bra_code.startswith('MC'):  # 人工配(油料、CTP、配方物料)[隶属原材料胶块]
@@ -201,7 +201,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             # 胶皮
             if scan_material_type == '胶皮':
                 # 查看群控配方是否含有掺料和待处理料
-                product_recipe = classes_plan.product_batching.batching_details.filter(delete_flag=False, type=1)
+                pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
+                if not pcp:
+                    raise serializers.ValidationError('群控计划不存在')
+                product_recipe = pcp.product_batching.batching_details.filter(delete_flag=False, type=1)
                 query_set = product_recipe.filter(Q(Q(material__material_name__icontains='掺料') |
                                                   Q(material__material_name__icontains='待处理料'))).first()
                 if query_set:
@@ -312,6 +315,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                     if not s_weight:
                                         continue
                                     if s_weight * manual.split_num != i.standard_weight:
+                                        replace_record = ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, status='已处理', real_material=i.material.material_name + '人工配', result=1).first()
+                                        if replace_record:
+                                            continue
                                         scan_material_msg = '料包重量与配方不一致, 请工艺确认'
                                         ReplaceMaterial.objects.create(**replace_material_data)
                                         break
@@ -446,35 +452,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             except:
                 logger.error('扫码补料后调用接口时群控服务器错误！')
         return validated_data
-
-    # def create(self, validated_data):
-    #     tank_data = validated_data.get('tank_data')
-    #     plan_classes_uid = validated_data.get('plan_classes_uid')
-    #     trains = validated_data.get('trains')
-    #     pre_material = tank_data.pop('pre_material', '')
-    #     # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0)
-    #     if pre_material:
-    #         pre_material.actual_weight = pre_material.init_weight
-    #         pre_material.adjust_left_weight = 0
-    #         pre_material.real_weight = 0
-    #         pre_material.useup_time = datetime.now()
-    #         pre_material.save()
-    #     instance = LoadTankMaterialLog.objects.create(**tank_data)
-    #     # 判断补充进料后是否能进上辅机
-    #     fml = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid, trains=int(trains)).last()
-    #     if fml and fml.add_feed_result == 1:
-    #         # 请求进料判断接口
-    #         try:
-    #             resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5,
-    #                                  data=validated_data)
-    #             content = json.loads(resp.content.decode())
-    #             if content['success']:
-    #                 logger.info('扫码补料后调用接口成功')
-    #             else:
-    #                 logger.error('扫码补料后调用接口时不可进料')
-    #         except:
-    #             logger.error('扫码补料后调用接口时群控服务器错误！')
-    #     return instance
 
     class Meta:
         model = FeedingMaterialLog
@@ -689,32 +666,49 @@ class WeightTankStatusSerializer(BaseModelSerializer):
 
 class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(write_only=True, help_text='行标')
-    manual_infos = serializers.ListField(help_text="""人工配物料信息[{"manual_type": "manual_single", "manual_id":1},
-                                                                   {"manual_type": "manual", "manual_id":2}]""", write_only=True, default=[])
+    manual_infos = serializers.ListField(help_text="""人工配物料信息[{"manual_type": "manual_single", "manual_id":1, "package_count": 10, "name": ["a", "b"]},
+                                                                   {"manual_type": "manual", "manual_id":2, "package_count": 10, "name": ["c"]}]""", write_only=True, default=[])
 
     def validate(self, attrs):
         id = attrs.pop('id')
+        split_count = attrs.get('split_count')
         print_begin_trains = attrs['print_begin_trains']
         package_count = attrs['package_count']
         product_no = attrs['product_no']
         equip_no = attrs['equip_no']
         batch_classes = attrs['batch_classes']
         package_fufil = attrs['package_fufil']
-        print_flag = attrs.get('print_flag')
-        print_count = attrs.get('print_count', 1)
         merge_flag = attrs.get('merge_flag', False)
         batch_time = attrs['batch_time']
         manual_infos = attrs.get('manual_infos')
-        # 履历表中数据重新打印
-        last_print_reocrd = WeightPackageLog.objects.filter(id=id)
-        if last_print_reocrd and print_flag == 1:
-            raise serializers.ValidationError('已下发打印，等待打印机打印')
         # 需要合包但没有扫入手工配料
         if merge_flag and not manual_infos:
             raise serializers.ValidationError('称量计划设置了合包, 请扫码加入人工配料')
-        # 打印数量判断
-        if print_count <= 0 or print_count > package_count or not isinstance(print_count, int):
-            raise serializers.ValidationError('打印张数需小于等于配置数量')
+        # 配置数量判断
+        total_package_count_data, ids_data = {}, {}
+        if manual_infos:
+            for item in manual_infos:
+                k = tuple(set(item['names']))
+                # 原材料累加包数比较  人工配料累加配置数量比较
+                count = item['package_count']
+                if item['manual_type'] == 'manual_single':
+                    count = WeightPackageWms.objects.get(id=item['manual_id']).now_package
+                if k not in total_package_count_data:
+                    total_package_count_data[k] = {'manual_type': item['manual_type'], 'count': count}
+                else:
+                    total_package_count_data[k]['count'] = total_package_count_data[k]['count'] + count
+                ids_data[k] = [item['manual_id']] if k not in ids_data else ids_data[k] + [item['manual_id']]
+            manual_infos.append({'total_package_count_data': total_package_count_data, 'ids_data': ids_data})
+        for k, v in total_package_count_data.items():
+            if v['manual_type'] == 'manual' and v['count'] < package_count:
+                raise serializers.ValidationError(f"手工料包配置数量不足,应包含物料:{','.join(list(k))}, 当前总配置数:{v['count']}")
+            if v['manual_type'] == 'manual_single' and v['count'] < package_count * split_count:
+                raise serializers.ValidationError(f"原材料{','.join(list(k))}包数不足,已有:{v['count']}, 所需总数:{package_count * split_count}")
+        # 数量判断
+        if print_begin_trains == 0 or print_begin_trains > package_fufil - 1:
+            raise serializers.ValidationError('起始车次不在{}-{}的可选范围'.format(1, package_fufil - 1))
+        if package_count > package_fufil - print_begin_trains + 1 or package_count <= 0:
+            raise serializers.ValidationError('配置数量不在{}-{}的可选范围'.format(1, package_fufil - print_begin_trains + 1))
         # 生成条码: 机台（3位）+年月日（8位）+班次（1位）+自增数（4位） 班次：1早班  2中班  3晚班
         # 履历表中无数据则初始为1, 否则获取最大数+1
         prefix = f"{equip_no}{batch_time.strftime('%Y%m%d')}"
@@ -723,18 +717,37 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         train_batch_classes = map_list.get(batch_classes)
         bra_code = prefix + train_batch_classes + '%04d' % incr_num
-        attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'noprint_count': package_fufil - package_count,
-                      'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1,
-                      'material_no': product_no, 'material_name': product_no})
+        attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'material_no': product_no,
+                      'material_name': product_no, 'noprint_count': package_fufil - package_count,
+                      'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1})
         return attrs
 
+    @atomic
     def create(self, validated_data):
         manual_infos = validated_data.pop('manual_infos')
+        machine_package_count = validated_data['package_count']
+        split_count = validated_data['split_count']
         instance = WeightPackageLog.objects.create(**validated_data)
-        # 机配物料关联人工配料
-        for i in manual_infos:
-            db_obj = WeightPackageWms if 'single' in i['manual_type'] else WeightPackageManual
-            db_obj.objects.filter(id=i['manual_id']).update(**{"weight_package_id": instance.id})
+        if manual_infos:
+            handle_info = manual_infos.pop(-1)
+            total_package_count_data, ids_data = handle_info.get('total_package_count_data'), handle_info.get('ids_data')
+            # 机配物料关联人工配料
+            for i in manual_infos:
+                k = tuple(set(i['names']))
+                update_kwargs = {}
+                total_package_count, ids = total_package_count_data.get(k), ids_data.get(k)
+                create_data = {"weight_package_id": instance.id, "count": i['package_count'], 'content': json.dumps(i['names'])}
+                if 'single' in i['manual_type']:
+                    create_data['manual_wms_id'] = i['manual_id']
+                    update_kwargs['now_package'] = 0 if i['manual_id'] != ids[-1] else total_package_count['count'] - machine_package_count * split_count
+                    db_name = WeightPackageWms
+                else:
+                    create_data['manual_id'] = i['manual_id']
+                    update_kwargs['real_count'] = 0 if i['manual_id'] != ids[-1] else total_package_count['count'] - machine_package_count
+                    db_name = WeightPackageManual
+                # 归零和减重(最新一条减重,其余的归零)
+                db_name.objects.filter(id=i['manual_id']).update(**update_kwargs)
+                MachineManualRelation.objects.create(**create_data)
         return instance
 
     class Meta:
@@ -742,7 +755,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         fields = ['plan_weight_uid', 'product_no', 'plan_weight', 'dev_type', 'id', 'record', 'print_flag', 'batch_time',
                   'package_count', 'print_begin_trains', 'noprint_count', 'package_fufil', 'package_plan_count',
                   'equip_no', 'batch_group', 'batch_classes', 'status', 'print_count', 'merge_flag', 'manual_infos',
-                  'expire_days', 'split_count', 'batch_user']
+                  'expire_days', 'split_count', 'batch_user', 'bra_code']
 
 
 class WeightPackageLogCUpdateSerializer(serializers.ModelSerializer):
@@ -775,10 +788,11 @@ class WeightPackageLogSerializer(BaseModelSerializer):
         if instance.merge_flag:
             batching_type = '机配+人工配'
             # 查询人工配料信息
-            weight_package_manual = instance.weight_package_manual.all()
-            weight_package_wms = instance.weight_package_wms.all()
+            manual_ids, manual_wms_ids = instance.total_weight[2:]
+            weight_package_manual = WeightPackageManual.objects.filter(id__in=manual_ids)
+            weight_package_wms = WeightPackageWms.objects.filter(id__in=manual_wms_ids)
             manual_headers = {'product_no': res['product_no'], 'dev_type': res['dev_type'],
-                              'total_nums': weight_package_manual.count() + weight_package_wms.count()}
+                              'total_nums': instance.total_weight[1]}
             manual_body = []
             detail_manual, detail_machine = 0, 0
             if weight_package_manual and not weight_package_wms:
@@ -843,15 +857,15 @@ class WeightPackageLogSerializer(BaseModelSerializer):
             # 总公差
             machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=Decimal(res['plan_weight']) + total_manual_weight, project_name='all')
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
-                    'machine_manual_weight': instance.total_weight, 'machine_manual_tolerance': machine_manual_tolerance,
-                    'manual_weight': round(total_manual_weight / instance.split_count, 3), 'machine_weight': instance.plan_weight,
+                    'machine_manual_weight': instance.total_weight[0], 'machine_manual_tolerance': machine_manual_tolerance,
+                    'manual_weight': total_manual_weight, 'machine_weight': round(instance.plan_weight / instance.split_count, 3),
                     'print_datetime': instance.last_updated_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime})
+        # 最新打印数据
+        last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).last()
+        max_trains = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).aggregate(max_trains=Max('end_trains'))['max_trains']
+        next_print_begin_trains, next_package_count = max_trains + 1, last_instance.package_count
+        res.update({'next_print_begin_trains': next_print_begin_trains, 'next_package_count': next_package_count})
         return res
-
-    def update(self, instance, validated_data):
-        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
-                               'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
-        return super().update(instance, validated_data)
 
     class Meta:
         model = WeightPackageLog
@@ -862,6 +876,11 @@ class WeightPackageLogSerializer(BaseModelSerializer):
 
 
 class WeightPackageLogUpdateSerializer(serializers.ModelSerializer):
+
+    def update(self, instance, validated_data):
+        validated_data.update({'print_flag': True, 'last_updated_date': datetime.now(),
+                               'last_updated_user': self.context['request'].user, 'print_datetime': datetime.now()})
+        return super().update(instance, validated_data)
 
     class Meta:
         model = WeightPackageLog
@@ -893,7 +912,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                     'material_name': i.material_name, 'standard_weight': i.standard_weight, 'batch_type': i.batch_type,
                     'tolerance': i.tolerance}
             manual_details.append(item)
-        res.update({'manual_details': manual_details, 'expire_datetime': expire_datetime})
+        res.update({'manual_details': manual_details, 'expire_datetime': expire_datetime, 'package_count': instance.real_count})
         return res
 
     @atomic
@@ -901,6 +920,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         now_date = datetime.now().replace(microsecond=0)
         batching_equip = validated_data.get('batching_equip')
+        package_count = validated_data.get('package_count')
         manual_details = validated_data.pop('manual_details', [])
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
@@ -921,7 +941,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
                                             small_num__lt=total_weight, big_num__gte=total_weight).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{str(total_weight)}{tolerance}"
-        validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
+        validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class, 'real_count': package_count,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})
         instance = super().create(validated_data)

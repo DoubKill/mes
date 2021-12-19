@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django.db import models
@@ -100,7 +101,7 @@ class WeightPackageLog(AbstractEntity):
     material_no = models.CharField(max_length=64, help_text='物料打包编号', null=True)
     plan_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='单重', default=0)
     actual_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='实际重量', default=0)
-    bra_code = models.CharField(max_length=64, help_text='条形码')
+    bra_code = models.CharField(max_length=64, help_text='条形码', null=True, blank=True)
     status = models.CharField(help_text='打印状态', max_length=8, default='N')
     batch_time = models.DateTimeField(max_length=10, help_text='配料日期')
     batch_classes = models.CharField(max_length=8, help_text='配料班次')
@@ -125,13 +126,20 @@ class WeightPackageLog(AbstractEntity):
     @property
     def total_weight(self):
         total_weight = self.plan_weight
-        manual = self.weight_package_manual.all()
-        manual_wms = self.weight_package_wms.all()
-        for i in manual:
-            total_weight += Decimal(i.single_weight.split('±')[0])
-        for j in manual_wms:
-            total_weight += Decimal(j.single_weight.split('±')[0])
-        return total_weight
+        data = self.single_weight_package.all()
+        already_exist = []
+        manual_ids, manual_wms_ids = [], []
+        for i in data:
+            content = set(json.loads(i.content))
+            if content not in already_exist:
+                if i.manual:
+                    manual_ids.append(i.manual_id)
+                    total_weight += Decimal(i.manual.single_weight.split('±')[0]) * i.manual.split_num
+                if i.manual_wms:
+                    manual_wms_ids.append(i.manual_wms_id)
+                    total_weight += Decimal(i.manual_wms.single_weight.split('±')[0]) * i.manual_wms.split_num
+                already_exist.append(content)
+        return [total_weight, data.count(), manual_ids, manual_wms_ids]
 
     class Meta:
         db_table = 'weight_package_log'
@@ -480,7 +488,7 @@ class Plan(models.Model):
     order_by = models.IntegerField(blank=True, help_text='写1', null=True)
     date_time = models.CharField(max_length=10, help_text='日期', blank=True, null=True)
     addtime = models.CharField(max_length=19, help_text='创建时间', blank=True, null=True)
-    merge_flag = models.BinaryField(help_text='是否合包', default=False)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
 
     class Meta:
         managed = False
@@ -512,7 +520,7 @@ class RecipePre(models.Model):
     error = models.DecimalField(max_digits=5, help_text='总误差，界面写入', decimal_places=3, blank=True, null=True)
     time = models.CharField(max_length=19, help_text='修改时间', blank=True, null=True)
     use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
-    merge_flag = models.BinaryField(help_text='是否合包', default=False)
+    merge_flag = models.BooleanField(help_text='是否合包', default=False)
     split_count = models.IntegerField(help_text='机配分包数', default=1)
 
     class Meta:
@@ -641,7 +649,7 @@ class WeightPackageManual(AbstractEntity):
     split_num = models.IntegerField(help_text='分包数')
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
-    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_manual')
+    real_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
 
     @property
     def manual_weight_names(self):
@@ -689,7 +697,6 @@ class WeightPackageSingle(AbstractEntity):
     package_count = models.IntegerField(help_text='配置数量')
     print_count = models.IntegerField(help_text='打印张数', null=True, blank=True)
     print_flag = models.IntegerField(help_text='打印状态', default=False)
-    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_single')
 
     class Meta:
         db_table = 'weight_package_single'
@@ -703,14 +710,29 @@ class WeightPackageWms(AbstractEntity):
     single_weight = models.CharField(max_length=64, help_text='单配重量')
     batching_type = models.CharField(max_length=64, help_text='配料方式', default='人工配')
     batch_user = models.CharField(max_length=64, help_text='配料员', default='原材料')
+    split_num = models.IntegerField(help_text='分包数', default=1)
     batch_time = models.DateTimeField(help_text='配料时间', null=True, blank=True)
     tolerance = models.CharField(max_length=64, help_text='公差', default='')
-    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配物料id', on_delete=models.CASCADE, null=True,
-                                       blank=True, related_name='weight_package_wms')
+    package_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
+    real_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
+    now_package = models.IntegerField(help_text='当前包数', null=True, blank=True)
 
     class Meta:
         db_table = 'weight_package_wms'
         verbose_name_plural = verbose_name = 'wms扫码原材料合包'
+
+
+class MachineManualRelation(models.Model):
+    """合包配料机配与人工配关联关系"""
+    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配id', on_delete=models.CASCADE, null=True, blank=True, related_name='single_weight_package')
+    manual = models.ForeignKey(WeightPackageManual, help_text='人工配料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_manual')
+    manual_wms = models.ForeignKey(WeightPackageWms, help_text='原材料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_wms')
+    count = models.IntegerField(help_text='配置数量', null=True, default=True)
+    content = models.TextField(help_text='条码对应的物料', default='')
+
+    class Meta:
+        db_table = 'machine_manual_relation'
+        verbose_name_plural = verbose_name = '合包配料机配与人工配关联关系'
 
     # class TempPlan(models.Model):
 #     id = models.BigIntegerField(db_column='ID')  # Field name made lowercase.
