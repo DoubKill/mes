@@ -3896,12 +3896,12 @@ class EquipMTBFMTTPStatementView(APIView):
         if s_time:
             year = s_time.split('-')[0]
             month = s_time.split('-')[-1]
-            begin_time = s_time + '-01'
+            begin_time = year + '-01-01'
             if month == '1':
-                end_time = s_time + '-12-31'
+                end_time = year + '-12-31'
             else:
                 day = calendar._monthlen(int(year), int(month))
-                end_time = f"{ int(year) + 1}-{int(month) - 1}-{day}"
+                end_time = f"{ int(year) + 1}-{int(month)}-{day}"
         else:
             begin_time = f'{date.today().year}-01-01'
             end_time = f'{date.today().year}-12-31'
@@ -3969,7 +3969,7 @@ class EquipWorkOrderStatementView(APIView):
             'work_order_no__icontains': work_order_no,
             'work_type__icontains': work_type
         }
-        queryset1 = EquipApplyOrder.objects.filter(**kwargs, **time_range, status='已验收').values('plan_id',
+        queryset1 = EquipApplyOrder.objects.filter(**kwargs, **time_range, status='已验收').annotate('plan_id',
             'plan_name',
             'work_order_no',
             'work_type',
@@ -3978,7 +3978,7 @@ class EquipWorkOrderStatementView(APIView):
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
             验收时间=OSum(F('accept_datetime') - F('repair_end_datetime'))
         )
-        queryset2 = EquipInspectionOrder.objects.filter(**kwargs, **time_range, status='已完成').values('plan_id',
+        queryset2 = EquipInspectionOrder.objects.filter(**kwargs, **time_range, status='已完成').annotate('plan_id',
             'plan_name',
             'work_order_no',
             'work_type',
@@ -4148,7 +4148,7 @@ class EquipPeriodStatementView(APIView):
                                                                )
                 data = self.get_result(queryset)
             else:
-                queryset = EquipApplyOrder.objects.filter(work_type=work_type, equip_condition='停机', status='已完成',
+                queryset = EquipApplyOrder.objects.filter(work_type=work_type, equip_condition='停机', status__in=['已完成', '已验收'],
                                                           # fault_datetime__range=(kwargs.get(type).get('begin_time'), kwargs.get(type).get('end_time')),
                                                           last_updated_date__range=(kwargs.get(type).get('begin_time'), kwargs.get(type).get('end_time'))
                                                           )
