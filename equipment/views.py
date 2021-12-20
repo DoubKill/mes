@@ -4184,7 +4184,7 @@ class EquipFinishingRateView(APIView):
                     'uncompleted': 0, 'rate': 0, 'in_time_rate': 0}
             query_set = EquipInspectionOrder.objects.filter(
                 **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type='维修') &
-                                                                                      Q(Q(result_repair_standard__isnull=False) | Q(result_maintenance_standard__isnull=False)),
+                                                                                      Q(Q(equip_repair_standard__isnull=False) | Q(equip_maintenance_standard__isnull=False)),
                                                                                       **time_range)
             if query_set:
                 data = self.compute(key_word, query_set)
