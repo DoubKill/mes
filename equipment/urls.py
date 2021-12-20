@@ -162,6 +162,12 @@ urlpatterns = [
     path('equip-statement/', EquipStatementView.as_view()),
     # 人员别 处理时间分析报表
     path('equip-user-statement/', EquipUserStatementView.as_view()),
+    # 期间别 处理时间分析报表
+    path('equip-period-statement/', EquipPeriodStatementView.as_view()),
+    # 工单按时完成率报表
+    path('equip-finishing-rate/', EquipFinishingRateView.as_view()),
+    # 交旧率报表
+    path('equip-old-rate/', EquipOldRateView.as_view()),
     # 同步erp接口
     path('get-spare/', GetSpare.as_view()),
     # 获取备件入库单据接口
