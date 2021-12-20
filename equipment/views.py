@@ -4183,7 +4183,7 @@ class EquipFinishingRateView(APIView):
             data = {'work_type': key_word, 'total_orders': 0, 'completed_in_time': 0, 'completed_overtime': 0,
                     'uncompleted': 0, 'rate': 0, 'in_time_rate': 0}
             query_set = EquipInspectionOrder.objects.filter(
-                **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type=key_word) &
+                **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type='维修') &
                                                                                       Q(Q(result_repair_standard__isnull=False) | Q(result_maintenance_standard__isnull=False)),
                                                                                       **time_range)
             if query_set:
@@ -4200,8 +4200,8 @@ class EquipFinishingRateView(APIView):
         new_query_set = completed.annotate(completed_time=ExpressionWrapper(F('repair_end_datetime') - F('repair_start_datetime'), output_field=DurationField()))
         for i in new_query_set:
             spend_time = round(i.completed_time.total_seconds() / 60, 2)
-            operation_time = i.equip_repair_standard.operation_time if work_type in ['巡检'] else i.equip_maintenance_standard.operation_time
-            operation_time_unit = i.equip_repair_standard.operation_time_unit if work_type in ['巡检'] else i.equip_maintenance_standard.operation_time_unit
+            operation_time = i.equip_repair_standard.operation_time if i.equip_repair_standard else i.equip_maintenance_standard.operation_time
+            operation_time_unit = i.equip_repair_standard.operation_time_unit if i.equip_repair_standard else i.equip_maintenance_standard.operation_time_unit
             if operation_time_unit == '日':
                 standard_time = operation_time * 24 * 60
             elif operation_time_unit == '小时':
