@@ -148,7 +148,7 @@ urlpatterns = [
     path('wms-expire-list/', WMSExpireListView.as_view()),
     path('wms-expire-details/', WMSExpireDetailView.as_view()),
     path('wms-safety-settings/', WmsInventoryMaterialViewSet.as_view()),
-    path('wms-stock-summsry/', WMSStockSummaryView.as_view()),
+    path('wms-stock-summsry/', WMSStockSummaryView.as_view()),  # 库存统计
 
     # 炭黑出库
     path('th-storage-summary/', THStorageSummaryView.as_view()),  # 炭黑所有库存统计
@@ -164,7 +164,7 @@ urlpatterns = [
     path('th-expire-list/', THExpireListView.as_view()),
     path('th-expire-details/', THExpireDetailView.as_view()),
     path('th-safety-settings/', THInventoryMaterialViewSet.as_view()),
-    path('th-stock-summsry/', THStockSummaryView.as_view()),
+    path('th-stock-summsry/', THStockSummaryView.as_view()),  # 库存统计
 
     path('outbound-history/', OutBoundHistory.as_view()),
     # 胶料库内库存统计

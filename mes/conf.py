@@ -4,8 +4,9 @@ auther:
 datetime: 2020/7/27
 name: 
 """
+from django.conf import settings
+
 from inventory.models import MixGumInInventoryLog, MixGumOutInventoryLog
-from mes import settings
 
 COMMON_READ_ONLY_FIELDS = ('created_date', 'last_updated_date', 'delete_date',
                            'delete_flag', 'created_user', 'last_updated_user',
@@ -30,11 +31,17 @@ BZ_PASSWORD = "mes@_123"
 BZ_HOST = "10.4.23.101"
 
 
-WMS_CONF = dict(host='10.4.24.25', user='sa', database='zhada_wms_zhongc', password='Admin123$')
+WMS_CONF = dict(host=settings.DATABASES['wms']['HOST'],
+                user=settings.DATABASES['wms']['USER'],
+                database=settings.DATABASES['wms']['NAME'],
+                password=settings.DATABASES['wms']['PASSWORD'])
 WMS_URL = "http://10.4.24.25:8169"   # 原材料库地址
 
 TH_URL = "http://10.4.24.33:8169/"  # 炭黑库地址
-TH_CONF = dict(host='10.4.24.33', user='sa', database='zhada_wms_zhongc', password='Admin123$')  # 炭黑库数据库配置
+TH_CONF = dict(host=settings.DATABASES['cb']['HOST'],
+               user=settings.DATABASES['cb']['USER'],
+               database=settings.DATABASES['cb']['NAME'],
+               password=settings.DATABASES['cb']['PASSWORD'])
 
 STATION_LOCATION_MAP = {
     "一层前端": ["3", "4"],
