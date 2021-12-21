@@ -119,6 +119,7 @@ class MaterialTestMethod(AbstractEntity):
     test_method = models.ForeignKey(TestMethod, help_text='试验方法', on_delete=models.CASCADE)
     data_point = models.ManyToManyField(DataPoint, help_text='数据点', related_name='point_methods')
     is_judged = models.BooleanField(help_text='是否做为判定', default=True)
+    is_print = models.BooleanField(help_text='是否做为判定', default=True)
 
     def __str__(self):
         return self.test_method.name
