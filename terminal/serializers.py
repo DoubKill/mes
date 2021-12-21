@@ -959,7 +959,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         # 根据重量查询公差
         distinguish_name, project_name = ["细料称量", "整包细料重量"] if batching_equip.startswith('F') else ["硫磺称量", "整包硫磺重量"]
         rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name, project__keyword_name=project_name,
-                                            small_num__lt=total_weight, big_num__gte=total_weight).first()
+                                            small_num__lt=total_weight, big_num__gte=total_weight, use_flag=True).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         single_weight = f"{str(total_weight)}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class, 'real_count': package_count,
@@ -999,7 +999,8 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         now_date = datetime.now().replace(microsecond=0)
         material_name, single_weight, split_num = validated_data.get('material_name'), validated_data.get('single_weight'), validated_data.get('split_num')
-        handle_weight = round(Decimal(single_weight) / split_num, 3)
+        if split_num:
+            single_weight = round(Decimal(single_weight) / split_num, 3)
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
@@ -1011,9 +1012,9 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         max_code = WeightPackageSingle.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
         bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         # 单物料所有量程公差
-        rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
+        rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
-        single_weight = f"{handle_weight}{tolerance}"
+        single_weight = f"{single_weight}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})

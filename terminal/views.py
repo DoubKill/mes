@@ -861,7 +861,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
         material_name = self.request.query_params.get('material_name')
         if material_name:
             instance = self.get_queryset().filter(material_name=material_name).first()
-            history_weight = '' if not instance else instance.single_weight
+            history_weight = '' if not instance else instance.single_weight.split('±')[0]
             return Response(history_weight)
         else:
             queryset = self.filter_queryset(self.get_queryset())
@@ -898,11 +898,11 @@ class GetMaterialTolerance(APIView):
             if '单个' not in project_name:
                 project_name = f"整包{type_name}重量"
             rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
-                                                project__keyword_name=project_name,
+                                                project__keyword_name=project_name, use_flag=True,
                                                 small_num__lt=standard_weight, big_num__gte=standard_weight).first()
         # 人工单配配方或通用(所有量程)
         else:
-            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
+            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
         return Response(tolerance)
 
