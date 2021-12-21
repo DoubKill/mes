@@ -712,7 +712,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             # res = {'ZL': 25, 'SM_CREATE': '2021-11-29 14:55:03', 'SL': 100, 'WLXXID': 'WLXX20100210111511609'} 测试数据
             if res:
                 # 查询配方中人工配物料
-                recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+                try:
+                    recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+                except Exception as e:
+                    raise ValidationError(e)
                 materials = set(recipe_manual.values_list('material_name', flat=True))
                 # ERP绑定关系
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
@@ -777,7 +780,10 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return Response({'results': results})
 
     def scan_check(self, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
-        recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+        try:
+            recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+        except Exception as e:
+            raise ValidationError(e)
         recipe_manual_names = recipe_manual.values_list('material_name', flat=True)
         scan_info = list(manual.package_details.all().values_list('material_name', flat=True))
         if set(scan_info) - set(recipe_manual_names):
@@ -851,6 +857,23 @@ class WeightPackageSingleViewSet(ModelViewSet):
         else:
             return (IsAuthenticated(),)
 
+    def list(self, request, *args, **kwargs):
+        material_name = self.request.query_params.get('material_name')
+        if material_name:
+            instance = self.get_queryset().filter(material_name=material_name).first()
+            history_weight = '' if not instance else instance.single_weight
+            return Response(history_weight)
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
         data = self.request.data
@@ -892,7 +915,17 @@ class GetManualInfo(APIView):
     def get(self, request):
         data = self.request.query_params
         product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type'), data.get('batching_equip')
-        results = get_manual_materials(product_no, int(dev_type), batching_equip)
+        if batching_equip:
+            try:
+                results = get_manual_materials(product_no, int(dev_type), batching_equip)
+            except Exception as e:
+                raise ValidationError(e)
+        else:
+            recipe = ProductBatching.objects.filter(stage_product_batch_no=product_no, dev_type__category_name=dev_type,
+                                                    used_type=4, delete_flag=False).first()
+            if not recipe:
+                raise ValidationError('未找到mes配方')
+            results = recipe.batching_details.values('material__material_name', 'actual_weight')
         return Response({'results': list(results)})
 
 

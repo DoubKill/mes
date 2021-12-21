@@ -329,7 +329,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if flag:
             # 配方中物料单车需要重量
             if not isinstance(material_name, dict):
-                single_material_weight = detail_infos[material_name]
+                single_material_weight = detail_infos[material_name] if not bra_code.startswith('MC') else (1 if single.batching_type=='通用' else single.split_num)
                 attrs = self.check_used(plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs)
                 details.append(dict(attrs))
             else:
@@ -677,6 +677,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         print_begin_trains = attrs['print_begin_trains']
         package_count = attrs['package_count']
         product_no = attrs['product_no']
+        dev_type = attrs['dev_type']
         equip_no = attrs['equip_no']
         batch_classes = attrs['batch_classes']
         package_fufil = attrs['package_fufil']
@@ -721,17 +722,16 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         # 配料时间
         batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).starttime
         # 计算有效期
-        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+        single_expire_record = PackageExpire.objects.filter(product_no__startswith=product_no, product_no__icontains=dev_type)
         if not single_expire_record:
-            single_date = PackageExpire.objects.create(**{'product_no': product_no, 'product_name': product_no,
-                                                          'update_user': 'system',
-                                                          'update_date': datetime.now().date()})
+            days = 0
         else:
             single_date = single_expire_record.first()
-        days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+            days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
+        str_batch_time = ''.join(batch_time[:10].split('-'))
         # 生成条码: 机台（3位）+年月日（8位）+班次（1位）+自增数（4位） 班次：1早班  2中班  3晚班
         # 履历表中无数据则初始为1, 否则获取最大数+1
-        prefix = f"{equip_no}{batch_time}"
+        prefix = f"{equip_no}{str_batch_time}"
         max_code = WeightPackageLog.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
         incr_num = 1 if not max_code else int(max_code[-4:]) + 1
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
@@ -998,7 +998,8 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
     def create(self, validated_data):
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         now_date = datetime.now().replace(microsecond=0)
-        material_name, single_weight = validated_data.get('material_name'), validated_data.get('single_weight')
+        material_name, single_weight, split_num = validated_data.get('material_name'), validated_data.get('single_weight'), validated_data.get('split_num')
+        handle_weight = round(Decimal(single_weight) / split_num, 3)
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
@@ -1012,7 +1013,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         # 单物料所有量程公差
         rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name).first()
         tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
-        single_weight = f"{single_weight}{tolerance}"
+        single_weight = f"{handle_weight}{tolerance}"
         validated_data.update({'created_user': self.context['request'].user, 'batch_class': batch_class,
                                'batch_group': batch_group, 'bra_code': bra_code, 'single_weight': single_weight,
                                'end_trains': validated_data['begin_trains'] + validated_data['package_count'] - 1})
