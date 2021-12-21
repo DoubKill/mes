@@ -652,14 +652,18 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no,
                                                        product_no=obj.product_no
                                                        ).order_by('actual_trains')
+        methods = list(MaterialTestMethod.objects.filter(material__material_no=obj.product_no,
+                                                         is_print=True
+                                                         ).values_list('test_method__name', flat=True))
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
             test_results = MaterialTestResult.objects.filter(id__in=max_result_ids,
-                                                             is_judged=True).order_by('test_indicator_name',
-                                                                                      'data_point_name')
+                                                             test_method_name__in=methods
+                                                             ).order_by('test_indicator_name',
+                                                                        'data_point_name')
             for test_result in test_results:
                 if test_result.level == 1:
                     result = '合格'
