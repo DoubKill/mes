@@ -4908,7 +4908,7 @@ class WMSStockSummaryView(APIView):
         temp = sc.all()
 
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
-            F('wms_material_code'), F('warning_weight') * 1000))
+            F('wms_material_code'), F('warning_weight')))
 
         data_dict = {}
 
