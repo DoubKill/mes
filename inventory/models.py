@@ -1140,11 +1140,11 @@ class WMSMaterialSafetySettings(AbstractEntity):
         (2, '日均用量设定值（吨）')
     )
     type = models.IntegerField(help_text='设定类别', choices=TYPE_CHOICE, default=1)
-    avg_consuming_weight = models.FloatField(help_text='日均用量计算值（吨）', default=0)
-    avg_setting_weight = models.FloatField(help_text='日均用量设定值（吨）', default=0)
+    avg_consuming_weight = models.FloatField(help_text='日均用量计算值（kg）', default=0)
+    avg_setting_weight = models.FloatField(help_text='日均用量设定值（kg）', default=0)
     wms_material_code = models.CharField(max_length=128, help_text='WMS物料编码')
     warning_days = models.FloatField(help_text='预警天数', default=0)
-    warning_weight = models.FloatField(help_text='预警重量（吨）', default=0)
+    warning_weight = models.FloatField(help_text='预警重量（kg）', default=0)
 
     def save(self, *args, **kwargs):
         if self.type == 1:

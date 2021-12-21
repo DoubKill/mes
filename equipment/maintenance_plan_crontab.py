@@ -2,12 +2,11 @@
 根据设备维护维修标准自动生成维护维修计划
 """
 
-import logging
 import os
 import sys
 import django
 import datetime
-import logging
+import math
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,72 +58,89 @@ class MaintenancePlan:
     def maintenance_plan(self):
         queryset = EquipMaintenanceStandard.objects.filter(use_flag=True).all()
         for obj in queryset:
-            if not obj.start_time or not obj.cycle_unit or not obj.maintenance_cycle or not obj.cycle_num:
+            if not obj.cycle_unit or not obj.start_time:
                 continue
-            start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')
-            kwargs = {  # 判断条件
-                '日': {'status': datetime.datetime.now() <= start_time + datetime.timedelta(days=obj.maintenance_cycle * obj.cycle_num) and
-                  datetime.datetime.now() + datetime.timedelta(days=3) >= start_time},
-                '小时': {'status': datetime.datetime.now() <= start_time + datetime.timedelta(hours=obj.maintenance_cycle * obj.cycle_num) and
-                  datetime.datetime.now() + datetime.timedelta(days=3) >= start_time},
-                '分钟': {'status': datetime.datetime.now() <= start_time + datetime.timedelta(minutes=obj.maintenance_cycle * obj.cycle_num) and
-                  datetime.datetime.now() + datetime.timedelta(days=3) >= start_time},
-                '秒': {'status': datetime.datetime.now() <= start_time + datetime.timedelta(seconds=obj.maintenance_cycle * obj.cycle_num) and
-                  datetime.datetime.now() + datetime.timedelta(days=3) >= start_time}}
-
-            if obj.cycle_unit == '车次':
+            start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')  # 开始时间
+            maintenance_cycle = obj.maintenance_cycle if obj.maintenance_cycle else 1  # 维护周期
+            cycle_unit = obj.cycle_unit  # 周期单位
+            cycle_num = obj.cycle_num if obj.cycle_num else 0  # 周期数
+            # 一个周期时长
+            cycle_time = {
+                '4小时': datetime.timedelta(hours=4) * maintenance_cycle,
+                '日': datetime.timedelta(days=1) * maintenance_cycle,
+                '周': datetime.timedelta(days=7) * maintenance_cycle,
+                '月': datetime.timedelta(days=30) * maintenance_cycle,
+                '季度': datetime.timedelta(days=30) * maintenance_cycle,
+                '年': datetime.timedelta(days=365) * maintenance_cycle,
+                '半年': datetime.timedelta(days=182) * maintenance_cycle,
+            }
+            if obj.cycle_unit == '车数':
                 equip_list = Equip.objects.filter(category=obj.equip_type).values('equip_no')
                 for equip in equip_list:
                     actual_trains = TrainsFeedbacks.objects.filter(equip_no=equip['equip_no'],
-                                                                   factory_date__gte=start_time,
-                                                                   factory_date__lte=datetime.datetime.now()).aggregate(
+                                                                   end_time__gte=start_time,
+                                                                   end_time__lte=datetime.datetime.now()).aggregate(
                                                                    actual_trains=Count('id'))
+
                     actual_trains = actual_trains.get('actual_trains')
-                    if actual_trains < obj.maintenance_cycle * obj.cycle_num:
+                    if cycle_num and actual_trains < maintenance_cycle * cycle_num:
                         for i in range(1, obj.cycle_num + 1):
                             if actual_trains in [(i-1) * obj.maintenance_cycle, i * obj.maintenance_cycle] and EquipPlan.objects.filter(equip_manintenance_standard=obj).count() == (i-1):
-                                # 获取开始时间
                                 try:
-                                    plan_time = TrainsFeedbacks.objects.filter(equip_no=equip['equip_no'],
-                                                                   factory_date__gte=start_time,
-                                                                   factory_date__lte=datetime.datetime.now()).order_by('id')[obj.maintenance_cycle * (i-1)].created_date
+                                    plan_time = datetime.datetime.now().replace(microsecond=0)
                                     self.create_plan(obj, equip['equip_no'], plan_time)
                                 except: pass
+                    else:
+                        count = actual_trains // maintenance_cycle
+                        if EquipPlan.objects.filter(equip_manintenance_standard=obj).count() < count:
+                            plan_time = datetime.datetime.now().replace(microsecond=0)
+                            self.create_plan(obj, equip['equip_no'], plan_time)
+                continue
+            elif obj.cycle_unit == '班次':
+                equip_list = Equip.objects.filter(category=obj.equip_type).values('equip_no')
+                if not Equip.objects.filter(category=obj.equip_type).values('equip_no').exists():
+                    return ''
+                equip = '，'.join([equip['equip_no'] for equip in equip_list])
+                today = datetime.datetime.today()
+                tomorrow = datetime.datetime.today() + datetime.timedelta(days=1)
+                now = datetime.datetime.now()
+                # 早班
+                begin_time = datetime.datetime(today.year, today.month, today.day) + datetime.timedelta(hours=8)
+                end_time = datetime.datetime(today.year, today.month, today.day) + datetime.timedelta(hours=20)
+                tomorrow_time = datetime.datetime(tomorrow.year, tomorrow.month, tomorrow.day) + datetime.timedelta(hours=8)
+                if begin_time <= now <= end_time:
+                    if not EquipPlan.objects.filter(equip_manintenance_standard=obj, created_date__gte=begin_time,
+                                                    created_date__lte=end_time).exists():
+                        self.create_plan(obj, equip, begin_time, end_time)
+
+                if end_time <= now <= tomorrow_time:
+                    if not EquipPlan.objects.filter(equip_manintenance_standard=obj, created_date__gte=end_time,
+                                                    created_date__lte=tomorrow_time).exists():
+                        self.create_plan(obj, equip, end_time, tomorrow_time)
+                continue
             else:
-                if kwargs.get(obj.cycle_unit)['status']:
+                if cycle_num:
+                    count = cycle_num
+                else:  # 周期数为0
+                    count = math.ceil((datetime.datetime.now() - start_time) / cycle_time.get(cycle_unit))
+                for i in range(1, count + 1):  # 1,   2 , 3
+                    begin_time = start_time + cycle_time.get(cycle_unit) * (i - 1)
+                    end_time = start_time + cycle_time.get(cycle_unit) * i
+                    now = datetime.datetime.now()
+                    if i == 1:
+                        create_time = start_time - datetime.timedelta(days=3)
+                    else:
+                        create_time = begin_time - datetime.timedelta(days=3)
+                    if create_time > begin_time:
+                        continue
+                    if now > end_time:
+                        continue
                     equip_list = Equip.objects.filter(category=obj.equip_type).values('equip_no')
                     if not Equip.objects.filter(category=obj.equip_type).values('equip_no').exists():
                         return ''
                     equip = '，'.join([equip['equip_no'] for equip in equip_list])
-                    for i in range(1, obj.cycle_num + 1):
-                        kwargs = {
-                            '日': {'first': (start_time - datetime.timedelta(days=3)),
-                                  'st': (start_time + datetime.timedelta(days=obj.maintenance_cycle * (i - 1))),
-                                  'et': (start_time + datetime.timedelta(days=obj.maintenance_cycle * i))},
-                            '小时': {'first': (start_time - datetime.timedelta(days=3)),
-                                   'st': (start_time + datetime.timedelta(hours=obj.maintenance_cycle * (i - 1))),
-                                   'et': (start_time + datetime.timedelta(hours=obj.maintenance_cycle * i))},
-                            '分钟': {'first': (start_time - datetime.timedelta(days=3)),
-                                   'st': (start_time + datetime.timedelta(minutes=obj.maintenance_cycle * (i - 1))),
-                                   'et': (start_time + datetime.timedelta(minutes=obj.maintenance_cycle * i))},
-                            '秒': {'first': (start_time - datetime.timedelta(days=3)),
-                                  'st': (start_time + datetime.timedelta(seconds=obj.maintenance_cycle * (i - 1))),
-                                  'et': (start_time + datetime.timedelta(seconds=obj.maintenance_cycle * i))},
-                        }
-                        if i == 1:
-                            plan = EquipPlan.objects.filter(equip_manintenance_standard=obj,
-                                                     planned_maintenance_date__gte=kwargs.get(obj.cycle_unit)['first'],
-                                                     planned_maintenance_date__lte=kwargs.get(obj.cycle_unit)['et']).exists()
-                            now_time = (kwargs.get(obj.cycle_unit)['first'] < datetime.datetime.now() < kwargs.get(obj.cycle_unit)['et'])
-                            if not plan and now_time:
-                                self.create_plan(obj, equip, start_time, kwargs.get(obj.cycle_unit)['et'])
-                        else:
-                            plan = EquipPlan.objects.filter(equip_manintenance_standard=obj,
-                                                     planned_maintenance_date__gte=kwargs.get(obj.cycle_unit)['st'],
-                                                     planned_maintenance_date__lte=kwargs.get(obj.cycle_unit)['et']).exists()
-                            now_time = (kwargs.get(obj.cycle_unit)['st'] < datetime.datetime.now() < kwargs.get(obj.cycle_unit)['et'])
-                            if not plan and now_time:
-                                self.create_plan(obj, equip, kwargs.get(obj.cycle_unit)['st'], kwargs.get(obj.cycle_unit)['et'])
+                    if not EquipPlan.objects.filter(equip_manintenance_standard=obj, planned_maintenance_date=begin_time):
+                        self.create_plan(obj, equip, begin_time, end_time)
 
 
 class ApplyOrder:

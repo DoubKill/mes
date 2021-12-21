@@ -276,7 +276,7 @@ class EquipJobItemStandardFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipJobItemStandard
-        fields = ('work_type', 'standard_name', 'use_flag')
+        fields = ('work_type', 'standard_name', 'use_flag', 'id')
 
 
 class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):

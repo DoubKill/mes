@@ -4769,10 +4769,14 @@ class WmsInventoryMaterialViewSet(GenericAPIView):
         queryset = WmsInventoryMaterial.objects.using(self.DB).all()
         material_no = self.request.query_params.get('material_no')
         material_name = self.request.query_params.get('material_name')
+        unset_flag = self.request.query_params.get('unset_flag')
         if material_no:
             queryset = queryset.filter(material_no__icontains=material_no)
         if material_name:
             queryset = queryset.filter(material_name__icontains=material_name)
+        if unset_flag:
+            mt_codes = list(WMSMaterialSafetySettings.objects.values_list('wms_material_code', flat=True))
+            queryset = queryset.exclude(material_no__in=mt_codes)
         page = self.paginate_queryset(queryset)
         serializer = WmsInventoryMaterialSerializer(page, many=True)
         return self.get_paginated_response(serializer.data)
@@ -4904,7 +4908,7 @@ class WMSStockSummaryView(APIView):
         temp = sc.all()
 
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
-            F('wms_material_code'), F('warning_weight') * 1000))
+            F('wms_material_code'), F('warning_weight')))
 
         data_dict = {}
 
