@@ -671,6 +671,8 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         id = attrs.pop('id')
+        plan_weight_uid = attrs.get('plan_weight_uid')
+        bra_code = attrs.get('bra_code')
         split_count = attrs.get('split_count')
         print_begin_trains = attrs['print_begin_trains']
         package_count = attrs['package_count']
@@ -704,22 +706,41 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"手工料包配置数量不足,应包含物料:{','.join(list(k))}, 当前总配置数:{v['count']}")
             if v['manual_type'] == 'manual_single' and v['count'] < package_count * split_count:
                 raise serializers.ValidationError(f"原材料{','.join(list(k))}包数不足,已有:{v['count']}, 所需总数:{package_count * split_count}")
+        # 参数不变使用重新打印
+        if bra_code:
+            record = WeightPackageLog.objects.filter(bra_code=bra_code).first()
+            if not record:
+                raise serializers.ValidationError('页面数据发生变化，请刷新后重试')
+            if record.print_begin_trains == print_begin_trains and record.package_count == package_count:
+                raise serializers.ValidationError('打印起始车次与配置数量无变化，请使用重新打印')
         # 数量判断
         if print_begin_trains == 0 or print_begin_trains > package_fufil - 1:
             raise serializers.ValidationError('起始车次不在{}-{}的可选范围'.format(1, package_fufil - 1))
         if package_count > package_fufil - print_begin_trains + 1 or package_count <= 0:
             raise serializers.ValidationError('配置数量不在{}-{}的可选范围'.format(1, package_fufil - print_begin_trains + 1))
+        # 配料时间
+        batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).starttime
+        # 计算有效期
+        single_expire_record = PackageExpire.objects.filter(product_no=product_no)
+        if not single_expire_record:
+            single_date = PackageExpire.objects.create(**{'product_no': product_no, 'product_name': product_no,
+                                                          'update_user': 'system',
+                                                          'update_date': datetime.now().date()})
+        else:
+            single_date = single_expire_record.first()
+        days = single_date.package_fine_usefullife if equip_no.startswith('F') else single_date.package_sulfur_usefullife
         # 生成条码: 机台（3位）+年月日（8位）+班次（1位）+自增数（4位） 班次：1早班  2中班  3晚班
         # 履历表中无数据则初始为1, 否则获取最大数+1
-        prefix = f"{equip_no}{batch_time.strftime('%Y%m%d')}"
+        prefix = f"{equip_no}{batch_time}"
         max_code = WeightPackageLog.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
         incr_num = 1 if not max_code else int(max_code[-4:]) + 1
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         train_batch_classes = map_list.get(batch_classes)
         bra_code = prefix + train_batch_classes + '%04d' % incr_num
         attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'material_no': product_no,
-                      'material_name': product_no, 'noprint_count': package_fufil - package_count,
-                      'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1})
+                      'material_name': product_no, 'noprint_count': package_fufil - package_count, 'expire_days': days,
+                      'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1,
+                      'batch_time': batch_time})
         return attrs
 
     @atomic

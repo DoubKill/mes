@@ -791,10 +791,13 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         # 查找已经扫码物料中配料内容一致的总配置数量
         already_count = 0
         for i in already_scan_info:
-            if i['manual_type'] == check_type and set(scan_info) == set(i['names']):
-                if i['manual_id'] == manual.id:
-                    raise ValueError('该条码已经扫过')
-                already_count += i['package_count']
+            if i['manual_type'] == check_type:
+                if set(scan_info) & set(i['names']) and set(scan_info) != set(i['names']):
+                    raise ValueError('物料种类与之前扫入重叠但不一致')
+                if set(scan_info) == set(i['names']):
+                    if i['manual_id'] == manual.id:
+                        raise ValueError('该条码已经扫过')
+                    already_count += i['package_count']
         # 已经扫码的物料配置数量大于机配，不可扫码
         if already_count >= machine_package_count:
             raise ValidationError('该人工条码内的物料配置数量已经足够')

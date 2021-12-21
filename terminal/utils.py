@@ -133,6 +133,8 @@ class TankStatusSync(object):
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<open_doorResult>(.*)</open_doorResult>', res)[0]
         data = json.loads(rep_json)
+        if not data:
+            raise ValueError('获取料罐信息失败, 返回数据为空')
         for x in self.queryset:
             temp_no = x.tank_no
             # 万龙表里的罐号跟接口里的罐号不一致，需要做个转换
