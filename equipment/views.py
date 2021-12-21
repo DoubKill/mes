@@ -11,7 +11,7 @@ from suds.client import Client
 from io import BytesIO
 from itertools import chain
 from django.db.models.functions import TruncMonth
-from django.db.models import F, Q, Sum, Count
+from django.db.models import F, Q, Sum, Count, ExpressionWrapper, DurationField
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -688,7 +688,6 @@ class EquipSupplierViewSet(CommonDeleteMixin, ModelViewSet):
 class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
     """设备固定资产台账"""
     queryset = EquipProperty.objects.filter(delete_flag=False).order_by('-id')
-    serializer_class = EquipPropertySerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPropertyFilter
@@ -712,6 +711,11 @@ class EquipPropertyViewSet(CommonDeleteMixin, ModelViewSet):
         '录入人': 'created_username',
         '录入日期': 'created_date',
     }
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EquipPropertySerializer
+        return EquipPropertyCreatSerializer
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -3900,14 +3904,13 @@ class EquipMTBFMTTPStatementView(APIView):
         if s_time:
             year = s_time.split('-')[0]
             month = s_time.split('-')[-1]
-            begin_time = s_time + '-01'
+            begin_time = year + '-01-01'
             if month == '1':
-                end_time = s_time + '-12-31'
+                end_time = year + '-12-31'
             else:
                 day = calendar._monthlen(int(year), int(month))
-                end_time = f"{ int(year) + 1}-{int(month) - 1}-{day}"
+                end_time = f"{ int(year) + 1}-{int(month)}-{day}"
         else:
-            end_year = date.today().year
             begin_time = f'{date.today().year}-01-01'
             end_time = f'{date.today().year}-12-31'
         time_range = [begin_time, end_time]
@@ -3925,7 +3928,6 @@ class EquipMTBFMTTPStatementView(APIView):
                 elif year == b[0]:
                     for month in range(1, int(b[1]) + 1):
                         time_list.append(f'{b[0]}年{month}月')
-        time_list = []
         dic = {}
         for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
@@ -3975,24 +3977,18 @@ class EquipWorkOrderStatementView(APIView):
             'work_order_no__icontains': work_order_no,
             'work_type__icontains': work_type
         }
-        queryset1 = EquipApplyOrder.objects.filter(**kwargs, **time_range, status='已验收').values('plan_id',
-            'plan_name',
-            'work_order_no',
-            'work_type',
-            派单时间=(F('assign_datetime') - F('created_date')),
-            接单时间=(F('receiving_datetime') - F('assign_datetime')),
-            维修时间=(F('repair_end_datetime') - F('repair_start_datetime')),
-            验收时间=(F('accept_datetime') - F('repair_end_datetime'))
-        )
-        queryset2 = EquipInspectionOrder.objects.filter(**kwargs, **time_range, status='已完成').values('plan_id',
-            'plan_name',
-            'work_order_no',
-            'work_type',
-            派单时间=(F('assign_datetime') - F('created_date')),
-            接单时间=(F('receiving_datetime') - F('assign_datetime')),
-            维修时间=(F('repair_end_datetime') - F('repair_start_datetime')),
-            验收时间=(F('repair_end_datetime') - F('repair_end_datetime'))
-        )
+        queryset1 = EquipApplyOrder.objects.filter(**kwargs, **time_range, status='已验收').values('plan_id').annotate(
+            派单时间=OSum(F('assign_datetime') - F('created_date')),
+            接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
+            维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
+            验收时间=OSum(F('accept_datetime') - F('repair_end_datetime'))
+        ).values('plan_id', 'plan_name', 'work_order_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
+        queryset2 = EquipInspectionOrder.objects.filter(**kwargs, **time_range, status='已完成').values('plan_id').annotate(
+            派单时间=OSum(F('assign_datetime') - F('created_date')),
+            接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
+            维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
+            验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime'))
+        ).values('plan_id', 'plan_name', 'work_order_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
 
         queryset = chain(queryset1, queryset2)
 
@@ -4026,24 +4022,26 @@ class EquipStatementView(APIView):
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
-            验收时间=OSum(F('accept_datetime') - F('repair_end_datetime'))
-        ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
+            验收时间=OSum(F('accept_datetime') - F('repair_end_datetime')),
+            count=Count('id'),
+        ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间', 'count')
         queryset2 = EquipInspectionOrder.objects.filter(**time_range, status='已完成', equip_no__icontains=equip_no,  work_type__icontains=work_type)
         data2 = queryset2.values('equip_no', 'work_type').annotate(
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
-            验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime'))
-        ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
+            验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime')),
+            count=Count('id')
+        ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间', 'count')
         queryset = chain(data1, data2)
 
         res = [{
             'equip_no': item['equip_no'],
             'work_type': item['work_type'],
-            '派单时间': round(item['派单时间'].total_seconds() / 60, 2),
-            '接单时间': round(item['接单时间'].total_seconds() / 60, 2),
-            '维修时间': round(item['维修时间'].total_seconds() / 60, 2),
-            '验收时间': round(item['验收时间'].total_seconds() / 60, 2),
+            '派单时间': round(item['派单时间'].total_seconds() / item['count'] / 60, 2),
+            '接单时间': round(item['接单时间'].total_seconds() / item['count'] / 60, 2),
+            '维修时间': round(item['维修时间'].total_seconds() / item['count'] / 60, 2),
+            '验收时间': round(item['验收时间'].total_seconds() / item['count'] / 60, 2),
         } for item in queryset]
         return Response(res)
 
@@ -4065,25 +4063,200 @@ class EquipUserStatementView(APIView):
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
-            验收时间=OSum(F('accept_datetime') - F('repair_end_datetime'))
-        ).values('receiving_user', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
+            验收时间=OSum(F('accept_datetime') - F('repair_end_datetime')),
+            count=Count('id')
+        ).values('receiving_user', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间', 'count')
         queryset2 = EquipInspectionOrder.objects.filter(**time_range, status='已完成', receiving_user__icontains=username, work_type__icontains=work_type)
 
         data2 = queryset2.values('receiving_user', 'work_type').annotate(
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
             维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
-            验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime'))
-        ).values('receiving_user', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间')
+            验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime')),
+            count=Count('id')
+        ).values('receiving_user', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间', 'count')
         queryset = chain(data1, data2)
 
         res = [{
             'receiving_user': item['receiving_user'],
             'work_type': item['work_type'],
-            '派单时间': round(item['派单时间'].total_seconds() / 60, 2),
-            '接单时间': round(item['接单时间'].total_seconds() / 60, 2),
-            '维修时间': round(item['维修时间'].total_seconds() / 60, 2),
-            '验收时间': round(item['验收时间'].total_seconds() / 60, 2),
+            '派单时间': round(item['派单时间'].total_seconds() / item['count'] / 60, 2),
+            '接单时间': round(item['接单时间'].total_seconds() / item['count'] / 60, 2),
+            '维修时间': round(item['维修时间'].total_seconds() / item['count'] / 60, 2),
+            '验收时间': round(item['验收时间'].total_seconds() / item['count'] / 60, 2),
+        } for item in queryset]
+        return Response(res)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipPeriodStatementView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get_result(self, queryset):
+        data = queryset.values('work_type').annotate(
+            派单时间=OSum(F('assign_datetime') - F('created_date')),
+            接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
+            维修时间=OSum(F('repair_end_datetime') - F('repair_start_datetime')),
+            验收时间=OSum(F('repair_end_datetime') - F('repair_end_datetime')),
+            count=Count('id'),
+        ).values('work_type', '派单时间', '接单时间', '维修时间', '验收时间', 'count')
+
+        return data
+
+    def get(self, request):
+        work_type = self.request.query_params.get('work_type')
+        time = self.request.query_params.get('time')
+        type = self.request.query_params.get('type')
+
+        now = dt.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if time:
+            now = dt.datetime.strptime(time, '%Y-%m-%d')
+        # 本周第一天和最后一天
+        this_week_start = now - dt.timedelta(days=now.weekday())
+        this_week_end = now + dt.timedelta(days=6 - now.weekday())
+        # 本月第一天和最后一天
+        days = calendar.monthrange(now.year, now.month)[1]
+        this_month_start = dt.datetime(now.year, now.month, 1)
+        this_month_end = dt.datetime(now.year, now.month, 1) + dt.timedelta(days=days-1)
+        # 本年第一天和最后一天
+        this_year_start = dt.datetime(now.year, 1, 1)
+        this_year_end = dt.datetime(now.year + 1, 1, 1) - dt.timedelta(days=1)
+
+        kwargs = {
+            'day': {'begin_time': now, 'end_time': now + dt.timedelta(days=1)},
+            'week': {'begin_time': this_week_start, 'end_time': this_week_end},
+            'month': {'begin_time': this_month_start, 'end_time': this_month_end},
+            'year': {'begin_time': this_year_start, 'end_time': this_year_end},
+        }
+
+        if not work_type:
+            queryset1 = EquipApplyOrder.objects.filter(equip_condition='停机', status__in=['已完成', '已验收'],
+                                                       last_updated_date__range=(
+                                                           kwargs.get(type).get('begin_time'),
+                                                           kwargs.get(type).get('end_time'))
+                                                           )
+            queryset2 = EquipInspectionOrder.objects.filter(equip_condition='停机', status='已完成',
+                                                            last_updated_date__range=(
+                                                            kwargs.get(type).get('begin_time'),
+                                                            kwargs.get(type).get('end_time'))
+                                                            )
+            data = chain(self.get_result(queryset1), self.get_result(queryset2))
+
+        else:
+            if work_type == '巡检':
+                queryset = EquipInspectionOrder.objects.filter(work_type=work_type, equip_condition='停机', status='已完成',
+                                                               # fault_datetime__range=(kwargs.get(type).get('begin_time'), kwargs.get(type).get('end_time')),
+                                                               last_updated_date__range=(kwargs.get(type).get('begin_time'), kwargs.get(type).get('end_time'))
+                                                               )
+                data = self.get_result(queryset)
+            else:
+                queryset = EquipApplyOrder.objects.filter(work_type=work_type, equip_condition='停机', status__in=['已完成', '已验收'],
+                                                          # fault_datetime__range=(kwargs.get(type).get('begin_time'), kwargs.get(type).get('end_time')),
+                                                          last_updated_date__range=(kwargs.get(type).get('begin_time'), kwargs.get(type).get('end_time'))
+                                                          )
+                data = self.get_result(queryset)
+
+        if type == 'day':
+            time = time
+        elif type == 'week':
+            time = f"{kwargs.get(type).get('begin_time')}~{kwargs.get(type).get('end_time')}"
+        elif type == 'month':
+            time = kwargs.get(type).get('begin_time').strftime('%Y-%m')
+        elif type == 'year':
+            time = kwargs.get(type).get('begin_time').strftime('%Y')
+        res = [{
+            'time': time,
+            'work_type': item['work_type'],
+            '派单时间': round(item['派单时间'].total_seconds() / 60, 2) / item['count'],
+            '接单时间': round(item['接单时间'].total_seconds() / 60, 2) / item['count'],
+            '维修时间': round(item['维修时间'].total_seconds() / 60, 2) / item['count'],
+            '验收时间': round(item['验收时间'].total_seconds() / 60, 2) / item['count'],
+        } for item in data]
+        return Response(res)
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipFinishingRateView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        s_time = self.request.query_params.get('s_time')
+        e_time = self.request.query_params.get('e_time')
+        time_range = {}
+        if s_time:
+            time_range = {'created_date__range': [s_time, e_time]}
+        res = []
+        key_words = ['巡检', '保养', '润滑', '标定', '维修']
+        for key_word in key_words:
+            data = {'work_type': key_word, 'total_orders': 0, 'completed_in_time': 0, 'completed_overtime': 0,
+                    'uncompleted': 0, 'rate': 0, 'in_time_rate': 0}
+            query_set = EquipInspectionOrder.objects.filter(
+                **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type=key_word) &
+                                                                                      Q(Q(equip_repair_standard__isnull=False) | Q(equip_maintenance_standard__isnull=False) | Q(result_repair_standard__isnull=False)),
+                                                                                      **time_range)
+            if query_set:
+                data = self.compute(key_word, query_set)
+            res.append(data)
+        return Response(res)
+
+    @classmethod
+    def compute(cls, work_type, query_set):
+        completed = query_set.filter(status__in=['已完成', '已验收'])
+        total_orders = query_set.count()  # 总工单数
+        uncompleted = total_orders - completed.count()  # 未完成工单数
+        completed_in_time, completed_overtime = 0, 0
+        new_query_set = completed.annotate(completed_time=ExpressionWrapper(F('repair_end_datetime') - F('repair_start_datetime'), output_field=DurationField()))
+        for i in new_query_set:
+            spend_time = round(i.completed_time.total_seconds() / 60, 2)
+            if i.equip_repair_standard:
+                operation_time = i.equip_repair_standard.operation_time
+                operation_time_unit = i.equip_repair_standard.operation_time_unit
+            elif i.equip_maintenance_standard:
+                operation_time = i.equip_maintenance_standard.operation_time
+                operation_time_unit = i.equip_maintenance_standard.operation_time_unit
+            else:
+                operation_time = i.result_repair_standard.operation_time
+                operation_time_unit = i.result_repair_standard.operation_time_unit
+            if operation_time_unit == '日':
+                standard_time = operation_time * 24 * 60
+            elif operation_time_unit == '小时':
+                standard_time = operation_time * 60
+            elif operation_time_unit == '分钟':
+                standard_time = operation_time
+            elif operation_time_unit == '秒':
+                standard_time = operation_time / 60
+            else:
+                standard_time = spend_time
+            if 0 < spend_time <= standard_time:
+                completed_in_time += 1
+            else:
+                completed_overtime += 1
+        data = {'work_type': work_type, 'total_orders': total_orders, 'completed_in_time': completed_in_time,
+                'completed_overtime': completed_overtime, 'uncompleted': uncompleted,
+                'rate': round(completed.count() / total_orders * 100, 2),
+                'in_time_rate': round(completed_in_time / total_orders * 100, 2)}
+        return data
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipOldRateView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        queryset = EquipRepairMaterialReq.objects.values('equip_spare__equip_component_type').annotate(
+            count=Count('id'),
+            apply_count=Sum('apply'),  # 申请数量
+            old_count=Sum('apply', distinct=True, filter=Q(submit_old_flag=True))  # 交旧数量
+        ).values('equip_spare__equip_component_type__component_type_code',
+                 'equip_spare__equip_component_type__component_type_name',
+                 'count', 'apply_count', 'old_count')
+        res = [{
+            'component_type_code': item['equip_spare__equip_component_type__component_type_code'],
+            'component_type_name': item['equip_spare__equip_component_type__component_type_name'],
+            'count': item['count'],
+            'apply_count': item['apply_count'],
+            'old_count': item['old_count'],
+            'old_rate': format(item['old_count'] / item['apply_count'], '.2%') if item['old_count'] else 0
         } for item in queryset]
         return Response(res)
 

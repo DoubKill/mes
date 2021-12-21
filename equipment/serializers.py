@@ -342,6 +342,7 @@ class EquipPropertySerializer(BaseModelSerializer):
     equip_type_name = serializers.ReadOnlyField(source="equip_type.equip_type.global_name", read_only=True,
                                                 help_text='设备型号')
     made_in = serializers.ReadOnlyField(source='equip_supplier.supplier_name', help_text='设备制造商', default='')
+    price = serializers.DecimalField(max_digits=20, decimal_places=2)
 
     def get_status_name(self, obj):
         dic = {
@@ -349,6 +350,14 @@ class EquipPropertySerializer(BaseModelSerializer):
             2: '废弃',
             3: '限制'}
         return dic.get(obj.status)
+
+    class Meta:
+        model = EquipProperty
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class EquipPropertyCreatSerializer(BaseModelSerializer):
 
     class Meta:
         model = EquipProperty
@@ -505,6 +514,10 @@ class EquipSpareErpListSerializer(BaseModelSerializer):
                                                       help_text='备件分类', max_length=64)
     key_parts_flag_name = serializers.SerializerMethodField()
     use_flag_name = serializers.SerializerMethodField()
+    cost = serializers.SerializerMethodField()
+
+    def get_cost(self, obj):
+        return round(obj.cost if obj.cost else 0, 2)
 
     def get_key_parts_flag_name(self, obj):
         return '是' if obj.key_parts_flag else '否'
@@ -975,7 +988,7 @@ class EquipRepairMaterialReqSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         instance = super().to_representation(instance)
         out_record = EquipWarehouseOrder.objects.filter(order_id=instance['warehouse_out_no']).first()
-        instance.update({'out_record_status': out_record._status(), 'warehouse_out_no': instance['warehouse_out_no']})
+        instance.update({'out_record_status': out_record.status_name, 'warehouse_out_no': instance['warehouse_out_no']})
         return instance
 
     class Meta:

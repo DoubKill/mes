@@ -1287,7 +1287,7 @@ class RecipePreVIew(ListAPIView):
                                                                delete_flag=False).first()
         if cl_material:
             qk_weight = float(cl_material.actual_weight)
-            cl_weight = sum([i['standard_weight'] for i in detail_list])
+            cl_weight = float(sum([i['standard_weight'] for i in detail_list]))
             if qk_weight // cl_weight == 1 and 0.98 * qk_weight < cl_weight < 1.02 * qk_weight:
                 package_cnt = 1
             elif qk_weight // cl_weight == 1 and 0.5 * qk_weight < cl_weight < 0.85 * qk_weight:
@@ -1311,10 +1311,11 @@ class RecipePreVIew(ListAPIView):
             package_cnt = 1
 
         defaults = {"package_cnt": package_cnt,
-                    "total_standard_error": round(total_standard_error, 2)}
-        kwargs = {"name": '{}-{}-{}'.format(product_name, dev_type, '硫磺包' if 'S' in equip_no else '细料包'),
+                    "total_standard_error": round(total_standard_error, 2),
+                    "weigh_type": 1 if 'S' in equip_no else 2,
+                    }
+        kwargs = {"name": '硫磺' if 'S' in equip_no else '细料',
                   "product_batching": product_batching,
-                  "weigh_type": 1 if 'S' in equip_no else 2,
                   "delete_flag": False}
         weigh_cnt_type, _ = WeighCntType.objects.update_or_create(defaults=defaults, **kwargs)
         weigh_cnt_type.weight_details.all().delete()
