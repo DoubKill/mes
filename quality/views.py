@@ -1762,7 +1762,7 @@ class MaterialSingleTypeExamineResultView(APIView):
                 mes_decide_qualified=False).values('value', 'type__name')
         ret['mode'] = {'mode': material.desc,
                        'created_username': material.deal_username,
-                       'create_time': material.deal_time}
+                       'create_time': material.deal_time.strftime('%Y-%m-%d %H:%M:%S') if material.deal_time else None}
         return Response(ret)
 
 
