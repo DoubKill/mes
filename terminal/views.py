@@ -702,20 +702,20 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             try:
                 manual_type, manual_id = self.scan_check(product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info)
             except Exception as e:
-                raise ValidationError(e)
+                raise ValidationError(e.args[0])
             details = WeightPackageManualSerializer(manual).data
         else:  # 原材料扫码
             try:
                 res = material_out_barcode(scan_bra_code)
             except Exception as e:
-                raise ValidationError(e)
+                raise ValidationError(e.args[0])
             # res = {'ZL': 25, 'SM_CREATE': '2021-11-29 14:55:03', 'SL': 100, 'WLXXID': 'WLXX20100210111511609'} 测试数据
             if res:
                 # 查询配方中人工配物料
                 try:
                     recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
                 except Exception as e:
-                    raise ValidationError(e)
+                    raise ValidationError(e.args[0])
                 materials = set(recipe_manual.values_list('material_name', flat=True))
                 # ERP绑定关系
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
@@ -783,7 +783,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         try:
             recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
         except Exception as e:
-            raise ValidationError(e)
+            raise ValidationError(e.args[0])
         recipe_manual_names = recipe_manual.values_list('material_name', flat=True)
         scan_info = list(manual.package_details.all().values_list('material_name', flat=True))
         if set(scan_info) - set(recipe_manual_names):
@@ -919,7 +919,7 @@ class GetManualInfo(APIView):
             try:
                 results = get_manual_materials(product_no, int(dev_type), batching_equip)
             except Exception as e:
-                raise ValidationError(e)
+                raise ValidationError(e.args[0])
         else:
             recipe = ProductBatching.objects.filter(stage_product_batch_no=product_no, dev_type__category_name=dev_type,
                                                     used_type=4, delete_flag=False).first()
