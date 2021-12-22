@@ -158,7 +158,9 @@ class ExamineMaterialFilter(django_filters.rest_framework.FilterSet):
                   'supplier',
                   'qualified',
                   'material_create_time_b',
-                  'material_create_time_e')
+                  'material_create_time_e',
+                  'deal_status',
+                  'deal_result')
 
 
 class MaterialReportEquipFilter(django_filters.rest_framework.FilterSet):
