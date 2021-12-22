@@ -1659,6 +1659,9 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        deal_status = self.request.query_params.get('deal_status')
+        if deal_status == '未处理':
+            queryset = queryset.filter(qualified=False)
         if self.request.query_params.get('all'):
             data = queryset.values("id", "name", 'sample_name', 'batch', 'supplier')
             return Response({'results': data})
