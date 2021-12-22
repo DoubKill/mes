@@ -45,7 +45,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
     MaterialExamineResult, MaterialExamineType, MaterialExamineRatingStandard, ExamineValueUnit, ExamineMaterial, \
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
+    QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog
 
@@ -59,7 +59,7 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialDealResultListSerializer1, ExamineMaterialSerializer, MaterialExamineTypeSerializer, \
     ExamineValueUnitSerializer, MaterialExamineResultMainSerializer, DataPointStandardErrorSerializer, \
     MaterialEquipTypeSerializer, MaterialEquipSerializer, MaterialEquipTypeUpdateSerializer, \
-    ExamineMaterialCreateSerializer, UnqualifiedMaterialProcessModeSerializer, IgnoredProductInfoSerializer, \
+    ExamineMaterialCreateSerializer, IgnoredProductInfoSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
     MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
     ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer, \
@@ -1664,6 +1664,21 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
             return Response({'results': data})
         return super().list(request, *args, **kwargs)
 
+    @action(methods=['post'], detail=False)
+    def disqualification(self, request):
+        material_ids = self.request.data.get('material_ids')
+        desc = self.request.data.get('desc')
+        deal_result = self.request.data.get('deal_result')
+        ExamineMaterial.objects.filter(id__in=material_ids).update(
+            deal_status='已处理',
+            deal_result=deal_result,
+            desc=desc,
+            deal_username=self.request.user.username,
+            deal_time=datetime.datetime.now(),
+            status=1
+        )
+        return Response('成功')
+
 
 class WMSMaterialSearchView(APIView):
     """根据条码号搜索中策总厂wms物料信息，参数:?tmh=BHZ12105311651140001"""
@@ -1745,31 +1760,10 @@ class MaterialSingleTypeExamineResultView(APIView):
             material_data['transport_date'] = last_examine_result.transport_date
             ret['unqualified_type_data'] = last_examine_result.single_examine_results.filter(
                 mes_decide_qualified=False).values('value', 'type__name')
-        mode = UnqualifiedMaterialProcessMode.objects.filter(material=material).last()
-        if mode:
-            ret['mode'] = {'mode': mode.mode,
-                           'created_username': mode.create_user.username,
-                           'create_time': datetime.datetime.strftime(mode.create_time, '%Y-%m-%d %H:%M:%S')}
-        else:
-            ret['mode'] = {}
+        ret['mode'] = {'mode': material.desc,
+                       'created_username': material.deal_username,
+                       'create_time': material.deal_time.strftime('%Y-%m-%d %H:%M:%S') if material.deal_time else None}
         return Response(ret)
-
-
-@method_decorator([api_recorder], name="dispatch")
-class UnqualifiedMaterialProcessModeViewSet(viewsets.GenericViewSet,
-                                            mixins.CreateModelMixin,
-                                            mixins.ListModelMixin):
-    """
-    list:
-        批次原材料不合格项详情
-    create:
-        新建批次原材料不合格单
-    """
-    queryset = UnqualifiedMaterialProcessMode.objects.all()
-    serializer_class = UnqualifiedMaterialProcessModeSerializer
-    permission_classes = (IsAuthenticated,)
-    filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('material_id',)
 
 
 @method_decorator([api_recorder], name="dispatch")

@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
+    IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog
 from recipe.models import MaterialAttribute
@@ -1627,15 +1627,7 @@ class ExamineMaterialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExamineMaterial
-        fields = ('id',
-                  'name',
-                  'sample_name',
-                  'batch',
-                  'supplier',
-                  'qualified',
-                  'create_time',
-                  'examine_results',
-                  'examine_types')
+        fields = "__all__"
 
 
 class ExamineMaterialCreateSerializer(serializers.ModelSerializer):
@@ -1673,19 +1665,6 @@ class MaterialEquipSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialEquip
         fields = '__all__'
-
-
-class UnqualifiedMaterialProcessModeSerializer(serializers.ModelSerializer):
-
-    def create(self, validated_data):
-        validated_data['create_user'] = self.context['request'].user
-        instance, _ = UnqualifiedMaterialProcessMode.objects.update_or_create(
-            defaults={'material': validated_data['material']}, **validated_data)
-        return instance
-
-    class Meta:
-        model = UnqualifiedMaterialProcessMode
-        exclude = ('create_user',)
 
 
 class MaterialReportEquipSerializer(BaseModelSerializer):
