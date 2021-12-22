@@ -1665,7 +1665,12 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
         if self.request.query_params.get('all'):
             data = queryset.values("id", "name", 'sample_name', 'batch', 'supplier')
             return Response({'results': data})
-        return super().list(request, *args, **kwargs)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(methods=['post'], detail=False)
     def disqualification(self, request):
