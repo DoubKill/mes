@@ -1684,9 +1684,38 @@ class WMSMaterialSearchView(APIView):
     """根据条码号搜索中策总厂wms物料信息，参数:?tmh=BHZ12105311651140001"""
 
     def get(self, request):
+        from django.conf import settings
+        import random
+        import uuid
         tmh = self.request.query_params.get('tmh')
         if not tmh:
             raise ValidationError('请输入条码号')
+        if settings.DEBUG:
+            ret = [{'ZCDBH': 'AJCKD{}'.format(random.randint(1111111, 9999999)),
+                    'WLXXID': uuid.uuid1(),
+                    'TMH': tmh,
+                    'BZDW': '箱',
+                    'SLDW': '件',
+                    'ZLDW': '千克kg/件（30千克）',
+                    'SL': 42,
+                    'ZL': 1260,
+                    'SCRQ': '20210531',
+                    'SM_USERID': '5005',
+                    'SM_CREATE': '2021-05-31 16:59:15',
+                    'KFID': '4235C4C1EECA69D9E0539C0A010A323A',
+                    'KFMC': '下沙仓库',
+                    'TOFAC': 'AJ1',
+                    'TOFACNM': '中策安吉炼胶',
+                    'WLDWXXID': 'WLDWXX20120406083346797',
+                    'WLDWMC': '希布尔国际贸易有限公司',
+                    'WLMC': '进口松香丁苯SBR1500(俄罗斯 V厂）',
+                    'CD': '杭州',
+                    'PDM': 'B2411',
+                    'SYQX': '2021-08-29',
+                    'PH': '{}'.format(random.randint(20211201, 20311201)),
+                    'DDH': 'RKD20210531030',
+                    'ZSL': 0}]
+            return Response(ret)
         url = 'http://10.1.10.157:9091/WebService.asmx?wsdl'
         try:
             client = Client(url)
