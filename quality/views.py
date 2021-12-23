@@ -1659,10 +1659,18 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        deal_status = self.request.query_params.get('deal_status')
+        if deal_status == '未处理':
+            queryset = queryset.filter(qualified=False)
         if self.request.query_params.get('all'):
             data = queryset.values("id", "name", 'sample_name', 'batch', 'supplier')
             return Response({'results': data})
-        return super().list(request, *args, **kwargs)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(methods=['post'], detail=False)
     def disqualification(self, request):
