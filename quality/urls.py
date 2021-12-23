@@ -85,7 +85,7 @@ router.register('material-examine-result', MaterialExamineResultViewSet)
 router.register('examine-material', ExamineMaterialViewSet)
 
 # 原材料不合格管理
-router.register('material-unqualified-process', UnqualifiedMaterialProcessModeViewSet)
+# router.register('material-unqualified-process', UnqualifiedMaterialProcessModeViewSet)
 
 # 原材料上报设备
 router.register('material-report-equip', MaterialReportEquipViewSet)

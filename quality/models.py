@@ -119,6 +119,7 @@ class MaterialTestMethod(AbstractEntity):
     test_method = models.ForeignKey(TestMethod, help_text='试验方法', on_delete=models.CASCADE)
     data_point = models.ManyToManyField(DataPoint, help_text='数据点', related_name='point_methods')
     is_judged = models.BooleanField(help_text='是否做为判定', default=True)
+    is_print = models.BooleanField(help_text='是否做为判定', default=True)
 
     def __str__(self):
         return self.test_method.name
@@ -637,6 +638,11 @@ class ExamineMaterial(models.Model):
     process_mode_time = models.DateTimeField(null=True, blank=True)
     create_time = models.DateTimeField(auto_now_add=True)
     update_time = models.DateTimeField(auto_now=True)
+    deal_status = models.CharField(max_length=8, help_text='处理状态（已处理/未处理）', default='未处理')
+    deal_result = models.CharField(max_length=16, help_text='处理结果（放行/不放行）', blank=True,  null=True)
+    desc = models.CharField(max_length=256, help_text='处理说明', blank=True,  null=True)
+    deal_username = models.CharField(max_length=64, help_text='处理人', blank=True,  null=True)
+    deal_time = models.DateTimeField(help_text='处理时间', blank=True,  null=True)
 
     class Meta:
         db_table = 'examine_material'
@@ -684,17 +690,17 @@ class MaterialSingleTypeExamineResult(models.Model):
         db_table = 'material_single_type_examine_result'
         verbose_name_plural = verbose_name = '单类型检测结果'
 
-
-class UnqualifiedMaterialProcessMode(models.Model):
-    """不合格原材料处理方式"""
-    material = models.ForeignKey(ExamineMaterial, related_name='unqualified_processes', on_delete=models.CASCADE)
-    mode = models.CharField(max_length=200, unique=True)
-    create_user = models.ForeignKey(User, on_delete=models.CASCADE)
-    create_time = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = 'unqualified_material_process_mode'
-        verbose_name_plural = verbose_name = '不合格原材料处理方式'
+#
+# class UnqualifiedMaterialProcessMode(models.Model):
+#     """不合格原材料处理方式"""
+#     material = models.ForeignKey(ExamineMaterial, related_name='unqualified_processes', on_delete=models.CASCADE)
+#     mode = models.CharField(max_length=200, unique=True)
+#     create_user = models.ForeignKey(User, on_delete=models.CASCADE)
+#     create_time = models.DateTimeField(auto_now_add=True)
+#
+#     class Meta:
+#         db_table = 'unqualified_material_process_mode'
+#         verbose_name_plural = verbose_name = '不合格原材料处理方式'
 
 
 class MaterialReportEquip(AbstractEntity):

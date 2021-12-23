@@ -26,7 +26,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     TestIndicator, LabelPrint, UnqualifiedDealOrder, UnqualifiedDealOrderDetail, BatchYear, ExamineMaterial, \
     MaterialExamineResult, MaterialSingleTypeExamineResult, MaterialExamineType, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
-    UnqualifiedMaterialProcessMode, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
+    IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
     LabelPrintLog
 from recipe.models import MaterialAttribute
@@ -652,14 +652,18 @@ class MaterialDealResultListSerializer(BaseModelSerializer):
         test_orders = MaterialTestOrder.objects.filter(lot_no=obj.lot_no,
                                                        product_no=obj.product_no
                                                        ).order_by('actual_trains')
+        methods = list(MaterialTestMethod.objects.filter(material__material_no=obj.product_no,
+                                                         is_print=True
+                                                         ).values_list('test_method__name', flat=True))
         for test_order in test_orders:
             ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
             test_results = MaterialTestResult.objects.filter(id__in=max_result_ids,
-                                                             is_judged=True).order_by('test_indicator_name',
-                                                                                      'data_point_name')
+                                                             test_method_name__in=methods
+                                                             ).order_by('test_indicator_name',
+                                                                        'data_point_name')
             for test_result in test_results:
                 if test_result.level == 1:
                     result = '合格'
@@ -1623,15 +1627,7 @@ class ExamineMaterialSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ExamineMaterial
-        fields = ('id',
-                  'name',
-                  'sample_name',
-                  'batch',
-                  'supplier',
-                  'qualified',
-                  'create_time',
-                  'examine_results',
-                  'examine_types')
+        fields = "__all__"
 
 
 class ExamineMaterialCreateSerializer(serializers.ModelSerializer):
@@ -1669,19 +1665,6 @@ class MaterialEquipSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialEquip
         fields = '__all__'
-
-
-class UnqualifiedMaterialProcessModeSerializer(serializers.ModelSerializer):
-
-    def create(self, validated_data):
-        validated_data['create_user'] = self.context['request'].user
-        instance, _ = UnqualifiedMaterialProcessMode.objects.update_or_create(
-            defaults={'material': validated_data['material']}, **validated_data)
-        return instance
-
-    class Meta:
-        model = UnqualifiedMaterialProcessMode
-        exclude = ('create_user',)
 
 
 class MaterialReportEquipSerializer(BaseModelSerializer):

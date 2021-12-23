@@ -2456,7 +2456,7 @@ class WmsStorageSummaryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = inventory_where_str = ""
         if material_name:
-            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
                 extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
@@ -3126,7 +3126,7 @@ class WMSInventoryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = ""
         if material_name:
-            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
                 extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
@@ -4908,7 +4908,7 @@ class WMSStockSummaryView(APIView):
         temp = sc.all()
 
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
-            F('wms_material_code'), F('warning_weight') * 1000))
+            F('wms_material_code'), F('warning_weight')))
 
         data_dict = {}
 
