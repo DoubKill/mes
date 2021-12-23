@@ -936,7 +936,7 @@ class EquipInspectionOrder(AbstractEntity):
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
     back_order = models.BooleanField(help_text='是否退单', default=False)
-    equip_maintenance_standard_work = models.ForeignKey(EquipMaintenanceStandardWork, help_text='设备巡检区域详情', on_delete=models.CASCADE)
+    equip_maintenance_standard_work = models.ForeignKey(EquipMaintenanceStandardWork, help_text='设备巡检区域详情', on_delete=models.CASCADE, null=True, blank=True)
     inspection_line_no = models.IntegerField(help_text='巡检顺序编号', blank=True, null=True)
 
     class Meta:
