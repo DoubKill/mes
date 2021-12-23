@@ -274,7 +274,7 @@ class OutBoundDeliveryOrderDetail(AbstractEntity):
     )
     outbound_delivery_order = models.ForeignKey(OutBoundDeliveryOrder, help_text='出库单据', on_delete=models.CASCADE,
                                                 related_name='outbound_delivery_details')
-    order_no = models.CharField(max_length=64, verbose_name='出库任务编号', help_text='出库任务编号')
+    order_no = models.CharField(max_length=64, verbose_name='出库任务编号', help_text='出库任务编号', unique=True)
     # station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='出库任务状态', help_text='出库任务状态', choices=STATUS_CHOICE, default=1)
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
