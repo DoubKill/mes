@@ -270,6 +270,8 @@ class LoadTankMaterialLog(AbstractEntity):
 
 
 class ReplaceMaterial(AbstractEntity):
+    reason_type = models.CharField(max_length=64, help_text='原因类别: 物料名不一致、重量不匹配、超过有效期、未到放置期', default='物料名不一致')
+    expire_datetime = models.DateTimeField(help_text='有效期', null=True, blank=True)
     plan_classes_uid = models.CharField(max_length=64, help_text='计划号')
     equip_no = models.CharField(max_length=64, help_text='机台')
     product_no = models.CharField(max_length=64, help_text='胶料配方')

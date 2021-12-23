@@ -190,6 +190,12 @@ class BatchProductionInfoView(APIView):
             plan_status_info = PlanStatus.objects.using("SFJ").filter(
                 plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
+            if plan_status not in ['运行中', '等待']:
+                continue
+            actual_trains = 0
+            if plan_status == '运行中':
+                max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
+                actual_trains = actual_trains if not max_trains else max_trains
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
@@ -215,9 +221,7 @@ class BatchProductionInfoView(APIView):
                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
                 current_product_data['weight'] = 0
                 current_product_data['trains'] = trains
-
-        return Response({'plan_actual_data': plan_actual_data,
-                         'current_product_data': current_product_data})
+        return Response({'plan_actual_data': plan_actual_data, 'current_product_data': current_product_data})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2313,7 +2317,7 @@ class ReplaceMaterialViewSet(ModelViewSet):
     filter_class = ReplaceMaterialFilter
 
     def list(self, request, *args, **kwargs):
-        choice = self.request.query_params.get('id')
+        choice = self.request.query_params.get('id')  # 是否是下拉框选择
         queryset = self.filter_queryset(self.get_queryset())
         if not choice:
             page = self.paginate_queryset(queryset)

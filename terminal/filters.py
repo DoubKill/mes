@@ -115,7 +115,7 @@ class ReplaceMaterialFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = ReplaceMaterial
-        fields = ('id', 'plan_classes_uid', 'product_no', 'real_material', 'bra_code', 'status', 'equip_no')
+        fields = ('id', 'plan_classes_uid', 'product_no', 'real_material', 'bra_code', 'status', 'equip_no', 'reason_type')
 
 
 class ReturnRubberFilter(django_filters.rest_framework.FilterSet):
