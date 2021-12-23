@@ -1894,7 +1894,8 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         "作业类型": "work_type",
         "标准编号": "standard_code",
         "标准名称": "standard_name",
-        "机台": "equip_no",
+        "类别": "type",
+        "机台": "equip",
         "部位名称": "equip_part_name",
         "部件名称": "equip_component_name",
         "设备条件": "equip_condition",
@@ -2027,17 +2028,17 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
-            equip_part = EquipPartNew.objects.filter(part_name=item[4]).first()
-            equip_component = EquipComponent.objects.filter(component_name=item[5]).first()
-            equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[8]).first()
-            if not equip_part:
-                raise ValidationError(f'部位名称{item[4]}不存在')
-            if not equip_job_item_standard:
-                raise ValidationError(f'作业项目{item[8]}不存在')
+            equip_part = EquipPartNew.objects.filter(part_name=item[5]).first()
+            equip_component = EquipComponent.objects.filter(component_name=item[6]).first()
+            equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[9]).first()
+            if item[0] != '巡检' and not equip_part:
+                raise ValidationError(f'部位名称{item[5]}不存在')
+            if item[0] != '巡检' and not equip_job_item_standard:
+                raise ValidationError(f'作业项目{item[9]}不存在')
             try:
-                if item[9]:
-                    start_time = dt.date(*map(int, item[9].split('-'))) if isinstance(item[9], str) else datetime.date(
-                        xlrd.xldate.xldate_as_datetime(item[9], 0))
+                if item[10]:
+                    start_time = dt.date(*map(int, item[10].split('-'))) if isinstance(item[10], str) else datetime.date(
+                        xlrd.xldate.xldate_as_datetime(item[10], 0))
             except:
                 raise ValidationError('导入的开始时间格式有误')
 
@@ -2053,23 +2054,23 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 signal_list.append({"work_type": item[0],
                                     "standard_code": item[1],
                                     "standard_name": item[2],
-                                    "equip_no": item[3],
-                                    "equip_part": equip_part.id,
+                                    "equip_no": item[4],
+                                    "equip_part": equip_part.id if equip_part else None,
                                     "equip_component": equip_component.id if equip_component else None,
-                                    "equip_condition": item[6],
-                                    "important_level": item[7],
-                                    "equip_job_item_standard": equip_job_item_standard.id,
-                                    "start_time": start_time if item[9] else None,
-                                    "maintenance_cycle": item[10] if item[10] else None,
-                                    "cycle_unit": item[11] if item[11] else None,
-                                    "cycle_num": item[12] if item[12] else None,
-                                    "cycle_person_num": item[13] if item[13] else None,
-                                    "operation_time": item[14] if item[14] else None,
-                                    "operation_time_unit": item[15] if item[15] else None,
+                                    "equip_condition": item[7],
+                                    "important_level": item[8],
+                                    "equip_job_item_standard": equip_job_item_standard.id if equip_job_item_standard else None,
+                                    "start_time": start_time if item[10] else None,
+                                    "maintenance_cycle": item[11] if item[11] else None,
+                                    "cycle_unit": item[12] if item[12] else None,
+                                    "cycle_num": item[13] if item[13] else None,
+                                    "cycle_person_num": item[14] if item[13] else None,
+                                    "operation_time": item[15] if item[15] else None,
+                                    "operation_time_unit": item[16] if item[16] else None,
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
-                                    "spares": item[16] if item[16] else 'no',  # '清洁剂'
+                                    "spares": item[17] if item[17] else 'no',  # '清洁剂'
                                     })
 
         serializer = EquipMaintenanceStandardImportSerializer(data=signal_list, many=True, context={'request': request})
@@ -2127,7 +2128,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
     EXPORT_FIELDS_DICT = {
         "标准编号": "standard_code",
         "标准名称": "standard_name",
-        "设备种类": "equip_type_name",
+        "机台": "equip",
         "部位名称": "equip_part_name",
         "部件名称": "equip_component_name",
         "设备条件": "equip_condition",
@@ -2265,7 +2266,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
-                                    "spares": item[12] if item[12] else 'no',  # '清洁剂',
+                                    "spares": item[12] if item[12] else 'no',
                                     })
 
         serializer = EquipRepairStandardImportSerializer(data=signal_list, many=True, context={'request': request})
@@ -3747,6 +3748,7 @@ class EquipPlanViewSet(ModelViewSet):
         "作业类型": "work_type",
         "计划编号": "plan_id",
         "计划名称": "plan_name",
+        "类别": "type",
         "机台": "equip_name",
         "维护标准": "standard",
         "设备条件": "equip_condition",

@@ -789,10 +789,10 @@ class EquipJobItemStandardUpdateSerializer(BaseModelSerializer):
 class EquipMaintenanceStandardSerializer(BaseModelSerializer):
     standard_code = serializers.CharField(help_text='标准编号', max_length=64, validators=[
         UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准编号已存在')])
-    equip_part_name = serializers.ReadOnlyField(source='equip_part.part_name', help_text='部位名称')
+    equip_part_name = serializers.ReadOnlyField(source='equip_part.part_name', help_text='部位名称', default='')
     equip_component_name = serializers.ReadOnlyField(source='equip_component.component_name', help_text='部件名称')
     equip_job_item_standard_name = serializers.ReadOnlyField(source='equip_job_item_standard.standard_name',
-                                                             help_text='作业项目')
+                                                             help_text='作业项目', default='')
     specification = serializers.ReadOnlyField(source='maintenance_materials.equip_spare_erp.specification',
                                               help_text='所需物料规格')
     quantity = serializers.ReadOnlyField(source='maintenance_materials.quantity', help_text='物料数量')
@@ -1192,10 +1192,11 @@ class EquipApplyOrderExportSerializer(BaseModelSerializer):
 
 
 class EquipInspectionOrderSerializer(BaseModelSerializer):
-    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_name',
+    equip_repair_standard_name = serializers.ReadOnlyField(source='equip_repair_standard.standard_code',
                                                            help_text='维护标准名', default='')
     work_persons = serializers.ReadOnlyField(source='equip_maintenance_standard.cycle_person_num', help_text='作业标准人数',
                                              default='')
+    type = serializers.ReadOnlyField(source='equip_repair_standard.type', help_text='类别(机械/电气)')
     area_name = serializers.ReadOnlyField(source='equip_maintenance_standard_work.equip_area_define.area_name', help_text='巡检区域名称')
     equip_type = serializers.SerializerMethodField(help_text='设备机型')
     work_content = serializers.ListField(help_text='实际巡检标准列表', write_only=True, default=[])
@@ -1529,6 +1530,7 @@ class EquipPlanSerializer(BaseModelSerializer):
     equip_no = serializers.ListField(help_text='机台', write_only=True)
     standard_name = serializers.ReadOnlyField(help_text='维护标准名称', source='equip_manintenance_standard.standard_code')
     repair_standard_name = serializers.ReadOnlyField(help_text='维修标准名称', source='equip_repair_standard.standard_code')
+    type = serializers.ReadOnlyField(help_text='巡检标准类别', source='equip_manintenance_standard.type')
     equip_name = serializers.ReadOnlyField(source='equip_no')
     planned_maintenance_date = serializers.CharField()
     next_maintenance_date = serializers.CharField(default=None)

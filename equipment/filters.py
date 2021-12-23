@@ -291,7 +291,7 @@ class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):
         model = EquipMaintenanceStandard
         fields = (
             'id', 'work_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
-            'spare_name', 'specification', 'use_flag')
+            'spare_name', 'specification', 'use_flag', 'type')
 
 
 class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
@@ -416,10 +416,11 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
 class EquipPlanFilter(django_filters.rest_framework.FilterSet):
     plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
     planned_maintenance_date = django_filters.CharFilter(field_name='planned_maintenance_date__date', help_text='计划日期')
+    type = django_filters.CharFilter(field_name='equip_manintenance_standard__type', help_text='类别')
 
     class Meta:
         model = EquipPlan
-        fields = ('work_type', 'plan_name', 'planned_maintenance_date', 'plan_source', 'status', 'equip_condition', 'importance_level')
+        fields = ('work_type', 'plan_name', 'planned_maintenance_date', 'plan_source', 'status', 'equip_condition', 'importance_level', 'type')
 
 
 class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
@@ -434,10 +435,11 @@ class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
     assign_to_user = django_filters.CharFilter(field_name='assign_to_user', help_text='被指派人', lookup_expr='icontains')
     repair_user = django_filters.CharFilter(field_name='repair_user', help_text='巡检人', lookup_expr='icontains')
     receiving_user = django_filters.CharFilter(field_name='receiving_user', help_text='接单人', lookup_expr='icontains')
+    type = django_filters.CharFilter(field_name='equip_repair_standard__type', help_text='类型', lookup_expr='icontains')
 
     class Meta:
         model = EquipInspectionOrder
         fields = ('planned_repair_date', 'plan_name', 'equip_no', 'work_order_no', 'equip_condition', 'status',
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'importance_level',
-                  'assign_user', 'assign_to_user', 'receiving_user')
+                  'assign_user', 'assign_to_user', 'receiving_user', 'type')
 

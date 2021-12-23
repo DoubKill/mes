@@ -59,6 +59,9 @@ class MaintenancePlan:
     def maintenance_plan(self):
         queryset = EquipMaintenanceStandard.objects.filter(use_flag=True).all()
         for obj in queryset:
+            # 巡检标准中如果作业内容为空，则不生成巡检计划
+            if obj.work_type == '巡检' and not EquipMaintenanceStandardWork.objects.filter(equip_maintenance_standard=obj).exists():
+                continue
             if not obj.cycle_unit or not obj.start_time:
                 continue
             start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')  # 开始时间
