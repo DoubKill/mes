@@ -260,7 +260,8 @@ class OutWorkFeedBack(APIView):
             lot_no = data.get("lot_no", "99999999")  # 给一个无法查到的lot_no
             order_no = data.get('order_no')
             if order_no:
-                dp_obj = OutBoundDeliveryOrderDetail.objects.filter(order_no=order_no).first()
+                dp_obj = OutBoundDeliveryOrderDetail.objects.filter(
+                    order_no=order_no, lot_no=lot_no).order_by('id').last()
                 if dp_obj:
                     dp_obj.status = 3
                     dp_obj.finish_time = datetime.datetime.now()
