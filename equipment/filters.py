@@ -290,7 +290,7 @@ class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipMaintenanceStandard
         fields = (
-            'id', 'work_type', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+            'id', 'work_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
             'spare_name', 'specification', 'use_flag')
 
 
@@ -304,19 +304,20 @@ class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipRepairStandard
-        fields = ('id', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+        fields = ('id', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
                   'spare_name', 'specification', 'use_flag')
 
 
 class EquipWarehouseOrderFilter(django_filters.rest_framework.FilterSet):
     order_id = django_filters.CharFilter(field_name='order_id', lookup_expr='icontains')
+    barcode = django_filters.CharFilter(field_name='barcode', lookup_expr='icontains')
     s_time = django_filters.CharFilter(field_name='created_date__date', lookup_expr='gte')
     e_time = django_filters.CharFilter(field_name='created_date__date', lookup_expr='lte')
     created_user = django_filters.CharFilter(field_name='created_user__username', lookup_expr='icontains')
 
     class Meta:
         model = EquipWarehouseOrder
-        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user')
+        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user', 'barcode')
 
 
 class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):

@@ -252,7 +252,7 @@ class EquipPartNew(AbstractEntity):
         设备部位
     """
     equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE,
-                                   help_text='所属主设备种类')
+                                   help_text='所属主设备种类', null=True, blank=True)
     part_code = models.CharField(max_length=64, help_text='部位编号')
     part_name = models.CharField(max_length=64, help_text='部位名称')
     global_part_type = models.ForeignKey(GlobalCode, help_text='部位分类', on_delete=models.CASCADE)
@@ -540,14 +540,16 @@ class EquipMaintenanceStandard(AbstractEntity):
     standard_code = models.CharField(max_length=64, help_text='标准编号')
     standard_name = models.CharField(max_length=64, help_text='标准名称', null=True, blank=True)
     work_type = models.CharField(max_length=64, help_text='作业类型')
-    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
+    type = models.CharField(max_length=64, help_text='类别（机械、电气、通用）', null=True, blank=True)
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类', null=True, blank=True)
+    equip_no = models.CharField(max_length=64, help_text='机台')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
-                                   help_text='设备部位', verbose_name='设备部位')
+                                   help_text='设备部位', verbose_name='设备部位', null=True, blank=True)
     equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE,
                                         blank=True, null=True)
     equip_condition = models.CharField(max_length=64, help_text='设备条件')
     important_level = models.CharField(max_length=64, help_text='重要程度')
-    equip_job_item_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
+    equip_job_item_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE, null=True, blank=True)
     start_time = models.DateField(help_text='起始日期', blank=True, null=True)
     maintenance_cycle = models.IntegerField(help_text='起始周期', blank=True, null=True)
     cycle_unit = models.CharField(max_length=64, help_text='起始周期单位', blank=True, null=True)
@@ -576,11 +578,29 @@ class EquipMaintenanceStandardMaterials(AbstractEntity):
         verbose_name_plural = verbose_name = '设备维护所需物料'
 
 
+class EquipMaintenanceStandardWork(AbstractEntity):
+    equip_maintenance_standard = models.ForeignKey(EquipMaintenanceStandard, help_text='设备维护作业标准定义',
+                                                   related_name='equip_maintenance_materials', on_delete=models.CASCADE)
+    equip_area_define = models.ForeignKey(EquipAreaDefine, help_text='作业位置区域',
+                                        related_name='equip_area_define', on_delete=models.CASCADE)
+    equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
+                                   help_text='设备部位', verbose_name='设备部位')
+    equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE,
+                                        blank=True, null=True)
+    equip_job_item_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
+    lot_no = models.CharField(max_length=64, help_text='巡检点区域条码')
+
+    class Meta:
+        db_table = 'equip_maintenance_standard_work'
+        verbose_name_plural = verbose_name = '设备巡检作业区域'
+
+
 class EquipRepairStandard(AbstractEntity):
     standard_code = models.CharField(max_length=64, help_text='标准编号')
     standard_name = models.CharField(max_length=64, help_text='标准名称', null=True, blank=True)
     # work_type = models.CharField(max_length=64, help_text='作业类型')
-    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类')
+    equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类', null=True, blank=True)
+    equip_no = models.CharField(max_length=64, help_text='机台')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
                                    help_text='设备部位', verbose_name='设备部位')
     equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE
@@ -916,6 +936,8 @@ class EquipInspectionOrder(AbstractEntity):
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
     back_order = models.BooleanField(help_text='是否退单', default=False)
+    equip_maintenance_standard_work = models.ForeignKey(EquipMaintenanceStandardWork, help_text='设备巡检区域详情', on_delete=models.CASCADE)
+    inspection_line_no = models.IntegerField(help_text='巡检顺序编号', blank=True, null=True)
 
     class Meta:
         db_table = 'equip_inspection_order'
