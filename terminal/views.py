@@ -84,6 +84,66 @@ class BatchBasicInfoView(APIView):
         return Response(data)
 
 
+# @method_decorator([api_recorder], name="dispatch")
+# class BatchProductionInfoView(APIView):
+#     """根据mac地址、班次， 获取生产计划信息和当前生产的规格；参数：?mac_address=xxx&classes=xxx"""
+#     permission_classes = (IsAuthenticated,)
+#
+#     def get(self, request):
+#         mac_address = self.request.query_params.get('mac_address')
+#         classes = self.request.query_params.get('classes')
+#         if not mac_address:
+#             raise ValidationError('参数缺失')
+#         terminal_location = TerminalLocation.objects.filter(terminal__no=mac_address).first()
+#         if not terminal_location:
+#             raise ValidationError('该终端位置点不存在')
+#         equip_no = terminal_location.equip.equip_no
+#
+#         # 获取当前时间的工厂日期
+#         now = datetime.datetime.now()
+#         current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+#             start_time__lte=now,
+#             end_time__gte=now,
+#             plan_schedule__work_schedule__work_procedure__global_name='密炼'
+#         ).first()
+#         if current_work_schedule_plan:
+#             date_now = str(current_work_schedule_plan.plan_schedule.day_time)
+#         else:
+#             date_now = str(now.date())
+#
+#         plan_actual_data = []  # 计划对比实际数据
+#         current_product_data = {}  # 当前生产数据
+#         classes_plans = ProductClassesPlan.objects.filter(
+#             work_schedule_plan__plan_schedule__day_time=date_now,
+#             equip__equip_no=equip_no,
+#             delete_flag=False)
+#         if classes:
+#             classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
+#         for plan in classes_plans:
+#             # 任务状态
+#             plan_status_info = PlanStatus.objects.using("SFJ").filter(
+#                 plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
+#             plan_status = plan_status_info.status if plan_status_info else plan.status
+#             if plan_status not in ['运行中', '等待']:
+#                 continue
+#             actual_trains = 0
+#             if plan_status == '运行中':
+#                 max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
+#                 current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
+#                 actual_trains = actual_trains if not max_trains else max_trains
+#             plan_actual_data.append(
+#                 {
+#                     'product_no': plan.product_batching.stage_product_batch_no,
+#                     'plan_trains': plan.plan_trains,
+#                     'actual_trains': actual_trains,
+#                     'plan_classes_uid': plan.plan_classes_uid,
+#                     'status': plan_status,
+#                     'classes': plan.work_schedule_plan.classes.global_name
+#                 }
+#             )
+#         return Response({'plan_actual_data': plan_actual_data,
+#                          'current_product_data': current_product_data})
+
 @method_decorator([api_recorder], name="dispatch")
 class BatchProductionInfoView(APIView):
     """根据mac地址、班次， 获取生产计划信息和当前生产的规格；参数：?mac_address=xxx&classes=xxx"""
@@ -120,17 +180,16 @@ class BatchProductionInfoView(APIView):
         if classes:
             classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
+            last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
+                                                                           feed_end_time__isnull=False).last()
+            if last_feed_log:
+                actual_trains = last_feed_log.trains
+            else:
+                actual_trains = 0
             # 任务状态
             plan_status_info = PlanStatus.objects.using("SFJ").filter(
                 plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
-            if plan_status not in ['运行中', '等待']:
-                continue
-            actual_trains = 0
-            if plan_status == '运行中':
-                max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
-                current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
-                actual_trains = actual_trains if not max_trains else max_trains
             plan_actual_data.append(
                 {
                     'product_no': plan.product_batching.stage_product_batch_no,
@@ -141,6 +200,22 @@ class BatchProductionInfoView(APIView):
                     'classes': plan.work_schedule_plan.classes.global_name
                 }
             )
+            if plan_status == '运行中':
+                max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
+                    feed_log__plan_classes_uid=plan.plan_classes_uid).aggregate(
+                    max_feed_log_id=Max('feed_log_id'))['max_feed_log_id']
+                if max_feed_log_id:
+                    max_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(id=max_feed_log_id).first()
+                    if max_feed_log.feed_begin_time:
+                        trains = max_feed_log.trains + 1
+                    else:
+                        trains = max_feed_log.trains
+                else:
+                    trains = 1
+                current_product_data['product_no'] = plan.product_batching.stage_product_batch_no
+                current_product_data['weight'] = 0
+                current_product_data['trains'] = trains
+
         return Response({'plan_actual_data': plan_actual_data,
                          'current_product_data': current_product_data})
 

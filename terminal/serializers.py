@@ -242,11 +242,13 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:
                 # 查找物料替代表
                 replace_record = ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, status='已处理',
-                                                                real_material=material_name, result=1).first()
+                                                                real_material=scan_material, result=1).first()
                 if replace_record and replace_record.result:
                     # 转换物料名
                     flag, send_flag = True, True
                     material_no = material_name = replace_record.recipe_material
+                    attrs.update({'material_name': material_name, 'material_no': material_no})
+                    attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no})
                 else:
                     # 添加到工艺放行表中的数据
                     replace_material_data = {"plan_classes_uid": plan_classes_uid, "equip_no": classes_plan.equip.equip_no,
@@ -276,7 +278,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             elif weight_package.expire_days != 0 and datetime.now().replace(microsecond=0) - weight_package.batch_time > timedelta(days=weight_package.expire_days):
                                 scan_material_msg = '料包已过期, 请工艺确认'
                                 ReplaceMaterial.objects.create(**replace_material_data)
-                            elif merge_flag and weight_package.total_weight != xl_total_weight:  # 合包但重量不一致
+                            elif merge_flag and weight_package.total_weight[0] != xl_total_weight:  # 合包但重量不一致
                                 scan_material_msg = '料包重量与配方不一致, 请工艺确认'
                                 ReplaceMaterial.objects.create(**replace_material_data)
                             elif only_machine and weight_package.plan_weight != xl_total_weight:  # 全机配但重量不一致
@@ -291,6 +293,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                     material_no = material_name = '细料' if '细料' in materials else '硫磺'
                                 else:
                                     material_no = material_name = weight_package.material_no + '机配'
+                                attrs.update({'material_name': material_name, 'material_no': material_no})
+                                attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no})
                         else:  # 两种场景(全人工配、机配+人工配)
                             if only_machine:
                                 raise serializers.ValidationError('该配方生产不需要投入人工配物料')
@@ -374,7 +378,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 # 未用完
                 if pre_material.adjust_left_weight != 0:
                     attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
-                                               'real_weight': pre_material.real_weight, 'pre_material': pre_material,
+                                               'real_weight': pre_material.real_weight, 'pre_material_id': pre_material.id,
                                                'adjust_left_weight': pre_material.adjust_left_weight,
                                                'variety': pre_material.variety,
                                                'single_need': single_material_weight})
@@ -410,7 +414,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         if pre_material.adjust_left_weight != 0:
                             attrs['tank_data'].update({'actual_weight': pre_material.actual_weight,
                                                        'real_weight': pre_material.real_weight,
-                                                       'pre_material': pre_material,
+                                                       'pre_material_id': pre_material.id,
                                                        'variety': pre_material.variety,
                                                        'adjust_left_weight': pre_material.adjust_left_weight,
                                                        'single_need': single_material_weight})
@@ -428,9 +432,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             tank_data = i.get('tank_data')
             plan_classes_uid = i.get('plan_classes_uid')
             trains = i.get('trains')
-            pre_material = i.pop('pre_material', '')
+            pre_material_id = tank_data.pop('pre_material_id', '')
             # 上一计划的条码物料归零(同计划中同物料的先一物料扣重时归0)
-            if pre_material:
+            if pre_material_id:
+                pre_material = LoadTankMaterialLog.objects.filter(id=pre_material_id).first()
                 pre_material.actual_weight = pre_material.init_weight
                 pre_material.adjust_left_weight = 0
                 pre_material.real_weight = 0
