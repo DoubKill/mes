@@ -542,7 +542,7 @@ class EquipMaintenanceStandard(AbstractEntity):
     work_type = models.CharField(max_length=64, help_text='作业类型')
     type = models.CharField(max_length=64, help_text='类别（机械、电气、通用）', null=True, blank=True)
     equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类', null=True, blank=True)
-    equip_no = models.CharField(max_length=64, help_text='机台')
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
                                    help_text='设备部位', verbose_name='设备部位', null=True, blank=True)
     equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE,
@@ -600,7 +600,7 @@ class EquipRepairStandard(AbstractEntity):
     standard_name = models.CharField(max_length=64, help_text='标准名称', null=True, blank=True)
     # work_type = models.CharField(max_length=64, help_text='作业类型')
     equip_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='所属主设备种类', null=True, blank=True)
-    equip_no = models.CharField(max_length=64, help_text='机台')
+    equip_no = models.CharField(max_length=64, help_text='机台', null=True, blank=True)
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.CASCADE,
                                    help_text='设备部位', verbose_name='设备部位')
     equip_component = models.ForeignKey(EquipComponent, help_text='设备部件', on_delete=models.CASCADE
