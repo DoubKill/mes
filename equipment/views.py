@@ -4210,7 +4210,7 @@ class EquipFinishingRateView(APIView):
                     'uncompleted': 0, 'rate': 0, 'in_time_rate': 0}
             query_set = EquipInspectionOrder.objects.filter(
                 **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type=key_word) &
-                                                                                      Q(Q(equip_repair_standard__isnull=False) | Q(equip_maintenance_standard__isnull=False) | Q(result_repair_standard__isnull=False)),
+                                                                                      Q(Q(equip_repair_standard__isnull=False) | Q(equip_maintenance_standard__isnull=False)),
                                                                                       **time_range)
             if query_set:
                 data = self.compute(key_word, query_set)
@@ -4225,6 +4225,9 @@ class EquipFinishingRateView(APIView):
         completed_in_time, completed_overtime = 0, 0
         new_query_set = completed.annotate(completed_time=ExpressionWrapper(F('repair_end_datetime') - F('repair_start_datetime'), output_field=DurationField()))
         for i in new_query_set:
+            if not i.equip_repair_standard:  # 没有维护作业标准的，按照 按时完成统计
+                completed_in_time += 1
+                continue
             spend_time = round(i.completed_time.total_seconds() / 60, 2)
             if i.equip_repair_standard:
                 operation_time = i.equip_repair_standard.operation_time
@@ -4261,7 +4264,12 @@ class EquipOldRateView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        queryset = EquipRepairMaterialReq.objects.values('equip_spare__equip_component_type').annotate(
+        s_time = self.request.query_params.get('s_time')
+        e_time = self.request.query_params.get('e_time')
+        time_range = {}
+        if s_time:
+            time_range = {'created_date__range': (s_time, e_time)}
+        queryset = EquipRepairMaterialReq.objects.filter(**time_range).values('equip_spare__equip_component_type').annotate(
             count=Count('id'),
             apply_count=Sum('apply'),  # 申请数量
             old_count=Sum('apply', distinct=True, filter=Q(submit_old_flag=True))  # 交旧数量
