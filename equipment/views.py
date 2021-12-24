@@ -3707,9 +3707,9 @@ class EquipCodePrintView(APIView):
                 for spare_code in data.get('spare_list'):
                     res.append(
                        {"print_type":1,
-                        "code": spare_code.get('equip_spare__spare_code'),
-                        "name": spare_code.get('equip_spare__spare_name'),
-                        "num": spare_code.get('one_piece'),
+                        "code": spare_code.get('spare_code'),
+                        "name": spare_code.get('spare_name'),
+                        "technical_params": spare_code.get('technical_params'),
                         "barcode": spare_code.get('spare_code')
                         })
                 res = requests.post(url=url.get('code2'), json=res, verify=False, timeout=10)
@@ -3731,6 +3731,16 @@ class EquipCodePrintView(APIView):
                         "component_type": obj.component.equip_component_type.component_type_name if obj.component else None,
                         "node_id": lot_no}
                 res = requests.post(url=url.get('code3'), json=data, verify=False, timeout=10)
+            if status == 4:  # 巡检点标签打印
+                data = {
+                    "print_type": 1,
+                    "area_code": data.get('area_code'),
+                    "area_name": data.get('spare_name'),
+                    "part_name": data.get('part_name'),
+                    "component_name": data.get('component_name'),
+                    "lot_no": data.get('lot_no'),
+                }
+                res = requests.post(url=url.get('code4'), json=res, verify=False, timeout=10)
         except:
             raise ValidationError('打印超时，请检查您的网络或ip配置')
         return Response({'results': res.text})
@@ -3937,7 +3947,7 @@ class EquipMTBFMTTPStatementView(APIView):
                     for month in range(1, int(b[1]) + 1):
                         time_list.append(f'{b[0]}年{month}月')
         dic = {}
-        for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
+        for i in range(15):
             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
             dic[equip_list[i] + '2'] = {'equip_no': equip_list[i], 'content': '故障时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
             dic[equip_list[i] + '3'] = {'equip_no': equip_list[i], 'content': '故障次数', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
@@ -3959,11 +3969,11 @@ class EquipMTBFMTTPStatementView(APIView):
             year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
             if item['equip_no'] in equip_list:
                 dic[item['equip_no'] + '1'][year_month] = total_time
-                dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 60, 2),
+                dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 3600, 2),
                 dic[item['equip_no'] + '3'][year_month] = item['count']
                 dic[item['equip_no'] + '4'][year_month] = total_time / item['count']
-                dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 60) / item['count'], 2)
-                dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / total_time, 2)
+                dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 3600) / item['count'], 2)
+                dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / 3600 / total_time, 2)
         return Response(dic.values())
 
 
