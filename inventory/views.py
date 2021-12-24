@@ -4680,7 +4680,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
         except Exception:
             raise ValidationError('出库单据号不存在')
 
-        last_order_detail = instance.outbound_delivery_details.order_by('created_date').last()
+        last_order_detail = instance.outbound_delivery_details.order_by('id').last()
         if not last_order_detail:
             sub_no = '00001'
         else:
