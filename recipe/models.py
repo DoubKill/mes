@@ -191,7 +191,7 @@ class ProductBatching(AbstractEntity):
                     break
             if not xl_plan:  # 全部人工配
                 use_code = LoadTankMaterialLog.objects.filter(bra_code__startswith=f'MM').values_list('bra_code', flat=True)
-                old_code = WeightPackageManual.objects.filter(~Q(bra_code__in=use_code), product_no=self.stage_product_batch_no, dev_type=self.dev_type).first()  # 最旧一条未使用机配物料
+                old_code = WeightPackageManual.objects.filter(~Q(bra_code__in=use_code), product_no=self.stage_product_batch_no, dev_type=self.dev_type, real_count__gt=0).first()  # 最旧一条未使用机配物料
                 only_manual = True
                 split_manual = split_manual if not old_code else old_code.split_num
             else:
@@ -203,7 +203,7 @@ class ProductBatching(AbstractEntity):
                     use_machine = LoadTankMaterialLog.objects.filter(bra_code__startswith=f'M{prefix}').values_list('bra_code', flat=True)
                     old_machine = WeightPackageLog.objects.filter(~Q(bra_code__in=use_machine), product_no__startswith=self.stage_product_batch_no, dev_type=self.dev_type.category_name).first()  # 最旧一条未使用机配物料
                     use_manual = LoadTankMaterialLog.objects.filter(bra_code__startswith=f'MM').values_list('bra_code', flat=True)
-                    old_manual = WeightPackageManual.objects.filter(~Q(bra_code__in=use_manual), product_no=self.stage_product_batch_no, dev_type=self.dev_type).first()  # 最旧一条未使用机配物料
+                    old_manual = WeightPackageManual.objects.filter(~Q(bra_code__in=use_manual), product_no=self.stage_product_batch_no, dev_type=self.dev_type, real_count__gt=0).first()  # 最旧一条未使用机配物料
                     merge_flag = False if not old_machine else old_machine.merge_flag
                     split_manual = split_manual if not old_manual else old_manual.split_num
                     split_machine = split_machine if not old_machine else old_machine.split_count

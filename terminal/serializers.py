@@ -193,13 +193,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                               'scan_material_type': scan_material_type}
         # 判断物料是否在配方中
         if isinstance(material_name, dict) or material_name not in materials:
-            flag, send_flag = False, False
+            flag, send_flag = True, True
             record_data = {'plan_classes_uid': plan_classes_uid, 'bra_code': bra_code,
                            'product_no': classes_plan.product_batching.stage_product_batch_no,
                            'material_name': scan_material, 'plan_weight': total_weight}
             other_type, status = scan_material_type, False
             # 胶皮
             if scan_material_type == '胶皮':
+                flag, send_flag = False, False
                 # 查看群控配方是否含有掺料和待处理料
                 pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
                 if not pcp:
@@ -259,6 +260,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no})
                 else:  # 料包
                     only_manual, only_machine, merge_flag = recipe_detail.get('only_manual'), recipe_detail.get('only_machine'), recipe_detail.get('merge_flag')
+                    if merge_flag and bra_code.startswith('MM'):
+                        raise serializers.ValidationError('计划设置合包，不可扫人工配置条码')
                     machine_material = recipe_detail.get('machine_material')
                     xl = classes_plan.product_batching.weight_cnt_types.first()  # 是否存在料包
                     if not xl:
@@ -360,8 +363,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 attrs = self.check_used(plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs)
                 details.append(dict(attrs))
             else:
-                single_material_weight = material_name.pop('single_weight', 1)
                 for k in material_name.keys():
+                    if '人工配' not in k:
+                        continue
+                    single_material_weight = detail_infos[k]
                     copy_attrs = copy.deepcopy(attrs)
                     res_attrs = self.check_used(plan_classes_uid, k, bra_code, total_weight, single_material_weight, copy_attrs)
                     if res_attrs['status'] == 2:
