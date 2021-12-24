@@ -4224,9 +4224,14 @@ class EquipFinishingRateView(APIView):
         completed_in_time, completed_overtime = 0, 0
         new_query_set = completed.annotate(completed_time=ExpressionWrapper(F('repair_end_datetime') - F('repair_start_datetime'), output_field=DurationField()))
         for i in new_query_set:
-            if not i.equip_repair_standard or not i.equip_repair_standard or not i.equip_maintenance_standard:  # 没有维护作业标准的，按照 按时完成统计
-                completed_in_time += 1
-                continue
+            if work_type == '巡检':
+                if not i.equip_repair_standard:
+                    completed_in_time += 1
+                    continue
+            else:
+                if not i.equip_repair_standard or not i.equip_repair_standard or not i.equip_maintenance_standard:   # 没有维护作业标准的，按照 按时完成统计
+                    completed_in_time += 1
+                    continue
             spend_time = round(i.completed_time.total_seconds() / 60, 2)
             if i.equip_repair_standard:
                 operation_time = i.equip_repair_standard.operation_time
