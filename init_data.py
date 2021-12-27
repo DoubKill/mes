@@ -143,6 +143,7 @@ permission_data = [
     {'id': 162, 'code': 'print_deal_result', 'name': '打印', 'parent_id': 118},
     {'id': 540, 'code': 'all_deal_result', 'name': '批量修改车次', 'parent_id': 118},
     {'id': 541, 'code': 'only_deal_result', 'name': '修改指定车次', 'parent_id': 118},
+    {'id': 777, 'code': 'range_deal_result', 'name': '打印区间显示', 'parent_id': 118},
 
     {'id': 120, 'code': 'class_production_summary', 'name': '班次密炼时间汇总', 'parent_id': None},
     {'id': 121, 'code': 'view_class_production_summary', 'name': '查看', 'parent_id': 120},
