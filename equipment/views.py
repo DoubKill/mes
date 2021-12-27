@@ -3693,7 +3693,9 @@ class EquipCodePrintView(APIView):
             raise ValidationError('ip格式有误')
         url = {'code1': f'http://{res.global_name}:6111/printer/print-storehouse/',
                'code2': f'http://{res.global_name}:6111/printer/print-spareparts/',
-               'code3': f'http://{res.global_name}:6111/printer/print-equip/', }
+               'code3': f'http://{res.global_name}:6111/printer/print-equip/',
+               'code4': f'http://{res.global_name}:6111/printer/print-label/',
+               }
         status = self.request.data.get('status')
         lot_no = self.request.data.get('lot_no', None)
         data = self.request.data
@@ -3740,7 +3742,7 @@ class EquipCodePrintView(APIView):
                     "component_name": data.get('component_name'),
                     "lot_no": data.get('lot_no'),
                 }
-                res = requests.post(url=url.get('code4'), json=res, verify=False, timeout=10)
+                res = requests.post(url=url.get('code4'), json=data, verify=False, timeout=10)
         except:
             raise ValidationError('打印超时，请检查您的网络或ip配置')
         return Response({'results': res.text})
