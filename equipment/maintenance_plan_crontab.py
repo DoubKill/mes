@@ -74,7 +74,7 @@ class MaintenancePlan:
                 '日': datetime.timedelta(days=1) * maintenance_cycle,
                 '周': datetime.timedelta(days=7) * maintenance_cycle,
                 '月': datetime.timedelta(days=30) * maintenance_cycle,
-                '季度': datetime.timedelta(days=30) * maintenance_cycle,
+                '季度': datetime.timedelta(days=90) * maintenance_cycle,
                 '年': datetime.timedelta(days=365) * maintenance_cycle,
                 '半年': datetime.timedelta(days=182) * maintenance_cycle,
             }
