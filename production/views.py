@@ -1768,13 +1768,11 @@ class ProductBatchInfo(APIView):
             'test_result': ins.test_result,
         }
 
-        table_head_top = {}
-        ret = {}
+        ret = []
         test_orders = MaterialTestOrder.objects.filter(lot_no=lot_no,
                                                        product_no=ins.product_no
                                                        ).order_by('actual_trains')
         for test_order in test_orders:
-            ret[test_order.actual_trains] = []
             max_result_ids = list(test_order.order_results.values(
                 'test_indicator_name', 'data_point_name'
             ).annotate(max_id=Max('id')).values_list('max_id', flat=True))
@@ -1788,44 +1786,25 @@ class ProductBatchInfo(APIView):
                     result = 'pass'
                 else:
                     result = '不合格'
-                ret[test_order.actual_trains].append(
+                indicator = MaterialDataPointIndicator.objects.filter(
+                    data_point__name=test_result.data_point_name,
+                    material_test_method__material__material_name=ins.product_no,
+                    level=1).first()
+                if indicator:
+                    upper_limit = indicator.upper_limit
+                    lower_limit = indicator.lower_limit
+                else:
+                    upper_limit = lower_limit = None
+                ret.append(
                     {
                         'data_point_name': test_result.data_point_name,
                         'result': result,
                         'value': test_result.value,
-                        'test_indicator_name': test_result.test_indicator_name
+                        'test_indicator_name': test_result.test_indicator_name,
+                        'train': test_order.actual_trains,
+                        'upper_limit': upper_limit,
+                        'lower_limit': lower_limit
                     }
                 )
-                test_indicator_name = test_result.test_indicator_name
-                if test_indicator_name in table_head_top:
-                    table_head_top[test_indicator_name].add(test_result.data_point_name)
-                else:
-                    table_head_top[test_indicator_name] = {test_result.data_point_name}
-
-        data_point_range_data = {}
-        indicators = []
-        for indicator_name, points in table_head_top.items():
-            point_head = []
-            for point in points:
-                indicator = MaterialDataPointIndicator.objects.filter(
-                    data_point__name=point,
-                    material_test_method__material__material_name=ins.product_no,
-                    level=1).first()
-                if indicator:
-                    point_head.append(
-                        {"point": point,
-                         "upper_limit": indicator.upper_limit,
-                         "lower_limit": indicator.lower_limit}
-                    )
-                    data_point_range_data[point] = [indicator.lower_limit, indicator.upper_limit]
-                else:
-                    point_head.append(
-                        {"point": point,
-                         "upper_limit": None,
-                         "lower_limit": None}
-                    )
-            indicators.append({'point': indicator_name, 'point_head': point_head})
-
-        ret['table_head'] = indicators
         data['test_info'] = ret
         return Response({'success': True, 'data': data, 'message': '查询成功！'})

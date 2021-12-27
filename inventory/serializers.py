@@ -8,6 +8,7 @@ import datetime
 import json
 import time
 
+from django.db import IntegrityError
 from django.db.models import Sum
 from django.db.transaction import atomic
 from rest_framework import serializers
@@ -1686,21 +1687,28 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         warehouse = validated_data['outbound_delivery_order'].warehouse
-        last_order = OutBoundDeliveryOrderDetail.objects.filter(
-            created_date__date=datetime.datetime.now().date()
-        ).order_by('created_date').last()
-        if last_order:
-            last_ordering = str(int(last_order.order_no[12:]) + 1)
-            if len(last_ordering) <= 5:
-                ordering = last_ordering.zfill(5)
+        while 1:
+            last_order = OutBoundDeliveryOrderDetail.objects.filter(
+                created_date__date=datetime.datetime.now().date()
+            ).order_by('id').last()
+            if last_order:
+                last_ordering = str(int(last_order.order_no[12:]) + 1)
+                if len(last_ordering) <= 5:
+                    ordering = last_ordering.zfill(5)
+                else:
+                    ordering = last_ordering.zfill(len(last_ordering))
             else:
-                ordering = last_ordering.zfill(len(last_ordering))
-        else:
-            ordering = '00001'
-        validated_data['order_no'] = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
-                                                        datetime.datetime.now().date().strftime('%Y%m%d'),
-                                                        ordering)
-        return super().create(validated_data)
+                ordering = '00001'
+            order_no = 'CHD{}{}{}'.format('Z' if warehouse == '终炼胶库' else 'H',
+                                          datetime.datetime.now().date().strftime('%Y%m%d'),
+                                          ordering)
+            validated_data['order_no'] = order_no
+            try:
+                instance = OutBoundDeliveryOrderDetail.objects.create(**validated_data)
+                break
+            except IntegrityError:
+                pass
+        return instance
 
     class Meta:
         model = OutBoundDeliveryOrderDetail
