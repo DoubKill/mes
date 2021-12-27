@@ -712,7 +712,7 @@ permission_data = [
     {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
 
-    # 下一个权限id从777开始
+    # 下一个权限id从778开始
 ]
 
 
