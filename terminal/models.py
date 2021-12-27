@@ -657,7 +657,7 @@ class WeightPackageManual(AbstractEntity):
     def manual_weight_names(self):
         data = {}
         for item in self.package_details.values('material_name', 'standard_weight'):
-            data[item['material_name']+'人工配'] = item['standard_weight']
+            data[item['material_name']] = item['standard_weight']
         return data
 
     @property
