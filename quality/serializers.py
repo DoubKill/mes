@@ -1754,6 +1754,47 @@ class ProductTestPlanDetailSerializer(BaseModelSerializer):
         read_only_fields = ('test_plan', 'production_group', 'value', 'raw_value', 'test_time')
 
 
+class ProductTestPlanDetailBulkCreateSerializer(serializers.Serializer):
+    test_plan = serializers.PrimaryKeyRelatedField(queryset=ProductTestPlan.objects.all())
+    product_test_plan_detail = ProductTestPlanDetailSerializer(many=True)
+
+    def create(self, validated_data):
+        product_test_plan_details = validated_data['product_test_plan_detail']
+        test_plan = validated_data['test_plan']
+        # 新建检测任务
+        for product_test_plan_detail in product_test_plan_details:
+            if 'lot_no' in product_test_plan_detail:
+                pallet_data = PalletFeedbacks.objects.filter(lot_no=product_test_plan_detail['lot_no']).first()
+            else:
+                pallet_data = PalletFeedbacks.objects.filter(
+                    equip_no=product_test_plan_detail['equip_no'],
+                    product_no=product_test_plan_detail['product_no'],
+                    classes=product_test_plan_detail['production_classes'],
+                    factory_date=product_test_plan_detail['factory_date'],
+                    begin_trains__lte=product_test_plan_detail['actual_trains'],
+                    end_trains__gte=product_test_plan_detail['actual_trains']).first()
+            # 补充生产班组字段
+            if pallet_data:
+                s = ProductClassesPlan.objects.filter(
+                    plan_classes_uid=pallet_data.plan_classes_uid
+                ).values('work_schedule_plan__group__global_name').first()
+                if not s:
+                    product_test_plan_detail['production_group'] = test_plan.test_group
+                else:
+                    product_test_plan_detail['production_group'] = s['work_schedule_plan__group__global_name']
+            else:
+                raise serializers.ValidationError('第{}车生产批次数据不存在'.format(product_test_plan_detail['actual_trains']))
+            product_test_plan_detail['lot_no'] = pallet_data.lot_no
+            product_test_plan_detail['test_plan'] = test_plan
+            ProductTestPlanDetail.objects.create(**product_test_plan_detail)
+        return validated_data
+
+    class Meta:
+        model = ProductTestPlanDetail
+        fields = '__all__'
+        read_only_fields = ('test_plan', 'production_group', 'value', 'raw_value', 'test_time')
+
+
 class ProductTestPlanSerializer(BaseModelSerializer):
     test_equip_no = serializers.ReadOnlyField(source='test_equip.no')
     product_test_plan_detail = ProductTestPlanDetailSerializer(many=True)

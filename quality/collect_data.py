@@ -51,7 +51,7 @@ def main():
                                                              status=1).order_by('id').last()
 
             if not equip_test_plan:
-                logger.error('机台：{}，暂无正在检测的计划'.format(sub_machine.machine_no))
+                # logger.error('机台：{}，暂无正在检测的计划'.format(sub_machine.machine_no))
                 continue
 
             try:
@@ -182,10 +182,10 @@ def main():
                         )
 
             # 判断该机台计划是否全部检测完成
-            if equip_test_plan.product_test_plan_detail.filter(
-                    value__isnull=False).count() == equip_test_plan.product_test_plan_detail.count():
-                equip_test_plan.status = 2
-                equip_test_plan.save()
+            # if equip_test_plan.product_test_plan_detail.filter(
+            #         value__isnull=False).count() == equip_test_plan.product_test_plan_detail.count():
+            #     equip_test_plan.status = 2
+            #     equip_test_plan.save()
 
             if rids:
                 sub_machine.max_rid = rids[-1]
