@@ -1899,7 +1899,9 @@ class MaterialReportValueViewSet(mixins.CreateModelMixin,
 class ProductTestPlanViewSet(ModelViewSet):
 
     """门尼检测计划"""
-    queryset = ProductTestPlan.objects.all()
+    queryset = ProductTestPlan.objects.prefetch_related(
+        Prefetch('product_test_plan_detail', queryset=ProductTestPlanDetail.objects.order_by('id')),
+    ).order_by('-id')
     serializer_class = ProductTestPlanSerializer
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend,)
