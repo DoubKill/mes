@@ -2456,7 +2456,7 @@ class WmsStorageSummaryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = inventory_where_str = ""
         if material_name:
-            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
                 extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
@@ -3126,7 +3126,7 @@ class WMSInventoryView(APIView):
         et = int(page) * int(page_size)
         extra_where_str = ""
         if material_name:
-            extra_where_str += "where temp.Name like '%{}%'".format(material_name)
+            extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
         if material_no:
             if extra_where_str:
                 extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
@@ -4679,7 +4679,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
         except Exception:
             raise ValidationError('出库单据号不存在')
 
-        last_order_detail = instance.outbound_delivery_details.order_by('created_date').last()
+        last_order_detail = instance.outbound_delivery_details.order_by('id').last()
         if not last_order_detail:
             sub_no = '00001'
         else:
@@ -4693,34 +4693,31 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
                 sub_no = '00001'
 
         detail_ids = []
+        items = []
         for item in data:
             item['sub_no'] = sub_no
             s = self.serializer_class(data=item, context={'request': request})
             s.is_valid(raise_exception=True)
             detail = s.save()
             detail_ids.append(detail.id)
+            dict1 = {'WORKID': detail.order_no,
+                     'MID': instance.product_no,
+                     'PICI': "1",
+                     'RFID': detail.pallet_no,
+                     'STATIONID': instance.station,
+                     'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            if instance.warehouse == '终炼胶库':
+                dict1['STOREDEF_ID'] = 1
+            items.append(dict1)
+        username = self.request.user.username
+        json_data = {
+            'msgId': instance.order_no,
+            'OUTTYPE': '快检出库',
+            "msgConut": str(len(items)),
+            "SENDUSER": self.request.user.username,
+            "items": items
+        }
         if not DEBUG:
-            # 出库
-            username = self.request.user.username
-            items = []
-            for detail in OutBoundDeliveryOrderDetail.objects.filter(id__in=detail_ids):
-                pallet = PalletFeedbacks.objects.filter(pallet_no=detail.pallet_no).last()
-                dict1 = {'WORKID': detail.order_no,
-                         'MID': instance.product_no,
-                         'PICI': pallet.bath_no if pallet else "1",
-                         'RFID': detail.pallet_no,
-                         'STATIONID': instance.station,
-                         'SENDDATE': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-                if instance.warehouse == '终炼胶库':
-                    dict1['STOREDEF_ID'] = 1
-                items.append(dict1)
-            json_data = {
-                'msgId': instance.order_no,
-                'OUTTYPE': '快检出库',
-                "msgConut": str(len(items)),
-                "SENDUSER": username,
-                "items": items
-            }
             json_data = json.dumps(json_data, ensure_ascii=False)
             if instance.warehouse == '混炼胶库':
                 sender = OUTWORKUploader(end_type="指定出库")
@@ -4908,7 +4905,7 @@ class WMSStockSummaryView(APIView):
         temp = sc.all()
 
         safety_data = dict(WMSMaterialSafetySettings.objects.values_list(
-            F('wms_material_code'), F('warning_weight') * 1000))
+            F('wms_material_code'), F('warning_weight')))
 
         data_dict = {}
 

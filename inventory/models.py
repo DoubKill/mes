@@ -274,7 +274,7 @@ class OutBoundDeliveryOrderDetail(AbstractEntity):
     )
     outbound_delivery_order = models.ForeignKey(OutBoundDeliveryOrder, help_text='出库单据', on_delete=models.CASCADE,
                                                 related_name='outbound_delivery_details')
-    order_no = models.CharField(max_length=64, verbose_name='出库任务编号', help_text='出库任务编号')
+    order_no = models.CharField(max_length=64, verbose_name='出库任务编号', help_text='出库任务编号', unique=True)
     # station = models.CharField(max_length=64, verbose_name='出库口', help_text='出库口', blank=True, null=True)
     status = models.PositiveIntegerField(verbose_name='出库任务状态', help_text='出库任务状态', choices=STATUS_CHOICE, default=1)
     pallet_no = models.CharField(max_length=64, verbose_name='托盘号', help_text='托盘号', blank=True, null=True)
@@ -1140,11 +1140,11 @@ class WMSMaterialSafetySettings(AbstractEntity):
         (2, '日均用量设定值（吨）')
     )
     type = models.IntegerField(help_text='设定类别', choices=TYPE_CHOICE, default=1)
-    avg_consuming_weight = models.FloatField(help_text='日均用量计算值（吨）', default=0)
-    avg_setting_weight = models.FloatField(help_text='日均用量设定值（吨）', default=0)
+    avg_consuming_weight = models.FloatField(help_text='日均用量计算值（kg）', default=0)
+    avg_setting_weight = models.FloatField(help_text='日均用量设定值（kg）', default=0)
     wms_material_code = models.CharField(max_length=128, help_text='WMS物料编码')
     warning_days = models.FloatField(help_text='预警天数', default=0)
-    warning_weight = models.FloatField(help_text='预警重量（吨）', default=0)
+    warning_weight = models.FloatField(help_text='预警重量（kg）', default=0)
 
     def save(self, *args, **kwargs):
         if self.type == 1:
