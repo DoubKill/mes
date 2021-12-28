@@ -643,6 +643,8 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
             else:
                 raise serializers.ValidationError(e)
         material_name = material_no = ''
+        if not res:
+            raise serializers.ValidationError('未找到条码对应信息')
         attr['scan_material'] = res.get('WLMC')
         material_name_set = set(ERPMESMaterialRelation.objects.filter(
             zc_material__wlxxid=res['WLXXID'],
