@@ -235,7 +235,7 @@ class AutoDispatch(object):
         else:
             inspection = True
             # 查询工单对应的包干人员[上班并且有空]
-            choice_all_user = get_maintenance_status(self.ding_api, order.equip_no)
+            choice_all_user = get_maintenance_status(self.ding_api, order.equip_no, order.equip_repair_standard.type)
             fault_name = order.equip_repair_standard.standard_name
         if not choice_all_user:
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')

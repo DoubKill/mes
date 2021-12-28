@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.models import EquipCategoryAttribute
+from equipment.check_status_to_msg import get_ding_uids_by_name
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
     EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter, \
@@ -36,7 +37,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork
+    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -1840,13 +1841,16 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
     def import_xlsx(self, request):
         def handle_data(work_details_column, check_standard_desc_column, check_standard_type_column):
             work_details = []
-            standard = {i.split('、')[0]: i.split('、')[1] for i in check_standard_desc_column.split('；')[:-1]}
-            type = {i.split('、')[0]: i.split('、')[1] for i in check_standard_type_column.split('；')[:-1]}
-            for i in work_details_column.split('；')[:-1]:
-                seq, content = i.split('、')
-                data = {"sequence": seq, "content": content, "check_standard_desc": standard.get(seq),
-                        "check_standard_type": type.get(seq)}
-                work_details.append(data)
+            try:
+                standard = {i.split('、')[0]: i.split('、')[1] for i in check_standard_desc_column.split('；')[:-1]}
+                type = {i.split('、')[0]: i.split('、')[1] for i in check_standard_type_column.split('；')[:-1]}
+                for i in work_details_column.split('；')[:-1]:
+                    seq, content = i.split('、')
+                    data = {"sequence": seq, "content": content, "check_standard_desc": standard.get(seq),
+                            "check_standard_type": type.get(seq)}
+                    work_details.append(data)
+            except:
+                raise ValidationError('导入的数据格式有误')
             return work_details
 
         excel_file = request.FILES.get('file', None)
@@ -3108,7 +3112,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
                                                       repair_user__icontains=user_name))).count()
-            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
+            finished = self.queryset.filter(status='已完成', accept_user=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3220,8 +3224,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
-                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_order': True
+                'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
+                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_reason': data.get('back_reason')
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
@@ -3316,7 +3320,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
             close_num = EquipApplyOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
-            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None}
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
+                    'close_reason': data.get('close_reason')}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -3545,8 +3550,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
-                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_order': True
+                'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
+                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_reason': data.get('back_reason')
             }
             content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
@@ -3573,7 +3578,10 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
             work_order_no = data.pop('work_order_no')
-            data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
+            result = data.get('result_repair_final_result')
+            data.update({'repair_end_datetime': now_date if result == '正常' else None,
+                         'last_updated_date': datetime.now(),
+                         'status': '已完成' if result == '正常' else '已开始',
                          'result_repair_graph_url': json.dumps(image_url_list)})
             # 记录到增减人员履历中
             for plan_id in plan_ids:
@@ -3588,13 +3596,15 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if instance:
                 EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
                 for item in work_content:
+                    item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
                     item.update({'work_type': '巡检', 'work_order_no': work_order_no})
                     EquipResultDetail.objects.create(**item)
         else:  # 关闭
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
-            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None}
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
+                    'close_reason': data.get('close_reason')}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -3657,6 +3667,7 @@ class GetStaffsView(APIView):
     def get(self, request):
         ding_api = DinDinAPI()
         equip_no = self.request.query_params.get('equip_no')
+        maintenance_type = self.request.query_params.get('maintenance_type', '通用')
         have_classes = self.request.query_params.get('have_classes')
         if not equip_no:
             section_name = self.request.query_params.get('section_name')
@@ -3679,7 +3690,7 @@ class GetStaffsView(APIView):
                 # 查询各员工考勤状态
                 result = get_staff_status(ding_api, section_name)
         else:
-            result = get_maintenance_status(ding_api, equip_no)
+            result = get_maintenance_status(ding_api, equip_no, maintenance_type)
         return Response({'results': result})
 
 
@@ -4373,3 +4384,59 @@ class GetSpareOrder(APIView):
                           'plan_in_quantity': spare.get('cksl')}
                 EquipWarehouseOrderDetail.objects.create(**kwargs)
         return Response('请求成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipOrderEntrustView(APIView):
+    """
+    工单查询加委托
+    """
+    def get(self, request):
+        oper_type = self.request.query_params.get('oper_type')
+        user_name = self.request.user.username
+        if oper_type == '维修':
+            apply_order = EquipApplyOrder.objects.filter(Q(status='已开始') | Q(status='已接单'), repair_user__icontains=user_name)
+            data = EquipApplyOrderSerializer(apply_order, many=True).data
+        else:
+            apply_order = EquipApplyOrder.objects.filter(accept_user=user_name, status='已完成')
+            data = EquipApplyOrderSerializer(apply_order, many=True).data
+        res = sorted(data, key=lambda x: x['created_date'], reverse=True)
+        return Response({"results": res})
+
+    @atomic()
+    def post(self, request):
+        pks = self.request.data.get('pks')
+        oper_type = self.request.data.get('oper_type')
+        entrust_to_user = self.request.data.get('entrust_to_user')
+        ding_api = DinDinAPI()
+        now_date = str(datetime.now().replace(microsecond=0))
+        if oper_type == '验收':
+            entrust_num = EquipApplyOrder.objects.filter(~Q(status='已完成'), id__in=pks).count()
+            if entrust_num != 0:
+                raise ValidationError('存在非已完成状态的订单, 请刷新订单!')
+            data = {'entrust_to_user': entrust_to_user, 'entrust_datetime': now_date, 'accept_user': entrust_to_user}
+        else:
+            entrust_num = EquipApplyOrder.objects.filter(~Q(status__in=['已接单', '已开始']), id__in=pks).count()
+            if entrust_num != 0:
+                raise ValidationError('存在非已开始状态的订单, 请刷新订单!')
+            data = {'entrust_to_user': entrust_to_user, 'entrust_datetime': now_date, 'repair_user': entrust_to_user}
+        EquipApplyOrder.objects.filter(id__in=pks).update(**data)
+        instance_list = EquipApplyOrder.objects.filter(id__in=pks)
+        # 发送消息给受委托人和上级
+        user_ids = get_ding_uids_by_name(entrust_to_user, all_user='1,2')
+        for order_id in pks:
+            instance = instance_list.filter(id=order_id).first()
+            # 添加履历
+            EquipOrderEntrust.objects.create(**{'work_order_no': instance.work_order_no, 'entrust_type': oper_type,
+                                                'entrust_user': self.request.user.username,
+                                                'entrust_datetime': now_date, 'entrust_to_user': entrust_to_user})
+            content = {"title": f"{oper_type}委托工单成功",
+                       "form": [
+                           {"key": "工单编号:", "value": instance.work_order_no},
+                           {"key": "机台:", "value": instance.equip_no},
+                           {"key": "重要程度:", "value": instance.importance_level},
+                           {"key": "受委托人:", "value": entrust_to_user},
+                           {"key": "委托时间:", "value": now_date}]}
+            ding_api.send_message(user_ids, content, order_id)
+
+        return Response('委托操作成功')

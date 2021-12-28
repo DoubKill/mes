@@ -155,14 +155,19 @@ def get_staff_status(ding_api, section_name, group=''):
     return result
 
 
-def get_maintenance_status(ding_api, equip_no):
+def get_maintenance_status(ding_api, equip_no, maintenance_type):
     result = []
     """获取包干人员信息"""
-    maintenances = EquipMaintenanceAreaSetting.objects.filter(equip__equip_no=equip_no)\
-        .annotate(username=F('maintenance_user__username'), phone_number=F('maintenance_user__phone_number'),
-                  group=F('maintenance_user__repair_group'), uid=F('maintenance_user__id'),
-                  leader=F('maintenance_user__section__in_charge_user__username'),
-                  leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
+    if maintenance_type == '通用':
+        query_set = EquipMaintenanceAreaSetting.objects.filter(equip__equip_no=equip_no)
+    else:
+        query_set = EquipMaintenanceAreaSetting.objects.filter(equip__equip_no=equip_no, maintenance_user__workshop__icontains=maintenance_type)
+    maintenances = query_set.annotate(username=F('maintenance_user__username'),
+                                      phone_number=F('maintenance_user__phone_number'),
+                                      group=F('maintenance_user__repair_group'),
+                                      uid=F('maintenance_user__id'),
+                                      leader=F('maintenance_user__section__in_charge_user__username'),
+                                      leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
         .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group')
     for staff in maintenances:
         staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,

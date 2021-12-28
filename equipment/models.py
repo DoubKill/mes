@@ -902,6 +902,10 @@ class EquipApplyOrder(AbstractEntity):
     status = models.CharField(max_length=64, help_text='状态', null=True, blank=True)
     timeout_color = models.CharField(max_length=8, help_text='超期未处理颜色', null=True, blank=True)
     back_order = models.BooleanField(help_text='是否退单', default=False)
+    close_reason = models.CharField(max_length=512, help_text='闭单原因', null=True, blank=True)
+    back_reason = models.CharField(max_length=512, help_text='退单原因', null=True, blank=True)
+    entrust_to_user = models.CharField(max_length=64, help_text='受委托人', null=True, blank=True)
+    entrust_datetime = models.DateTimeField(help_text='委托时间', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_apply_order'
@@ -938,10 +942,26 @@ class EquipInspectionOrder(AbstractEntity):
     back_order = models.BooleanField(help_text='是否退单', default=False)
     equip_maintenance_standard_work = models.ForeignKey(EquipMaintenanceStandardWork, help_text='设备巡检区域详情', on_delete=models.CASCADE, null=True, blank=True)
     inspection_line_no = models.IntegerField(help_text='巡检顺序编号', blank=True, null=True)
+    close_reason = models.CharField(max_length=512, help_text='闭单原因', null=True, blank=True)
+    back_reason = models.CharField(max_length=512, help_text='退单原因', null=True, blank=True)
+    entrust_to_user = models.CharField(max_length=64, help_text='受委托人', null=True, blank=True)
+    entrust_datetime = models.DateTimeField(help_text='委托时间', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_inspection_order'
         verbose_name_plural = verbose_name = '设备巡检工单'
+
+
+class EquipOrderEntrust(AbstractEntity):
+    work_order_no = models.CharField(max_length=64, help_text='工单编号')
+    entrust_type = models.CharField(max_length=64, help_text='委托类型：维修 验收')
+    entrust_user = models.CharField(max_length=64, help_text='委托人')
+    entrust_datetime = models.DateTimeField(help_text='委托时间')
+    entrust_to_user = models.CharField(max_length=64, help_text='被委托人')
+
+    class Meta:
+        db_table = 'equip_order_entrust'
+        verbose_name_plural = verbose_name = '委托履历表'
 
 
 class EquipRegulationRecord(AbstractEntity):
@@ -990,6 +1010,9 @@ class EquipResultDetail(AbstractEntity):
     job_item_check_standard = models.CharField(max_length=64, help_text='判断标准及说明', default='')
     job_item_check_type = models.CharField(max_length=64, help_text='判断类型', default='')
     operation_result = models.CharField(max_length=64, help_text='处理结果', default='')
+    abnormal_operation_desc = models.CharField(max_length=512, help_text='异常处理备注', null=True, blank=True)
+    abnormal_operation_result = models.CharField(max_length=512, help_text='异常处理结果', null=True, blank=True)
+    abnormal_operation_url = models.TextField(help_text='异常处理图片url', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_result_detail'

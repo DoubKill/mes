@@ -171,7 +171,9 @@ urlpatterns = [
     # 同步erp接口
     path('get-spare/', GetSpare.as_view()),
     # 获取备件入库单据接口
-    path('get-spare-order/', GetSpareOrder.as_view())
+    path('get-spare-order/', GetSpareOrder.as_view()),
+    # 委托工单与查询
+    path('equip-order-entrust/', EquipOrderEntrustView.as_view()),
 
 ]
 

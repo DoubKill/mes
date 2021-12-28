@@ -123,7 +123,7 @@ class MaintenancePlan:
                 if cycle_num:
                     count = cycle_num
                 else:  # 周期数为0时, 则计划可以一直生成
-                    count = math.ceil((start_time - datetime.datetime.now()) / cycle_time.get(cycle_unit))
+                    count = math.ceil((datetime.datetime.now() + datetime.timedelta(days=3) - start_time) / cycle_time.get(cycle_unit))
                 for i in range(1, count + 1):
                     begin_time = start_time + cycle_time.get(cycle_unit) * (i - 1)
                     end_time = start_time + cycle_time.get(cycle_unit) * i

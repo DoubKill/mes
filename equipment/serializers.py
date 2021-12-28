@@ -671,6 +671,7 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
     equip_name = serializers.CharField(source='equip.equip_name', read_only=True)
     equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True, default='')
     equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True, default='')
+    workshop = serializers.CharField(source='maintenance_user.workshop', read_only=True, default='')
 
     class Meta:
         model = EquipMaintenanceAreaSetting
@@ -1226,11 +1227,18 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                                                     equip_jobitem_standard=instance.equip_job_item_standard)
             if data:
                 for i in data:
+                    abnormal_operation_url = []
+                    if i.abnormal_operation_url:
+                        abnormal_operation_url = json.dumps(i.abnormal_operation_url) if isinstance(i.abnormal_operation_url, list) else json.loads(i.abnormal_operation_url)
                     work_content.append(
                         {'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
-                         'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
+                         'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type,
+                         'abnormal_operation_desc': i.abnormal_operation_desc,
+                         'abnormal_operation_result': i.abnormal_operation_result,
+                         'abnormal_operation_url': abnormal_operation_url,
+                         })
             else:
                 data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard) \
                     .values('equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
