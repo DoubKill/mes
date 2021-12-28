@@ -1862,6 +1862,12 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            if not item[3]:
+                raise ValidationError('作业详情内容不可为空')
+            if not item[4]:
+                raise ValidationError('判断标准不可为空')
+            if not item[5]:
+                raise ValidationError('类型不可为空')
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的标准编码不能重复')
