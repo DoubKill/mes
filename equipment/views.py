@@ -2148,7 +2148,6 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         "所需人数": "cycle_person_num",
         "作业时间": "operation_time",
         "作业时间单位": "operation_time_unit",
-        "所需物料名称": "spare_list_str",
         "录入人": "created_username",
         "录入时间": "created_date",
     }
@@ -2276,7 +2275,6 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
-                                    "spares": item[12] if item[12] else 'no',
                                     })
 
         serializer = EquipRepairStandardImportSerializer(data=signal_list, many=True, context={'request': request})
@@ -2284,21 +2282,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             if len(serializer.validated_data) < 1:
                 raise ValidationError('没有可导入的数据')
             for data in serializer.validated_data:
-                spares = dict(data).pop('spares')
-                data.pop('spares')
-                spare_list = spares.split(',') or spares.split(' ') or spares.split('，')
-                spare_obj_list = []
-                for spare in spare_list:
-                    if spare != 'no':
-                        spare_obj = EquipSpareErp.objects.filter(spare_name=spare).first()
-                        spare_obj_list.append(spare_obj)
-                        if not spare_obj:
-                            raise ValidationError(f'所选物料名称{spare}不存在')
-                obj = EquipRepairStandard.objects.create(**data)
-                for spare_obj in spare_obj_list:
-                    EquipRepairStandardMaterials.objects.create(equip_repair_standard=obj,
-                                                                equip_spare_erp=spare_obj,
-                                                                quantity=1)  # 默认1
+                EquipRepairStandard.objects.create(**data)
         else:
             raise ValidationError('导入的数据类型有误')
         return Response(f'成功导入{len(serializer.validated_data)}条数据')

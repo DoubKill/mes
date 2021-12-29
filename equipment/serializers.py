@@ -961,7 +961,6 @@ class EquipRepairStandardImportSerializer(BaseModelSerializer):
         UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准编号已存在')])
     standard_name = serializers.CharField(help_text='标准名称', max_length=64, validators=[
         UniqueValidator(queryset=EquipMaintenanceStandard.objects.all(), message='标准名称已存在')])
-    spares = serializers.CharField(write_only=True, default='')
 
     class Meta:
         model = EquipRepairStandard
