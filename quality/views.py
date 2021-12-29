@@ -63,7 +63,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialExamineResultMainCreateSerializer, MaterialReportEquipSerializer, MaterialReportValueSerializer, \
     MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
     ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer, \
-    UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer
+    UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
+    ProductTestPlanDetailBulkCreateSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -1898,7 +1899,9 @@ class MaterialReportValueViewSet(mixins.CreateModelMixin,
 class ProductTestPlanViewSet(ModelViewSet):
 
     """门尼检测计划"""
-    queryset = ProductTestPlan.objects.all()
+    queryset = ProductTestPlan.objects.prefetch_related(
+        Prefetch('product_test_plan_detail', queryset=ProductTestPlanDetail.objects.order_by('id')),
+    ).order_by('-id')
     serializer_class = ProductTestPlanSerializer
     permission_classes = (IsAuthenticated, )
     filter_backends = (DjangoFilterBackend,)
@@ -1908,6 +1911,27 @@ class ProductTestPlanViewSet(ModelViewSet):
         """结束检测"""
         instance.status = 4
         instance.save()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class ProductTestPlanDetailViewSet(ModelViewSet):
+    """门尼检测计划详情"""
+    queryset = ProductTestPlanDetail.objects.all()
+    serializer_class = ProductTestPlanDetailSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+
+    def perform_destroy(self, instance):
+        if instance.value:
+            raise ValidationError('该数据已检测，无法删除！')
+        return super().perform_destroy(instance)
+
+    @action(methods=['post'], detail=False)
+    def bulk_create(self, request):
+        serializer = ProductTestPlanDetailBulkCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2048,10 +2072,10 @@ class ReportValueView(APIView):
             current_test_detail.raw_value = data['raw_value']
             current_test_detail.save()
 
-        if equip_test_plan.product_test_plan_detail.filter(
-                value__isnull=False).count() == equip_test_plan.product_test_plan_detail.count():
-            equip_test_plan.status = 2
-            equip_test_plan.save()
+        # if equip_test_plan.product_test_plan_detail.filter(
+        #         value__isnull=False).count() == equip_test_plan.product_test_plan_detail.count():
+        #     equip_test_plan.status = 2
+        #     equip_test_plan.save()
 
         product_no = current_test_detail.product_no  # 胶料编码
         production_class = current_test_detail.production_classes  # 班次
