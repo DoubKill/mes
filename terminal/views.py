@@ -240,14 +240,18 @@ class BatchProductBatchingVIew(APIView):
         # 未进料(显示为空);
         if not add_materials:
             return Response([])
-        materials_info = add_materials.filter(id__in=add_materials).values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight', 'adjust_left_weight',  'single_need')
+        materials_info = LoadTankMaterialLog.objects.filter(id__in=add_materials).values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight', 'adjust_left_weight',  'single_need', 'scan_material_type')
+        res = []
         for material in materials_info:
             material_name = material['material_name']
             total_left = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name, useup_time__year='1970').aggregate(total_left=Sum('adjust_left_weight'))['total_left']
             left = total_left if total_left else 0
+            if left == 0 and material['scan_material_type'] in ['机配', '人工配', '硫磺', '细料']:
+                continue
             update_data = {'msg': ''} if left >= material['single_need'] else {'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)}
             material.update(update_data)
-        return Response(materials_info)
+            res.append(material)
+        return Response(res)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -515,14 +519,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
                         if not single_expire_record:
-                            single_date = PackageExpire.objects.create(**{'product_no': i['product_no'],
-                                                                          'product_name': i['product_no'],
-                                                                          'update_user': 'system',
-                                                                          'update_date': str(now_date.date())})
+                            expire_days = 0
                         else:
                             single_date = single_expire_record.first()
-                        expire_days = single_date.package_fine_usefullife if equip_no.startswith(
-                            'F') else single_date.package_sulfur_usefullife
+                            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
+                                'F') else single_date.package_sulfur_usefullife
                         expire_datetime = datetime.datetime.strptime(actual_batch_time,
                                                                      '%Y-%m-%d %H:%M:%S') + timedelta(
                             days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
@@ -572,14 +573,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
-                            single_date = PackageExpire.objects.create(**{'product_no': serializer['product_no'],
-                                                                          'product_name': serializer['product_no'],
-                                                                          'update_user': 'system',
-                                                                          'update_date': str(now_date.date())})
+                            expire_days = 0
                         else:
                             single_date = single_expire_record.first()
-                        expire_days = single_date.package_fine_usefullife if equip_no.startswith(
-                            'F') else single_date.package_sulfur_usefullife
+                            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
+                                'F') else single_date.package_sulfur_usefullife
                         expire_datetime = datetime.datetime.strptime(actual_batch_time,
                                                                      '%Y-%m-%d %H:%M:%S') + timedelta(
                             days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
@@ -640,14 +638,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
-                            single_date = PackageExpire.objects.create(**{'product_no': serializer['product_no'],
-                                                                          'product_name': serializer['product_no'],
-                                                                          'update_user': 'system',
-                                                                          'update_date': str(now_date.date())})
+                            expire_days = 0
                         else:
                             single_date = single_expire_record.first()
-                        expire_days = single_date.package_fine_usefullife if equip_no.startswith(
-                            'F') else single_date.package_sulfur_usefullife
+                            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
+                                'F') else single_date.package_sulfur_usefullife
                         expire_datetime = datetime.datetime.strptime(actual_batch_time,
                                                                      '%Y-%m-%d %H:%M:%S') + timedelta(
                             days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
@@ -898,7 +893,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
         if material_name:
-            instance = self.get_queryset().filter(material_name=material_name).first()
+            instance = self.get_queryset().filter(batching_type='通用', material_name=material_name).first()
             history_weight = '' if not instance else instance.single_weight.split('±')[0]
             return Response(history_weight)
         else:

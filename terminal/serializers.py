@@ -20,7 +20,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ERPMESMaterialRelation, WeighCntType, ProductBatching
+from recipe.models import ERPMESMaterialRelation, WeighCntType, ProductBatching, ProductBatchingDetail
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
@@ -76,6 +76,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         flag, send_flag, material_in_flag = True, True, True
         # 物料编码、物料名称、物料重量、单位、扫码物料
         material_no, material_name, total_weight, unit, scan_material = None, None, 0, 'KG', ''
+        now_date = datetime.now()
         # 计划号中存在条码
         is_used = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code)
         if is_used:
@@ -108,7 +109,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     scan_material = material_name
                 total_weight = pallet_feedback.actual_weight
                 unit = unit
-                DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=datetime.now(), pallet_status=2)
+                DepotPallt.objects.filter(pallet_data__lot_no=bra_code).update(outer_time=now_date, pallet_status=2)
         elif len(bra_code) > 12 and bra_code[12] in ['H', 'Z']:  # 胶皮补打
             start_time = f'20{bra_code[:2]}-{bra_code[2:4]}-{bra_code[4:6]} {bra_code[6:8]}:{bra_code[8:10]}:{bra_code[10:12]}'
             end_time = str(datetime.strptime(start_time, '%Y-%m-%d %H:%M:%S') + timedelta(seconds=1))
@@ -136,7 +137,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             manual = WeightPackageManual.objects.filter(bra_code=bra_code).first()
             if manual and manual.real_count != 0:
                 material_no = material_name = manual.manual_weight_names
-                material_name.update({'single_weight': manual.split_num})
+                material_name.update({'single_weight': Decimal(manual.split_num)})
                 scan_material_type = '人工配'
                 total_weight = manual.split_num * manual.real_count
                 unit = '包'
@@ -176,8 +177,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 total_weight = res.get('ZL')
                 unit = res.get('BZDW')
             # scan_material = '测试物料'
-            # material_name = '子午胶(海南,云南)'
-            # material_no = '子午胶(海南,云南)'
+            # material_name = '10%充油S'
+            # material_no = '10%充油S'
             # total_weight = 5000
             # unit = 'KG'
         if not material_name:
@@ -185,7 +186,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         attrs['equip_no'] = classes_plan.equip.equip_no
         attrs['material_name'] = material_name
         attrs['material_no'] = material_no
-        attrs['tank_data'] = {'msg': '', 'bra_code': bra_code, 'init_weight': total_weight, 'scan_time': str(datetime.now()),
+        attrs['tank_data'] = {'msg': '', 'bra_code': bra_code, 'init_weight': total_weight, 'scan_time': str(now_date),
                               'useup_time': '1970-01-01 00:00:00', 'unit': unit,
                               'material_no': material_no, 'material_name': material_name, 'real_weight': total_weight,
                               'scan_material': scan_material, 'plan_classes_uid': plan_classes_uid,
@@ -204,36 +205,45 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 pcp = ProductClassesPlan.objects.using('SFJ').filter(plan_classes_uid=plan_classes_uid).first()
                 if not pcp:
                     raise serializers.ValidationError('群控计划不存在')
-                product_recipe = pcp.product_batching.batching_details.filter(delete_flag=False, type=1)
+                product_recipe = ProductBatchingDetail.objects.using('SFJ').filter(product_batching_id=pcp.product_batching_id, delete_flag=False, type=1)
                 query_set = product_recipe.filter(Q(Q(material__material_name__icontains='掺料') |
                                                   Q(material__material_name__icontains='待处理料'))).first()
                 if query_set:
                     recipe_material_name = query_set.material.material_name
                     # 炼胶类型判断: 混炼/终炼
-                    if 'FM' in classes_plan.product_batching.stage_product_batch_no:
+                    if re.findall('FM|RFM|RE', classes_plan.product_batching.stage_product_batch_no):
                         # 待处理料不需要做加硫磺前后判断
                         if '掺料' in recipe_material_name:
                             # 加硫磺前后(上面限定了胶皮,这里不会出现小料硫磺xxx-硫磺)
                             s_id = product_recipe.filter(Q(material__material_name__icontains='硫磺')).first()
-                            if s_id.id < query_set.id:
-                                # 硫磺在前, 只能投加硫料
-                                if add_s:
-                                    other_type, status, scan_material_msg = f'{scan_material_type}掺料', 'Y', f'物料:{scan_material} 扫码成功'
+                            if s_id:
+                                if s_id.id < query_set.id:
+                                    # 硫磺在前, 只能投加硫料
+                                    if add_s:
+                                        other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                                    else:
+                                        other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入加硫料'
                                 else:
-                                    other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 加硫磺前只能投入无硫料'
-                            else:
+                                    if add_s:
+                                        other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入无硫料'
+                                    else:
+                                        other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
+                            else:  # 有掺料无硫磺
                                 if add_s:
-                                    other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 加硫磺后只能投入加硫料'
+                                    other_type, status, scan_material_msg = f'{scan_material_type}掺料', True, f'物料:{scan_material} 扫码成功'
                                 else:
-                                    other_type, status, scan_material_msg = f'{scan_material_type}掺料', 'Y', f'物料:{scan_material} 扫码成功'
+                                    other_type, scan_material_msg = f'{scan_material_type}掺料', '扫码失败: 请投入加硫料'
                         else:
-                            other_type, status, scan_material_msg = '待处理料', 'Y', f'待处理物料:{scan_material}扫码成功'
+                            if add_s:
+                                other_type, status, scan_material_msg = '待处理料', True, f'待处理物料:{scan_material}扫码成功'
+                            else:
+                                other_type, scan_material_msg = f'{scan_material_type}待处理料', '扫码失败: 请投入加硫料'
                     else:
                         # 加硫禁止投料
                         if add_s:
-                            other_type, scan_material_msg = f'{scan_material_type}{recipe_material_name}', '扫码失败: 无硫混炼不可投入加硫料'
+                            other_type, scan_material_msg = f'{scan_material_type}{recipe_material_name}', '扫码失败: 请投入无硫料'
                         else:
-                            other_type, status, scan_material_msg = f'{scan_material_type}{recipe_material_name}', 'Y', f'物料:{scan_material} 扫码成功'
+                            other_type, status, scan_material_msg = f'{scan_material_type}{recipe_material_name}', True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
                 record_data.update({'other_type': other_type, 'status': status})
@@ -245,15 +255,28 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                          "product_no": classes_plan.product_batching.stage_product_batch_no,
                                          "real_material": scan_material, "bra_code": bra_code, "status": "未处理",
                                          "created_user": self.context['request'].user, "real_material_no": scan_material,
-                                         "last_updated_date": datetime.now(), "material_type": scan_material_type}
+                                         "last_updated_date": now_date, "material_type": scan_material_type}
                 if scan_material_type == '胶块':
-                    res = self.material_pass(attrs, plan_classes_uid, scan_material, material_type=scan_material_type)
+                    res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                     if not res[0]:
                         scan_material_msg = '胶块不在配方中, 请工艺确认'
                         ReplaceMaterial.objects.create(**replace_material_data)
+                        record_data.update({'other_type': scan_material_type})
                         OtherMaterialLog.objects.create(**record_data)
                         flag, send_flag = False, False
-                    else:
+                    # 通配条码(MC开头)需要判别有效期
+                    if flag and bra_code.startswith('MC'):
+                        expire_datetime = single.created_date + timedelta(days=single.expire_day)
+                        if now_date > expire_datetime:
+                            res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
+                            if not res[0]:
+                                scan_material_msg = '通用配方包已过期, 请工艺确认'
+                                replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
+                                ReplaceMaterial.objects.create(**replace_material_data)
+                                record_data.update({'other_type': scan_material_type})
+                                OtherMaterialLog.objects.create(**record_data)
+                                flag, send_flag = False, False
+                    if flag:
                         material_no = material_name = res[1]
                         attrs.update({'material_name': material_name, 'material_no': material_no})
                         attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no})
@@ -261,8 +284,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     if '硫磺' not in materials and '细料' not in materials:  # 是否存在料包
                         raise serializers.ValidationError('该配方生产不需要投入料包')
                     xl_total_weight = detail_infos.get('硫磺') if '硫磺' in materials else detail_infos.get('细料')
-                    already_y = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name__in=['硫磺', '细料'])
-                    already_n = LoadTankMaterialLog.objects.filter(scan_material_type__in=['机配', '人工配'], plan_classes_uid=plan_classes_uid)
+                    already_y = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['硫磺', '细料'], useup_time__year='1970')
+                    already_n = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['机配', '人工配'], useup_time__year='1970')
                     if scan_material_type == '机配':  # 扫描机配料包三种场景(细料/硫磺、机配+人工配)
                         merge_flag = weight_package.merge_flag
                         if (already_y and not merge_flag) or (already_n and merge_flag):
@@ -277,7 +300,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 scan_material_msg = '配方名不一致, 请工艺确认'
                                 ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
-                        if flag and weight_package.expire_days != 0 and datetime.now().replace(microsecond=0) - weight_package.batch_time > timedelta(days=weight_package.expire_days):
+                        if flag and weight_package.expire_days != 0 and now_date - weight_package.batch_time > timedelta(days=weight_package.expire_days):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包已过期, 请工艺确认'
@@ -287,6 +310,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 flag, send_flag = False, False
                         if flag and merge_flag and weight_package.total_weight[0] != xl_total_weight:  # 合包但重量不一致
                             scan_material_type = '硫磺' if '硫磺' in materials else '细料'
+                            material_no = material_name = '细料' if '细料' in materials else '硫磺'
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='重量不匹配', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包重量与配方不一致, 请工艺确认'
@@ -297,7 +321,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             machine_details = RecipeMaterial.objects.using(weight_package.equip_no).filter(recipe_name=f'{weight_package.product_no}({weight_package.dev_type})')
                             if set(machine_details.values_list('name', flat=True)) - set([i['material__material_name'] for i in cnt_type_details]):
                                 raise serializers.ValidationError('扫码手工物料种类和配方不一致')
-                            scan_bra_code, scan_split_num = [], []
+                            material_no = material_name = {i.name: i.weight for i in machine_details}
+                            material_name['single_weight'] = weight_package.split_count
+                            # 扫到物料对应条码列表、扫到物料对应物料的分包数、料框表里的条码对应种类数
+                            scan_bra_code, scan_split_num, load_tank_materials = [], [], 0
                             for i in cnt_type_details:
                                 instance = machine_details.filter(name=i['material__material_name']).first()
                                 if not instance:
@@ -310,22 +337,25 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                         replace_material_data['real_material'] = i['material__material_name']
                                         ReplaceMaterial.objects.create(**replace_material_data)
                                         flag, send_flag = False, False
-                                scan_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=i['material__material_name']).last()
+                                scan_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=i['material__material_name'], useup_time__year='1970').last()
                                 if scan_material:
+                                    load_tank_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=scan_material.bra_code).count()
                                     scan_split_num.append(scan_material.single_need)
                                     scan_bra_code.append(scan_material.bra_code)
                             else:
-                                if scan_bra_code and (len(scan_bra_code) != len(material_name) or len(set(scan_bra_code)) != 1 or len(set(scan_split_num)) != 1 or set(scan_split_num) != {material_name['single_weight']}):
+                                material_name_length = len([i for i in material_name.keys() if i != 'single_weight'])
+                                if scan_bra_code and (len(scan_bra_code) != material_name_length or len(set(scan_bra_code)) != 1 or len(set(scan_split_num)) != 1 or set(scan_split_num) != {material_name['single_weight']} or material_name_length != load_tank_materials):
                                     raise serializers.ValidationError('添加的人工配料与之前不一致')
                         if flag:
                             if merge_flag:
                                 material_no = material_name = '细料' if '细料' in materials else '硫磺'
                             else:
-                                machine_details = RecipeMaterial.objects.using(weight_package.equip_no).filter(recipe_name=f'{weight_package.product_no}({weight_package.dev_type})')
+                                machine_details = RecipeMaterial.objects.using(weight_package.equip_no).filter(
+                                    recipe_name=f'{weight_package.product_no}({weight_package.dev_type})')
                                 material_no = material_name = {i.name: i.weight for i in machine_details}
                                 material_name['single_weight'] = weight_package.split_count
                             attrs.update({'material_name': material_name, 'material_no': material_no})
-                            attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no,
+                            attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no, 'scan_material': material_name,
                                                        'scan_material_type': scan_material_type if not merge_flag else ('硫磺' if '硫磺' in materials else '细料')})
                     else:  # 两种场景(全人工配、机配+人工配)
                         if already_y:
@@ -340,7 +370,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 scan_material_msg = '配方名不一致, 请工艺确认'
                                 ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
-                        if flag and expire_days != 0 and datetime.now().replace(microsecond=0) - manual.created_date > timedelta(days=expire_days):
+                        if flag and expire_days != 0 and now_date - manual.created_date > timedelta(days=expire_days):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包已过期, 请工艺确认'
@@ -349,28 +379,29 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         if flag:  # 机配+人工配但重量不一致,需要比较物料
                             if set(manual.detail_material_names) - set([i['material__material_name'] for i in cnt_type_details]):
                                 raise serializers.ValidationError('扫码手工物料种类和配方不一致')
-                            scan_bra_code, scan_split_num = [], []
+                            scan_bra_code, scan_split_num, load_tank_materials = [], [], 0
                             for i in cnt_type_details:
                                 s_weight = material_name.get(i['material__material_name'])
                                 if not s_weight:
                                     continue
                                 if s_weight * manual.split_num != i['actual_weight']:
-                                    res = self.material_pass(plan_classes_uid, i.material.material_name, reason_type='重量不匹配', material_type=scan_material_type)
+                                    res = self.material_pass(plan_classes_uid, i['material__material_name'], reason_type='重量不匹配', material_type=scan_material_type)
                                     if not res[0]:
                                         scan_material_msg = '料包重量与配方不一致, 请工艺确认'
                                         replace_material_data['real_material'] = i['material__material_name']
                                         ReplaceMaterial.objects.create(**replace_material_data)
                                         flag, send_flag = False, False
                                         break
-                                scan_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=i['material__material_name']).last()
+                                scan_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=i['material__material_name'], useup_time__year='1970').last()
                                 if scan_material:
+                                    load_tank_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=scan_material.bra_code).count()
                                     scan_split_num.append(scan_material.single_need)
                                     scan_bra_code.append(scan_material.bra_code)
                             else:
-                                if scan_bra_code and (len(scan_bra_code) != len(material_name) or len(set(scan_bra_code)) != 1 or len(set(scan_split_num)) != 1 or set(scan_split_num) != {material_name['single_weight']}):
+                                material_name_length = len([i for i in material_name.keys() if i != 'single_weight'])
+                                if scan_bra_code and (len(scan_bra_code) != material_name_length or len(set(scan_bra_code)) != 1 or len(set(scan_split_num)) != 1 or set(scan_split_num) != {material_name['single_weight']} or material_name_length != load_tank_materials):
                                     raise serializers.ValidationError('添加的人工配料与之前不一致')
-                        if flag:
-                            flag, send_flag = True, True
+                                flag, send_flag = True, True
         details = []
         if flag:
             # 配方中物料单车需要重量
@@ -389,8 +420,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     copy_attrs = copy.deepcopy(attrs)
                     res_attrs = self.check_used(plan_classes_uid, k, bra_code, total_weight, single_material_weight, copy_attrs)
                     if res_attrs['status'] == 2:
-                        raise serializers.ValidationError('配料不符合添加要求')
-                    res_attrs['tank_data'].update({'material_name': k, 'material_no': k})
+                        raise serializers.ValidationError(res_attrs['tank_data']['msg'])
+                    res_attrs['tank_data'].update({'material_name': k, 'material_no': k, 'scan_material': k})
                     res_attrs.update({'material_name': k, 'material_no': k})
                     details.append(res_attrs)
         attrs = {'attrs': details}
@@ -409,6 +440,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         return attrs
 
     def material_pass(self, plan_classes_uid, scan_material, reason_type='物料名不一致', material_type='机配'):
+        """
+        查看当前不可放行的物料是否有放行的处理记录
+        """
         # 查找物料替代表
         replace_record = ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, status='已处理',
                                                         reason_type=reason_type, real_material=scan_material,
@@ -420,6 +454,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         return False, ''
 
     def check_used(self, plan_classes_uid, material_name, bra_code, total_weight, single_material_weight, attrs):
+        """
+        判断物料是否充足、是否重复扫码等逻辑
+        """
         # 获取计划号对应料框信息
         all_load_materials = list(LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid).values_list('material_name', flat=True))
         add_materials = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, useup_time__year='1970', material_name=material_name)
@@ -454,7 +491,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             # 同物料扫码
             else:
                 left_weight = add_materials.aggregate(left_weight=Sum('real_weight'))['left_weight']
-                if left_weight > single_material_weight:
+                if left_weight >= single_material_weight:
                     attrs['tank_data'].update({'msg': '同物料未使用完, 不能扫码'})
                     attrs['status'] = 2
                 else:
@@ -687,7 +724,8 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
             except:
                 raise serializers.ValidationError('mes同步称量系统{}料罐状态失败'.format(equip_no))
             # 扫码物料与所有料罐不一致
-            feed_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True, material_name=material_name)
+            tank_info = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True)
+            feed_info = tank_info.filter(material_name=material_name)
             if not feed_info:
                 attr['status'] = 2
                 attr['tank_no'] = ''
@@ -699,7 +737,17 @@ class WeightBatchingLogCreateSerializer(BaseModelSerializer):
                     attr['tank_no'] = single_tank.tank_no
                     attr['failed_reason'] = '料罐处于高位, 无法开门'
                 else:
-                    attr['tank_no'] = single_tank.tank_no
+                    # 所有门都是关闭才可以打开(上面已经同步了当前料罐的状态了)
+                    open_doors = tank_info.filter(open_flag=True)
+                    if len(open_doors) != 0:
+                        if len(open_doors) == 1 and single_tank.tank_no == open_doors.first().tank_no:
+                            attr['tank_no'] = single_tank.tank_no
+                        else:
+                            attr['status'] = 2
+                            attr['tank_no'] = single_tank.tank_no
+                            attr['failed_reason'] = '已经有打开的料罐门, 不可再开'
+                    else:
+                        attr['tank_no'] = single_tank.tank_no
         attr['material_name'] = material_name
         attr['material_no'] = material_no
         attr['created_user'] = self.context['request'].user
@@ -1282,6 +1330,9 @@ class PlanSerializer(serializers.ModelSerializer):
         validated_data['state'] = '等待'
         validated_data['actno'] = 0
         validated_data['addtime'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 查询配方的合包状态
+        recipe = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        validated_data['merge_flag'] = recipe.merge_flag if recipe else False
         try:
             instance = Plan.objects.using(equip_no).create(**validated_data)
         except ConnectionDoesNotExist:

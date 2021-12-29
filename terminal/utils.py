@@ -472,15 +472,15 @@ def get_manual_materials(product_no, dev_type, batching_equip):
     if not record:
         raise ValueError(f"未找到mes配方{product_no}信息")
     # weigh_type 1 硫磺 2 细料
-    instance = record.weight_cnt_types.filter(weigh_type=2).first() if batching_equip.startswith(
-        'F') else record.weight_cnt_types.filter(weigh_type=1).first()
+    instance = record.weight_cnt_types.filter(weigh_type=2, delete_flag=0).first() if batching_equip.startswith(
+        'F') else record.weight_cnt_types.filter(weigh_type=1, delete_flag=0).first()
     if not instance:
         raise ValueError(f"{product_no}无料包信息")
     # 机配物料
     machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(
         recipe_name=f'{product_no}({record.dev_type.category_name})').values_list('name', flat=True))
     # 人工配物料信息
-    manual_material = instance.weight_details.exclude(material__material_name__in=machine_material). \
+    manual_material = instance.weight_details.filter(delete_flag=0).exclude(material__material_name__in=machine_material). \
         annotate(material_name=F("material__material_name"), tolerance=F("standard_error")) \
         .values('material_name', 'standard_weight')
     return manual_material
