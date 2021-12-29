@@ -94,6 +94,8 @@ router.register('material-report-equip', MaterialReportEquipViewSet)
 router.register('material-report-value', MaterialReportValueViewSet)
 # 门尼检测计划
 router.register('product-test-plan', ProductTestPlanViewSet)
+# 门尼检测计划详情
+router.register('product-test-plan-detail', ProductTestPlanDetailViewSet)
 # 门尼检测履历
 router.register('product-test-resume', ProductTestResumeViewSet)
 
