@@ -906,6 +906,8 @@ class EquipApplyOrder(AbstractEntity):
     back_reason = models.CharField(max_length=512, help_text='退单原因', null=True, blank=True)
     entrust_to_user = models.CharField(max_length=64, help_text='受委托人', null=True, blank=True)
     entrust_datetime = models.DateTimeField(help_text='委托时间', null=True, blank=True)
+    inspection_order = models.ForeignKey('EquipInspectionOrder', help_text='巡检报修工单',
+                                         on_delete=models.CASCADE, null=True, blank=True, related_name='apply_order')
 
     class Meta:
         db_table = 'equip_apply_order'

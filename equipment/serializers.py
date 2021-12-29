@@ -1016,6 +1016,8 @@ class EquipApplyRepairSerializer(BaseModelSerializer):
             equip_order_data['equip_part_new'] = validated_data.get('equip_part_new')
         if validated_data.get('result_fault_desc'):
             equip_order_data['result_fault_desc'] = validated_data.get('result_fault_desc')
+        if validated_data.get('inspection_order'):
+            equip_order_data['inspection_order'] = validated_data.get('inspection_order')
         EquipApplyOrder.objects.create(**equip_order_data)
         return super().create(validated_data)
 

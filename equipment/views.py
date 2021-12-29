@@ -3309,6 +3309,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
             image_url_list = data.pop('image_url_list', [])
             result_accept_result = data.get('result_accept_result')
             if result_accept_result == '合格':
+                # 更新巡检中异常报修的工单状态
+                for obj in self.get_queryset().filter(id__in=pks):
+                    EquipInspectionOrder.objects.filter(apply_order=obj).update(status='已完成')
                 data = {
                     'status': data.get('status'), 'accept_datetime': now_date,
                     'result_accept_result': result_accept_result, 'timeout_color': None,
