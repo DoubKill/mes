@@ -1916,7 +1916,7 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         "所需人数": "cycle_person_num",
         "作业时间": "operation_time",
         "作业时间单位": "operation_time_unit",
-        "所需物料名称": "spare_list_str",
+        # "所需物料名称": "spare_list_str",
         "录入人": "created_username",
         "录入时间": "created_date",
     }
