@@ -230,7 +230,9 @@ class ProductBatchingViewSet(ModelViewSet):
             data = queryset.values('id', 'stage_product_batch_no',
                                    'batching_weight',
                                    'production_time_interval',
-                                   'used_type')
+                                   'used_type',
+                                   'dev_type',
+                                   'dev_type__category_name')
             return Response({'results': data})
         else:
             page = self.paginate_queryset(queryset)

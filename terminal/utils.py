@@ -8,7 +8,7 @@ import time
 import requests
 from datetime import datetime
 
-from django.db.models import Sum
+from django.db.models import Sum, F
 from django.db.transaction import atomic
 from suds.client import Client
 
@@ -17,7 +17,7 @@ from inventory.utils import wms_out
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
 from recipe.models import ProductBatching
-from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin
+from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule
 
 
 class INWeighSystem(object):
@@ -133,6 +133,8 @@ class TankStatusSync(object):
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<open_doorResult>(.*)</open_doorResult>', res)[0]
         data = json.loads(rep_json)
+        if not data:
+            raise ValueError('获取料罐信息失败, 返回数据为空')
         for x in self.queryset:
             temp_no = x.tank_no
             # 万龙表里的罐号跟接口里的罐号不一致，需要做个转换
@@ -440,3 +442,45 @@ class CLSystem(object):
             </soapenv:Envelope>""".format(plan_no, number)
         ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
         return ret
+
+
+def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量'):
+    # 人工单配细料硫磺包
+    type_name = '硫磺' if batching_equip.startswith('S') else '细料'
+    # 人工单配细料硫磺包
+    if batching_equip:
+        if '单个' not in project_name:
+            project_name = f"整包{type_name}重量"
+        rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
+                                            project__keyword_name=project_name, use_flag=True,
+                                            small_num__lt=standard_weight, big_num__gte=standard_weight).first()
+    # 人工单配配方或通用(所有量程)
+    else:
+        rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
+    tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
+    return tolerance
+
+
+def get_manual_materials(product_no, dev_type, batching_equip):
+    filter_kwargs = {}
+    if isinstance(dev_type, int):
+        filter_kwargs['dev_type_id'] = dev_type
+    else:
+        filter_kwargs['dev_type__category_name'] = dev_type
+    record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
+                                            delete_flag=False, **filter_kwargs).first()
+    if not record:
+        raise ValueError(f"未找到mes配方{product_no}信息")
+    # weigh_type 1 硫磺 2 细料
+    instance = record.weight_cnt_types.filter(weigh_type=2, delete_flag=0).first() if batching_equip.startswith(
+        'F') else record.weight_cnt_types.filter(weigh_type=1, delete_flag=0).first()
+    if not instance:
+        raise ValueError(f"{product_no}无料包信息")
+    # 机配物料
+    machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(
+        recipe_name=f'{product_no}({record.dev_type.category_name})').values_list('name', flat=True))
+    # 人工配物料信息
+    manual_material = instance.weight_details.filter(delete_flag=0).exclude(material__material_name__in=machine_material). \
+        annotate(material_name=F("material__material_name"), tolerance=F("standard_error")) \
+        .values('material_name', 'standard_weight')
+    return manual_material

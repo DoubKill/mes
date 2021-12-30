@@ -8,10 +8,11 @@ class UserFilter(django_filters.rest_framework.FilterSet):
     username = django_filters.CharFilter(field_name='username', lookup_expr='icontains', help_text='用户名')
     groups = django_filters.CharFilter(field_name='group_extensions', help_text='角色id')
     is_leave = django_filters.BooleanFilter(field_name='user_extension__is_leave', help_text='是否离职')
+    section_name = django_filters.CharFilter(field_name='section__name', lookup_expr='icontains', help_text='部门')
 
     class Meta:
         model = User
-        fields = ('num', 'username', 'is_leave', 'groups', 'is_active', 'section_id')
+        fields = ('num', 'username', 'is_leave', 'groups', 'is_active', 'section_id', 'section_name')
 
 
 class GroupExtensionFilter(django_filters.rest_framework.FilterSet):
