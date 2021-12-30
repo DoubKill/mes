@@ -168,7 +168,8 @@ def get_maintenance_status(ding_api, equip_no, maintenance_type):
                                       uid=F('maintenance_user__id'),
                                       leader=F('maintenance_user__section__in_charge_user__username'),
                                       leader_phone_number=F('maintenance_user__section__in_charge_user__phone_number'))\
-        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group')
+        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group').distinct()
+
     for staff in maintenances:
         staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
                       'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
