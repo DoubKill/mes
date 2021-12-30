@@ -303,6 +303,8 @@ permission_data = [
     # {'id': 436, 'code': 'add_xl_recipe', 'name': '新增', 'parent_id': 434},
     # {'id': 437, 'code': 'change_xl_recipe', 'name': '修改', 'parent_id': 434},
     # {'id': 438, 'code': 'delete_xl_recipe', 'name': '删除', 'parent_id': 434},
+    {'id': 802, 'code': 'merge_xl_recipe', 'name': '是否合包', 'parent_id': 434},
+
 
     {'id': 439, 'code': 'xl_plan', 'name': '小料称量计划管理', 'parent_id': None},
     {'id': 440, 'code': 'view_xl_plan', 'name': '查看', 'parent_id': 439},
@@ -312,6 +314,7 @@ permission_data = [
     {'id': 444, 'code': 'issue_xl_plan', 'name': '下达', 'parent_id': 439},
     {'id': 445, 'code': 'reload_xl_plan', 'name': '重传', 'parent_id': 439},
     {'id': 446, 'code': 'stop_xl_plan', 'name': '停止', 'parent_id': 439},
+    {'id': 803, 'code': 'merge_xl_plan', 'name': '是否合包', 'parent_id': 439},
 
     {'id': 447, 'code': 'xl_report_basic', 'name': '小料称量车次报表', 'parent_id': None},
     {'id': 448, 'code': 'view_xl_report_basic', 'name': '查看', 'parent_id': 447},
@@ -711,8 +714,39 @@ permission_data = [
     {'id': 763, 'code': 'export_equip_plan', 'name': '导出', 'parent_id': 758},
     {'id': 764, 'code': 'feed_equip_plan', 'name': '查询', 'parent_id': 758},
 
+    {'id': 778, 'code': 'tolerance_keyword', 'name': '公差关键字定义', 'parent_id': None},
+    {'id': 779, 'code': 'view_tolerance_keyword', 'name': '查看', 'parent_id': 778},
+    {'id': 780, 'code': 'add_tolerance_keyword', 'name': '新建', 'parent_id': 778},
+    {'id': 781, 'code': 'delete_tolerance_keyword', 'name': '删除', 'parent_id': 778},
 
-    # 下一个权限id从778开始
+    {'id': 782, 'code': 'tolerance_rule', 'name': '公差标准录入', 'parent_id': None},
+    {'id': 783, 'code': 'view_tolerance_rule', 'name': '查看', 'parent_id': 782},
+    {'id': 784, 'code': 'add_tolerance_rule', 'name': '新增', 'parent_id': 782},
+    {'id': 785, 'code': 'change_tolerance_rule', 'name': '编辑', 'parent_id': 782},
+    {'id': 786, 'code': 'delete_tolerance_rule', 'name': '删除', 'parent_id': 782},
+
+    {'id': 787, 'code': 'replace_material', 'name': '细料胶块放行', 'parent_id': None},
+    {'id': 788, 'code': 'view_replace_material', 'name': '查看', 'parent_id': 787},
+    {'id': 789, 'code': 'opera_replace_material', 'name': '操作按钮', 'parent_id': 787},
+
+    {'id': 790, 'code': 'return_rubber', 'name': '胶皮补打卡片', 'parent_id': None},
+    {'id': 791, 'code': 'view_return_rubber', 'name': '查看', 'parent_id': 790},
+    {'id': 792, 'code': 'add_return_rubber', 'name': '新建', 'parent_id': 790},
+    {'id': 793, 'code': 'print_return_rubber', 'name': '打印', 'parent_id': 790},
+
+    {'id': 794, 'code': 'weighting_package_manual', 'name': '单配(合包)化工流转卡', 'parent_id': None},
+    {'id': 795, 'code': 'view_weighting_package_manual', 'name': '查看', 'parent_id': 794},
+    {'id': 796, 'code': 'add_weighting_package_manual', 'name': '新建', 'parent_id': 794},
+    {'id': 797, 'code': 'print_weighting_package_manual', 'name': '打印', 'parent_id': 794},
+
+    {'id': 798, 'code': 'weighting_package_single', 'name': '单配(配方/通用)化工流转卡', 'parent_id': None},
+    {'id': 799, 'code': 'view_weighting_package_single', 'name': '查看', 'parent_id': 798},
+    {'id': 800, 'code': 'add_weighting_package_single', 'name': '新建', 'parent_id': 798},
+    {'id': 801, 'code': 'print_weighting_package_single', 'name': '打印', 'parent_id': 798},
+
+    # 下一个 804开始
+
+
 ]
 
 
@@ -741,7 +775,7 @@ def main():
     os.system('python manage.py migrate')
 
     print('创建超级管理员...')
-    User.objects.create_superuser('mes', '123456@qq.com', '123456')
+    # User.objects.create_superuser('mes', '123456@qq.com', '123456')
     init_permissions()
 
 
