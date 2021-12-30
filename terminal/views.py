@@ -180,15 +180,14 @@ class BatchProductionInfoView(APIView):
         if classes:
             classes_plans = classes_plans.filter(work_schedule_plan__classes__global_name=classes)
         for plan in classes_plans:
-            last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
-                                                                           feed_end_time__isnull=False).last()
-            if last_feed_log:
-                actual_trains = last_feed_log.trains
-            else:
-                actual_trains = 0
+            # last_feed_log = FeedingMaterialLog.objects.using('SFJ').filter(plan_classes_uid=plan.plan_classes_uid,
+            #                                                                feed_end_time__isnull=False).last()
+            # if last_feed_log:
+            #     actual_trains = last_feed_log.trains
+            # else:
+            #     actual_trains = 0
             # 任务状态
-            plan_status_info = PlanStatus.objects.using("SFJ").filter(
-                plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
+            plan_status_info = PlanStatus.objects.using("SFJ").filter(plan_classes_uid=plan.plan_classes_uid).order_by('created_date').last()
             plan_status = plan_status_info.status if plan_status_info else plan.status
             if plan_status not in ['运行中', '等待']:
                 continue
@@ -196,16 +195,27 @@ class BatchProductionInfoView(APIView):
             if plan_status == '运行中':
                 max_trains = TrainsFeedbacks.objects.filter(plan_classes_uid=plan.plan_classes_uid).aggregate(max_trains=Max('actual_trains'))['max_trains']
                 actual_trains = actual_trains if not max_trains else max_trains
-            plan_actual_data.append(
-                {
-                    'product_no': plan.product_batching.stage_product_batch_no,
-                    'plan_trains': plan.plan_trains,
-                    'actual_trains': actual_trains,
-                    'plan_classes_uid': plan.plan_classes_uid,
-                    'status': plan_status,
-                    'classes': plan.work_schedule_plan.classes.global_name
-                }
-            )
+                plan_actual_data.insert(0,
+                    {
+                        'product_no': plan.product_batching.stage_product_batch_no,
+                        'plan_trains': plan.plan_trains,
+                        'actual_trains': actual_trains,
+                        'plan_classes_uid': plan.plan_classes_uid,
+                        'status': plan_status,
+                        'classes': plan.work_schedule_plan.classes.global_name
+                    }
+                )
+            else:
+                plan_actual_data.append(
+                    {
+                        'product_no': plan.product_batching.stage_product_batch_no,
+                        'plan_trains': plan.plan_trains,
+                        'actual_trains': actual_trains,
+                        'plan_classes_uid': plan.plan_classes_uid,
+                        'status': plan_status,
+                        'classes': plan.work_schedule_plan.classes.global_name
+                    }
+                )
             if plan_status == '运行中':
                 max_feed_log_id = LoadMaterialLog.objects.using('SFJ').filter(
                     feed_log__plan_classes_uid=plan.plan_classes_uid).aggregate(
@@ -2421,7 +2431,7 @@ class MaterialDetailsAux(APIView):
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
         material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch
         if from_mes:
-            res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details]
+            res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details] + [classes_plan.product_batching.stage_product_batch_no]
             return Response(res)
         else:
             return Response({'material_name_weight': material_name_weight, 'cnt_type_details': cnt_type_details})
