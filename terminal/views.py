@@ -525,7 +525,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
                         # 配料时间
-                        actual_batch_time = equip_plan_info.filter(planid=i['plan_weight_uid']).first().starttime
+                        actual_batch_time = ReportBasic.objects.using(equip_no).get(planid=i['plan_weight_uid'], actno=1).starttime
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
                         if not single_expire_record:
@@ -544,8 +544,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
                                                                   stage_product_batch_no=product_no_dev,
                                                                   dev_type__category_name=dev_type).first()
-                            if prod and prod.weight_cnt_types.first():
-                                total_weight = prod.weight_cnt_types.first().total_weight
+                            if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
+                                total_weight = prod.weight_cnt_types.filter(delete_flag=False).first().total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
@@ -578,8 +578,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        actual_batch_time = equip_plan_info.filter(
-                            planid=serializer['plan_weight_uid']).first().starttime
+                        actual_batch_time = ReportBasic.objects.using(equip_no).get(planid=serializer['plan_weight_uid'], actno=1).starttime
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
@@ -598,8 +597,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
                                                                   stage_product_batch_no=product_no_dev,
                                                                   dev_type__category_name=dev_type).first()
-                            if prod and prod.weight_cnt_types.first():
-                                total_weight = prod.weight_cnt_types.first().total_weight
+                            if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
+                                total_weight = prod.weight_cnt_types.filter(delete_flag=False).first().total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -643,8 +642,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        actual_batch_time = equip_plan_info.filter(
-                            planid=serializer['plan_weight_uid']).first().starttime
+                        actual_batch_time = ReportBasic.objects.using(equip_no).get(planid=serializer['plan_weight_uid'], actno=1).starttime
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
@@ -663,8 +661,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
                                                                   stage_product_batch_no=product_no_dev,
                                                                   dev_type__category_name=dev_type).first()
-                            if prod and prod.weight_cnt_types.first():
-                                total_weight = prod.weight_cnt_types.first().total_weight
+                            if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
+                                total_weight = prod.weight_cnt_types.filter(delete_flag=False).first().total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
@@ -768,18 +766,18 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 if not comm_material:
                     raise ValidationError('未找到该物料在mes配方中对应的名称')
                 # 获取配方中该物料重量
-                detail = WeighBatchingDetail.objects.filter(material__material_name=comm_material[0]).first()
+                detail = WeighBatchingDetail.objects.filter(delete_flag=False, material__material_name=comm_material[0]).first()
                 if not detail:
                     raise ValidationError('配方中不存在该物料')
                 standard_weight = detail.standard_weight
                 # 新建记录
                 record = WeightPackageWms.objects.filter(bra_code=scan_bra_code).last()
-                single_weight = str(round(standard_weight / machine_split_count, 3))
+                single_weight = str(round(Decimal(standard_weight / machine_split_count), 3))
                 if not record:
                     record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                 'single_weight': single_weight, 'split_num': machine_split_count,
                                                                 'package_count': machine_package_count,
-                                                                'batch_time': res.get('SM_CREATE'),
+                                                                'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
                                                                 'real_count': machine_package_count, 'now_package': res.get('SL')})
                     obj = record  # 原材料条码实例
                 else:
@@ -793,7 +791,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         new_record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                         'single_weight': single_weight, 'split_num': machine_split_count,
                                                                         'package_count': machine_package_count,
-                                                                        'batch_time': res.get('SM_CREATE'),
+                                                                        'batch_time': res.get('SM_CREATE'), 'standard_weight_old': record.standard_weight_old,
                                                                         'real_count': machine_package_count, 'now_package': record.now_package})
                         record.now_package = 0
                         record.save()
@@ -813,7 +811,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             else:
                 raise ValidationError('条码未找到对应信息')
         single_weight = Decimal(details['single_weight'].split('±')[0])
-        # 手工配料总重
+        # 人工配料总重
         detail_manual = sum([i['standard_weight'] for i in details['manual_details'] if
                              i['batch_type'] == '人工配']) if 'manual_details' in details else single_weight
         # 手工配料详情中的机配总重
@@ -833,7 +831,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             raise ValueError('手工条码内部分物料不在配方中')
         # 重量比较
         for item in manual.package_details.all():
-            name, weight = item.material_name, item.standard_weight * manual.split_num
+            name, weight = item.material_name, item.standard_weight_old
             info = recipe_manual.filter(material_name=name).first()
             if info.get('standard_weight') != weight:
                 raise ValueError(f'手工条码中物料重量与配方不符:{name}')

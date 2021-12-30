@@ -396,7 +396,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 s_weight = material_name.get(i['material__material_name'])
                                 if not s_weight:
                                     continue
-                                if s_weight * manual.split_num != i['actual_weight']:
+                                if s_weight != i['actual_weight']:
                                     res = self.material_pass(plan_classes_uid, i['material__material_name'], reason_type='重量不匹配', material_type=scan_material_type)
                                     if not res[0]:
                                         scan_material_msg = '料包重量与配方不一致, 请工艺确认'
@@ -1083,7 +1083,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         bra_code = prefix + ('%04d' % (int(max_code[-4:]) + 1) if max_code else '0001')
         total_weight = 0
         for item in manual_details:
-            total_weight += item.get('standard_weight', 0)
+            total_weight += round(Decimal(item.get('standard_weight', 0)), 3)
         # 根据重量查询公差
         distinguish_name, project_name = ["细料称量", "整包细料重量"] if batching_equip.startswith('F') else ["硫磺称量", "整包硫磺重量"]
         rule = ToleranceRule.objects.filter(distinguish__keyword_name=distinguish_name, project__keyword_name=project_name,
@@ -1098,7 +1098,8 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         for item in manual_details:
             create_data = {'manual_details_id': instance.id, 'material_name': item.get('material_name'),
                            'standard_weight': item.get('standard_weight'), 'batch_type': item.get('batch_type'),
-                           'tolerance': item.get('tolerance'), 'created_user': self.context['request'].user}
+                           'tolerance': item.get('tolerance'), 'created_user': self.context['request'].user,
+                           'standard_weight_old': item.get('standard_weight_old')}
             WeightPackageManualDetails.objects.create(**create_data)
         return instance
 
@@ -1129,6 +1130,11 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
         material_name, single_weight, split_num = validated_data.get('material_name'), validated_data.get('single_weight'), validated_data.get('split_num')
         if split_num:
             single_weight = round(Decimal(single_weight) / split_num, 3)
+        else:
+            try:
+                single_weight = round(Decimal(single_weight), 3)
+            except:
+                raise serializers.ValidationError('重量应为有效数值')
         # 班次, 班组
         batch_class = '早班' if '08:00:00' <= str(now_date)[-8:] < '20:00:00' else '夜班'
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
