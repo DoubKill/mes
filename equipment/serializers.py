@@ -467,6 +467,7 @@ class EquipOrderAssignRuleSerializer(BaseModelSerializer):
         UniqueValidator(queryset=EquipOrderAssignRule.objects.all(),
                         message='该工单指派规则名称已存在')])
     use_flag_name = serializers.SerializerMethodField()
+    equip_type_name = serializers.ReadOnlyField(source='equip_type.global_name')
 
     def get_use_flag_name(self, obj):
         return 'Y' if obj.use_flag else 'N'
