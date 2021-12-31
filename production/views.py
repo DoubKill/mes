@@ -6,6 +6,8 @@ import math
 import time
 
 import requests
+from mes.common_code import SqlClient, OSum
+from django.conf import settings
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.db.models import Max, Sum, Count, Min, F, Q
@@ -33,13 +35,15 @@ from plan.models import ProductClassesPlan
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
-    QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords
+    QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
+    RubberCannotPutinReason
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
-    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer
+    ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
+    RubberCannotPutinReasonSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -1808,3 +1812,63 @@ class ProductBatchInfo(APIView):
                 )
         data['test_info'] = ret
         return Response({'success': True, 'data': data, 'message': '查询成功！'})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class RubberCannotPutinReasonView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        s_time = self.request.query_params.get('s_time')
+        e_time = self.request.query_params.get('e_time')
+        factory_date = self.request.query_params.get('factory_date')
+        equip = self.request.query_params.get('equip')
+        equip_list = ['Z%.2d' % i for i in range(1, 16)]
+        queryset = RubberCannotPutinReason.objects.all()
+        if equip:
+            result = RubberCannotPutinReasonSerializer(queryset.filter(factory_date__date=factory_date, machine_no=equip), many=True).data
+        elif s_time:
+            start = datetime.datetime.strptime(s_time, "%Y-%m-%d")
+            end = datetime.datetime.strptime(e_time, "%Y-%m-%d")
+            """获取两个日期之间的所有日期"""
+            delta = end - start
+            time_list = [(start + timedelta(days=i)).strftime("%Y年%m月%d日") for i in range(delta.days + 1)]
+            dic = {}
+            temp = queryset.filter(factory_date__date__range=(s_time, e_time)).values('reason_name', 'factory_date__date').annotate(
+                num=Count('id'))
+            for item in temp:
+                t = item['factory_date__date'].strftime("%Y年%m月%d日")
+                if dic.get(item['reason_name']):
+                    dic[item['reason_name']][t] += item['num']
+                    dic[item['reason_name']]['count'] += item['num']
+                else:
+                    dic[item['reason_name']] = {'不入库原因': item['reason_name'], 'count': 0}
+                    for time in time_list:
+                        dic[item['reason_name']].update({time: None})
+                    dic[item['reason_name']][t] = item['num']
+                    dic[item['reason_name']]['count'] += item['num']
+            result = dic.values()
+            # count = {}  # 底部数量统计
+            # for i in result:
+            #     for key, value in i.items():
+            #         if key[1:2].isdecimal() and value:
+            #             if count.get(key):
+            #                 count[key] += value
+            #             else:
+            #                 count[key] = value
+        elif factory_date:
+            dic = {}
+            temp = queryset.filter(factory_date__date=factory_date).values('reason_name', 'machine_no').annotate(
+                num=Count('id'))
+            for item in temp:
+                if dic.get(item['reason_name']):
+                    dic[item['reason_name']][item['machine_no']] += item['num']
+                    dic[item['reason_name']]['count'] += item['num']
+                else:
+                    dic[item['reason_name']] = {'不入库原因': item['reason_name'], 'count': 0}
+                    for equip in equip_list:
+                        dic[item['reason_name']].update({equip: None})
+                    dic[item['reason_name']][item['machine_no']] = item['num']
+                    dic[item['reason_name']]['count'] += item['num']
+            result = dic.values()
+        return Response({'results': result})
