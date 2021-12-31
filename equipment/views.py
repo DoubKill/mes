@@ -3915,10 +3915,12 @@ class EquipOrderListView(APIView):
             queryset1 = queryset1.filter(Q(assign_user=self.request.user.username) |
                                     Q(assign_to_user=self.request.user.username) |
                                     Q(receiving_user=self.request.user.username) |
-                                    Q(accept_user=self.request.user.username))
+                                    Q(accept_user=self.request.user.username) |
+                                    Q(status='已生成'))
             queryset2 = queryset2.filter(Q(assign_user=self.request.user.username) |
                                     Q(assign_to_user=self.request.user.username) |
-                                    Q(receiving_user=self.request.user.username))
+                                    Q(receiving_user=self.request.user.username) |
+                                    Q(status='已生成'))
 
         serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True).data
         serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True).data
