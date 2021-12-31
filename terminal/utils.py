@@ -147,14 +147,14 @@ class TankStatusSync(object):
             # 默认正常
             status = 3
             # 高位有料表示高位报警
-            if data[high_level]:
+            if data.get(high_level):
                 status = 2
             # 低位有料表示地位报警
-            elif data[low_level]:
+            elif data.get(low_level):
                 status = 1
             x.status = status
-            x.material_name = data[material_name]
-            x.material_no = data[material_name]
+            x.material_name = data.get(material_name)
+            x.material_no = data.get(material_name)
             x.save()
 
 
