@@ -744,9 +744,12 @@ permission_data = [
     {'id': 800, 'code': 'add_weighting_package_single', 'name': '新建', 'parent_id': 798},
     {'id': 801, 'code': 'print_weighting_package_single', 'name': '打印', 'parent_id': 798},
 
-    # 下一个 804开始
+    {'id': 804, 'code': 'durate_putin_reason', 'name': '不合格品原因统计', 'parent_id': None},
+    {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
+    {'id': 806, 'code': 'export_durate_putin_reason', 'name': '导出', 'parent_id': 804},
 
 
+    # 下一个 807开始
 ]
 
 
