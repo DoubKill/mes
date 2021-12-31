@@ -107,7 +107,7 @@ class TankStatusSync(object):
 
     def __init__(self, equip_no: str):
         self.url = f"http://{self.equip_no_ip.get(equip_no, '10.4.23.79')}:9000/xlserver"
-        self.queryset = WeightTankStatus.objects.filter(equip_no=equip_no)
+        self.queryset = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True)
         self.equip_no = equip_no
 
     @atomic
