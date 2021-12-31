@@ -54,7 +54,8 @@ def main():
                     b.datetime,
                     a.machineno,
                     a.lotNO,
-                    b.palletno
+                    b.palletno,
+                    b.producecode,
                     b.actual_weight,
                     a.lasttime
                 FROM
@@ -79,9 +80,9 @@ def main():
                 reason_name=item[0],
                 factory_date=item[1],
                 machine_no='Z%.2d' % item[2],
-                production_no=item[3],
+                pallet_no=item[3],
                 lot_no=item[4],
-                pallet_no=item[5],
+                production_no=item[5],
                 actual_weight=item[6],
                 input_datetime=item[7],
             )
