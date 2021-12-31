@@ -429,7 +429,7 @@ class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
     plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机台', lookup_expr='icontains')
     work_order_no = django_filters.CharFilter(field_name='work_order_no', help_text='工单编号', lookup_expr='icontains')
-    equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_name',
+    equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_code',
                                                       help_text='巡检标准', lookup_expr='icontains')
     assign_user = django_filters.CharFilter(field_name='assign_user', help_text='指派人', lookup_expr='icontains')
     assign_to_user = django_filters.CharFilter(field_name='assign_to_user', help_text='被指派人', lookup_expr='icontains')
