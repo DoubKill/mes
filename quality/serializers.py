@@ -1398,7 +1398,7 @@ class MaterialExamineRatingStandardNodeSerializer(serializers.ModelSerializer):
 
 
 class MaterialExamineTypeSerializer(serializers.ModelSerializer):
-    unit_name = serializers.CharField(source='unit.name', read_only=True)
+    unit_name = serializers.CharField(source='unit.name', read_only=True, default=None)
     standards = MaterialExamineRatingStandardNodeSerializer(many=True, required=False)
     unitname = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     name = serializers.CharField(validators=[UniqueValidator(queryset=MaterialExamineType.objects.all(),
@@ -1423,10 +1423,12 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
 
     @atomic()
     def update(self, instance, validated_data):
-        unit_name = validated_data.pop("unitname", None)
         standards = validated_data.pop("standards", None)
-        if unit_name:
-            unit, _ = ExamineValueUnit.objects.get_or_create(name=unit_name)
+        if 'unitname' in validated_data:
+            if validated_data['unitname']:
+                unit, _ = ExamineValueUnit.objects.get_or_create(name=validated_data['unitname'])
+            else:
+                unit = None
             validated_data["unit"] = unit
         instance.standards.all().delete()
         if standards:
@@ -1434,6 +1436,7 @@ class MaterialExamineTypeSerializer(serializers.ModelSerializer):
                 x.update(examine_type=instance)
             MaterialExamineRatingStandard.objects.bulk_create(
                 [MaterialExamineRatingStandard(**x) for x in standards])
+        validated_data.pop("unitname", None)
         return super().update(instance, validated_data)
 
     class Meta:

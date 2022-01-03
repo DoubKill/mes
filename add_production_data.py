@@ -66,7 +66,7 @@ def main():
                     classes=pcp.work_schedule_plan.classes.global_name,
                     product_time=datetime.datetime.now(),
                     factory_date=pcp.work_schedule_plan.plan_schedule.day_time,
-                    lot_no='AAJ1{}{}'.format(pcp.equip.equip_no, datetime.datetime.now().strftime('%Y%m%d%H%M%S%f' )),
+                    lot_no='AAJ1{}{}'.format(pcp.equip.equip_no, datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')),
                 )
                 # for train in [st - 1, st]:
                 #     mto = MaterialTestOrder.objects.create(
