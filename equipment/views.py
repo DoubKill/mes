@@ -4333,13 +4333,16 @@ class GetSpare(APIView):
                 raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
             if item['state'] != '启用':
                 continue
+            if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
+                continue
             EquipSpareErp.objects.create(
                 spare_code=item['wlbh'],
                 spare_name=item['wlmc'],
                 equip_component_type=equip_component_type,
                 specification=item['gg'],
                 unit=item['bzdwmc'],
-                unique_id=item['wlxxid']
+                unique_id=item['wlxxid'],
+                sync_date=dt.datetime.now()
             )
         return Response('同步完成')
 
