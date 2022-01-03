@@ -4354,7 +4354,7 @@ class GetSpareOrder(APIView):
         # 获取最新的单据
         last = EquipWarehouseOrder.objects.filter(processing_time__isnull=False).order_by('processing_time').last()  # 第一次先在数据库插入一条假数据
         last_time = (last.processing_time + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-        json_data = {"ztmc": "zcaj", "clsj": last_time}
+        json_data = {"ztmc": "zcaj", "clsj": last_time, 'djbh': None}
 
         url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getkclld.io'
         try:
