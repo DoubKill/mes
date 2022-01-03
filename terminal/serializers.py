@@ -152,6 +152,8 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     mes_recipe = [i for i in materials if i.startswith(single.material_name)]
                     if mes_recipe:
                         material_name = mes_recipe[0]
+                    else:
+                        raise serializers.ValidationError(f'配方明细中未找到{single.material_name}')
                 else:
                     material_name = single.material_name
                 material_no = material_name

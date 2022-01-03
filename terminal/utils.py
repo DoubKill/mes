@@ -467,7 +467,7 @@ def get_manual_materials(product_no, dev_type, batching_equip):
         filter_kwargs['dev_type_id'] = dev_type
     else:
         filter_kwargs['dev_type__category_name'] = dev_type
-    record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
+    record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4, batching_type=2,
                                             delete_flag=False, **filter_kwargs).first()
     if not record:
         raise ValueError(f"未找到mes配方{product_no}信息")
