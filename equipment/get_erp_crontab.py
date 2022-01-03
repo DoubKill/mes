@@ -116,5 +116,5 @@ class GetSpareOrder(APIView):
 if __name__ == '__main__':
     get_spare = GetSpare()
     get_spare.get()
-    # get_spare_order = GetSpareOrder()
-    # get_spare_order.get()
+    get_spare_order = GetSpareOrder()
+    get_spare_order.get()
