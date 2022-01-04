@@ -3082,7 +3082,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
                 query_set = self.queryset.filter(Q(status=status) & Q(Q(assign_to_user=user_name) | Q(receiving_user=user_name) |
-                Q(entrust_to_user=user_name) | Q(repair_user=user_name) | Q(accept_user=user_name)))
+                Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name) | Q(accept_user=user_name)))
         elif my_order == '2':
             if not status:
                 if not searched:
@@ -4408,7 +4408,7 @@ class EquipOrderEntrustView(APIView):
         oper_type = self.request.query_params.get('oper_type')
         user_name = self.request.user.username
         if oper_type == '维修':
-            apply_order = EquipApplyOrder.objects.filter(Q(status='已开始') | Q(status='已接单'), repair_user__icontains=user_name).order_by('entrust_to_user')
+            apply_order = EquipApplyOrder.objects.filter(Q(entrust_to_user=user_name) | Q(receiving_user=user_name), status__in=['已开始', '已接单']).order_by('entrust_to_user')
             data = EquipApplyOrderSerializer(apply_order, many=True).data
         else:
             apply_order = EquipApplyOrder.objects.filter(accept_user=user_name, status='已完成')
