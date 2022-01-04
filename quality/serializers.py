@@ -1531,6 +1531,7 @@ class MaterialExamineResultMainCreateSerializer(serializers.ModelSerializer):
             instance.save()
         material = instance.material
         material.qualified = instance.qualified
+        material.status = 1
         material.save()
         return instance
 
