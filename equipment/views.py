@@ -4408,7 +4408,7 @@ class EquipOrderEntrustView(APIView):
         oper_type = self.request.query_params.get('oper_type')
         user_name = self.request.user.username
         if oper_type == '维修':
-            apply_order = EquipApplyOrder.objects.filter(Q(status='已开始') | Q(status='已接单'), repair_user__icontains=user_name)
+            apply_order = EquipApplyOrder.objects.filter(Q(status='已开始') | Q(status='已接单'), repair_user__icontains=user_name).order_by('entrust_to_user', '-last_updated_date')
             data = EquipApplyOrderSerializer(apply_order, many=True).data
         else:
             apply_order = EquipApplyOrder.objects.filter(accept_user=user_name, status='已完成')
