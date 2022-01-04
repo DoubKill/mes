@@ -327,6 +327,7 @@ permission_data = [
     {'id': 453, 'code': 'space_material_outbound_record', 'name': '指定库位出库', 'parent_id': 451},
     {'id': 454, 'code': 'weight_material_outbound_record', 'name': '指定重量出库', 'parent_id': 451},
     {'id': 738, 'code': 'unqualified_material_outbound_record', 'name': '非合格品出库', 'parent_id': 451},
+    {'id': 739, 'code': 'untested_material_outbound_record', 'name': '待检品出库', 'parent_id': 451},
 
     {'id': 455, 'code': 'material_outbound_task', 'name': '原材料出库任务', 'parent_id': None},
     {'id': 456, 'code': 'view_material_outbound_task', 'name': '查看', 'parent_id': 455},
@@ -365,6 +366,7 @@ permission_data = [
     {'id': 465, 'code': 'space_th_outbound_record', 'name': '指定库位出库', 'parent_id': 463},
     {'id': 466, 'code': 'weight_th_outbound_record', 'name': '指定重量出库', 'parent_id': 463},
     {'id': 743, 'code': 'unqualified_th_outbound_record', 'name': '非合格品出库', 'parent_id': 463},
+    {'id': 744, 'code': 'untested_th_outbound_record', 'name': '待检品出库', 'parent_id': 463},
 
     {'id': 467, 'code': 'th_outbound_task', 'name': '炭黑库出库任务', 'parent_id': None},
     {'id': 468, 'code': 'view_th_outbound_task', 'name': '查看', 'parent_id': 467},
