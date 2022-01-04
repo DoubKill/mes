@@ -3113,7 +3113,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
-                                                      repair_user__icontains=user_name))).count()
+                                                      repair_user__icontains=user_name) |
+                                                    Q(entrust_to_user__icontains=user_name))).count()
             finished = self.queryset.filter(status='已完成', accept_user=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
@@ -4430,7 +4431,7 @@ class EquipOrderEntrustView(APIView):
             entrust_num = EquipApplyOrder.objects.filter(~Q(status__in=['已接单', '已开始']), id__in=pks).count()
             if entrust_num != 0:
                 raise ValidationError('存在非已开始状态的订单, 请刷新订单!')
-            data = {'entrust_to_user': entrust_to_user, 'entrust_datetime': now_date, 'repair_user': entrust_to_user}
+            data = {'entrust_to_user': entrust_to_user, 'entrust_datetime': now_date}
         EquipApplyOrder.objects.filter(id__in=pks).update(**data)
         instance_list = EquipApplyOrder.objects.filter(id__in=pks)
         # 发送消息给受委托人和上级
