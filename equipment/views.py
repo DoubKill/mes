@@ -3073,7 +3073,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     else:
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
-                              Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
+                              Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name) |
+                              Q(entrust_to_user__icontains=user_name)
+                              ))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
