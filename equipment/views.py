@@ -3081,8 +3081,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
-                query_set = self.queryset.filter(Q(status=status) & Q(Q(assign_to_user=user_name) | Q(receiving_user=user_name) |
-                Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name) | Q(accept_user=user_name)))
+                query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status=status))
         elif my_order == '2':
             if not status:
                 if not searched:
