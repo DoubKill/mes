@@ -3415,7 +3415,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(status='已生成'))
             else:
-                query_set = self.queryset.filter(Q(status='已生成') | Q(Q(status=status) | Q(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                query_set = self.queryset.filter(Q(status='已生成') | Q(Q(status=status) & Q(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                                                  Q(repair_user__icontains=user_name))))
         elif my_order == '2':
             if not status:
