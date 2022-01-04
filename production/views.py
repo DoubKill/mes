@@ -1862,7 +1862,10 @@ class RubberCannotPutinReasonView(APIView):
                 num=Count('id'))
             for item in temp:
                 if dic.get(item['reason_name']):
-                    dic[item['reason_name']][item['machine_no']] += item['num']
+                    if dic[item['reason_name']][item['machine_no']]:
+                        dic[item['reason_name']][item['machine_no']] += item['num']
+                    else:
+                        dic[item['reason_name']][item['machine_no']] = item['num']
                     dic[item['reason_name']]['count'] += item['num']
                 else:
                     dic[item['reason_name']] = {'不入库原因': item['reason_name'], 'count': 0}
