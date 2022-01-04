@@ -1839,7 +1839,10 @@ class RubberCannotPutinReasonView(APIView):
             for item in temp:
                 t = item['factory_date__date'].strftime("%Y年%m月%d日")
                 if dic.get(item['reason_name']):
-                    dic[item['reason_name']][t] += item['num']
+                    if dic[item['reason_name']][t]:
+                        dic[item['reason_name']][t] += item['num']
+                    else:
+                        dic[item['reason_name']][t] = item['num']
                     dic[item['reason_name']]['count'] += item['num']
                 else:
                     dic[item['reason_name']] = {'不入库原因': item['reason_name'], 'count': 0}
