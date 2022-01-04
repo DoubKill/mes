@@ -3074,7 +3074,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
                               Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name) |
-                              Q(entrust_to_user__icontains=user_name)
+                              Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name)
                               ))
                 else:
                     query_set = self.queryset.filter(
@@ -3114,7 +3114,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
                                                       repair_user__icontains=user_name) |
-                                                    Q(entrust_to_user__icontains=user_name))).count()
+                                                    Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name))).count()
             finished = self.queryset.filter(status='已完成', accept_user=user_name).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
