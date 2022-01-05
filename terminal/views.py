@@ -4,7 +4,7 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Max, Sum, Q, F
+from django.db.models import Max, Sum, Q
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
@@ -22,7 +22,6 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import WorkSchedulePlan, Equip
 from inventory.models import MaterialOutHistory
-from mes import settings
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF
 from mes.derorators import api_recorder
@@ -55,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials
+    get_manual_materials, get_sfj_carbon_materials
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -505,7 +504,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         plan_filter_kwargs = {'date_time': batch_time, 'actno__gte': 1}
         weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
         if product_no:
-            weight_filter_kwargs.update({'product_no': re.split(r'\(|\（|\[', product_no)[0]})
+            weight_filter_kwargs.update({'product_no': product_no})
             plan_filter_kwargs.update({'recipe': product_no})
         # 获取称量系统生产计划数据
         equip_plan_info = Plan.objects.using(equip_no).filter(**plan_filter_kwargs)
@@ -534,22 +533,26 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             single_date = single_expire_record.first()
                             expire_days = single_date.package_fine_usefullife if equip_no.startswith(
                                 'F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time,
-                                                                     '%Y-%m-%d %H:%M:%S') + timedelta(
-                            days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
+                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
                         total_weight = plan_weight
                         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
                         if i['merge_flag']:
                             # 配方中料包重量
-                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
+                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
                                                                   stage_product_batch_no=product_no_dev,
                                                                   dev_type__category_name=dev_type).first()
                             if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
-                                total_weight = prod.weight_cnt_types.filter(delete_flag=False).first().total_weight
+                                xl_instance = prod.weight_cnt_types.filter(delete_flag=False).first()
+                                if '专用' in i['product_no']:
+                                    xl_materials = list(xl_instance.weight_details.filter(delete_flag=0).values('material__material_name', 'standard_weight'))
+                                    handle_xl_materials = get_sfj_carbon_materials(xl_materials, product_no_dev, i['product_no'].split('-')[-2])
+                                    total_weight = sum([i['standard_weight'] for i in handle_xl_materials])
+                                else:
+                                    total_weight = xl_instance.total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
-                                  'batch_time': actual_batch_time, 'product_no': product_no_dev,
+                                  'batch_time': actual_batch_time, 'product_no': i['product_no'],
                                   'batching_type': '机配', 'machine_weight': round(plan_weight / split_count, 3), 'manual_weight': 0,
                                   'batch_user': i['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                   'expire_datetime': expire_datetime, 'split_count': split_count,
@@ -594,15 +597,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         product_no_dev = re.split(r'\(|\（|\[', serializer['product_no'])[0]
                         if serializer['merge_flag']:
                             # 配方中料包重量
-                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
+                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
                                                                   stage_product_batch_no=product_no_dev,
                                                                   dev_type__category_name=dev_type).first()
                             if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
-                                total_weight = prod.weight_cnt_types.filter(delete_flag=False).first().total_weight
+                                xl_instance = prod.weight_cnt_types.filter(delete_flag=False).first()
+                                if '专用' in serializer['product_no']:
+                                    xl_materials = list(xl_instance.weight_details.filter(delete_flag=0).values('material__material_name', 'standard_weight'))
+                                    handle_xl_materials = get_sfj_carbon_materials(xl_materials, product_no_dev, serializer['product_no'].split('-')[-2])
+                                    total_weight = sum([i['standard_weight'] for i in handle_xl_materials])
+                                else:
+                                    total_weight = xl_instance.total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
-                                           'batch_time': actual_batch_time, 'product_no': product_no_dev,
+                                           'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
                                            'batching_type': '机配', 'machine_weight': round(plan_weight / split_count, 3),
                                            'manual_weight': 0, 'batch_user': serializer['oper'],
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
@@ -658,15 +667,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         product_no_dev = re.split(r'\(|\（|\[', serializer['product_no'])[0]
                         if serializer['merge_flag']:
                             # 配方中料包重量
-                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4,
+                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
                                                                   stage_product_batch_no=product_no_dev,
                                                                   dev_type__category_name=dev_type).first()
                             if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
-                                total_weight = prod.weight_cnt_types.filter(delete_flag=False).first().total_weight
+                                xl_instance = prod.weight_cnt_types.filter(delete_flag=False).first()
+                                if '专用' in serializer['product_no']:
+                                    xl_materials = list(xl_instance.weight_details.filter(delete_flag=0).values('material__material_name', 'standard_weight'))
+                                    handle_xl_materials = get_sfj_carbon_materials(xl_materials, product_no_dev, serializer['product_no'].split('-')[-2])
+                                    total_weight = sum([i['standard_weight'] for i in handle_xl_materials])
+                                else:
+                                    total_weight = xl_instance.total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
-                                           'batch_time': actual_batch_time, 'product_no': product_no_dev,
+                                           'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
                                            'batching_type': '机配', 'expire_days': expire_days,
                                            'machine_weight': round(plan_weight / split_count, 3), 'manual_weight': 0,
                                            'batch_user': serializer['oper'], 'split_count': split_count,
@@ -737,8 +752,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             if manual.real_count == 0:
                 raise ValidationError('该人工配料条码配置数量已经用完')
             # 判断物料配方是否一致
-            if manual.product_no != product_no or manual.dev_type.category_name != dev_type:
-                raise ValidationError('单种手工配料机型或配方不符合')
+            if manual.product_no != product_no or manual.dev_type != dev_type:
+                raise ValidationError('单种人工配料机型或配方不符合')
             # 返回人工配料id，关联使用
             try:
                 manual_type, manual_id = self.scan_check(product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info)
@@ -754,10 +769,13 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             if res:
                 # 查询配方中人工配物料
                 try:
-                    recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+                    if '专用' in product_no:
+                        recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
+                    else:
+                        recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
                 except Exception as e:
                     raise ValidationError(e.args[0])
-                materials = set(recipe_manual.values_list('material_name', flat=True))
+                materials = set(recipe_manual.values_list('material__material_name', flat=True))
                 # ERP绑定关系
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
@@ -822,18 +840,20 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
 
     def scan_check(self, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
         try:
-            recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
+            if '专用' in product_no:
+                recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
+            else:
+                recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
         except Exception as e:
             raise ValidationError(e.args[0])
-        recipe_manual_names = recipe_manual.values_list('material_name', flat=True)
+        recipe_manual_names = {i['material__material_name']: i['standard_weight'] for i in recipe_manual}
         scan_info = list(manual.package_details.all().values_list('material_name', flat=True))
-        if set(scan_info) - set(recipe_manual_names):
+        if set(scan_info) - set(recipe_manual_names.keys()):
             raise ValueError('手工条码内部分物料不在配方中')
         # 重量比较
         for item in manual.package_details.all():
             name, weight = item.material_name, item.standard_weight_old
-            info = recipe_manual.filter(material_name=name).first()
-            if info.get('standard_weight') != weight:
+            if recipe_manual_names.get(name) != weight:
                 raise ValueError(f'手工条码中物料重量与配方不符:{name}')
         # 查找已经扫码物料中配料内容一致的总配置数量
         already_count = 0
@@ -958,16 +978,38 @@ class GetManualInfo(APIView):
         product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type'), data.get('batching_equip')
         if batching_equip:
             try:
-                results = get_manual_materials(product_no, int(dev_type), batching_equip)
+                if "专用" in product_no:
+                    equip_no = product_no.split('-')[-2]
+                    results = get_manual_materials(product_no, dev_type, batching_equip, equip_no)
+                else:
+                    results = get_manual_materials(product_no, dev_type, batching_equip)
             except Exception as e:
                 raise ValidationError(e.args[0])
         else:
-            recipe = ProductBatching.objects.filter(stage_product_batch_no=product_no, dev_type__category_name=dev_type,
-                                                    used_type=4, delete_flag=False).first()
+            product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
+            recipe = ProductBatching.objects.filter(stage_product_batch_no=product_no_dev, dev_type__category_name=dev_type,
+                                                    used_type=4, delete_flag=False, batching_type=2).first()
             if not recipe:
                 raise ValidationError('未找到mes配方')
             results = recipe.batching_details.values('material__material_name', 'actual_weight')
         return Response({'results': list(results)})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class GetXlRecipesInfoView(APIView):
+    """查询称量系统所有配方信息"""
+
+    def get(self, request):
+        data = {}
+        db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
+        for batching_equip in db_config:
+            all_recipes = RecipePre.objects.using(batching_equip).all()
+            for i in all_recipes:
+                if i.name not in data:
+                    data[i.name] = {'batching_equip': [batching_equip], 'dev_type': i.ver, 'product_no': i.name}
+                else:
+                    data[i.name]['batching_equip'].append(batching_equip)
+        return Response({'results': data.values()})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2428,6 +2470,9 @@ class MaterialDetailsAux(APIView):
         if not classes_plan:
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
         material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch
+        if cnt_type_details:
+            # 去除炭黑罐投入的化工原料
+            cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
         if from_mes:
             res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details] + [classes_plan.product_batching.stage_product_batch_no]
             return Response(res)

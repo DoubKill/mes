@@ -726,7 +726,7 @@ permission_data = [
     {'id': 783, 'code': 'view_tolerance_rule', 'name': '查看', 'parent_id': 782},
     {'id': 784, 'code': 'add_tolerance_rule', 'name': '新增', 'parent_id': 782},
     {'id': 785, 'code': 'change_tolerance_rule', 'name': '编辑', 'parent_id': 782},
-    {'id': 786, 'code': 'delete_tolerance_rule', 'name': '删除', 'parent_id': 782},
+    {'id': 786, 'code': 'delete_tolerance_rule', 'name': '停用/启用', 'parent_id': 782},
 
     {'id': 787, 'code': 'replace_material', 'name': '细料胶块放行', 'parent_id': None},
     {'id': 788, 'code': 'view_replace_material', 'name': '查看', 'parent_id': 787},

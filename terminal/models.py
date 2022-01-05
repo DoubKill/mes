@@ -639,7 +639,8 @@ class ToleranceRule(AbstractEntity):
 class WeightPackageManual(AbstractEntity):
     bra_code = models.CharField(max_length=64, help_text='卡片条码')
     product_no = models.CharField(max_length=64, help_text='配方名称')
-    dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型')
+    # dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型')
+    dev_type = models.CharField(max_length=64, help_text='称量配方机型')
     single_weight = models.CharField(max_length=64, help_text='单配重量')
     batch_class = models.CharField(max_length=64, help_text='班次')
     batch_group = models.CharField(max_length=64, help_text='班组')
