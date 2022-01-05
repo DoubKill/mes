@@ -501,10 +501,13 @@ def get_sfj_carbon_materials(cnt_type_details, stage_product_batch_no, equip_no)
                                                                           product_batching__stage_product_batch_no=stage_product_batch_no,
                                                                           product_batching__equip__equip_no=equip_no).values_list('material__material_name', flat='True')
     if sfj_recipe_carbon:
-        for singe_material in sfj_recipe_carbon:
-            for recipe_material in cnt_type_details:
-                if not recipe_material.get('material__material_name').startswith(singe_material) and recipe_material not in handle_cnt_type_details:
-                    handle_cnt_type_details.append(recipe_material)
+        for recipe_material in cnt_type_details:
+            for singe_material in sfj_recipe_carbon:
+                material_prefix = re.split(r'[(,（]', singe_material)[0]  # 群控炭黑罐里化工料名: ZNF活性剂(8号罐)， mes: ZNF活性剂-C
+                if recipe_material.get('material__material_name').startswith(material_prefix):
+                    break
+            else:
+                handle_cnt_type_details.append(recipe_material)
     else:
         handle_cnt_type_details = cnt_type_details
     return handle_cnt_type_details
