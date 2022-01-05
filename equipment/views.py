@@ -26,6 +26,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
 from basics.models import EquipCategoryAttribute
+from equipment.check_status_to_msg import get_ding_uids_by_name
 from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipPartFilter, EquipMaintenanceOrderFilter, \
     PropertyFilter, PlatformConfigFilter, EquipMaintenanceOrderLogFilter, EquipCurrentStatusFilter, EquipSupplierFilter, \
     EquipPropertyFilter, EquipAreaDefineFilter, EquipPartNewFilter, EquipComponentTypeFilter, \
@@ -36,7 +37,7 @@ from equipment.filters import EquipDownTypeFilter, EquipDownReasonFilter, EquipP
     EquipWarehouseRecordFilter, EquipApplyOrderFilter, EquipApplyRepairFilter, EquipWarehouseOrderFilter, \
     EquipPlanFilter, EquipInspectionOrderFilter
 from equipment.models import EquipTargetMTBFMTTRSetting, EquipWarehouseAreaComponent, EquipRepairMaterialReq, \
-    EquipInspectionOrder, EquipRegulationRecord
+    EquipInspectionOrder, EquipRegulationRecord, EquipMaintenanceStandardWork, EquipOrderEntrust
 from equipment.serializers import *
 from equipment.serializers import EquipRealtimeSerializer
 from equipment.task import property_template, property_import
@@ -873,7 +874,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     filter_class = EquipPartNewFilter
     FILE_NAME = '设备部位信息'
-    EXPORT_FIELDS_DICT = {"所属主设备种类": "category_no",
+    EXPORT_FIELDS_DICT = {
                           "部位分类": "global_name",
                           "部位代码": "part_code",
                           "部位名称": "part_name",
@@ -894,24 +895,20 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[1] for i in data]
+            if lst.count(item[1]) > 1:
+                raise ValidationError('导入的部位编码不能重复')
             lst = [i[2] for i in data]
             if lst.count(item[2]) > 1:
-                raise ValidationError('导入的部位编码不能重复')
-            lst = [i[3] for i in data]
-            if lst.count(item[3]) > 1:
                 raise ValidationError('导入的部位名称不能重复')
-            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0]).first()
-            global_part_type = GlobalCode.objects.filter(global_name=item[1]).first()
-            if not equip_type:
-                raise ValidationError('主设备种类{}不存在'.format(item[0]))
+            global_part_type = GlobalCode.objects.filter(global_name=item[0]).first()
             if not global_part_type:
-                raise ValidationError('部位分类{}不存在'.format(item[1]))
-            obj = EquipPartNew.objects.filter(Q(part_code=item[2]) | Q(part_name=item[3])).first()
+                raise ValidationError('部位分类{}不存在'.format(item[0]))
+            obj = EquipPartNew.objects.filter(Q(part_code=item[1]) | Q(part_name=item[2])).first()
             if not obj:
-                parts_list.append({"equip_type": equip_type.id,
-                                   "global_part_type": global_part_type.id,
-                                   "part_code": item[2],
-                                   "part_name": item[3]})
+                parts_list.append({"global_part_type": global_part_type.id,
+                                   "part_code": item[1],
+                                   "part_name": item[2]})
         s = EquipPartNewSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
             if len(s.validated_data) < 1:
@@ -1008,7 +1005,6 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     FILE_NAME = '设备部件列表'
     EXPORT_FIELDS_DICT = {
-        "所属主设备种类": "equip_type_name",
         "所属设备部位": "equip_part_name",
         "部件分类": "equip_component_type_name",
         "部件代码": "component_code",
@@ -1021,15 +1017,12 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
 
     def get_queryset(self):
         query_params = self.request.query_params
-        equip_type = query_params.get('equip_type')
         equip_part = query_params.get('equip_part')
         equip_component_type = query_params.get('equip_component_type')
         component_name = query_params.get('component_name')
         is_binding = query_params.get('is_binding')
         use_flag = query_params.get('use_flag')
         filter_kwargs = {}
-        if equip_type:
-            filter_kwargs['equip_part__equip_type_id'] = equip_type
         if equip_part:
             filter_kwargs['equip_part_id'] = equip_part
         if equip_component_type:
@@ -1075,29 +1068,26 @@ class EquipComponentViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            lst = [i[2] for i in data]
+            if lst.count(item[2]) > 1:
+                raise ValidationError('导入的部件编码不能重复')
             lst = [i[3] for i in data]
             if lst.count(item[3]) > 1:
-                raise ValidationError('导入的部件编码不能重复')
-            lst = [i[4] for i in data]
-            if lst.count(item[4]) > 1:
                 raise ValidationError('导入的部件名称不能重复')
-            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[0], use_flag=1).first()
-            equip_part = EquipPartNew.objects.filter(equip_type=equip_type.id, part_name=item[1], use_flag=1).first()
-            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2], use_flag=1).first()
+            equip_part = EquipPartNew.objects.filter(part_name=item[0], use_flag=True).first()
+            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[1], use_flag=True).first()
 
-            if not equip_type:
-                raise ValidationError('主设备种类{}不存在'.format(item[0]))
             if not equip_part:
-                raise ValidationError('部位{}不存在'.format(item[1]))
+                raise ValidationError('部位{}不存在'.format(item[0]))
             if not equip_component_type:
-                raise ValidationError('部件分类{}不存在'.format(item[2]))
-            obj = EquipComponent.objects.filter(Q(component_code=item[3]) | Q(component_name=item[4])).first()
+                raise ValidationError('部件分类{}不存在'.format(item[1]))
+            obj = EquipComponent.objects.filter(Q(component_code=item[2]) | Q(component_name=item[3])).first()
             if not obj:
                 parts_list.append({"equip_part": equip_part.id,
                                    "equip_component_type": equip_component_type.id,
-                                   "component_code": item[3],
-                                   "component_name": item[4],
-                                   "use_flag": 1 if item[6] == 'Y' else 0})
+                                   "component_code": item[2],
+                                   "component_name": item[3],
+                                   "use_flag": 1 if item[5] == 'Y' else 0})
         s = EquipComponentCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
             if len(s.validated_data) < 1:
@@ -1849,13 +1839,16 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
     def import_xlsx(self, request):
         def handle_data(work_details_column, check_standard_desc_column, check_standard_type_column):
             work_details = []
-            standard = {i.split('、')[0]: i.split('、')[1] for i in check_standard_desc_column.split('；')[:-1]}
-            type = {i.split('、')[0]: i.split('、')[1] for i in check_standard_type_column.split('；')[:-1]}
-            for i in work_details_column.split('；')[:-1]:
-                seq, content = i.split('、')
-                data = {"sequence": seq, "content": content, "check_standard_desc": standard.get(seq),
-                        "check_standard_type": type.get(seq)}
-                work_details.append(data)
+            try:
+                standard = {i.split('、')[0]: i.split('、')[1] for i in check_standard_desc_column.split('；')[:-1]}
+                type = {i.split('、')[0]: i.split('、')[1] for i in check_standard_type_column.split('；')[:-1]}
+                for i in work_details_column.split('；')[:-1]:
+                    seq, content = i.split('、')
+                    data = {"sequence": seq, "content": content, "check_standard_desc": standard.get(seq),
+                            "check_standard_type": type.get(seq)}
+                    work_details.append(data)
+            except:
+                raise ValidationError('导入的数据格式有误')
             return work_details
 
         excel_file = request.FILES.get('file', None)
@@ -1867,6 +1860,12 @@ class EquipJobItemStandardViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         parts_list = []
         for item in data:
+            if not item[3]:
+                raise ValidationError('作业详情内容不可为空')
+            if not item[4]:
+                raise ValidationError('判断标准不可为空')
+            if not item[5]:
+                raise ValidationError('类型不可为空')
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的标准编码不能重复')
@@ -1903,7 +1902,8 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         "作业类型": "work_type",
         "标准编号": "standard_code",
         "标准名称": "standard_name",
-        "设备种类": "equip_type_name",
+        "类别": "type",
+        "机台": "equip",
         "部位名称": "equip_part_name",
         "部件名称": "equip_component_name",
         "设备条件": "equip_condition",
@@ -1916,7 +1916,7 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         "所需人数": "cycle_person_num",
         "作业时间": "operation_time",
         "作业时间单位": "operation_time_unit",
-        "所需物料名称": "spare_list_str",
+        # "所需物料名称": "spare_list_str",
         "录入人": "created_username",
         "录入时间": "created_date",
     }
@@ -1954,7 +1954,8 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         spare_list = request.data.get('spare_list', None)
-        serializer = self.get_serializer(data=request.data)
+        work_list = request.data.get('work_list', None)
+        serializer = EquipMaintenanceStandardCreateSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             obj = EquipMaintenanceStandard.objects.create(**serializer.validated_data, created_user=self.request.user)
             if spare_list:
@@ -1962,21 +1963,45 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                     EquipMaintenanceStandardMaterials.objects.create(equip_maintenance_standard=obj,
                                                                      equip_spare_erp_id=item['equip_spare_erp__id'],
                                                                      quantity=item['quantity'])
+            if work_list:  # 新建巡检标准时选择作业项目
+                for item in work_list:
+                    standard_code = obj.standard_code  # 巡检标准编号
+                    area_code = EquipAreaDefine.objects.filter(id=item['equip_area_define__id']).first().area_code
+                    equip_component = item.get('equip_component__id')
+                    EquipMaintenanceStandardWork.objects.create(equip_maintenance_standard=obj,
+                                                                equip_part_id=item['equip_part__id'],
+                                                                equip_area_define_id=item['equip_area_define__id'],
+                                                                equip_job_item_standard_id=item['equip_job_item_standard__id'],
+                                                                equip_component_id=equip_component,
+                                                                lot_no=f'{standard_code}{area_code}')
             return Response('新建成功')
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = EquipMaintenanceStandardCreateSerializer(instance, data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         id = int(kwargs.get('pk'))
         spare_list = request.data.get('spare_list', None)
+        work_list = request.data.get('work_list', None)
         if spare_list:
             EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard_id=id).delete()
             for item in spare_list:
                 EquipMaintenanceStandardMaterials.objects.create(equip_maintenance_standard_id=id,
                                                                  equip_spare_erp_id=item['equip_spare_erp__id'],
                                                                  quantity=item['quantity'])
+        if work_list:
+            EquipMaintenanceStandardWork.objects.filter(equip_maintenance_standard_id=id).delete()
+            for item in work_list:
+                standard_code = EquipMaintenanceStandard.objects.filter(id=id).first().standard_code
+                area_code = EquipAreaDefine.objects.filter(id=item['equip_area_define__id']).first().area_code
+                equip_component = item.get('equip_component__id')
+                EquipMaintenanceStandardWork.objects.create(equip_maintenance_standard_id=id,
+                                                            equip_part_id=item['equip_part__id'],
+                                                            equip_area_define_id=item['equip_area_define__id'],
+                                                            equip_job_item_standard_id=item['equip_job_item_standard__id'],
+                                                            equip_component_id=equip_component,
+                                                            lot_no=f'{standard_code}{area_code}')
+
         else:
             EquipMaintenanceStandardMaterials.objects.filter(equip_maintenance_standard_id=id).delete()
 
@@ -2011,20 +2036,17 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
-            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[3]).first()
-            equip_part = EquipPartNew.objects.filter(part_name=item[4]).first()
-            equip_component = EquipComponent.objects.filter(component_name=item[5]).first()
-            equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[8]).first()
-            if not equip_type:
-                raise ValidationError(f'设备种类{item[3]}不存在')
-            if not equip_part:
-                raise ValidationError(f'部位名称{item[4]}不存在')
-            if not equip_job_item_standard:
-                raise ValidationError(f'作业项目{item[8]}不存在')
+            equip_part = EquipPartNew.objects.filter(part_name=item[5]).first()
+            equip_component = EquipComponent.objects.filter(component_name=item[6]).first()
+            equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[9]).first()
+            if item[0] != '巡检' and not equip_part:
+                raise ValidationError(f'部位名称{item[5]}不存在')
+            if item[0] != '巡检' and not equip_job_item_standard:
+                raise ValidationError(f'作业项目{item[9]}不存在')
             try:
-                if item[9]:
-                    start_time = dt.date(*map(int, item[9].split('-'))) if isinstance(item[9], str) else datetime.date(
-                        xlrd.xldate.xldate_as_datetime(item[9], 0))
+                if item[10]:
+                    start_time = dt.date(*map(int, item[10].split('-'))) if isinstance(item[10], str) else datetime.date(
+                        xlrd.xldate.xldate_as_datetime(item[10], 0))
             except:
                 raise ValidationError('导入的开始时间格式有误')
 
@@ -2040,23 +2062,23 @@ class EquipMaintenanceStandardViewSet(CommonDeleteMixin, ModelViewSet):
                 signal_list.append({"work_type": item[0],
                                     "standard_code": item[1],
                                     "standard_name": item[2],
-                                    "equip_type": equip_type.id,
-                                    "equip_part": equip_part.id,
+                                    "equip_no": item[4],
+                                    "equip_part": equip_part.id if equip_part else None,
                                     "equip_component": equip_component.id if equip_component else None,
-                                    "equip_condition": item[6],
-                                    "important_level": item[7],
-                                    "equip_job_item_standard": equip_job_item_standard.id,
-                                    "start_time": start_time if item[9] else None,
-                                    "maintenance_cycle": item[10] if item[10] else None,
-                                    "cycle_unit": item[11] if item[11] else None,
-                                    "cycle_num": item[12] if item[12] else None,
-                                    "cycle_person_num": item[13] if item[13] else None,
-                                    "operation_time": item[14] if item[14] else None,
-                                    "operation_time_unit": item[15] if item[15] else None,
+                                    "equip_condition": item[7],
+                                    "important_level": item[8],
+                                    "equip_job_item_standard": equip_job_item_standard.id if equip_job_item_standard else None,
+                                    "start_time": start_time if item[10] else None,
+                                    "maintenance_cycle": item[11] if item[11] else None,
+                                    "cycle_unit": item[12] if item[12] else None,
+                                    "cycle_num": item[13] if item[13] else None,
+                                    "cycle_person_num": item[14] if item[13] else None,
+                                    "operation_time": item[15] if item[15] else None,
+                                    "operation_time_unit": item[16] if item[16] else None,
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
-                                    "spares": item[16] if item[16] else 'no',  # '清洁剂'
+                                    "spares": item[17] if item[17] else 'no',  # '清洁剂'
                                     })
 
         serializer = EquipMaintenanceStandardImportSerializer(data=signal_list, many=True, context={'request': request})
@@ -2114,7 +2136,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
     EXPORT_FIELDS_DICT = {
         "标准编号": "standard_code",
         "标准名称": "standard_name",
-        "设备种类": "equip_type_name",
+        "机台": "equip",
         "部位名称": "equip_part_name",
         "部件名称": "equip_component_name",
         "设备条件": "equip_condition",
@@ -2124,7 +2146,6 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         "所需人数": "cycle_person_num",
         "作业时间": "operation_time",
         "作业时间单位": "operation_time_unit",
-        "所需物料名称": "spare_list_str",
         "录入人": "created_username",
         "录入时间": "created_date",
     }
@@ -2162,7 +2183,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         spare_list = request.data.get('spare_list', None)
-        serializer = self.get_serializer(data=request.data)
+        serializer = EquipRepairStandardCreateSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             obj = EquipRepairStandard.objects.create(**serializer.validated_data, created_user=self.request.user)
             if spare_list:
@@ -2173,9 +2194,8 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             return Response('新建成功')
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer = EquipRepairStandardCreateSerializer(instance, data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         id = int(kwargs.get('pk'))
         spare_list = request.data.get('spare_list', None)
@@ -2218,13 +2238,11 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
         data = get_sheet_data(cur_sheet)
         signal_list = []
         for item in data:
-            equip_type = EquipCategoryAttribute.objects.filter(category_no=item[2]).first()
             equip_part = EquipPartNew.objects.filter(part_name=item[3]).first()
             equip_component = EquipComponent.objects.filter(component_name=item[4]).first()
             equip_fault = EquipFault.objects.filter(fault_name=item[7]).first()
             equip_job_item_standard = EquipJobItemStandard.objects.filter(standard_name=item[8]).first()
-            if not equip_type:
-                raise ValidationError(f'设备种类{item[2]}不存在')
+
             if not equip_part:
                 raise ValidationError(f'部位名称{item[3]}不存在')
             if not equip_fault:
@@ -2242,7 +2260,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             if not EquipRepairStandard.objects.filter(Q(Q(standard_code=item[0]) | Q(standard_name=item[1]))).exists():
                 signal_list.append({"standard_code": item[0],
                                     "standard_name": item[1],
-                                    "equip_type": equip_type.id,
+                                    "equip_no": item[2],
                                     "equip_part": equip_part.id,
                                     "equip_component": equip_component.id if equip_component else None,
                                     "equip_condition": item[5],
@@ -2255,7 +2273,6 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
                                     "remind_flag1": True,
                                     "remind_flag2": True,
                                     "remind_flag3": False,
-                                    "spares": item[12] if item[12] else 'no',  # '清洁剂',
                                     })
 
         serializer = EquipRepairStandardImportSerializer(data=signal_list, many=True, context={'request': request})
@@ -2263,21 +2280,7 @@ class EquipRepairStandardViewSet(CommonDeleteMixin, ModelViewSet):
             if len(serializer.validated_data) < 1:
                 raise ValidationError('没有可导入的数据')
             for data in serializer.validated_data:
-                spares = dict(data).pop('spares')
-                data.pop('spares')
-                spare_list = spares.split(',') or spares.split(' ') or spares.split('，')
-                spare_obj_list = []
-                for spare in spare_list:
-                    if spare != 'no':
-                        spare_obj = EquipSpareErp.objects.filter(spare_name=spare).first()
-                        spare_obj_list.append(spare_obj)
-                        if not spare_obj:
-                            raise ValidationError(f'所选物料名称{spare}不存在')
-                obj = EquipRepairStandard.objects.create(**data)
-                for spare_obj in spare_obj_list:
-                    EquipRepairStandardMaterials.objects.create(equip_repair_standard=obj,
-                                                                equip_spare_erp=spare_obj,
-                                                                quantity=1)  # 默认1
+                EquipRepairStandard.objects.create(**data)
         else:
             raise ValidationError('导入的数据类型有误')
         return Response(f'成功导入{len(serializer.validated_data)}条数据')
@@ -2678,6 +2681,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         st = (int(page) - 1) * int(page_size)
         et = int(page) * int(page_size)
         count = len(data)
+        if self.request.query_params.get('all'):
+            return Response({'results': data})
         return Response({'results': data[st:et], 'count': count})
 
     @atomic
@@ -3024,9 +3029,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         "部位名称": "part_name",
         "维修标准/故障原因": "fault_reason",
         "故障详情描述": "result_fault_desc",
-        "实际维修标准": "result_fault_reason",
         "维修备注": "result_repair_desc",
-        "最终故障原因": "result_final_fault_cause",
         "计划维修日期": "planned_repair_date",
         "设备条件": "equip_condition",
         "重要程度": "importance_level",
@@ -3034,10 +3037,10 @@ class EquipApplyOrderViewSet(ModelViewSet):
         "维修人": "repair_user",
         "维修开始时间": "repair_start_datetime",
         "维修结束时间": "repair_end_datetime",
-        "是否物料申请": "result_material_requisition",
+        "是否需要物料": "result_material_requisition",
         "是否需要外协助": "result_need_outsourcing",
         "是否等待物料": "wait_material",
-        "是否等待外协助": "wait_outsourcing",
+        "是否等待外维修": "wait_outsourcing",
         "指派人": "assign_user",
         "指派时间": "assign_datetime",
         "被指派人": "assign_to_user",
@@ -3068,14 +3071,20 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     else:
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
-                              Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name)))
+                              Q(status='已开始', repair_end_datetime__isnull=True, repair_user__icontains=user_name) |
+                              Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name)
+                              ))
                 else:
                     query_set = self.queryset.filter(
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
-                query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                                                 Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
+                query_set = self.queryset.filter(Q(status='已生成') |
+                Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(created_user__username=user_name))) |
+                Q(Q(status='已指派') & Q(assign_to_user__icontains=user_name)) |
+                Q(Q(status__in=['已接单', '已开始']) & Q(Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name))) |
+                Q(Q(status='已验收', accept_user=user_name)))
+
         elif my_order == '2':
             if not status:
                 if not searched:
@@ -3106,8 +3115,10 @@ class EquipApplyOrderViewSet(ModelViewSet):
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
-                                                      repair_user__icontains=user_name))).count()
-            finished = self.queryset.filter(status='已完成', created_user__username=user_name).count()
+                                                      repair_user__icontains=user_name) |
+                                                    Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name))).count()
+            # finished = self.queryset.filter(status='已完成', accept_user=user_name).count()
+            finished = self.queryset.filter(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(created_user__username=user_name))).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3219,8 +3230,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
-                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_order': True
+                'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
+                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_reason': data.get('back_reason')
             }
             content.update({"title": f"您指派的设备维修单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
@@ -3233,10 +3244,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                 raise ValidationError('订单未被接单, 请刷新订单!')
             # 如果是报修工单，故障发生时间
             obj = self.get_queryset().filter(id__in=pks).first()
-            if obj:
+            fault_datetime = now_date
+            if obj and EquipApplyRepair.objects.filter(plan_id=obj.plan_id).exists():
                 fault_datetime = EquipApplyRepair.objects.filter(plan_id=obj.plan_id).first().fault_datetime
-            else:
-                fault_datetime = now_date
             data = {
                 'status': data.get('status'), 'repair_start_datetime': now_date, 'fault_datetime': fault_datetime,
                 'last_updated_date': datetime.now(), 'timeout_color': None
@@ -3299,6 +3309,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
             image_url_list = data.pop('image_url_list', [])
             result_accept_result = data.get('result_accept_result')
             if result_accept_result == '合格':
+                # 更新巡检中异常报修的工单状态
+                for obj in self.get_queryset().filter(id__in=pks):
+                    EquipInspectionOrder.objects.filter(apply_order=obj).update(status='已完成', repair_end_datetime=now_date)
                 data = {
                     'status': data.get('status'), 'accept_datetime': now_date,
                     'result_accept_result': result_accept_result, 'timeout_color': None,
@@ -3316,7 +3329,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
             close_num = EquipApplyOrder.objects.filter(status='已关闭', id__in=pks).count()
             if close_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
-            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None}
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
+                    'close_reason': data.get('close_reason')}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -3360,8 +3374,11 @@ class EquipInspectionOrderViewSet(ModelViewSet):
     filter_class = EquipInspectionOrderFilter
     FILE_NAME = '设备巡检工单表'
     EXPORT_FIELDS_DICT = {
-        "计划/报修编号": "plan_id",
-        "计划/报修名称": "plan_name",
+        "计划编号": "plan_id",
+        "计划名称": "plan_name",
+        '序号': 'inspection_line_no',
+        '区域': 'area_name',
+        '类别': 'type',
         "工单编号": "work_order_no",
         "机台": "equip_no",
         "巡检标准": "equip_repair_standard_name",
@@ -3403,8 +3420,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(status='已生成'))
             else:
-                query_set = self.queryset.filter(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
-                                                 Q(repair_user__icontains=user_name) | Q(status='已生成'))
+                query_set = self.queryset.filter(Q(status='已生成') | Q(Q(status=status) & Q(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                                                 Q(repair_user__icontains=user_name))))
         elif my_order == '2':
             if not status:
                 if not searched:
@@ -3436,7 +3453,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
                                                       repair_user__icontains=user_name))).count()
-            finished = self.queryset.filter(status='已完成', repair_user__icontains=user_name).count()
+            finished = self.queryset.filter(Q(Q(status='已完成') & Q(Q(repair_user__icontains=user_name) | Q(assign_user=user_name)))).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()
@@ -3545,8 +3562,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 raise ValidationError('未指派订单无法退单, 请刷新订单!')
             data = {
                 'status': data.get('status'), 'receiving_user': None, 'receiving_datetime': None,
-                'assign_user': None, 'assign_datetime': None, 'timeout_color': None,
-                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_order': True
+                'assign_user': None, 'assign_datetime': None, 'timeout_color': None, 'back_order': True,
+                'assign_to_user': None, 'last_updated_date': datetime.now(), 'back_reason': data.get('back_reason')
             }
             content.update({"title": f"您指派的设备巡检单已被{user_ids}退单",
                             "form": [{"key": "退单人:", "value": user_ids},
@@ -3573,7 +3590,10 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             work_content = data.pop('work_content', [])
             image_url_list = data.pop('image_url_list', [])
             work_order_no = data.pop('work_order_no')
-            data.update({'repair_end_datetime': now_date, 'last_updated_date': datetime.now(), 'status': '已完成',
+            result = data.get('result_repair_final_result')
+            data.update({'repair_end_datetime': now_date if result == '正常' else None,
+                         'last_updated_date': datetime.now(),
+                         'status': '已完成' if result == '正常' else '已开始',
                          'result_repair_graph_url': json.dumps(image_url_list)})
             # 记录到增减人员履历中
             for plan_id in plan_ids:
@@ -3588,13 +3608,16 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if instance:
                 EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
                 for item in work_content:
+                    if item.get('abnormal_operation_url'):
+                        item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
                     item.update({'work_type': '巡检', 'work_order_no': work_order_no})
                     EquipResultDetail.objects.create(**item)
         else:  # 关闭
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
                 raise ValidationError('存在已经关闭的订单, 请刷新订单!')
-            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None}
+            data = {'status': data.get('status'), 'last_updated_date': datetime.now(), 'timeout_color': None,
+                    'close_reason': data.get('close_reason')}
             content.update({"title": f"您指派的设备维修单已被{user_ids}关闭",
                             "form": [{"key": "闭单人:", "value": user_ids},
                                      {"key": "关闭时间:", "value": now_date}]})
@@ -3657,6 +3680,7 @@ class GetStaffsView(APIView):
     def get(self, request):
         ding_api = DinDinAPI()
         equip_no = self.request.query_params.get('equip_no')
+        maintenance_type = self.request.query_params.get('maintenance_type', '通用')
         have_classes = self.request.query_params.get('have_classes')
         if not equip_no:
             section_name = self.request.query_params.get('section_name')
@@ -3679,7 +3703,7 @@ class GetStaffsView(APIView):
                 # 查询各员工考勤状态
                 result = get_staff_status(ding_api, section_name)
         else:
-            result = get_maintenance_status(ding_api, equip_no)
+            result = get_maintenance_status(ding_api, equip_no, maintenance_type)
         return Response({'results': result})
 
 
@@ -3693,27 +3717,29 @@ class EquipCodePrintView(APIView):
             raise ValidationError('ip格式有误')
         url = {'code1': f'http://{res.global_name}:6111/printer/print-storehouse/',
                'code2': f'http://{res.global_name}:6111/printer/print-spareparts/',
-               'code3': f'http://{res.global_name}:6111/printer/print-equip/', }
+               'code3': f'http://{res.global_name}:6111/printer/print-equip/',
+               'code4': f'http://{res.global_name}:6111/printer/print-label/',
+               }
         status = self.request.data.get('status')
         lot_no = self.request.data.get('lot_no', None)
         data = self.request.data
 
         try:
-            if status == 1:
+            if status == 1:  # 打印库位条码
                 del data['status']
                 res = requests.post(url=url.get('code1'), json=data, verify=False, timeout=10)
-            if status == 2:
+            if status == 2:  # 打印备件条码
                 res = []
                 for spare_code in data.get('spare_list'):
                     res.append(
                        {"print_type":1,
-                        "code": spare_code.get('equip_spare__spare_code'),
-                        "name": spare_code.get('equip_spare__spare_name'),
-                        "num": spare_code.get('one_piece'),
+                        "code": spare_code.get('spare_code'),
+                        "name": spare_code.get('spare_name'),
+                        "technical_params": spare_code.get('technical_params'),
                         "barcode": spare_code.get('spare_code')
                         })
                 res = requests.post(url=url.get('code2'), json=res, verify=False, timeout=10)
-            if status == 3:
+            if status == 3:  # 打印bom条码
                 obj = EquipBom.objects.filter(node_id=lot_no).first()
                 if not obj:
                     raise ValidationError('节点编号不存在, 无法打印')
@@ -3731,6 +3757,16 @@ class EquipCodePrintView(APIView):
                         "component_type": obj.component.equip_component_type.component_type_name if obj.component else None,
                         "node_id": lot_no}
                 res = requests.post(url=url.get('code3'), json=data, verify=False, timeout=10)
+            if status == 4:  # 巡检点标签打印
+                data = {
+                    "print_type": 1,
+                    "area_code": data.get('area_code'),
+                    "area_name": data.get('spare_name'),
+                    "part_name": data.get('part_name'),
+                    "component_name": data.get('component_name'),
+                    "lot_no": data.get('lot_no'),
+                }
+                res = requests.post(url=url.get('code4'), json=data, verify=False, timeout=10)
         except:
             raise ValidationError('打印超时，请检查您的网络或ip配置')
         return Response({'results': res.text})
@@ -3748,6 +3784,7 @@ class EquipPlanViewSet(ModelViewSet):
         "作业类型": "work_type",
         "计划编号": "plan_id",
         "计划名称": "plan_name",
+        "类别": "type",
         "机台": "equip_name",
         "维护标准": "standard",
         "设备条件": "equip_condition",
@@ -3808,25 +3845,32 @@ class EquipPlanViewSet(ModelViewSet):
             equip_no = plan.equip_no
             equip_list = equip_no.split('，')
             if plan.work_type == '巡检':
-                if EquipInspectionOrder.objects.filter(plan_id=plan.plan_id).count() == len(equip_list):
+                # if EquipInspectionOrder.objects.filter(plan_id=plan.plan_id).count() == len(equip_list):
+                if EquipInspectionOrder.objects.filter(plan_id=plan.plan_id).exists():
                     raise ValidationError('工单已生成')
                 for equip in equip_list:
-                    max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
-                        max_order_code=Max('work_order_no'))['max_order_code']
-                    work_order_no = plan.plan_id + '-' + (
-                        '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
-                    res = EquipInspectionOrder.objects.create(plan_id=plan.plan_id,
-                                                              plan_name=plan.plan_name,
-                                                              work_type=plan.work_type,
-                                                              work_order_no=work_order_no,
-                                                              equip_no=equip,
-                                                              equip_repair_standard=plan.equip_manintenance_standard,
-                                                              planned_repair_date=plan.planned_maintenance_date,
-                                                              status='已生成',
-                                                              equip_condition=plan.equip_condition,
-                                                              importance_level=plan.importance_level,
-                                                              created_user=self.request.user)
-                    results.append(res.id)
+                    work = list(EquipMaintenanceStandardWork.objects.filter(
+                        equip_maintenance_standard=plan.equip_manintenance_standard).order_by('id'))
+                    for work_detail in work:
+                        max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan.plan_id).aggregate(
+                            max_order_code=Max('work_order_no'))['max_order_code']
+                        work_order_no = plan.plan_id + '-' + (
+                            '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+                        res = EquipInspectionOrder.objects.create(plan_id=plan.plan_id,
+                                                                  plan_name=plan.plan_name,
+                                                                  work_type=plan.work_type,
+                                                                  work_order_no=work_order_no,
+                                                                  equip_no=equip,
+                                                                  equip_repair_standard=plan.equip_manintenance_standard,
+                                                                  planned_repair_date=plan.planned_maintenance_date,
+                                                                  status='已生成',
+                                                                  equip_condition=plan.equip_condition,
+                                                                  importance_level=plan.importance_level,
+                                                                  created_user=self.request.user,
+                                                                  equip_maintenance_standard_work=work_detail,
+                                                                  inspection_line_no=work.index(work_detail) + 1
+                                                                  )
+                        results.append(res.id)
             else:
                 if EquipApplyOrder.objects.filter(plan_id=plan.plan_id).count() == len(equip_list):
                     raise ValidationError('工单已生成')
@@ -3880,10 +3924,12 @@ class EquipOrderListView(APIView):
             queryset1 = queryset1.filter(Q(assign_user=self.request.user.username) |
                                     Q(assign_to_user=self.request.user.username) |
                                     Q(receiving_user=self.request.user.username) |
-                                    Q(accept_user=self.request.user.username))
+                                    Q(accept_user=self.request.user.username) |
+                                    Q(status='已生成'))
             queryset2 = queryset2.filter(Q(assign_user=self.request.user.username) |
                                     Q(assign_to_user=self.request.user.username) |
-                                    Q(receiving_user=self.request.user.username))
+                                    Q(receiving_user=self.request.user.username) |
+                                    Q(status='已生成'))
 
         serializer1 = EquipApplyOrderSerializer(instance=queryset1, many=True).data
         serializer2 = EquipInspectionOrderSerializer(instance=queryset2, many=True).data
@@ -3929,7 +3975,7 @@ class EquipMTBFMTTPStatementView(APIView):
                     for month in range(1, int(b[1]) + 1):
                         time_list.append(f'{b[0]}年{month}月')
         dic = {}
-        for i in range(15):   # total_time = calendar.monthrange(   ,   )[1] * 24
+        for i in range(15):
             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
             dic[equip_list[i] + '2'] = {'equip_no': equip_list[i], 'content': '故障时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
             dic[equip_list[i] + '3'] = {'equip_no': equip_list[i], 'content': '故障次数', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
@@ -3951,11 +3997,11 @@ class EquipMTBFMTTPStatementView(APIView):
             year_month = f'{item["fault_datetime__year"]}年{item["fault_datetime__month"]}月'
             if item['equip_no'] in equip_list:
                 dic[item['equip_no'] + '1'][year_month] = total_time
-                dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 60, 2),
+                dic[item['equip_no'] + '2'][year_month] = round(item['time'].total_seconds() / 3600, 2),
                 dic[item['equip_no'] + '3'][year_month] = item['count']
                 dic[item['equip_no'] + '4'][year_month] = total_time / item['count']
-                dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 60) / item['count'], 2)
-                dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / total_time, 2)
+                dic[item['equip_no'] + '5'][year_month] = round((item['time'].total_seconds() / 3600) / item['count'], 2)
+                dic[item['equip_no'] + '6'][year_month] = round((item['time'].total_seconds()) / 3600 / total_time, 2)
         return Response(dic.values())
 
 
@@ -4017,7 +4063,7 @@ class EquipStatementView(APIView):
         time_range = {}
         if s_time:
             time_range = {'created_date__range': [s_time, e_time]}
-        queryset1 = EquipApplyOrder.objects.filter(**time_range, status='已验收', equip_no__icontains=equip_no, work_type__icontains=work_type)
+        queryset1 = EquipApplyOrder.objects.filter(**time_range, status='已验收', equip_condition='停机', equip_no__icontains=equip_no, work_type__icontains=work_type)
         data1 = queryset1.values('equip_no', 'work_type').annotate(
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
@@ -4025,7 +4071,7 @@ class EquipStatementView(APIView):
             验收时间=OSum(F('accept_datetime') - F('repair_end_datetime')),
             count=Count('id'),
         ).values('equip_no', 'work_type', '派单时间', '接单时间', '维修时间', '验收时间', 'count')
-        queryset2 = EquipInspectionOrder.objects.filter(**time_range, status='已完成', equip_no__icontains=equip_no,  work_type__icontains=work_type)
+        queryset2 = EquipInspectionOrder.objects.filter(**time_range, status='已完成', equip_condition='停机', equip_no__icontains=equip_no,  work_type__icontains=work_type)
         data2 = queryset2.values('equip_no', 'work_type').annotate(
             派单时间=OSum(F('assign_datetime') - F('created_date')),
             接单时间=OSum(F('receiving_datetime') - F('assign_datetime')),
@@ -4167,10 +4213,10 @@ class EquipPeriodStatementView(APIView):
         res = [{
             'time': time,
             'work_type': item['work_type'],
-            '派单时间': round(item['派单时间'].total_seconds() / 60, 2) / item['count'],
-            '接单时间': round(item['接单时间'].total_seconds() / 60, 2) / item['count'],
-            '维修时间': round(item['维修时间'].total_seconds() / 60, 2) / item['count'],
-            '验收时间': round(item['验收时间'].total_seconds() / 60, 2) / item['count'],
+            '派单时间': round(item['派单时间'].total_seconds() / 60 / item['count'], 2),
+            '接单时间': round(item['接单时间'].total_seconds() / 60 / item['count'], 2),
+            '维修时间': round(item['维修时间'].total_seconds() / 60 / item['count'], 2),
+            '验收时间': round(item['验收时间'].total_seconds() / 60 / item['count'], 2),
         } for item in data]
         return Response(res)
 
@@ -4191,8 +4237,7 @@ class EquipFinishingRateView(APIView):
             data = {'work_type': key_word, 'total_orders': 0, 'completed_in_time': 0, 'completed_overtime': 0,
                     'uncompleted': 0, 'rate': 0, 'in_time_rate': 0}
             query_set = EquipInspectionOrder.objects.filter(
-                **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type=key_word) &
-                                                                                      Q(Q(equip_repair_standard__isnull=False) | Q(equip_maintenance_standard__isnull=False) | Q(result_repair_standard__isnull=False)),
+                **time_range) if key_word == '巡检' else EquipApplyOrder.objects.filter(Q(work_type=key_word),
                                                                                       **time_range)
             if query_set:
                 data = self.compute(key_word, query_set)
@@ -4207,6 +4252,14 @@ class EquipFinishingRateView(APIView):
         completed_in_time, completed_overtime = 0, 0
         new_query_set = completed.annotate(completed_time=ExpressionWrapper(F('repair_end_datetime') - F('repair_start_datetime'), output_field=DurationField()))
         for i in new_query_set:
+            if work_type == '巡检':
+                if not i.equip_repair_standard:
+                    completed_in_time += 1
+                    continue
+            else:
+                if not i.equip_repair_standard or not i.equip_repair_standard or not i.equip_maintenance_standard:   # 没有维护作业标准的，按照 按时完成统计
+                    completed_in_time += 1
+                    continue
             spend_time = round(i.completed_time.total_seconds() / 60, 2)
             if i.equip_repair_standard:
                 operation_time = i.equip_repair_standard.operation_time
@@ -4243,7 +4296,12 @@ class EquipOldRateView(APIView):
     permission_classes = (IsAuthenticated,)
 
     def get(self, request):
-        queryset = EquipRepairMaterialReq.objects.values('equip_spare__equip_component_type').annotate(
+        s_time = self.request.query_params.get('s_time')
+        e_time = self.request.query_params.get('e_time')
+        time_range = {}
+        if s_time:
+            time_range = {'created_date__range': (s_time, e_time)}
+        queryset = EquipRepairMaterialReq.objects.filter(**time_range).values('equip_spare__equip_component_type').annotate(
             count=Count('id'),
             apply_count=Sum('apply'),  # 申请数量
             old_count=Sum('apply', distinct=True, filter=Q(submit_old_flag=True))  # 交旧数量
@@ -4265,34 +4323,36 @@ class EquipOldRateView(APIView):
 class GetSpare(APIView):
     @atomic
     def get(self, request, *args, **kwargs):
-        if self.request.query_params.get('spare'):  # 同步erp
-            last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
-            last_time = (last.sync_date + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-            url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
-            try:
-                res = requests.post(url=url, json={"syncDate": last_time})
-            except Exception:
-                raise ValidationError("网络异常")
-            if res.status_code != 200:
-                raise ValidationError("请求失败")
-            data = json.loads(res.content)
-            if not data.get('flag'):
-                raise ValidationError(data.get('message'))
-            ret = data.get('obj')
-            for item in ret:
-                equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
-                if not equip_component_type:
-                    raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
-                if item['state'] != '启用':
-                    continue
-                EquipSpareErp.objects.create(
-                    spare_code=item['wlbh'],
-                    spare_name=item['wlmc'],
-                    equip_component_type=equip_component_type,
-                    specification=item['gg'],
-                    unit=item['bzdwmc'],
-                    unique_id=item['wlxxid']
-                )
+        last = EquipSpareErp.objects.filter(sync_date__isnull=False).order_by('sync_date').last()  # 第一次先在数据库插入一条假数据
+        last_time = (last.sync_date + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+        url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/jc/getbjwlxx.io'
+        try:
+            res = requests.post(url=url, json={"syncDate": last_time}, timeout=10)
+        except Exception:
+            raise ValidationError("网络异常")
+        if res.status_code != 200:
+            raise ValidationError("请求失败")
+        data = json.loads(res.content)
+        if not data.get('flag'):
+            raise ValidationError(data.get('message'))
+        ret = data.get('obj')
+        for item in ret:
+            equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
+            if not equip_component_type:
+                raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
+            if item['state'] != '启用':
+                continue
+            if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
+                continue
+            EquipSpareErp.objects.create(
+                spare_code=item['wlbh'],
+                spare_name=item['wlmc'],
+                equip_component_type=equip_component_type,
+                specification=item['gg'],
+                unit=item['bzdwmc'],
+                unique_id=item['wlxxid'],
+                sync_date=dt.datetime.now()
+            )
         return Response('同步完成')
 
 
@@ -4300,18 +4360,14 @@ class GetSpare(APIView):
 class GetSpareOrder(APIView):
     @atomic
     def get(self, request):
-        order = self.request.query_params.get('order')
-        if order == 'get_code':  # 获取指定时间后的单据
-            # 获取最新的单据
-            last = EquipWarehouseOrder.objects.filter(processing_time__isnull=False).order_by('processing_time').last()  # 第一次先在数据库插入一条假数据
-            last_time = (last.processing_time + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-            json_data = {"ztmc": "zcaj", "clsj": last_time}
-        else:  # 根据单据编号获取指定的单据
-            json_data = {"ztmc": "zcaj", "djbh": order}
-        # 获取数据
+        # 获取最新的单据
+        last = EquipWarehouseOrder.objects.filter(processing_time__isnull=False).order_by('processing_time').last()  # 第一次先在数据库插入一条假数据
+        last_time = (last.processing_time + dt.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+        json_data = {"ztmc": "zcaj", "clsj": last_time, 'djbh': None}
+
         url = 'http://10.1.10.136/zcxjws_web/zcxjws/pc/zc/getkclld.io'
         try:
-            res = requests.post(url=url, json=json_data)
+            res = requests.post(url=url, json=json_data, timeout=10)
         except Exception:
             raise ValidationError("网络异常")
         if res.status_code != 200:
@@ -4346,3 +4402,59 @@ class GetSpareOrder(APIView):
                           'plan_in_quantity': spare.get('cksl')}
                 EquipWarehouseOrderDetail.objects.create(**kwargs)
         return Response('请求成功')
+
+
+@method_decorator([api_recorder], name='dispatch')
+class EquipOrderEntrustView(APIView):
+    """
+    工单查询加委托
+    """
+    def get(self, request):
+        oper_type = self.request.query_params.get('oper_type')
+        user_name = self.request.user.username
+        if oper_type == '维修':
+            apply_order = EquipApplyOrder.objects.filter(Q(entrust_to_user=user_name) | Q(receiving_user=user_name, entrust_to_user__isnull=True), status__in=['已开始', '已接单']).order_by('entrust_to_user')
+            data = EquipApplyOrderSerializer(apply_order, many=True).data
+        else:
+            apply_order = EquipApplyOrder.objects.filter(accept_user=user_name, status='已完成')
+            data = EquipApplyOrderSerializer(apply_order, many=True).data
+        res = sorted(data, key=lambda x: x['created_date'], reverse=True)
+        return Response({"results": res})
+
+    @atomic()
+    def post(self, request):
+        pks = self.request.data.get('pks')
+        oper_type = self.request.data.get('oper_type')
+        entrust_to_user = self.request.data.get('entrust_to_user')
+        ding_api = DinDinAPI()
+        now_date = str(datetime.now().replace(microsecond=0))
+        if oper_type == '验收':
+            entrust_num = EquipApplyOrder.objects.filter(~Q(status='已完成'), id__in=pks).count()
+            if entrust_num != 0:
+                raise ValidationError('存在非已完成状态的订单, 请刷新订单!')
+            data = {'entrust_datetime': now_date, 'accept_user': entrust_to_user}
+        else:
+            entrust_num = EquipApplyOrder.objects.filter(~Q(status__in=['已接单', '已开始']), id__in=pks).count()
+            if entrust_num != 0:
+                raise ValidationError('存在非已开始状态的订单, 请刷新订单!')
+            data = {'entrust_to_user': entrust_to_user, 'entrust_datetime': now_date}
+        EquipApplyOrder.objects.filter(id__in=pks).update(**data)
+        instance_list = EquipApplyOrder.objects.filter(id__in=pks)
+        # 发送消息给受委托人和上级
+        user_ids = get_ding_uids_by_name(entrust_to_user, all_user='1,2')
+        for order_id in pks:
+            instance = instance_list.filter(id=order_id).first()
+            # 添加履历
+            EquipOrderEntrust.objects.create(**{'work_order_no': instance.work_order_no, 'entrust_type': oper_type,
+                                                'entrust_user': self.request.user.username,
+                                                'entrust_datetime': now_date, 'entrust_to_user': entrust_to_user})
+            content = {"title": f"{oper_type}委托工单成功",
+                       "form": [
+                           {"key": "工单编号:", "value": instance.work_order_no},
+                           {"key": "机台:", "value": instance.equip_no},
+                           {"key": "重要程度:", "value": instance.importance_level},
+                           {"key": "受委托人:", "value": entrust_to_user},
+                           {"key": "委托时间:", "value": now_date}]}
+            ding_api.send_message(user_ids, content, order_id)
+
+        return Response('委托操作成功')

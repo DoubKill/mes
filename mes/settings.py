@@ -229,6 +229,15 @@ LOGGING = {
             'formatter': 'standard',
             'interval': 1,
         },
+        'getErpFile': {
+            'level': 'INFO',
+            'class': 'mes.custom_log.CommonTimedRotatingFileHandler',
+            'filename': os.path.join(LOGGING_DIR, 'get_erp.log'),
+            'when': 'midnight',
+            'backupCount': 10,
+            'formatter': 'standard',
+            'interval': 1,
+        },
     },
     'loggers': {
         'django.db.backends': {
@@ -268,7 +277,11 @@ LOGGING = {
         'send_ding_msg': {
             'handlers': ['sendMsgFile'],
             'level': 'INFO',
-        }
+        },
+        'get_erp_log': {
+            'handlers': ['getErpFile'],
+            'level': 'INFO',
+        },
     },
 }
 

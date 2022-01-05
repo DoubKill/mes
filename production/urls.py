@@ -90,5 +90,8 @@ urlpatterns = [
     # 生产管理-生产记录（计划对比实际）
     path('product-classes-plan-real/', ProductPlanRealView.as_view()),
 
-    path('open-api/batch-info/', ProductBatchInfo.as_view())
+    path('open-api/batch-info/', ProductBatchInfo.as_view()),
+
+    # 不合格品原因统计
+    path('durate-putin-reson/', RubberCannotPutinReasonView.as_view())
 ]

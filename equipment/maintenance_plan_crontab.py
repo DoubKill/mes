@@ -16,7 +16,8 @@ django.setup()
 
 from django.db.models import Count, Max
 from django.db.transaction import atomic
-from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder, EquipInspectionOrder
+from equipment.models import EquipMaintenanceStandard, EquipPlan, Equip, EquipApplyOrder, EquipInspectionOrder, \
+    EquipMaintenanceStandardWork
 from production.models import TrainsFeedbacks
 from system.models import User
 
@@ -58,6 +59,9 @@ class MaintenancePlan:
     def maintenance_plan(self):
         queryset = EquipMaintenanceStandard.objects.filter(use_flag=True).all()
         for obj in queryset:
+            # 巡检标准中如果作业内容为空，则不生成巡检计划
+            if obj.work_type == '巡检' and not EquipMaintenanceStandardWork.objects.filter(equip_maintenance_standard=obj).exists():
+                continue
             if not obj.cycle_unit or not obj.start_time:
                 continue
             start_time = datetime.datetime.strptime(str(obj.start_time),'%Y-%m-%d')  # 开始时间
@@ -70,14 +74,14 @@ class MaintenancePlan:
                 '日': datetime.timedelta(days=1) * maintenance_cycle,
                 '周': datetime.timedelta(days=7) * maintenance_cycle,
                 '月': datetime.timedelta(days=30) * maintenance_cycle,
-                '季度': datetime.timedelta(days=30) * maintenance_cycle,
+                '季度': datetime.timedelta(days=90) * maintenance_cycle,
                 '年': datetime.timedelta(days=365) * maintenance_cycle,
                 '半年': datetime.timedelta(days=182) * maintenance_cycle,
             }
             if obj.cycle_unit == '车数':
-                equip_list = Equip.objects.filter(category=obj.equip_type).values('equip_no')
+                equip_list = obj.equip_no.split('，')
                 for equip in equip_list:
-                    actual_trains = TrainsFeedbacks.objects.filter(equip_no=equip['equip_no'],
+                    actual_trains = TrainsFeedbacks.objects.filter(equip_no=equip,
                                                                    end_time__gte=start_time,
                                                                    end_time__lte=datetime.datetime.now()).aggregate(
                                                                    actual_trains=Count('id'))
@@ -88,19 +92,16 @@ class MaintenancePlan:
                             if actual_trains in [(i-1) * obj.maintenance_cycle, i * obj.maintenance_cycle] and EquipPlan.objects.filter(equip_manintenance_standard=obj).count() == (i-1):
                                 try:
                                     plan_time = datetime.datetime.now().replace(microsecond=0)
-                                    self.create_plan(obj, equip['equip_no'], plan_time)
+                                    self.create_plan(obj, equip, plan_time)
                                 except: pass
                     else:
                         count = actual_trains // maintenance_cycle
                         if EquipPlan.objects.filter(equip_manintenance_standard=obj).count() < count:
                             plan_time = datetime.datetime.now().replace(microsecond=0)
-                            self.create_plan(obj, equip['equip_no'], plan_time)
+                            self.create_plan(obj, equip, plan_time)
                 continue
             elif obj.cycle_unit == '班次':
-                equip_list = Equip.objects.filter(category=obj.equip_type).values('equip_no')
-                if not Equip.objects.filter(category=obj.equip_type).values('equip_no').exists():
-                    return ''
-                equip = '，'.join([equip['equip_no'] for equip in equip_list])
+                equip = obj.equip_no
                 today = datetime.datetime.today()
                 tomorrow = datetime.datetime.today() + datetime.timedelta(days=1)
                 now = datetime.datetime.now()
@@ -121,9 +122,9 @@ class MaintenancePlan:
             else:
                 if cycle_num:
                     count = cycle_num
-                else:  # 周期数为0
-                    count = math.ceil((datetime.datetime.now() - start_time) / cycle_time.get(cycle_unit))
-                for i in range(1, count + 1):  # 1,   2 , 3
+                else:  # 周期数为0时, 则计划可以一直生成
+                    count = math.ceil((datetime.datetime.now() + datetime.timedelta(days=3) - start_time) / cycle_time.get(cycle_unit))
+                for i in range(1, count + 1):
                     begin_time = start_time + cycle_time.get(cycle_unit) * (i - 1)
                     end_time = start_time + cycle_time.get(cycle_unit) * i
                     now = datetime.datetime.now()
@@ -135,10 +136,7 @@ class MaintenancePlan:
                         continue
                     if now > end_time:
                         continue
-                    equip_list = Equip.objects.filter(category=obj.equip_type).values('equip_no')
-                    if not Equip.objects.filter(category=obj.equip_type).values('equip_no').exists():
-                        return ''
-                    equip = '，'.join([equip['equip_no'] for equip in equip_list])
+                    equip = obj.equip_no
                     if not EquipPlan.objects.filter(equip_manintenance_standard=obj, planned_maintenance_date=begin_time):
                         self.create_plan(obj, equip, begin_time, end_time)
 
@@ -155,23 +153,29 @@ class ApplyOrder:
             if plan.work_type == '巡检':
                 if not EquipInspectionOrder.objects.filter(plan_id=plan.plan_id).exists() and (plan.planned_maintenance_date - datetime.datetime.now()) < datetime.timedelta(days=1):
                     for equip in equip_list:
-                        max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan.plan_id). \
-                            aggregate(max_order_code=Max('work_order_no'))['max_order_code']
-                        work_order_no = plan.plan_id + '-' + (
-                            '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
-                        user = User.objects.filter(username='系统自动').first()
-                        EquipInspectionOrder.objects.create(plan_id=plan.plan_id,
-                                                            plan_name=plan.plan_name,
-                                                            work_type=plan.work_type,
-                                                            work_order_no=work_order_no,
-                                                            equip_no=equip,
-                                                            equip_repair_standard=plan.equip_manintenance_standard,
-                                                            planned_repair_date=plan.planned_maintenance_date,
-                                                            status='已生成',
-                                                            equip_condition=plan.equip_condition,
-                                                            importance_level=plan.importance_level,
-                                                            created_user=user
-                                                   )
+                        # 巡检标准维护区域
+                        work = list(EquipMaintenanceStandardWork.objects.filter(equip_maintenance_standard=plan.equip_manintenance_standard).order_by('id'))
+                        for work_detail in work:
+                            max_order_code = EquipInspectionOrder.objects.filter(work_order_no__startswith=plan.plan_id). \
+                                aggregate(max_order_code=Max('work_order_no'))['max_order_code']
+                            work_order_no = plan.plan_id + '-' + (
+                                '%04d' % (int(max_order_code.split('-')[-1]) + 1) if max_order_code else '0001')
+
+                            user = User.objects.filter(username='系统自动').first()
+                            EquipInspectionOrder.objects.create(plan_id=plan.plan_id,
+                                                                plan_name=plan.plan_name,
+                                                                work_type=plan.work_type,
+                                                                work_order_no=work_order_no,
+                                                                equip_no=equip,
+                                                                equip_repair_standard=plan.equip_manintenance_standard,
+                                                                planned_repair_date=plan.planned_maintenance_date,
+                                                                status='已生成',
+                                                                equip_condition=plan.equip_condition,
+                                                                importance_level=plan.importance_level,
+                                                                created_user=user,
+                                                                equip_maintenance_standard_work=work_detail,
+                                                                inspection_line_no=work.index(work_detail) + 1
+                                                       )
                     plan.status = '已生成工单'
                     plan.save()
             else:
