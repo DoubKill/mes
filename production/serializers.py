@@ -242,7 +242,6 @@ class ProductionPlanRealityAnalysisSerializer(serializers.ModelSerializer):
 # 将群控的车次报表直接移植过来
 class TrainsFeedbacksSerializer2(BaseModelSerializer):
     """车次产出反馈"""
-    status = serializers.SerializerMethodField(read_only=True)
     actual_weight = serializers.SerializerMethodField(read_only=True)
     mixer_time = serializers.SerializerMethodField(read_only=True)
 
@@ -257,17 +256,6 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
             return None
         else:
             return str(obj.actual_weight / 100)
-
-    def get_status(self, object):
-        ps_obj = PlanStatus.objects.filter(equip_no=object.equip_no,
-                                           plan_classes_uid=object.plan_classes_uid,
-                                           product_no=object.product_no,
-                                           actual_trains=object.actual_trains).order_by('product_time').last()
-        if ps_obj:
-            status = ps_obj.status
-        else:
-            status = None
-        return status
 
     class Meta:
         model = TrainsFeedbacks
