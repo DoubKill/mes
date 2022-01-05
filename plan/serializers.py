@@ -5,12 +5,16 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueTogetherValidator
 
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan, \
-    BatchingClassesPlan, BatchingClassesEquipPlan
+    BatchingClassesPlan, BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, \
+    SchedulingEquipCapacity, SchedulingWashRule, SchedulingWashRuleDetail, SchedulingWashPlaceKeyword, \
+    SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, SchedulingProductDemandedDeclareSummary, \
+    SchedulingProductSafetyParams, SchedulingResult, SchedulingEquipShutDownPlan
 from plan.uuidfield import UUidTools
 from production.models import PlanStatus
 from quality.utils import get_cur_sheet
@@ -638,3 +642,228 @@ class PlantImportSerializer(BaseModelSerializer):
     class Meta:
         model = ProductClassesPlan
         fields = ('excel_file', )
+
+
+class SchedulingParamsSettingSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SchedulingParamsSetting
+        fields = '__all__'
+
+
+class SchedulingRecipeMachineSettingSerializer(BaseModelSerializer):
+    mixing_vice_machine = serializers.ListField(write_only=True, required=False, allow_empty=True)
+    final_vice_machine = serializers.ListField(write_only=True, required=False, allow_empty=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.mixing_vice_machine:
+            data['mixing_vice_machine'] = instance.mixing_vice_machine.split('/')
+        else:
+            data['mixing_vice_machine'] = []
+        if instance.final_vice_machine:
+            data['final_vice_machine'] = instance.final_vice_machine.split('/')
+        else:
+            data['final_vice_machine'] = []
+        return data
+
+    def validate(self, attrs):
+        attrs['mixing_vice_machine'] = '/'.join(attrs.get('mixing_vice_machine', ''))
+        attrs['final_vice_machine'] = '/'.join(attrs.get('final_vice_machine', ''))
+        return attrs
+
+    class Meta:
+        model = SchedulingRecipeMachineSetting
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+        validators = [UniqueTogetherValidator(
+            queryset=SchedulingRecipeMachineSetting.objects.filter(delete_flag=False).all(),
+            fields=('rubber_type', 'product_no', 'stage'), message='该数据已存在')]
+
+
+class RecipeMachineWeightSerializer(serializers.ModelSerializer):
+    equip_no = serializers.CharField(source='equip__equip_no')
+    devoted_weight = serializers.SerializerMethodField()
+    resting_period = serializers.SerializerMethodField()
+
+    def get_resting_period(self, obj):
+        return 0
+
+    def get_devoted_weight(self, obj):
+        stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
+        c_pb = ProductBatchingDetail.objects.using('SFJ').filter(
+            product_batching=obj['id'],
+            delete_flag=False,
+            material__material_type__global_name__in=stages).first()
+        if c_pb:
+            return c_pb.actual_weight
+        else:
+            return 0
+
+    class Meta:
+        model = ProductBatching
+        fields = ('id', 'equip_no', 'stage_product_batch_no', 'batching_weight', 'devoted_weight', 'resting_period')
+
+
+class SchedulingEquipCapacitySerializer(BaseModelSerializer):
+
+    class Meta:
+        model = SchedulingEquipCapacity
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class SchedulingWashRuleDetailSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = SchedulingWashRuleDetail
+        exclude = ('wash_rule', )
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class SchedulingWashRuleSerializer(BaseModelSerializer):
+    rule_details = SchedulingWashRuleDetailSerializer(many=True, help_text="""[{"ordering": 1, "process": "处理", "spec_params": "处理参数（规格/单位）", "quantity_params": "（车数/数量）"}]""")
+
+    @atomic()
+    def create(self, validated_data):
+        rule_details = validated_data.pop('rule_details', [])
+        instance = super().create(validated_data)
+        for item in rule_details:
+            item['wash_rule'] = instance
+            item['created_user'] = self.context['request'].user
+            SchedulingWashRuleDetail.objects.create(**item)
+        return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+        rule_details = validated_data.pop('rule_details', [])
+        instance = super().update(instance, validated_data)
+        if rule_details:
+            instance.rule_details.all().delete()
+            for item in rule_details:
+                item['wash_rule'] = instance
+                item['created_user'] = self.context['request'].user
+                SchedulingWashRuleDetail.objects.create(**item)
+        return instance
+
+    class Meta:
+        model = SchedulingWashRule
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class SchedulingWashPlaceKeywordSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = SchedulingWashPlaceKeyword
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class SchedulingWashPlaceOperaKeywordSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = SchedulingWashPlaceOperaKeyword
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class SchedulingProductDemandedDeclareSerializer(BaseModelSerializer):
+    safety_stock = serializers.SerializerMethodField(default=0)
+
+    def get_safety_stock(self, obj):
+        p = SchedulingProductSafetyParams.objects.filter(
+            product_no=obj.product_no).first()
+        if p:
+            return p.safety_stock
+        else:
+            return 0
+
+    @atomic()
+    def create(self, validated_data):
+        validated_data['factory_date'] = datetime.now().date()
+        instance = super().create(validated_data)
+        s = SchedulingProductDemandedDeclareSummary.objects.filter(
+            factory_date=instance.factory_date,
+            product_no=instance.product_no).first()
+        if not s:
+            c = SchedulingProductDemandedDeclareSummary.objects.filter(
+                factory_date=instance.factory_date).count()
+            sn = c + 1
+            SchedulingProductDemandedDeclareSummary.objects.create(
+                sn=sn,
+                factory_date=instance.factory_date,
+                product_no=instance.product_no,
+                plan_weight=instance.today_demanded,
+                workshop_weight=instance.current_stock,
+                current_stock=0
+            )
+        else:
+            s.plan_weight += instance.today_demanded
+            s.workshop_weight += instance.current_stock
+            s.save()
+        return instance
+
+    @atomic()
+    def update(self, instance, validated_data):
+
+        s = SchedulingProductDemandedDeclareSummary.objects.filter(
+            factory_date=instance.factory_date,
+            product_no=instance.product_no).first()
+        if s:
+            if 'today_demanded' in validated_data:
+                s.plan_weight -= instance.today_demanded
+                s.plan_weight += validated_data['today_demanded']
+            if 'current_stock' in validated_data:
+                s.workshop_weight -= instance.current_stock
+                s.workshop_weight += validated_data['current_stock']
+            s.save()
+        return super().update(instance, validated_data)
+
+    class Meta:
+        model = SchedulingProductDemandedDeclare
+        fields = '__all__'
+        read_only_fields = ('order_no', 'factory_date')
+        # read_only_fields = COMMON_READ_ONLY_FIELDS
+        # extra_kwargs = {'factory_date': {'read_only': False}}
+
+
+class SchedulingProductSafetyParamsSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = SchedulingProductSafetyParams
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSerializer):
+    demanded_weight = serializers.FloatField(default=0)
+
+    def validate(self, attrs):
+        c = SchedulingProductDemandedDeclareSummary.objects.filter(
+            factory_date=attrs['factory_date']).count()
+        attrs['sn'] = c + 1
+        return attrs
+
+    class Meta:
+        model = SchedulingProductDemandedDeclareSummary
+        fields = '__all__'
+        read_only_fields = ('sn',)
+
+
+class SchedulingResultSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SchedulingResult
+        fields = '__all__'
+
+
+class SchedulingEquipShutDownPlanSerializer(BaseModelSerializer):
+
+    def create(self, validated_data):
+        validated_data['factory_date'] = datetime.now().date()
+        return super().create(validated_data)
+
+    class Meta:
+        model = SchedulingEquipShutDownPlan
+        fields = '__all__'
+        read_only_fields = ('factory_date',)
