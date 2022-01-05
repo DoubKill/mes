@@ -6,6 +6,8 @@ import math
 import time
 
 import requests
+
+from equipment.utils import gen_template_response
 from mes.common_code import SqlClient, OSum
 from django.conf import settings
 from django.db.models.functions import TruncMonth
@@ -836,6 +838,28 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
     serializer_class = TrainsFeedbacksSerializer2
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filter_class = TrainsFeedbacksFilter
+    FILE_NAME = '车次报表'
+    EXPORT_FIELDS_DICT = {
+        'No': 'no',
+        '机台': 'equip_no',
+        '配方编号': 'product_no',
+        '班次': 'classes',
+        '计划编号': 'plan_classes_uid',
+        '开始时间': 'begin_time',
+        '结束时间': 'end_time',
+        '设定车次': 'plan_trains',
+        '实际车次': 'actual_trains',
+        '本/远控': 'control_mode',
+        '手/自动': 'operating_type',
+        '总重量(kg)': 'actual_weight',
+        '排胶时间(s)': 'evacuation_time',
+        '排胶温度(°c)': 'evacuation_temperature',
+        '排胶能量(J)': 'evacuation_energy',
+        '操作人': 'operation_user',
+        '存盘时间(s)': 'product_time',
+        '密炼时间(s)': 'mixer_time',
+        '间隔时间(s)': 'interval_time',
+    }
 
     def list(self, request, *args, **kwargs):
         params = request.query_params
@@ -843,6 +867,7 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
         queryset = self.filter_queryset(self.get_queryset())
         st = params.get('begin_time')
         et = params.get('end_time')
+        export = params.get('export')
         if st:
             queryset = queryset.filter(factory_date__gte=st[:10])
         if et:
@@ -853,6 +878,10 @@ class TrainsFeedbacksAPIView(mixins.ListModelMixin,
             except:
                 raise ValidationError("trains参数错误,参考: trains=5,10")
             queryset = queryset.filter(actual_trains__range=train_range)
+        if export:
+            data = list(self.get_serializer(queryset, many=True).data)
+            [i.update({'no': data.index(i) + 1}) for i in data]
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
