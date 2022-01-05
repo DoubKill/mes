@@ -1729,7 +1729,7 @@ class PalletTrainsBatchFixView(ListAPIView, UpdateAPIView):
             raise ValidationError('参数错误！')
         for item in data:
             instance = PalletFeedbacks.objects.get(id=item['id'])
-            s = PalletFeedbacksBatchModifySerializer(instance=instance, data=item)
+            s = PalletFeedbacksBatchModifySerializer(instance=instance, data=item, context={'request': request})
             s.is_valid(raise_exception=True)
             s.save()
             MaterialTestOrder.objects.filter(lot_no=instance.lot_no).delete()
