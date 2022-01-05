@@ -8,7 +8,7 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
-    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog
+    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -307,7 +307,7 @@ class TrainsFixSerializer(serializers.Serializer):
         return attrs
 
 
-class PalletFeedbacksBatchModifySerializer(serializers.ModelSerializer):
+class PalletFeedbacksBatchModifySerializer(BaseModelSerializer):
 
     class Meta:
         model = PalletFeedbacks
@@ -338,3 +338,12 @@ class ProductPlanRealViewSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductClassesPlan
         fields = ('classes', 'plan_trains', 'actual_trains', 'product_no', 'begin_time')
+
+
+class RubberCannotPutinReasonSerializer(serializers.ModelSerializer):
+    input_datetime = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+    factory_date = serializers.DateTimeField(format='%Y-%m-%d', read_only=True)
+
+    class Meta:
+        model = RubberCannotPutinReason
+        fields = '__all__'

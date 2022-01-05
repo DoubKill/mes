@@ -230,7 +230,9 @@ class SectionViewSet(ModelViewSet):
             if section.id not in index_tree:
                 index_tree[section.id] = dict(
                     {"section_id": section.id, 'in_charge_username': in_charge_username, "label": section.name,
-                     'children': list(User.objects.filter(section=section, is_active=1).values(user_id=F('id'), label=F('username')))})
+                     'children': list(User.objects.filter(section=section, is_active=1).values(user_id=F('id'),
+                                                                                               label=F('username'),
+                                                                                               type=F('workshop')))})
 
             if not section.parent_section_id:  # 根节点
                 data.append(index_tree[section.id])  # 浅拷贝
@@ -239,14 +241,18 @@ class SectionViewSet(ModelViewSet):
             if section.parent_section_id in index_tree:  # 子节点
                 if "children" not in index_tree[section.parent_section_id]:
                     index_tree[section.parent_section_id]["children"] = list(User.objects.filter(section=section.parent_section,
-                                                                                                 is_active=1).values(user_id=F('id'), label=F('username')))
+                                                                                                 is_active=1).values(user_id=F('id'),
+                                                                                                                     label=F('username'),
+                                                                                                                     type=F('workshop')))
 
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
             else:  # 没有节点则加入
                 index_tree[section.parent_section_id] = dict(
                     {"section_id": section.parent_section_id, 'in_charge_username': in_charge_username,
                      "label": section.parent_section.name, "children": list(User.objects.filter(section=section.parent_section,
-                                                                                                is_active=1).values(user_id=F('id'), label=F('username')))})
+                                                                                                is_active=1).values(user_id=F('id'),
+                                                                                                                    label=F('username'),
+                                                                                                                    type=F('workshop')))})
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
         return Response({'results': data})
 

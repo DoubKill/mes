@@ -290,8 +290,8 @@ class EquipMaintenanceStandardFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = EquipMaintenanceStandard
         fields = (
-            'id', 'work_type', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
-            'spare_name', 'specification', 'use_flag')
+            'id', 'work_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+            'spare_name', 'specification', 'use_flag', 'type')
 
 
 class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
@@ -304,19 +304,20 @@ class EquipRepairStandardFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = EquipRepairStandard
-        fields = ('id', 'equip_type', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
+        fields = ('id', 'equip_part', 'equip_component', 'important_level', 'equip_condition',
                   'spare_name', 'specification', 'use_flag')
 
 
 class EquipWarehouseOrderFilter(django_filters.rest_framework.FilterSet):
     order_id = django_filters.CharFilter(field_name='order_id', lookup_expr='icontains')
+    barcode = django_filters.CharFilter(field_name='barcode', lookup_expr='icontains')
     s_time = django_filters.CharFilter(field_name='created_date__date', lookup_expr='gte')
     e_time = django_filters.CharFilter(field_name='created_date__date', lookup_expr='lte')
     created_user = django_filters.CharFilter(field_name='created_user__username', lookup_expr='icontains')
 
     class Meta:
         model = EquipWarehouseOrder
-        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user')
+        fields = ('status', 'order_id', 's_time', 'e_time', 'created_user', 'barcode')
 
 
 class EquipWarehouseOrderDetailFilter(django_filters.rest_framework.FilterSet):
@@ -415,10 +416,11 @@ class EquipApplyOrderFilter(django_filters.rest_framework.FilterSet):
 class EquipPlanFilter(django_filters.rest_framework.FilterSet):
     plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
     planned_maintenance_date = django_filters.CharFilter(field_name='planned_maintenance_date__date', help_text='计划日期')
+    type = django_filters.CharFilter(field_name='equip_manintenance_standard__type', help_text='类别')
 
     class Meta:
         model = EquipPlan
-        fields = ('work_type', 'plan_name', 'planned_maintenance_date', 'plan_source', 'status', 'equip_condition', 'importance_level')
+        fields = ('work_type', 'plan_name', 'planned_maintenance_date', 'plan_source', 'status', 'equip_condition', 'importance_level', 'type')
 
 
 class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
@@ -427,16 +429,17 @@ class EquipInspectionOrderFilter(django_filters.rest_framework.FilterSet):
     plan_name = django_filters.CharFilter(field_name='plan_name', help_text='计划名称', lookup_expr='icontains')
     equip_no = django_filters.CharFilter(field_name='equip_no', help_text='机台', lookup_expr='icontains')
     work_order_no = django_filters.CharFilter(field_name='work_order_no', help_text='工单编号', lookup_expr='icontains')
-    equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_name',
+    equip_repair_standard = django_filters.CharFilter(field_name='equip_repair_standard__standard_code',
                                                       help_text='巡检标准', lookup_expr='icontains')
     assign_user = django_filters.CharFilter(field_name='assign_user', help_text='指派人', lookup_expr='icontains')
     assign_to_user = django_filters.CharFilter(field_name='assign_to_user', help_text='被指派人', lookup_expr='icontains')
     repair_user = django_filters.CharFilter(field_name='repair_user', help_text='巡检人', lookup_expr='icontains')
     receiving_user = django_filters.CharFilter(field_name='receiving_user', help_text='接单人', lookup_expr='icontains')
+    type = django_filters.CharFilter(field_name='equip_repair_standard__type', help_text='类型', lookup_expr='icontains')
 
     class Meta:
         model = EquipInspectionOrder
         fields = ('planned_repair_date', 'plan_name', 'equip_no', 'work_order_no', 'equip_condition', 'status',
                   'equip_repair_standard', 'equip_condition', 'repair_user', 'importance_level',
-                  'assign_user', 'assign_to_user', 'receiving_user')
+                  'assign_user', 'assign_to_user', 'receiving_user', 'type')
 
