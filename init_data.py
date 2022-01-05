@@ -221,6 +221,7 @@ permission_data = [
 
     {'id': 247, 'code': 'trains_report', 'name': '车次报表', 'parent_id': None},
     {'id': 248, 'code': 'view_trains_report', 'name': '查看', 'parent_id': 247},
+    {'id': 807, 'code': 'export_trains_report', 'name': '导出', 'parent_id': 247},
 
     {'id': 249, 'code': 'production_analyze', 'name': '产量计划实际分析', 'parent_id': None},
     {'id': 250, 'code': 'view_production_analyze', 'name': '查看', 'parent_id': 249},
@@ -751,7 +752,7 @@ permission_data = [
     {'id': 806, 'code': 'export_durate_putin_reason', 'name': '导出', 'parent_id': 804},
 
 
-    # 下一个 807开始
+    # 下一个 808开始
 ]
 
 
