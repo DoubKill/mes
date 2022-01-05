@@ -4431,7 +4431,7 @@ class EquipOrderEntrustView(APIView):
             entrust_num = EquipApplyOrder.objects.filter(~Q(status='已完成'), id__in=pks).count()
             if entrust_num != 0:
                 raise ValidationError('存在非已完成状态的订单, 请刷新订单!')
-            data = {'entrust_to_user': entrust_to_user, 'entrust_datetime': now_date, 'accept_user': entrust_to_user}
+            data = {'entrust_datetime': now_date, 'accept_user': entrust_to_user}
         else:
             entrust_num = EquipApplyOrder.objects.filter(~Q(status__in=['已接单', '已开始']), id__in=pks).count()
             if entrust_num != 0:
