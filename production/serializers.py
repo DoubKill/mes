@@ -307,7 +307,7 @@ class TrainsFixSerializer(serializers.Serializer):
         return attrs
 
 
-class PalletFeedbacksBatchModifySerializer(serializers.ModelSerializer):
+class PalletFeedbacksBatchModifySerializer(BaseModelSerializer):
 
     class Meta:
         model = PalletFeedbacks
