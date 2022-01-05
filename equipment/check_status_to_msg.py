@@ -177,7 +177,7 @@ def handle(order):
         if check_result:
             order.timeout_color = "红色"
             order.save()
-            uids = get_ding_uids_by_name(order.created_user.username, all_user='1,2')
+            uids = get_ding_uids_by_name(order.accept_user, all_user='1,2')
             fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
             content = {"title": f"第{times}次催办\r\n您名下单据超期未验收",
