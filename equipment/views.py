@@ -3082,7 +3082,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
                 query_set = self.queryset.filter(Q(status='已生成') |
-                Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(created_user_username=user_name))) |
+                Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(created_user__username=user_name))) |
                 Q(Q(status='已指派') & Q(assign_user__icontains=user_name)) |
                 Q(Q(status__in=['已接单', '已开始']) & Q(Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name))) |
                 Q(Q(status='已验收', accept_user=user_name)))
