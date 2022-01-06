@@ -10,6 +10,7 @@ from rest_framework.validators import UniqueTogetherValidator
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
+from plan.utils import calculate_product_stock
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, ProductBatchingClassesPlan, \
     BatchingClassesPlan, BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, \
     SchedulingEquipCapacity, SchedulingWashRule, SchedulingWashRuleDetail, SchedulingWashPlaceKeyword, \
@@ -782,10 +783,13 @@ class SchedulingProductDemandedDeclareSerializer(BaseModelSerializer):
     @atomic()
     def create(self, validated_data):
         validated_data['factory_date'] = datetime.now().date()
+        validated_data['order_no'] = self.context['order_no']
         instance = super().create(validated_data)
         s = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=instance.factory_date,
             product_no=instance.product_no).first()
+        current_stock = round((calculate_product_stock(instance.product_no, 'FM') +
+                               calculate_product_stock(instance.product_no, 'RFM')) / 1000, 2)
         if not s:
             c = SchedulingProductDemandedDeclareSummary.objects.filter(
                 factory_date=instance.factory_date).count()
@@ -796,7 +800,7 @@ class SchedulingProductDemandedDeclareSerializer(BaseModelSerializer):
                 product_no=instance.product_no,
                 plan_weight=instance.today_demanded,
                 workshop_weight=instance.current_stock,
-                current_stock=0
+                current_stock=current_stock
             )
         else:
             s.plan_weight += instance.today_demanded
@@ -837,18 +841,30 @@ class SchedulingProductSafetyParamsSerializer(BaseModelSerializer):
 
 
 class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSerializer):
-    demanded_weight = serializers.FloatField(default=0)
+    demanded_weight = serializers.SerializerMethodField(default=0, read_only=True)
 
-    def validate(self, attrs):
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        available_time = data['available_time']
+        data['available_time'] = round(available_time * 24, 1)
+        return data
+
+    def get_demanded_weight(self, obj):
+        return obj.plan_weight - obj.workshop_weight - obj.current_stock
+
+    def create(self, validated_data):
+        validated_data['factory_date'] = datetime.now().date()
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
-            factory_date=attrs['factory_date']).count()
-        attrs['sn'] = c + 1
-        return attrs
+            factory_date=validated_data['factory_date']).count()
+        validated_data['sn'] = c + 1
+        validated_data['current_stock'] = round((calculate_product_stock(validated_data['product_no'], 'FM') +
+                                                 calculate_product_stock(validated_data['product_no'], 'RFM')) / 1000, 2)
+        return super(SchedulingProductDemandedDeclareSummarySerializer, self).create(validated_data)
 
     class Meta:
         model = SchedulingProductDemandedDeclareSummary
         fields = '__all__'
-        read_only_fields = ('sn',)
+        read_only_fields = ('sn', 'factory_date')
 
 
 class SchedulingResultSerializer(serializers.ModelSerializer):

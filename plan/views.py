@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 
-from basics.models import WorkSchedulePlan, GlobalCode
+from basics.models import WorkSchedulePlan, GlobalCode, Equip
 from basics.views import CommonDeleteMixin
 from equipment.utils import gen_template_response
 from mes.common_code import get_weekdays
@@ -646,9 +646,10 @@ class SchedulingProductDemandedDeclareViewSet(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         data = self.request.data
+        order_no = 'FC{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
         if not isinstance(data, list):
             raise ValidationError('data error')
-        s = self.serializer_class(data=data, many=True, context={'request': request})
+        s = self.serializer_class(data=data, many=True, context={'request': request, 'order_no': order_no})
         s.is_valid(raise_exception=True)
         s.save()
         return Response('ok')
@@ -660,6 +661,17 @@ class SchedulingProductSafetyParamsViewSet(CommonDeleteMixin, ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = SchedulingProductSafetyParamsFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True)
+        data = self.get_paginated_response(serializer.data).data
+        sum_data = queryset.aggregate(total_safety_stock=Sum('safety_stock'),
+                                      total_daily_usage=Sum('daily_usage'))
+        data['total_safety_stock'] = sum_data['total_safety_stock']
+        data['total_daily_usage'] = sum_data['total_daily_usage']
+        return Response(data)
 
 
 class ProductDeclareSummaryViewSet(ModelViewSet):
@@ -710,6 +722,16 @@ class SchedulingResultViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     pagination_class = None
 
+    def list(self, request, *args, **kwargs):
+        ret = {}
+        for equip in Equip.objects.filter(
+                category__equip_type__global_name='密炼设备'
+        ).order_by('equip_no'):
+            queryset = SchedulingResult.objects.filter(equip_no=equip.equip_no).order_by('sn')
+            data = self.get_serializer(queryset, many=True).data
+            ret[equip.equip_no] = {'data': data, 'dev_type': equip.category.category_name}
+        return Response(ret)
+
 
 class SchedulingEquipShutDownPlanViewSet(ModelViewSet):
     queryset = SchedulingEquipShutDownPlan.objects.all()
@@ -723,3 +745,11 @@ class SchedulingEquipShutDownPlanViewSet(ModelViewSet):
         if factory_date:
             queryset = queryset.filter(begin_time__date=factory_date)
         return queryset
+
+
+class SchedulingProceduresView(APIView):
+    def post(self, request):
+        factory_date = self.request.data.get('factory_date')
+        if not factory_date:
+            raise ValidationError('参数确实')
+        return Response('ok')

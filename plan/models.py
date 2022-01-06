@@ -312,9 +312,9 @@ class SchedulingProductDemandedDeclare(AbstractEntity):
     factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期')
     product_no = models.CharField(max_length=64, help_text='胶料代码')
     today_demanded = models.FloatField(help_text='当日需求（吨）')
-    tomorrow_demanded = models.FloatField(help_text='明日需求（吨）')
-    current_stock = models.FloatField(help_text='当前库存（吨）')
-    underway_stock = models.FloatField(help_text='在途库存（吨）')
+    tomorrow_demanded = models.FloatField(help_text='明日需求（吨）', default=0)
+    current_stock = models.FloatField(help_text='当前库存（吨）', default=0)
+    underway_stock = models.FloatField(help_text='在途库存（吨）', default=0)
     status = models.CharField(max_length=64, help_text='状态', default='未确认')
 
     class Meta:
@@ -342,9 +342,13 @@ class SchedulingProductDemandedDeclareSummary(models.Model):
     plan_weight = models.FloatField(help_text='计划总用量（吨）', default=0)
     workshop_weight = models.FloatField(help_text='车间总库存（吨）', default=0)
     current_stock = models.FloatField(help_text='立体库总库存（吨）', default=0)
-    desc = models.FloatField(help_text='备注（加硫不合格待处理）', default=0)
+    desc = models.CharField(max_length=128, help_text='备注（加硫不合格待处理）', blank=True, null=True)
     target_stock = models.FloatField(help_text='目标总库存量（吨）', default=0)
     available_time = models.FloatField(help_text='可用时间', default=0)
+
+    def save(self, *args, **kwargs):
+        self.available_time = round((self.workshop_weight + self.current_stock) / self.plan_weight, 2)
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'aps_product_demanded_declare_summary'
@@ -360,6 +364,9 @@ class SchedulingResult(models.Model):
     plan_trains = models.IntegerField(help_text='车数')
     desc = models.CharField(max_length=64, help_text='备注', null=True)
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    batching_weight = models.FloatField(help_text='产出重量')
+    devoted_weight = models.FloatField(help_text='投入重量')
+    dev_type = models.CharField(max_length=64, help_text='机型')
 
     class Meta:
         db_table = 'aps_result'

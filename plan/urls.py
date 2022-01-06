@@ -10,7 +10,7 @@ from plan.views import ProductDayPlanViewSet, \
     MaterialTankStatusView, SchedulingEquipCapacityViewSet, SchedulingWashRuleViewSet, \
     SchedulingWashPlaceKeywordViewSet, SchedulingWashPlaceOperaKeywordViewSet, RecipeMachineWeight, \
     SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
-    SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet
+    SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView
 
 router = DefaultRouter()
 
@@ -58,4 +58,5 @@ urlpatterns = [
 
     path('recipe-machine-weight/', RecipeMachineWeight.as_view()),
     path('mat-tank-status/', MaterialTankStatusView.as_view()),
+    path('scheduling-procedures/', SchedulingProceduresView.as_view())
 ]
