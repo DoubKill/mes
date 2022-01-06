@@ -122,6 +122,7 @@ class WeightPackageLog(AbstractEntity):
     record = models.IntegerField(help_text='plan表数据id', null=True)
     merge_flag = models.BooleanField(help_text='是否合包', default=False)
     split_count = models.IntegerField(help_text='机配分包数', default=1)
+    machine_manual_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='配方料包展示重量', default=0)
 
     @property
     def total_weight(self):

@@ -919,7 +919,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         fields = ['plan_weight_uid', 'product_no', 'plan_weight', 'dev_type', 'id', 'record', 'print_flag', 'batch_time',
                   'package_count', 'print_begin_trains', 'noprint_count', 'package_fufil', 'package_plan_count',
                   'equip_no', 'batch_group', 'batch_classes', 'status', 'print_count', 'merge_flag', 'manual_infos',
-                  'expire_days', 'split_count', 'batch_user', 'bra_code']
+                  'expire_days', 'split_count', 'batch_user', 'bra_code', 'machine_manual_weight']
 
 
 class WeightPackageLogCUpdateSerializer(serializers.ModelSerializer):
@@ -1019,9 +1019,9 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'manual_weight': total_manual_weight, 'manual_tolerance': tolerance,
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
             # 总公差
-            machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=Decimal(res['plan_weight']) + total_manual_weight, project_name='all')
+            machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
-                    'machine_manual_weight': instance.total_weight[0], 'machine_manual_tolerance': machine_manual_tolerance,
+                    'machine_manual_weight': instance.machine_manual_weight, 'machine_manual_tolerance': machine_manual_tolerance,
                     'manual_weight': total_manual_weight, 'machine_weight': round(instance.plan_weight / instance.split_count, 3),
                     'print_datetime': instance.last_updated_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime})
         # 最新打印数据
