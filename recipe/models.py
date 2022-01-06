@@ -176,7 +176,7 @@ class ProductBatching(AbstractEntity):
         instance = self.weight_cnt_types.filter(delete_flag=False).first()
         if instance:
             material_name_weight.append({'material__material_name': '硫磺' if instance.weigh_type == 1 else '细料', 'actual_weight': instance.total_weight})
-            cnt_type_details += list(instance.weight_details.filter(delete_flag=0).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight'))
+            cnt_type_details += list(instance.weight_details.filter(delete_flag=False).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight', 'standard_error'))
         return material_name_weight, cnt_type_details
 
     class Meta:

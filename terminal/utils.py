@@ -8,7 +8,7 @@ import time
 import requests
 from datetime import datetime
 
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Q
 from django.db.transaction import atomic
 from suds.client import Client
 
@@ -16,7 +16,7 @@ from inventory.conf import cb_ip, cb_port
 from inventory.utils import wms_out
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
-from recipe.models import ProductBatching
+from recipe.models import ProductBatching, ProductBatchingDetail
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule
 
 
@@ -107,7 +107,7 @@ class TankStatusSync(object):
 
     def __init__(self, equip_no: str):
         self.url = f"http://{self.equip_no_ip.get(equip_no, '10.4.23.79')}:9000/xlserver"
-        self.queryset = WeightTankStatus.objects.filter(equip_no=equip_no)
+        self.queryset = WeightTankStatus.objects.filter(equip_no=equip_no, use_flag=True)
         self.equip_no = equip_no
 
     @atomic
@@ -147,14 +147,14 @@ class TankStatusSync(object):
             # 默认正常
             status = 3
             # 高位有料表示高位报警
-            if data[high_level]:
+            if data.get(high_level):
                 status = 2
             # 低位有料表示地位报警
-            elif data[low_level]:
+            elif data.get(low_level):
                 status = 1
             x.status = status
-            x.material_name = data[material_name]
-            x.material_no = data[material_name]
+            x.material_name = data.get(material_name)
+            x.material_no = data.get(material_name)
             x.save()
 
 
@@ -461,13 +461,14 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
     return tolerance
 
 
-def get_manual_materials(product_no, dev_type, batching_equip):
+def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     filter_kwargs = {}
     if isinstance(dev_type, int):
         filter_kwargs['dev_type_id'] = dev_type
     else:
         filter_kwargs['dev_type__category_name'] = dev_type
-    record = ProductBatching.objects.filter(stage_product_batch_no=product_no, used_type=4,
+    product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
+    record = ProductBatching.objects.filter(stage_product_batch_no=product_no_dev, used_type=4, batching_type=2,
                                             delete_flag=False, **filter_kwargs).first()
     if not record:
         raise ValueError(f"未找到mes配方{product_no}信息")
@@ -477,10 +478,36 @@ def get_manual_materials(product_no, dev_type, batching_equip):
     if not instance:
         raise ValueError(f"{product_no}无料包信息")
     # 机配物料
-    machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(
-        recipe_name=f'{product_no}({record.dev_type.category_name})').values_list('name', flat=True))
+    machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=product_no).values_list('name', flat=True))
+    # 添加-C
+    machine_material_C = [i + '-C' for i in machine_material]
     # 人工配物料信息
-    manual_material = instance.weight_details.filter(delete_flag=0).exclude(material__material_name__in=machine_material). \
-        annotate(material_name=F("material__material_name"), tolerance=F("standard_error")) \
-        .values('material_name', 'standard_weight')
+    manual_material = instance.weight_details.filter(delete_flag=0).exclude(material__material_name__in=machine_material_C). \
+        annotate(material_name=F('material__material_name'), tolerance=F("standard_error")).values('material__material_name', 'standard_weight', 'material_name')
+    if equip_no:
+        manual_material = get_sfj_carbon_materials(manual_material, product_no_dev, equip_no)
     return manual_material
+
+
+def get_sfj_carbon_materials(cnt_type_details, stage_product_batch_no, equip_no):
+    """去除炭黑罐投入的化工原料"""
+    handle_cnt_type_details = []
+    sfj_recipe_carbon = ProductBatchingDetail.objects.using('SFJ').filter(~Q(material__material_name__startswith='炭黑'),
+                                                                          ~Q(material__material_name__startswith='白炭黑'),
+                                                                          ~Q(material__material_name__startswith='N'),
+                                                                          ~Q(material__material_name__startswith='卸'),
+                                                                          delete_flag=False, type=2,
+                                                                          product_batching__used_type=4,
+                                                                          product_batching__stage_product_batch_no=stage_product_batch_no,
+                                                                          product_batching__equip__equip_no=equip_no).values_list('material__material_name', flat='True')
+    if sfj_recipe_carbon:
+        for recipe_material in cnt_type_details:
+            for singe_material in sfj_recipe_carbon:
+                material_prefix = re.split(r'[(,（]', singe_material)[0]  # 群控炭黑罐里化工料名: ZNF活性剂(8号罐)， mes: ZNF活性剂-C
+                if recipe_material.get('material__material_name').startswith(material_prefix):
+                    break
+            else:
+                handle_cnt_type_details.append(recipe_material)
+    else:
+        handle_cnt_type_details = cnt_type_details
+    return handle_cnt_type_details
