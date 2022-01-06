@@ -169,14 +169,19 @@ class ProductBatching(AbstractEntity):
 
     @property
     def get_product_batch(self):
-        # 胶皮、胶块
-        material_name_weight = list(self.batching_details.filter(delete_flag=False, type=1).values('material__material_name', 'actual_weight'))
-        # 小料明细
-        cnt_type_details = []
-        instance = self.weight_cnt_types.filter(delete_flag=False).first()
-        if instance:
-            material_name_weight.append({'material__material_name': '硫磺' if instance.weigh_type == 1 else '细料', 'actual_weight': instance.total_weight})
-            cnt_type_details += list(instance.weight_details.filter(delete_flag=0).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight'))
+        material_name_weight, cnt_type_details = [], []
+        # 获取机型配方
+        product_batch = ProductBatching.objects.filter(stage_product_batch_no=self.stage_product_batch_no, used_type=4,
+                                                       dev_type__category_no=self.dev_type.category_no, delete_flag=False,
+                                                       batching_type=2).first()
+        if product_batch:
+            # 胶皮、胶块
+            material_name_weight = list(product_batch.batching_details.filter(delete_flag=False, type=1).values('material__material_name', 'actual_weight'))
+            # 小料明细
+            instance = product_batch.weight_cnt_types.filter(delete_flag=False).first()
+            if instance:
+                material_name_weight.append({'material__material_name': '硫磺' if instance.weigh_type == 1 else '细料', 'actual_weight': instance.total_weight})
+                cnt_type_details += list(instance.weight_details.filter(delete_flag=False).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight', 'standard_error'))
         return material_name_weight, cnt_type_details
 
     class Meta:
