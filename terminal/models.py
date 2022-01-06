@@ -122,6 +122,7 @@ class WeightPackageLog(AbstractEntity):
     record = models.IntegerField(help_text='plan表数据id', null=True)
     merge_flag = models.BooleanField(help_text='是否合包', default=False)
     split_count = models.IntegerField(help_text='机配分包数', default=1)
+    machine_manual_weight = models.DecimalField(decimal_places=3, max_digits=8, help_text='配方料包展示重量', default=0)
 
     @property
     def total_weight(self):
@@ -134,10 +135,10 @@ class WeightPackageLog(AbstractEntity):
             if content not in already_exist:
                 if i.manual:
                     manual_ids.append(i.manual_id)
-                    total_weight += Decimal(i.manual.single_weight.split('±')[0]) * i.manual.split_num
+                    total_weight += i.manual.total_manual_weight
                 if i.manual_wms:
                     manual_wms_ids.append(i.manual_wms_id)
-                    total_weight += Decimal(i.manual_wms.single_weight.split('±')[0]) * i.manual_wms.split_num
+                    total_weight += i.manual_wms.standard_weight_old
                 already_exist.append(content)
         return [total_weight, data.count(), manual_ids, manual_wms_ids]
 
@@ -639,7 +640,8 @@ class ToleranceRule(AbstractEntity):
 class WeightPackageManual(AbstractEntity):
     bra_code = models.CharField(max_length=64, help_text='卡片条码')
     product_no = models.CharField(max_length=64, help_text='配方名称')
-    dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型')
+    # dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型')
+    dev_type = models.CharField(max_length=64, help_text='称量配方机型')
     single_weight = models.CharField(max_length=64, help_text='单配重量')
     batch_class = models.CharField(max_length=64, help_text='班次')
     batch_group = models.CharField(max_length=64, help_text='班组')
@@ -656,9 +658,16 @@ class WeightPackageManual(AbstractEntity):
     @property
     def manual_weight_names(self):
         data = {}
-        for item in self.package_details.values('material_name', 'standard_weight'):
-            data[item['material_name']] = item['standard_weight']
+        for item in self.package_details.values('material_name', 'standard_weight_old'):
+            data[item['material_name']] = item['standard_weight_old']
         return data
+
+    @property
+    def total_manual_weight(self):
+        total_weight = 0
+        for item in self.package_details.all():
+            total_weight += item.standard_weight_old
+        return total_weight
 
     @property
     def detail_material_names(self):
@@ -674,6 +683,7 @@ class WeightPackageManualDetails(AbstractEntity):
     standard_weight = models.DecimalField(max_digits=6, decimal_places=3, help_text='重量:kg')
     batch_type = models.CharField(max_length=64, help_text='配料方式')
     tolerance = models.CharField(max_length=16, help_text='公差')
+    standard_weight_old = models.DecimalField(max_digits=6, decimal_places=3, help_text='重量:kg', default=0)
     manual_details = models.ForeignKey(WeightPackageManual, help_text='单配id', on_delete=models.CASCADE, related_name='package_details')
 
     class Meta:
@@ -718,6 +728,7 @@ class WeightPackageWms(AbstractEntity):
     package_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
     real_count = models.IntegerField(help_text='配置数量', null=True, blank=True)
     now_package = models.IntegerField(help_text='当前包数', null=True, blank=True)
+    standard_weight_old = models.DecimalField(max_digits=6, decimal_places=3, help_text='配方标准重量:kg', default=0)
 
     class Meta:
         db_table = 'weight_package_wms'
