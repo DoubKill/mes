@@ -316,7 +316,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             raise serializers.ValidationError('扫码合包配置冲突')
                         if already_y and already_y.last().single_need != weight_package.split_count:
                             raise serializers.ValidationError('分包数与之前扫入不一致')
-                        if weight_package.dev_type != classes_plan.product_batching.dev_type.category_name:
+                        if weight_package.dev_type != classes_plan.equip.category.category_name:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
                             res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
@@ -388,7 +388,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                         product_no_dev = re.split(r'\(|\（|\[', manual.product_no)[0]
                         package_expire = PackageExpire.objects.filter(product_no__startswith=manual.product_no).first()
                         expire_days = 0 if not package_expire else (package_expire.package_fine_usefullife if 'F' in manual.batching_equip else package_expire.package_sulfur_usefullife)
-                        if manual.dev_type != classes_plan.product_batching.dev_type.category_name:
+                        if manual.dev_type != classes_plan.equip.category.category_name:
                             raise serializers.ValidationError('投料与生产机型不一致, 无法投料')
                         if product_no_dev != classes_plan.product_batching.stage_product_batch_no:
                             res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
