@@ -45,9 +45,9 @@ def main():
     for equip in equip_list:
         obj = RubberCannotPutinReason.objects.filter(machine_no=equip).order_by('id').last()
         if obj:
-            last_time = obj.input_datetime.strftime('%Y-%m-%d')
+            last_time = obj.input_datetime.strftime('%Y-%m-%d %H:%M:%S')
         else:
-            last_time = datetime.datetime.now().strftime('%Y-%m-%d')
+            last_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         sql = f"""
                     SELECT
                     a.cause,
@@ -77,12 +77,12 @@ def main():
         sc.close()
         for item in temp:
             RubberCannotPutinReason.objects.create(
-                reason_name=item[0],
+                reason_name=item[0].strip(),
                 factory_date=item[1],
                 machine_no='Z%.2d' % item[2],
-                pallet_no=item[3],
-                lot_no=item[4],
-                production_no=item[5],
+                pallet_no=item[3].strip(),
+                lot_no=item[4].strip(),
+                production_no=item[5].strip(),
                 actual_weight=item[6],
                 input_datetime=item[7],
             )
