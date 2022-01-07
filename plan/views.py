@@ -27,12 +27,12 @@ from mes.permissions import PermissionClass
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductClassesPlanFilter, \
     BatchingClassesPlanFilter, SchedulingRecipeMachineSettingFilter, SchedulingProductDemandedDeclareSummaryFilter, \
-    SchedulingProductSafetyParamsFilter, SchedulingResultFilter
+    SchedulingProductSafetyParamsFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
     BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, SchedulingEquipCapacity, \
     SchedulingWashRule, SchedulingWashPlaceKeyword, SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, \
     SchedulingProductDemandedDeclareSummary, SchedulingProductSafetyParams, SchedulingResult, \
-    SchedulingEquipShutDownPlan
+    SchedulingEquipShutDownPlan, SchedulingRecipeMachineRelationHistory
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
     ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
@@ -42,6 +42,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     RecipeMachineWeightSerializer, SchedulingProductDemandedDeclareSerializer, \
     SchedulingProductDemandedDeclareSummarySerializer, SchedulingProductSafetyParamsSerializer, \
     SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer
+from plan.utils import calculate_product_plan_trains
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
@@ -716,20 +717,37 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
 
 
 class SchedulingResultViewSet(ModelViewSet):
-    queryset = SchedulingResult.objects.all()
+    queryset = SchedulingResult.objects.order_by('sn')
     serializer_class = SchedulingResultSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_class = SchedulingResultFilter
     pagination_class = None
 
+    def post(self, request):
+        schedule_no = self.request.data.get('schedule_no')
+        plan_data = self.request.data.get('plan_data')
+        if not all([schedule_no, plan_data]):
+            raise ValidationError('参数缺失！')
+        return Response('成功')
+
+    @action(methods=['get'], detail=False)
+    def schedule_nos(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        query_set = SchedulingResult.objects.all()
+        if factory_date:
+            query_set = query_set.filter(factory_date=factory_date)
+        return Response(set(query_set.values_list('schedule_no', flat=True)))
+
     def list(self, request, *args, **kwargs):
+        schedule_no = self.request.query_params.get('schedule_no')
+        if not schedule_no:
+            raise ValidationError('请输入排程单号！')
         ret = {}
         for equip in Equip.objects.filter(
                 category__equip_type__global_name='密炼设备'
         ).order_by('equip_no'):
             ret[equip.equip_no] = {'data': [], 'dev_type': equip.category.category_name}
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.get_queryset().filter(schedule_no=schedule_no)
         for instance in queryset:
             ret[instance.equip_no]['data'].append(self.get_serializer(instance).data)
         return Response(ret)
@@ -750,8 +768,41 @@ class SchedulingEquipShutDownPlanViewSet(ModelViewSet):
 
 
 class SchedulingProceduresView(APIView):
+
+    @atomic()
     def post(self, request):
         factory_date = self.request.data.get('factory_date')
         if not factory_date:
             raise ValidationError('参数确实')
+        while 1:
+            schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
+            if not SchedulingResult.objects.filter(schedule_no=schedule_no).exists():
+                break
+
+        i = 1
+        for instance in SchedulingProductDemandedDeclareSummary.objects.filter(factory_date=factory_date).order_by('sn'):
+            try:
+                data = calculate_product_plan_trains(instance.product_no,
+                                                     instance.plan_weight-instance.workshop_weight-instance.current_stock)
+            except Exception as e:
+                raise ValidationError(e)
+            for item in data:
+                SchedulingRecipeMachineRelationHistory.objects.create(
+                    schedule_no=schedule_no,
+                    equip_no=item['equip_no'],
+                    recipe_name=item['product_no'],
+                    batching_weight=item['batching_weight'],
+                    devoted_weight=item['devoted_weight'],
+                    dev_type=item['dev_type'],
+                )
+                SchedulingResult.objects.create(
+                    sn=i,
+                    factory_date=factory_date,
+                    schedule_no=schedule_no,
+                    equip_no=item['equip_no'],
+                    recipe_name=item['product_no'],
+                    time_consume=item['consume_time'],
+                    plan_trains=item['plan_trains']
+                )
+            i += 1
         return Response('ok')

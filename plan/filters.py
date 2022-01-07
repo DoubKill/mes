@@ -90,12 +90,3 @@ class SchedulingProductSafetyParamsFilter(django_filters.rest_framework.FilterSe
     class Meta:
         model = SchedulingProductSafetyParams
         fields = ('factory', 'product_no')
-
-
-class SchedulingResultFilter(django_filters.rest_framework.FilterSet):
-    schedule_no = django_filters.CharFilter(field_name='schedule_no', help_text='排程单号', lookup_expr='icontains')
-    recipe_name = django_filters.CharFilter(field_name='recipe_name', help_text='胶料名称', lookup_expr='icontains')
-
-    class Meta:
-        model = SchedulingResult
-        fields = ('schedule_no', 'factory_date', 'recipe_name')

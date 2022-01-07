@@ -119,7 +119,7 @@ def calculate_product_plan_trains(product_no, need_weight):
     stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
     ms = SchedulingRecipeMachineSetting.objects.filter(product_no=product_no, stage='FM').first()
     if not ms:
-        raise
+        raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
     product_batching = ProductBatching.objects.using('SFJ').filter(
         stage_product_batch_no__icontains='-FM-{}'.format(product_no),
         equip__equip_no=ms.final_main_machine
@@ -142,22 +142,22 @@ def calculate_product_plan_trains(product_no, need_weight):
                         'batching_weight': batching_weight,
                         'devoted_weight': devoted_weight,
                         'plan_trains': plan_trains,
-                        'consume_time': int(avg_mixin_time * plan_trains),
+                        'consume_time': round(avg_mixin_time * plan_trains, 2),
                         'dev_type': product_batching['equip__category__category_name']
                         })
             try:
                 stage = c_pb.material.material_no.split('-')[1]
             except Exception:
-                raise
+                raise ValueError('物料名称错误')
             stock_weight = calculate_product_stock(product_no, stage)
             ms = SchedulingRecipeMachineSetting.objects.filter(product_no=product_no,
                                                                stage=stage).first()
             if not ms:
-                raise
+                raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
             try:
                 mixin_main_equip = ms.mixing_main_machine.split('/')[0]
-            except Exception:
-                raise
+            except Exception as e:
+                raise ValueError(e)
             need_weight = float(plan_trains * devoted_weight)
             product_batching = ProductBatching.objects.using('SFJ').filter(
                 stage_product_batch_no__icontains='-{}-{}'.format(stage, product_no),
@@ -169,11 +169,11 @@ def calculate_product_plan_trains(product_no, need_weight):
                         'batching_weight': batching_weight,
                         'devoted_weight': 0,
                         'plan_trains': plan_trains,
-                        'consume_time': int(avg_mixin_time * plan_trains),
+                        'consume_time': round(avg_mixin_time * plan_trains / 3600, 2),
                         'dev_type': product_batching['equip__category__category_name']
                         })
             product_batching = None
-    print(ret)
+    return ret
 
 
 # [{'product_no': 'C-FM-J260-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 3108},
@@ -184,7 +184,7 @@ def calculate_product_plan_trains(product_no, need_weight):
 if __name__ == '__main__':
     # calculate_equip_left_time()
     # calculate_product_available_time()
-    calculate_product_plan_trains('J260', 12)
+    print(calculate_product_plan_trains('J260', 12))
 
 
 
