@@ -721,6 +721,7 @@ class SchedulingResultViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     pagination_class = None
+    filter_fields = ('schedule_no', 'factory_date', 'recipe_name')
 
     def list(self, request, *args, **kwargs):
         ret = {}

@@ -356,6 +356,7 @@ class SchedulingProductDemandedDeclareSummary(models.Model):
 
 
 class SchedulingResult(models.Model):
+    factory_date = models.DateField(help_text='排程日期', verbose_name='排程日期')
     schedule_no = models.CharField(max_length=64, help_text='排程编号')
     equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
     sn = models.IntegerField(help_text='顺序')
