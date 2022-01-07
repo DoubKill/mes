@@ -182,11 +182,11 @@ class SectionViewSet(ModelViewSet):
             return Response({'in_charge_user': section.in_charge_user.username if section else None})
         data = []
         index_tree = {}
-        for section in Section.objects.filter():
+        for section in Section.objects.order_by('id'):
             in_charge_username = section.in_charge_user.username if section.in_charge_user else ''
             if section.id not in index_tree:
                 index_tree[section.id] = dict({"id": section.id,
-                                               'section_id': section.code,
+                                               'section_id': section.section_id,
                                                'in_charge_user_id': section.in_charge_user_id,
                                                'in_charge_username': in_charge_username,
                                                "label": section.name,
@@ -204,7 +204,7 @@ class SectionViewSet(ModelViewSet):
             else:  # 没有节点则加入
                 index_tree[section.parent_section_id] = dict(
                     {"id": section.parent_section_id,
-                     'section_id': section.code,
+                     'section_id': section.section_id,
                      'in_charge_user_id': section.in_charge_user_id,
                      'in_charge_username': in_charge_username,
                      "label": section.parent_section.name,

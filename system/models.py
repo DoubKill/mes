@@ -59,7 +59,7 @@ class AbstractEntity(models.Model):
 
 class Section(AbstractEntity):
     """部门表"""
-    code = models.CharField(max_length=40, help_text='部门ID', verbose_name='部门ID')
+    section_id = models.CharField(max_length=40, help_text='部门ID', verbose_name='部门ID')
     name = models.CharField(max_length=30, help_text='部门名称', verbose_name='部门名称')
     description = models.CharField(max_length=256, blank=True, null=True,
                                    help_text='说明', verbose_name='说明')
