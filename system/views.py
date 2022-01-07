@@ -182,7 +182,7 @@ class SectionViewSet(ModelViewSet):
             return Response({'in_charge_user': section.in_charge_user.username if section else None})
         data = []
         index_tree = {}
-        for section in Section.objects.order_by('id'):
+        for section in Section.objects.filter():
             in_charge_username = section.in_charge_user.username if section.in_charge_user else ''
             if section.id not in index_tree:
                 index_tree[section.id] = dict({"id": section.id,
