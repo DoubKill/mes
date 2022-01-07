@@ -162,7 +162,7 @@ class SectionViewSet(ModelViewSet):
     destroy:
         删除部门
     """
-    queryset = Section.objects.filter()
+    queryset = Section.objects.order_by('id')
     serializer_class = SectionSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
