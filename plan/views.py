@@ -27,7 +27,7 @@ from mes.permissions import PermissionClass
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductClassesPlanFilter, \
     BatchingClassesPlanFilter, SchedulingRecipeMachineSettingFilter, SchedulingProductDemandedDeclareSummaryFilter, \
-    SchedulingProductSafetyParamsFilter
+    SchedulingProductSafetyParamsFilter, SchedulingResultFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
     BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, SchedulingEquipCapacity, \
     SchedulingWashRule, SchedulingWashPlaceKeyword, SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, \
@@ -720,17 +720,18 @@ class SchedulingResultViewSet(ModelViewSet):
     serializer_class = SchedulingResultSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
+    filter_class = SchedulingResultFilter
     pagination_class = None
-    filter_fields = ('schedule_no', 'factory_date', 'recipe_name')
 
     def list(self, request, *args, **kwargs):
         ret = {}
         for equip in Equip.objects.filter(
                 category__equip_type__global_name='密炼设备'
         ).order_by('equip_no'):
-            queryset = SchedulingResult.objects.filter(equip_no=equip.equip_no).order_by('sn')
-            data = self.get_serializer(queryset, many=True).data
-            ret[equip.equip_no] = {'data': data, 'dev_type': equip.category.category_name}
+            ret[equip.equip_no] = {'data': [], 'dev_type': equip.category.category_name}
+        queryset = self.filter_queryset(self.get_queryset())
+        for instance in queryset:
+            ret[instance.equip_no]['data'].append(self.get_serializer(instance).data)
         return Response(ret)
 
 
