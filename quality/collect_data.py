@@ -108,78 +108,74 @@ def main():
 
                 for train in range(current_test_detail.actual_trains,
                                    current_test_detail.actual_trains + equip_test_plan.test_interval):
-
-                    if train == current_test_detail.actual_trains:
-                        pallet = PalletFeedbacks.objects.filter(
-                            lot_no=current_test_detail.lot_no).first()
-                    else:
-                        pallet = PalletFeedbacks.objects.filter(
-                            equip_no=equip_no,
-                            product_no=product_no,
-                            classes=production_class,
-                            factory_date=factory_date,
-                            begin_trains__lte=train,
-                            end_trains__gte=train
-                        ).first()
-                    if not pallet:
+                    pallets = PalletFeedbacks.objects.filter(
+                        equip_no=equip_no,
+                        product_no=product_no,
+                        classes=production_class,
+                        factory_date=factory_date,
+                        begin_trains__lte=train,
+                        end_trains__gte=train
+                    )
+                    if not pallets:
                         continue
-                    lot_no = pallet.lot_no
+                    for pallet in pallets:
+                        lot_no = pallet.lot_no
 
-                    # 车次检测单
-                    test_order = MaterialTestOrder.objects.filter(
-                        lot_no=lot_no, actual_trains=train).first()
-                    if not test_order:
-                        test_order = MaterialTestOrder.objects.create(
-                            lot_no=current_test_detail.lot_no,
-                            material_test_order_uid=uuid.uuid1(),
-                            actual_trains=train,
-                            product_no=product_no,
-                            plan_classes_uid=pallet.plan_classes_uid,
-                            production_class=production_class,
-                            production_group=production_group,
-                            production_equip_no=equip_no,
-                            production_factory_date=factory_date
-                        )
+                        # 车次检测单
+                        test_order = MaterialTestOrder.objects.filter(
+                            lot_no=lot_no, actual_trains=train).first()
+                        if not test_order:
+                            test_order = MaterialTestOrder.objects.create(
+                                lot_no=lot_no,
+                                material_test_order_uid=uuid.uuid1(),
+                                actual_trains=train,
+                                product_no=product_no,
+                                plan_classes_uid=pallet.plan_classes_uid,
+                                production_class=production_class,
+                                production_group=production_group,
+                                production_equip_no=equip_no,
+                                production_factory_date=factory_date
+                            )
 
-                    # 对数据点进行判级
-                    for item in data:
-                        value = item[0]
-                        data_point_name = item[1].strip(' ')
-                        if data_point_name not in test_data_points:
-                            continue
+                        # 对数据点进行判级
+                        for item in data:
+                            value = item[0]
+                            data_point_name = item[1].strip(' ')
+                            if data_point_name not in test_data_points:
+                                continue
 
-                        # 获取判级标准
-                        indicator = MaterialDataPointIndicator.objects.filter(
-                            material_test_method=material_test_method,
-                            data_point__name=data_point_name,
-                            data_point__test_type__test_indicator__name=indicator_name,
-                            upper_limit__gte=value,
-                            lower_limit__lte=value).first()
-                        if indicator:
-                            mes_result = indicator.result
-                            level = indicator.level
-                        else:
-                            mes_result = '三等品'
-                            level = 2
+                            # 获取判级标准
+                            indicator = MaterialDataPointIndicator.objects.filter(
+                                material_test_method=material_test_method,
+                                data_point__name=data_point_name,
+                                data_point__test_type__test_indicator__name=indicator_name,
+                                upper_limit__gte=value,
+                                lower_limit__lte=value).first()
+                            if indicator:
+                                mes_result = indicator.result
+                                level = indicator.level
+                            else:
+                                mes_result = '三等品'
+                                level = 2
 
-                        # 创建数据点检测结果
-                        MaterialTestResult.objects.create(
-                            material_test_order=test_order,
-                            test_factory_date=datetime.datetime.now(),
-                            value=value,
-                            test_times=test_times,
-                            data_point_name=data_point_name,
-                            test_method_name=method_name,
-                            test_indicator_name=indicator_name,
-                            result=mes_result,
-                            mes_result=mes_result,
-                            machine_name=equip_test_plan.test_equip.no,
-                            test_group=test_group,
-                            level=level,
-                            test_class=test_class,
-                            is_judged=material_test_method.is_judged,
-                            created_user=equip_test_plan.created_user
-                        )
+                            # 创建数据点检测结果
+                            MaterialTestResult.objects.create(
+                                material_test_order=test_order,
+                                test_factory_date=datetime.datetime.now(),
+                                value=value,
+                                test_times=test_times,
+                                data_point_name=data_point_name,
+                                test_method_name=method_name,
+                                test_indicator_name=indicator_name,
+                                result=mes_result,
+                                mes_result=mes_result,
+                                machine_name=equip_test_plan.test_equip.no,
+                                test_group=test_group,
+                                level=level,
+                                test_class=test_class,
+                                is_judged=material_test_method.is_judged,
+                                created_user=equip_test_plan.created_user
+                            )
 
             # 判断该机台计划是否全部检测完成
             # if equip_test_plan.product_test_plan_detail.filter(
