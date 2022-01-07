@@ -182,7 +182,7 @@ class SectionViewSet(ModelViewSet):
             return Response({'in_charge_user': section.in_charge_user.username if section else None})
         data = []
         index_tree = {}
-        for section in Section.objects.order_by('id'):
+        for section in Section.objects.filter():
             in_charge_username = section.in_charge_user.username if section.in_charge_user else ''
             if section.id not in index_tree:
                 index_tree[section.id] = dict({"id": section.id,
@@ -210,6 +210,7 @@ class SectionViewSet(ModelViewSet):
                      "label": section.parent_section.name,
                      "children": []})
                 index_tree[section.parent_section_id]["children"].append(index_tree[section.id])
+                index_tree[section.parent_section_id]["children"].sort(key=lambda x: x['id'])
         return Response({'results': data})
 
     def destroy(self, request, *args, **kwargs):
