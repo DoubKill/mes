@@ -63,7 +63,6 @@ class LoadMaterialLogUpdateSerializer(BaseModelSerializer):
         fields = ['adjust_left_weight']
 
 
-@atomic
 class LoadMaterialLogCreateSerializer(BaseModelSerializer):
     bra_code = serializers.CharField(write_only=True)
 
