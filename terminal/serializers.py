@@ -186,11 +186,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     material_no = scan_material
                 total_weight = res.get('ZL')
                 unit = res.get('BZDW')
-            # scan_material = '进口溶聚丁苯胶SOL5360H(美国)'
-            # material_name = '进口溶聚丁苯胶SOL5360H'
-            # material_no = '进口溶聚丁苯胶SOL5360H'
-            # total_weight = 10000
-            # unit = 'KG'
         if not material_name:
             raise serializers.ValidationError('未找到该条形码信息！')
         attrs['equip_no'] = classes_plan.equip.equip_no
@@ -573,7 +568,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             # 请求进料判断接口
             try:
                 resp = requests.post(url=settings.AUXILIARY_URL + 'api/v1/production/handle_feed/', timeout=5,
-                                     data=validated_data)
+                                     json=validated_data)
                 content = json.loads(resp.content.decode())
                 if content['success']:
                     logger.info('扫码补料后调用接口成功')
