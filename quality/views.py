@@ -5,6 +5,7 @@ import os
 import re
 from decimal import Decimal
 
+import requests
 from suds.client import Client
 from django.db import connection
 from django.forms import model_to_dict
@@ -29,6 +30,7 @@ from basics.serializers import GlobalCodeSerializer
 import uuid
 from mes import settings
 from mes.common_code import CommonDeleteMixin, date_range, get_template_response
+from mes.conf import WMS_URL
 from mes.paginations import SinglePageNumberPagination
 from mes.derorators import api_recorder
 from mes.permissions import PermissionClass
@@ -1678,7 +1680,8 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
         material_ids = self.request.data.get('material_ids')
         desc = self.request.data.get('desc')
         deal_result = self.request.data.get('deal_result')
-        ExamineMaterial.objects.filter(id__in=material_ids).update(
+        materials = ExamineMaterial.objects.filter(id__in=material_ids)
+        materials.update(
             deal_status='已处理',
             deal_result=deal_result,
             desc=desc,
@@ -1686,6 +1689,26 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
             deal_time=datetime.datetime.now(),
             status=1
         )
+        if deal_result == '放行':
+            url = WMS_URL + '/MESApi/UpdateTestingResult'
+            for m in materials:
+                data = {
+                    "TestingType": 2,
+                    "SpotCheckDetailList": [{
+                        "BatchNo": m.batch,
+                        "MaterialCode": m.wlxxid,
+                        "CheckResult": 1
+                    }]
+                }
+                headers = {"Content-Type": "application/json ;charset=utf-8"}
+                try:
+                    r = requests.post(url, json=data, headers=headers, timeout=5)
+                    r = r.json()
+                except Exception:
+                    continue
+                resp_status = r.get('state')
+                m.status = 2 if resp_status == 1 else 3
+                m.save()
         return Response('成功')
 
 
