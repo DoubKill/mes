@@ -3943,37 +3943,28 @@ class EquipOrderListView(APIView):
 class EquipMTBFMTTPStatementView(APIView):
     permission_classes = (IsAuthenticated,)
 
+    def get_month_range(self, start_day, end_day):
+        months = (end_day.year - start_day.year) * 12 + end_day.month - start_day.month
+        month_range = ['%s年%s月' % (start_day.year + mon // 12, mon % 12 + 1)
+                       for mon in range(start_day.month - 1, start_day.month + months)]
+        return month_range
+
     def get(self, request):
         # 统计自然日生产时间
         s_time = self.request.query_params.get('s_time', None)  # 2021-12
         equip_list = [f'Z{"%.2d" % i}' for i in range(1, 16)]
-        if s_time:
-            year = s_time.split('-')[0]
-            month = s_time.split('-')[-1]
+        year = s_time.split('-')[0]
+        month = s_time.split('-')[-1]
+        if month == '01':
             begin_time = year + '-01-01'
-            if month == '1':
-                end_time = year + '-12-31'
-            else:
-                day = calendar._monthlen(int(year), int(month))
-                end_time = f"{ int(year) + 1}-{int(month)}-{day}"
+            end_time = year + '-12-31'
         else:
-            begin_time = f'{date.today().year}-01-01'
-            end_time = f'{date.today().year}-12-31'
+            begin_time = s_time + '-01'
+            day = calendar._monthlen(int(year) + 1, int(month) - 1)
+            end_time = f"{ int(year) + 1}-{int(month) - 1}-{day}"
         time_range = [begin_time, end_time]
-        a = begin_time.split('-')
-        b = end_time.split('-')
-        time_list = []
-        for year in [a[0], b[0]]:
-            if a[0] == b[0]:
-                for month in range(1, 13):
-                    time_list.append(f'{a[0]}年{month}月')
-            else:
-                if year == a[0]:
-                    for month in range(int(a[1]), 13):
-                        time_list.append(f'{a[0]}年{month}月')
-                elif year == b[0]:
-                    for month in range(1, int(b[1]) + 1):
-                        time_list.append(f'{b[0]}年{month}月')
+        time_list = self.get_month_range(dt.datetime.strptime(begin_time, '%Y-%m-%d'),
+                                         dt.datetime.strptime(end_time, '%Y-%m-%d'))
         dic = {}
         for i in range(15):
             dic[equip_list[i] + '1'] = {'equip_no': equip_list[i], 'content': '理论生产总时间(h)', time_list[0]: None, time_list[1]: None, time_list[2]: None, time_list[3]: None, time_list[4]: None, time_list[5]: None, time_list[6]: None, time_list[7]: None, time_list[8]: None, time_list[9]: None, time_list[10]: None, time_list[11]: None}
