@@ -382,9 +382,9 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
     work_schedule_plan__work_schedule_plan_no = serializers.CharField(write_only=True)
     equip__equip_no = serializers.CharField(write_only=True, required=False)
     product_batching__stage_product_batch_no = serializers.CharField(write_only=True, required=False)
-    product_day_plan__equip__equip_no = serializers.CharField(write_only=True)
-    product_day_plan__plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
-    product_day_plan__product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
+    # product_day_plan__equip__equip_no = serializers.CharField(write_only=True)
+    # product_day_plan__plan_schedule__plan_schedule_no = serializers.CharField(write_only=True)
+    # product_day_plan__product_batching__stage_product_batch_no = serializers.CharField(write_only=True)
     status = serializers.CharField(write_only=True, required=False)
 
     def validate(self, attrs):
@@ -426,9 +426,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
         fields = ('sn', 'plan_trains', 'time', 'weight', 'unit', 'work_schedule_plan__work_schedule_plan_no',
                   'plan_classes_uid', 'note',
                   'equip__equip_no', 'product_batching__stage_product_batch_no',
-                  'status',
-                  'product_day_plan__equip__equip_no', 'product_day_plan__product_batching__stage_product_batch_no',
-                  'product_day_plan__plan_schedule__plan_schedule_no', 'delete_flag', 'created_date')
+                  'status', 'delete_flag', 'created_date')
         read_only_fields = COMMON_READ_ONLY_FIELDS
         extra_kwargs = {'plan_classes_uid': {'validators': []}}
 
