@@ -395,5 +395,5 @@ class DelUser(APIView):
     permission_classes = (IsAuthenticated,)
 
     def delete(self, request, pk):
-        User.objects.filter(pk=pk).update(delete_flag=True)
+        User.objects.filter(pk=pk).update(delete_flag=True, is_active=0)
         return Response('ok')
