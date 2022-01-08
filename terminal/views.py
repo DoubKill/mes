@@ -189,7 +189,7 @@ class BatchProductBatchingVIew(APIView):
         # 未进料(显示为空);
         if not add_materials:
             return Response([])
-        materials_info = LoadTankMaterialLog.objects.filter(id__in=add_materials).values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight', 'adjust_left_weight',  'single_need', 'scan_material_type')
+        materials_info = LoadTankMaterialLog.objects.filter(id__in=add_materials).values('id', 'material_name', 'bra_code', 'scan_material', 'init_weight', 'actual_weight', 'adjust_left_weight',  'single_need', 'scan_material_type', 'unit')
         res = []
         for material in materials_info:
             material_name = material['material_name']

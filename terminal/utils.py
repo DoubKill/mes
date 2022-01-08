@@ -479,11 +479,14 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
         raise ValueError(f"{product_no}无料包信息")
     # 机配物料
     machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=product_no).values_list('name', flat=True))
-    # 添加-C
-    machine_material_C = [i + '-C' for i in machine_material]
     # 人工配物料信息
-    manual_material = instance.weight_details.filter(delete_flag=0).exclude(material__material_name__in=machine_material_C). \
-        annotate(material_name=F('material__material_name'), tolerance=F("standard_error")).values('material__material_name', 'standard_weight', 'material_name')
+    manual_material = []
+    xl_materials = instance.weight_details.filter(delete_flag=0)
+    for i in xl_materials:
+        real_name = re.split(r'-C|-X', i.material.material_name)[0] if i.material.material_name.endswith('-C') or i.material.material_name.endswith('-X') else i.material.material_name
+        if real_name not in machine_material:
+            manual_material.append({'material_name': i.material.material_name, 'tolerance': i.standard_error,
+                                    'material__material_name': i.material.material_name, 'standard_weight': i.standard_weight})
     if equip_no:
         manual_material = get_sfj_carbon_materials(manual_material, product_no_dev, equip_no)
     return manual_material
