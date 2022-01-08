@@ -388,3 +388,12 @@ class ResetPassword(APIView):
         user.set_password(new_password)
         user.save()
         return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DelUser(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def delete(self, request, pk):
+        User.objects.filter(pk=pk).update(delete_flag=True)
+        return Response('ok')
