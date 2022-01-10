@@ -179,7 +179,10 @@ class SectionViewSet(ModelViewSet):
             # 根据部门获取部门负责人
             name = self.request.query_params.get('section_name')
             section = self.queryset.filter(name=name).first()
-            return Response({'in_charge_user': section.in_charge_user.username if section else None})
+            in_charge_user = None
+            if section:
+                in_charge_user = section.in_charge_user if section.in_charge_user else None
+            return Response({'in_charge_user': in_charge_user})
         data = []
         index_tree = {}
         for section in Section.objects.order_by('id'):
