@@ -30,6 +30,7 @@ permission_data = [
     {'id': 13, 'code': 'add_user', 'name': '增加', 'parent_id': 11},
     {'id': 14, 'code': 'change_user', 'name': '修改', 'parent_id': 11},
     {'id': 15, 'code': 'delete_user', 'name': '启用/停用', 'parent_id': 11},
+    {'id': 808, 'code': 'del_user', 'name': '删除', 'parent_id': 11},
 
     {'id': 16, 'code': 'group_user', 'name': '角色别用户管理', 'parent_id': None},
     {'id': 17, 'code': 'view_group_user', 'name': '查看', 'parent_id': 16},
@@ -751,11 +752,8 @@ permission_data = [
     {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
     {'id': 806, 'code': 'export_durate_putin_reason', 'name': '导出', 'parent_id': 804},
 
-    {'id': 808, 'code': 'del_user', 'name': '用户删除', 'parent_id': None},
-    {'id': 809, 'code': 'view_del_user', 'name': '查看', 'parent_id': 808},
 
-
-    # 下一个 810开始
+    # 下一个 809开始
 ]
 
 
