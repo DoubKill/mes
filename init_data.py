@@ -751,8 +751,11 @@ permission_data = [
     {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
     {'id': 806, 'code': 'export_durate_putin_reason', 'name': '导出', 'parent_id': 804},
 
+    {'id': 808, 'code': 'del_user', 'name': '不合格品原因统计', 'parent_id': None},
+    {'id': 809, 'code': 'view_del_user', 'name': '查看', 'parent_id': 808},
 
-    # 下一个 808开始
+
+    # 下一个 810开始
 ]
 
 
