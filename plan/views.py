@@ -554,7 +554,8 @@ class MaterialTankStatusView(APIView):
         tank_type = self.request.query_params.get('tank_type', '1')
         data = MaterialTankStatus.objects.filter(
             tank_no__in=[str(i) for i in range(11)],
-            tank_type=tank_type
+            tank_type=tank_type,
+            equip_no__in=['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10']
         ).using('SFJ').values('equip_no', 'tank_no', 'material_name').order_by('equip_no', 'tank_no')
         ret = {}
         equip_nos = set()
