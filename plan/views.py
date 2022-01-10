@@ -723,7 +723,7 @@ class SchedulingResultViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     pagination_class = None
 
-    def post(self, request):
+    def create(self, request, *args, **kwargs):
         schedule_no = self.request.data.get('schedule_no')
         plan_data = self.request.data.get('plan_data')
         if not all([schedule_no, plan_data]):
