@@ -90,6 +90,7 @@ def main():
                 # 更新当前检测任务结果值
                 test_results = {item[1].strip(' '): item[0] for item in data}
                 current_test_detail.value = json.dumps(test_results)
+                current_test_detail.status = 2
                 current_test_detail.save()
 
                 # 卡片判级
