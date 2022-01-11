@@ -5,7 +5,7 @@ from django.db.transaction import atomic
 from rest_framework import serializers
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from rest_framework.validators import UniqueTogetherValidator
+from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
 from mes.base_serializer import BaseModelSerializer
@@ -722,6 +722,8 @@ class SchedulingWashRuleDetailSerializer(BaseModelSerializer):
 
 class SchedulingWashRuleSerializer(BaseModelSerializer):
     rule_details = SchedulingWashRuleDetailSerializer(many=True, help_text="""[{"ordering": 1, "process": "处理", "spec_params": "处理参数（规格/单位）", "quantity_params": "（车数/数量）"}]""")
+    rule_no = serializers.CharField(max_length=64, validators=[UniqueValidator(
+        queryset=SchedulingWashRule.objects.all(), message='该洗车规则编号已存在！')])
 
     @atomic()
     def create(self, validated_data):

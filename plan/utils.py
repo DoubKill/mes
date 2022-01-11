@@ -142,7 +142,7 @@ def calculate_product_plan_trains(product_no, need_weight):
                         'batching_weight': batching_weight,
                         'devoted_weight': devoted_weight,
                         'plan_trains': plan_trains,
-                        'consume_time': round(avg_mixin_time * plan_trains, 2),
+                        'consume_time': round(avg_mixin_time * plan_trains / 3600, 2),
                         'dev_type': product_batching['equip__category__category_name']
                         })
             try:
