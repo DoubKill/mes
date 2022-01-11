@@ -724,11 +724,27 @@ class SchedulingResultViewSet(ModelViewSet):
     filter_backends = (DjangoFilterBackend,)
     pagination_class = None
 
+    @atomic()
     def create(self, request, *args, **kwargs):
         schedule_no = self.request.data.get('schedule_no')
         plan_data = self.request.data.get('plan_data')
         if not all([schedule_no, plan_data]):
             raise ValidationError('参数缺失！')
+        sr = SchedulingResult.objects.filter(schedule_no=schedule_no).first()
+        factory_date = sr.factory_date
+        SchedulingResult.objects.filter(schedule_no=schedule_no).delete()
+        for key, value in plan_data.items():
+            for idx, item in enumerate(value):
+                SchedulingResult.objects.create(
+                    factory_date=factory_date,
+                    schedule_no=schedule_no,
+                    equip_no=key,
+                    sn=idx+1,
+                    recipe_name=item['recipe_name'],
+                    time_consume=item['time_consume'],
+                    plan_trains=item['plan_trains'],
+                    desc=item['desc']
+                )
         return Response('成功')
 
     @action(methods=['get'], detail=False)
