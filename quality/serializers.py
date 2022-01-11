@@ -1886,7 +1886,7 @@ class ProductTEstResumeSerializer(BaseModelSerializer):
     test_times = serializers.ReadOnlyField(source='test_plan.test_times')
     test_interval = serializers.ReadOnlyField(source='test_plan.test_interval')
     test_user = serializers.ReadOnlyField(source='test_plan.test_user')
-    status = serializers.ReadOnlyField(source='test_plan.status')
+    # status = serializers.ReadOnlyField(source='test_plan.status')
     values = serializers.CharField(read_only=True)
 
     class Meta:
