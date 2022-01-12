@@ -338,9 +338,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 flag, send_flag = False, False
                         if flag and not merge_flag:
                             machine_details = RecipeMaterial.objects.using(weight_package.equip_no).filter(recipe_name=weight_package.product_no)
-                            if set(machine_details.values_list('name', flat=True)) - set([i['material__material_name'][:-2] for i in cnt_type_details]):
+                            # 转换配方内物料名与称量配方物料比较
+                            cnt_type_data = {}
+                            for i in cnt_type_details:
+                                if i['material__material_name'].endswith('-C') or i['material__material_name'].endswith('-X'):
+                                    cnt_type_data[re.split(r'-C|-X', i['material__material_name'])[0]] = i['material__material_name']
+                                else:
+                                    cnt_type_data[i['material__material_name']] = i['material__material_name']
+                            if set(machine_details.values_list('name', flat=True)) - set(cnt_type_data.keys()):
                                 raise serializers.ValidationError('扫码机配物料种类和配方不一致')
-                            material_no = material_name = {i.name + '-C': i.weight for i in machine_details}
+                            material_no = material_name = {cnt_type_data.get(i.name): i.weight for i in machine_details}
                             material_name['single_weight'] = weight_package.split_count
                             # 扫到物料对应条码列表、扫到物料对应物料的分包数、料框表里的条码对应种类数
                             scan_bra_code, scan_split_num, load_tank_materials = [], [], 0
@@ -369,7 +376,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             if merge_flag:
                                 material_no = material_name = '细料' if '细料' in materials else '硫磺'
                             else:
-                                material_no = material_name = {i.name + '-C': i.weight for i in machine_details}
                                 material_name['single_weight'] = weight_package.split_count
                             attrs.update({'material_name': material_name, 'material_no': material_no})
                             attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no, 'scan_material': material_name,

@@ -632,10 +632,15 @@ class PalletTrainFeedback(APIView):
         if stage:
             pallet_feed_backs = pallet_feed_backs.filter(product_no__icontains=stage)
         ret = []
+        trains = []
         for pallet_feed_back in pallet_feed_backs:
             begin_trains = pallet_feed_back.begin_trains
             end_trains = pallet_feed_back.end_trains
             for i in range(begin_trains, end_trains + 1):
+                if i not in trains:
+                    trains.append(i)
+                else:
+                    continue
                 # test_order = MaterialTestOrder.objects.filter(product_no=product_no,
                 #                                               production_equip_no=equip_no,
                 #                                               production_factory_date=factory_date,

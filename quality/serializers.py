@@ -156,65 +156,76 @@ class MaterialTestOrderSerializer(BaseModelSerializer):
 
     def create(self, validated_data):
         order_results = validated_data.pop('order_results', None)
-        test_order = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
-                                                      actual_trains=validated_data['actual_trains']).first()
-        # plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
-        # if not plan:
-        #     raise serializers.ValidationError('该计划编号不存在')
-        # validated_data['plan_classes_uid'] = plan.work_schedule_plan.group.global_name
-        if test_order:
-            instance = test_order
-            created = False
-        else:
-            validated_data['material_test_order_uid'] = uuid.uuid1()
-            instance = super().create(validated_data)
-            created = True
 
-        material_no = validated_data['product_no']
-        for item in order_results:
-            if not item.get('value'):
-                continue
-            item['material_test_order'] = instance
-            item['test_factory_date'] = datetime.now()
-            if created:
-                item['test_times'] = 1
+        pallets = PalletFeedbacks.objects.filter(
+            equip_no=validated_data['production_equip_no'],
+            product_no=validated_data['product_no'],
+            classes=validated_data['production_class'],
+            factory_date=validated_data['production_factory_date'],
+            begin_trains__lte=validated_data['actual_trains'],
+            end_trains__gte=validated_data['actual_trains']
+        )
+        for pallet in pallets:
+            validated_data['lot_no'] = pallet.lot_no
+            test_order = MaterialTestOrder.objects.filter(lot_no=validated_data['lot_no'],
+                                                          actual_trains=validated_data['actual_trains']).first()
+            # plan = ProductClassesPlan.objects.filter(plan_classes_uid=validated_data['plan_classes_uid']).first()
+            # if not plan:
+            #     raise serializers.ValidationError('该计划编号不存在')
+            # validated_data['plan_classes_uid'] = plan.work_schedule_plan.group.global_name
+            if test_order:
+                instance = test_order
+                created = False
             else:
-                last_test_result = MaterialTestResult.objects.filter(
-                    material_test_order=instance,
-                    test_indicator_name=item['test_indicator_name'],
-                    data_point_name=item['data_point_name'],
-                ).order_by('-test_times').first()
-                if last_test_result:
-                    item['test_times'] = last_test_result.test_times + 1
-                else:
+                validated_data['material_test_order_uid'] = uuid.uuid1()
+                instance = super().create(validated_data)
+                created = True
+
+            material_no = validated_data['product_no']
+            for item in order_results:
+                if not item.get('value'):
+                    continue
+                item['material_test_order'] = instance
+                item['test_factory_date'] = datetime.now()
+                if created:
                     item['test_times'] = 1
-            material_test_method = MaterialTestMethod.objects.filter(
-                material__material_no=material_no,
-                test_method__name=item['test_method_name'],
-                test_method__test_type__test_indicator__name=item['test_indicator_name'],
-                data_point__name=item['data_point_name'],
-                data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
-            if material_test_method:
-                item['is_judged'] = material_test_method.is_judged
-                indicator = MaterialDataPointIndicator.objects.filter(
-                    material_test_method=material_test_method,
-                    data_point__name=item['data_point_name'],
-                    data_point__test_type__test_indicator__name=item['test_indicator_name'],
-                    upper_limit__gte=item['value'],
-                    lower_limit__lte=item['value']).first()
-                if indicator:
-                    item['mes_result'] = indicator.result
-                    item['data_point_indicator'] = indicator
-                    item['level'] = indicator.level
                 else:
-                    item['mes_result'] = '三等品'
-                    item['level'] = 2
-            else:
-                raise serializers.ValidationError('该胶料实验方法不存在！')
-            item['created_user'] = self.context['request'].user  # 加一个create_user
-            item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
-            MaterialTestResult.objects.create(**item)
-        return instance
+                    last_test_result = MaterialTestResult.objects.filter(
+                        material_test_order=instance,
+                        test_indicator_name=item['test_indicator_name'],
+                        data_point_name=item['data_point_name'],
+                    ).order_by('-test_times').first()
+                    if last_test_result:
+                        item['test_times'] = last_test_result.test_times + 1
+                    else:
+                        item['test_times'] = 1
+                material_test_method = MaterialTestMethod.objects.filter(
+                    material__material_no=material_no,
+                    test_method__name=item['test_method_name'],
+                    test_method__test_type__test_indicator__name=item['test_indicator_name'],
+                    data_point__name=item['data_point_name'],
+                    data_point__test_type__test_indicator__name=item['test_indicator_name']).first()
+                if material_test_method:
+                    item['is_judged'] = material_test_method.is_judged
+                    indicator = MaterialDataPointIndicator.objects.filter(
+                        material_test_method=material_test_method,
+                        data_point__name=item['data_point_name'],
+                        data_point__test_type__test_indicator__name=item['test_indicator_name'],
+                        upper_limit__gte=item['value'],
+                        lower_limit__lte=item['value']).first()
+                    if indicator:
+                        item['mes_result'] = indicator.result
+                        item['data_point_indicator'] = indicator
+                        item['level'] = indicator.level
+                    else:
+                        item['mes_result'] = '三等品'
+                        item['level'] = 2
+                else:
+                    raise serializers.ValidationError('该胶料实验方法不存在！')
+                item['created_user'] = self.context['request'].user  # 加一个create_user
+                item['test_class'] = validated_data['production_class']  # 暂时先这么写吧
+                MaterialTestResult.objects.create(**item)
+        return validated_data
 
     class Meta:
         model = MaterialTestOrder
@@ -1875,7 +1886,7 @@ class ProductTEstResumeSerializer(BaseModelSerializer):
     test_times = serializers.ReadOnlyField(source='test_plan.test_times')
     test_interval = serializers.ReadOnlyField(source='test_plan.test_interval')
     test_user = serializers.ReadOnlyField(source='test_plan.test_user')
-    status = serializers.ReadOnlyField(source='test_plan.status')
+    # status = serializers.ReadOnlyField(source='test_plan.status')
     values = serializers.CharField(read_only=True)
 
     class Meta:
