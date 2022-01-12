@@ -511,6 +511,12 @@ class ProductTestPlan(AbstractEntity):
 
 class ProductTestPlanDetail(models.Model):
     """检测计划详情"""
+    STATUS_CHOICE = (
+        (1, '待检测'),
+        (2, '完成'),
+        (3, '检测中'),
+        (4, '强制结束')
+    )
     equip_no = models.CharField(max_length=64, help_text="机台号", verbose_name='机台号', blank=True)
     test_plan = models.ForeignKey(ProductTestPlan, help_text='检测计划', on_delete=models.CASCADE, related_name=
                                   'product_test_plan_detail')
@@ -523,6 +529,7 @@ class ProductTestPlanDetail(models.Model):
     value = models.CharField(max_length=200, help_text="检测结果值json格式,{'ML(1+4)': 12}", null=True)
     raw_value = models.TextField(null=True, help_text='检测原数据')
     test_time = models.DateTimeField(auto_now=True)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
 
     class Meta:
         db_table = 'product_test_plan_detail'

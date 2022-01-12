@@ -162,7 +162,7 @@ class SectionViewSet(ModelViewSet):
     destroy:
         删除部门
     """
-    queryset = Section.objects.filter()
+    queryset = Section.objects.order_by('id')
     serializer_class = SectionSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -179,7 +179,10 @@ class SectionViewSet(ModelViewSet):
             # 根据部门获取部门负责人
             name = self.request.query_params.get('section_name')
             section = self.queryset.filter(name=name).first()
-            return Response({'in_charge_user': section.in_charge_user.username if section else None})
+            in_charge_user = None
+            if section:
+                in_charge_user = section.in_charge_user.username if section.in_charge_user else None
+            return Response({'in_charge_user': in_charge_user})
         data = []
         index_tree = {}
         for section in Section.objects.order_by('id'):
@@ -388,3 +391,12 @@ class ResetPassword(APIView):
         user.set_password(new_password)
         user.save()
         return Response('修改成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DelUser(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def delete(self, request, pk):
+        User.objects.filter(pk=pk).update(delete_flag=True, is_active=0)
+        return Response('ok')

@@ -30,6 +30,7 @@ permission_data = [
     {'id': 13, 'code': 'add_user', 'name': '增加', 'parent_id': 11},
     {'id': 14, 'code': 'change_user', 'name': '修改', 'parent_id': 11},
     {'id': 15, 'code': 'delete_user', 'name': '启用/停用', 'parent_id': 11},
+    {'id': 808, 'code': 'del_user', 'name': '删除', 'parent_id': 11},
 
     {'id': 16, 'code': 'group_user', 'name': '角色别用户管理', 'parent_id': None},
     {'id': 17, 'code': 'view_group_user', 'name': '查看', 'parent_id': 16},
@@ -751,8 +752,36 @@ permission_data = [
     {'id': 805, 'code': 'view_durate_putin_reason', 'name': '查看', 'parent_id': 804},
     {'id': 806, 'code': 'export_durate_putin_reason', 'name': '导出', 'parent_id': 804},
 
+    {'id': 809, 'code': 'equip_mtbfmttp_statement', 'name': 'MTBF/MTTR分析报表', 'parent_id': None},
+    {'id': 810, 'code': 'view_equip_mtbfmttp_statement', 'name': '查看', 'parent_id': 809},
+    {'id': 811, 'code': 'export_equip_mtbfmttp_statement', 'name': '导出', 'parent_id': 809},
 
-    # 下一个 808开始
+    {'id': 812, 'code': 'equip_workorder_statement', 'name': '工单别处理时间报表', 'parent_id': None},
+    {'id': 813, 'code': 'view_equip_workorder_statement', 'name': '查看', 'parent_id': 812},
+    {'id': 814, 'code': 'export_equip_workorder_statement', 'name': '导出', 'parent_id': 812},
+
+    {'id': 815, 'code': 'equip_statement', 'name': '机台别处理时间报表', 'parent_id': None},
+    {'id': 816, 'code': 'view_equip_statement', 'name': '查看', 'parent_id': 815},
+    {'id': 817, 'code': 'export_equip_statement', 'name': '导出', 'parent_id': 815},
+
+    {'id': 818, 'code': 'equip_user_statement', 'name': '人员别处理时间报表', 'parent_id': None},
+    {'id': 819, 'code': 'view_equip_user_statement', 'name': '查看', 'parent_id': 818},
+    {'id': 820, 'code': 'export_equip_user_statement', 'name': '导出', 'parent_id': 818},
+
+    {'id': 821, 'code': 'equip_period_statement', 'name': '期间别处理时间分析报表', 'parent_id': None},
+    {'id': 822, 'code': 'view_equip_period_statement', 'name': '查看', 'parent_id': 821},
+    {'id': 823, 'code': 'export_equip_period_statement', 'name': '导出', 'parent_id': 821},
+
+    {'id': 824, 'code': 'equip_finishing_rate', 'name': '工单按时完成率报表', 'parent_id': None},
+    {'id': 825, 'code': 'view_equip_finishing_rate', 'name': '查看', 'parent_id': 824},
+    {'id': 826, 'code': 'export_equip_finishing_rate', 'name': '导出', 'parent_id': 824},
+
+    {'id': 827, 'code': 'equip_old_rate', 'name': '交旧率报表', 'parent_id': None},
+    {'id': 828, 'code': 'view_equip_old_rate', 'name': '查看', 'parent_id': 827},
+    {'id': 829, 'code': 'export_equip_old_rate', 'name': '导出', 'parent_id': 827},
+
+
+    # 下一个 830开始
 ]
 
 

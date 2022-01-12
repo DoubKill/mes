@@ -76,16 +76,19 @@ def main():
         temp = sc.all()
         sc.close()
         for item in temp:
-            RubberCannotPutinReason.objects.create(
-                reason_name=item[0].strip(),
-                factory_date=item[1],
-                machine_no='Z%.2d' % item[2],
-                pallet_no=item[3].strip(),
-                lot_no=item[4].strip(),
-                production_no=item[5].strip(),
-                actual_weight=item[6],
-                input_datetime=item[7],
-            )
+            if item[8]:
+                RubberCannotPutinReason.objects.create(
+                    reason_name=item[0].strip(),
+                    factory_date=item[1],
+                    machine_no='Z%.2d' % item[2],
+                    pallet_no=item[3].strip(),
+                    lot_no=item[4].strip(),
+                    production_no=item[5].strip(),
+                    actual_weight=item[6],
+                    input_datetime=item[7],
+                )
+            else:  # 删除的不入库原因，mes中对应的也删除
+                RubberCannotPutinReason.objects.filter(lot_no=item[4]).delete()
 
 
 if __name__ == '__main__':
