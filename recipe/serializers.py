@@ -242,9 +242,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 weight_details = weight_cnt_type.pop('weight_details', None)
                 weight_cnt_type['product_batching'] = instance
                 if '-FM' in stage_product_batch_no:
-                    weight_cnt_type['name'] = '硫磺'
+                    weight_cnt_type.update({'name': '硫磺', 'weigh_type': 1})
                 else:
-                    weight_cnt_type['name'] = '细料'
+                    weight_cnt_type.update({'name': '细料', 'weigh_type': 2})
                 cnt_type_instance = WeighCntType.objects.create(**weight_cnt_type)
                 if weight_details:
                     # 新建小料包详情
@@ -394,9 +394,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                     # 否则新建
                     weight_cnt_type['product_batching'] = instance
                     if '-FM' in instance.stage_product_batch_no:
-                        weight_cnt_type['name'] = '硫磺'
+                        weight_cnt_type.update({'name': '硫磺', 'weigh_type': 1})
                     else:
-                        weight_cnt_type['name'] = '细料'
+                        weight_cnt_type.update({'name': '细料', 'weigh_type': 2})
                     cnt_type_instance = WeighCntType.objects.create(**weight_cnt_type)
                 if weight_details:
                     # 更新小料包详情
