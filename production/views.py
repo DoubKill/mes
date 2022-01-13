@@ -1995,9 +1995,11 @@ class MonthlyOutputStatisticsReport(APIView):
 
             for item in result:
                 item['max_value'] = dic[item['equip_no']] if dic.get(item['equip_no']) else None
-                item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
-                    settings_value.__dict__.get(item['equip_no'])
-
+                if settings_value:
+                    item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
+                        settings_value.__dict__.get(item['equip_no'])
+                else:
+                    item['settings_value'] = None
             # 获取不同段次的总重量
             state_value = self.queryset.filter(factory_date__gte=st, factory_date__lte=et).values('product_no').annotate(weight=Sum('actual_weight'))
             jl = {'jl': 0}
