@@ -2217,8 +2217,8 @@ class DailyProductionCompletionReport(APIView):
             results['name_4']['weight'] += round(item['weight'] / 1000, 2)
             results['name_5']['weight'] += round(item['weight'] / 1000, 2)
             results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
-            results['name_4'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
-            results['name_5'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
+            results['name_4'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
+            results['name_5'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
 
         # 外发无硫料（吨）
         out_queryset = FinalGumOutInventoryLog.objects.using('lb').filter(inout_num_type__icontains='出库',
