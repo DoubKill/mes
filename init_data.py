@@ -780,24 +780,25 @@ permission_data = [
     {'id': 828, 'code': 'view_equip_old_rate', 'name': '查看', 'parent_id': 827},
     {'id': 829, 'code': 'export_equip_old_rate', 'name': '导出', 'parent_id': 827},
 
-    {'id': 830, 'code': 'machine-target-value', 'name': '机台目标值设定', 'parent_id': None},
-    {'id': 831, 'code': 'view_machine-target-value', 'name': '查看', 'parent_id': 830},
-    {'id': 832, 'code': 'export_machine-target-value', 'name': '导出', 'parent_id': 830},
+    {'id': 830, 'code': 'machine_target_value', 'name': '机台目标值设定', 'parent_id': None},
+    {'id': 831, 'code': 'view_machine_target_value', 'name': '查看', 'parent_id': 830},
+    {'id': 832, 'code': 'export_machine_target_value', 'name': '导出', 'parent_id': 830},
+    {'id': 833, 'code': 'save_machine_target_value', 'name': '保存', 'parent_id': 830},
 
-    {'id': 833, 'code': 'monthly-output-statistics-report', 'name': '月产量统计汇总报表', 'parent_id': None},
-    {'id': 834, 'code': 'view_monthly-output-statistics-report', 'name': '查看', 'parent_id': 833},
-    {'id': 835, 'code': 'export_monthly-output-statistics-report', 'name': '导出', 'parent_id': 833},
+    {'id': 834, 'code': 'monthly_output_statistics_report', 'name': '月产量统计汇总报表', 'parent_id': None},
+    {'id': 835, 'code': 'view_monthly_output_statistics_report', 'name': '查看', 'parent_id': 834},
+    {'id': 836, 'code': 'export_monthly_output_statistics_report', 'name': '导出', 'parent_id': 834},
 
-    {'id': 836, 'code': 'monthly-output-statistics-and-performance', 'name': '月产量统计明细及绩效', 'parent_id': None},
-    {'id': 837, 'code': 'view_monthly-output-statistics-and-performance', 'name': '查看', 'parent_id': 836},
-    {'id': 838, 'code': 'export_monthly-output-statistics-and-performance', 'name': '导出', 'parent_id': 836},
+    {'id': 837, 'code': 'monthly_output_statistics_and_performance', 'name': '月产量统计明细及绩效', 'parent_id': None},
+    {'id': 838, 'code': 'view_monthly_output_statistics_and_performance', 'name': '查看', 'parent_id': 837},
+    {'id': 839, 'code': 'export_monthly_output_statistics_and_performance', 'name': '导出', 'parent_id': 837},
 
-    {'id': 839, 'code': 'daily-production-completion-report', 'name': '月产量完成报表', 'parent_id': None},
-    {'id': 840, 'code': 'view_daily-production-completion-report', 'name': '查看', 'parent_id': 839},
-    {'id': 841, 'code': 'export_daily-production-completion-report', 'name': '导出', 'parent_id': 839},
+    {'id': 840, 'code': 'daily_production_completion_report', 'name': '月产量完成报表', 'parent_id': None},
+    {'id': 841, 'code': 'view_daily_production_completion_report', 'name': '查看', 'parent_id': 840},
+    {'id': 842, 'code': 'export_daily_production_completion_report', 'name': '导出', 'parent_id': 840},
 
 
-    # 下一个 842开始
+    # 下一个 843开始
 ]
 
 
