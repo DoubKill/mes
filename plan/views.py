@@ -27,7 +27,7 @@ from mes.permissions import PermissionClass
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductClassesPlanFilter, \
     BatchingClassesPlanFilter, SchedulingRecipeMachineSettingFilter, SchedulingProductDemandedDeclareSummaryFilter, \
-    SchedulingProductSafetyParamsFilter
+    SchedulingProductSafetyParamsFilter, SchedulingProductDemandedDeclareFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
     BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, SchedulingEquipCapacity, \
     SchedulingWashRule, SchedulingWashPlaceKeyword, SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, \
@@ -629,7 +629,7 @@ class SchedulingProductDemandedDeclareViewSet(ModelViewSet):
     serializer_class = SchedulingProductDemandedDeclareSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
-    filter_fields = ('factory', 'factory_date', 'product_no', 'status')
+    filter_class = SchedulingProductDemandedDeclareFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
