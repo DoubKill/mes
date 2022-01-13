@@ -1925,6 +1925,8 @@ class MachineTargetValue(APIView):
         time = self.request.query_params.get('time')
         this_begin_time = datetime.date.today() - datetime.timedelta(days=90)
         queryset = MachineTargetYieldSettings.objects.all()
+        if not queryset.exists():
+            return Response('Data does not exist')
         date = queryset.filter(input_datetime__gte=this_begin_time).values('input_datetime__date')
         if time:
             res = queryset.filter(input_datetime__date=time).order_by('-id').values()[0]
