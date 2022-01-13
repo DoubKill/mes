@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import django
 from django.db.models import Sum, Q
@@ -12,7 +12,7 @@ from basics.models import Equip, GlobalCode
 from plan.models import ProductClassesPlan, SchedulingEquipCapacity, SchedulingProductDemandedDeclare, \
     SchedulingRecipeMachineSetting, SchedulingResult
 from production.models import TrainsFeedbacks
-from inventory.models import BzFinalMixingRubberInventoryLB, BzFinalMixingRubberInventory
+from inventory.models import BzFinalMixingRubberInventoryLB, BzFinalMixingRubberInventory, ProductStockDailySummary
 from recipe.models import ProductBatching, ProductBatchingDetail
 
 
@@ -73,21 +73,18 @@ def calculate_product_available_time():
     print(ret)
 
 
-def calculate_product_stock(product_no, stage):
+def calculate_product_stock(factory_date, product_no, stage):
     """
     计算胶料现有库存量
+    @param factory_date: 工厂日期
     @param product_no: 胶料代码
     @param stage: 段次
     @return: 库存总重量
     """
-    t1 = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
-        material_no__icontains='-{}-{}'.format(stage, product_no)
-    ).aggregate(s=Sum('total_weight'))['s']
-    t2 = BzFinalMixingRubberInventory.objects.using('bz').filter(
-        material_no__icontains='-{}-{}'.format(stage, product_no)
-    ).aggregate(s=Sum('total_weight'))['s']
-    total_weight = float(t1) if t1 else 0 + float(t2) if t2 else 0
-    return total_weight
+    s = ProductStockDailySummary.objects.filter(
+        factory_date=factory_date,
+        product_no__icontains='-{}-{}'.format(stage, product_no)).aggregate(s=Sum('stock_weight'))['s']
+    return s if s else 0
 
 
 def calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name):
@@ -102,14 +99,14 @@ def calculate_equip_recipe_avg_mixin_time(equip_no, recipe_name):
         avg_mixin_time = capacity.avg_mixing_time + capacity.avg_interval_time
     else:
         # TODO 如果该配方没有历史生产数据，密炼一车所消耗的时间默认值为多少？
-        avg_mixin_time = 120
+        avg_mixin_time = 150
     return avg_mixin_time
 
 
-
-def calculate_product_plan_trains(product_no, need_weight):
+def calculate_product_plan_trains(factory_date, product_no, need_weight):
     """
     根据需求重量、定机表数据，安排机台生产计划
+    @param factory_date: 工厂日期
     @param need_weight: 需求重量(吨)
     @param product_no:胶料代码
     """
@@ -117,7 +114,7 @@ def calculate_product_plan_trains(product_no, need_weight):
     stock_weight = 0
     ret = []
     stages = list(GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True))
-    ms = SchedulingRecipeMachineSetting.objects.filter(product_no=product_no, stage='FM').first()
+    ms = SchedulingRecipeMachineSetting.objects.filter(product_no=product_no).first()
     if not ms:
         raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
     product_batching = ProductBatching.objects.using('SFJ').filter(
@@ -133,6 +130,11 @@ def calculate_product_plan_trains(product_no, need_weight):
             delete_flag=False,
             material__material_type__global_name__in=stages).first()
         plan_trains = round((need_weight - stock_weight) / batching_weight, 1)
+        i = str(plan_trains).split('.')[-1]
+        if int(i) < 5:
+            plan_trains = int(plan_trains - 1)
+        else:
+            plan_trains = int(plan_trains)
         avg_mixin_time = calculate_equip_recipe_avg_mixin_time(product_batching['equip__equip_no'],
                                                                product_batching['stage_product_batch_no'])
         if c_pb:
@@ -149,9 +151,8 @@ def calculate_product_plan_trains(product_no, need_weight):
                 stage = c_pb.material.material_no.split('-')[1]
             except Exception:
                 raise ValueError('物料名称错误')
-            stock_weight = calculate_product_stock(product_no, stage)
-            ms = SchedulingRecipeMachineSetting.objects.filter(product_no=product_no,
-                                                               stage=stage).first()
+            stock_weight = calculate_product_stock(factory_date, product_no, stage)
+            # ms = SchedulingRecipeMachineSetting.objects.filter(product_no=product_no).first()
             if not ms:
                 raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
             try:
@@ -173,7 +174,68 @@ def calculate_product_plan_trains(product_no, need_weight):
                         'dev_type': product_batching['equip__category__category_name']
                         })
             product_batching = None
-    return ret
+    return ret[::-1]
+
+
+def extend_last_aps_result(schedule_no):
+    """
+    继承前一天未打完的排程计划
+    @param schedule_no: 新的排程单号
+    @return:
+    """
+    now_date = datetime.now().date()
+    yesterday = now_date - timedelta(1)
+    yesterday_last_res = SchedulingResult.objects.filter(factory_date=yesterday).order_by('id').last()
+    if yesterday_last_res:
+        for equip_no in Equip.objects.filter(
+                category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True).order_by('equip_no'):
+            query_set = SchedulingResult.objects.filter(
+                schedule_no=yesterday_last_res.schedule_no,
+                equip_no=equip_no)
+            if not query_set:
+                continue
+            # 找到昨天夜班最后一条计划，与该机台昨天排程的计划对比。
+            yesterday_plan = ProductClassesPlan.objects.using('SFJ').filter(
+                equip__equip_no=equip_no,
+                work_schedule_plan__plan_schedule__day_time=yesterday,
+                status__in=('运行中', '完成', '停止')
+            ).order_by('-id').values('product_batching__stage_product_batch_no', 'plan_classes_uid')
+            if yesterday_plan:
+                recipe_name = yesterday_plan[0]['product_batching__stage_product_batch_no'] # 配方名称
+                plan_classes_uid = yesterday_plan[0]['plan_classes_uid']  # 计划编号
+                q = query_set.filter(recipe_name=recipe_name).order_by('sn').last()
+                if q:
+                    # 获取计划完成车次
+                    tfb_obj = TrainsFeedbacks.objects.using('SFJ').filter(
+                        plan_classes_uid=plan_classes_uid).order_by('-id').values('actual_trains')
+                    if tfb_obj:
+                        finished_trains = tfb_obj[0]['actual_trains']
+                    else:
+                        finished_trains = 0
+
+                    if finished_trains < q.plan_trains:
+                        unfinished_plan = query_set.filter(sn__gte=q.sn)
+                    else:
+                        unfinished_plan = query_set.filter(sn__gt=q.sn)
+                    idx = 1
+                    for plan in unfinished_plan:
+                        if plan.sn == q.sn:
+                            plan_trains = plan.plan_trains - finished_trains
+                            time_consume = round(
+                                calculate_equip_recipe_avg_mixin_time(equip_no, plan.recipe_name) * plan_trains / 3600,
+                                2)
+                        else:
+                            plan_trains = plan.plan_trains
+                            time_consume = plan.time_consume
+                        SchedulingResult.objects.create(factory_date=now_date,
+                                                        schedule_no=schedule_no,
+                                                        equip_no=equip_no,
+                                                        sn=idx,
+                                                        recipe_name=plan.recipe_name,
+                                                        time_consume=time_consume,
+                                                        plan_trains=plan_trains,
+                                                        desc=plan.desc)
+                        idx += 1
 
 
 # [{'product_no': 'C-FM-J260-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 3108},
@@ -184,7 +246,7 @@ def calculate_product_plan_trains(product_no, need_weight):
 if __name__ == '__main__':
     # calculate_equip_left_time()
     # calculate_product_available_time()
-    print(calculate_product_plan_trains('J260', 12))
+    print(calculate_product_plan_trains('2022-01-13', 'K109', 9.9))
 
 
 

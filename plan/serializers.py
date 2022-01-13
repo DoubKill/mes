@@ -857,8 +857,8 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=validated_data['factory_date']).count()
         validated_data['sn'] = c + 1
-        validated_data['current_stock'] = round((calculate_product_stock(validated_data['product_no'], 'FM') +
-                                                 calculate_product_stock(validated_data['product_no'], 'RFM')) / 1000, 2)
+        validated_data['current_stock'] = round((calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'FM') +
+                                                 calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'RFM')) / 1000, 2)
         return super(SchedulingProductDemandedDeclareSummarySerializer, self).create(validated_data)
 
     class Meta:

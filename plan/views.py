@@ -42,7 +42,7 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     RecipeMachineWeightSerializer, SchedulingProductDemandedDeclareSerializer, \
     SchedulingProductDemandedDeclareSummarySerializer, SchedulingProductSafetyParamsSerializer, \
     SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer
-from plan.utils import calculate_product_plan_trains
+from plan.utils import calculate_product_plan_trains, extend_last_aps_result
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
@@ -718,7 +718,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
 
 
 class SchedulingResultViewSet(ModelViewSet):
-    queryset = SchedulingResult.objects.order_by('sn')
+    queryset = SchedulingResult.objects.order_by('id')
     serializer_class = SchedulingResultSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -795,25 +795,26 @@ class SchedulingProceduresView(APIView):
             schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
             if not SchedulingResult.objects.filter(schedule_no=schedule_no).exists():
                 break
+        extend_last_aps_result(schedule_no)
 
-        i = 1
         for instance in SchedulingProductDemandedDeclareSummary.objects.filter(factory_date=factory_date).order_by('sn'):
             try:
-                data = calculate_product_plan_trains(instance.product_no,
+                data = calculate_product_plan_trains(factory_date,
+                                                     instance.product_no,
                                                      instance.plan_weight-instance.workshop_weight-instance.current_stock)
             except Exception as e:
                 raise ValidationError(e)
             for item in data:
-                SchedulingRecipeMachineRelationHistory.objects.create(
-                    schedule_no=schedule_no,
-                    equip_no=item['equip_no'],
-                    recipe_name=item['product_no'],
-                    batching_weight=item['batching_weight'],
-                    devoted_weight=item['devoted_weight'],
-                    dev_type=item['dev_type'],
-                )
+                # SchedulingRecipeMachineRelationHistory.objects.create(
+                #     schedule_no=schedule_no,
+                #     equip_no=item['equip_no'],
+                #     recipe_name=item['product_no'],
+                #     batching_weight=item['batching_weight'],
+                #     devoted_weight=item['devoted_weight'],
+                #     dev_type=item['dev_type'],
+                # )
                 SchedulingResult.objects.create(
-                    sn=i,
+                    sn=1,
                     factory_date=factory_date,
                     schedule_no=schedule_no,
                     equip_no=item['equip_no'],
@@ -821,5 +822,4 @@ class SchedulingProceduresView(APIView):
                     time_consume=item['consume_time'],
                     plan_trains=item['plan_trains']
                 )
-            i += 1
         return Response('ok')
