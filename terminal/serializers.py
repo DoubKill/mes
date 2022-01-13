@@ -352,10 +352,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             # 扫到物料对应条码列表、扫到物料对应物料的分包数、料框表里的条码对应种类数
                             scan_bra_code, scan_split_num, load_tank_materials = [], [], 0
                             for i in cnt_type_details:
-                                instance = machine_details.filter(name=i['material__material_name'][:-2]).first()
+                                name = re.split(r'-C|-X', i['material__material_name'])[0]
+                                instance = machine_details.filter(name=name).first()
                                 if not instance:
                                     continue
-                                if abs(instance.weight - i['actual_weight']) > i['standard_error']:
+                                if abs(instance.weight * weight_package.split_count - i['actual_weight']) > i['standard_error']:
                                     res = self.material_pass(plan_classes_uid, i['material__material_name'], reason_type='重量不匹配', material_type=scan_material_type)
                                     if not res[0]:
                                         scan_material_msg = '料包重量与配方不一致, 请工艺确认'
@@ -864,7 +865,8 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         if package_count > package_fufil - print_begin_trains + 1 or package_count <= 0:
             raise serializers.ValidationError('配置数量不在{}-{}的可选范围'.format(1, package_fufil - print_begin_trains + 1))
         # 配料时间
-        batch_time = ReportBasic.objects.using(equip_no).get(planid=plan_weight_uid, actno=print_begin_trains).starttime
+        actual_train = ReportBasic.objects.using(equip_no).filter(planid=plan_weight_uid, actno=print_begin_trains).first()
+        batch_time = actual_train.starttime if actual_train else batch_time
         # 计算有效期
         single_expire_record = PackageExpire.objects.filter(product_no=product_no)
         if not single_expire_record:
@@ -1021,9 +1023,11 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
             # 总公差
             machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
+            if '%' in machine_manual_tolerance:
+                machine_manual_tolerance = f"{machine_manual_tolerance[0]}{round(Decimal(machine_manual_tolerance[1:-1]) / 100 * instance.machine_manual_weight, 3)}kg"
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
                     'machine_manual_weight': instance.machine_manual_weight, 'machine_manual_tolerance': machine_manual_tolerance,
-                    'manual_weight': total_manual_weight, 'machine_weight': round(instance.plan_weight / instance.split_count, 3),
+                    'manual_weight': total_manual_weight, 'machine_weight': instance.plan_weight,
                     'print_datetime': instance.last_updated_date.strftime('%Y-%m-%d %H:%M:%S'), 'expire_datetime': expire_datetime})
         # 最新打印数据
         last_instance = WeightPackageLog.objects.filter(plan_weight_uid=instance.plan_weight_uid).last()
@@ -1218,7 +1222,7 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
         fields = ['id', 'plan_weight_uid', 'product_no', 'plan_weight', 'batch_time', 'noprint_count', 'package_fufil',
                   'print_flag', 'package_plan_count', 'dev_type', 'bra_code', 'record', 'package_count', 'status',
                   'print_begin_trains', 'equip_no', 'batch_group', 'begin_trains', 'end_trains', 'batch_classes', 'oper',
-                  'merge_flag']
+                  'merge_flag', 'starttime']
 
 
 class WeightPackageRetrieveLogSerializer(BaseModelSerializer):
