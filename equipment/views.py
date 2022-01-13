@@ -2917,7 +2917,7 @@ class EquipAutoPlanView(APIView):
                     return Response({"success": False, "message": '条码扫描有误', "data": None})
                 obj = EquipSpareErp.objects.filter(spare_code=spare_code).first()
                 if order.status in [1, 2, 3]:  # 入库单据
-                    quantity = order.plan_in_quantity
+                    quantity = order.plan_in_quantity - order.in_quantity
                     default = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0).first()
                     area = EquipWarehouseArea.objects.filter(
                         Q(warehouse_area__equip_component_type=obj.equip_component_type) | Q(

@@ -4,10 +4,12 @@ import re
 
 import math
 import time
+from itertools import groupby
 
 import requests
 
 from equipment.utils import gen_template_response
+from inventory.models import FinalGumOutInventoryLog
 from mes.common_code import SqlClient, OSum
 from django.conf import settings
 from django.db.models.functions import TruncMonth
@@ -38,7 +40,7 @@ from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, Qua
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
-    RubberCannotPutinReason
+    RubberCannotPutinReason, MachineTargetYieldSettings
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -1912,3 +1914,326 @@ class RubberCannotPutinReasonView(APIView):
                     dic[item['reason_name']]['count'] += item['num']
             result = dic.values()
         return Response({'results': result})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MachineTargetValue(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        # 取最近90天，每天的最后一条数据
+        time = self.request.query_params.get('time')
+        this_begin_time = datetime.date.today() - datetime.timedelta(days=90)
+        queryset = MachineTargetYieldSettings.objects.all()
+        date = queryset.filter(input_datetime__gte=this_begin_time).values('input_datetime__date')
+        if time:
+            res = queryset.filter(input_datetime__date=time).order_by('-id').values()[0]
+        else:
+            res = queryset.order_by('-id').values()[0]
+        res['190E'] = res.pop('E190')
+        del res['id']
+        del res['input_user_id']
+        del res['input_datetime']
+        results = [{'equip_no': key, 'value': value}for key, value in res.items()]
+
+        return Response({'date': [i['input_datetime__date'] for i in date], 'results': results})
+
+    def post(self, request):
+        dic = {}
+        data = self.request.data
+        for i in data:
+            if i['equip_no'] == '190E':
+                dic['E190'] = i['value']
+            else:
+                dic[i['equip_no']] = i['value']
+        user = self.request.user
+        dic.update(input_user=user)
+        MachineTargetYieldSettings.objects.update_or_create(defaults=dic, input_datetime__date=datetime.date.today())
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MonthlyOutputStatisticsReport(APIView):
+    queryset = TrainsFeedbacks.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        state = self.request.query_params.get('state')  # 段数
+        equip = self.request.query_params.get('equip')
+        space = self.request.query_params.get('space', '')  # 规格    C-FM-C101-02
+        if state:
+            kwargs = {'equip_no': equip, 'product_no__icontains': f"-{state}-{space}"} if equip else \
+                {'product_no__icontains': f"-{state}-{space}"}
+            queryset = self.queryset.filter(**kwargs).values('equip_no', 'product_no')\
+                .annotate(value=Count('id'), weight=Sum('actual_weight'))
+            dic = {}
+            for item in queryset:
+                space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}"
+                if dic.get(space_equip):
+                    dic[space_equip]['value'] += item['value']
+                    dic[space_equip]['weight'] += round(item['weight'], 2)
+                else:
+                    dic[space_equip] = {'space': item['product_no'].split('-')[2], 'equip_no': item['equip_no'], 'value': item['value'], 'weight': round(item['weight'], 2)}
+            result = dic.values()
+            return Response({'result': result})
+        else:
+            # 取每个机台的历史最大值
+            equip_max_value = self.queryset.values('factory_date__year', 'factory_date__month',
+                                                      'equip_no').annotate(value=Count('id')).order_by('equip_no', 'value')
+            dic = {}
+            [dic.update({item['equip_no']: item['value']}) for item in equip_max_value]
+            # 取每个机台设定的目标值
+            settings_value = MachineTargetYieldSettings.objects.order_by('id').last()
+            # 获取起止时间内总重量和总数量
+            result = self.queryset.filter(factory_date__gte=st, factory_date__lte=et).values('equip_no').annotate(value=Count('id'),
+                                                                 weight=Sum('actual_weight'))
+
+            for item in result:
+                item['max_value'] = dic[item['equip_no']] if dic.get(item['equip_no']) else None
+                item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
+                    settings_value.__dict__.get(item['equip_no'])
+
+            # 获取不同段次的总重量
+            state_value = self.queryset.filter(factory_date__gte=st, factory_date__lte=et).values('product_no').annotate(weight=Sum('actual_weight'))
+            jl = {'jl': 0}
+            wl = {'wl': 0}
+
+            for item in state_value:
+                if item['product_no'].split('-')[1] in ['RE', 'FM', 'RFM']:
+                    if jl.get(item['product_no'].split('-')[1]):
+                        jl[item['product_no'].split('-')[1]] += round(item['weight'], 2)
+                    else:
+                        jl[item['product_no'].split('-')[1]] = round(item['weight'], 2)
+                    jl['jl'] += round(item['weight'], 2)
+                else:
+                    if wl.get(item['product_no'].split('-')[1]):
+                        wl[item['product_no'].split('-')[1]] += round(item['weight'], 2)
+                    else:
+                        wl[item['product_no'].split('-')[1]] = round(item['weight'], 2)
+                    wl['wl'] += round(item['weight'], 2)
+
+            jl = [{'name': key, 'value': value} for key, value in jl.items()]
+            wl = [{'name': key, 'value': value} for key, value in wl.items()]
+            return Response({'result': result, 'wl': reversed(wl), 'jl': reversed(jl)})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MonthlyOutputStatisticsAndPerformance(APIView):
+
+    def get_max_value(self, equip, last_date, group_list):
+        from django.db import connection
+        cursor = connection.cursor()
+        cursor.execute(
+            # f"""
+            # SELECT
+            #     max( count ) count,
+            #     classes,
+            #     RIGHT ( days, 2 ) days
+            # FROM
+            #     (
+            #     SELECT count( id ) count, classes, DATE_FORMAT( factory_date, '%Y%m%d' ) days FROM trains_feedbacks
+            #     where equip_no='{equip}' and factory_date <= '{last_date}' GROUP BY classes, factory_date
+            #      ) AS a
+            # GROUP BY
+            #     RIGHT ( a.days, 2 ),
+            #     classes
+            # """
+            f"""
+            SELECT MAX( COUNT ) COUNT, classes, days 
+            FROM
+                (SELECT
+                    MAX( COUNT ) COUNT, CLASSES, TO_CHAR( FACTORY_DATE, 'dd' ) days 
+                FROM
+                    ( SELECT COUNT( id ) COUNT, CLASSES, FACTORY_DATE FROM TRAINS_FEEDBACKS 
+                    WHERE equip_no = '{equip}' AND to_char( FACTORY_DATE, 'YYYY-MM-DD' ) <= '{last_date}' GROUP BY CLASSES, FACTORY_DATE ) 
+                GROUP BY CLASSES, TO_CHAR( FACTORY_DATE, 'dd' ) 
+                ) 
+            GROUP BY classes, days ORDER BY days
+            """
+        )
+
+        row = cursor.fetchall()
+        dic = {'state': '机台最高值', 'count': 0}
+        for i in row:
+            s = group_list[int(i[2]) - 1]
+            classes = s[0] if i[1] == '早班' else s[1]
+            key = f'{int(i[2])}{classes}'
+
+            if dic.get(key):
+                dic[key] += i[0]
+            else:
+                dic[key] = i[0]
+            dic['count'] += i[0]
+        return dic
+
+    def get_settings_value(self, equip, settings_queryset, group_list):
+        dic = {'state': '机台目标值', 'count': 0}
+        group_index = [index + 1 for index in range(len(group_list))]
+        settings_index = [i['input_datetime__day'] for i in settings_queryset]
+        no_settings = list(set(group_index).difference(set(settings_index)))
+
+        for i in settings_queryset:
+            s = group_list[int(i['input_datetime__day']) - 1]
+            for classes in s:
+                key = f"{int(i['input_datetime__day'])}{classes}"
+                if dic.get(key):
+                    dic[key] += i[equip]
+                else:
+                    dic[key] = i[equip]
+                dic['count'] += i[equip]
+        # 当天没有设定值则取本月的最后一条
+        for i in no_settings:
+            value = settings_queryset[-1][equip]
+            group = group_list[i - 1]
+            for classes in group:
+                key = f"{i}{classes}"
+                dic[key] = value
+                dic['count'] += value
+        return dic
+
+    def get(self, request):
+        params = self.request.query_params
+        unit = params.get('unit', '车')
+        date = params.get('date')
+        equip = params.get('equip')
+        year = int(date.split('-')[0]) if date else datetime.date.today().year
+        month = int(date.split('-')[1]) if date else datetime.date.today().month
+        equip_kwargs = {'equip_no': equip} if equip else {}
+        this_month_start = datetime.datetime(year, month, 1)
+        if month == 12:
+            this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
+        last_date = datetime.datetime.strftime(datetime.datetime(year, month, 1) - datetime.timedelta(days=1), '%Y-%m-%d')
+        kwargs = {'count': Count('id')} if unit == '车' else {'count': Sum('actual_weight')}
+        # 获取班组
+        group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
+                                                start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
+        group_list = []
+        for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
+            group_list.append([item['group__global_name'] for item in group])
+
+        queryset = TrainsFeedbacks.objects.filter(factory_date__gte=this_month_start, factory_date__lte=this_month_end, **equip_kwargs).values(
+            'classes', 'factory_date', 'product_no').annotate(**kwargs)
+        jl = {'jl': {'state': '加硫小计', 'count': 0}}
+        wl = {'wl': {'state': '无硫小计', 'count': 0}}
+        hj = {'hj': {'state': '无硫/加硫合计', 'count': 0}}
+        # 获取机台目标值
+        if equip == '190E':
+            equip = 'E190'
+        settings_queryset = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
+                                                  input_datetime__month=month).values(f'{equip}','input_datetime__day').order_by('id')
+        if settings_queryset.exists():
+            settings_value = self.get_settings_value(equip, list(settings_queryset), group_list)
+        else:
+            settings_value = {'state': '机台目标值', 'count': 0}
+        # 获取历史每日生产最大值
+        max_value = self.get_max_value(equip, last_date, group_list)
+
+        for item in queryset:
+            state = item['product_no'].split('-')[1]
+            day = item['factory_date'].day
+            classes = group_list[day - 1][0] if item['classes'] == '早班' else group_list[day - 1][1]
+            if hj['hj'].get(f'{day}{classes}'):
+                hj['hj'][f'{day}{classes}'] += item['count']
+            else:
+                hj['hj'][f'{day}{classes}'] = item['count']
+            hj['hj']['count'] += item['count']
+            if state in ['RE', 'FM', 'RFM']:
+                if jl.get(state):
+                    if jl[state].get(f'{day}{classes}'):
+                        jl[state][f'{day}{classes}'] += item['count']
+                    else:
+                        jl[state][f'{day}{classes}'] = item['count']
+                    jl[state]['count'] += item['count']
+                else:
+                    jl[state] = {'state': state, f'{day}{classes}': item['count'], 'count': item['count']}
+                if jl['jl'].get(f'{day}{classes}'):
+                    jl['jl'][f'{day}{classes}'] += item['count']
+                else:
+                    jl['jl'][f'{day}{classes}'] = item['count']
+                jl['jl']['count'] += item['count']
+            else:
+                if wl.get(state):
+                    if wl[state].get(f'{day}{classes}'):
+                        wl[state][f'{day}{classes}'] += item['count']
+                    else:
+                        wl[state][f'{day}{classes}'] = item['count']
+                    wl[state]['count'] += item['count']
+                else:
+                    wl[state] = {'state': state, f'{day}{classes}': item['count'], 'count': item['count']}
+                if wl['wl'].get(f'{day}{classes}'):
+                    wl['wl'][f'{day}{classes}'] += item['count']
+                else:
+                    wl['wl'][f'{day}{classes}'] = item['count']
+                wl['wl']['count'] += item['count']
+
+        wl = reversed(list(wl.values()))
+        jl = reversed(list(jl.values()))
+        hj = list(hj.values())
+        hj.append(settings_value)
+        hj.append(max_value)
+
+        return Response({'wl': wl, 'jl': jl, 'hj': hj, 'group_list': group_list})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class DailyProductionCompletionReport(APIView):
+
+    def get(self, request):
+        params = self.request.query_params
+        date = params.get('date')
+        year = int(date.split('-')[0]) if date else datetime.date.today().year
+        month = int(date.split('-')[1]) if date else datetime.date.today().month
+        this_month_start = datetime.datetime(year, month, 1)
+        if month == 12:
+            this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
+        results = {
+            'name_1': {'name': '计划目标', 'weight': 0},
+            'name_2': {'name': '终炼实际完成(吨)', 'weight': 0},
+            'name_3': {'name': '外发无硫料(吨)', 'weight': 0},
+            'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},
+            'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},
+            'name_6': {'name': '实际生产工作日数', 'weight': 0},
+            'name_7': {'name': '日均完成率', 'weight': 0},
+        }
+        # 终炼实际完成（吨）  FM , RFM , RE
+        queryset = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
+                                                Q(Q(product_no__icontains='-FM-') |
+                                                  Q(product_no__icontains='-RFM-') |
+                                                  Q(product_no__icontains='-RE-')))
+        fin_queryset = queryset.values('factory_date__day').annotate(weight=Sum('actual_weight'))
+
+        for item in fin_queryset:
+            results['name_2']['weight'] += round(item['weight'] / 1000, 2)
+            results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
+
+        # 外发无硫料（吨）
+        out_queryset = FinalGumOutInventoryLog.objects.using('lb').filter(inout_num_type__icontains='出库',
+                                                           material_no__icontains="M",
+                                                           start_time__gte=this_month_start,
+                                                           start_time__lte=this_month_end).values('start_time__day').annotate(weight=Sum('weight'))
+
+        for item in out_queryset:
+            results['name_3']['weight'] += round(item['weight'] / 1000, 2)
+            results['name_3'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
+            if results['name_2'].get(f"{item['start_time__day']}日"):
+                results['name_4'][f"{item['start_time__day']}日"] = round((results['name_2'][f"{item['start_time__day']}日"] + \
+                                                                   results['name_3'][f"{item['start_time__day']}日"] * 0.7), 2)
+                results['name_5'][f"{item['start_time__day']}日"] = round((results['name_2'][f"{item['factory_date__day']}日"] + \
+                                                                          results['name_3'][f"{item['start_time__day']}日"]), 2)
+
+        # 开机机台
+        equip_queryset = list(queryset.values('equip_no', 'factory_date__day').distinct())
+        #  [{'equip_no': 'Z03', 'factory_date__day': 7}, {'equip_no': 'Z03', 'factory_date__day': 8}, {'equip_no': 'Z02', 'factory_date__day': 8}]
+
+        for item in equip_queryset:
+            if results['name_6'].get(f"{item['factory_date__day']}日"):
+                results['name_6'][f"{item['factory_date__day']}日"] += round(24 / 24, 2)  # 24h
+            else:
+                results['name_6'][f"{item['factory_date__day']}日"] = round(24 / 24, 2)
+
+        return Response({'results': results.values()})

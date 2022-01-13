@@ -1,6 +1,7 @@
 from django.db import models
 
 from basics.models import AbstractEntity, GlobalCode, Location
+from system.models import User
 
 
 class TrainsFeedbacks(AbstractEntity):
@@ -354,3 +355,27 @@ class RubberCannotPutinReason(models.Model):
 
     class Meta:
         db_table = 'rubber_cannot_putin_reason'
+
+
+class MachineTargetYieldSettings(models.Model):
+    Z01 = models.IntegerField(help_text='机台目标值')
+    Z02 = models.IntegerField(help_text='机台目标值')
+    Z03 = models.IntegerField(help_text='机台目标值')
+    Z04 = models.IntegerField(help_text='机台目标值')
+    Z05 = models.IntegerField(help_text='机台目标值')
+    Z06 = models.IntegerField(help_text='机台目标值')
+    Z07 = models.IntegerField(help_text='机台目标值')
+    Z08 = models.IntegerField(help_text='机台目标值')
+    Z09 = models.IntegerField(help_text='机台目标值')
+    Z10 = models.IntegerField(help_text='机台目标值')
+    Z11 = models.IntegerField(help_text='机台目标值')
+    Z12 = models.IntegerField(help_text='机台目标值')
+    Z13 = models.IntegerField(help_text='机台目标值')
+    Z14 = models.IntegerField(help_text='机台目标值')
+    Z15 = models.IntegerField(help_text='机台目标值')
+    E190 = models.IntegerField(help_text='机台目标值/190E')
+    input_user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE)
+    input_datetime = models.DateTimeField(help_text='录入时间', auto_now_add=True)
+
+    class Meta:
+        db_table = 'machine_target_yield_settings'
