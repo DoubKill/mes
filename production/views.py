@@ -2058,7 +2058,10 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
         row = cursor.fetchall()
         dic = {'state': '机台最高值', 'count': 0}
         for i in row:
-            s = group_list[int(i[2]) - 1]
+            try:
+                s = group_list[int(i[2]) - 1]
+            except:
+                raise ValidationError('请先去添加排班计划')
             classes = s[0] if i[1] == '早班' else s[1]
             key = f'{int(i[2])}{classes}'
 
@@ -2211,7 +2214,11 @@ class DailyProductionCompletionReport(APIView):
 
         for item in fin_queryset:
             results['name_2']['weight'] += round(item['weight'] / 1000, 2)
+            results['name_4']['weight'] += round(item['weight'] / 1000, 2)
+            results['name_5']['weight'] += round(item['weight'] / 1000, 2)
             results['name_2'][f"{item['factory_date__day']}日"] = round(item['weight'] / 1000, 2)
+            results['name_4'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
+            results['name_5'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
 
         # 外发无硫料（吨）
         out_queryset = FinalGumOutInventoryLog.objects.using('lb').filter(inout_num_type__icontains='出库',
@@ -2221,12 +2228,15 @@ class DailyProductionCompletionReport(APIView):
 
         for item in out_queryset:
             results['name_3']['weight'] += round(item['weight'] / 1000, 2)
+            results['name_4']['weight'] += round((item['weight'] / 1000) * 0.7, 2)
+            results['name_5']['weight'] += round(item['weight'] / 1000, 2)
             results['name_3'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
             if results['name_2'].get(f"{item['start_time__day']}日"):
-                results['name_4'][f"{item['start_time__day']}日"] = round((results['name_2'][f"{item['start_time__day']}日"] + \
-                                                                          (results['name_3'][f"{item['start_time__day']}日"]) * 0.7), 2)
-                results['name_5'][f"{item['start_time__day']}日"] = round((results['name_2'][f"{item['factory_date__day']}日"] + \
-                                                                          results['name_3'][f"{item['start_time__day']}日"]), 2)
+                results['name_4'][f"{item['start_time__day']}日"] += round((item['weight'] / 1000) * 0.7, 2)
+                results['name_5'][f"{item['start_time__day']}日"] += round(item['weight'] / 1000, 2)
+            else:
+                results['name_4'][f"{item['start_time__day']}日"] = round((item['weight'] / 1000) * 0.7, 2)
+                results['name_5'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
 
         # 开机机台
         equip_queryset = list(queryset.values('equip_no', 'factory_date__day').distinct())
