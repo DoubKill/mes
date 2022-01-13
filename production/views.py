@@ -1929,7 +1929,7 @@ class MachineTargetValue(APIView):
         if not queryset.exists():
             equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05',  'Z06',  'Z07',  'Z08',  'Z09',  'Z10',  'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
             return Response({'date': [datetime.date.today()], 'results': [{'equip_no': equip, 'value': None} for equip in equip_list]})
-        date = queryset.filter(input_datetime__gte=this_begin_time).values('input_datetime__date')
+        date = queryset.filter(input_datetime__gte=this_begin_time).values('input_datetime__date').order_by('id')
         if time:
             res = queryset.filter(input_datetime__date=time).order_by('-id').values()[0]
         else:
