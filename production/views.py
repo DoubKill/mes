@@ -1977,9 +1977,9 @@ class MonthlyOutputStatisticsReport(APIView):
                 space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}"
                 if dic.get(space_equip):
                     dic[space_equip]['value'] += item['value']
-                    dic[space_equip]['weight'] += round(item['weight'], 2)
+                    dic[space_equip]['weight'] += round(item['weight'] / 1000, 2)
                 else:
-                    dic[space_equip] = {'space': item['product_no'].split('-')[2], 'equip_no': item['equip_no'], 'value': item['value'], 'weight': round(item['weight'], 2)}
+                    dic[space_equip] = {'space': item['product_no'].split('-')[2], 'equip_no': item['equip_no'], 'value': item['value'], 'weight': round(item['weight'] / 1000, 2)}
             result = dic.values()
             return Response({'result': result})
         else:
@@ -1995,6 +1995,7 @@ class MonthlyOutputStatisticsReport(APIView):
                                                                  weight=Sum('actual_weight'))
 
             for item in result:
+                item['weight'] = round(item['weight'] / 1000, 2)
                 item['max_value'] = dic[item['equip_no']] if dic.get(item['equip_no']) else None
                 if settings_value:
                     item['settings_value'] = settings_value.__dict__.get('E190') if item['equip_no'] == '190E' else\
@@ -2009,15 +2010,15 @@ class MonthlyOutputStatisticsReport(APIView):
             for item in state_value:
                 if item['product_no'].split('-')[1] in ['RE', 'FM', 'RFM']:
                     if jl.get(item['product_no'].split('-')[1]):
-                        jl[item['product_no'].split('-')[1]] += round(item['weight'], 2)
+                        jl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
                     else:
-                        jl[item['product_no'].split('-')[1]] = round(item['weight'], 2)
+                        jl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
                     jl['jl'] += round(item['weight'], 2)
                 else:
                     if wl.get(item['product_no'].split('-')[1]):
-                        wl[item['product_no'].split('-')[1]] += round(item['weight'], 2)
+                        wl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
                     else:
-                        wl[item['product_no'].split('-')[1]] = round(item['weight'], 2)
+                        wl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
                     wl['wl'] += round(item['weight'], 2)
 
             jl = [{'name': key, 'value': value} for key, value in jl.items()]
