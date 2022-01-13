@@ -2013,13 +2013,13 @@ class MonthlyOutputStatisticsReport(APIView):
                         jl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
                     else:
                         jl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
-                    jl['jl'] += round(item['weight'], 2)
+                    jl['jl'] += round(item['weight'] / 1000, 2)
                 else:
                     if wl.get(item['product_no'].split('-')[1]):
                         wl[item['product_no'].split('-')[1]] += round(item['weight'] / 1000, 2)
                     else:
                         wl[item['product_no'].split('-')[1]] = round(item['weight'] / 1000, 2)
-                    wl['wl'] += round(item['weight'], 2)
+                    wl['wl'] += round(item['weight'] / 1000, 2)
 
             jl = [{'name': key, 'value': value} for key, value in jl.items()]
             wl = [{'name': key, 'value': value} for key, value in wl.items()]
@@ -2146,40 +2146,41 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
         for item in queryset:
             state = item['product_no'].split('-')[1]
             day = item['factory_date'].day
+            count = item['count'] if unit == '车' else item['count'] / 1000
             classes = group_list[day - 1][0] if item['classes'] == '早班' else group_list[day - 1][1]
             if hj['hj'].get(f'{day}{classes}'):
-                hj['hj'][f'{day}{classes}'] += item['count']
+                hj['hj'][f'{day}{classes}'] += count
             else:
-                hj['hj'][f'{day}{classes}'] = item['count']
-            hj['hj']['count'] += item['count']
+                hj['hj'][f'{day}{classes}'] = count
+            hj['hj']['count'] += count
             if state in ['RE', 'FM', 'RFM']:
                 if jl.get(state):
                     if jl[state].get(f'{day}{classes}'):
-                        jl[state][f'{day}{classes}'] += item['count']
+                        jl[state][f'{day}{classes}'] += count
                     else:
-                        jl[state][f'{day}{classes}'] = item['count']
-                    jl[state]['count'] += item['count']
+                        jl[state][f'{day}{classes}'] = count
+                    jl[state]['count'] += count
                 else:
                     jl[state] = {'state': state, f'{day}{classes}': item['count'], 'count': item['count']}
                 if jl['jl'].get(f'{day}{classes}'):
-                    jl['jl'][f'{day}{classes}'] += item['count']
+                    jl['jl'][f'{day}{classes}'] += count
                 else:
-                    jl['jl'][f'{day}{classes}'] = item['count']
-                jl['jl']['count'] += item['count']
+                    jl['jl'][f'{day}{classes}'] = count
+                jl['jl']['count'] += count
             else:
                 if wl.get(state):
                     if wl[state].get(f'{day}{classes}'):
-                        wl[state][f'{day}{classes}'] += item['count']
+                        wl[state][f'{day}{classes}'] += count
                     else:
-                        wl[state][f'{day}{classes}'] = item['count']
-                    wl[state]['count'] += item['count']
+                        wl[state][f'{day}{classes}'] = count
+                    wl[state]['count'] += count
                 else:
                     wl[state] = {'state': state, f'{day}{classes}': item['count'], 'count': item['count']}
                 if wl['wl'].get(f'{day}{classes}'):
-                    wl['wl'][f'{day}{classes}'] += item['count']
+                    wl['wl'][f'{day}{classes}'] += count
                 else:
-                    wl['wl'][f'{day}{classes}'] = item['count']
-                wl['wl']['count'] += item['count']
+                    wl['wl'][f'{day}{classes}'] = count
+                wl['wl']['count'] += count
 
         wl = reversed(list(wl.values()))
         jl = reversed(list(jl.values()))
