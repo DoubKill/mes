@@ -2161,7 +2161,7 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
                         jl[state][f'{day}{classes}'] = count
                     jl[state]['count'] += count
                 else:
-                    jl[state] = {'state': state, f'{day}{classes}': item['count'], 'count': item['count']}
+                    jl[state] = {'state': state, f'{day}{classes}': count, 'count': count}
                 if jl['jl'].get(f'{day}{classes}'):
                     jl['jl'][f'{day}{classes}'] += count
                 else:
@@ -2175,7 +2175,7 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
                         wl[state][f'{day}{classes}'] = count
                     wl[state]['count'] += count
                 else:
-                    wl[state] = {'state': state, f'{day}{classes}': item['count'], 'count': item['count']}
+                    wl[state] = {'state': state, f'{day}{classes}': count, 'count': count}
                 if wl['wl'].get(f'{day}{classes}'):
                     wl['wl'][f'{day}{classes}'] += count
                 else:
