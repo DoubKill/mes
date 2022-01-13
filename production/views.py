@@ -1928,7 +1928,7 @@ class MachineTargetValue(APIView):
         queryset = MachineTargetYieldSettings.objects.all()
         if not queryset.exists():
             equip_list = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05',  'Z06',  'Z07',  'Z08',  'Z09',  'Z10',  'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
-            return Response({'date': [datetime.date.today()], 'results': [{equip: None} for equip in equip_list]})
+            return Response({'date': [datetime.date.today()], 'results': [{'equip_no': equip, 'value': None} for equip in equip_list]})
         date = queryset.filter(input_datetime__gte=this_begin_time).values('input_datetime__date')
         if time:
             res = queryset.filter(input_datetime__date=time).order_by('-id').values()[0]
@@ -1938,7 +1938,7 @@ class MachineTargetValue(APIView):
         del res['id']
         del res['input_user_id']
         del res['input_datetime']
-        results = [{'equip_no': key, 'value': value}for key, value in res.items()]
+        results = [{'equip_no': key, 'value': value} for key, value in res.items()]
 
         return Response({'date': [i['input_datetime__date'] for i in date], 'results': results})
 
