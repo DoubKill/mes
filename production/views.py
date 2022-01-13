@@ -1959,6 +1959,7 @@ class MachineTargetValue(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class MonthlyOutputStatisticsReport(APIView):
     queryset = TrainsFeedbacks.objects.all()
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request, *args, **kwargs):
         st = self.request.query_params.get('st')
@@ -2026,6 +2027,7 @@ class MonthlyOutputStatisticsReport(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class MonthlyOutputStatisticsAndPerformance(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get_max_value(self, equip, last_date, group_list):
         from django.db import connection
@@ -2189,6 +2191,7 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class DailyProductionCompletionReport(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         params = self.request.query_params
