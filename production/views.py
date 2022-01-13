@@ -2224,7 +2224,7 @@ class DailyProductionCompletionReport(APIView):
             results['name_3'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
             if results['name_2'].get(f"{item['start_time__day']}日"):
                 results['name_4'][f"{item['start_time__day']}日"] = round((results['name_2'][f"{item['start_time__day']}日"] + \
-                                                                   results['name_3'][f"{item['start_time__day']}日"] * 0.7), 2)
+                                                                          (results['name_3'][f"{item['start_time__day']}日"]) * 0.7), 2)
                 results['name_5'][f"{item['start_time__day']}日"] = round((results['name_2'][f"{item['factory_date__day']}日"] + \
                                                                           results['name_3'][f"{item['start_time__day']}日"]), 2)
 
