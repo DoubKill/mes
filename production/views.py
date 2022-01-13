@@ -1,3 +1,4 @@
+import decimal
 import json
 import datetime
 import re
@@ -2228,14 +2229,14 @@ class DailyProductionCompletionReport(APIView):
 
         for item in out_queryset:
             results['name_3']['weight'] += round(item['weight'] / 1000, 2)
-            results['name_4']['weight'] += round((item['weight'] / 1000) * 0.7, 2)
+            results['name_4']['weight'] += round((item['weight'] / 1000) * decimal.Decimal(0.7), 2)
             results['name_5']['weight'] += round(item['weight'] / 1000, 2)
             results['name_3'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
             if results['name_2'].get(f"{item['start_time__day']}日"):
-                results['name_4'][f"{item['start_time__day']}日"] += round(item['weight'] / 1000, 2) * 0.7
+                results['name_4'][f"{item['start_time__day']}日"] += round((item['weight'] / 1000) * decimal.Decimal(0.7), 2)
                 results['name_5'][f"{item['start_time__day']}日"] += round(item['weight'] / 1000, 2)
             else:
-                results['name_4'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2) * 0.7
+                results['name_4'][f"{item['start_time__day']}日"] = round((item['weight'] / 1000) * decimal.Decimal(0.7), 2)
                 results['name_5'][f"{item['start_time__day']}日"] = round(item['weight'] / 1000, 2)
 
         # 开机机台
