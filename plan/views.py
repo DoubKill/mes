@@ -741,7 +741,7 @@ class SchedulingResultViewSet(ModelViewSet):
                     equip_no=key,
                     sn=idx+1,
                     recipe_name=item['recipe_name'],
-                    time_consume=item['time_consume'],
+                    time_consume=item['time_consume'] if item['time_consume'] else 0,
                     plan_trains=item['plan_trains'],
                     desc=item['desc']
                 )
