@@ -93,5 +93,13 @@ urlpatterns = [
     path('open-api/batch-info/', ProductBatchInfo.as_view()),
 
     # 不合格品原因统计
-    path('durate-putin-reson/', RubberCannotPutinReasonView.as_view())
+    path('durate-putin-reson/', RubberCannotPutinReasonView.as_view()),
+    # 机台目标值设定
+    path('machine-target-value/', MachineTargetValue.as_view()),
+    # 月产量统计汇总报表
+    path('monthly-output-statistics-report/', MonthlyOutputStatisticsReport.as_view()),
+    # 月产量统计明细及绩效
+    path('monthly-output-statistics-and-performance/', MonthlyOutputStatisticsAndPerformance.as_view()),
+    # 月产量完成报表
+    path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
 ]
