@@ -790,18 +790,25 @@ class SchedulingProceduresView(APIView):
     def post(self, request):
         factory_date = self.request.data.get('factory_date')
         if not factory_date:
-            raise ValidationError('参数确实')
+            raise ValidationError('参数缺失！')
+        try:
+            factory_date = datetime.datetime.strptime(factory_date, "%Y-%m-%d")
+        except Exception:
+            raise ValidationError('参数错误！')
         while 1:
             schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
             if not SchedulingResult.objects.filter(schedule_no=schedule_no).exists():
                 break
-        extend_last_aps_result(schedule_no)
+        extend_last_aps_result(factory_date, schedule_no)
 
         for instance in SchedulingProductDemandedDeclareSummary.objects.filter(factory_date=factory_date).order_by('sn'):
+            need_weight = round(instance.plan_weight - instance.workshop_weight - instance.current_stock, 1)
+            if need_weight <= 0:
+                continue
             try:
                 data = calculate_product_plan_trains(factory_date,
                                                      instance.product_no,
-                                                     instance.plan_weight-instance.workshop_weight-instance.current_stock)
+                                                     need_weight)
             except Exception as e:
                 raise ValidationError(e)
             for item in data:

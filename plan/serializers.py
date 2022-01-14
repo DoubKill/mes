@@ -850,7 +850,7 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
         return data
 
     def get_demanded_weight(self, obj):
-        return obj.plan_weight - obj.workshop_weight - obj.current_stock
+        return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
 
     def create(self, validated_data):
         validated_data['factory_date'] = datetime.now().date()

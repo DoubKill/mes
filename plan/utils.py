@@ -177,14 +177,14 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
     return ret[::-1]
 
 
-def extend_last_aps_result(schedule_no):
+def extend_last_aps_result(factory_date, schedule_no):
     """
     继承前一天未打完的排程计划
+    @param factory_date: 日期
     @param schedule_no: 新的排程单号
     @return:
     """
-    now_date = datetime.now().date()
-    yesterday = now_date - timedelta(1)
+    yesterday = factory_date - timedelta(1)
     yesterday_last_res = SchedulingResult.objects.filter(factory_date=yesterday).order_by('id').last()
     if yesterday_last_res:
         for equip_no in Equip.objects.filter(
@@ -227,7 +227,7 @@ def extend_last_aps_result(schedule_no):
                         else:
                             plan_trains = plan.plan_trains
                             time_consume = plan.time_consume
-                        SchedulingResult.objects.create(factory_date=now_date,
+                        SchedulingResult.objects.create(factory_date=factory_date,
                                                         schedule_no=schedule_no,
                                                         equip_no=equip_no,
                                                         sn=idx,
