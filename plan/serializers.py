@@ -788,8 +788,8 @@ class SchedulingProductDemandedDeclareSerializer(BaseModelSerializer):
         s = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=instance.factory_date,
             product_no=instance.product_no).first()
-        current_stock = round((calculate_product_stock(instance.product_no, 'FM') +
-                               calculate_product_stock(instance.product_no, 'RFM')) / 1000, 2)
+        current_stock = round((calculate_product_stock(validated_data['factory_date'], instance.product_no, 'FM') +
+                               calculate_product_stock(validated_data['factory_date'], instance.product_no, 'RFM')) / 1000, 2)
         if not s:
             c = SchedulingProductDemandedDeclareSummary.objects.filter(
                 factory_date=instance.factory_date).count()
