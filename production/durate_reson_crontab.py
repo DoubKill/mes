@@ -57,7 +57,7 @@ def main():
                     b.palletno,
                     b.producecode,
                     b.actual_weight,
-                    a.lasttime,
+                    a.lasttime
                 FROM
                     collect_ploy_cause AS a
                     LEFT JOIN collect_ploy AS b ON a.LotNO = b.LotNO 
