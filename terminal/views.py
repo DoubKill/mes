@@ -464,7 +464,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
                         # 配料时间
-                        actual_batch_time = ReportBasic.objects.using(equip_no).get(planid=i['plan_weight_uid'], actno=1).starttime
+                        trains_time = ReportBasic.objects.using(equip_no).filter(planid=i['plan_weight_uid'], actno=1).first()
+                        actual_batch_time = trains_time.starttime if trains_time else i['starttime']
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
                         if not single_expire_record:
@@ -474,7 +475,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                             expire_days = single_date.package_fine_usefullife if equip_no.startswith(
                                 'F') else single_date.package_sulfur_usefullife
                         expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
-                        total_weight = plan_weight
+                        total_weight = plan_weight * split_count
                         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
                         if i['merge_flag']:
                             # 配方中料包重量
@@ -491,9 +492,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                     total_weight = xl_instance.total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
+                        if '%' in machine_tolerance:
+                            machine_tolerance = f"{machine_tolerance[0]}{round(Decimal(machine_tolerance[1:-1]) / 100 * total_weight, 3)}kg"
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
                                   'batch_time': actual_batch_time, 'product_no': i['product_no'],
-                                  'batching_type': '机配', 'machine_weight': round(plan_weight / split_count, 3), 'manual_weight': 0,
+                                  'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
                                   'batch_user': i['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                   'expire_datetime': expire_datetime, 'split_count': split_count,
                                   'machine_manual_weight': total_weight, 'machine_manual_tolerance': machine_tolerance,
@@ -521,7 +524,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        actual_batch_time = ReportBasic.objects.using(equip_no).get(planid=serializer['plan_weight_uid'], actno=1).starttime
+                        trains_time = ReportBasic.objects.using(equip_no).filter(planid=serializer['plan_weight_uid'], actno=1).first()
+                        actual_batch_time = trains_time.starttime if trains_time else serializer['starttime']
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
@@ -533,7 +537,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         expire_datetime = datetime.datetime.strptime(actual_batch_time,
                                                                      '%Y-%m-%d %H:%M:%S') + timedelta(
                             days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
-                        total_weight = plan_weight
+                        total_weight = plan_weight * split_count
                         product_no_dev = re.split(r'\(|\（|\[', serializer['product_no'])[0]
                         if serializer['merge_flag']:
                             # 配方中料包重量
@@ -550,9 +554,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                     total_weight = xl_instance.total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
+                        if '%' in machine_tolerance:
+                            machine_tolerance = f"{machine_tolerance[0]}{round(Decimal(machine_tolerance[1:-1]) / 100 * total_weight, 3)}kg"
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
-                                           'batching_type': '机配', 'machine_weight': round(plan_weight / split_count, 3),
+                                           'batching_type': '机配', 'machine_weight': plan_weight,
                                            'manual_weight': 0, 'batch_user': serializer['oper'],
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                            'expire_datetime': expire_datetime, 'expire_days': expire_days,
@@ -591,7 +597,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
                         plan_weight = recipe_pre.first().weight if recipe_pre else 0
                         split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        actual_batch_time = ReportBasic.objects.using(equip_no).get(planid=serializer['plan_weight_uid'], actno=1).starttime
+                        trains_time = ReportBasic.objects.using(equip_no).filter(planid=serializer['plan_weight_uid'], actno=1).first()
+                        actual_batch_time = trains_time.starttime if trains_time else serializer['starttime']
                         # 计算有效期
                         single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
                         if not single_expire_record:
@@ -603,7 +610,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         expire_datetime = datetime.datetime.strptime(actual_batch_time,
                                                                      '%Y-%m-%d %H:%M:%S') + timedelta(
                             days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
-                        total_weight = plan_weight
+                        total_weight = plan_weight * split_count
                         product_no_dev = re.split(r'\(|\（|\[', serializer['product_no'])[0]
                         if serializer['merge_flag']:
                             # 配方中料包重量
@@ -620,10 +627,12 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                     total_weight = xl_instance.total_weight
                         # 公差查询
                         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
+                        if '%' in machine_tolerance:
+                            machine_tolerance = f"{machine_tolerance[0]}{round(Decimal(machine_tolerance[1:-1]) / 100 * total_weight, 3)}kg"
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
                                            'batching_type': '机配', 'expire_days': expire_days,
-                                           'machine_weight': round(plan_weight / split_count, 3), 'manual_weight': 0,
+                                           'machine_weight': plan_weight, 'manual_weight': 0,
                                            'batch_user': serializer['oper'], 'split_count': split_count,
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                            'expire_datetime': expire_datetime, 'machine_manual_weight': total_weight,

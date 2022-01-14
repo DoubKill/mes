@@ -641,6 +641,12 @@ class LabelPrintViewSet(mixins.CreateModelMixin,
             # forcibly invalidate the prefetch cache on the instance.
             instance._prefetched_objects_cache = {}
         MaterialDealResult.objects.filter(lot_no=instance.lot_no).update(print_time=datetime.datetime.now())
+        st_ct = instance.created_date - datetime.timedelta(minutes=1)
+        et_ct = instance.created_date + datetime.timedelta(minutes=1)
+        LabelPrint.objects.filter(
+            lot_no=instance.lot_no,
+            label_type=instance.label_type
+        ).filter(Q(created_date__gt=st_ct) | Q(created_date__lt=et_ct)).update(status=1)
         return Response("打印完成")
 
 
@@ -1936,6 +1942,7 @@ class ProductTestPlanViewSet(ModelViewSet):
     def perform_destroy(self, instance):
         """结束检测"""
         instance.status = 4
+        ProductTestPlanDetail.objects.filter(test_plan=instance, status=1).update(status=4)
         instance.save()
 
 
@@ -2028,7 +2035,7 @@ class ReportValueView(APIView):
         if not current_test_detail:
             return Response({'msg': '全部检测完成', 'success': True})
 
-        # 如果是钢拔应检测五次
+        # 如果是钢拔应检测四/五次
         if test_type:
             if equip_test_plan.test_indicator_name == '钢拔' and test_type == '钢拔':
                 # 判断有没有
@@ -2050,11 +2057,14 @@ class ReportValueView(APIView):
                                                           ds3=data['DS3'],
                                                           result=data['Result'])
                 if ordering == equip_test_plan.count:
+                    current_test_detail.status = 2  # 完成
                     values = RubberMaxStretchTestResult.objects.filter(product_test_plan_detail=current_test_detail).aggregate(钢拔=Avg('max_strength'))
                     values.update({'钢拔': round(values['钢拔'], 3)})
                     current_test_detail.value = json.dumps(values, ensure_ascii=False)
                     current_test_detail.save()
                 else:
+                    current_test_detail.status = 3  # 检测中
+                    current_test_detail.save()
                     return Response('ok')
             # 如果是物性应检测三次
             elif equip_test_plan.test_indicator_name == '物性' and test_type == '物性':
@@ -2089,13 +2099,17 @@ class ReportValueView(APIView):
                     values.update({'扯断强度': round(values['扯断强度'], 3)})
                     values.update({'伸长率%': round(values['伸长率%'], 3)})
                     values.update({'M300': round(values['M300'], 3)})
+                    current_test_detail.status = 2  # 完成
                     current_test_detail.value = json.dumps(values, ensure_ascii=False)
                     current_test_detail.save()
                 else:
+                    current_test_detail.status = 3  # 检测中
+                    current_test_detail.save()
                     return Response('ok')
         else:
             current_test_detail.value = json.dumps(data['value'])
             current_test_detail.raw_value = data['raw_value']
+            current_test_detail.status = 2
             current_test_detail.save()
 
         # if equip_test_plan.product_test_plan_detail.filter(

@@ -245,6 +245,26 @@ class TrainsFeedbacksSerializer2(BaseModelSerializer):
     actual_weight = serializers.SerializerMethodField(read_only=True)
     mixer_time = serializers.SerializerMethodField(read_only=True)
 
+    def to_representation(self, instance):
+        data = super(TrainsFeedbacksSerializer2, self).to_representation(instance)
+        evacuation_energy = data['evacuation_energy']
+        equip_no = data['equip_no']
+        actual_weight = data['actual_weight']
+        try:
+            if equip_no == 'Z01':
+                data['evacuation_energy'] = int(evacuation_energy / 10)
+            if equip_no == 'Z02':
+                data['evacuation_energy'] = int(evacuation_energy / 0.6)
+            if equip_no == 'Z04':
+                data['evacuation_energy'] = int(evacuation_energy * 0.28 * float(actual_weight) / 1000)
+            if equip_no == 'Z12':
+                data['evacuation_energy'] = int(evacuation_energy / 5.3)
+            if equip_no == 'Z13':
+                data['evacuation_energy'] = int(evacuation_energy / 31.7)
+        except Exception:
+            pass
+        return data
+
     def get_mixer_time(self, obj):
         try:
             return obj.end_time - obj.begin_time
