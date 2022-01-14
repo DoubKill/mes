@@ -875,9 +875,9 @@ class SchedulingResultSerializer(serializers.ModelSerializer):
 
 class SchedulingEquipShutDownPlanSerializer(BaseModelSerializer):
 
-    def create(self, validated_data):
-        validated_data['factory_date'] = datetime.now().date()
-        return super().create(validated_data)
+    # def create(self, validated_data):
+    #     validated_data['factory_date'] = datetime.now().date()
+    #     return super().create(validated_data)
 
     class Meta:
         model = SchedulingEquipShutDownPlan

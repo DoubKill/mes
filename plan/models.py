@@ -372,17 +372,17 @@ class SchedulingResult(models.Model):
         verbose_name_plural = verbose_name = '排程结果'
 
 
-class SchedulingRecipeMachineRelationHistory(models.Model):
-    schedule_no = models.CharField(max_length=64, help_text='排程编号', db_index=True)
-    equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
-    recipe_name = models.CharField(max_length=64, help_text='配方名称')
-    batching_weight = models.FloatField(help_text='产出重量')
-    devoted_weight = models.FloatField(help_text='投入重量')
-    dev_type = models.CharField(max_length=64, help_text='机型')
-
-    class Meta:
-        db_table = 'aps_recipe_machine_result_history'
-        verbose_name_plural = verbose_name = '排程机台配方投入产出履历'
+# class SchedulingRecipeMachineRelationHistory(models.Model):
+#     schedule_no = models.CharField(max_length=64, help_text='排程编号', db_index=True)
+#     equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
+#     recipe_name = models.CharField(max_length=64, help_text='配方名称')
+#     batching_weight = models.FloatField(help_text='产出重量')
+#     devoted_weight = models.FloatField(help_text='投入重量')
+#     dev_type = models.CharField(max_length=64, help_text='机型')
+#
+#     class Meta:
+#         db_table = 'aps_recipe_machine_result_history'
+#         verbose_name_plural = verbose_name = '排程机台配方投入产出履历'
 
 
 class SchedulingEquipShutDownPlan(AbstractEntity):

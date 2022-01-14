@@ -32,7 +32,7 @@ from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, Ba
     BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, SchedulingEquipCapacity, \
     SchedulingWashRule, SchedulingWashPlaceKeyword, SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, \
     SchedulingProductDemandedDeclareSummary, SchedulingProductSafetyParams, SchedulingResult, \
-    SchedulingEquipShutDownPlan, SchedulingRecipeMachineRelationHistory
+    SchedulingEquipShutDownPlan
 from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCreateSerializer, \
     ProductBatchingSerializer, ProductBatchingDetailSerializer, ProductDayPlansySerializer, \
     ProductClassesPlansySerializer, MaterialsySerializer, BatchingClassesPlanSerializer, \
