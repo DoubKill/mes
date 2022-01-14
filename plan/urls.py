@@ -6,7 +6,11 @@ from plan.views import ProductDayPlanViewSet, \
     ProductDayPlanAPiView, MaterialDemandedView, ProductClassesPlanManyCreate, ProductClassesPlanList, PlanReceive, \
     ProductBatchingReceive, ProductBatchingDetailReceive, ProductDayPlanReceive, ProductClassesPlanReceive, \
     MaterialReceive, BatchingClassesPlanView, IssueBatchingClassesPlanView, BatchingClassesEquipPlanViewSet, \
-    PlantImportView, LabelPlanInfo
+    PlantImportView, LabelPlanInfo, SchedulingParamsSettingView, SchedulingRecipeMachineSettingView, \
+    MaterialTankStatusView, SchedulingEquipCapacityViewSet, SchedulingWashRuleViewSet, \
+    SchedulingWashPlaceKeywordViewSet, SchedulingWashPlaceOperaKeywordViewSet, RecipeMachineWeight, \
+    SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
+    SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView
 
 router = DefaultRouter()
 
@@ -19,6 +23,19 @@ router.register(r'product-classes-plan-list', ProductClassesPlanList)
 router.register(r'batching-classes-plan', BatchingClassesPlanView)
 
 router.register(r'batching-classes-equip-plan', BatchingClassesEquipPlanViewSet)
+
+router.register(r'scheduling-params-setting', SchedulingParamsSettingView)  # 排程基础参数设置
+router.register(r'scheduling-recipe-machine-setting', SchedulingRecipeMachineSettingView)  # 排程定机表
+router.register(r'scheduling-equip-capacity', SchedulingEquipCapacityViewSet)  # 机台生产能力
+router.register(r'scheduling-wash-rules', SchedulingWashRuleViewSet)  # 洗车放置规则
+router.register(r'scheduling-place-keyword', SchedulingWashPlaceKeywordViewSet)  # 胶料/单位关键字定义
+router.register(r'scheduling-place-opera-keyword', SchedulingWashPlaceOperaKeywordViewSet)  # 处理关键字定义
+router.register(r'scheduling-product-demanded-declare', SchedulingProductDemandedDeclareViewSet)  # 胶料计划申报
+router.register(r'scheduling-product-declare-summary', ProductDeclareSummaryViewSet)  # 胶料计划申报汇总
+router.register(r'scheduling-product-safety-params', SchedulingProductSafetyParamsViewSet)  # 各分厂安全库存及安全系数列表
+router.register(r'scheduling-result', SchedulingResultViewSet)  # 排程结果
+router.register(r'scheduling-equip-shutdown-plan', SchedulingEquipShutDownPlanViewSet)  # 计划停机
+
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -37,5 +54,9 @@ urlpatterns = [
     path('material-receive/', MaterialReceive.as_view()),  # 原材料同步
     path('issue-batching-classes-plan/<int:pk>/', IssueBatchingClassesPlanView.as_view()),
     path('plan-import/', PlantImportView.as_view()),  # 计划导入
-    path('label-plan-info/', LabelPlanInfo.as_view())
+    path('label-plan-info/', LabelPlanInfo.as_view()),
+
+    path('recipe-machine-weight/', RecipeMachineWeight.as_view()),
+    path('mat-tank-status/', MaterialTankStatusView.as_view()),
+    path('scheduling-procedures/', SchedulingProceduresView.as_view())
 ]

@@ -89,7 +89,7 @@ permission_data = [
     {'id': 62, 'code': 'delete_productdayplan', 'name': '删除', 'parent_id': 58},
     {'id': 77, 'code': 'send_productdayplan', 'name': '计划下达', 'parent_id': 58},
 
-    {'id': 63, 'code': 'materialdemanded', 'name': '物料料需求量', 'parent_id': None},
+    {'id': 63, 'code': 'materialdemanded', 'name': '物料需求量', 'parent_id': None},
     {'id': 64, 'code': 'view_materialdemanded', 'name': '查看', 'parent_id': 63},
 
     {'id': 65, 'code': 'product_actual', 'name': '密炼实绩', 'parent_id': None},
@@ -797,8 +797,83 @@ permission_data = [
     {'id': 841, 'code': 'view_daily_production_completion_report', 'name': '查看', 'parent_id': 840},
     {'id': 842, 'code': 'export_daily_production_completion_report', 'name': '导出', 'parent_id': 840},
 
+    {'id': 843, 'code': 'aps_params_setting', 'name': '排程参数设定', 'parent_id': None},
+    {'id': 844, 'code': 'view_aps_params_setting', 'name': '查看', 'parent_id': 843},
+    {'id': 845, 'code': 'change_aps_params_setting', 'name': '修改', 'parent_id': 843},
 
-    # 下一个 843开始
+    {'id': 846, 'code': 'aps_machine_setting', 'name': '排程定机表设定', 'parent_id': None},
+    {'id': 847, 'code': 'view_aps_machine_setting', 'name': '查看', 'parent_id': 846},
+    {'id': 848, 'code': 'add_aps_machine_setting', 'name': '新增', 'parent_id': 846},
+    {'id': 849, 'code': 'change_aps_machine_setting', 'name': '修改', 'parent_id': 846},
+    {'id': 850, 'code': 'delete_aps_machine_setting', 'name': '删除', 'parent_id': 846},
+    {'id': 851, 'code': 'import_aps_machine_setting', 'name': '导入', 'parent_id': 846},
+    {'id': 852, 'code': 'export_aps_machine_setting', 'name': '导出', 'parent_id': 846},
+
+    {'id': 853, 'code': 'aps_machine_recipe', 'name': '排程胶料机台配方物料统计', 'parent_id': None},
+    {'id': 854, 'code': 'view_aps_machine_recipe', 'name': '查看', 'parent_id': 853},
+
+    {'id': 855, 'code': 'aps_tank_status', 'name': '排程炭黑粉料罐物料规格汇总', 'parent_id': None},
+    {'id': 856, 'code': 'view_aps_tank_status', 'name': '查看', 'parent_id': 855},
+
+    {'id': 857, 'code': 'aps_equip_capacity', 'name': '排程机台设备生产能力', 'parent_id': None},
+    {'id': 858, 'code': 'view_aps_equip_capacity', 'name': '查看', 'parent_id': 857},
+    {'id': 859, 'code': 'add_aps_equip_capacity', 'name': '新增', 'parent_id': 857},
+    {'id': 860, 'code': 'change_aps_equip_capacity', 'name': '修改', 'parent_id': 857},
+    {'id': 861, 'code': 'delete_aps_equip_capacity', 'name': '删除', 'parent_id': 857},
+    {'id': 862, 'code': 'export_aps_equip_capacity', 'name': '导出', 'parent_id': 857},
+
+    {'id': 863, 'code': 'aps_wash_rules', 'name': '排程洗车规则及放置规则', 'parent_id': None},
+    {'id': 864, 'code': 'view_aps_wash_rules', 'name': '查看', 'parent_id': 863},
+    {'id': 865, 'code': 'add_aps_wash_rules', 'name': '新增', 'parent_id': 863},
+    {'id': 866, 'code': 'change_aps_wash_rules', 'name': '修改', 'parent_id': 863},
+    {'id': 867, 'code': 'delete_aps_wash_rules', 'name': '启用/停用', 'parent_id': 863},
+
+    {'id': 868, 'code': 'aps_product_keyword', 'name': '排程胶料/单位关键字定义', 'parent_id': None},
+    {'id': 869, 'code': 'view_aps_product_keyword', 'name': '查看', 'parent_id': 868},
+    {'id': 870, 'code': 'add_aps_product_keyword', 'name': '新增', 'parent_id': 868},
+    {'id': 871, 'code': 'change_aps_product_keyword', 'name': '修改', 'parent_id': 868},
+    {'id': 872, 'code': 'delete_aps_product_keyword', 'name': '启用/停用', 'parent_id': 868},
+
+    {'id': 873, 'code': 'aps_opera_keyword', 'name': '排程处理关键字定义', 'parent_id': None},
+    {'id': 874, 'code': 'view_aps_opera_keyword', 'name': '查看', 'parent_id': 873},
+    {'id': 875, 'code': 'add_aps_opera_keyword', 'name': '新增', 'parent_id': 873},
+    {'id': 876, 'code': 'change_aps_opera_keyword', 'name': '修改', 'parent_id': 873},
+    {'id': 877, 'code': 'delete_aps_opera_keyword', 'name': '删除', 'parent_id': 873},
+
+    {'id': 878, 'code': 'aps_demanded_declare', 'name': '排程各分厂胶料计划申报', 'parent_id': None},
+    {'id': 879, 'code': 'view_aps_demanded_declare', 'name': '查看', 'parent_id': 878},
+    {'id': 880, 'code': 'add_aps_demanded_declare', 'name': '新增', 'parent_id': 878},
+    {'id': 881, 'code': 'change_aps_demanded_declare', 'name': '修改', 'parent_id': 878},
+    {'id': 882, 'code': 'delete_aps_demanded_declare', 'name': '删除', 'parent_id': 878},
+
+    {'id': 883, 'code': 'aps_safety_params_declare', 'name': '排程安全库存及安全系数申报', 'parent_id': None},
+    {'id': 884, 'code': 'view_aps_safety_params_declare', 'name': '查看', 'parent_id': 883},
+    {'id': 885, 'code': 'add_aps_safety_params_declare', 'name': '新增', 'parent_id': 883},
+    {'id': 886, 'code': 'change_aps_safety_params_declare', 'name': '修改', 'parent_id': 883},
+    {'id': 887, 'code': 'delete_aps_safety_params_declare', 'name': '启用/停用', 'parent_id': 883},
+
+    {'id': 888, 'code': 'aps_plan_summary', 'name': '排程胶料计划库存汇总', 'parent_id': None},
+    {'id': 889, 'code': 'view_aps_plan_summary', 'name': '查看', 'parent_id': 888},
+    {'id': 890, 'code': 'add_aps_plan_summary', 'name': '新增', 'parent_id': 888},
+    {'id': 891, 'code': 'change_aps_plan_summary', 'name': '修改', 'parent_id': 888},
+    {'id': 892, 'code': 'delete_aps_plan_summary', 'name': '删除', 'parent_id': 888},
+    {'id': 893, 'code': 'import_aps_plan_summary', 'name': '导入', 'parent_id': 888},
+    {'id': 894, 'code': 'export_aps_plan_summary', 'name': '导出', 'parent_id': 888},
+    {'id': 895, 'code': 'procedures_aps_plan_summary', 'name': ' 自动排程', 'parent_id': 888},
+
+    {'id': 896, 'code': 'aps_result', 'name': '排程机台生产计划-整体列表', 'parent_id': None},
+    {'id': 897, 'code': 'view_aps_result', 'name': '查看', 'parent_id': 896},
+    {'id': 898, 'code': 'change_aps_result', 'name': '修改', 'parent_id': 896},
+    {'id': 899, 'code': 'confirm_aps_result', 'name': '确定全部机台计划', 'parent_id': 896},
+    {'id': 900, 'code': 'export_aps_result', 'name': '导出', 'parent_id': 896},
+
+    {'id': 901, 'code': 'aps_halt_plan', 'name': '排程机台设备停机计划设置', 'parent_id': None},
+    {'id': 902, 'code': 'view_aps_halt_plan', 'name': '查看', 'parent_id': 901},
+    {'id': 903, 'code': 'add_aps_halt_plan', 'name': '新增', 'parent_id': 901},
+    {'id': 904, 'code': 'change_aps_halt_plan', 'name': '修改', 'parent_id': 901},
+    {'id': 905, 'code': 'delete_aps_halt_plan', 'name': '删除', 'parent_id': 901},
+
+    # 下一个 906开始
 ]
 
 
