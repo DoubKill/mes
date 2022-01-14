@@ -126,7 +126,7 @@ class WeightPackageLog(AbstractEntity):
 
     @property
     def total_weight(self):
-        total_weight = self.plan_weight
+        total_weight = self.plan_weight * self.split_count
         data = self.single_weight_package.all()
         already_exist = []
         manual_ids, manual_wms_ids = [], []
