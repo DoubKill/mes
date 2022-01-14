@@ -735,6 +735,8 @@ class SchedulingResultViewSet(ModelViewSet):
         SchedulingResult.objects.filter(schedule_no=schedule_no).delete()
         for key, value in plan_data.items():
             for idx, item in enumerate(value):
+                if not item.get('recipe_name') or not item.get('plan_trains'):
+                    continue
                 SchedulingResult.objects.create(
                     factory_date=factory_date,
                     schedule_no=schedule_no,
