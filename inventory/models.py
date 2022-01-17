@@ -1156,3 +1156,13 @@ class WMSMaterialSafetySettings(AbstractEntity):
     class Meta:
         db_table = 'wms_material_safety'
         verbose_name_plural = verbose_name = '原材料立库安全预警设置'
+
+
+class ProductStockDailySummary(models.Model):
+    factory_date = models.DateField(help_text='日期')
+    product_no = models.CharField(max_length=64, help_text='胶料名称')
+    stock_weight = models.FloatField(help_text='库存重量')
+
+    class Meta:
+        db_table = 'product_stock_daily_summary'
+        verbose_name_plural = verbose_name = '胶片库存每日统计'

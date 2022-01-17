@@ -212,15 +212,186 @@ class BatchingClassesEquipPlan(models.Model):
 #         verbose_name_plural = verbose_name = '班次小料需求量'
 
 
-class ClassesPlanIssue(models.Model):
-    STATUS_CHOICE = (
-        (1, '下发成功'),
-        (2, '未下发'),
-        (3, '下发失败')
-    )
-    product_classes_plan = models.ForeignKey(ProductClassesPlan, on_delete=models.CASCADE, help_text='胶料日班次计划表id')
-    status = models.IntegerField(help_text='下发状态', default=2)
+class SchedulingParamsSetting(models.Model):
+    scheduling_type = models.CharField(max_length=32, help_text='排程方式选择(传统方式/优化算法)')
+    scheduling_during_time = models.IntegerField(help_text='自动排程期间（小时）')
+    scheduling_interval_trains = models.IntegerField(help_text='前后工序间隔车数（车）')
+    scheduling_adaptable_trains = models.IntegerField(help_text='现场可修改计划数量（车）', blank=True, null=True)
+    min_stock_trains = models.FloatField(help_text='确保最低库存量（天）')
+    scheduling_auto_time = models.CharField(max_length=32, help_text='排程参数自动统计时间', blank=True, null=True)
+    standing_time = models.IntegerField(help_text='无S打加S放置期时间（小时）', blank=True, null=True)
+    pkg_count = models.IntegerField(help_text='小料包一车包数')
+    validity = models.IntegerField(help_text='小料包有效期（小时）', blank=True, null=True)
+    mixing_summary_st_time = models.IntegerField(help_text='开始密炼时间统计范围（秒）', blank=True, null=True)
+    mixing_summary_et_time = models.IntegerField(help_text='结束密炼时间统计范围（秒）', blank=True, null=True)
+    mixing_interval_st_time = models.IntegerField(help_text='开始密炼间隔时间统计范围（秒）', blank=True, null=True)
+    mixing_interval_et_time = models.IntegerField(help_text='结束密炼间隔时间统计范围（秒）', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否考虑物料齐套')
+    mixing_place_interval_time = models.FloatField(help_text='混炼各段次之间放置时间（小时）', blank=True, null=True)
 
     class Meta:
-        db_table = 'classes_plan_issue'
-        verbose_name_plural = verbose_name = '计划下发至快检系统'
+        db_table = 'aps_params_setting'
+        verbose_name_plural = verbose_name = '自动排程参数设定'
+
+
+class SchedulingRecipeMachineSetting(AbstractEntity):
+    rubber_type = models.CharField(max_length=32, help_text='胶料类别')
+    product_no = models.CharField(max_length=32, help_text='胶料代码')
+    stage = models.CharField(max_length=32, help_text='胶料段次')
+    mixing_main_machine = models.CharField(max_length=128, help_text='混炼主机台')
+    mixing_vice_machine = models.CharField(max_length=128, help_text='混炼辅机台', blank=True, null=True)
+    final_main_machine = models.CharField(max_length=128, help_text='终炼主机台')
+    final_vice_machine = models.CharField(max_length=128, help_text='终炼辅机台', blank=True, null=True)
+
+    class Meta:
+        db_table = 'aps_recipe_machine_setting'
+        verbose_name_plural = verbose_name = '定机表'
+        unique_together = ('rubber_type', 'product_no', 'stage')
+
+
+class SchedulingEquipCapacity(AbstractEntity):
+    equip_no = models.CharField(max_length=16, help_text='机台号')
+    product_no = models.CharField(max_length=32, help_text='胶料代码')
+    avg_mixing_time = models.IntegerField(help_text='平均工作时间（秒）')
+    avg_interval_time = models.IntegerField(help_text='平均间隔时间（秒）')
+    avg_rubbery_quantity = models.FloatField(help_text='*平均加胶量(kg)')
+
+    class Meta:
+        db_table = 'aps_equip_capacity'
+        verbose_name_plural = verbose_name = '机台生产能力'
+
+
+class SchedulingWashRule(AbstractEntity):
+    rule_no = models.CharField(max_length=64, help_text='规则编号', unique=True)
+    rule_name = models.CharField(max_length=64, help_text='规则名称')
+    previous_spec = models.CharField(max_length=64, help_text='前规格', blank=True, null=True)
+    following_spec = models.CharField(max_length=64, help_text='后规格', blank=True, null=True)
+    note = models.CharField(max_length=256, help_text='备注', blank=True, null=True)
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'aps_wash_rule'
+        verbose_name_plural = verbose_name = '洗车放置规则'
+
+
+class SchedulingWashRuleDetail(AbstractEntity):
+    wash_rule = models.ForeignKey(SchedulingWashRule, on_delete=models.CASCADE, related_name='rule_details')
+    # ordering = models.IntegerField(help_text='序号')
+    process = models.CharField(max_length=64, help_text='处理', blank=True, null=True)
+    spec_params = models.CharField(max_length=64, help_text='处理参数（规格/单位）', blank=True, null=True)
+    quantity_params = models.IntegerField(help_text='处理参数（车数/数量）', blank=True, null=True)
+
+    class Meta:
+        db_table = 'aps_wash_rule_detail'
+        verbose_name_plural = verbose_name = '洗车放置规则详情'
+
+
+class SchedulingWashPlaceKeyword(AbstractEntity):
+    keyword_no = models.CharField(max_length=64, help_text='编号', unique=True)
+    keyword_name = models.CharField(max_length=64, help_text='名称', unique=True)
+    product_nos = models.CharField(max_length=512, help_text='胶料代码')
+    note = models.CharField(max_length=256, help_text='备注', blank=True, null=True)
+
+    class Meta:
+        db_table = 'aps_wash_place_keyword'
+        verbose_name_plural = verbose_name = '胶料/单位关键字定义'
+
+
+class SchedulingWashPlaceOperaKeyword(AbstractEntity):
+    keyword_no = models.CharField(max_length=64, help_text='编号', unique=True)
+    keyword_name = models.CharField(max_length=64, help_text='名称', unique=True)
+    note = models.CharField(max_length=256, help_text='备注', blank=True, null=True)
+
+    class Meta:
+        db_table = 'aps_wash_place_opera_keyword'
+        verbose_name_plural = verbose_name = '处理关键字定义'
+
+
+class SchedulingProductDemandedDeclare(AbstractEntity):
+    order_no = models.CharField(max_length=64, help_text='单号')
+    factory = models.CharField(max_length=64, help_text='分厂')
+    factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期')
+    product_no = models.CharField(max_length=64, help_text='胶料代码')
+    today_demanded = models.FloatField(help_text='当日需求（吨）')
+    tomorrow_demanded = models.FloatField(help_text='明日需求（吨）', default=0)
+    current_stock = models.FloatField(help_text='当前库存（吨）', default=0)
+    underway_stock = models.FloatField(help_text='在途库存（吨）', default=0)
+    status = models.CharField(max_length=64, help_text='状态', default='未确认')
+
+    class Meta:
+        db_table = 'aps_product_demanded_declare'
+        verbose_name_plural = verbose_name = '分厂胶料计划申报'
+
+
+class SchedulingProductSafetyParams(AbstractEntity):
+    factory = models.CharField(max_length=64, help_text='分厂')
+    product_no = models.CharField(max_length=64, help_text='胶料代码')
+    safety_stock = models.FloatField(help_text='安全库存（吨）')
+    safety_factor = models.FloatField(help_text='安全库存系数')
+    daily_usage = models.FloatField(help_text='日均用量（吨）')
+    use_flag = models.BooleanField(help_text='是否启用', verbose_name='是否启用', default=True)
+
+    class Meta:
+        db_table = 'aps_product_safety_params'
+        verbose_name_plural = verbose_name = '分厂胶料计划申报'
+
+
+class SchedulingProductDemandedDeclareSummary(models.Model):
+    sn = models.IntegerField(help_text='顺序')
+    factory_date = models.DateField(help_text='工厂日期', verbose_name='工厂日期')
+    product_no = models.CharField(max_length=64, help_text='胶料代码')
+    plan_weight = models.FloatField(help_text='计划总用量（吨）', default=0)
+    workshop_weight = models.FloatField(help_text='车间总库存（吨）', default=0)
+    current_stock = models.FloatField(help_text='立体库总库存（吨）', default=0)
+    desc = models.CharField(max_length=128, help_text='备注（加硫不合格待处理）', blank=True, null=True)
+    target_stock = models.FloatField(help_text='目标总库存量（吨）', default=0)
+    available_time = models.FloatField(help_text='可用时间', default=0)
+
+    def save(self, *args, **kwargs):
+        self.available_time = round((self.workshop_weight + self.current_stock) / self.plan_weight, 2)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        db_table = 'aps_product_demanded_declare_summary'
+        verbose_name_plural = verbose_name = '分厂胶料计划申报汇总'
+
+
+class SchedulingResult(models.Model):
+    factory_date = models.DateField(help_text='排程日期', verbose_name='排程日期')
+    schedule_no = models.CharField(max_length=64, help_text='排程编号', db_index=True)
+    equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
+    sn = models.IntegerField(help_text='顺序')
+    recipe_name = models.CharField(max_length=64, help_text='配方名称')
+    time_consume = models.FloatField(help_text='耗时', default=0)
+    plan_trains = models.IntegerField(help_text='车数')
+    desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
+    created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+
+    class Meta:
+        db_table = 'aps_result'
+        verbose_name_plural = verbose_name = '排程结果'
+
+
+# class SchedulingRecipeMachineRelationHistory(models.Model):
+#     schedule_no = models.CharField(max_length=64, help_text='排程编号', db_index=True)
+#     equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
+#     recipe_name = models.CharField(max_length=64, help_text='配方名称')
+#     batching_weight = models.FloatField(help_text='产出重量')
+#     devoted_weight = models.FloatField(help_text='投入重量')
+#     dev_type = models.CharField(max_length=64, help_text='机型')
+#
+#     class Meta:
+#         db_table = 'aps_recipe_machine_result_history'
+#         verbose_name_plural = verbose_name = '排程机台配方投入产出履历'
+
+
+class SchedulingEquipShutDownPlan(AbstractEntity):
+    equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
+    down_type = models.CharField(max_length=64, help_text='停机类型')
+    begin_time = models.DateTimeField(help_text='开始停机时间')
+    duration = models.FloatField(help_text='停机时长（小时）')
+    desc = models.CharField(max_length=64, help_text='备注', null=True)
+
+    class Meta:
+        db_table = 'aps_equip_shutdown_plan'
+        verbose_name_plural = verbose_name = '分厂胶料计划申报'

@@ -1,6 +1,7 @@
 import django_filters
 from plan.models import ProductDayPlan, MaterialDemanded, ProductClassesPlan, \
-    BatchingClassesPlan
+    BatchingClassesPlan, SchedulingRecipeMachineSetting, SchedulingProductDemandedDeclareSummary, \
+    SchedulingProductSafetyParams, SchedulingResult, SchedulingProductDemandedDeclare
 
 
 class ProductDayPlanFilter(django_filters.rest_framework.FilterSet):
@@ -62,3 +63,40 @@ class BatchingClassesPlanFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = BatchingClassesPlan
         fields = ('day_time', 'dev_type', 'weight_batch_no', 'classes_name')
+
+
+class SchedulingRecipeMachineSettingFilter(django_filters.rest_framework.FilterSet):
+    """胶料日计划过滤器"""
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料代码', lookup_expr='icontains')
+
+    class Meta:
+        model = SchedulingRecipeMachineSetting
+        fields = ('product_no', 'rubber_type')
+
+
+class SchedulingProductDemandedDeclareSummaryFilter(django_filters.rest_framework.FilterSet):
+    """胶料日计划过滤器"""
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料代码', lookup_expr='icontains')
+
+    class Meta:
+        model = SchedulingProductDemandedDeclareSummary
+        fields = ('factory_date', 'product_no')
+
+
+class SchedulingProductSafetyParamsFilter(django_filters.rest_framework.FilterSet):
+    """胶料日计划过滤器"""
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料代码', lookup_expr='icontains')
+
+    class Meta:
+        model = SchedulingProductSafetyParams
+        fields = ('factory', 'product_no')
+
+
+class SchedulingProductDemandedDeclareFilter(django_filters.rest_framework.FilterSet):
+    st = django_filters.DateFilter(field_name='factory_date', lookup_expr='gte')
+    et = django_filters.DateFilter(field_name='factory_date', lookup_expr='lte')
+    order_no = django_filters.CharFilter(field_name='order_no', lookup_expr='icontains')
+
+    class Meta:
+        model = SchedulingProductDemandedDeclare
+        fields = ('factory', 'st', 'et', 'product_no', 'status', 'order_no')
