@@ -2690,6 +2690,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         handle = self.request.data.get('handle')
         data = self.request.data
         inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id']).first()
+        if not inventory:
+            return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
             # 盘库
             if handle == '盘库':
