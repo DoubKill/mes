@@ -2051,7 +2051,7 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
         for dic in result:
             if dic['state'] in order:
                 lst.append(dic)
-        res = sorted(lst, key=lambda x: order.index(x['name']))
+        res = sorted(lst, key=lambda x: order.index(x['state']))
         return res
 
     def get_max_value(self, equip, last_date, group_list):
