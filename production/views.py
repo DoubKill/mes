@@ -2169,10 +2169,11 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
                 settings_value = self.get_settings_value(equip, list(settings_queryset), group_list)
             else:
                 settings_value = {'state': '机台目标值', 'count': 0}
+            # 获取历史每日生产最大值
+            max_value = self.get_max_value(equip, last_date, group_list)
         else:
             settings_value = {'state': '机台目标值', 'count': 0}
-        # 获取历史每日生产最大值
-        max_value = self.get_max_value(equip, last_date, group_list)
+            max_value = {'state': '机台最高值', 'count': 0}
 
         for item in queryset:
             state = item['product_no'].split('-')[1]
