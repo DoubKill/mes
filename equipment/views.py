@@ -2558,7 +2558,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
             if not query:
                 return Response({"success": False, "message": '备件以删除不能出库', "data": None})
-            if instance.plan_out_quantity == out_quantity + instance.out_quantity:
+            if instance.plan_out_quantity >= out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity
                 instance.status = 6  # 出库完成
             else:
@@ -2690,6 +2690,8 @@ class EquipWarehouseInventoryViewSet(ModelViewSet):
         handle = self.request.data.get('handle')
         data = self.request.data
         inventory = self.queryset.filter(equip_spare_id=data['equip_spare'], equip_warehouse_location_id=data['equip_warehouse_location__id']).first()
+        if not inventory:
+            return Response({"success": False, "message": '备件代码不存在', "data": None})
         if handle:
             # 盘库
             if handle == '盘库':
@@ -2940,7 +2942,7 @@ class EquipAutoPlanView(APIView):
 
                 else:  # 出库单据
                     quantity = order.plan_out_quantity - order.out_quantity
-                    queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code)
+                    queryset = EquipWarehouseInventory.objects.filter(equip_spare__spare_code=spare_code, quantity__gt=0)
                     default = queryset.filter(quantity__gt=0).first()
                     if not default:
                         return Response({"success": False, "message": '库存中不存在该备件', "data": None})
