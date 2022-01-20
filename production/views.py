@@ -1961,6 +1961,14 @@ class MonthlyOutputStatisticsReport(APIView):
     queryset = TrainsFeedbacks.objects.all()
     permission_classes = (IsAuthenticated,)
 
+    def my_order(self, result, order):
+        lst = []
+        for dic in result:
+            if dic['name'] in order:
+                lst.append(dic)
+        res = sorted(lst, key=lambda x: order.index(x['name']))
+        return res
+
     def get(self, request, *args, **kwargs):
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
@@ -2023,16 +2031,43 @@ class MonthlyOutputStatisticsReport(APIView):
 
             jl = [{'name': key, 'value': value} for key, value in jl.items()]
             wl = [{'name': key, 'value': value} for key, value in wl.items()]
-            return Response({'result': result, 'wl': reversed(wl), 'jl': reversed(jl)})
+            # 按照机台和段次排序
+            all_state = GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name')
+            state_list = [i[0] for i in all_state]
+            jl_order = ['RE', 'FM', 'RFM', 'jl']
+            # 去除加硫的
+            ret = [i for i in state_list if i not in jl_order]
+            wl_order = ['1MB', '2MB', '3MB', 'HMB', 'CMB', 'RMB']
+            # 新增的添加到最后
+            new_state = [i for i in ret if i not in wl_order]
+            wl_order = wl_order + new_state + ['wl']
+            equip_order = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
+            result = sorted(result, key=lambda x: equip_order.index(x['equip_no']))
+            wl = self.my_order(wl, wl_order)
+            jl = self.my_order(jl, jl_order)
+
+            return Response({'result': result, 'wl': wl, 'jl': jl})
 
 
 @method_decorator([api_recorder], name="dispatch")
 class MonthlyOutputStatisticsAndPerformance(APIView):
     permission_classes = (IsAuthenticated,)
 
+    def my_order(self, result, order):
+        lst = []
+        for dic in result:
+            if dic['state'] in order:
+                lst.append(dic)
+        res = sorted(lst, key=lambda x: order.index(x['state']))
+        return res
+
     def get_max_value(self, equip, last_date, group_list):
         from django.db import connection
         cursor = connection.cursor()
+        if equip:
+            filter_kwargs = f""" WHERE equip_no = '{equip}' AND to_char( FACTORY_DATE, 'YYYY-MM-DD' ) <= '{last_date}' GROUP BY CLASSES, FACTORY_DATE ) """
+        else:
+            filter_kwargs = f""" WHERE to_char( FACTORY_DATE, 'YYYY-MM-DD' ) <= '{last_date}' GROUP BY CLASSES, FACTORY_DATE ) """
         cursor.execute(
             # f"""
             # SELECT
@@ -2055,7 +2090,7 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
                     MAX( COUNT ) COUNT, CLASSES, TO_CHAR( FACTORY_DATE, 'dd' ) days 
                 FROM
                     ( SELECT COUNT( id ) COUNT, CLASSES, FACTORY_DATE FROM TRAINS_FEEDBACKS 
-                    WHERE equip_no = '{equip}' AND to_char( FACTORY_DATE, 'YYYY-MM-DD' ) <= '{last_date}' GROUP BY CLASSES, FACTORY_DATE ) 
+                   {filter_kwargs}
                 GROUP BY CLASSES, TO_CHAR( FACTORY_DATE, 'dd' ) 
                 ) 
             GROUP BY classes, days ORDER BY days
@@ -2134,14 +2169,18 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
         # 获取机台目标值
         if equip == '190E':
             equip = 'E190'
-        settings_queryset = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
-                                                  input_datetime__month=month).values(f'{equip}','input_datetime__day').order_by('id')
-        if settings_queryset.exists():
-            settings_value = self.get_settings_value(equip, list(settings_queryset), group_list)
+        if equip:
+            settings_queryset = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
+                                                      input_datetime__month=month).values(f'{equip}','input_datetime__day').order_by('id')
+            if settings_queryset.exists():
+                settings_value = self.get_settings_value(equip, list(settings_queryset), group_list)
+            else:
+                settings_value = {'state': '机台目标值', 'count': 0}
+            # 获取历史每日生产最大值
+            max_value = self.get_max_value(equip, last_date, group_list)
         else:
             settings_value = {'state': '机台目标值', 'count': 0}
-        # 获取历史每日生产最大值
-        max_value = self.get_max_value(equip, last_date, group_list)
+            max_value = {'state': '机台最高值', 'count': 0}
 
         for item in queryset:
             state = item['product_no'].split('-')[1]
@@ -2182,8 +2221,10 @@ class MonthlyOutputStatisticsAndPerformance(APIView):
                     wl['wl'][f'{day}{classes}'] = count
                 wl['wl']['count'] += count
 
-        wl = reversed(list(wl.values()))
-        jl = reversed(list(jl.values()))
+        jl_order = ['RE', 'FM', 'RFM', '加硫小计']
+        wl_order = ['1MB', '2MB', '3MB', 'HMB', 'CMB', 'RMB', '无硫小计']
+        wl = self.my_order(list(wl.values()), wl_order)
+        jl = self.my_order(list(jl.values()), jl_order)
         hj = list(hj.values())
         hj.append(settings_value)
         hj.append(max_value)

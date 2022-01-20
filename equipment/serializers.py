@@ -1450,14 +1450,14 @@ class EquipWarehouseOrderSerializer(BaseModelSerializer):
             # 单据中新添加的备件
             if not queryset.filter(equip_spare_id=equip_spare['id']).exists():
                 if instance.status in [1, 2, 3]:
-                    state_lst.append(1)
+                    state_lst.append(2)
                     EquipWarehouseOrderDetail.objects.create(equip_warehouse_order=instance,
                                                              equip_spare_id=equip_spare['id'],
                                                              plan_in_quantity=equip_spare['quantity'],
                                                              created_user=self.context["request"].user,
                                                              status=1)
                 else:
-                    state_lst.append(4)
+                    state_lst.append(5)
                     EquipWarehouseOrderDetail.objects.create(equip_warehouse_order=instance,
                                                              equip_spare_id=equip_spare['id'],
                                                              plan_out_quantity=equip_spare['quantity'],
