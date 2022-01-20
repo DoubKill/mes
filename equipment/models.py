@@ -209,8 +209,8 @@ class EquipProperty(AbstractEntity):
         (2, '废弃'),
         (3, '限制'),
     )
-    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', null=True)
-    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', null=True)
+    no = models.CharField(max_length=64, help_text='编号', verbose_name='编号', null=True, blank=True)
+    name = models.CharField(max_length=64, help_text='名称', verbose_name='名称', null=True, blank=True)
     property_no = models.CharField(max_length=64, help_text='固定资产编码', verbose_name='固定资产编码', null=True, blank=True)
     src_no = models.CharField(max_length=64, help_text='原编码', verbose_name='原编码', blank=True, null=True)
     financial_no = models.CharField(max_length=64, help_text='财务编码', verbose_name='财务编码', blank=True, null=True)

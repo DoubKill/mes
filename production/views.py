@@ -2032,8 +2032,15 @@ class MonthlyOutputStatisticsReport(APIView):
             jl = [{'name': key, 'value': value} for key, value in jl.items()]
             wl = [{'name': key, 'value': value} for key, value in wl.items()]
             # 按照机台和段次排序
+            all_state = GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name')
+            state_list = [i[0] for i in all_state]
             jl_order = ['RE', 'FM', 'RFM', 'jl']
-            wl_order = ['1MB', '2MB', '3MB', 'HMB', 'CMB', 'RMB', 'wl']
+            # 去除加硫的
+            ret = [i for i in state_list if i not in jl_order]
+            wl_order = ['1MB', '2MB', '3MB', 'HMB', 'CMB', 'RMB']
+            # 新增的添加到最后
+            new_state = [i for i in ret if i not in wl_order]
+            wl_order = wl_order + new_state + ['wl']
             equip_order = ['Z01', 'Z02', 'Z03', 'Z04', 'Z05', 'Z06', 'Z07', 'Z08', 'Z09', 'Z10', 'Z11', 'Z12', 'Z13', 'Z14', 'Z15', '190E']
             result = sorted(result, key=lambda x: equip_order.index(x['equip_no']))
             wl = self.my_order(wl, wl_order)
