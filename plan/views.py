@@ -921,7 +921,7 @@ class SchedulingProceduresView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class SchedulingStockSummary(ModelViewSet):
-    queryset = ProductStockDailySummary.objects.filter(stage__in=('HMB', 'CMB', '1MB', '2MB', '3MB'))
+    queryset = ProductStockDailySummary.objects.filter(stage__in=('HMB', 'CMB', '1MB', '2MB', '3MB')).order_by('product_no')
     serializer_class = ProductStockDailySummarySerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
