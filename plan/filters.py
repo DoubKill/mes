@@ -1,4 +1,6 @@
 import django_filters
+
+from inventory.models import ProductStockDailySummary
 from plan.models import ProductDayPlan, MaterialDemanded, ProductClassesPlan, \
     BatchingClassesPlan, SchedulingRecipeMachineSetting, SchedulingProductDemandedDeclareSummary, \
     SchedulingProductSafetyParams, SchedulingResult, SchedulingProductDemandedDeclare
@@ -100,3 +102,11 @@ class SchedulingProductDemandedDeclareFilter(django_filters.rest_framework.Filte
     class Meta:
         model = SchedulingProductDemandedDeclare
         fields = ('factory', 'st', 'et', 'product_no', 'status', 'order_no')
+
+
+class ProductStockDailySummaryFilter(django_filters.rest_framework.FilterSet):
+    product_no = django_filters.CharFilter(field_name='product_no', lookup_expr='icontains')
+
+    class Meta:
+        model = ProductStockDailySummary
+        fields = ('factory_date', 'product_no')

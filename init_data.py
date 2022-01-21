@@ -866,6 +866,7 @@ permission_data = [
     {'id': 898, 'code': 'change_aps_result', 'name': '修改', 'parent_id': 896},
     {'id': 899, 'code': 'confirm_aps_result', 'name': '确定全部机台计划', 'parent_id': 896},
     {'id': 900, 'code': 'export_aps_result', 'name': '导出', 'parent_id': 896},
+    {'id': 909, 'code': 'import_aps_result', 'name': '导入', 'parent_id': 896},
 
     {'id': 901, 'code': 'aps_halt_plan', 'name': '排程机台设备停机计划设置', 'parent_id': None},
     {'id': 902, 'code': 'view_aps_halt_plan', 'name': '查看', 'parent_id': 901},
@@ -873,7 +874,11 @@ permission_data = [
     {'id': 904, 'code': 'change_aps_halt_plan', 'name': '修改', 'parent_id': 901},
     {'id': 905, 'code': 'delete_aps_halt_plan', 'name': '删除', 'parent_id': 901},
 
-    # 下一个 906开始
+    {'id': 906, 'code': 'aps_stock_summary', 'name': '排程无硫库存单', 'parent_id': None},
+    {'id': 907, 'code': 'view_aps_stock_summary', 'name': '查看', 'parent_id': 906},
+    {'id': 908, 'code': 'export_aps_stock_summary', 'name': '导出', 'parent_id': 906},
+
+    # 下一个 910开始
 ]
 
 

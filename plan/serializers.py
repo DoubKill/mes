@@ -8,6 +8,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueTogetherValidator, UniqueValidator
 
 from basics.models import GlobalCode, WorkSchedulePlan, EquipCategoryAttribute, Equip, PlanSchedule
+from inventory.models import ProductStockDailySummary
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.utils import calculate_product_stock
@@ -551,10 +552,10 @@ class PlantImportSerializer(BaseModelSerializer):
             while 1:
                 raw_index = j * 25 + 1
                 col_index = i * 4 + 1
-                if col_index >= 33:
+                if col_index >= 61:
                     break
                 try:
-                    equip_data = current_sheet.cell(raw_index, col_index).value.strip()
+                    equip_data = current_sheet.cell(0, col_index).value.strip()
                     if not equip_data:
                         break
                     ret = re.search(r'Z\d+', equip_data)
@@ -566,8 +567,11 @@ class PlantImportSerializer(BaseModelSerializer):
                 except Exception:
                     raise serializers.ValidationError('机台格式错误')
                 tmp_class = None
-                for rowNum in range(j * 25 + 3, 25 * (j + 1)):
-                    value = current_sheet.row_values(rowNum)[i * 4 + 1:(i + 1) * 4 + 1]
+                for rowNum in range(j * 25 + 2, 25 * (j + 1)):
+                    try:
+                        value = current_sheet.row_values(rowNum)[i * 4 + 1:(i + 1) * 4 + 1]
+                    except IndexError:
+                        continue
                     classes = current_sheet.cell(rowNum, 0).value
                     if classes:
                         tmp_class = classes
@@ -584,22 +588,24 @@ class PlantImportSerializer(BaseModelSerializer):
                         raise serializers.ValidationError('机台：{}， 胶料规格:{}，车次信息错误，请修改后重试！'.format(equip_no, value[0]))
                     except Exception:
                         raise
-                    product_batching = ProductBatching.objects.filter(used_type=4,
-                                                                      stage_product_batch_no=product_no,
-                                                                      batching_type=2
-                                                                      ).first()
+
                     work_schedule_plan = WorkSchedulePlan.objects.filter(classes__global_name=classes,
                                                                          plan_schedule__day_time=factory_date
                                                                          ).first()
                     equip = Equip.objects.filter(equip_no=equip_no).first()
                     if not equip:
                         raise serializers.ValidationError('机台：{}未找到，请修改后重试！'.format(equip_no))
+                    product_batching = ProductBatching.objects.filter(used_type=4,
+                                                                      stage_product_batch_no=product_no,
+                                                                      batching_type=2,
+                                                                      dev_type=equip.category
+                                                                      ).first()
                     if not product_batching:
                         raise serializers.ValidationError('机台：{}，胶料规格:{}未找到，请修改后重试！'.format(equip_no, value[0]))
                     if not work_schedule_plan:
                         raise serializers.ValidationError('{}日期未找到{}排班数据未找到，请修改后重试！'.format(factory_date, classes))
-                    if product_batching.dev_type != equip.category:
-                        raise serializers.ValidationError('机台{}所属机型与胶料规格{}机型不一致，请修改后重试！'.format(equip_no, product_no))
+                    # if product_batching.dev_type != equip.category:
+                    #     raise serializers.ValidationError('机台{}所属机型与胶料规格{}机型不一致，请修改后重试！'.format(equip_no, product_no))
                     classes_plan_data = {
                         "sn": 0,
                         "plan_trains": plan_trains,
@@ -850,6 +856,9 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
         return data
 
     def get_demanded_weight(self, obj):
+        min_stock_days = SchedulingParamsSetting.objects.first().min_stock_trains
+        if obj.available_time > min_stock_days:
+            return 0
         return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
 
     def create(self, validated_data):
@@ -883,3 +892,10 @@ class SchedulingEquipShutDownPlanSerializer(BaseModelSerializer):
         model = SchedulingEquipShutDownPlan
         fields = '__all__'
         read_only_fields = ('factory_date',)
+
+
+class ProductStockDailySummarySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ProductStockDailySummary
+        fields = '__all__'
