@@ -1017,8 +1017,8 @@ class PackageExpireView(APIView):
             s_day, f_day = 5, 7
             day_info = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_no='料包默认有效期', delete_flag=False)
             if day_info:
-                s_days_info = day_info.filter(global_name='硫磺包有效期').first()
-                f_days_info = day_info.filter(global_name='细料包有效期').first()
+                s_days_info = day_info.filter(global_no='硫磺包有效期').first()
+                f_days_info = day_info.filter(global_no='细料包有效期').first()
                 if s_days_info:
                     try:
                         s_day = int(s_days_info.global_name)
@@ -1298,7 +1298,7 @@ class RecipePreVIew(ListAPIView):
         et = self.request.query_params.get('et')
         if self.request.query_params.get('all'):
             try:
-                return Response(RecipePre.objects.using(equip_no).values('id', 'name', 'ver'))
+                return Response(RecipePre.objects.using(equip_no).filter(use_not=0).values('id', 'name', 'ver'))
             except ConnectionDoesNotExist:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             except Exception:
@@ -1685,7 +1685,7 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
         获取投料提示信息
     """
     serializer_class = XLPromptSerializer
-    queryset = WeightTankStatus.objects.filter(use_flag=True, status=1)
+    queryset = WeightTankStatus.objects.filter(use_flag=True)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -1704,18 +1704,27 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
             # 当天称量计划的所有配方名称
             all_recipe = Plan.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).all().values_list('recipe', flat=True)
+                state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_recipe:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
-        # 获取所有配方中的原料信息
-        materials = set(RecipeMaterial.objects.using(equip_no).filter(recipe_name__in=set(all_recipe))
-                        .values_list('name', flat=True))
-        # 当前设备料罐信息
-        queryset = self.get_queryset().filter(equip_no=equip_no, material_name__in=materials)
-        serializer = self.get_serializer(queryset, many=True)
-        return response(success=True, data=serializer.data)
+        data = {}
+        for single_recipe in all_recipe:
+            need_trains = single_recipe.get('setno_trains') - (single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
+            material_details = RecipeMaterial.objects.using(equip_no).filter(recipe_name=single_recipe.get('recipe'))
+            name_weight = {i.name: i.weight for i in material_details}
+            same_materials = self.get_queryset().filter(equip_no=equip_no, material_name__in=name_weight.keys()).values('tank_no', 'material_name', 'status')
+            if same_materials:
+                for single_material in same_materials:
+                    material_name = single_material.get('material_name')
+                    weight = name_weight.get(material_name)
+                    if material_name not in data:
+                        data.update({material_name: {'tank_no': single_material.get('tank_no'), 'need_weight': need_trains * weight, 'material_name': material_name, 'status': 0 if single_material.get('status') == 1 else (1 if single_material.get('status') == 3 else 2)}})
+                    else:
+                        data[material_name].update({'need_weight': data[material_name]['need_weight'] + need_trains * weight})
+        res = sorted(data.values(), key=lambda x: (x['status'], -x['need_weight']))
+        return response(success=True, data=res)
 
 
 @method_decorator([api_recorder], name='dispatch')
