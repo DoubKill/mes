@@ -436,6 +436,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         end_time = self.request.query_params.get("end_time")
         location = self.request.query_params.get("location")
         material_no = self.request.query_params.get("material_no")
+        e_material_no = self.request.query_params.get("e_material_no")
         material_name = self.request.query_params.get("material_name")
         quality_status = self.request.query_params.get("quality_status")
         order_no = self.request.query_params.get("order_no")
@@ -446,6 +447,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
             filter_dict.update(location__icontains=location)
         if material_no:
             filter_dict.update(material_no__icontains=material_no)
+        if e_material_no:
+            filter_dict.update(material_no=e_material_no)
         if order_no:
             filter_dict.update(order_no__icontains=order_no)
         if lot_no:

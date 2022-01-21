@@ -362,7 +362,7 @@ class SchedulingResult(models.Model):
     equip_no = models.CharField(max_length=64, help_text='机台', verbose_name='机台')
     sn = models.IntegerField(help_text='顺序')
     recipe_name = models.CharField(max_length=64, help_text='配方名称')
-    time_consume = models.FloatField(help_text='耗时', default=0)
+    time_consume = models.FloatField(help_text='耗时(h)', default=0)
     plan_trains = models.IntegerField(help_text='车数')
     desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)

@@ -1161,7 +1161,9 @@ class WMSMaterialSafetySettings(AbstractEntity):
 class ProductStockDailySummary(models.Model):
     factory_date = models.DateField(help_text='日期')
     product_no = models.CharField(max_length=64, help_text='胶料名称')
-    stock_weight = models.FloatField(help_text='库存重量')
+    stock_weight = models.FloatField(help_text='库存重量', default=0)
+    stage = models.CharField(max_length=64, help_text='段次', blank=True, null=True)
+    # recipe_no = models.CharField(max_length=64, help_text='配方名称', blank=True, null=True)
 
     class Meta:
         db_table = 'product_stock_daily_summary'
