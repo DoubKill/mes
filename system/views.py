@@ -122,11 +122,7 @@ class GroupExtensionViewSet(ModelViewSet):
             return super().list(request, *args, **kwargs)
 
     def get_serializer_class(self):
-        if self.action == 'create':
-            return GroupExtensionSerializer
-        elif self.action == 'update':
-            return GroupExtensionUpdateSerializer
-        elif self.action == 'partial_update':
+        if self.action in ('create', 'update', 'partial_update'):
             return GroupExtensionUpdateSerializer
         else:
             return GroupExtensionSerializer

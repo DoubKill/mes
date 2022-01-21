@@ -23,6 +23,8 @@ from inventory.models import BzFinalMixingRubberInventoryLB, BzFinalMixingRubber
 
 
 def product_stock_daily_summary():
+    if ProductStockDailySummary.objects.filter(factory_date=datetime.datetime.now().date()).exists():
+        return
     t1 = list(BzFinalMixingRubberInventoryLB.objects.using('lb').filter(
         store_name='炼胶库').values('material_no').annotate(s=Sum('total_weight')))
     t2 = list(BzFinalMixingRubberInventory.objects.using('bz').values(
@@ -30,15 +32,29 @@ def product_stock_daily_summary():
     t1.extend(t2)
     ret = {}
     for item in t1:
-        if item['material_no'] not in ret:
-            ret[item['material_no']] = item['s']
+        try:
+            items = item['material_no'].split('-')
+            stage = items[1]
+            product_no = items[2]
+        except Exception:
+            continue
+        k = stage+'-'+product_no
+        if k not in ret:
+            ret[k] = item['s']
         else:
-            ret[item['material_no']] += item['s']
+            ret[k] += item['s']
     for key, value in ret.items():
+        try:
+            items = key.split('-')
+            stage = items[0]
+            product_no = items[1]
+        except Exception:
+            continue
         ProductStockDailySummary.objects.create(
             factory_date=datetime.datetime.now().date(),
-            product_no=key,
-            stock_weight=value
+            stock_weight=value,
+            stage=stage,
+            product_no=product_no
         )
 
 
