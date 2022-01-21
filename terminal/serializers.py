@@ -866,7 +866,7 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('配置数量不在{}-{}的可选范围'.format(1, package_fufil - print_begin_trains + 1))
         # 配料时间
         actual_train = ReportBasic.objects.using(equip_no).filter(planid=plan_weight_uid, actno=print_begin_trains).first()
-        batch_time = actual_train.starttime if actual_train else batch_time
+        batch_time = actual_train.starttime if actual_train else str(batch_time)
         # 计算有效期
         single_expire_record = PackageExpire.objects.filter(product_no=product_no)
         if not single_expire_record:
