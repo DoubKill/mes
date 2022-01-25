@@ -10,7 +10,7 @@ from plan.views import ProductDayPlanViewSet, \
     MaterialTankStatusView, SchedulingEquipCapacityViewSet, SchedulingWashRuleViewSet, \
     SchedulingWashPlaceKeywordViewSet, SchedulingWashPlaceOperaKeywordViewSet, RecipeMachineWeight, \
     SchedulingProductDemandedDeclareViewSet, ProductDeclareSummaryViewSet, SchedulingProductSafetyParamsViewSet, \
-    SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView
+    SchedulingResultViewSet, SchedulingEquipShutDownPlanViewSet, SchedulingProceduresView, SchedulingStockSummary
 
 router = DefaultRouter()
 
@@ -35,6 +35,7 @@ router.register(r'scheduling-product-declare-summary', ProductDeclareSummaryView
 router.register(r'scheduling-product-safety-params', SchedulingProductSafetyParamsViewSet)  # 各分厂安全库存及安全系数列表
 router.register(r'scheduling-result', SchedulingResultViewSet)  # 排程结果
 router.register(r'scheduling-equip-shutdown-plan', SchedulingEquipShutDownPlanViewSet)  # 计划停机
+router.register(r'scheduling-stock-summary', SchedulingStockSummary)  # 无硫库存统计
 
 
 urlpatterns = [

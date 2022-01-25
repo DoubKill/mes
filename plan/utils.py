@@ -83,7 +83,8 @@ def calculate_product_stock(factory_date, product_no, stage):
     """
     s = ProductStockDailySummary.objects.filter(
         factory_date=factory_date,
-        product_no__icontains='-{}-{}'.format(stage, product_no)).aggregate(s=Sum('stock_weight'))['s']
+        stage=stage,
+        product_no=product_no).aggregate(s=Sum('stock_weight'))['s']
     return s if s else 0
 
 
@@ -243,10 +244,74 @@ def extend_last_aps_result(factory_date, schedule_no):
 #  {'product_no': 'C-1MB-J260-01', 'equip_no': 'Z03', 'batching_weight': 888.0, 'devoted_weight': 0, 'plan_trains': 11.5, 'consume_time': 1380}]
 
 
+class Node(object):
+    """节点"""
+
+    def __init__(self, value):
+        self.value = value
+        self.next = None
+        self.time_enough = True
+
+
+class APSLink(object):
+
+    def __init__(self, equip_no, schedule_no, head=None):
+        self.head = head
+        t = SchedulingResult.objects.filter(
+            schedule_no=schedule_no, equip_no=equip_no).aggregate(t=Sum('time_consume'))['t']
+        self.total_time = t if t else 0
+
+    def is_full(self):
+        return int(self.total_time / 3600) > 24
+
+    def append(self, value: dict):
+        if self.is_full():
+            return
+        node = Node(value)
+        if self.head is None:
+            self.head = node
+        else:
+            c_node = self.head
+            c_product_no = c_node.value['product_no']
+            n_c_product_no = value['product_no']
+            while c_node.next:
+                if not c_node.time_enough and not c_product_no.split('-')[2] == n_c_product_no.split('-')[2]:
+                    n_node = c_node.next
+                    node.next = n_node
+                    c_node.time_enough = True
+                    break
+                c_node = c_node.next
+            c_node.next = node
+
+            # 同一物料不同段次，判断是否来得及补料
+            if c_product_no.split('-')[2] == n_c_product_no.split('-')[2]:
+                if c_node.value['consume_time'] / 3600 < 1:  # 补料时间从配置中获取
+                    c_node.time_enough = False
+        self.total_time += value['consume_time']
+
+    def travel(self):
+        c_node = self.head
+        ret = []
+        while c_node:
+            print(c_node.value, c_node.time_enough)
+            ret.append(c_node.value)
+            c_node = c_node.next
+        return ret
+
+
 if __name__ == '__main__':
     # calculate_equip_left_time()
     # calculate_product_available_time()
-    print(calculate_product_plan_trains('2022-01-13', 'K109', 9.9))
+    # print(calculate_product_plan_trains('2022-01-13', 'K109', 9.9))
+    a = APSLink()
+    a.append({'product_no': 'C-1MB-J260-01', 'equip_no': 'Z03', 'batching_weight': 888.0, 'devoted_weight': 0, 'plan_trains': 11.5, 'consume_time': 2222})
+    a.append({'product_no': 'C-2MB-J260-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 6666})
+    a.append({'product_no': 'C-3MB-J260-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 6666})
+    a.append({'product_no': 'C-1MB-C590-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 6666})
+    a.append({'product_no': 'C-2MB-C590-01', 'equip_no': 'Z09', 'batching_weight': 462.45, 'devoted_weight': 450.0, 'plan_trains': 25.9, 'consume_time': 6666})
+    # a.travel()
+    b = APSLink()
+    b.travel()
 
 
 

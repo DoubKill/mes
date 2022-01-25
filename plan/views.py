@@ -1,5 +1,6 @@
 import datetime
 import json
+import re
 
 import requests
 from django.db import connection, IntegrityError
@@ -20,6 +21,7 @@ from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from basics.models import WorkSchedulePlan, GlobalCode, Equip
 from basics.views import CommonDeleteMixin
 from equipment.utils import gen_template_response
+from inventory.models import ProductStockDailySummary
 from mes.common_code import get_weekdays
 from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
@@ -27,7 +29,7 @@ from mes.permissions import PermissionClass
 from mes.sync import ProductClassesPlanSyncInterface
 from plan.filters import ProductDayPlanFilter, MaterialDemandedFilter, ProductClassesPlanFilter, \
     BatchingClassesPlanFilter, SchedulingRecipeMachineSettingFilter, SchedulingProductDemandedDeclareSummaryFilter, \
-    SchedulingProductSafetyParamsFilter, SchedulingProductDemandedDeclareFilter
+    SchedulingProductSafetyParamsFilter, SchedulingProductDemandedDeclareFilter, ProductStockDailySummaryFilter
 from plan.models import ProductDayPlan, ProductClassesPlan, MaterialDemanded, BatchingClassesPlan, \
     BatchingClassesEquipPlan, SchedulingParamsSetting, SchedulingRecipeMachineSetting, SchedulingEquipCapacity, \
     SchedulingWashRule, SchedulingWashPlaceKeyword, SchedulingWashPlaceOperaKeyword, SchedulingProductDemandedDeclare, \
@@ -41,8 +43,9 @@ from plan.serializers import ProductDayPlanSerializer, ProductClassesPlanManyCre
     SchedulingWashRuleSerializer, SchedulingWashPlaceKeywordSerializer, SchedulingWashPlaceOperaKeywordSerializer, \
     RecipeMachineWeightSerializer, SchedulingProductDemandedDeclareSerializer, \
     SchedulingProductDemandedDeclareSummarySerializer, SchedulingProductSafetyParamsSerializer, \
-    SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer
-from plan.utils import calculate_product_plan_trains, extend_last_aps_result
+    SchedulingResultSerializer, SchedulingEquipShutDownPlanSerializer, ProductStockDailySummarySerializer
+from plan.utils import calculate_product_plan_trains, extend_last_aps_result, APSLink, \
+    calculate_equip_recipe_avg_mixin_time
 from production.models import PlanStatus, TrainsFeedbacks, MaterialTankStatus
 from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import ProductBatching, ProductBatchingDetail, Material, MaterialAttribute
@@ -487,6 +490,7 @@ class LabelPlanInfo(APIView):
         return Response(ret)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingParamsSettingView(ModelViewSet):
     queryset = SchedulingParamsSetting.objects.all()
     serializer_class = SchedulingParamsSettingSerializer
@@ -494,6 +498,7 @@ class SchedulingParamsSettingView(ModelViewSet):
     pagination_class = None
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingRecipeMachineSettingView(ModelViewSet):
     queryset = SchedulingRecipeMachineSetting.objects.order_by('rubber_type', 'stage', 'product_no')
     serializer_class = SchedulingRecipeMachineSettingSerializer
@@ -527,6 +532,7 @@ class SchedulingRecipeMachineSettingView(ModelViewSet):
         return Response('ok')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class RecipeMachineWeight(ListAPIView):
     queryset = ProductBatching.objects.all()
     serializer_class = RecipeMachineWeightSerializer
@@ -545,9 +551,10 @@ class RecipeMachineWeight(ListAPIView):
         return ProductBatching.objects.using('SFJ').exclude(
             used_type=6).filter(**query_kwargs).filter(
             batching_type=1, stage__global_name__in=['FM', '3MB', '2MB', '2MB', 'HMB']
-        ).values('id', 'equip__equip_no', 'stage_product_batch_no', 'batching_weight')
+        ).values('id', 'equip__equip_no', 'stage_product_batch_no', 'batching_weight').order_by('equip__equip_no')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class MaterialTankStatusView(APIView):
 
     def get(self, request):
@@ -568,8 +575,9 @@ class MaterialTankStatusView(APIView):
         return Response({'equip_nos': sorted(list(equip_nos)), 'data': list(ret.values())})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingEquipCapacityViewSet(ModelViewSet):
-    queryset = SchedulingEquipCapacity.objects.order_by('-id')
+    queryset = SchedulingEquipCapacity.objects.order_by('equip_no', 'product_no')
     serializer_class = SchedulingEquipCapacitySerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend, OrderingFilter)
@@ -600,6 +608,7 @@ class SchedulingEquipCapacityViewSet(ModelViewSet):
         return Response(serializer.data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingWashRuleViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = SchedulingWashRule.objects.order_by('-id')
     serializer_class = SchedulingWashRuleSerializer
@@ -608,6 +617,7 @@ class SchedulingWashRuleViewSet(CommonDeleteMixin, ModelViewSet):
     pagination_class = None
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingWashPlaceKeywordViewSet(ModelViewSet):
     queryset = SchedulingWashPlaceKeyword.objects.order_by('id')
     serializer_class = SchedulingWashPlaceKeywordSerializer
@@ -616,6 +626,7 @@ class SchedulingWashPlaceKeywordViewSet(ModelViewSet):
     pagination_class = None
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingWashPlaceOperaKeywordViewSet(ModelViewSet):
     queryset = SchedulingWashPlaceOperaKeyword.objects.order_by('id')
     serializer_class = SchedulingWashPlaceOperaKeywordSerializer
@@ -624,6 +635,7 @@ class SchedulingWashPlaceOperaKeywordViewSet(ModelViewSet):
     pagination_class = None
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingProductDemandedDeclareViewSet(ModelViewSet):
     queryset = SchedulingProductDemandedDeclare.objects.order_by('id')
     serializer_class = SchedulingProductDemandedDeclareSerializer
@@ -657,6 +669,7 @@ class SchedulingProductDemandedDeclareViewSet(ModelViewSet):
         return Response('ok')
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingProductSafetyParamsViewSet(CommonDeleteMixin, ModelViewSet):
     queryset = SchedulingProductSafetyParams.objects.order_by('id')
     serializer_class = SchedulingProductSafetyParamsSerializer
@@ -676,6 +689,7 @@ class SchedulingProductSafetyParamsViewSet(CommonDeleteMixin, ModelViewSet):
         return Response(data)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class ProductDeclareSummaryViewSet(ModelViewSet):
     queryset = SchedulingProductDemandedDeclareSummary.objects.order_by('sn')
     serializer_class = SchedulingProductDemandedDeclareSummarySerializer
@@ -771,7 +785,66 @@ class SchedulingResultViewSet(ModelViewSet):
             ret[instance.equip_no]['data'].append(self.get_serializer(instance).data)
         return Response(ret)
 
+    @action(methods=['post'], detail=False)
+    def import_xlx(self, request):
+        factory_date = self.request.data.get('factory_date')
+        schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        current_sheet = get_cur_sheet(excel_file)
+        for j in range(2):
+            i = 0
+            while 1:
+                col_index = i * 4 + 1
+                if col_index >= 61:
+                    break
+                try:
+                    equip_data = current_sheet.cell(0, col_index).value.strip()
+                    if not equip_data:
+                        break
+                    ret = re.search(r'Z\d+', equip_data)
+                    equip_no = ret.group()
+                    if len(equip_no) < 3:
+                        equip_no = 'Z' + '0{}'.format(equip_no[-1])
+                except IndexError:
+                    break
+                except Exception:
+                    raise ValidationError('机台格式错误')
+                for rowNum in range(j * 25 + 2, 25 * (j + 1)):
+                    try:
+                        value = current_sheet.row_values(rowNum)[i * 4 + 1:(i + 1) * 4 + 1]
+                    except IndexError:
+                        continue
+                    product_no = value[0].strip()
+                    plan_trains = value[1]
+                    if not all([product_no, plan_trains]):
+                        continue
+                    note = value[3].strip()
+                    try:
+                        plan_trains = int(plan_trains)
+                    except ValueError:
+                        raise ValidationError('机台：{}， 胶料规格:{}，车次信息错误，请修改后重试！'.format(equip_no, value[0]))
+                    pb = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no__icontains='-{}'.format(product_no)).first()
+                    if pb:
+                        product_no = pb.stage_product_batch_no
+                    train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no)
+                    SchedulingResult.objects.create(
+                        factory_date=factory_date,
+                        schedule_no=schedule_no,
+                        equip_no=equip_no,
+                        sn=1,
+                        recipe_name=product_no,
+                        time_consume=round(train_time_consume*plan_trains/3600, 1),
+                        plan_trains=plan_trains,
+                        desc=note
+                    )
+                i += 1
+            j += 1
+        return Response('ok')
 
+
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingEquipShutDownPlanViewSet(ModelViewSet):
     queryset = SchedulingEquipShutDownPlan.objects.all()
     serializer_class = SchedulingEquipShutDownPlanSerializer
@@ -786,6 +859,7 @@ class SchedulingEquipShutDownPlanViewSet(ModelViewSet):
         return queryset
 
 
+@method_decorator([api_recorder], name="dispatch")
 class SchedulingProceduresView(APIView):
 
     @atomic()
@@ -801,7 +875,13 @@ class SchedulingProceduresView(APIView):
             schedule_no = 'APS1{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
             if not SchedulingResult.objects.filter(schedule_no=schedule_no).exists():
                 break
+
+        # 继承前一天排程未完成的计划
         extend_last_aps_result(factory_date, schedule_no)
+
+        equip_nos = Equip.objects.filter(category__equip_type__global_name='密炼设备').values_list('equip_no', flat=True).order_by('equip_no')
+        links = [APSLink(equip_no, schedule_no) for equip_no in range(len(equip_nos))]
+        link_dict = {equip_no: links[idx] for idx, equip_no in enumerate(equip_nos)}
 
         for instance in SchedulingProductDemandedDeclareSummary.objects.filter(factory_date=factory_date).order_by('sn'):
             need_weight = round(instance.plan_weight - instance.workshop_weight - instance.current_stock, 1)
@@ -814,6 +894,11 @@ class SchedulingProceduresView(APIView):
             except Exception as e:
                 raise ValidationError(e)
             for item in data:
+                instance = link_dict[item['equip_no']]
+                instance.append(item)
+        for i in links:
+            ret = i.travel()
+            for item in ret:
                 # SchedulingRecipeMachineRelationHistory.objects.create(
                 #     schedule_no=schedule_no,
                 #     equip_no=item['equip_no'],
@@ -832,3 +917,25 @@ class SchedulingProceduresView(APIView):
                     plan_trains=item['plan_trains']
                 )
         return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SchedulingStockSummary(ModelViewSet):
+    queryset = ProductStockDailySummary.objects.filter(stage__in=('HMB', 'CMB', '1MB', '2MB', '3MB')).order_by('product_no')
+    serializer_class = ProductStockDailySummarySerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = ProductStockDailySummaryFilter
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+        ret = {}
+        for item in data:
+            if item['product_no'] not in ret:
+                ret[item['product_no']] = {'product_no': item['product_no'],
+                                           item['stage']: item['stock_weight']}
+            else:
+                ret[item['product_no']][item['stage']] = item['stock_weight']
+        return Response(ret.values())

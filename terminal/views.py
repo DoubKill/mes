@@ -20,7 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from basics.models import WorkSchedulePlan, Equip
+from basics.models import WorkSchedulePlan, Equip, GlobalCode
 from inventory.models import MaterialOutHistory
 from mes.common_code import CommonDeleteMixin, TerminalCreateAPIView, response, SqlClient
 from mes.conf import TH_CONF
@@ -497,7 +497,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
                                   'batch_time': actual_batch_time, 'product_no': i['product_no'],
                                   'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
-                                  'batch_user': i['oper'], 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                  'batch_user': self.request.user.username, 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                   'expire_datetime': expire_datetime, 'split_count': split_count,
                                   'machine_manual_weight': total_weight, 'machine_manual_tolerance': machine_tolerance,
                                   'expire_days': expire_days})
@@ -559,7 +559,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
                                            'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
                                            'batching_type': '机配', 'machine_weight': plan_weight,
-                                           'manual_weight': 0, 'batch_user': serializer['oper'],
+                                           'manual_weight': 0, 'batch_user': self.request.user.username,
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                            'expire_datetime': expire_datetime, 'expire_days': expire_days,
                                            'machine_manual_weight': total_weight, 'split_count': split_count,
@@ -633,7 +633,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                            'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
                                            'batching_type': '机配', 'expire_days': expire_days,
                                            'machine_weight': plan_weight, 'manual_weight': 0,
-                                           'batch_user': serializer['oper'], 'split_count': split_count,
+                                           'batch_user': self.request.user.username, 'split_count': split_count,
                                            'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
                                            'expire_datetime': expire_datetime, 'machine_manual_weight': total_weight,
                                            'machine_manual_tolerance': machine_tolerance})
@@ -714,7 +714,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 res = material_out_barcode(scan_bra_code)
             except Exception as e:
                 raise ValidationError(e.args[0])
-            # res = {'ZL': 25, 'SM_CREATE': '2021-11-29 14:55:03', 'SL': 100, 'WLXXID': 'WLXX20100210111511609'} 测试数据
             if res:
                 # 查询配方中人工配物料
                 try:
@@ -724,7 +723,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
                 except Exception as e:
                     raise ValidationError(e.args[0])
-                materials = set(recipe_manual.values_list('material__material_name', flat=True))
+                materials = set([i.get('material__material_name') for i in recipe_manual])
                 # ERP绑定关系
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
@@ -733,7 +732,11 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 if not comm_material:
                     raise ValidationError('未找到该物料在mes配方中对应的名称')
                 # 获取配方中该物料重量
-                detail = WeighBatchingDetail.objects.filter(delete_flag=False, material__material_name=comm_material[0]).first()
+                product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
+                detail = WeighBatchingDetail.objects.filter(delete_flag=False, material__material_name=comm_material[0],
+                                                            weigh_cnt_type__product_batching__stage_product_batch_no=product_no_dev,
+                                                            weigh_cnt_type__product_batching__dev_type__category_name=dev_type,
+                                                            weigh_cnt_type__product_batching__used_type=4).first()
                 if not detail:
                     raise ValidationError('配方中不存在该物料')
                 standard_weight = detail.standard_weight
@@ -745,7 +748,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                                                 'single_weight': single_weight, 'split_num': machine_split_count,
                                                                 'package_count': machine_package_count,
                                                                 'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
-                                                                'real_count': machine_package_count, 'now_package': res.get('SL')})
+                                                                'real_count': machine_package_count, 'now_package': res.get('ZL') // standard_weight})
                     obj = record  # 原材料条码实例
                 else:
                     obj = record
@@ -952,7 +955,7 @@ class GetXlRecipesInfoView(APIView):
         data = {}
         db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
         for batching_equip in db_config:
-            all_recipes = RecipePre.objects.using(batching_equip).all()
+            all_recipes = RecipePre.objects.using(batching_equip).filter(use_not=0)
             for i in all_recipes:
                 if i.name not in data:
                     data[i.name] = {'batching_equip': [batching_equip], 'dev_type': i.ver, 'product_no': i.name}
@@ -1002,17 +1005,35 @@ class PackageExpireView(APIView):
         equip_list = [k for k, v in DATABASES.items() if 'YK_XL' in v.get('NAME')]
         for equip in equip_list:
             try:
-                single_equip_recipe = list(Plan.objects.using(equip).all().values_list('recipe', flat=True).distinct())
+                single_equip_recipe = list(RecipePre.objects.using(equip).filter(use_not=0).values_list('name', flat=True).distinct())
             except:
                 # 机台连不上
                 continue
             all_product_no.extend(single_equip_recipe)
         # 取plan表配方和有效期表配方差集新增数据
         set_product_no = set(all_product_no) - set(package_expire_recipe)
-        for single_product_no in set_product_no:
-            PackageExpire.objects.create(product_no=single_product_no, product_name=single_product_no,
-                                         update_user=self.request.user.username,
-                                         update_date=datetime.datetime.now().date())
+        if set_product_no:
+            # 获取公共代码定义的天数
+            s_day, f_day = 5, 7
+            day_info = GlobalCode.objects.filter(global_type__use_flag=True, global_type__type_no='料包默认有效期', delete_flag=False)
+            if day_info:
+                s_days_info = day_info.filter(global_no='硫磺包有效期').first()
+                f_days_info = day_info.filter(global_no='细料包有效期').first()
+                if s_days_info:
+                    try:
+                        s_day = int(s_days_info.global_name)
+                    except:
+                        pass
+                if f_days_info:
+                    try:
+                        f_day = int(f_days_info.global_name)
+                    except:
+                        pass
+            for single_product_no in set_product_no:
+                PackageExpire.objects.create(product_no=single_product_no, product_name=single_product_no,
+                                             package_fine_usefullife=f_day, package_sulfur_usefullife=s_day,
+                                             update_user=self.request.user.username,
+                                             update_date=datetime.datetime.now().date())
         # 读取数据
         data = PackageExpire.objects.all() if not filter_kwargs else PackageExpire.objects.filter(**filter_kwargs)
         res = list(
@@ -1277,7 +1298,7 @@ class RecipePreVIew(ListAPIView):
         et = self.request.query_params.get('et')
         if self.request.query_params.get('all'):
             try:
-                return Response(RecipePre.objects.using(equip_no).values('id', 'name', 'ver'))
+                return Response(RecipePre.objects.using(equip_no).filter(use_not=0).values('id', 'name', 'ver'))
             except ConnectionDoesNotExist:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             except Exception:
@@ -1664,7 +1685,7 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
         获取投料提示信息
     """
     serializer_class = XLPromptSerializer
-    queryset = WeightTankStatus.objects.filter(use_flag=True, status=1)
+    queryset = WeightTankStatus.objects.filter(use_flag=True)
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, *args, **kwargs):
@@ -1683,18 +1704,27 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
             # 当天称量计划的所有配方名称
             all_recipe = Plan.objects.using(equip_no).filter(
                 Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).all().values_list('recipe', flat=True)
+                state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
         except:
             return response(success=False, message='称量机台{}错误'.format(equip_no))
         if not all_recipe:
             return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
-        # 获取所有配方中的原料信息
-        materials = set(RecipeMaterial.objects.using(equip_no).filter(recipe_name__in=set(all_recipe))
-                        .values_list('name', flat=True))
-        # 当前设备料罐信息
-        queryset = self.get_queryset().filter(equip_no=equip_no, material_name__in=materials)
-        serializer = self.get_serializer(queryset, many=True)
-        return response(success=True, data=serializer.data)
+        data = {}
+        for single_recipe in all_recipe:
+            need_trains = single_recipe.get('setno_trains') - (single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
+            material_details = RecipeMaterial.objects.using(equip_no).filter(recipe_name=single_recipe.get('recipe'))
+            name_weight = {i.name: i.weight for i in material_details}
+            same_materials = self.get_queryset().filter(equip_no=equip_no, material_name__in=name_weight.keys()).values('tank_no', 'material_name', 'status')
+            if same_materials:
+                for single_material in same_materials:
+                    material_name = single_material.get('material_name')
+                    weight = name_weight.get(material_name)
+                    if material_name not in data:
+                        data.update({material_name: {'tank_no': single_material.get('tank_no'), 'need_weight': need_trains * weight, 'material_name': material_name, 'status': 0 if single_material.get('status') == 1 else (1 if single_material.get('status') == 3 else 2)}})
+                    else:
+                        data[material_name].update({'need_weight': data[material_name]['need_weight'] + need_trains * weight})
+        res = sorted(data.values(), key=lambda x: (x['status'], -x['need_weight']))
+        return response(success=True, data=res)
 
 
 @method_decorator([api_recorder], name='dispatch')
