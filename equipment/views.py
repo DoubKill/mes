@@ -2558,7 +2558,7 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
             if not query:
                 return Response({"success": False, "message": '备件以删除不能出库', "data": None})
-            if instance.plan_out_quantity >= out_quantity + instance.out_quantity:
+            if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity
                 instance.status = 6  # 出库完成
             else:
@@ -2926,8 +2926,8 @@ class EquipAutoPlanView(APIView):
                             warehouse_area__isnull=True)).first()
                     if not area:
                         return Response({"success": False, "message": '该备件没有可存放的库区', "data": None})
-                    location = EquipWarehouseLocation.objects.filter(equip_warehouse_area=area,
-                                                                     delete_flag=False).values('id', 'location_name')
+                    location = list(EquipWarehouseLocation.objects.filter(equip_warehouse_area=area,
+                                                                     delete_flag=False).values('id', 'location_name'))
                     # 该备件可以存放的库区和库位
                     if default:  # 默认显示的库区
                         area_id = default.equip_warehouse_area.id
@@ -2939,6 +2939,10 @@ class EquipAutoPlanView(APIView):
                         area_name = area.area_name if area else None
                         de_location_name = location[0].get('location_name')
                         de_location_id = location[0].get('id')
+                    # 将默认显示的库位放到第一个
+                    for i in location:
+                        if i['id'] == de_location_id:
+                            location.insert(0, location.pop(location.index(i)))
 
                 else:  # 出库单据
                     quantity = order.plan_out_quantity - order.out_quantity
@@ -2953,6 +2957,10 @@ class EquipAutoPlanView(APIView):
                                  'location_name': item['equip_warehouse_location__location_name']} for item in res]
                     de_location_name = default.equip_warehouse_location.location_name
                     de_location_id = default.equip_warehouse_location.id
+                    # 将默认显示的库位放到第一个
+                    for i in location:
+                        if i['id'] == de_location_id:
+                            location.insert(0, location.pop(location.index(i)))
                 data = {
                     'id': order.id,
                     "equip_warehouse_order": order.equip_warehouse_order.id,
@@ -3731,16 +3739,13 @@ class EquipCodePrintView(APIView):
                 del data['status']
                 res = requests.post(url=url.get('code1'), json=data, verify=False, timeout=10)
             if status == 2:  # 打印备件条码
-                res = []
-                for spare_code in data.get('spare_list'):
-                    res.append(
-                       {"print_type":1,
-                        "code": spare_code.get('spare_code'),
-                        "name": spare_code.get('spare_name'),
-                        "technical_params": spare_code.get('technical_params'),
-                        "barcode": spare_code.get('spare_code')
-                        })
-                res = requests.post(url=url.get('code2'), json=res, verify=False, timeout=10)
+                data = {"print_type":1,
+                        "code": data.get('spare_code'),
+                        "name": data.get('spare_name'),
+                        "technical_params": data.get('technical_params'),
+                        "barcode": data.get('spare_code')
+                        }
+                res = requests.post(url=url.get('code2'), json=data, verify=False, timeout=10)
             if status == 3:  # 打印bom条码
                 obj = EquipBom.objects.filter(node_id=lot_no).first()
                 if not obj:
@@ -3763,7 +3768,7 @@ class EquipCodePrintView(APIView):
                 data = {
                     "print_type": 1,
                     "area_code": data.get('area_code'),
-                    "area_name": data.get('spare_name'),
+                    "area_name": data.get('area_name'),
                     "part_name": data.get('part_name'),
                     "component_name": data.get('component_name'),
                     "lot_no": data.get('lot_no'),
