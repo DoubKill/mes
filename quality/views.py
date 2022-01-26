@@ -2346,13 +2346,13 @@ class ProductTestStaticsView(APIView):
         dic = {}
         data_point_dic = {}
         data_point_query = MaterialDataPointIndicator.objects.values(
-            'material_test_method__material__material_name', 'data_point__name',
+            'material_test_method__material__material_no', 'data_point__name',
             'upper_limit', 'lower_limit')
         for i in data_point_query:
-            if data_point_dic.get(i['material_test_method__material__material_name']):
-                data_point_dic[i['material_test_method__material__material_name']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
+            if data_point_dic.get(i['material_test_method__material__material_no']):
+                data_point_dic[i['material_test_method__material__material_no']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
             else:
-                data_point_dic[i['material_test_method__material__material_name']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+                data_point_dic[i['material_test_method__material__material_no']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
 
         res = queryset.values('material_test_order__product_no', 'data_point_name', 'value')
         for j in res:
@@ -2532,13 +2532,13 @@ class ClassTestStaticsView(APIView):
         dic = {}
         data_point_dic = {}
         data_point_query = MaterialDataPointIndicator.objects.values(
-            'material_test_method__material__material_name', 'data_point__name',
+            'material_test_method__material__material_no', 'data_point__name',
             'upper_limit', 'lower_limit')
         for i in data_point_query:
-            if data_point_dic.get(i['material_test_method__material__material_name']):
-                data_point_dic[i['material_test_method__material__material_name']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
+            if data_point_dic.get(i['material_test_method__material__material_no']):
+                data_point_dic[i['material_test_method__material__material_no']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
             else:
-                data_point_dic[i['material_test_method__material__material_name']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+                data_point_dic[i['material_test_method__material__material_no']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
 
         res = queryset.values('material_test_order__production_factory_date',
                               'material_test_order__product_no',
@@ -2725,13 +2725,13 @@ class UnqialifiedEquipView(APIView):
         dic_ = {}
         data_point_dic = {}
         data_point_query = MaterialDataPointIndicator.objects.values(
-            'material_test_method__material__material_name', 'data_point__name',
+            'material_test_method__material__material_no', 'data_point__name',
             'upper_limit', 'lower_limit')
         for i in data_point_query:
-            if data_point_dic.get(i['material_test_method__material__material_name']):
-                data_point_dic[i['material_test_method__material__material_name']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
+            if data_point_dic.get(i['material_test_method__material__material_no']):
+                data_point_dic[i['material_test_method__material__material_no']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
             else:
-                data_point_dic[i['material_test_method__material__material_name']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+                data_point_dic[i['material_test_method__material__material_no']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
 
         res = material_test_result.values('material_test_order__production_equip_no',
                                           'material_test_order__product_no',
