@@ -2344,28 +2344,38 @@ class ProductTestStaticsView(APIView):
         # 统计不合格中超过和小于标准的数量
         # ---------------- begin ---------------
         dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.all()
+        data_point_dic = {}
+        data_point_query = MaterialDataPointIndicator.objects.values(
+            'material_test_method__material__material_name', 'data_point__name',
+            'upper_limit', 'lower_limit')
+        for i in data_point_query:
+            if data_point_dic.get(i['material_test_method__material__material_name']):
+                data_point_dic[i['material_test_method__material__material_name']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
+            else:
+                data_point_dic[i['material_test_method__material__material_name']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+
         res = queryset.values('material_test_order__product_no', 'data_point_name', 'value')
         for j in res:
-            data_point_indicator = data_point_query.filter(data_point__name=j['data_point_name'],
-                                                      material_test_method__material__material_name=j['material_test_order__product_no']).first()
-            MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-            if data_point_indicator:
-                if 'MH' in j['data_point_name']:
-                    MH_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    MH_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'ML' in j['data_point_name']:
-                    ML_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    ML_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC10' in j['data_point_name']:
-                    TC10_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC10_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC50' in j['data_point_name']:
-                    TC50_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC50_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC90' in j['data_point_name']:
-                    TC90_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC90_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
+            if data_point_dic.get(j['material_test_order__product_no']):
+                data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
+                if data_point_list:
+                    MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
+                    if 'MH' in j['data_point_name']:
+                        MH_lower = 1 if j['value'] < data_point_list[0] else 0
+                        MH_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'ML' in j['data_point_name']:
+                        ML_lower = 1 if j['value'] < data_point_list[0] else 0
+                        ML_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC10' in j['data_point_name']:
+                        TC10_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC10_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC50' in j['data_point_name']:
+                        TC50_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC50_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC90' in j['data_point_name']:
+                        TC90_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC90_upper = 1 if j['value'] > data_point_list[1] else 0
+
             spe = j['material_test_order__product_no'].split('-')[2]
             if dic.get(spe):
                 data = dic.get(spe)
@@ -2520,32 +2530,42 @@ class ClassTestStaticsView(APIView):
         # 统计不合格中超过和小于标准的数量
         # ---------------- begin ---------------
         dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.all()
+        data_point_dic = {}
+        data_point_query = MaterialDataPointIndicator.objects.values(
+            'material_test_method__material__material_name', 'data_point__name',
+            'upper_limit', 'lower_limit')
+        for i in data_point_query:
+            if data_point_dic.get(i['material_test_method__material__material_name']):
+                data_point_dic[i['material_test_method__material__material_name']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
+            else:
+                data_point_dic[i['material_test_method__material__material_name']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+
         res = queryset.values('material_test_order__production_factory_date',
                               'material_test_order__product_no',
                               'material_test_order__production_class',
                               'data_point_name', 'value')
         for j in res:
-            data_point_indicator = data_point_query.filter(data_point__name=j['data_point_name'],
-                                                      material_test_method__material__material_name=j['material_test_order__product_no']).first()
-            MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-            if data_point_indicator:
-                if 'MH' in j['data_point_name']:
-                    MH_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    MH_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'ML' in j['data_point_name']:
-                    ML_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    ML_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC10' in j['data_point_name']:
-                    TC10_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC10_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC50' in j['data_point_name']:
-                    TC50_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC50_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC90' in j['data_point_name']:
-                    TC90_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC90_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-            spe = str(j['material_test_order__production_factory_date']) + '_' + j['material_test_order__production_class']
+            if data_point_dic.get(j['material_test_order__product_no']):
+                data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
+                if data_point_list:
+                    MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
+                    if 'MH' in j['data_point_name']:
+                        MH_lower = 1 if j['value'] < data_point_list[0] else 0
+                        MH_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'ML' in j['data_point_name']:
+                        ML_lower = 1 if j['value'] < data_point_list[0] else 0
+                        ML_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC10' in j['data_point_name']:
+                        TC10_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC10_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC50' in j['data_point_name']:
+                        TC50_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC50_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC90' in j['data_point_name']:
+                        TC90_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC90_upper = 1 if j['value'] > data_point_list[1] else 0
+
+            spe = j['material_test_order__product_no'].split('-')[2]
             if dic.get(spe):
                 data = dic.get(spe)
                 dic[spe].update({
@@ -2703,31 +2723,41 @@ class UnqialifiedEquipView(APIView):
         # 统计不合格中超过和小于标准的数量
         # ---------------- begin ---------------
         dic_ = {}
-        data_point_query = MaterialDataPointIndicator.objects.all()
+        data_point_dic = {}
+        data_point_query = MaterialDataPointIndicator.objects.values(
+            'material_test_method__material__material_name', 'data_point__name',
+            'upper_limit', 'lower_limit')
+        for i in data_point_query:
+            if data_point_dic.get(i['material_test_method__material__material_name']):
+                data_point_dic[i['material_test_method__material__material_name']][i['data_point__name']] = [i['lower_limit'], i['upper_limit']]
+            else:
+                data_point_dic[i['material_test_method__material__material_name']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
+
         res = material_test_result.values('material_test_order__production_equip_no',
                                           'material_test_order__product_no',
                                           'data_point_name', 'value')
         for j in res:
-            data_point_indicator = data_point_query.filter(data_point__name=j['data_point_name'],
-                                                      material_test_method__material__material_name=j['material_test_order__product_no']).first()
-            MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-            if data_point_indicator:
-                if 'MH' in j['data_point_name']:
-                    MH_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    MH_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'ML' in j['data_point_name']:
-                    ML_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    ML_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC10' in j['data_point_name']:
-                    TC10_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC10_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC50' in j['data_point_name']:
-                    TC50_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC50_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-                if 'TC90' in j['data_point_name']:
-                    TC90_lower = 1 if j['value'] < data_point_indicator.lower_limit else 0
-                    TC90_upper = 1 if j['value'] > data_point_indicator.upper_limit else 0
-            spe = j['material_test_order__production_equip_no']
+            if data_point_dic.get(j['material_test_order__product_no']):
+                data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
+                if data_point_list:
+                    MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
+                    if 'MH' in j['data_point_name']:
+                        MH_lower = 1 if j['value'] < data_point_list[0] else 0
+                        MH_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'ML' in j['data_point_name']:
+                        ML_lower = 1 if j['value'] < data_point_list[0] else 0
+                        ML_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC10' in j['data_point_name']:
+                        TC10_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC10_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC50' in j['data_point_name']:
+                        TC50_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC50_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'TC90' in j['data_point_name']:
+                        TC90_lower = 1 if j['value'] < data_point_list[0] else 0
+                        TC90_upper = 1 if j['value'] > data_point_list[1] else 0
+
+            spe = j['material_test_order__product_no'].split('-')[2]
             if dic_.get(spe):
                 data = dic_.get(spe)
                 dic_[spe].update({
