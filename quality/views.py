@@ -2565,7 +2565,7 @@ class ClassTestStaticsView(APIView):
                         TC90_lower = 1 if j['value'] < data_point_list[0] else 0
                         TC90_upper = 1 if j['value'] > data_point_list[1] else 0
 
-            spe = j['material_test_order__product_no'].split('-')[2]
+            spe = str(j['material_test_order__production_factory_date']) + '_' + j['material_test_order__production_class']
             if dic.get(spe):
                 data = dic.get(spe)
                 dic[spe].update({
@@ -2757,7 +2757,7 @@ class UnqialifiedEquipView(APIView):
                         TC90_lower = 1 if j['value'] < data_point_list[0] else 0
                         TC90_upper = 1 if j['value'] > data_point_list[1] else 0
 
-            spe = j['material_test_order__product_no'].split('-')[2]
+            spe = j['material_test_order__production_equip_no']
             if dic_.get(spe):
                 data = dic_.get(spe)
                 dic_[spe].update({
