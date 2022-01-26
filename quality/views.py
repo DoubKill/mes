@@ -2433,6 +2433,19 @@ class ProductTestStaticsView(APIView):
         for i in result.keys():
             if dic.get(i):
                 result[i].update(dic[i])
+            else:
+                result[i].update({
+                    'MH_lower': 0,
+                    'MH_upper': 0,
+                    'ML_lower': 0,
+                    'ML_upper': 0,
+                    'TC10_lower': 0,
+                    'TC10_upper': 0,
+                    'TC50_lower': 0,
+                    'TC50_upper': 0,
+                    'TC90_lower': 0,
+                    'TC90_upper': 0,
+                })
         """result {'J260': {'product_type': 'J260', 'JC': 2, 'HG': 1, 'MH': 1, 'ML': 1, 'TC10': 1 .....}}"""
         # --------------- end -----------------
         pre_data = queryset.values('material_test_order__product_no', 'test_indicator_name', 'data_point_name')\
@@ -2618,6 +2631,19 @@ class ClassTestStaticsView(APIView):
         for i in result.keys():
             if dic.get(i):
                 result[i].update(dic[i])
+            else:
+                result[i].update({
+                    'MH_lower': 0,
+                    'MH_upper': 0,
+                    'ML_lower': 0,
+                    'ML_upper': 0,
+                    'TC10_lower': 0,
+                    'TC10_upper': 0,
+                    'TC50_lower': 0,
+                    'TC50_upper': 0,
+                    'TC90_lower': 0,
+                    'TC90_upper': 0,
+                })
         # --------------- end -----------------
         pre_data = queryset.values('material_test_order__production_factory_date',
                                    'material_test_order__production_class', 'test_indicator_name', 'data_point_name') \
@@ -2899,6 +2925,19 @@ class UnqialifiedEquipView(APIView):
                     }
                 if dic_.get(equip):
                     data.update(dic_[equip])
+                else:
+                    data.update({
+                        'MH_lower': 0,
+                        'MH_upper': 0,
+                        'ML_lower': 0,
+                        'ML_upper': 0,
+                        'TC10_lower': 0,
+                        'TC10_upper': 0,
+                        'TC50_lower': 0,
+                        'TC50_upper': 0,
+                        'TC90_lower': 0,
+                        'TC90_upper': 0,
+                    })
                 results.append(
                     data
                     # {
