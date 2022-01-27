@@ -2356,14 +2356,20 @@ class ReturnRubberViewSet(ModelViewSet):
     queryset = ReturnRubber.objects.all().order_by('-id')
     serializer_class = ReturnRubberSerializer
     pagination_class = None
-    permission_classes = (IsAuthenticated,)
+    permission_classes = ()
     filter_backends = (DjangoFilterBackend,)
     filter_class = ReturnRubberFilter
 
-    @action(methods=['post'], detail=False, url_path='print_return_rubber', url_name='print_return_rubber')
+    def get_permissions(self):
+        if self.request.query_params.get('client'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    @action(methods=['put'], detail=False, url_path='print_return_rubber', url_name='print_return_rubber')
     def print_return_rubber(self, request):
         rid = self.request.data.get('id')
-        status = self.request.data.get('status')
+        status = self.request.data.get('print_flag')
         self.get_queryset().filter(id=rid).update(status=status)
         return response(success=True, message='回正打印状态成功')
 

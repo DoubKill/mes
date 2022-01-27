@@ -318,6 +318,15 @@ class WeighCntType(models.Model):
             delete_flag=False).aggregate(total_weight=Sum('standard_weight'))['total_weight']
         return total_weight if total_weight else 0
 
+    def cnt_total_weight(self, equip_no):
+        """获取料包重量(除去走罐体称量部分)"""
+        out_materials = ProductBatchingEquip.objects.filter(cnt_type_detail_equip__weigh_cnt_type=self, type=4,
+                                                            is_used=True, equip_no=equip_no, feeding_mode='C') \
+            .values_list('material__material_name', flat=True)
+        total_weight = self.weight_details.filter(~Q(material__material_name__in=out_materials), delete_flag=False) \
+            .aggregate(total_weight=Sum('standard_weight'))['total_weight']
+        return total_weight if total_weight else 0
+
     class Meta:
         db_table = 'weigh_cnt_type'
         verbose_name_plural = verbose_name = '小料称重分包分类'
@@ -362,3 +371,18 @@ class ERPMESMaterialRelation(models.Model):
     class Meta:
         db_table = 'erp_mes_material_relation'
         verbose_name_plural = verbose_name = 'ERP与MES信息绑定关系'
+
+
+class ProductBatchingEquip(models.Model):
+    product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配方id', related_name='product_batching_equip')
+    equip_no = models.CharField(max_length=8, help_text='机台名称')
+    material = models.ForeignKey(Material, on_delete=models.CASCADE, help_text='物料id')
+    batching_detail_equip = models.ForeignKey(ProductBatchingDetail, on_delete=models.CASCADE, help_text='胶块信息表id', null=True, blank=True)
+    cnt_type_detail_equip = models.ForeignKey(WeighBatchingDetail, on_delete=models.CASCADE, help_text='小料详情id', null=True, blank=True)
+    type = models.IntegerField(help_text='类别: 1: 胶料, 2: 炭黑, 3: 油料, 4: 小料')
+    feeding_mode = models.CharField(max_length=4, help_text='投料方式: P密炼口投料, C炭黑罐自动, O油料罐自动', null=True, blank=True)
+    is_used = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'product_batching_equip'
+        verbose_name_plural = verbose_name = '机台配方详情'

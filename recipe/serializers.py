@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 
-from django.db.models import Q
+from django.db.models import *
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -12,7 +12,8 @@ from mes.base_serializer import BaseModelSerializer
 from mes.sync import ProductObsoleteInterface
 from plan.models import ProductClassesPlan
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
-    MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation
+    MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation, \
+    ProductBatchingEquip
 from mes.conf import COMMON_READ_ONLY_FIELDS
 
 sync_logger = logging.getLogger('sync_log')
@@ -125,6 +126,15 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
     material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
+    master = serializers.DictField(default={})
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.product_batching, is_used=True,
+                                                            material=instance.material, type=instance.type)
+        update_data = {i.equip_no: i.feeding_mode for i in batching_info}
+        res.update({'master': update_data})
+        return res
 
     class Meta:
         model = ProductBatchingDetail
@@ -158,6 +168,15 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     reject_username = serializers.CharField(source="reject_user.username", read_only=True)
     used_username = serializers.CharField(source="used_user.username", read_only=True)
     obsolete_username = serializers.CharField(source="obsolete_user.username", read_only=True)
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        # 查看是否存在_NEW配方
+        new_recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+            stage_product_batch_no=f'{instance.stage_product_batch_no}_NEW', dev_type=instance.dev_type).first()
+        new_recipe_id = new_recipe.id if new_recipe else 0
+        res['new_recipe_id'] = new_recipe_id
+        return res
 
     class Meta:
         model = ProductBatching
@@ -202,12 +221,16 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         },
     ]
     """)
+    create_new = serializers.BooleanField(default=False)
 
     @atomic()
     def create(self, validated_data):
         batching_details = validated_data.pop('batching_details', None)
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
         stage_product_batch_no = validated_data.get('stage_product_batch_no')
+        if validated_data.pop('create_new'):
+            stage_product_batch_no += '_NEW'
+            validated_data['stage_product_batch_no'] = stage_product_batch_no
         if stage_product_batch_no:
             # 传胶料编码则代表是特殊配方
             validated_data.pop('site', None)
@@ -225,17 +248,22 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                                                                             product_info.product_no, versions)
         instance = super().create(validated_data)
         if batching_details:
-            batching_detail_list = [None] * len(batching_details)
             for i, detail in enumerate(batching_details):
-                # material = detail.get('material')
+                material = detail.get('material')
                 detail.pop('id', None)
-                # if material.material_type.global_name == '炭黑':
-                #     detail['type'] = 2
-                # elif material.material_type.global_name == '油料':
-                #     detail['type'] = 3
+                master = detail.pop('master', None)
+                if material.material_type.global_name == '炭黑':
+                    detail['type'] = 2
+                elif material.material_type.global_name == '油料':
+                    detail['type'] = 3
                 detail['product_batching'] = instance
-                batching_detail_list[i] = ProductBatchingDetail(**detail)
-            ProductBatchingDetail.objects.bulk_create(batching_detail_list)
+                detail_instance = ProductBatchingDetail.objects.create(**detail)
+                # 保存投料方式设定
+                if master:
+                    for k, v in master.items():
+                        data = {'product_batching': instance, 'equip_no': k, 'material': material, 'feeding_mode': v,
+                                'type': detail['type'], 'batching_detail_equip': detail_instance}
+                        ProductBatchingEquip.objects.create(**data)
         if weight_cnt_types:
             # 新建小料包
             for weight_cnt_type in weight_cnt_types:
@@ -248,11 +276,17 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 cnt_type_instance = WeighCntType.objects.create(**weight_cnt_type)
                 if weight_details:
                     # 新建小料包详情
-                    weight_cnt_types_detail_list = [None] * len(weight_details)
                     for j, weight_detail in enumerate(weight_details):
+                        master = weight_detail.pop('master', None)
                         weight_detail["weigh_cnt_type"] = cnt_type_instance
-                        weight_cnt_types_detail_list[j] = WeighBatchingDetail(**weight_detail)
-                    WeighBatchingDetail.objects.bulk_create(weight_cnt_types_detail_list)
+                        cnt_detail_instance = WeighBatchingDetail.objects.create(**weight_detail)
+                        # 保存投料方式设定
+                        if master:
+                            for k, v in master.keys():
+                                data = {'product_batching': instance, 'equip_no': k, 'type': 4, 'feeding_mode': v,
+                                        'material': weight_detail.get('material'),
+                                        'cnt_type_detail_equip': cnt_detail_instance}
+                                ProductBatchingEquip.objects.create(**data)
         try:
             material_type = GlobalCode.objects.filter(global_type__type_name='原材料类别',
                                                       global_name=instance.stage.global_name).first()
@@ -269,7 +303,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
 
     class Meta:
         model = ProductBatching
-        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'weight_cnt_types',
+        fields = ('factory', 'site', 'product_info', 'precept', 'stage_product_batch_no', 'weight_cnt_types', 'create_new',
                   'stage', 'versions', 'batching_details', 'equip', 'id', 'dev_type', 'production_time_interval')
         extra_kwargs = {
             'stage_product_batch_no': {
@@ -283,6 +317,15 @@ class WeighCntTypeDetailRetrieveSerializer(serializers.ModelSerializer):
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
     material_type = serializers.CharField(source='material.material_type.global_name', read_only=True)
+    master = serializers.DictField(default={})
+
+    def to_representation(self, instance):
+        res = super().to_representation(instance)
+        batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.weigh_cnt_type.product_batching,
+                                                            material=instance.material, is_used=True, type=4)
+        update_data = {i.equip_no: i.feeding_mode for i in batching_info}
+        res.update({'master': update_data})
+        return res
 
     class Meta:
         model = WeighBatchingDetail
@@ -338,6 +381,11 @@ class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
         },
     ]
     """)
+    enable_equip = serializers.SerializerMethodField()
+
+    def get_enable_equip(self, obj):
+        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=obj, is_used=True).values_list('equip_no', flat=True).distinct())
+        return enable_equip
 
     class Meta:
         model = ProductBatching
@@ -348,6 +396,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     batching_detail_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
     cnt_type_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
     weight_detail_ids = serializers.ListField(required=False, allow_empty=True, allow_null=True)
+    del_batching_equip = serializers.ListField(required=False, allow_empty=True, allow_null=True)
 
     @atomic()
     def update(self, instance, validated_data):
@@ -357,29 +406,55 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
         batching_detail_ids = validated_data.pop('batching_detail_ids', [])
         cnt_type_ids = validated_data.pop('cnt_type_ids', [])
+        del_batching_equip = validated_data.pop('del_batching_equip', [])
         weight_detail_ids = validated_data.pop('weight_detail_ids', [])
         ProductBatchingDetail.objects.filter(id__in=batching_detail_ids).update(delete_flag=True)
         WeighCntType.objects.filter(id__in=cnt_type_ids).update(delete_flag=True)
         WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).update(delete_flag=True)
+        # 禁用删除机台
+        if del_batching_equip:
+            ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=del_batching_equip).update(is_used=False)
+        # 删除物料
+        material_ids = list(ProductBatchingDetail.objects.filter(id__in=batching_detail_ids).values_list('material__id', flat=True)) + list(WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).values_list('material__id', flat=True))
+        ProductBatchingEquip.objects.filter(product_batching=instance, id__in=material_ids).update(is_used=False)
         instance = super().update(instance, validated_data)
         if batching_details is not None:
             for detail in batching_details:
                 batching_detail_id = detail.pop('id', None)
-                # material = detail.get('material')
-                # if material.material_type.global_name == '炭黑':
-                #     detail['type'] = 2
-                # elif material.material_type.global_name == '油料':
-                #     detail['type'] = 3
+                master = detail.pop('master', None)
+                material = detail.get('material')
+                if material.material_type.global_name == '炭黑':
+                    detail['type'] = 2
+                elif material.material_type.global_name == '油料':
+                    detail['type'] = 3
                 if batching_detail_id:
                     # 更新
                     batching_detail_instance = ProductBatchingDetail.objects.filter(id=batching_detail_id).first()
                     if not batching_detail_instance:
                         raise serializers.ValidationError('object does not exit!')
                     ProductBatchingDetail.objects.filter(id=batching_detail_id).update(**detail)
+                    if master:
+                        for k, v in master.items():
+                            exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=material)
+                            if exist_equip:
+                                update_data = {'type': detail['type'], 'feeding_mode': v, 'material': material}
+                                exist_equip.filter(batching_detail_equip_id=batching_detail_id).update(**update_data)
+                            else:  # 新增机台
+                                create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
+                                               'batching_detail_equip': batching_detail_instance, 'type': detail['type'],
+                                               'feeding_mode': v}
+                                ProductBatchingEquip.objects.create(**create_data)
                 else:
                     # 更新
                     detail['product_batching'] = instance
-                    ProductBatchingDetail.objects.create(**detail)
+                    batching_detail_instance = ProductBatchingDetail.objects.create(**detail)
+                    # 保存投料方式设定
+                    if master:
+                        for k, v in master.items():
+                            create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
+                                           'batching_detail_equip': batching_detail_instance,
+                                           'type': detail['type'], 'feeding_mode': v}
+                            ProductBatchingEquip.objects.create(**create_data)
         if weight_cnt_types is not None:
             for weight_cnt_type in weight_cnt_types:
                 weight_details = weight_cnt_type.pop('weight_details', None)
@@ -402,16 +477,34 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                     # 更新小料包详情
                     for weight_detail in weight_details:
                         weight_detail_id = weight_detail.pop('id', None)
+                        material = weight_detail.get('material')
+                        master = weight_detail.pop('master', None)
                         if weight_detail_id:
                             # 有id则更新
                             detail = WeighBatchingDetail.objects.filter(id=weight_detail_id).first()
                             if not detail:
                                 raise serializers.ValidationError('object does not exit!')
                             WeighBatchingDetail.objects.filter(id=weight_detail_id).update(**weight_detail)
+                            if master:
+                                for k, v in master.items():
+                                    exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=material)
+                                    if exist_equip:
+                                        update_data = {'type': 4, 'feeding_mode': v, 'material': material}
+                                        exist_equip.filter(cnt_type_detail_equip_id=weight_detail_id).update(**update_data)
+                                    else:  # 新增机台
+                                        create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
+                                                       'cnt_type_detail_equip': detail, 'type': 4, 'feeding_mode': v}
+                                        ProductBatchingEquip.objects.create(**create_data)
                         else:
                             # 否则新建
                             weight_detail["weigh_cnt_type"] = cnt_type_instance
-                            WeighBatchingDetail.objects.create(**weight_detail)
+                            cnt_detail_instance = WeighBatchingDetail.objects.create(**weight_detail)
+                            # 保存投料方式设定
+                            if master:
+                                for k, v in master.items():
+                                    data = {'product_batching': instance, 'equip_no': k, 'material': material,
+                                            'cnt_type_detail_equip': cnt_detail_instance, 'type': 4, 'feeding_mode': v}
+                                    ProductBatchingEquip.objects.create(**data)
         for cnt_type_instance in instance.weight_cnt_types.filter(delete_flag=False):
             if not cnt_type_instance.weight_details.filter(delete_flag=False).exists():
                 cnt_type_instance.delete_flag = True
@@ -423,7 +516,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
     class Meta:
         model = ProductBatching
         fields = ('id', 'batching_details', 'dev_type', 'production_time_interval', 'weight_cnt_types',
-                  'batching_detail_ids', 'cnt_type_ids', 'weight_detail_ids')
+                  'batching_detail_ids', 'cnt_type_ids', 'weight_detail_ids', 'del_batching_equip')
 
 
 class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
@@ -468,6 +561,7 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
                 instance.obsolete_user = self.context['request'].user
                 instance.used_type = 6
                 instance.obsolete_time = datetime.now()
+                ProductBatchingEquip.objects.filter(product_batching=instance).update(is_used=False)
             else:  # 驳回
                 instance.used_type = 5
                 instance.reject_user = self.context['request'].user

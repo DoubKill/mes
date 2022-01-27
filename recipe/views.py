@@ -25,7 +25,8 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation
+    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
+    ProductBatchingEquip
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -278,6 +279,8 @@ class RecipeNoticeAPiView(APIView):
 
     def post(self, request):
         product_batching_id = self.request.query_params.get('product_batching_id')
+        product_no = self.request.query_params.get('product_no')
+        notice_flag = self.request.query_params.get('notice_flag')
         try:
             product_batching_id = int(product_batching_id)
         except Exception:
@@ -290,7 +293,15 @@ class RecipeNoticeAPiView(APIView):
             raise ValidationError('只有应用状态的配方才可下发至上辅机')
         if not product_batching.dev_type:
             raise ValidationError('请选择机型')
-        interface = ProductBatchingSyncInterface(instance=product_batching)
+        if not notice_flag:
+            # 查询群控是否存在同名接口
+            real_product_no = product_no if 'NEW' not in product_no else product_no.split('_NEW')[0]
+            sfj_same_recipe = ProductBatching.objects.using('SFJ').exclude(used_type=6).filter(stage_product_batch_no=real_product_no)
+            if sfj_same_recipe:
+                return Response({'notice_flag': True})
+        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True)
+                            .values_list('equip_no', flat=True).distinct())
+        interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': enable_equip})
         try:
             interface.request()
         except Exception as e:
@@ -299,6 +310,16 @@ class RecipeNoticeAPiView(APIView):
                                                 stage_product_batch_no=product_batching.stage_product_batch_no,
                                                 dev_type=product_batching.dev_type):
             p.batching_details.all().delete()
+        # NEW配方下传成功：1、废弃旧配方；2、修改配方名称；
+        if 'NEW' in product_no:
+            origin_recipe = product_no.split('_NEW')[0]
+            # 废弃原配方
+            ProductBatching.objects.filter(stage_product_batch_no=origin_recipe).update(used_type=6)
+            # 清除机台配方
+            ProductBatchingEquip.objects.filter(product_batching__stage_product_batch_no=origin_recipe).update(is_used=False)
+            # 去除配方里的_NEW
+            product_batching.stage_product_batch_no = origin_recipe
+            product_batching.save()
         return Response(data={'auxiliary_url': settings.AUXILIARY_URL}, status=status.HTTP_200_OK)
 
 
