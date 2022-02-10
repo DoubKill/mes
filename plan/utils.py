@@ -215,12 +215,12 @@ def extend_last_aps_result(factory_date, schedule_no):
                         finished_trains = 0
 
                     if finished_trains < q.plan_trains:
-                        unfinished_plan = query_set.filter(sn__gte=q.sn)
+                        unfinished_plan = query_set.filter(id__gte=q.id)
                     else:
-                        unfinished_plan = query_set.filter(sn__gt=q.sn)
+                        unfinished_plan = query_set.filter(id__gt=q.id)
                     idx = 1
                     for plan in unfinished_plan:
-                        if plan.sn == q.sn:
+                        if plan.id == q.id:
                             plan_trains = plan.plan_trains - finished_trains
                             time_consume = round(
                                 calculate_equip_recipe_avg_mixin_time(equip_no, plan.recipe_name) * plan_trains / 3600,

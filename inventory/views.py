@@ -443,6 +443,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         lot_no = self.request.query_params.get("lot_no")
         pallet_no = self.request.query_params.get("pallet_no")
         order_type = self.request.query_params.get("order_type")
+        batch_no = self.request.query_params.get("batch_no")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -536,6 +537,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(task__start_time__lte=end_time)
             if material_name:
                 filter_dict.update(material_name__icontains=material_name)
+            if batch_no:
+                filter_dict.update(batch_no=batch_no)
             if quality_status:
                 if quality_status == '1':
                     batch_nos = list(ExamineMaterial.objects.filter(qualified=True).values_list('batch', flat=True))
