@@ -4,12 +4,13 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Max, Sum, Q
+from django.db.models import Max, Sum, Q, Prefetch
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from pygments.lexer import using
 from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -29,7 +30,7 @@ from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
-    WeighBatchingDetail
+    WeighBatchingDetail, ProductBatchingEquip
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
     FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter, WeightPackageManualFilter, \
@@ -54,7 +55,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_sfj_carbon_materials
+    get_manual_materials, get_sfj_carbon_materials, transform_tolerance
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2463,3 +2464,106 @@ class MaterialDetailsAux(APIView):
             return Response(res)
         else:
             return Response({'material_name_weight': material_name_weight, 'cnt_type_details': cnt_type_details})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class XlRecipeNoticeView(APIView):
+    """下传mes称量配方到称量系统"""
+
+    def post(self, request):
+        product_batching_id = self.request.query_params.get('product_batching_id')
+        product_no = self.request.query_params.get('product_no')
+        xl_equip = self.request.query_params.get('xl_equip')
+        notice_flag = self.request.query_params.get('notice_flag')
+        try:
+            product_batching_id = int(product_batching_id)
+            keywords = xl_equip[0]
+        except Exception:
+            raise ValidationError('参数错误')
+        product_batching = ProductBatching.objects.filter(id=product_batching_id).prefetch_related(
+            Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))).first()
+        if not product_batching:
+            raise ValidationError('该配方不存在')
+        if not product_batching.used_type == 4:
+            raise ValidationError('只有应用状态的配方才可下发至称量系统')
+        mes_xl_details = ProductBatchingEquip.objects.filter(product_batching=product_batching, is_used=True, type=4)
+        if not mes_xl_details:
+            raise ValidationError('配方中无称量系统小料内容, 无法下发')
+        not_tank_materials = mes_xl_details.filter(~Q(feeding_mode__startswith='C'), feeding_mode__startswith=keywords)
+        if not not_tank_materials:
+            raise ValidationError('配方中的小料内容投料方式与机台不相符')
+        # 查询所有的称量线体罐物料与配方设置物料是否一致
+        mes_xl_materials = not_tank_materials.values_list('material__material_name', flat=True).distinct()
+        handle_mes_xl_materials = {i[:-2]: i for i in mes_xl_materials if i.endswith('-C') or i.endswith('-X')}
+        xl_equip_materials = list(Bin.objects.using(xl_equip).values_list('name', flat=True))
+        out_mes_materials = list(set(handle_mes_xl_materials.keys()) - set(xl_equip_materials))
+        if not notice_flag and out_mes_materials:
+            return Response({'notice_flag': True})
+        # 配方和线体相同物料
+        same_material_list = list(set(handle_mes_xl_materials.keys()) & set(xl_equip_materials))
+        tran_to_mes = [handle_mes_xl_materials.get(j) for j in same_material_list]
+        # 在使用称量配方不能下发
+        equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
+        # 下发配方数据与是否下发标识
+        now_date = datetime.datetime.now().date()
+        before_date = now_date - timedelta(days=1)
+        send_data = {'dev_type': product_batching.dev_type.category_no}
+        for single_equip_no in equip_no_list:
+            send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, material__material_name__in=tran_to_mes)
+            if not send_materials:
+                continue
+            not_keyword_material = mes_xl_details.filter(~Q(feeding_mode__startswith=keywords), equip_no=single_equip_no)
+            send_recipe_name = f"{product_no.split('-NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-only)")
+            processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中', '等待'], recipe=send_recipe_name)
+            if processing_xl_plan:
+                raise ValidationError('预下发配方正在该线体进行配料')
+            send_data[send_recipe_name] = send_materials
+        # 下传配方
+        try:
+            with atomic(using=xl_equip):
+                self.issue_xl_system(xl_equip, send_data)
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        return Response(f'{xl_equip}细料配方下传成功')
+
+    def issue_xl_system(self, xl_equip, data):
+        """
+        新增称量系统配方
+        """
+        dev_type = data.pop('dev_type')
+        # 数据整理[物料名去除后缀, 配料重量提取默认分包数]
+        for recipe_name, recipe_materials in data.items():
+            total_weight = recipe_materials.aggregate(total_weight=Sum('cnt_type_detail_equip__standard_weight'))['total_weight']
+            if not total_weight:
+                raise ValidationError(f'下发物料重量无法解析{total_weight}')
+            split_count = 1 if total_weight <= 30 else 2
+            weight = round(total_weight / split_count, 3)
+            n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
+            # 添加配方数据
+            tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=weight, project_name='all')
+            handle_tolerance = transform_tolerance(weight, tolerance)
+            m_id = RecipePre.objects.using(xl_equip).aggregate(m_id=Max('id'))['m_id']
+            if not m_id:
+                raise ValidationError(f'无法解析{xl_equip}配方表主键')
+            RecipePre.objects.using(xl_equip).create(**{'id': m_id + 1, 'name': recipe_name, 'ver': dev_type,
+                                                        'weight': weight, 'error': handle_tolerance, 'use_not': 0,
+                                                        'merge_flag': False, 'split_count': split_count, 'time': n_time})
+            # 添加配方明细数据
+            recipe_material_list = []
+            n_id = RecipeMaterial.objects.using(xl_equip).aggregate(n_id=Max('id'))['n_id']
+            if not n_id:
+                raise ValidationError(f'无法解析{xl_equip}配方明细表主键')
+            add_ids = [n_id]
+            for single in recipe_materials:
+                mes_name = single.material.material_name
+                xl_name = mes_name[:-2] if '-C' in mes_name or '-X' in mes_name else mes_name
+                single_weight = round(single.cnt_type_detail_equip.standard_weight / split_count, 3)
+                # 单物料公差
+                single_tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=single_weight)
+                h_single_tolerance = transform_tolerance(single_weight, single_tolerance)
+                create_data = {'id': max(add_ids) + 1, 'recipe_name': recipe_name, 'name': xl_name,
+                               'weight': single_weight, 'error': h_single_tolerance, 'time': n_time}
+                single_data = RecipeMaterial(**create_data)
+                add_ids.append(max(add_ids) + 1)
+                recipe_material_list.append(single_data)
+            RecipeMaterial.objects.using(xl_equip).bulk_create(recipe_material_list)

@@ -4,6 +4,7 @@
 import re
 import json
 import time
+from decimal import Decimal
 
 import requests
 from datetime import datetime
@@ -514,3 +515,16 @@ def get_sfj_carbon_materials(cnt_type_details, stage_product_batch_no, equip_no)
     else:
         handle_cnt_type_details = cnt_type_details
     return handle_cnt_type_details
+
+
+def transform_tolerance(weight, tolerance):
+    """
+    转换公差 ex 3 '±1%' --> 0.030
+    """
+    if tolerance.endswith('kg'):
+        result = Decimal(tolerance[1:-2])
+    elif tolerance.endswith('%'):
+        result = round(Decimal(tolerance[1:-1]) / 100 * weight, 3)
+    else:
+        result = 0
+    return result

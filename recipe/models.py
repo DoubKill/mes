@@ -321,7 +321,7 @@ class WeighCntType(models.Model):
     def cnt_total_weight(self, equip_no):
         """获取料包重量(除去走罐体称量部分)"""
         out_materials = ProductBatchingEquip.objects.filter(cnt_type_detail_equip__weigh_cnt_type=self, type=4,
-                                                            is_used=True, equip_no=equip_no, feeding_mode='C') \
+                                                            is_used=True, equip_no=equip_no, feeding_mode__startswith='C') \
             .values_list('material__material_name', flat=True)
         total_weight = self.weight_details.filter(~Q(material__material_name__in=out_materials), delete_flag=False) \
             .aggregate(total_weight=Sum('standard_weight'))['total_weight']
