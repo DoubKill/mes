@@ -34,7 +34,7 @@ class ClassesBanBurySummaryView(ListAPIView):
         factory_dates = set([str(item['date']) for item in page])
         classes = set([item['classes'] for item in page])
         schedule_plans = WorkSchedulePlan.objects.filter(
-            plan_schedule__work_schedule__schedule_name='三班两运转').filter(
+            plan_schedule__work_schedule__work_procedure__global_name='密炼').filter(
             Q(plan_schedule__day_time__in=factory_dates) | Q(classes__global_name__in=classes)).values(
             'plan_schedule__day_time', 'classes__global_name', 'start_time', 'end_time'
         )

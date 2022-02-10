@@ -20,8 +20,7 @@ from production.models import PlanStatus
 
 def main():
     # ProductDayPlan.objects.all().delete()
-    ps = PlanSchedule.objects.filter(day_time=datetime.datetime.now().date(),
-                                     work_schedule__schedule_name='三班两运转').first()
+    ps = PlanSchedule.objects.filter(day_time=datetime.datetime.now().date()).first()
     for pb in ProductBatching.objects.filter(used_type=4):
         equip_ids = list(Equip.objects.filter(category=pb.dev_type).values_list('id', flat=True))
         if equip_ids:
