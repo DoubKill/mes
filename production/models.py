@@ -379,3 +379,46 @@ class MachineTargetYieldSettings(models.Model):
 
     class Meta:
         db_table = 'machine_target_yield_settings'
+
+
+class EmployeeAttendanceRecords(models.Model):
+    name = models.CharField(help_text='姓名', max_length=64)
+    section = models.CharField(help_text='岗位', max_length=64)
+    date = models.DateField(help_text='上班时间')
+    classes = models.CharField(help_text='班组', max_length=64)
+    equip = models.CharField(help_text='机台', max_length=64)
+
+    class Meta:
+        db_table = 'employee_attendance_records'
+        verbose_name_plural = verbose_name = '员工出勤记录表'
+
+
+class PerformanceJobLadder(models.Model):
+    code = models.CharField(help_text='岗位编号', max_length=64, unique=True)
+    name = models.CharField(help_text='岗位名称', max_length=64, unique=True)
+    coefficient = models.IntegerField(help_text='绩效系数')
+    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+
+    class Meta:
+        db_table = 'performance_job_ladder'
+        verbose_name_plural = verbose_name = '岗位阶梯表'
+
+
+class PerformanceUnitPrice(models.Model):
+    state = models.CharField(help_text='段次', max_length=64)
+    equip_type = models.CharField(help_text='机型', max_length=64)
+    pt = models.FloatField(help_text='普通胶')
+    dj = models.FloatField(help_text='丁基胶')
+
+    class Meta:
+        db_table = 'performance_unit_price'
+        verbose_name_plural = verbose_name = '绩效单价表'
+
+
+class ProductInfoDingJi(AbstractEntity):
+    product_no = models.CharField(help_text='胶料编码', max_length=64)
+    product_name = models.CharField(help_text='胶料名称', max_length=64)
+
+    class Meta:
+        db_table = 'product_info_dingji'
+        verbose_name_plural = verbose_name = '丁基胶规格设定'

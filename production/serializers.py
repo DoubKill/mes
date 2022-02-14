@@ -8,7 +8,8 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
-    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason
+    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
+    ProductInfoDingJi
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -366,4 +367,20 @@ class RubberCannotPutinReasonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RubberCannotPutinReason
+        fields = '__all__'
+
+
+class PerformanceJobLadderSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(validators=[UniqueValidator(queryset=PerformanceJobLadder.objects.all(), message='该岗位编号已存在')])
+    name = serializers.CharField(validators=[UniqueValidator(queryset=PerformanceJobLadder.objects.all(), message='该岗位名称已存在')])
+
+    class Meta:
+        model = PerformanceJobLadder
+        fields = '__all__'
+
+
+class ProductInfoDingJiSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = ProductInfoDingJi
         fields = '__all__'

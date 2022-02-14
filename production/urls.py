@@ -48,6 +48,10 @@ router.register(r'curve-information-list', CurveInformationList, basename="curve
 router.register(r'alarm_log-list', AlarmLogList, basename="alarm_log-list")
 # 车次报表展示
 router.register(r'trains-feedbacks-apiview', TrainsFeedbacksAPIView, basename="trains-feedbacks-apiview")
+# 绩效 岗位阶梯表
+router.register(r'performance-job-ladder', PerformanceJobLadderViewSet)
+# 丁基胶 规格设定
+router.register('product-info-dj', ProductInfoDingJiViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -98,8 +102,19 @@ urlpatterns = [
     path('machine-target-value/', MachineTargetValue.as_view()),
     # 月产量统计汇总报表
     path('monthly-output-statistics-report/', MonthlyOutputStatisticsReport.as_view()),
-    # 月产量统计明细及绩效
-    path('monthly-output-statistics-and-performance/', MonthlyOutputStatisticsAndPerformance.as_view()),
+
+    # 密炼机台产量汇总表
+    path('summary_of_mill_output/', SummaryOfMillOutput.as_view()),
+    # path('monthly-output-statistics-and-performance/', MonthlyOutputStatisticsAndPerformance.as_view()),
+
+    # 员工出勤记录表
+    path('employee_attendance_records/', EmployeeAttendanceRecordsView.as_view()),
+    path('employee_attendance_records_export/', EmployeeAttendanceRecordsExport.as_view({'get': 'export'})),
+
+    # 绩效 单价表
+    path('performance-unit-price/', PerformanceUnitPriceView.as_view()),
+
+
     # 月产量完成报表
     path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
 ]
