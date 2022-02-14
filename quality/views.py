@@ -41,7 +41,8 @@ from quality.filters import TestMethodFilter, DataPointFilter, \
     MaterialTestMethodFilter, MaterialDataPointIndicatorFilter, MaterialTestOrderFilter, MaterialDealResulFilter, \
     DealSuggestionFilter, PalletFeedbacksTestFilter, UnqualifiedDealOrderFilter, MaterialExamineTypeFilter, \
     ExamineMaterialFilter, MaterialEquipFilter, MaterialExamineResultFilter, MaterialReportEquipFilter, \
-    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter
+    MaterialReportValueFilter, ProductReportEquipFilter, ProductReportValueFilter, ProductTestResumeFilter, \
+    MaterialTestPlanFilter
 from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod, MaterialTestOrder, \
     MaterialTestMethod, TestType, DataPoint, DealSuggestion, MaterialDealResult, LevelResult, MaterialTestResult, \
     LabelPrint, TestDataPoint, BatchMonth, BatchDay, BatchProductNo, BatchEquip, BatchClass, UnqualifiedDealOrder, \
@@ -49,7 +50,7 @@ from quality.models import TestIndicator, MaterialDataPointIndicator, TestMethod
     DataPointStandardError, MaterialSingleTypeExamineResult, MaterialEquipType, MaterialEquip, \
     QualifiedRangeDisplay, IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, \
     ProductReportEquip, ProductReportValue, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
-    LabelPrintLog
+    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail
 
 from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialTestOrderSerializer, MaterialTestOrderListSerializer, \
@@ -66,7 +67,8 @@ from quality.serializers import MaterialDataPointIndicatorSerializer, \
     MaterialReportValueCreateSerializer, ProductReportEquipSerializer, ProductReportValueViewSerializer, \
     ProductTestPlanSerializer, ProductTEstResumeSerializer, ReportValueSerializer, RubberMaxStretchTestResultSerializer, \
     UnqualifiedPalletFeedBackSerializer, LabelPrintLogSerializer, ProductTestPlanDetailSerializer, \
-    ProductTestPlanDetailBulkCreateSerializer
+    ProductTestPlanDetailBulkCreateSerializer, MaterialTestPlanSerializer, MaterialTestPlanCreateSerializer, \
+    MaterialTestPlanDetailSerializer
 
 from django.db.models import Prefetch
 from django.db.models import Q
@@ -2015,6 +2017,57 @@ class ReportValueView(APIView):
                 MaterialReportValue.objects.create(ip=data['ip'],
                                                    created_date=datetime.datetime.now(),
                                                    value=data['value']['ML(1+4)'])
+                # 1. 将添加到检测计划详情
+                material_test_plan_detail = MaterialTestPlanDetail.objects.filter(
+                    material_test_plan__material_report_equip__ip=data['ip'],
+                    material_test_plan__status=1,
+                    value__isnull=True).first()
+                if not material_test_plan_detail:
+                    raise ValidationError('当前机台没有进行中的检测计划')
+                material_test_plan_detail.value = data['value']['ML(1+4)']
+                material_test_plan_detail.status = 2
+                # 2. 判断计划详情的检测结果是否是合格
+                material = material_test_plan_detail.material
+                test_method = material_test_plan_detail.material_test_plan.test_method
+                if test_method.interval_type == 1:
+                    standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=test_method).first()
+                    if standard:
+                        qualified_range = [standard.lower_limiting_value, standard.upper_limit_value]
+                elif test_method.interval_type == 2:
+                    qualified_range = [None, test_method.limit_value]
+                elif test_method.interval_type == 3:
+                    qualified_range = [test_method.limit_value, None]
+                if data['value']['ML(1+4)'] in qualified_range:
+                    material_test_plan_detail.flat = True
+                else:
+                    material_test_plan_detail.flat = False
+                material_test_plan_detail.save()
+
+                # 4. 添加到 MaterialExamineResult 在添加到 MaterialSingleTypeExamineResult
+
+                if MaterialExamineResult.objects.filter(material=material,
+                                                        examine_date=material_test_plan_detail.material_test_plan.test_time).exists():
+                    material_examine_result = MaterialExamineResult.objects.filter(material=material,
+                                                                                   examine_date=material_test_plan_detail.material_test_plan.test_time).first()
+                    if not material_test_plan_detail.flat:
+                        material_examine_result.qualified = False
+                        material_examine_result.save()
+                else:
+                    material_examine_result = MaterialExamineResult.objects.create(
+                        material=material,
+                        examine_date=material_test_plan_detail.material_test_plan.test_time,
+                        transport_date=material_test_plan_detail.transport_date,
+                        qualified=material_test_plan_detail.flat,
+                        re_examine=False,
+                        recorder=material_test_plan_detail.recorder,
+                        sampling_user=material_test_plan_detail.sampling_user
+                    )
+                MaterialSingleTypeExamineResult.objects.create(
+                    material_examine_result=material_examine_result,
+                    type=material_test_plan_detail.material_test_plan.test_method,
+                    mes_decide_qualified=material_test_plan_detail.flat,
+                    value=data['value']['ML(1+4)'],
+                )
                 return Response({'msg': '上报成功', 'success': True})
             else:
                 # 胶料数据上报
@@ -2978,3 +3031,58 @@ class UnqialifiedEquipView(APIView):
             results = []
             all = {}
         return Response({'results': results, 'all': all})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialTestPlanViewSet(ModelViewSet):
+    queryset = MaterialTestPlan.objects.filter(status=1)
+    serializer_class = MaterialTestPlanSerializer
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = MaterialTestPlanFilter
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return MaterialTestPlanCreateSerializer
+        return MaterialTestPlanSerializer
+
+    @atomic
+    def update(self, request, *args, **kwargs):  # 检测中添加
+        instance = self.get_object()
+        material_dic = self.request.data
+        material_name = material_dic.get('material_name')
+        material_sample_name = material_dic.get('material_sample_name', None)
+        material_batch = material_dic.get('material_batch')
+        material_supplier = material_dic.get('material_supplier', None)
+        material_tmh = material_dic.get('material_tmh')
+        material_wlxxid = material_dic.get('material_wlxxid')
+        material = ExamineMaterial.objects.filter(batch=material_batch,
+                                                  wlxxid=material_wlxxid).first()
+        if not material:
+            material = ExamineMaterial.objects.create(batch=material_batch,
+                                                      name=material_name,
+                                                      sample_name=material_sample_name,
+                                                      supplier=material_supplier,
+                                                      tmh=material_tmh,
+                                                      wlxxid=material_wlxxid)
+        MaterialTestPlanDetail.objects.create(material_test_plan=instance,
+                                              material=material, recorder=self.request.user,
+                                              sampling_user=self.request.user)
+        return Response('添加成功')
+
+    def perform_destroy(self, instance):
+        """结束检测"""
+        instance.status = 4
+        MaterialTestPlanDetail.objects.filter(material_test_plan=instance, status=1).update(status=4)
+        instance.save()
+
+
+@method_decorator([api_recorder], name="dispatch")
+class MaterialTestPlanDetailViewSet(ModelViewSet):
+    queryset = MaterialTestPlanDetail.objects.all()
+    serializer_class = MaterialTestPlanDetailSerializer
+
+    def perform_destroy(self, instance):
+        if instance.value:
+            raise ValidationError('该数据已检测，无法删除！')
+        return super().perform_destroy(instance)
+

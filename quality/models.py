@@ -1,3 +1,5 @@
+import datetime
+
 from django.db import models
 
 # Create your models here.
@@ -764,3 +766,42 @@ class RubberMaxStretchTestResult(models.Model):
     class Meta:
         db_table = 'rubber_max_stretch_test_result'
         verbose_name_plural = verbose_name = '刚拔物性检测数据详情'
+
+
+class MaterialTestPlan(models.Model):
+    STATUS_CHOICE = (
+        (1, '待检测'),
+        (2, '完成'),
+        (4, '结束检测')
+    )
+    material_report_equip = models.ForeignKey(MaterialReportEquip, help_text='检测机台', on_delete=models.CASCADE)
+    plan_uid = models.CharField(max_length=64, help_text='计划编号', default=f"JH{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
+    test_time = models.DateField(help_text='检测日期')
+    test_classes = models.CharField(max_length=64, help_text='生产班次')
+    test_group = models.CharField(max_length=64, help_text='生产班组')
+    test_method = models.ForeignKey(MaterialExamineType, help_text='检测方法', on_delete=models.CASCADE)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
+
+    class Meta:
+        db_table = 'material_test_plan'
+        verbose_name_plural = verbose_name = '原材料检测计划'
+
+
+class MaterialTestPlanDetail(models.Model):
+    STATUS_CHOICE = (
+        (1, '待检测'),
+        (2, '完成'),
+        (4, '结束检测')
+    )
+    material_test_plan = models.ForeignKey(MaterialTestPlan, help_text='原材料检测计划', on_delete=models.CASCADE, related_name='material_list')
+    material = models.ForeignKey(ExamineMaterial, help_text='原材料', on_delete=models.PROTECT)
+    value = models.FloatField(null=True, help_text='检测值')
+    flat = models.NullBooleanField(help_text='是否合格', default=None)
+    status = models.PositiveIntegerField(help_text='状态', choices=STATUS_CHOICE, default=1)
+    transport_date = models.DateField(help_text='收货日期', null=True, blank=True)
+    recorder = models.ForeignKey(User, help_text='记录人', on_delete=models.CASCADE, related_name='material_plan_detail')
+    sampling_user = models.ForeignKey(User, help_text='抽样人', on_delete=models.CASCADE, related_name='material_test_plan_detail')
+
+    class Meta:
+        db_table = 'material_test_plan_detail'
+        verbose_name_plural = verbose_name = '原材料检测计划详情'

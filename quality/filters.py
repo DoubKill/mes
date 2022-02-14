@@ -3,7 +3,7 @@ import django_filters
 from quality.models import MaterialTestOrder, MaterialDataPointIndicator, \
     MaterialTestMethod, TestMethod, DataPoint, DealSuggestion, MaterialDealResult, UnqualifiedDealOrder, \
     ExamineMaterial, MaterialExamineType, MaterialExamineResult, MaterialEquip, MaterialReportEquip, \
-    MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail
+    MaterialReportValue, ProductReportEquip, ProductReportValue, ProductTestPlanDetail, MaterialTestPlan
 
 
 class TestMethodFilter(django_filters.rest_framework.FilterSet):
@@ -206,4 +206,11 @@ class ProductTestResumeFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = ProductTestPlanDetail
+        fields = '__all__'
+
+
+class MaterialTestPlanFilter(django_filters.rest_framework.FilterSet):
+
+    class Meta:
+        model = MaterialTestPlan
         fields = '__all__'
