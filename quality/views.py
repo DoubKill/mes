@@ -2032,15 +2032,12 @@ class ReportValueView(APIView):
                 if test_method.interval_type == 1:
                     standard = MaterialExamineRatingStandard.objects.filter(level=1, examine_type=test_method).first()
                     if standard:
-                        qualified_range = [standard.lower_limiting_value, standard.upper_limit_value]
+                        flat = True if standard.lower_limiting_value <= data['value']['ML(1+4)']  <= standard.upper_limit_value else False
                 elif test_method.interval_type == 2:
-                    qualified_range = [None, test_method.limit_value]
+                    flat = True if data['value']['ML(1+4)'] <= test_method.limit_value else False
                 elif test_method.interval_type == 3:
-                    qualified_range = [test_method.limit_value, None]
-                if data['value']['ML(1+4)'] in qualified_range:
-                    material_test_plan_detail.flat = True
-                else:
-                    material_test_plan_detail.flat = False
+                    flat = True if data['value']['ML(1+4)'] >= test_method.limit_value else False
+                material_test_plan_detail.flat = flat
                 material_test_plan_detail.save()
 
                 # 4. 添加到 MaterialExamineResult 在添加到 MaterialSingleTypeExamineResult
