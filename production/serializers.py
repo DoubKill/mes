@@ -371,12 +371,20 @@ class RubberCannotPutinReasonSerializer(serializers.ModelSerializer):
 
 
 class PerformanceJobLadderSerializer(serializers.ModelSerializer):
-    code = serializers.CharField(validators=[UniqueValidator(queryset=PerformanceJobLadder.objects.all(), message='该岗位编号已存在')])
+    code = serializers.CharField(default='GW0001')
     name = serializers.CharField(validators=[UniqueValidator(queryset=PerformanceJobLadder.objects.all(), message='该岗位名称已存在')])
 
     class Meta:
         model = PerformanceJobLadder
         fields = '__all__'
+
+    def create(self, validated_data):
+        if PerformanceJobLadder.objects.exists():
+            code = int(PerformanceJobLadder.objects.last().code[2:]) + 1
+            code = 'GW%.4d' % code
+            validated_data['code'] = code
+        instance = super().create(validated_data)
+        return instance
 
 
 class ProductInfoDingJiSerializer(BaseModelSerializer):

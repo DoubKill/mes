@@ -2319,6 +2319,7 @@ class DailyProductionCompletionReport(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class SummaryOfMillOutput(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
@@ -2331,11 +2332,12 @@ class SummaryOfMillOutput(APIView):
         equip_list = Equip.objects.filter(category__equip_type__global_name='密炼设备').order_by('equip_no').values('equip_no')
 
         results = {}
+        count = {'equip_no': None, 'type': '合计', 'count': 0}
         for equip in equip_list:
             equip = equip['equip_no']
             results[f"{equip}_pt"] = {'equip_no': f"{equip}({dic.get(equip)})", 'type': '普通胶车数', 'count': 0}
             results[f"{equip}_dj"] = {'equip_no': f"{equip}({dic.get(equip)})", 'type': '丁基胶车数', 'count': 0}
-            results[f"{equip}_xj"] = {'equip_no': f"{equip}({dic.get(equip)})", 'type': '小记', 'count': 0}
+            results[f"{equip}_xj"] = {'equip_no': f"{equip}({dic.get(equip)})", 'type': '小计', 'count': 0}
 
             for state in state_list:
                 results[f"{equip}_pt"][f"{state}-早"] = 0
@@ -2344,6 +2346,8 @@ class SummaryOfMillOutput(APIView):
                 results[f"{equip}_dj"][f"{state}-晚"] = 0
                 results[f"{equip}_xj"][f"{state}-早"] = 0
                 results[f"{equip}_xj"][f"{state}-晚"] = 0
+                count[f"{state}-早"] = 0
+                count[f"{state}-晚"] = 0
 
         data = TrainsFeedbacks.objects.filter(factory_date=factory_date).values('equip_no',
                                                                                 'product_no', 'classes').annotate(
@@ -2365,7 +2369,10 @@ class SummaryOfMillOutput(APIView):
                     results[f"{equip}_pt"]['count'] += actual_trains
                 results[f"{equip}_xj"][f"{state}-{classes}"] += actual_trains
                 results[f"{equip}_xj"]['count'] += actual_trains
-        return Response({'results': results.values()})
+                count[f"{state}-{classes}"] = actual_trains
+                count['count'] += actual_trains
+        return Response({'results': results.values(), 'count': count, 'state_list': state_list})
+
 
 @method_decorator([api_recorder], name="dispatch")
 class EmployeeAttendanceRecordsView(APIView):
@@ -2373,12 +2380,31 @@ class EmployeeAttendanceRecordsView(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
-        year = date.split('-')[0]
-        month = date.split('-')[1]
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
+        # 获取班组
+        this_month_start = datetime.datetime(year, month, 1)
+        if month == 12:
+            this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
+        group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
+                                                start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
+        group_list = []
+        for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
+            group_list.append([item['group__global_name'] for item in group])
+
+        results = {}
         data = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month).values(
             'equip', 'section', 'classes', 'date__day', 'name')
-        results = [{'equip': i['equip'], 'section': i['section'], 'classes': i['classes'], 'day': f"{i['date__day']}日", 'name': i['name']} for i in data]
-        return Response({'results': results})
+        for item in data:
+            equip = item['equip']
+            section = item['section']
+            if not results.get(f'{equip}_{section}'):
+                results[f'{equip}_{section}'] = {'equip': equip, 'section': section}
+            results[f'{equip}_{section}'][f"{item['date__day']}{item['classes']}"] = item['name']
+        results_sort = sorted(results.values(), key=lambda x: x['equip'])
+        return Response({'results': results_sort, 'group_list': group_list})
 
     # 导入出勤记录
     @atomic
@@ -2390,10 +2416,8 @@ class EmployeeAttendanceRecordsView(APIView):
         cur_sheet = get_cur_sheet(excel_file)
         rows = cur_sheet.nrows
         # 获取班组
-        # year = int(date.split('-')[0])
-        # month = int(date.split('-')[1])
-        year = 2021
-        month = 12
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
         this_month_start = datetime.datetime(year, month, 1)
         if month == 12:
             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
@@ -2435,14 +2459,14 @@ class EmployeeAttendanceRecordsView(APIView):
                     if name_index // 2 == 0:
                         day = name_index
                     else:
-                        day = (name_index + 1) / 2
-                    date = f'{date}-{day}'
+                        day = (name_index + 1) // 2
+                    date_ = f'{date}-{day}'
                     name = name
                     section = section_list[index]
                     classes = group_list[day - 1][i.index(name) % 2]
-                    equip = equip_list[i.index(name) // 4]
-                    dic = {'name': name, 'section': section, 'date': date, 'classes': classes, 'equip': equip}
-                    dic2 = dic
+                    equip = equip_list[index // 4]
+                    dic = {'name': name, 'section': section, 'date': date_, 'classes': classes, 'equip': equip}
+                    dic2 = dic.copy()
                     dic2.pop('name')
                     if dic in records:
                         continue
@@ -2476,11 +2500,9 @@ class EmployeeAttendanceRecordsExport(ViewSet):
         style.alignment = alignment
 
         # 工厂排班计划
-        # date = self.request.query_params.get('date')
-        # year = int(date.split('-')[0])
-        # month = int(date.split('-')[1])
-        year = 2021
-        month = 12
+        date = self.request.query_params.get('date')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
         this_month_start = datetime.datetime(year, month, 1)
         if month == 12:
             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
@@ -2531,12 +2553,6 @@ class PerformanceJobLadderViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     filter_fields = ('name',)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.delete_flag = True
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceUnitPriceView(APIView):
@@ -2545,29 +2561,39 @@ class PerformanceUnitPriceView(APIView):
     def get(self, request):
         results = {}
         state_lst = GlobalCode.objects.filter(global_type__type_name='胶料段次').values('global_name')
-        category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
-        for i in category_lst:
-            for j in state_lst:
-                category = i['category_no']
-                state = j['global_name']
-                results.update({f"{category}_{state}": {'state': state, f"{category}_pt": None, f"{category}_dj": None}})
+        # category_lst = EquipCategoryAttribute.objects.filter(delete_flag=False).values('category_no')
+        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400']
+
+        for state in state_lst:
+            state = state['global_name']
+            results[state] = {'state': state}
+            for category in category_lst:
+                results[state][f"{category}_pt"] = None
+                results[state][f"{category}_dj"] = None
 
         queryset = PerformanceUnitPrice.objects.values('state', 'equip_type', 'pt', 'dj')
         for item in queryset:
-            results[f"{item['equip_type']}_{item['state']}"][f"{item['equip_type']}_pt"] = item['pt']
-            results[f"{item['equip_type']}_{item['state']}"][f"{item['equip_type']}_dj"] = item['dj']
+            results[f"{item['state']}"][f"{item['equip_type']}_pt"] = item['pt']
+            results[f"{item['state']}"][f"{item['equip_type']}_dj"] = item['dj']
 
         return Response({'result': results.values()})
 
     @atomic
     def post(self, request):
         data = self.request.data  # list
-        unit_list = [{'state': item['state'],
-                      'equip_type': item['category_pt'].split('_')[0],
-                      'pt': item['category_pt'],
-                      'dj': item['category_dj']
-                      } for item in data]
-        PerformanceUnitPrice.objects.bulk_create(unit_list)
+        unit_list = []
+        category_lst = ['E580', 'F370', 'GK320', 'GK255', 'GK400']
+        obj = PerformanceUnitPrice.objects
+        for item in data:
+            for category in category_lst:
+                if item[f"{category}_pt"] or item[f"{category}_dj"]:
+                    if obj.filter(state=item['state'], equip_type=category):
+                        obj.filter(state=item['state'], equip_type=category).update(
+                            pt=item[f"{category}_pt"], dj=item[f"{category}_dj"])
+                    unit_list.append(PerformanceUnitPrice(
+                        state=item['state'], equip_type=category, pt=item[f"{category}_pt"], dj=item[f"{category}_dj"]))
+        obj.bulk_create(unit_list)
+        return Response('添加成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
