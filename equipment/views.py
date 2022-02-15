@@ -4381,9 +4381,9 @@ class GetSpareOrder(APIView):
             order_detail = dic.get('lldmx')  # list
             if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
                 continue
-            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).order_by('id')
+            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).last()
             if res:
-                order_id = res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1))
+                order_id = res.order_id[:10] + str('%04d' % (int(res.order_id[11:]) + 1))
             else:
                order_id = 'RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001'
             order = EquipWarehouseOrder.objects.create(
