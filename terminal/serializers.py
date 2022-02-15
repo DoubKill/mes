@@ -27,7 +27,7 @@ from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, We
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
     WeightPackageWms, MachineManualRelation
-from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_sfj_carbon_materials
+from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance
 
 logger = logging.getLogger('send_log')
 
@@ -86,12 +86,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
         # 获取配方信息
-        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch
+        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(equip_no=classes_plan.equip.equip_no)
         if not material_name_weight:
             raise serializers.ValidationError(f'获取配方详情失败:{classes_plan.product_batching.stage_product_batch_no}')
-        if cnt_type_details:
-            # 去除炭黑罐投入的化工原料
-            cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
+        # if cnt_type_details:
+        #     # 去除炭黑罐投入的化工原料
+        #     cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
         for i in material_name_weight:
             if i['material__material_name'] in ['硫磺', '细料']:
@@ -305,7 +305,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     if scan_material_type == '机配':  # 扫描机配料包三种场景(细料/硫磺、机配+人工配)
                         merge_flag = weight_package.merge_flag
                         product_no_dev = re.split(r'\(|\（|\[', material_name)[0]
-                        if '专用' in weight_package.product_no and weight_package.product_no.split('-')[-2] != classes_plan.equip.equip_no:
+                        if 'only' in weight_package.product_no and weight_package.product_no.split('-')[-2] != classes_plan.equip.equip_no:
                             raise serializers.ValidationError(f"物料为{weight_package.product_no}, 无法在当前机台使用投料")
                         if (already_y and not merge_flag) or (already_n and merge_flag):
                             raise serializers.ValidationError('扫码合包配置冲突')
@@ -382,7 +382,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no, 'scan_material': material_name,
                                                        'scan_material_type': scan_material_type if not merge_flag else ('硫磺' if '硫磺' in materials else '细料')})
                     else:  # 两种场景(全人工配、机配+人工配)
-                        if '专用' in manual.product_no and manual.product_no.split('-')[-2] != classes_plan.equip.equip_no:
+                        if 'only' in manual.product_no and manual.product_no.split('-')[-2] != classes_plan.equip.equip_no:
                             raise serializers.ValidationError(f"物料为{manual.product_no.split('-')[-2]}, 无法在当前机台使用投料")
                         if already_y:
                             raise serializers.ValidationError('扫码合包配置冲突')
@@ -1023,8 +1023,6 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
             # 总公差
             machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
-            if '%' in machine_manual_tolerance:
-                machine_manual_tolerance = f"{machine_manual_tolerance[0]}{round(Decimal(machine_manual_tolerance[1:-1]) / 100 * instance.machine_manual_weight, 3)}kg"
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
                     'machine_manual_weight': instance.machine_manual_weight, 'machine_manual_tolerance': machine_manual_tolerance,
                     'manual_weight': total_manual_weight, 'machine_weight': instance.plan_weight,

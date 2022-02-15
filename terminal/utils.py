@@ -9,7 +9,7 @@ from decimal import Decimal
 import requests
 from datetime import datetime
 
-from django.db.models import Sum, F, Q
+from django.db.models import Sum, F, Q, Count
 from django.db.transaction import atomic
 from suds.client import Client
 
@@ -17,7 +17,7 @@ from inventory.conf import cb_ip, cb_port
 from inventory.utils import wms_out
 from mes.settings import DATABASES
 from plan.models import BatchingClassesPlan
-from recipe.models import ProductBatching, ProductBatchingDetail
+from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
 from terminal.models import WeightTankStatus, RecipePre, RecipeMaterial, Plan, Bin, ToleranceRule
 
 
@@ -445,11 +445,10 @@ class CLSystem(object):
         return ret
 
 
-def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量'):
-    # 人工单配细料硫磺包
-    type_name = '硫磺' if batching_equip.startswith('S') else '细料'
+def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', only_num=None):
     # 人工单配细料硫磺包
     if batching_equip:
+        type_name = '硫磺' if batching_equip.startswith('S') else '细料'
         if '单个' not in project_name:
             project_name = f"整包{type_name}重量"
         rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
@@ -459,37 +458,47 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
     else:
         rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
     tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
+    if tolerance:
+        if rule.unit == '%':
+            handle_num = round(rule.standard_error / 100 * standard_weight, 3)
+            tolerance = f"{rule.handle.keyword_name}{handle_num}kg" if not only_num else handle_num
+        else:
+            if only_num:
+                tolerance = rule.standard_error
+    else:
+        if only_num:
+            tolerance = 0
     return tolerance
 
 
 def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
-    filter_kwargs = {}
-    if isinstance(dev_type, int):
-        filter_kwargs['dev_type_id'] = dev_type
-    else:
-        filter_kwargs['dev_type__category_name'] = dev_type
     product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
-    record = ProductBatching.objects.filter(stage_product_batch_no=product_no_dev, used_type=4, batching_type=2,
-                                            delete_flag=False, **filter_kwargs).first()
-    if not record:
-        raise ValueError(f"未找到mes配方{product_no}信息")
-    # weigh_type 1 硫磺 2 细料
-    instance = record.weight_cnt_types.filter(weigh_type=2, delete_flag=0).first() if batching_equip.startswith(
-        'F') else record.weight_cnt_types.filter(weigh_type=1, delete_flag=0).first()
-    if not instance:
-        raise ValueError(f"{product_no}无料包信息")
+    if not equip_no:
+        equip_recipes = ProductBatchingEquip.objects.filter(is_used=True, type=4,
+                                                            product_batching__stage_product_batch_no=product_no_dev,
+                                                            product_batching__dev_type__category_name=dev_type)\
+            .values('equip_no').annotate(num=Count('id', filter=~Q(feeding_mode__startswith=batching_equip[0])))
+        if not equip_recipes:
+            raise ValueError('为找到配方配料信息')
+        handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
+        if not handle_equip_recipe:
+            raise ValueError('为找到配方通用配料信息')
+        equip_no = handle_equip_recipe[0]
+    mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=equip_no, type=4,
+                                                     feeding_mode__startswith=batching_equip[0],
+                                                     product_batching__stage_product_batch_no=product_no_dev,
+                                                     product_batching__dev_type__category_name=dev_type)
     # 机配物料
     machine_material = list(RecipeMaterial.objects.using(batching_equip).filter(recipe_name=product_no).values_list('name', flat=True))
     # 人工配物料信息
     manual_material = []
-    xl_materials = instance.weight_details.filter(delete_flag=0)
-    for i in xl_materials:
-        real_name = re.split(r'-C|-X', i.material.material_name)[0] if i.material.material_name.endswith('-C') or i.material.material_name.endswith('-X') else i.material.material_name
+    for i in mes_recipe:
+        real_name = re.split(r'-C|-X', i.material.material_name)[0] if i.material.material_name.endswith(
+            '-C') or i.material.material_name.endswith('-X') else i.material.material_name
         if real_name not in machine_material:
-            manual_material.append({'material_name': i.material.material_name, 'tolerance': i.standard_error,
-                                    'material__material_name': i.material.material_name, 'standard_weight': i.standard_weight})
-    if equip_no:
-        manual_material = get_sfj_carbon_materials(manual_material, product_no_dev, equip_no)
+            manual_material.append({'material_name': i.material.material_name, 'tolerance': i.cnt_type_detail_equip.standard_error,
+                                    'material__material_name': i.material.material_name,
+                                    'standard_weight': i.cnt_type_detail_equip.standard_weight})
     return manual_material
 
 
@@ -515,16 +524,3 @@ def get_sfj_carbon_materials(cnt_type_details, stage_product_batch_no, equip_no)
     else:
         handle_cnt_type_details = cnt_type_details
     return handle_cnt_type_details
-
-
-def transform_tolerance(weight, tolerance):
-    """
-    转换公差 ex 3 '±1%' --> 0.030
-    """
-    if tolerance.endswith('kg'):
-        result = Decimal(tolerance[1:-2])
-    elif tolerance.endswith('%'):
-        result = round(Decimal(tolerance[1:-1]) / 100 * weight, 3)
-    else:
-        result = 0
-    return result

@@ -1,20 +1,17 @@
-from datetime import datetime
 import logging
+import uuid
+from datetime import datetime
 
-from django.db.models import *
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
-import uuid
 from mes.base_serializer import BaseModelSerializer
-from mes.sync import ProductObsoleteInterface
-from plan.models import ProductClassesPlan
+from mes.conf import COMMON_READ_ONLY_FIELDS
 from recipe.models import Material, ProductInfo, ProductBatching, ProductBatchingDetail, \
     MaterialAttribute, MaterialSupplier, WeighBatchingDetail, WeighCntType, ZCMaterial, ERPMESMaterialRelation, \
     ProductBatchingEquip
-from mes.conf import COMMON_READ_ONLY_FIELDS
 
 sync_logger = logging.getLogger('sync_log')
 
@@ -172,9 +169,13 @@ class ProductBatchingListSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         # 查看是否存在_NEW配方
-        new_recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
-            stage_product_batch_no=f'{instance.stage_product_batch_no}_NEW', dev_type=instance.dev_type).first()
-        new_recipe_id = new_recipe.id if new_recipe else 0
+        product_no = instance.stage_product_batch_no
+        if '_NEW' in product_no:
+            new_recipe_id = instance.id
+        else:
+            new_recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+                stage_product_batch_no=f'{instance.stage_product_batch_no}_NEW', dev_type=instance.dev_type).first()
+            new_recipe_id = new_recipe.id if new_recipe else 0
         res['new_recipe_id'] = new_recipe_id
         return res
 
@@ -228,9 +229,6 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         batching_details = validated_data.pop('batching_details', None)
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
         stage_product_batch_no = validated_data.get('stage_product_batch_no')
-        if validated_data.pop('create_new'):
-            stage_product_batch_no += '_NEW'
-            validated_data['stage_product_batch_no'] = stage_product_batch_no
         if stage_product_batch_no:
             # 传胶料编码则代表是特殊配方
             validated_data.pop('site', None)
@@ -244,8 +242,10 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             versions = validated_data.get('versions')
             if not all([site, stage, product_info, versions]):
                 raise serializers.ValidationError('参数不足')
-            validated_data['stage_product_batch_no'] = '{}-{}-{}-{}'.format(site.global_name, stage.global_name,
-                                                                            product_info.product_no, versions)
+            mes_recipe_name = '{}-{}-{}-{}'.format(site.global_name, stage.global_name, product_info.product_no, versions)
+            if validated_data.pop('create_new'):
+                mes_recipe_name += '_NEW'
+            validated_data['stage_product_batch_no'] = mes_recipe_name
         instance = super().create(validated_data)
         if batching_details:
             for i, detail in enumerate(batching_details):

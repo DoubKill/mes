@@ -167,21 +167,27 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
-    @property
-    def get_product_batch(self):
+    def get_product_batch(self, equip_no):
         material_name_weight, cnt_type_details = [], []
-        # 获取机型配方
-        product_batch = ProductBatching.objects.filter(stage_product_batch_no=self.stage_product_batch_no, used_type=4,
-                                                       dev_type__category_no=self.dev_type.category_no, delete_flag=False,
-                                                       batching_type=2).first()
-        if product_batch:
-            # 胶皮、胶块
-            material_name_weight = list(product_batch.batching_details.filter(delete_flag=False, type=1).values('material__material_name', 'actual_weight'))
-            # 小料明细
-            instance = product_batch.weight_cnt_types.filter(delete_flag=False).first()
-            if instance:
-                material_name_weight.append({'material__material_name': '硫磺' if instance.weigh_type == 1 else '细料', 'actual_weight': instance.total_weight})
-                cnt_type_details += list(instance.weight_details.filter(delete_flag=False).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight', 'standard_error'))
+        # 获取机台配方
+        sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=self.stage_product_batch_no,
+                                                                 used_type=4, delete_flag=False, equip__equip_no=equip_no,
+                                                                 dev_type__category_no=self.dev_type.category_no).first()
+        if sfj_recipe:
+            sfj_details = ProductBatchingDetail.objects.using('SFJ').filter(~Q(material__material_name__icontains='待处理料'),
+                                                                            ~Q(material__material_name__icontains='掺料'),
+                                                                            product_batching=sfj_recipe,
+                                                                            delete_flag=False, type=1)
+            material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight'))
+            # 料包明细
+            details = ProductBatchingEquip.objects.filter(~Q(feeding_mode__startswith='C'),
+                                                          product_batching__stage_product_batch_no=self.stage_product_batch_no,
+                                                          product_batching__dev_type__category_name=self.dev_type.category_no,
+                                                          equip_no=equip_no, is_used=True, type=4,
+                                                          cnt_type_detail_equip__delete_flag=False)
+            cnt_type_details += list(details.annotate(actual_weight=F('cnt_type_detail_equip__standard_weight'),
+                                                      standard_error=F('cnt_type_detail_equip__standard_error'))
+                                     .values('material__material_name', 'actual_weight', 'standard_error'))
         return material_name_weight, cnt_type_details
 
     class Meta:
