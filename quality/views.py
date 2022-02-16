@@ -2426,34 +2426,34 @@ class ProductTestStaticsView(APIView):
                         TC90_lower = 1 if j['value'] < data_point_list[0] else 0
                         TC90_upper = 1 if j['value'] > data_point_list[1] else 0
 
-            spe = j['material_test_order__product_no'].split('-')[2]
-            if dic.get(spe):
-                data = dic.get(spe)
-                dic[spe].update({
-                    'MH_lower': data['MH_lower'] + MH_lower,
-                    'MH_upper': data['MH_upper'] + MH_upper,
-                    'ML_lower': data['ML_lower'] + ML_lower,
-                    'ML_upper': data['ML_upper'] + ML_upper,
-                    'TC10_lower': data['TC10_lower'] + TC10_lower,
-                    'TC10_upper': data['TC10_upper'] + TC10_upper,
-                    'TC50_lower': data['TC50_lower'] + TC50_lower,
-                    'TC50_upper': data['TC50_upper'] + TC50_upper,
-                    'TC90_lower': data['TC90_lower'] + TC90_lower,
-                    'TC90_upper': data['TC90_upper'] + TC90_upper,
-                })
-            else:
-                dic[spe] = {
-                    'MH_lower': MH_lower,
-                    'MH_upper': MH_upper,
-                    'ML_lower': ML_lower,
-                    'ML_upper': ML_upper,
-                    'TC10_lower': TC10_lower,
-                    'TC10_upper': TC10_upper,
-                    'TC50_lower': TC50_lower,
-                    'TC50_upper': TC50_upper,
-                    'TC90_lower': TC90_lower,
-                    'TC90_upper': TC90_upper,
-                }
+                    spe = j['material_test_order__product_no'].split('-')[2]
+                    if dic.get(spe):
+                        data = dic.get(spe)
+                        dic[spe].update({
+                            'MH_lower': data['MH_lower'] + MH_lower,
+                            'MH_upper': data['MH_upper'] + MH_upper,
+                            'ML_lower': data['ML_lower'] + ML_lower,
+                            'ML_upper': data['ML_upper'] + ML_upper,
+                            'TC10_lower': data['TC10_lower'] + TC10_lower,
+                            'TC10_upper': data['TC10_upper'] + TC10_upper,
+                            'TC50_lower': data['TC50_lower'] + TC50_lower,
+                            'TC50_upper': data['TC50_upper'] + TC50_upper,
+                            'TC90_lower': data['TC90_lower'] + TC90_lower,
+                            'TC90_upper': data['TC90_upper'] + TC90_upper,
+                        })
+                    else:
+                        dic[spe] = {
+                            'MH_lower': MH_lower,
+                            'MH_upper': MH_upper,
+                            'ML_lower': ML_lower,
+                            'ML_upper': ML_upper,
+                            'TC10_lower': TC10_lower,
+                            'TC10_upper': TC10_upper,
+                            'TC50_lower': TC50_lower,
+                            'TC50_upper': TC50_upper,
+                            'TC90_lower': TC90_lower,
+                            'TC90_upper': TC90_upper,
+                        }
         # --------------- end -----------------
         # 检查数与合格数
         records = queryset.values('material_test_order__product_no').annotate(
@@ -2628,34 +2628,34 @@ class ClassTestStaticsView(APIView):
                         TC90_lower = 1 if j['value'] < data_point_list[0] else 0
                         TC90_upper = 1 if j['value'] > data_point_list[1] else 0
 
-            spe = str(j['material_test_order__production_factory_date']) + '_' + j['material_test_order__production_class']
-            if dic.get(spe):
-                data = dic.get(spe)
-                dic[spe].update({
-                    'MH_lower': data['MH_lower'] + MH_lower,
-                    'MH_upper': data['MH_upper'] + MH_upper,
-                    'ML_lower': data['ML_lower'] + ML_lower,
-                    'ML_upper': data['ML_upper'] + ML_upper,
-                    'TC10_lower': data['TC10_lower'] + TC10_lower,
-                    'TC10_upper': data['TC10_upper'] + TC10_upper,
-                    'TC50_lower': data['TC50_lower'] + TC50_lower,
-                    'TC50_upper': data['TC50_upper'] + TC50_upper,
-                    'TC90_lower': data['TC90_lower'] + TC90_lower,
-                    'TC90_upper': data['TC90_upper'] + TC90_upper,
-                })
-            else:
-                dic[spe] = {
-                    'MH_lower': MH_lower,
-                    'MH_upper': MH_upper,
-                    'ML_lower': ML_lower,
-                    'ML_upper': ML_upper,
-                    'TC10_lower': TC10_lower,
-                    'TC10_upper': TC10_upper,
-                    'TC50_lower': TC50_lower,
-                    'TC50_upper': TC50_upper,
-                    'TC90_lower': TC90_lower,
-                    'TC90_upper': TC90_upper,
-                }
+                    spe = str(j['material_test_order__production_factory_date']) + '_' + j['material_test_order__production_class']
+                    if dic.get(spe):
+                        data = dic.get(spe)
+                        dic[spe].update({
+                            'MH_lower': data['MH_lower'] + MH_lower,
+                            'MH_upper': data['MH_upper'] + MH_upper,
+                            'ML_lower': data['ML_lower'] + ML_lower,
+                            'ML_upper': data['ML_upper'] + ML_upper,
+                            'TC10_lower': data['TC10_lower'] + TC10_lower,
+                            'TC10_upper': data['TC10_upper'] + TC10_upper,
+                            'TC50_lower': data['TC50_lower'] + TC50_lower,
+                            'TC50_upper': data['TC50_upper'] + TC50_upper,
+                            'TC90_lower': data['TC90_lower'] + TC90_lower,
+                            'TC90_upper': data['TC90_upper'] + TC90_upper,
+                        })
+                    else:
+                        dic[spe] = {
+                            'MH_lower': MH_lower,
+                            'MH_upper': MH_upper,
+                            'ML_lower': ML_lower,
+                            'ML_upper': ML_upper,
+                            'TC10_lower': TC10_lower,
+                            'TC10_upper': TC10_upper,
+                            'TC50_lower': TC50_lower,
+                            'TC50_upper': TC50_upper,
+                            'TC90_lower': TC90_lower,
+                            'TC90_upper': TC90_upper,
+                        }
         # --------------- end -----------------
         # 检查数与合格数
         records = queryset.values('material_test_order__production_factory_date',
@@ -2833,34 +2833,34 @@ class UnqialifiedEquipView(APIView):
                         TC90_lower = 1 if j['value'] < data_point_list[0] else 0
                         TC90_upper = 1 if j['value'] > data_point_list[1] else 0
 
-            spe = j['material_test_order__production_equip_no']
-            if dic_.get(spe):
-                data = dic_.get(spe)
-                dic_[spe].update({
-                    'MH_lower': data['MH_lower'] + MH_lower,
-                    'MH_upper': data['MH_upper'] + MH_upper,
-                    'ML_lower': data['ML_lower'] + ML_lower,
-                    'ML_upper': data['ML_upper'] + ML_upper,
-                    'TC10_lower': data['TC10_lower'] + TC10_lower,
-                    'TC10_upper': data['TC10_upper'] + TC10_upper,
-                    'TC50_lower': data['TC50_lower'] + TC50_lower,
-                    'TC50_upper': data['TC50_upper'] + TC50_upper,
-                    'TC90_lower': data['TC90_lower'] + TC90_lower,
-                    'TC90_upper': data['TC90_upper'] + TC90_upper,
-                })
-            else:
-                dic_[spe] = {
-                    'MH_lower': MH_lower,
-                    'MH_upper': MH_upper,
-                    'ML_lower': ML_lower,
-                    'ML_upper': ML_upper,
-                    'TC10_lower': TC10_lower,
-                    'TC10_upper': TC10_upper,
-                    'TC50_lower': TC50_lower,
-                    'TC50_upper': TC50_upper,
-                    'TC90_lower': TC90_lower,
-                    'TC90_upper': TC90_upper,
-                }
+                    spe = j['material_test_order__production_equip_no']
+                    if dic_.get(spe):
+                        data = dic_.get(spe)
+                        dic_[spe].update({
+                            'MH_lower': data['MH_lower'] + MH_lower,
+                            'MH_upper': data['MH_upper'] + MH_upper,
+                            'ML_lower': data['ML_lower'] + ML_lower,
+                            'ML_upper': data['ML_upper'] + ML_upper,
+                            'TC10_lower': data['TC10_lower'] + TC10_lower,
+                            'TC10_upper': data['TC10_upper'] + TC10_upper,
+                            'TC50_lower': data['TC50_lower'] + TC50_lower,
+                            'TC50_upper': data['TC50_upper'] + TC50_upper,
+                            'TC90_lower': data['TC90_lower'] + TC90_lower,
+                            'TC90_upper': data['TC90_upper'] + TC90_upper,
+                        })
+                    else:
+                        dic_[spe] = {
+                            'MH_lower': MH_lower,
+                            'MH_upper': MH_upper,
+                            'ML_lower': ML_lower,
+                            'ML_upper': ML_upper,
+                            'TC10_lower': TC10_lower,
+                            'TC10_upper': TC10_upper,
+                            'TC50_lower': TC50_lower,
+                            'TC50_upper': TC50_upper,
+                            'TC90_lower': TC90_lower,
+                            'TC90_upper': TC90_upper,
+                        }
         # --------------- end -----------------
 
         # 检查数
