@@ -1241,7 +1241,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                         {'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
-                         'unit': i.equip_jobitem_standard.standard_detail.unit,
+                         'unit': i.equip_jobitem_standard.standard_detail.unit if i.equip_jobitem_standard_id else None,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type,
                          'abnormal_operation_desc': i.abnormal_operation_desc,
                          'abnormal_operation_result': i.abnormal_operation_result,
