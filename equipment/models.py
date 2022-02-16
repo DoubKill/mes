@@ -525,12 +525,12 @@ class EquipJobItemStandardDetail(AbstractEntity):
         ('完成未完成', '完成未完成'),
         ('合格不合格', '合格不合格'),
     )
-    equip_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE)
+    equip_standard = models.ForeignKey(EquipJobItemStandard, help_text='设备作业项目标准', on_delete=models.CASCADE, related_name='standard_detail')
     sequence = models.IntegerField(help_text='次序')
     content = models.CharField(max_length=64, help_text='内容')
     check_standard_desc = models.CharField(max_length=64, help_text='判断标准/步骤说明')
     check_standard_type = models.CharField(max_length=64, help_text='类型', choices=TYPE_CHOICE)
-    # unit = models.CharField(max_length=64, help_text='单位', null=True, blank=True)
+    unit = models.CharField(max_length=64, help_text='单位', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_job_item_standard_details'
