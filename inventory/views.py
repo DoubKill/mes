@@ -1616,7 +1616,7 @@ class ProductTraceView(APIView):
 
             # 配方创建
             product_info = model_to_dict(product)
-            temp_time = product_info.get("created_date", datetime.datetime.now())
+            temp_time = product.created_date
             work_schedule_plan = WorkSchedulePlan.objects.filter(
                 start_time__lte=temp_time,
                 end_time__gte=temp_time,
@@ -1636,8 +1636,9 @@ class ProductTraceView(APIView):
         rep["product_info"] = [product_info]
         # 配料详情
         if product:
-            product_details = product.batching_details.all().values("product_batching__stage_product_batch_no",
-                                                                    "material__material_no", "actual_weight")
+            product_details = product.batching_details.filter(
+                delete_flag=False
+            ).values("product_batching__stage_product_batch_no", "material__material_no", "actual_weight")
         else:
             product_details = []
         rep["product_details"] = list(product_details)
