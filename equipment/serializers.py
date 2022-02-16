@@ -1249,14 +1249,14 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          })
             else:
                 data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard) \
-                    .values('equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+                    .values('id', 'equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
                 for i in data:
                     work_content.append(
                         {'job_item_sequence': i.get('sequence'), 'job_item_content': i.get('content'),
                          'job_item_check_standard': i.get('check_standard_desc'),
                          'equip_jobitem_standard_id': i.get('equip_standard'),
                          'job_item_check_type': i.get('check_standard_type'),
-                         'uid': i.id})
+                         'uid': i.get('id')})
             work_content.sort(key=lambda x: x['job_item_sequence'])
         res['work_content'] = work_content
         # 区域位置
