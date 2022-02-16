@@ -3538,12 +3538,16 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         result_standard = data.get('equip_repair_standard')
         instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
         if instance:
-            EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
             for item in work_content:
+                uid = item.pop('uid', None)
                 if item.get('abnormal_operation_url'):
                     item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
                 item.update({'work_type': '巡检', 'work_order_no': work_order_no})
-                EquipResultDetail.objects.create(**item)
+                if id:  # 更新
+                    EquipResultDetail.objects.filter(id=uid).update(**item)
+                else:  # 新增
+                    EquipResultDetail.objects.create(**item)
+
 
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
@@ -3636,12 +3640,16 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
             if instance:
-                EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
+                # EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
                 for item in work_content:
+                    uid = item.pop('uid', None)
                     if item.get('abnormal_operation_url'):
                         item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
                     item.update({'work_type': '巡检', 'work_order_no': work_order_no})
-                    EquipResultDetail.objects.create(**item)
+                    if id:  # 更新
+                        EquipResultDetail.objects.filter(id=uid).update(**item)
+                    else:  # 新增
+                        EquipResultDetail.objects.create(**item)
         else:  # 关闭
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
