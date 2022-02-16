@@ -690,7 +690,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=instance).order_by('id') \
-            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
+            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type')
         work_details_column = check_standard_desc_column = check_standard_type_column = ''
         for detail in details:
             work_details_column += f"{detail['sequence']}、{detail['content']}；"
@@ -704,7 +704,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
     def get_work_details(self, obj):
         # 获取作业详情
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id') \
-            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
+            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
         return details
 
     class Meta:
@@ -716,7 +716,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
 class EquipJobItemStandardDetailSerializer(BaseModelSerializer):
     class Meta:
         model = EquipJobItemStandardDetail
-        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
+        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
