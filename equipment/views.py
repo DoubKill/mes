@@ -3528,6 +3528,24 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     @atomic
+    @action(methods=['post'], detail=False, url_name='temporary_save', url_path='temporary_save')
+    def temporary_save(self, request):
+        data = copy.deepcopy(self.request.data)
+        work_content = data.pop('work_content', [])
+        work_order_no = data.pop('work_order_no')
+
+        # 更新作业内容
+        result_standard = data.get('equip_repair_standard')
+        instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
+        if instance:
+            EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
+            for item in work_content:
+                if item.get('abnormal_operation_url'):
+                    item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
+                item.update({'work_type': '巡检', 'work_order_no': work_order_no})
+                EquipResultDetail.objects.create(**item)
+
+    @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
     def multi_update(self, request):
         data = copy.deepcopy(self.request.data)

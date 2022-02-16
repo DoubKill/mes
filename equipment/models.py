@@ -530,6 +530,7 @@ class EquipJobItemStandardDetail(AbstractEntity):
     content = models.CharField(max_length=64, help_text='内容')
     check_standard_desc = models.CharField(max_length=64, help_text='判断标准/步骤说明')
     check_standard_type = models.CharField(max_length=64, help_text='类型', choices=TYPE_CHOICE)
+    unit = models.CharField(max_length=64, help_text='单位', null=True, blank=True)
 
     class Meta:
         db_table = 'equip_job_item_standard_details'

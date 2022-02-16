@@ -690,7 +690,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=instance).order_by('id') \
-            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
         work_details_column = check_standard_desc_column = check_standard_type_column = ''
         for detail in details:
             work_details_column += f"{detail['sequence']}、{detail['content']}；"
@@ -704,7 +704,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
     def get_work_details(self, obj):
         # 获取作业详情
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id') \
-            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
         return details
 
     class Meta:
@@ -716,7 +716,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
 class EquipJobItemStandardDetailSerializer(BaseModelSerializer):
     class Meta:
         model = EquipJobItemStandardDetail
-        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -1245,6 +1245,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          'abnormal_operation_desc': i.abnormal_operation_desc,
                          'abnormal_operation_result': i.abnormal_operation_result,
                          'abnormal_operation_url': abnormal_operation_url,
+                         'uid': i.id
                          })
             else:
                 data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard) \
@@ -1254,7 +1255,8 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                         {'job_item_sequence': i.get('sequence'), 'job_item_content': i.get('content'),
                          'job_item_check_standard': i.get('check_standard_desc'),
                          'equip_jobitem_standard_id': i.get('equip_standard'),
-                         'job_item_check_type': i.get('check_standard_type')})
+                         'job_item_check_type': i.get('check_standard_type'),
+                         'uid': i.id})
             work_content.sort(key=lambda x: x['job_item_sequence'])
         res['work_content'] = work_content
         # 区域位置
