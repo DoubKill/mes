@@ -229,12 +229,14 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
         batching_details = validated_data.pop('batching_details', None)
         weight_cnt_types = validated_data.pop('weight_cnt_types', None)
         stage_product_batch_no = validated_data.get('stage_product_batch_no')
+        create_new = validated_data.pop('create_new')
         if stage_product_batch_no:
             # 传胶料编码则代表是特殊配方
             validated_data.pop('site', None)
             validated_data.pop('stage', None)
             validated_data.pop('versions', None)
             validated_data.pop('product_info', None)
+            mes_recipe_name = stage_product_batch_no
         else:
             site = validated_data.get('site')
             stage = validated_data.get('stage')
@@ -243,9 +245,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
             if not all([site, stage, product_info, versions]):
                 raise serializers.ValidationError('参数不足')
             mes_recipe_name = '{}-{}-{}-{}'.format(site.global_name, stage.global_name, product_info.product_no, versions)
-            if validated_data.pop('create_new'):
-                mes_recipe_name += '_NEW'
-            validated_data['stage_product_batch_no'] = mes_recipe_name
+        if create_new:
+            mes_recipe_name += '_NEW'
+        validated_data['stage_product_batch_no'] = mes_recipe_name
         instance = super().create(validated_data)
         if batching_details:
             for i, detail in enumerate(batching_details):
@@ -435,7 +437,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                     ProductBatchingDetail.objects.filter(id=batching_detail_id).update(**detail)
                     if master:
                         for k, v in master.items():
-                            exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=material)
+                            exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=batching_detail_instance.material)
                             if exist_equip:
                                 update_data = {'type': detail['type'], 'feeding_mode': v, 'material': material}
                                 exist_equip.filter(batching_detail_equip_id=batching_detail_id).update(**update_data)
@@ -487,7 +489,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             WeighBatchingDetail.objects.filter(id=weight_detail_id).update(**weight_detail)
                             if master:
                                 for k, v in master.items():
-                                    exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=material)
+                                    exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=detail.material)
                                     if exist_equip:
                                         update_data = {'type': 4, 'feeding_mode': v, 'material': material}
                                         exist_equip.filter(cnt_type_detail_equip_id=weight_detail_id).update(**update_data)

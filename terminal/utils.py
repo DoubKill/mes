@@ -479,10 +479,10 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
                                                             product_batching__dev_type__category_name=dev_type)\
             .values('equip_no').annotate(num=Count('id', filter=~Q(feeding_mode__startswith=batching_equip[0])))
         if not equip_recipes:
-            raise ValueError('为找到配方配料信息')
+            raise ValueError(f"未找到配方{product_no}配料信息")
         handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
         if not handle_equip_recipe:
-            raise ValueError('为找到配方通用配料信息')
+            raise ValueError(f"未找到配方{product_no}通用配料信息")
         equip_no = handle_equip_recipe[0]
     mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=equip_no, type=4,
                                                      feeding_mode__startswith=batching_equip[0],
