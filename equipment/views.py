@@ -3547,6 +3547,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     EquipResultDetail.objects.filter(id=uid).update(**item)
                 else:  # 新增
                     EquipResultDetail.objects.create(**item)
+        return Response('操作成功')
 
 
     @atomic
