@@ -3542,8 +3542,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 uid = item.pop('uid', None)
                 if item.get('abnormal_operation_url'):
                     item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                item.update({'work_type': '巡检', 'work_order_no': work_order_no})
-                if id:  # 更新
+                item.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                if uid:  # 更新
                     EquipResultDetail.objects.filter(id=uid).update(**item)
                 else:  # 新增
                     EquipResultDetail.objects.create(**item)
@@ -3646,8 +3646,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     uid = item.pop('uid', None)
                     if item.get('abnormal_operation_url'):
                         item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                    item.update({'work_type': '巡检', 'work_order_no': work_order_no})
-                    if id:  # 更新
+                    item.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                    if uid:  # 更新
                         EquipResultDetail.objects.filter(id=uid).update(**item)
                     else:  # 新增
                         EquipResultDetail.objects.create(**item)
