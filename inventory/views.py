@@ -2551,12 +2551,18 @@ class WmsStorageSummaryView(APIView):
                  })
         sc.close()
         # 返回所有的厂家
-        factory_list = list(set([re.findall(r'[(](.*?)[)]', item['material_name'])[0] for item in result if '(' in item['material_name']]))
+        factory_list = []
+        for item in result:
+            if '(' in item['material_name']:
+                try:
+                    factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[0])
+                except:
+                    continue
         # 根据地区过滤
         if factory:
             result = [item for item in result if factory in item['material_name']]
         count = len(result)
-        return Response({'results': result[st:et], "count": count, 'factory_list': factory_list})
+        return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
 @method_decorator([api_recorder], name="dispatch")
