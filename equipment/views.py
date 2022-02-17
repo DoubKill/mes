@@ -3540,6 +3540,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         if instance:
             for item in work_content:
                 uid = item.pop('uid', None)
+                item.pop('_is_save_one')
+                item.pop('_is_save_two')
                 if item.get('abnormal_operation_url'):
                     item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
                 item.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
@@ -3644,6 +3646,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 # EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
                 for item in work_content:
                     uid = item.pop('uid', None)
+                    item.pop('_is_save_one')
+                    item.pop('_is_save_two')
                     if item.get('abnormal_operation_url'):
                         item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
                     item.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
