@@ -2865,8 +2865,8 @@ class UnqialifiedEquipView(APIView):
         cursor.execute(sql)
         data = cursor.fetchall()
         for item in data:
-            if data_point_dic.get(j['material_test_order__product_no']):
-                data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
+            if data_point_dic.get(item[2]):
+                data_point_list = data_point_dic[item[2]].get(item[0])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
                     if 'MH' in item[0]:
