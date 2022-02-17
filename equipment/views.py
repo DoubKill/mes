@@ -3540,15 +3540,24 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         if instance:
             for item in work_content:
                 uid = item.pop('uid', None)
-                item.pop('_is_save_one', None)
-                item.pop('_is_save_two', None)
+                kwargs = {
+                    'abnormal_operation_desc': item['abnormal_operation_desc'],
+                    'abnormal_operation_result': item['abnormal_operation_result'],
+                    'equip_jobitem_standard_id': item['equip_jobitem_standard_id'],
+                    'job_item_check_standard': item['job_item_check_standard'],
+                    'job_item_check_type': item['job_item_check_type'],
+                    'job_item_content': item['job_item_content'],
+                    'job_item_sequence': item['job_item_sequence'],
+                    'operation_result': item['operation_result'],
+                    'unit': item['unit'],
+                }
                 if item.get('abnormal_operation_url'):
-                    item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                item.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                    kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
+                kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
                 if uid:  # 更新
-                    EquipResultDetail.objects.filter(id=uid).update(**item)
+                    EquipResultDetail.objects.filter(id=uid).update(**kwargs)
                 else:  # 新增
-                    EquipResultDetail.objects.create(**item)
+                    EquipResultDetail.objects.create(**kwargs)
         return Response('操作成功')
 
 
@@ -3646,15 +3655,24 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 # EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
                 for item in work_content:
                     uid = item.pop('uid', None)
-                    item.pop('_is_save_one', None)
-                    item.pop('_is_save_two', None)
+                    kwargs = {
+                        'abnormal_operation_desc': item['abnormal_operation_desc'],
+                        'abnormal_operation_result': item['abnormal_operation_result'],
+                        'equip_jobitem_standard_id': item['equip_jobitem_standard_id'],
+                        'job_item_check_standard': item['job_item_check_standard'],
+                        'job_item_check_type': item['job_item_check_type'],
+                        'job_item_content': item['job_item_content'],
+                        'job_item_sequence': item['job_item_sequence'],
+                        'operation_result': item['operation_result'],
+                        'unit': item['unit'],
+                    }
                     if item.get('abnormal_operation_url'):
-                        item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                    item.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                        kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
+                    kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
                     if uid:  # 更新
-                        EquipResultDetail.objects.filter(id=uid).update(**item)
+                        EquipResultDetail.objects.filter(id=uid).update(**kwargs)
                     else:  # 新增
-                        EquipResultDetail.objects.create(**item)
+                        EquipResultDetail.objects.create(**kwargs)
         else:  # 关闭
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
