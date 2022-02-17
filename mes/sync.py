@@ -8,6 +8,7 @@
 """
     基础数据同步至上辅机
 """
+import json
 import logging
 from datetime import datetime
 from doctest import master
@@ -17,6 +18,7 @@ from django.conf import settings
 from django.db.models import F
 from rest_framework import serializers
 
+from mes.common_code import DecimalEncoder
 from plan.models import ProductClassesPlan, ProductDayPlan
 from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
 
@@ -40,7 +42,9 @@ class BaseInterface(object):
                 "Content-Type": "application/json; charset=UTF-8",
                 # "Authorization": kwargs['context']
             }
-            res = requests.post(self.endpoint + self.Backend.path, headers=headers, json=kwargs)
+            # Decimal转换为float
+            data = json.dumps(kwargs, cls=DecimalEncoder)
+            res = requests.post(self.endpoint + self.Backend.path, headers=headers, data=data)
         except Exception as err:
             logger.error(err)
             raise Exception('上辅机服务错误')
