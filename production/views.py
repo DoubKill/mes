@@ -2380,6 +2380,7 @@ class EmployeeAttendanceRecordsView(APIView):
 
     def get(self, request):
         date = self.request.query_params.get('date')
+        name = self.request.query_params.get('name', '')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
         # 获取班组
@@ -2395,7 +2396,7 @@ class EmployeeAttendanceRecordsView(APIView):
             group_list.append([item['group__global_name'] for item in group])
 
         results = {}
-        data = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month).values(
+        data = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month, name__icontains=name).values(
             'equip', 'section', 'classes', 'date__day', 'name')
         for item in data:
             equip = item['equip']
