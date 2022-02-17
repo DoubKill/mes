@@ -2404,29 +2404,44 @@ class ProductTestStaticsView(APIView):
             else:
                 data_point_dic[i['material_test_method__material__material_no']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
 
-        res = queryset.values('material_test_order__product_no', 'data_point_name', 'value')
-        for j in res:
-            if data_point_dic.get(j['material_test_order__product_no']):
-                data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
+        sql = """
+        SELECT
+            a.data_point_name,
+            a.value,
+            bb.PRODUCT_NO 
+        FROM
+            MATERIAL_TEST_RESULT a,
+            MATERIAL_TEST_ORDER bb,
+            ( SELECT max( id ) maxtime FROM MATERIAL_TEST_RESULT GROUP BY MATERIAL_TEST_ORDER_ID ) b 
+        WHERE
+            a.id = b.maxtime 
+            AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
+            AND a.MATERIAL_TEST_ORDER_ID = bb.ID
+        """
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        for item in data:
+            if data_point_dic.get(item[2]):
+                data_point_list = data_point_dic[item[2]].get(item[0])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-                    if 'MH' in j['data_point_name']:
-                        MH_lower = 1 if j['value'] < data_point_list[0] else 0
-                        MH_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'ML' in j['data_point_name']:
-                        ML_lower = 1 if j['value'] < data_point_list[0] else 0
-                        ML_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC10' in j['data_point_name']:
-                        TC10_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC10_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC50' in j['data_point_name']:
-                        TC50_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC50_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC90' in j['data_point_name']:
-                        TC90_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC90_upper = 1 if j['value'] > data_point_list[1] else 0
-
-                    spe = j['material_test_order__product_no'].split('-')[2]
+                    if 'MH' in item[0]:
+                        MH_lower = 1 if item[1] < data_point_list[0] else 0
+                        MH_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'ML' in item[0]:
+                        ML_lower = 1 if item[1] < data_point_list[0] else 0
+                        ML_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC10' in item[0]:
+                        TC10_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC10_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC50' in item[0]:
+                        TC50_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC50_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC90' in item[0]:
+                        TC90_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC90_upper = 1 if item[1] > data_point_list[1] else 0
+                    spe = item[2].split('-')[2]
                     if dic.get(spe):
                         data = dic.get(spe)
                         dic[spe].update({
@@ -2603,32 +2618,51 @@ class ClassTestStaticsView(APIView):
             else:
                 data_point_dic[i['material_test_method__material__material_no']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
 
-        res = queryset.values('material_test_order__production_factory_date',
-                              'material_test_order__product_no',
-                              'material_test_order__production_class',
-                              'data_point_name', 'value')
-        for j in res:
-            if data_point_dic.get(j['material_test_order__product_no']):
-                data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
+        # res = queryset.values('material_test_order__production_factory_date',
+        #                       'material_test_order__product_no',
+        #                       'material_test_order__production_class',
+        #                       'data_point_name', 'value')
+        sql = """
+        SELECT
+            a.data_point_name,
+            a.value,
+            bb.PRODUCT_NO,
+            bb.PRODUCTION_FACTORY_DATE,
+            bb.PRODUCTION_CLASS
+        FROM
+            MATERIAL_TEST_RESULT a,
+            MATERIAL_TEST_ORDER bb,
+            ( SELECT max( id ) maxtime FROM MATERIAL_TEST_RESULT GROUP BY MATERIAL_TEST_ORDER_ID ) b 
+        WHERE
+            a.id = b.maxtime 
+            AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
+            AND a.MATERIAL_TEST_ORDER_ID = bb.ID
+        """
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        for item in data:
+            if data_point_dic.get(item[2]):
+                data_point_list = data_point_dic[item[2]].get(item[0])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-                    if 'MH' in j['data_point_name']:
-                        MH_lower = 1 if j['value'] < data_point_list[0] else 0
-                        MH_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'ML' in j['data_point_name']:
-                        ML_lower = 1 if j['value'] < data_point_list[0] else 0
-                        ML_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC10' in j['data_point_name']:
-                        TC10_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC10_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC50' in j['data_point_name']:
-                        TC50_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC50_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC90' in j['data_point_name']:
-                        TC90_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC90_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'MH' in item[0]:
+                        MH_lower = 1 if item[1] < data_point_list[0] else 0
+                        MH_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'ML' in item[0]:
+                        ML_lower = 1 if item[1] < data_point_list[0] else 0
+                        ML_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC10' in item[0]:
+                        TC10_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC10_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC50' in item[0]:
+                        TC50_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC50_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC90' in item[0]:
+                        TC90_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC90_upper = 1 if item[1] > data_point_list[1] else 0
 
-                    spe = str(j['material_test_order__production_factory_date']) + '_' + j['material_test_order__production_class']
+                    spe = str(item[3]) + '_' + item[4]
                     if dic.get(spe):
                         data = dic.get(spe)
                         dic[spe].update({
@@ -2809,31 +2843,49 @@ class UnqialifiedEquipView(APIView):
             else:
                 data_point_dic[i['material_test_method__material__material_no']] = {i['data_point__name']: [i['lower_limit'], i['upper_limit']]}
 
-        res = material_test_result.values('material_test_order__production_equip_no',
-                                          'material_test_order__product_no',
-                                          'data_point_name', 'value')
-        for j in res:
+        # res = material_test_result.values('material_test_order__production_equip_no',
+        #                                   'material_test_order__product_no',
+        #                                   'data_point_name', 'value')
+        sql = """
+        SELECT
+            a.data_point_name,
+            a.value,
+            bb.PRODUCT_NO,
+            bb.PRODUCTION_EQUIP_NO
+        FROM
+            MATERIAL_TEST_RESULT a,
+            MATERIAL_TEST_ORDER bb,
+            ( SELECT max( id ) maxtime FROM MATERIAL_TEST_RESULT GROUP BY MATERIAL_TEST_ORDER_ID ) b 
+        WHERE
+            a.id = b.maxtime 
+            AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
+            AND a.MATERIAL_TEST_ORDER_ID = bb.ID
+        """
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        data = cursor.fetchall()
+        for item in data:
             if data_point_dic.get(j['material_test_order__product_no']):
                 data_point_list = data_point_dic[j['material_test_order__product_no']].get(j['data_point_name'])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
-                    if 'MH' in j['data_point_name']:
-                        MH_lower = 1 if j['value'] < data_point_list[0] else 0
-                        MH_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'ML' in j['data_point_name']:
-                        ML_lower = 1 if j['value'] < data_point_list[0] else 0
-                        ML_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC10' in j['data_point_name']:
-                        TC10_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC10_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC50' in j['data_point_name']:
-                        TC50_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC50_upper = 1 if j['value'] > data_point_list[1] else 0
-                    if 'TC90' in j['data_point_name']:
-                        TC90_lower = 1 if j['value'] < data_point_list[0] else 0
-                        TC90_upper = 1 if j['value'] > data_point_list[1] else 0
+                    if 'MH' in item[0]:
+                        MH_lower = 1 if item[1] < data_point_list[0] else 0
+                        MH_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'ML' in item[0]:
+                        ML_lower = 1 if item[1] < data_point_list[0] else 0
+                        ML_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC10' in item[0]:
+                        TC10_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC10_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC50' in item[0]:
+                        TC50_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC50_upper = 1 if item[1] > data_point_list[1] else 0
+                    if 'TC90' in item[0]:
+                        TC90_lower = 1 if item[1] < data_point_list[0] else 0
+                        TC90_upper = 1 if item[1] > data_point_list[1] else 0
 
-                    spe = j['material_test_order__production_equip_no']
+                    spe = item[3]
                     if dic_.get(spe):
                         data = dic_.get(spe)
                         dic_[spe].update({
