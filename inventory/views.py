@@ -2448,6 +2448,7 @@ class WmsStorageSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
+        factory = self.request.query_params.get('factory')  # 厂家
         material_name = self.request.query_params.get('material_name')  # 物料名称
         material_no = self.request.query_params.get('material_no')  # 物料编码
         zc_material_code = self.request.query_params.get('zc_material_code')  # 中策物料编码
@@ -2549,7 +2550,12 @@ class WmsStorageSummaryView(APIView):
                  'quality_status': item[8]
                  })
         sc.close()
-        return Response({'results': result, "count": count})
+        # 返回所有的厂家
+        factory_list = [re.findall(r'[(](.*?)[)]', item['material_name'])[0] for item in result if '(' in item['material_name']]
+        # 根据地区过滤
+        if factory:
+            result = [item for item in result if factory in item['material_name']]
+        return Response({'results': result, "count": count, 'factory_list': factory_list})
 
 
 @method_decorator([api_recorder], name="dispatch")
