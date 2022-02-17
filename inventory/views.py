@@ -2534,7 +2534,7 @@ class WmsStorageSummaryView(APIView):
         """.format(inventory_where_str, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
-        count = len(temp)
+        # count = len(temp)
         # temp = temp[st:et]
         result = []
         for item in temp:
@@ -2555,6 +2555,7 @@ class WmsStorageSummaryView(APIView):
         # 根据地区过滤
         if factory:
             result = [item for item in result if factory in item['material_name']]
+        count = len(result)
         return Response({'results': result[st:et], "count": count, 'factory_list': factory_list})
 
 
