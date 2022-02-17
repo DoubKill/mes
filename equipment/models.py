@@ -1016,6 +1016,7 @@ class EquipResultDetail(AbstractEntity):
     abnormal_operation_desc = models.CharField(max_length=512, help_text='异常处理备注', null=True, blank=True)
     abnormal_operation_result = models.CharField(max_length=512, help_text='异常处理结果', null=True, blank=True)
     abnormal_operation_url = models.TextField(help_text='异常处理图片url', null=True, blank=True)
+    unit = models.CharField(max_length=64, help_text='单位', blank=True, null=True)
 
     class Meta:
         db_table = 'equip_result_detail'
