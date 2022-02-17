@@ -2548,17 +2548,14 @@ class WmsStorageSummaryView(APIView):
                  'weight': item[6],
                  'batch_no': item[7],
                  'quality_status': item[8],
-                 'factory': re.findall(r'[(](.*?)[)]', item[0])[-1]
+                 'factory': re.findall(r'[(](.*?)[)]', item[0])[-1] if re.findall(r'[(](.*?)[)]', item[0]) else ''
                  })
         sc.close()
         # 返回所有的厂家
         factory_list = []
         for item in result:
-            if '(' in item['material_name']:
-                try:
+            if '(' in item['material_name'] and re.findall(r'[(](.*?)[)]', item['material_name']):
                     factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[-1])
-                except:
-                    continue
         # 根据地区过滤
         if factory:
             result = [item for item in result if factory in item['material_name']]
