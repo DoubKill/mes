@@ -2551,7 +2551,7 @@ class WmsStorageSummaryView(APIView):
                  })
         sc.close()
         # 返回所有的厂家
-        factory_list = [re.findall(r'[(](.*?)[)]', item['material_name'])[0] for item in result if '(' in item['material_name']]
+        factory_list = list(set([re.findall(r'[(](.*?)[)]', item['material_name'])[0] for item in result if '(' in item['material_name']]))
         # 根据地区过滤
         if factory:
             result = [item for item in result if factory in item['material_name']]
