@@ -825,7 +825,7 @@ class SchedulingResultViewSet(ModelViewSet):
                         plan_trains = int(plan_trains)
                     except ValueError:
                         raise ValidationError('机台：{}， 胶料规格:{}，车次信息错误，请修改后重试！'.format(equip_no, value[0]))
-                    pb = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no__icontains='-{}'.format(product_no)).first()
+                    pb = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no__icontains='-{}'.format(product_no)).first()
                     if pb:
                         product_no = pb.stage_product_batch_no
                     train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no)

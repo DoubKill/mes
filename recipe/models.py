@@ -383,6 +383,7 @@ class ProductBatchingEquip(models.Model):
     product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配方id', related_name='product_batching_equip')
     equip_no = models.CharField(max_length=8, help_text='机台名称')
     material = models.ForeignKey(Material, on_delete=models.CASCADE, help_text='物料id')
+    handle_material_name = models.CharField(max_length=255, help_text='去除-C, -X后缀的物料名称')
     batching_detail_equip = models.ForeignKey(ProductBatchingDetail, on_delete=models.CASCADE, help_text='胶块信息表id', null=True, blank=True)
     cnt_type_detail_equip = models.ForeignKey(WeighBatchingDetail, on_delete=models.CASCADE, help_text='小料详情id', null=True, blank=True)
     type = models.IntegerField(help_text='类别: 1: 胶料, 2: 炭黑, 3: 油料, 4: 小料')

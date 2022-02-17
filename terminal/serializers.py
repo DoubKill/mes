@@ -7,20 +7,21 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
-from django.db.models import Q, Sum, Max, F, Min
+from django.db.models import Q, Sum, Max, Min, Count
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from basics.models import PlanSchedule, GlobalCode, WorkSchedulePlan
-from inventory.models import MaterialOutHistory, MixGumOutInventoryLog, DepotPallt
+from basics.models import WorkSchedulePlan
+from inventory.models import MixGumOutInventoryLog, DepotPallt
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ERPMESMaterialRelation, WeighCntType, ProductBatching, ProductBatchingDetail
+from recipe.models import ERPMESMaterialRelation, ProductBatchingDetail, \
+    ProductBatchingEquip
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
@@ -89,9 +90,6 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(equip_no=classes_plan.equip.equip_no)
         if not material_name_weight:
             raise serializers.ValidationError(f'获取配方详情失败:{classes_plan.product_batching.stage_product_batch_no}')
-        # if cnt_type_details:
-        #     # 去除炭黑罐投入的化工原料
-        #     cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
         for i in material_name_weight:
             if i['material__material_name'] in ['硫磺', '细料']:
@@ -337,7 +335,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                 ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag and not merge_flag:
-                            machine_details = RecipeMaterial.objects.using(weight_package.equip_no).filter(recipe_name=weight_package.product_no)
+                            machine_details = WeightPackageLogDetails.objects.filter(weight_package=weight_package)
                             # 转换配方内物料名与称量配方物料比较
                             cnt_type_data = {}
                             for i in cnt_type_details:
@@ -1370,6 +1368,31 @@ class PlanSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         equip_no = validated_data.pop('equip_no')
+        # 称量重量与mes不同无法下发计划
+        recipe_obj = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        product_no_dev, dev_type = re.split(r'\(|\（|\[', recipe_obj.name)[0], recipe_obj.ver
+        if 'ONLY' in validated_data['recipe']:
+            ml_equip_no = recipe_obj.name.split('-')[-2]
+        else:
+            equip_recipes = ProductBatchingEquip.objects.filter(is_used=True, type=4,
+                                                                product_batching__stage_product_batch_no=product_no_dev,
+                                                                product_batching__dev_type__category_name=dev_type) \
+                .values('equip_no').annotate(num=Count('id', filter=~Q(feeding_mode__startswith=equip_no[0])))
+            if not equip_recipes:
+                raise ValueError(f"未找到mes配方{product_no_dev}[{dev_type}]配料信息")
+            handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
+            if not handle_equip_recipe:
+                raise ValueError(f"未找到配方{product_no_dev}通用配料信息")
+            ml_equip_no = handle_equip_recipe[0]
+        recipe_materials = list(RecipeMaterial.objects.filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
+        mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
+                                                         feeding_mode__startswith=equip_no[0],
+                                                         handle_material_name__in=recipe_materials,
+                                                         product_batching__stage_product_batch_no=product_no_dev,
+                                                         product_batching__dev_type__category_name=dev_type)
+        mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
+        if recipe_obj.weight != mes_machine_weight:
+            raise serializers.ValidationError(f'称量配方重量{recipe_obj.weight}与mes配方不一致{round(mes_machine_weight, 3)}')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
                                                               grouptime=validated_data['grouptime']
                                                               ).order_by('order_by').last()

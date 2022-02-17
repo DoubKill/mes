@@ -10,7 +10,6 @@ from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
-from pygments.lexer import using
 from rest_framework import mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -55,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_sfj_carbon_materials
+    get_manual_materials
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1272,9 +1271,9 @@ class RecipePreVIew(ListAPIView):
         product_name = ret.group(1)
         dev_type = ret.group(2)
         product_batching = ProductBatching.objects.exclude(
-            used_type=6).filter(stage_product_batch_no=product_name,
-                                dev_type__category_no=dev_type,
-                                batching_type=2).first()
+            used_type__in=[6, 7]).filter(stage_product_batch_no=product_name,
+                                         dev_type__category_no=dev_type,
+                                         batching_type=2).first()
         if not product_batching:
             raise ValidationError('该配方MES不存在或已废弃！')
 
@@ -2403,9 +2402,6 @@ class MaterialDetailsAux(APIView):
         if not classes_plan:
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
         material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan.equip.equip_no)
-        # if cnt_type_details:
-        #     # 去除炭黑罐投入的化工原料
-        #     cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
         if from_mes:
             res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details] + [classes_plan.product_batching.stage_product_batch_no]
             return Response(res)
@@ -2440,15 +2436,13 @@ class XlRecipeNoticeView(APIView):
         if not not_tank_materials:
             raise ValidationError('配方中的小料内容投料方式与机台不相符')
         # 查询所有的称量线体罐物料与配方设置物料是否一致
-        mes_xl_materials = not_tank_materials.values_list('material__material_name', flat=True).distinct()
-        handle_mes_xl_materials = {i[:-2]: i for i in mes_xl_materials if i.endswith('-C') or i.endswith('-X')}
+        mes_xl_materials = not_tank_materials.values_list('handle_material_name', flat=True).distinct()
         xl_equip_materials = list(Bin.objects.using(xl_equip).values_list('name', flat=True))
-        out_mes_materials = list(set(handle_mes_xl_materials.keys()) - set(xl_equip_materials))
+        out_mes_materials = list(set(mes_xl_materials) - set(xl_equip_materials))
         if not notice_flag and out_mes_materials:
             return Response({'notice_flag': True, 'msg': ','.join(out_mes_materials)})
         # 配方和线体相同物料
-        same_material_list = list(set(handle_mes_xl_materials.keys()) & set(xl_equip_materials))
-        tran_to_mes = [handle_mes_xl_materials.get(j) for j in same_material_list]
+        same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
         # 在使用称量配方不能下发
         equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
         # 下发配方数据与是否下发标识
@@ -2456,7 +2450,7 @@ class XlRecipeNoticeView(APIView):
         before_date = now_date - timedelta(days=1)
         send_data = {'dev_type': product_batching.dev_type.category_no}
         for single_equip_no in equip_no_list:
-            send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, material__material_name__in=tran_to_mes)
+            send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
             if not send_materials:
                 continue
             not_keyword_material = mes_xl_details.filter(~Q(feeding_mode__startswith=keywords), equip_no=single_equip_no)
@@ -2504,8 +2498,7 @@ class XlRecipeNoticeView(APIView):
                 raise ValidationError(f'无法解析{xl_equip}配方明细表主键')
             add_ids = [n_id]
             for single in recipe_materials:
-                mes_name = single.material.material_name
-                xl_name = mes_name[:-2] if '-C' in mes_name or '-X' in mes_name else mes_name
+                xl_name = single.handle_material_name
                 single_weight = round(single.cnt_type_detail_equip.standard_weight / split_count, 3)
                 # 单物料公差
                 single_tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=single_weight, only_num=True)

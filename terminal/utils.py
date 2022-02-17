@@ -1,15 +1,12 @@
 """
     小料对接接口封装
 """
-import re
 import json
-import time
-from decimal import Decimal
-
-import requests
+import re
 from datetime import datetime
 
-from django.db.models import Sum, F, Q, Count
+import requests
+from django.db.models import Sum, Q, Count
 from django.db.transaction import atomic
 from suds.client import Client
 
@@ -253,7 +250,7 @@ def material_out_barcode(bar_code):
 
 # @atomic()
 def issue_recipe(recipe_no, equip_no):
-    recipe = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no=recipe_no,
+    recipe = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=recipe_no,
                                                                  dev_type__isnull=False, batching_type=2).last()
     weigh_recipe_name = f"{recipe.stage_product_batch_no}({recipe.dev_type.category_no})"
     time_now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -493,9 +490,7 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     # 人工配物料信息
     manual_material = []
     for i in mes_recipe:
-        real_name = re.split(r'-C|-X', i.material.material_name)[0] if i.material.material_name.endswith(
-            '-C') or i.material.material_name.endswith('-X') else i.material.material_name
-        if real_name not in machine_material:
+        if i.handle_material_name not in machine_material:
             manual_material.append({'material_name': i.material.material_name, 'tolerance': i.cnt_type_detail_equip.standard_error,
                                     'material__material_name': i.material.material_name,
                                     'standard_weight': i.cnt_type_detail_equip.standard_weight})
