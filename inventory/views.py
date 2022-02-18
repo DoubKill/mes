@@ -35,7 +35,7 @@ from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanM
     MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, \
     MixinRubberyOutBoundOrderFilter, FinalRubberyOutBoundOrderFilter, DepotSiteDataFilter, DepotDataFilter, \
     SulfurResumeFilter, DepotSulfurFilter, PalletDataFilter, DepotResumeFilter, SulfurDepotSiteFilter, SulfurDataFilter, \
-    OutBoundDeliveryOrderFilter, OutBoundDeliveryOrderDetailFilter
+    OutBoundDeliveryOrderFilter, OutBoundDeliveryOrderDetailFilter, WmsNucleinManagementFilter
 
 from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMaterialType, \
     BzFinalMixingRubberInventoryLB, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
@@ -43,7 +43,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
-    OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings
+    OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -55,10 +55,11 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer, WmsInventoryMaterialSerializer
+    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
+from mes import settings
 from mes.common_code import SqlClient, OSum
 from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL
 from mes.derorators import api_recorder
@@ -73,6 +74,7 @@ from production.models import PalletFeedbacks, TrainsFeedbacks
 from quality.deal_result import receive_deal_result
 from quality.models import LabelPrint, Train, MaterialDealResult, LabelPrintLog, ExamineMaterial
 from quality.serializers import MaterialDealResultListSerializer
+from quality.utils import update_wms_quality_result
 from recipe.models import Material, MaterialAttribute
 from system.models import User
 from terminal.models import LoadMaterialLog, WeightBatchingLog, WeightPackageLog
@@ -1616,7 +1618,7 @@ class ProductTraceView(APIView):
 
             # 配方创建
             product_info = model_to_dict(product)
-            temp_time = product_info.get("created_date", datetime.datetime.now())
+            temp_time = product.created_date
             work_schedule_plan = WorkSchedulePlan.objects.filter(
                 start_time__lte=temp_time,
                 end_time__gte=temp_time,
@@ -1636,8 +1638,9 @@ class ProductTraceView(APIView):
         rep["product_info"] = [product_info]
         # 配料详情
         if product:
-            product_details = product.batching_details.all().values("product_batching__stage_product_batch_no",
-                                                                    "material__material_no", "actual_weight")
+            product_details = product.batching_details.filter(
+                delete_flag=False
+            ).values("product_batching__stage_product_batch_no", "material__material_no", "actual_weight")
         else:
             product_details = []
         rep["product_details"] = list(product_details)
@@ -2533,6 +2536,9 @@ class WmsStorageSummaryView(APIView):
         """.format(inventory_where_str, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
+        l_data = list(WmsNucleinManagement.objects.filter(locked_status='已锁定').values_list('batch_no', flat=True))
+        if self.request.query_params.get('l_flag'):
+            temp = list(filter(lambda x: x[7] not in l_data, temp))
         count = len(temp)
         temp = temp[st:et]
         result = []
@@ -3210,6 +3216,30 @@ class WMSInventoryView(APIView):
         sc.close()
         return Response(
             {'results': result, "count": count, 'total_quantity': total_quantity, 'total_weight': total_weight})
+
+
+class WmsNucleinManagementView(ModelViewSet):
+    queryset = WmsNucleinManagement.objects.order_by('-id')
+    serializer_class = WmsNucleinManagementSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = WmsNucleinManagementFilter
+
+    def create(self, request, *args, **kwargs):
+        data = self.request.data
+        if not isinstance(data, list):
+            raise ValidationError('参数错误')
+        s = self.serializer_class(data=data, many=True, context={'request': request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        if not settings.DEBUG:
+            data_list = [{
+                    "BatchNo": w['batch_no'],
+                    "MaterialCode": w['material_no'],
+                    "CheckResult": 2
+                } for w in data]
+            update_wms_quality_result(data_list)
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
