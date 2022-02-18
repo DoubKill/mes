@@ -28,6 +28,8 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet, ReadOnlyModelV
 from basics.models import GlobalCodeType
 from basics.serializers import GlobalCodeSerializer
 import uuid
+
+from inventory.models import WmsNucleinManagement
 from mes import settings
 from mes.common_code import CommonDeleteMixin, date_range, get_template_response
 from mes.conf import WMS_URL
@@ -1692,6 +1694,11 @@ class ExamineMaterialViewSet(viewsets.GenericViewSet,
         desc = self.request.data.get('desc')
         deal_result = self.request.data.get('deal_result')
         materials = ExamineMaterial.objects.filter(id__in=material_ids)
+        batch_nos = list(materials.values_list('batch', flat=True))
+        if WmsNucleinManagement.objects.filter(
+                locked_status='已锁定',
+                batch_no__in=batch_nos).exists():
+            raise ValidationError('该批次物料已锁定核酸管控，无法处理！')
         materials.update(
             deal_status='已处理',
             deal_result=deal_result,

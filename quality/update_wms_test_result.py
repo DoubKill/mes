@@ -5,9 +5,11 @@
 
 import os
 import sys
+from datetime import datetime, timedelta
 
 import django
 import requests
+from django.db.models import Q
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -15,17 +17,24 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
 django.setup()
 
 from quality.models import ExamineMaterial
+from inventory.models import WmsNucleinManagement
 
 from mes.conf import WMS_URL
+from quality.utils import update_wms_quality_result
 
 import logging
 logger = logging.getLogger('quality_log')
 
 
 def main():
-    materials = ExamineMaterial.objects.filter(status=1)
+    ex_time = datetime.now() - timedelta(days=7)
+    materials = ExamineMaterial.objects.filter(Q(status=1) | Q(status=2, create_time__gte=ex_time))
     url = WMS_URL + '/MESApi/UpdateTestingResult'
     for m in materials:
+        if WmsNucleinManagement.objects.filter(locked_status='已锁定',
+                                               batch_no=m.batch,
+                                               material_no=m.wlxxid).exists():
+            continue
         data = {
                 "TestingType": 2,
                 "SpotCheckDetailList": [{
@@ -46,6 +55,16 @@ def main():
             logger.error('wms error msg: {}'.format(r.get('msg')))
         m.status = 2 if status == 1 else 3
         m.save()
+
+    # 核酸检测锁定（设定不合格）
+    data_list = [{
+                    "BatchNo": w.batch_no,
+                    "MaterialCode": w.material_no,
+                    "CheckResult": 2
+                } for w in WmsNucleinManagement.objects.filter(
+        locked_status='已锁定', created_date__gte=ex_time)]
+    if data_list:
+        update_wms_quality_result(data_list)
 
 
 if __name__ == '__main__':
