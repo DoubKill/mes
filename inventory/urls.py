@@ -119,6 +119,9 @@ router.register(r'sulfur-resume', SulfurResumeModelViewSet)
 # 硫磺PDA出入库
 router.register(r'sulfur-auto-plan', SulfurAutoPlanViewSet)
 
+# 原材料核酸管控
+router.register(r'wms-nuclein-management', WmsNucleinManagementView)
+
 
 urlpatterns = [
     path('', include(router.urls)),

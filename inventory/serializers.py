@@ -15,15 +15,18 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
+from mes import settings
 from mes.base_serializer import BaseModelSerializer
-from mes.conf import STATION_LOCATION_MAP
+from mes.conf import STATION_LOCATION_MAP, COMMON_READ_ONLY_FIELDS
+from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
-    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings
+    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
+    WmsNucleinManagement
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1768,3 +1771,22 @@ class WmsInventoryMaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = WmsInventoryMaterial
         fields = '__all__'
+
+
+class WmsNucleinManagementSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        if 'locked_status' in validated_data:
+            if validated_data['locked_status'] == '已锁定' and not settings.DEBUG:
+                data_list = [{
+                    "BatchNo": instance.batch_no,
+                    "MaterialCode": instance.material_no,
+                    "CheckResult": 2}]
+                update_wms_quality_result(data_list)
+        return validated_data
+
+    class Meta:
+        model = WmsNucleinManagement
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
