@@ -2417,7 +2417,12 @@ class ProductTestStaticsView(APIView):
             a.id = b.maxtime 
             AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
             AND a.MATERIAL_TEST_ORDER_ID = bb.ID
-        """
+            AND bb.PRODUCTION_EQUIP_NO LIKE '%{}%'
+            AND bb.PRODUCT_NO LIKE '%{}%'
+            AND bb.PRODUCTION_CLASS LIKE '%{}%'
+            AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}'', 'YYYY-MM-DD')
+        """.format(production_equip_no, product_str, production_class, start_time, end_time)
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
@@ -2637,7 +2642,12 @@ class ClassTestStaticsView(APIView):
             a.id = b.maxtime 
             AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
             AND a.MATERIAL_TEST_ORDER_ID = bb.ID
-        """
+             AND bb.PRODUCTION_EQUIP_NO LIKE '%{}%'
+            AND bb.PRODUCT_NO LIKE '%{}%'
+            AND bb.PRODUCTION_CLASS LIKE '%{}%'
+            AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+        """.format(production_equip_no, product_str, production_class, start_time, end_time)
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
@@ -2860,7 +2870,12 @@ class UnqialifiedEquipView(APIView):
             a.id = b.maxtime 
             AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
             AND a.MATERIAL_TEST_ORDER_ID = bb.ID
-        """
+            AND bb.PRODUCTION_EQUIP_NO LIKE '%{}%'
+            AND bb.PRODUCT_NO LIKE '%{}%'
+            AND bb.PRODUCTION_CLASS LIKE '%{}%'
+            AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+        """.format(equip_no, product_str, classes, s_time, e_time)
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
