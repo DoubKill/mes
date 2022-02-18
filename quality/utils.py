@@ -1,3 +1,4 @@
+import requests
 import xlrd
 import xlwt
 from django.http import HttpResponse
@@ -5,6 +6,7 @@ from io import BytesIO
 
 from rest_framework import serializers
 
+from mes.conf import WMS_URL
 from quality.serializers import DealResultDealSerializer
 
 
@@ -149,3 +151,18 @@ def export_mto():
     output.seek(0)
     response.write(output.getvalue())
     return response
+
+
+def update_wms_quality_result(data_list):
+    """
+    更新检测结果至WMS
+    @param data_list:
+    @return:
+    """
+    url = WMS_URL + '/MESApi/UpdateTestingResult'
+    data = {"TestingType": 2, "SpotCheckDetailList": data_list}
+    headers = {"Content-Type": "application/json ;charset=utf-8"}
+    try:
+        ret = requests.post(url, json=data, headers=headers, timeout=10)
+    except Exception as e:
+        pass
