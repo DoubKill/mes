@@ -2421,7 +2421,7 @@ class ProductTestStaticsView(APIView):
             AND bb.PRODUCT_NO LIKE '%{}%'
             AND bb.PRODUCTION_CLASS LIKE '%{}%'
             AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}'', 'YYYY-MM-DD')
+            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
         """.format(production_equip_no, product_str, production_class, start_time, end_time)
         cursor = connection.cursor()
         cursor.execute(sql)
