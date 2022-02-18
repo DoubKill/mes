@@ -491,6 +491,7 @@ class EquipMaintenanceAreaSetting(AbstractEntity):
     equip = models.ForeignKey(Equip, on_delete=models.CASCADE, help_text='机台')
     equip_part = models.ForeignKey(EquipPartNew, on_delete=models.SET_NULL,
                                    help_text='设备部位', blank=True, null=True)
+    unique_value = models.IntegerField(help_text="部位外键的值(为了增加3字段唯一性校验)")
     equip_area = models.ForeignKey(EquipAreaDefine, on_delete=models.SET_NULL,
                                    help_text='设备区域', blank=True, null=True)
 

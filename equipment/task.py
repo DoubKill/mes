@@ -233,6 +233,15 @@ class AutoDispatch(object):
             fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
+            # 查询巡检单是否有部分已经分派了
+            part_order = EquipInspectionOrder.objects.filter(plan_id=order.plan_id, assign_to_user__isnull=False).first()
+            if part_order:
+                order.assign_user = '系统自动'
+                order.assign_datetime = now_date
+                order.assign_to_user = part_order.assign_to_user
+                order.status = '已指派'
+                order.last_updated_date = now_date
+                order.save()
             inspection = True
             # 查询工单对应的包干人员[上班并且有空]
             choice_all_user = get_maintenance_status(self.ding_api, order.equip_no, order.equip_repair_standard.type)
@@ -254,9 +263,10 @@ class AutoDispatch(object):
         if not working_persons:
             # 发送消息给上级
             content.update({'title': f"系统派单: 无空闲可指派人员！"})
-            self.ding_api.send_message([leader_ding_uid], content)
+            # self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员')
-            return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
+            # return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
+            return [order.work_type, leader_ding_uid]
         processing_person = []
         for per in working_persons:
             if order.work_type != '巡检':
@@ -289,10 +299,11 @@ class AutoDispatch(object):
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
             content.update({'title': f"所有人员均有工单在处理, 系统自动派单失败！"})
-            self.ding_api.send_message([leader_ding_uid], content)
+            # self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: 系统自动派单失败, 可选人员:{working_persons}, 正在维修人员:{processing_person}')
-            return f'系统派单[{order.work_type}]: 系统自动派单失败'
-        return '系统派单[{order.work_type}]: 完成一次定时派单处理'
+            # return f'系统派单[{order.work_type}]: 系统自动派单失败'
+            return [order.work_type, leader_ding_uid]
+        return f'系统派单[{order.work_type}]: 完成一次定时派单处理'
 
     def get_group_info(self):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -309,5 +320,24 @@ if __name__ == '__main__':
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")
+    failed = {}  # {ding_uid: {维修: 4, 巡检: 7}}
     for order in orders:
         res = auto_dispatch.send_order(order)
+        if isinstance(res, list):
+            work_type, leader_ding_uid = res
+            if not leader_ding_uid:
+                continue
+            if leader_ding_uid in failed:
+                statics = failed['leader_ding_uid']
+                statics[work_type] = statics[work_type] + 1 if work_type in statics else 1
+            else:
+                failed[leader_ding_uid] = {work_type: 1}
+    if failed:
+        for leader_ding_uid, total_error_msg in failed:
+            send_msg_content = ''
+            for work_type, num in total_error_msg.items():
+                send_msg_content += f'{work_type}: {num}'
+            now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            content = {"title": f"单据派单失败, 请及时查看: {send_msg_content}"}
+            auto_dispatch.ding_api.send_message([leader_ding_uid], content)
+

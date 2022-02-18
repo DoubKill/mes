@@ -673,13 +673,20 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
     equip_part_name = serializers.CharField(source='equip_part.part_name', read_only=True, default='')
     equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True, default='')
     workshop = serializers.CharField(source='maintenance_user.workshop', read_only=True, default='')
+    unique_value = serializers.IntegerField(default=0)
+
+    def validate(self, attrs):
+        equip_part = attrs.get('equip_part')
+        if equip_part:
+            attrs['unique_value'] = equip_part
+        return attrs
 
     class Meta:
         model = EquipMaintenanceAreaSetting
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
         validators = [UniqueTogetherValidator(queryset=EquipMaintenanceAreaSetting.objects.all(),
-                                              fields=('maintenance_user', 'equip', 'equip_part'),
+                                              fields=('maintenance_user', 'equip', 'unique_value'),
                                               message='请勿重复添加！'),
                       ]
 

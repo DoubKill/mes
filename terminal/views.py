@@ -1386,7 +1386,7 @@ class XLPlanVIewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
         now_date = datetime.datetime.now().date()
-        date_time = self.request.query_params.get('date_time', now_date.strftime('%Y-%m-%d'))
+        date_time = self.request.query_params.get('date_time')
         grouptime = self.request.query_params.get('grouptime')
         recipe = self.request.query_params.get('recipe')
         state = self.request.query_params.get('state')
@@ -1416,7 +1416,6 @@ class XLPlanVIewSet(ModelViewSet):
                 raise
             return self.get_paginated_response(serializer.data)
         else:
-            filter_kwargs.pop('date_time')
             e_days = 7 if equip_no.startswith('F') else 5
             s_time, e_time = now_date - timedelta(days=e_days), now_date
             filter_kwargs.update({'date_time__gte': s_time, 'date_time__lte': e_time})
