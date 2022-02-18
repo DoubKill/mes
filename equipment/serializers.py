@@ -1104,7 +1104,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
-                work_content.sort(key=lambda x: x['job_item_sequence'])
+                work_content.sort(key=lambda x: int(x['job_item_sequence']))
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
@@ -1260,7 +1260,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                          'job_item_check_type': i.get('check_standard_type'),
                          'unit': i.get('unit'),
                          })
-            work_content.sort(key=lambda x: x['job_item_sequence'])
+            work_content.sort(key=lambda x: int(x['job_item_sequence']))
         res['work_content'] = work_content
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()
