@@ -2413,23 +2413,63 @@ class ProductTestStaticsView(APIView):
 
         sql = """
         SELECT
-            a.data_point_name,
-            a.value,
-            bb.PRODUCT_NO 
-        FROM
-            MATERIAL_TEST_RESULT a,
-            MATERIAL_TEST_ORDER bb,
-            ( SELECT max( id ) maxtime FROM MATERIAL_TEST_RESULT GROUP BY MATERIAL_TEST_ORDER_ID ) b 
-        WHERE
-            a.id = b.maxtime 
-            AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
-            AND a.MATERIAL_TEST_ORDER_ID = bb.ID
-            AND bb.PRODUCTION_EQUIP_NO LIKE '%{}%'
-            AND bb.PRODUCT_NO LIKE '%{}%'
-            AND bb.PRODUCTION_CLASS LIKE '%{}%'
-            AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-        """.format(production_equip_no, product_str, production_class, start_time, end_time)
+     * 
+    FROM
+     (
+     SELECT
+     a.data_point_name,
+      a.value,
+      b.product_no,
+      b.production_factory_date,
+      b.production_class,
+      a.test_times,
+      b.actual_trains,
+      b.production_equip_no 
+     FROM
+      material_test_result a
+      LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
+     WHERE
+      b.PRODUCTION_EQUIP_NO LIKE '%{}%'
+                AND b.PRODUCT_NO LIKE '%{}%'
+                AND b.PRODUCTION_CLASS LIKE '%{}%'
+                AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+                AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+      
+     ) a 
+    WHERE
+     a.test_times = (
+     SELECT
+      max( x.test_times ) 
+     FROM
+      (
+      SELECT
+       a.value,
+       a.test_class,
+       a.test_times,
+       a.data_point_name,
+       b.production_factory_date,
+       b.actual_trains,
+       b.product_no,
+       b.production_equip_no 
+      FROM
+       material_test_result a
+       LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
+      WHERE
+       b.PRODUCTION_EQUIP_NO LIKE '%{}%'
+                AND b.PRODUCT_NO LIKE '%{}%'
+                AND b.PRODUCTION_CLASS LIKE '%{}%'
+                AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+                AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+       
+      ) x 
+     WHERE
+      x.data_point_name = a.data_point_name 
+      AND x.actual_trains = a.actual_trains 
+      AND x.product_no = a.product_no 
+     AND x.production_equip_no = a.production_equip_no 
+     )""".format(production_equip_no, product_str, production_class, start_time, end_time,
+                   production_equip_no, product_str, production_class, start_time, end_time)
+
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
@@ -2635,26 +2675,63 @@ class ClassTestStaticsView(APIView):
         #                       'material_test_order__production_class',
         #                       'data_point_name', 'value')
         sql = """
-        SELECT
-            a.data_point_name,
-            a.value,
-            bb.PRODUCT_NO,
-            bb.PRODUCTION_FACTORY_DATE,
-            bb.PRODUCTION_CLASS
+            SELECT
+         * 
         FROM
-            MATERIAL_TEST_RESULT a,
-            MATERIAL_TEST_ORDER bb,
-            ( SELECT max( id ) maxtime FROM MATERIAL_TEST_RESULT GROUP BY MATERIAL_TEST_ORDER_ID ) b 
+         (
+         SELECT
+         a.data_point_name,
+          a.value,
+          b.product_no,
+          b.production_factory_date,
+          b.production_class,
+          a.test_times,
+          b.actual_trains,
+          b.production_equip_no 
+         FROM
+          material_test_result a
+          LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
+         WHERE
+          b.PRODUCTION_EQUIP_NO LIKE '%{}%'
+                    AND b.PRODUCT_NO LIKE '%{}%'
+                    AND b.PRODUCTION_CLASS LIKE '%{}%'
+                    AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+                    AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+
+         ) a 
         WHERE
-            a.id = b.maxtime 
-            AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
-            AND a.MATERIAL_TEST_ORDER_ID = bb.ID
-             AND bb.PRODUCTION_EQUIP_NO LIKE '%{}%'
-            AND bb.PRODUCT_NO LIKE '%{}%'
-            AND bb.PRODUCTION_CLASS LIKE '%{}%'
-            AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-        """.format(production_equip_no, product_str, production_class, start_time, end_time)
+         a.test_times = (
+         SELECT
+          max( x.test_times ) 
+         FROM
+          (
+          SELECT
+           a.value,
+           a.test_class,
+           a.test_times,
+           a.data_point_name,
+           b.production_factory_date,
+           b.actual_trains,
+           b.product_no,
+           b.production_equip_no 
+          FROM
+           material_test_result a
+           LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
+          WHERE
+           b.PRODUCTION_EQUIP_NO LIKE '%{}%'
+                    AND b.PRODUCT_NO LIKE '%{}%'
+                    AND b.PRODUCTION_CLASS LIKE '%{}%'
+                    AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+                    AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+
+          ) x 
+         WHERE
+          x.data_point_name = a.data_point_name 
+          AND x.actual_trains = a.actual_trains 
+          AND x.product_no = a.product_no 
+         AND x.production_equip_no = a.production_equip_no 
+         )""".format(production_equip_no, product_str, production_class, start_time, end_time,
+                     production_equip_no, product_str, production_class, start_time, end_time)
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
@@ -2864,25 +2941,63 @@ class UnqialifiedEquipView(APIView):
         #                                   'material_test_order__product_no',
         #                                   'data_point_name', 'value')
         sql = """
-        SELECT
-            a.data_point_name,
-            a.value,
-            bb.PRODUCT_NO,
-            bb.PRODUCTION_EQUIP_NO
+            SELECT
+         * 
         FROM
-            MATERIAL_TEST_RESULT a,
-            MATERIAL_TEST_ORDER bb,
-            ( SELECT max( id ) maxtime FROM MATERIAL_TEST_RESULT GROUP BY MATERIAL_TEST_ORDER_ID ) b 
+         (
+         SELECT
+         a.data_point_name,
+          a.value,
+          b.product_no,
+          b.production_factory_date,
+          b.production_class,
+          a.test_times,
+          b.actual_trains,
+          b.production_equip_no 
+         FROM
+          material_test_result a
+          LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
+         WHERE
+          b.PRODUCTION_EQUIP_NO LIKE '%{}%'
+                    AND b.PRODUCT_NO LIKE '%{}%'
+                    AND b.PRODUCTION_CLASS LIKE '%{}%'
+                    AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+                    AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+
+         ) a 
         WHERE
-            a.id = b.maxtime 
-            AND a.MATERIAL_TEST_ORDER_ID = a.MATERIAL_TEST_ORDER_ID 
-            AND a.MATERIAL_TEST_ORDER_ID = bb.ID
-            AND bb.PRODUCTION_EQUIP_NO LIKE '%{}%'
-            AND bb.PRODUCT_NO LIKE '%{}%'
-            AND bb.PRODUCTION_CLASS LIKE '%{}%'
-            AND bb.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
-            AND bb.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-        """.format(equip_no, product_str, classes, s_time, e_time)
+         a.test_times = (
+         SELECT
+          max( x.test_times ) 
+         FROM
+          (
+          SELECT
+           a.value,
+           a.test_class,
+           a.test_times,
+           a.data_point_name,
+           b.production_factory_date,
+           b.actual_trains,
+           b.product_no,
+           b.production_equip_no 
+          FROM
+           material_test_result a
+           LEFT JOIN material_test_order b ON a.material_test_order_id = b.id 
+          WHERE
+           b.PRODUCTION_EQUIP_NO LIKE '%{}%'
+                    AND b.PRODUCT_NO LIKE '%{}%'
+                    AND b.PRODUCTION_CLASS LIKE '%{}%'
+                    AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
+                    AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
+
+          ) x 
+         WHERE
+          x.data_point_name = a.data_point_name 
+          AND x.actual_trains = a.actual_trains 
+          AND x.product_no = a.product_no 
+         AND x.production_equip_no = a.production_equip_no 
+         )""".format(equip_no, product_str, classes, s_time, e_time,
+                     equip_no, product_str, classes, s_time, e_time)
         cursor = connection.cursor()
         cursor.execute(sql)
         data = cursor.fetchall()
@@ -2907,7 +3022,7 @@ class UnqialifiedEquipView(APIView):
                         TC90_lower = 1 if item[1] < data_point_list[0] else 0
                         TC90_upper = 1 if item[1] > data_point_list[1] else 0
 
-                    spe = item[3]
+                    spe = item[7]
                     if dic_.get(spe):
                         data = dic_.get(spe)
                         dic_[spe].update({
