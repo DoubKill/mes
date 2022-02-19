@@ -2586,6 +2586,7 @@ class WmsStorageSummaryView(APIView):
             temp = sc.all()
             creater_time = temp[0][0]
             i['creater_time'] = creater_time.split(' ')[0]
+        sc.close()
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
