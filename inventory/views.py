@@ -2574,12 +2574,12 @@ class WmsStorageSummaryView(APIView):
             if inventory_st:
                 search_kwargs = f"""where a.CreaterTime >= '{inventory_st}'
                 and a.CreaterTime <= '{inventory_et}'
-                and a.MaterialCode = {i['material_no']}
-                and a.BatchNo = {i['batch_no']}
+                and a.MaterialCode = '{i['material_no']}'
+                and a.BatchNo = '{i['batch_no']}'
                 """
             else:
-                search_kwargs = f"""where a.MaterialCode = {i['material_no']}
-                and a.BatchNo = {i['batch_no']}
+                search_kwargs = f"""where a.MaterialCode = '{i['material_no']}'
+                and a.BatchNo = '{i['batch_no']}'
                 """
             sql = """select min(a.CreaterTime) from t_inventory_stock a {}""".format(search_kwargs)
             sc = SqlClient(sql=sql, **self.DATABASE_CONF)
