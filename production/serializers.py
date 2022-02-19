@@ -388,6 +388,7 @@ class PerformanceJobLadderSerializer(serializers.ModelSerializer):
 
 
 class ProductInfoDingJiSerializer(BaseModelSerializer):
+    username = serializers.ReadOnlyField(source='created_user__username')
 
     class Meta:
         model = ProductInfoDingJi

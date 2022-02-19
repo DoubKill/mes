@@ -418,6 +418,7 @@ class PerformanceUnitPrice(models.Model):
 class ProductInfoDingJi(AbstractEntity):
     product_no = models.CharField(help_text='胶料编码', max_length=64)
     product_name = models.CharField(help_text='胶料名称', max_length=64)
+    is_use = models.BooleanField(help_text='是否作为丁基胶判断标准', default=0)
 
     class Meta:
         db_table = 'product_info_dingji'
