@@ -2614,7 +2614,9 @@ class WmsStorageSummaryView(APIView):
             for item in temp:
                 dic[f'{item[0]}-{item[1]}'] = item[2]
             for item in result:
-                item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
+                try:
+                    item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
+                except: pass
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
