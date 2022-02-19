@@ -2564,61 +2564,28 @@ class WmsStorageSummaryView(APIView):
         factory_list = []
         for item in result:
             if '(' in item['material_name'] and re.findall(r'[(](.*?)[)]', item['material_name']):
-                    factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[-1])
+                factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[-1])
         # 根据地区过滤
         if factory:
             result = [item for item in result if factory in item['material_name']]
         count = len(result)
         # 取原材料第一条入库的时间
-        material_no_list = []
-        batch_no_list = []
         for i in result[st: et]:
-            material_no_list.append(i['material_no'])
-            batch_no_list.append(i['batch_no'])
-
-
+            if inventory_st:
+                search_kwargs = f"""where a.CreaterTime >= '{inventory_st}'
+                and a.CreaterTime <= '{inventory_et}'
+                and a.MaterialCode = '{i['material_no']}'
+                and a.BatchNo = '{i['batch_no']}'
+                """
+            else:
+                search_kwargs = f"""where a.MaterialCode = '{i['material_no']}'
+                and a.BatchNo = '{i['batch_no']}'
+                """
+            sql = """select min(a.CreaterTime) from t_inventory_stock a {}""".format(search_kwargs)
             sc = SqlClient(sql=sql, **self.DATABASE_CONF)
             temp = sc.all()
             creater_time = temp[0][0]
             i['creater_time'] = creater_time.split(' ')[0] if creater_time else None
-
-        if inventory_st:
-            search_kwargs = f"""
-            where a.MaterialCode in {tuple(material_no_list)}
-            and a.BatchNo in {tuple(batch_no_list)}
-            and a.CreaterTime >= '{inventory_st}'
-            and a.CreaterTime <= '{inventory_et}'
-            """
-        else:
-            search_kwargs = f"""
-            where a.MaterialCode in {tuple(material_no_list)}
-            and a.BatchNo in {tuple(batch_no_list)}
-            """
-        sql = f"""
-        SELECT *  FROM
-                (select a.MaterialCode, a.BatchNo, a.CreaterTime  from t_inventory_stock a 
-            {search_kwargs}
-              ) a 
-            WHERE
-                a.CreaterTime = (
-                SELECT
-                    min( x.CreaterTime ) 
-                FROM
-                    (select a.MaterialCode, a.BatchNo, a.CreaterTime  from t_inventory_stock a 
-             {search_kwargs}
-                    ) x 
-                WHERE
-                    x.MaterialCode = a.MaterialCode 
-                    AND x.BatchNo = a.BatchNo 
-                )
-        """
-        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
-        dic = {}  # material_no - batch_no : created_time
-        temp = sc.all()
-        for item in temp:
-            dic[f'{temp[0]-temp[1]}'] = item[2]
-        for item in result:
-            item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
         sc.close()
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
