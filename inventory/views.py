@@ -2452,7 +2452,7 @@ class WmsStorageSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
-        factory = self.request.query_params.get('factory')  # 厂家
+        factory = self.request.query_params.get('factory', None)  # 厂家
         material_name = self.request.query_params.get('material_name')  # 物料名称
         material_no = self.request.query_params.get('material_no')  # 物料编码
         zc_material_code = self.request.query_params.get('zc_material_code')  # 中策物料编码
@@ -2573,7 +2573,6 @@ class WmsStorageSummaryView(APIView):
         material_no_list = []
         batch_no_list = []
         if result:
-            result = result[st: et]
             for i in result:
                 material_no_list.append(i['material_no'])
                 batch_no_list.append(i['batch_no'])
@@ -2616,7 +2615,7 @@ class WmsStorageSummaryView(APIView):
                 dic[f'{item[0]}-{item[1]}'] = item[2]
             for item in result:
                 item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
-        return Response({'results': result, "count": count, 'factory_list': list(set(factory_list))})
+        return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
 @method_decorator([api_recorder], name="dispatch")
