@@ -2806,6 +2806,11 @@ class WMSRelease(APIView):
             raise ValidationError('参数不足！')
         if not isinstance(tracking_nums, list):
             raise ValidationError('参数错误！')
+        batch_nos = list(WmsInventoryStock.objects.using('wms').filter(lot_no__in=tracking_nums).values_list('batch_no', flat=True))
+        if WmsNucleinManagement.objects.filter(
+                locked_status='已锁定',
+                batch_no__in=batch_nos).exists():
+            raise ValidationError('该批次物料已锁定核酸管控，无法处理！')
         data = {
             "TestingType": 1,
             "AllCheckDetailList": []
