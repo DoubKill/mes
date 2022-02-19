@@ -129,6 +129,8 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
         res = super().to_representation(instance)
         batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.product_batching,
                                                             material=instance.material, type=instance.type)
+        if instance.product_batching.used_type not in [6, 7]:
+            batching_info = batching_info.filter(is_used=True)
         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
         res.update({'master': update_data})
         return res
@@ -178,7 +180,7 @@ class ProductBatchingListSerializer(BaseModelSerializer):
             new_recipe_id = new_recipe.id if new_recipe else 0
         res['new_recipe_id'] = new_recipe_id
         # 返回配方可用机台
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance).values_list('equip_no', flat=True).distinct())
+        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True).values_list('equip_no', flat=True).distinct())
         res['enable_equip'] = enable_equip
         return res
 
