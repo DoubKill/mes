@@ -2585,7 +2585,7 @@ class WmsStorageSummaryView(APIView):
             sc = SqlClient(sql=sql, **self.DATABASE_CONF)
             temp = sc.all()
             creater_time = temp[0][0]
-            i['creater_time'] = creater_time.split(' ')[0]
+            i['creater_time'] = creater_time.split(' ')[0] if creater_time else None
         sc.close()
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
