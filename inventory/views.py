@@ -2612,7 +2612,7 @@ class WmsStorageSummaryView(APIView):
                 dic = {}  # material_no - batch_no : created_time
                 temp = sc.all()
             except:
-                pass
+                raise ValidationError('dw')
             sc.close()
             for item in temp:
                 dic[f'{item[0]}-{item[1]}'] = item[2]
