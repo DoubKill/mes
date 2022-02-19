@@ -2564,7 +2564,7 @@ class WmsStorageSummaryView(APIView):
         factory_list = []
         for item in result:
             if '(' in item['material_name'] and re.findall(r'[(](.*?)[)]', item['material_name']):
-                factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[-1])
+                    factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[-1])
         # 根据地区过滤
         if factory:
             result = [item for item in result if factory in item['material_name']]
