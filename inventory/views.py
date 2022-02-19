@@ -2585,7 +2585,7 @@ class WmsStorageSummaryView(APIView):
             sc = SqlClient(sql=sql, **self.DATABASE_CONF)
             temp = sc.all()
             creater_time = temp[0][0]
-            i['creater_time'] = creater_time
+            i['creater_time'] = creater_time.split(' ')[0]
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
@@ -2851,6 +2851,7 @@ class WMSExceptHandleView(APIView):
             created_user=self.request.user,
             **data
         )
+        return Response('保存成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
