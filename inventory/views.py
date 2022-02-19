@@ -2576,12 +2576,6 @@ class WmsStorageSummaryView(APIView):
             material_no_list.append(i['material_no'])
             batch_no_list.append(i['batch_no'])
 
-
-            sc = SqlClient(sql=sql, **self.DATABASE_CONF)
-            temp = sc.all()
-            creater_time = temp[0][0]
-            i['creater_time'] = creater_time.split(' ')[0] if creater_time else None
-
         if inventory_st:
             search_kwargs = f"""
             where a.MaterialCode in {tuple(material_no_list)}
