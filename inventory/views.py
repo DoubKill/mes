@@ -2589,7 +2589,8 @@ class WmsStorageSummaryView(APIView):
                 where a.MaterialCode in {tuple(set(material_no_list))}
                 and a.BatchNo in {tuple(set(batch_no_list))}
                 """
-            sql = f"""
+            try:
+                sql = f"""
             SELECT *  FROM
                     (select a.MaterialCode, a.BatchNo, a.CreaterTime  from t_inventory_stock a 
                 {search_kwargs}
@@ -2607,6 +2608,8 @@ class WmsStorageSummaryView(APIView):
                         AND x.BatchNo = a.BatchNo 
                     )
             """
+            except:
+                raise ValidationError('dw')
             sc = SqlClient(sql=sql, **self.DATABASE_CONF)
             dic = {}  # material_no - batch_no : created_time
             temp = sc.all()
@@ -2614,9 +2617,7 @@ class WmsStorageSummaryView(APIView):
             for item in temp:
                 dic[f'{item[0]}-{item[1]}'] = item[2]
             for item in result:
-                try:
-                    item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
-                except: pass
+                item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
