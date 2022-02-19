@@ -1636,25 +1636,29 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        date_now = datetime.datetime.now().date()
-        date_before = date_now - timedelta(days=1)
-        date_now_planid = ''.join(str(date_now).split('-'))[2:]
-        date_before_planid = ''.join(str(date_before).split('-'))[2:]
-        # 从称量系统同步料罐状态到mes表中
-        tank_status_sync = TankStatusSync(equip_no=equip_no)
-        try:
-            tank_status_sync.sync()
-        except:
-            return response(success=False, message='mes同步称量系统料罐状态失败')
-        try:
-            # 当天称量计划的所有配方名称
-            all_recipe = Plan.objects.using(equip_no).filter(
-                Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
-        except:
-            return response(success=False, message='称量机台{}错误'.format(equip_no))
-        if not all_recipe:
-            return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
+        planid = self.request.query_params.get('planid')
+        if planid:
+            all_recipe = Plan.objects.using(equip_no).filter(planid=planid).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+        else:
+            date_now = datetime.datetime.now().date()
+            date_before = date_now - timedelta(days=1)
+            date_now_planid = ''.join(str(date_now).split('-'))[2:]
+            date_before_planid = ''.join(str(date_before).split('-'))[2:]
+            # 从称量系统同步料罐状态到mes表中
+            tank_status_sync = TankStatusSync(equip_no=equip_no)
+            try:
+                tank_status_sync.sync()
+            except:
+                return response(success=False, message='mes同步称量系统料罐状态失败')
+            try:
+                # 当天称量计划的所有配方名称
+                all_recipe = Plan.objects.using(equip_no).filter(
+                    Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+                    state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+            except:
+                return response(success=False, message='称量机台{}错误'.format(equip_no))
+            if not all_recipe:
+                return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         data = {}
         for single_recipe in all_recipe:
             need_trains = single_recipe.get('setno_trains') - (single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
