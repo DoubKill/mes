@@ -2578,15 +2578,15 @@ class WmsStorageSummaryView(APIView):
 
         if inventory_st:
             search_kwargs = f"""
-            where a.MaterialCode in {tuple(material_no_list)}
-            and a.BatchNo in {tuple(batch_no_list)}
+            where a.MaterialCode in {tuple(set(material_no_list))}
+            and a.BatchNo in {tuple(set(batch_no_list))}
             and a.CreaterTime >= '{inventory_st}'
             and a.CreaterTime <= '{inventory_et}'
             """
         else:
             search_kwargs = f"""
-            where a.MaterialCode in {tuple(material_no_list)}
-            and a.BatchNo in {tuple(batch_no_list)}
+            where a.MaterialCode in {tuple(set(material_no_list))}
+            and a.BatchNo in {tuple(set(batch_no_list))}
             """
         sql = f"""
         SELECT *  FROM
@@ -2609,11 +2609,11 @@ class WmsStorageSummaryView(APIView):
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         dic = {}  # material_no - batch_no : created_time
         temp = sc.all()
+        sc.close()
         for item in temp:
-            dic[f'{temp[0]-temp[1]}'] = item[2]
+            dic[f'{item[0]}-{item[1]}'] = item[2]
         for item in result:
             item['creater_time'] = dic[f"{item['material_no']}-{item['batch_no']}"].split(' ')[0] if dic.get(f"{item['material_no']}-{item['batch_no']}") else None
-        sc.close()
         return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
