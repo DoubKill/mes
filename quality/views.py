@@ -2947,6 +2947,8 @@ class ClassTestStaticsView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class UnqialifiedEquipView(APIView):
+    """机台别不合格率统计"""
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         station = self.request.query_params.get("station", '')
