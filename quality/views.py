@@ -2751,7 +2751,8 @@ class ClassTestStaticsView(APIView):
                         TC90_lower = 1 if item[1] < data_point_list[0] else 0
                         TC90_upper = 1 if item[1] > data_point_list[1] else 0
 
-                    spe = str(item[3]) + '_' + item[4]
+                    date = item[3].strftime('%Y-%m-%d')
+                    spe = date + '_' + item[4]
                     if dic.get(spe):
                         data = dic.get(spe)
                         dic[spe].update({
