@@ -18,7 +18,7 @@ from mes.common_code import SqlClient, OSum
 from django.conf import settings
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
-from django.db.models import Max, Sum, Count, Min, F, Q
+from django.db.models import Max, Sum, Count, Min, F, Q, Avg
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -63,6 +63,7 @@ from quality.models import BatchProductNo, BatchDay, Batch, BatchMonth, BatchYea
     MaterialDealResult, MaterialTestResult, MaterialDataPointIndicator
 from quality.serializers import BatchProductNoDateZhPassSerializer, BatchProductNoClassZhPassSerializer
 from quality.utils import get_cur_sheet, get_sheet_data
+from terminal.models import Plan
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2353,7 +2354,7 @@ class SummaryOfMillOutput(APIView):
                                                                                 'product_no', 'classes').annotate(
             actual_trains=Count('actual_trains')).values('equip_no', 'product_no', 'classes', 'actual_trains')
 
-        dj = ProductInfoDingJi.objects.filter(delete_flag=False).values('product_no')
+        dj = ProductInfoDingJi.objects.filter(delete_flag=False, is_use=True).values('product_no')
         for item in data:
             equip = item['equip_no']
             state = item['product_no'].split('-')[1]
@@ -2372,6 +2373,69 @@ class SummaryOfMillOutput(APIView):
                 count[f"{state}-{classes}"] = actual_trains
                 count['count'] += actual_trains
         return Response({'results': results.values(), 'count': count, 'state_list': state_list})
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SummaryOfWeighingOutput(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        factory_date = self.request.query_params.get('factory_date')
+        year, month = factory_date.split('-')
+        this_month_start = datetime.datetime(year, month, 1)
+        if month == 12:
+            this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
+
+        equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
+
+        result = []
+        group_dic = {}
+        users = {}  # {'1-早班'： '张三'}
+        group = WorkSchedulePlan.objects.filter(start_time__year=year,
+                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day')
+        for item in group:
+            group_dic[f'{item[2]}-{item[0]}'] = item[1]
+        # 查询称量分类下当前月上班的所有员工
+        user_list = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month, equip__in=equip_list).values('name', 'date__day', 'classes', 'section')
+        # 岗位系数
+        section_dic = {}
+        section_info = PerformanceJobLadder.objects.filter(delete_flag=False).values('name', 'coefficient', 'post_standard', 'post_coefficient')
+        for item in section_info:
+            section_dic[item['name']] = [item['coefficient'], item['post_standard'], item['post_coefficient']]
+
+        for item in user_list:
+            classes = group.get(f"{item['date__day']}-{item['classes']}")
+            if users.get(f"{item['date__day']}-{classes}"):
+                users[f"{item['date__day']}-{classes}"] = [item['name'],]
+            else:
+                users[f"{item['date__day']}-{classes}"] += item['name']
+
+        user_result = {}
+        for equip_no in equip_list:
+            # 细料/硫磺单价'
+            price = 1 if equip_no in ['F01', 'F02', 'F03'] else 2  #todo
+            dic = {'equip_no': equip_no}
+            data = Plan.objects.using(equip_no).filter(actno__gt=1, merge_flag=1,
+                                                       date_time__get=this_month_start,
+                                                       date_time__lte=this_month_end).values('date_time', 'grouptime').annotate(
+                'date_time', 'grouptime', count=Avg('actno'))
+            for item in data:
+                date = item['date_time']
+                day = date.split('-')[2]    # 2  早班
+                classes = item['grouptime']  # 早班/ 中班 / 夜班
+                dic[f'{date}{group}'] = item['count']
+                names = users.get(f'{day}-{classes}')
+                for name in names:
+                    if user_result.get(name):
+                        user_result[name][f"{day}{classes}"] = item['count'] * section_dic[name][1] * price
+                    else:
+                        user_result[name] = {f"{day}{classes}": item['count']}
+
+            result.append(dic)
+        result.append(user_result.values())
+        return Response({'result': result})
 
 
 @method_decorator([api_recorder], name="dispatch")

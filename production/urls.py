@@ -106,6 +106,8 @@ urlpatterns = [
     # 密炼机台产量汇总表
     path('summary_of_mill_output/', SummaryOfMillOutput.as_view()),
     # path('monthly-output-statistics-and-performance/', MonthlyOutputStatisticsAndPerformance.as_view()),
+    # 称量设备产量汇总表
+    path('summary_of_weighing_output', SummaryOfWeighingOutput.as_view()),
 
     # 员工出勤记录表
     path('employee_attendance_records/', EmployeeAttendanceRecordsView.as_view()),

@@ -394,9 +394,16 @@ class EmployeeAttendanceRecords(models.Model):
 
 
 class PerformanceJobLadder(models.Model):
+    Status = (
+        (1, '最大值'),
+        (2, '平均值')
+    )
     code = models.CharField(help_text='岗位编号', max_length=64, unique=True)
     name = models.CharField(help_text='岗位名称', max_length=64, unique=True)
+    type = models.CharField(help_text='岗位类别', max_length=64, null=True, blank=True)
     coefficient = models.IntegerField(help_text='绩效系数')
+    post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
+    post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
     delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
 
     class Meta:
