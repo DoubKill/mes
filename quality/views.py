@@ -2430,10 +2430,20 @@ class ProductTestStaticsView(APIView):
                 data_point_list = data_point_dic[item[2]].get(item[0])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
+                    bz_lower = bz_upper = mn_lower = mn_upper = yd_lower = yd_upper = 0
+                    if 'ML(1+4)' == item[0]:
+                        mn_lower = 1 if item[1] < data_point_list[0] else 0
+                        mn_upper = 1 if item[1] > data_point_list[1] else 0
+                    if '比重值' == item[0]:
+                        bz_lower = 1 if item[1] < data_point_list[0] else 0
+                        bz_upper = 1 if item[1] > data_point_list[1] else 0
+                    if '硬度值' == item[0]:
+                        yd_lower = 1 if item[1] < data_point_list[0] else 0
+                        yd_upper = 1 if item[1] > data_point_list[1] else 0
                     if 'MH' in item[0]:
                         MH_lower = 1 if item[1] < data_point_list[0] else 0
                         MH_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'ML' in item[0]:
+                    if 'ML' == item[0]:
                         ML_lower = 1 if item[1] < data_point_list[0] else 0
                         ML_upper = 1 if item[1] > data_point_list[1] else 0
                     if 'TC10' in item[0]:
@@ -2449,6 +2459,12 @@ class ProductTestStaticsView(APIView):
                     if dic.get(spe):
                         data = dic.get(spe)
                         dic[spe].update({
+                            'mn_lower': data['mn_lower'] + mn_lower,
+                            'mn_upper': data['mn_upper'] + mn_upper,
+                            'bz_lower': data['bz_lower'] + bz_lower,
+                            'bz_upper': data['bz_upper'] + bz_upper,
+                            'yd_lower': data['yd_lower'] + yd_lower,
+                            'yd_upper': data['yd_upper'] + yd_upper,
                             'MH_lower': data['MH_lower'] + MH_lower,
                             'MH_upper': data['MH_upper'] + MH_upper,
                             'ML_lower': data['ML_lower'] + ML_lower,
@@ -2462,6 +2478,12 @@ class ProductTestStaticsView(APIView):
                         })
                     else:
                         dic[spe] = {
+                            'mn_lower': mn_lower,
+                            'mn_upper': mn_upper,
+                            'bz_lower': bz_lower,
+                            'bz_upper': bz_upper,
+                            'yd_lower': yd_lower,
+                            'yd_upper': yd_upper,
                             'MH_lower': MH_lower,
                             'MH_upper': MH_upper,
                             'ML_lower': ML_lower,
@@ -2504,6 +2526,12 @@ class ProductTestStaticsView(APIView):
                 result[i].update(dic[i])
             else:
                 result[i].update({
+                    'mn_lower': 0,
+                    'mn_upper': 0,
+                    'bz_lower': 0,
+                    'bz_upper': 0,
+                    'yd_lower': 0,
+                    'yd_upper': 0,
                     'MH_lower': 0,
                     'MH_upper': 0,
                     'ML_lower': 0,
@@ -2697,10 +2725,20 @@ class ClassTestStaticsView(APIView):
                 data_point_list = data_point_dic[item[2]].get(item[0])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
+                    bz_lower = bz_upper = mn_lower = mn_upper = yd_lower = yd_upper = 0
+                    if 'ML(1+4)' == item[0]:
+                        mn_lower = 1 if item[1] < data_point_list[0] else 0
+                        mn_upper = 1 if item[1] > data_point_list[1] else 0
+                    if '比重值' == item[0]:
+                        bz_lower = 1 if item[1] < data_point_list[0] else 0
+                        bz_upper = 1 if item[1] > data_point_list[1] else 0
+                    if '硬度值' == item[0]:
+                        yd_lower = 1 if item[1] < data_point_list[0] else 0
+                        yd_upper = 1 if item[1] > data_point_list[1] else 0
                     if 'MH' in item[0]:
                         MH_lower = 1 if item[1] < data_point_list[0] else 0
                         MH_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'ML' in item[0]:
+                    if 'ML' == item[0]:
                         ML_lower = 1 if item[1] < data_point_list[0] else 0
                         ML_upper = 1 if item[1] > data_point_list[1] else 0
                     if 'TC10' in item[0]:
@@ -2717,6 +2755,12 @@ class ClassTestStaticsView(APIView):
                     if dic.get(spe):
                         data = dic.get(spe)
                         dic[spe].update({
+                            'mn_lower': data['mn_lower'] + mn_lower,
+                            'mn_upper': data['mn_upper'] + mn_upper,
+                            'bz_lower': data['bz_lower'] + bz_lower,
+                            'bz_upper': data['bz_upper'] + bz_upper,
+                            'yd_lower': data['yd_lower'] + yd_lower,
+                            'yd_upper': data['yd_upper'] + yd_upper,
                             'MH_lower': data['MH_lower'] + MH_lower,
                             'MH_upper': data['MH_upper'] + MH_upper,
                             'ML_lower': data['ML_lower'] + ML_lower,
@@ -2730,6 +2774,12 @@ class ClassTestStaticsView(APIView):
                         })
                     else:
                         dic[spe] = {
+                            'mn_lower': mn_lower,
+                            'mn_upper': mn_upper,
+                            'bz_lower': bz_lower,
+                            'bz_upper': bz_upper,
+                            'yd_lower': yd_lower,
+                            'yd_upper': yd_upper,
                             'MH_lower': MH_lower,
                             'MH_upper': MH_upper,
                             'ML_lower': ML_lower,
@@ -2768,6 +2818,12 @@ class ClassTestStaticsView(APIView):
                 result[i].update(dic[i])
             else:
                 result[i].update({
+                    'mn_lower': 0,
+                    'mn_upper': 0,
+                    'bz_lower': 0,
+                    'bz_upper': 0,
+                    'yd_lower': 0,
+                    'yd_upper': 0,
                     'MH_lower': 0,
                     'MH_upper': 0,
                     'ML_lower': 0,
@@ -2848,6 +2904,8 @@ class ClassTestStaticsView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class UnqialifiedEquipView(APIView):
+    """机台别不合格率统计"""
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         station = self.request.query_params.get("station", '')
@@ -2965,10 +3023,20 @@ class UnqialifiedEquipView(APIView):
                 data_point_list = data_point_dic[item[2]].get(item[0])
                 if data_point_list:
                     MH_lower = MH_upper = ML_lower = ML_upper = TC10_lower = TC10_upper = TC50_lower = TC50_upper = TC90_lower = TC90_upper = 0
+                    bz_lower = bz_upper = mn_lower = mn_upper = yd_lower = yd_upper = 0
+                    if 'ML(1+4)' == item[0]:
+                        mn_lower = 1 if item[1] < data_point_list[0] else 0
+                        mn_upper = 1 if item[1] > data_point_list[1] else 0
+                    if '比重值' == item[0]:
+                        bz_lower = 1 if item[1] < data_point_list[0] else 0
+                        bz_upper = 1 if item[1] > data_point_list[1] else 0
+                    if '硬度值' == item[0]:
+                        yd_lower = 1 if item[1] < data_point_list[0] else 0
+                        yd_upper = 1 if item[1] > data_point_list[1] else 0
                     if 'MH' in item[0]:
                         MH_lower = 1 if item[1] < data_point_list[0] else 0
                         MH_upper = 1 if item[1] > data_point_list[1] else 0
-                    if 'ML' in item[0]:
+                    if 'ML' == item[0]:
                         ML_lower = 1 if item[1] < data_point_list[0] else 0
                         ML_upper = 1 if item[1] > data_point_list[1] else 0
                     if 'TC10' in item[0]:
@@ -2985,6 +3053,12 @@ class UnqialifiedEquipView(APIView):
                     if dic_.get(spe):
                         data = dic_.get(spe)
                         dic_[spe].update({
+                            'mn_lower': data['mn_lower'] + mn_lower,
+                            'mn_upper': data['mn_upper'] + mn_upper,
+                            'bz_lower': data['bz_lower'] + bz_lower,
+                            'bz_upper': data['bz_upper'] + bz_upper,
+                            'yd_lower': data['yd_lower'] + yd_lower,
+                            'yd_upper': data['yd_upper'] + yd_upper,
                             'MH_lower': data['MH_lower'] + MH_lower,
                             'MH_upper': data['MH_upper'] + MH_upper,
                             'ML_lower': data['ML_lower'] + ML_lower,
@@ -2998,6 +3072,12 @@ class UnqialifiedEquipView(APIView):
                         })
                     else:
                         dic_[spe] = {
+                            'mn_lower': mn_lower,
+                            'mn_upper': mn_upper,
+                            'bz_lower': bz_lower,
+                            'bz_upper': bz_upper,
+                            'yd_lower': yd_lower,
+                            'yd_upper': yd_upper,
                             'MH_lower': MH_lower,
                             'MH_upper': MH_upper,
                             'ML_lower': ML_lower,
@@ -3125,6 +3205,12 @@ class UnqialifiedEquipView(APIView):
                     data.update(dic_[equip])
                 else:
                     data.update({
+                        'mn_lower': 0,
+                        'mn_upper': 0,
+                        'bz_lower': 0,
+                        'bz_upper': 0,
+                        'yd_lower': 0,
+                        'yd_upper': 0,
                         'MH_lower': 0,
                         'MH_upper': 0,
                         'ML_lower': 0,
@@ -3138,26 +3224,6 @@ class UnqialifiedEquipView(APIView):
                     })
                 results.append(
                     data
-                    # {
-                    #     'equip': equip,
-                    #     'test_all': TEST_ALL,
-                    #     'test_right': TEST_RIGHT,
-                    #     'mn': MN,
-                    #     'yd': YD,
-                    #     'bz': BZ,
-                    #     'rate_1': '%.2f' % (((TEST_ALL - RATE_1) / TEST_ALL) * 100) if TEST_ALL else 0,
-                    #     'MH': MH,
-                    #     'ML': ML,
-                    #     'TC10': TC10,
-                    #     'TC50': TC50,
-                    #     'TC90': TC90,
-                    #     'lb_all': RATE_LB,
-                    #     'rate_lb': '%.2f' % (((TEST_ALL - RATE_LB) / TEST_ALL) * 100) if TEST_ALL else 0,
-                    #     'cp_all': TEST_ALL - TEST_RIGHT,
-                    #     'rate': '%.2f' % ((TEST_RIGHT / TEST_ALL) * 100) if TEST_ALL else 0,
-                    #     'rate_1_sum': TEST_ALL - RATE_1,
-                    #     'rate_s_sum': TEST_ALL - RATE_LB
-                    # }
                 )
             all = {}
             num = rate_1 = rate_lb = test_all = rate_pass_sum = 0
