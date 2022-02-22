@@ -127,7 +127,7 @@ class TankStatusSync(object):
                       </tem:open_door>
                    </soapenv:Body>
                 </soapenv:Envelope>""".format(signal_a, signal_b)
-        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=10)
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<open_doorResult>(.*)</open_doorResult>', res)[0]
         data = json.loads(rep_json)
@@ -176,7 +176,7 @@ class CarbonDeliverySystem(object):
                           </tem:GetCarbonTankLevel>
                        </soapenv:Body>
                     </soapenv:Envelope>"""
-        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=10)
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<GetCarbonTankLevelResult>(.*)</GetCarbonTankLevelResult>', res)[0]
         carbon_tank_details = json.loads(rep_json)
@@ -209,7 +209,7 @@ class CarbonDeliverySystem(object):
                           </tem:FeedingPortToCarbonTankRelation>
                        </soapenv:Body>
                     </soapenv:Envelope>"""
-        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=5)
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<FeedingPortToCarbonTankRelationResult>(.*)</FeedingPortToCarbonTankRelationResult>', res)[0]
         line_info = json.loads(rep_json)
@@ -340,7 +340,7 @@ class CLSystem(object):
           </tem:open_door>
        </soapenv:Body>
     </soapenv:Envelope>""".format(door_1, door_2)
-        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
     def add_plan(self, plan_no):
@@ -358,7 +358,7 @@ class CLSystem(object):
                   </tem:plan_add>
                </soapenv:Body>
             </soapenv:Envelope>""".format(plan_no)
-        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
     def issue_plan(self, plan_no, recipe_no, num):
@@ -380,7 +380,7 @@ class CLSystem(object):
                   </tem:plan_down>
                </soapenv:Body>
             </soapenv:Envelope>""".format(plan_no, recipe_no, num)
-        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
     def reload_plan(self, plan_no, recipe_no):
@@ -400,7 +400,7 @@ class CLSystem(object):
                   </tem:reload_plan>
                </soapenv:Body>
             </soapenv:Envelope>""".format(plan_no, recipe_no)
-        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
     def stop(self, plan_no):
@@ -418,7 +418,7 @@ class CLSystem(object):
                   </tem:stop_plan>
                </soapenv:Body>
             </soapenv:Envelope>""".format(plan_no)
-        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
     def update_trains(self, plan_no, number):
@@ -438,7 +438,7 @@ class CLSystem(object):
                   </tem:update_num>
                </soapenv:Body>
             </soapenv:Envelope>""".format(plan_no, number)
-        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers)
+        ret = requests.post(self.url, data=data.encode('utf-8'), headers=headers, timeout=5)
         return ret
 
 

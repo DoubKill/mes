@@ -44,7 +44,7 @@ class BaseInterface(object):
             }
             # Decimal转换为float
             data = json.dumps(kwargs, cls=DecimalEncoder)
-            res = requests.post(self.endpoint + self.Backend.path, headers=headers, data=data)
+            res = requests.post(self.endpoint + self.Backend.path, headers=headers, data=data, timeout=10)
         except Exception as err:
             logger.error(err)
             raise Exception('上辅机服务错误')
