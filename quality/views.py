@@ -2655,6 +2655,9 @@ class ProductTestStaticsView(APIView):
             rate_pass_sum += v['HG']
         all.update(rate_1='%.2f' % (rate_1 / rate_test_all*100), rate_lb='%.2f' % (rate_lb / rate_test_all*100),
                    rate='%.2f' % (rate_pass_sum / rate_test_all*100))
+        for dic in res_data:
+            for key, value in dic.items():
+                dic[key] = None if not dic[key] else dic[key]
         return Response({'result': res_data, 'all': all})
 
 
@@ -2942,6 +2945,9 @@ class ClassTestStaticsView(APIView):
             rate_pass_sum += v['HG']
         all.update(rate_1='%.2f' % (rate_1 / rate_test_all*100), rate_lb='%.2f' % (rate_lb / rate_test_all*100),
                    rate='%.2f' % (rate_pass_sum / rate_test_all*100))
+        for dic in res_data:
+            for key, value in dic.items():
+                dic[key] = None if not dic[key] else dic[key]
         return Response({'result': sorted(res_data, key=lambda x: (x['date'], x['sort_class'])), 'all': all})
 
 
@@ -3282,6 +3288,9 @@ class UnqialifiedEquipView(APIView):
         else:
             results = []
             all = {}
+        for dic in results:
+            for key, value in dic.items():
+                dic[key] = None if not dic[key] else dic[key]
         return Response({'results': results, 'all': all})
 
 
