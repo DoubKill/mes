@@ -47,14 +47,15 @@ from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, Qua
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
-    PerformanceUnitPrice, ProductInfoDingJi
+    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
     ProductionPlanRealityAnalysisSerializer, UnReachedCapacityCauseSerializer, TrainsFeedbacksSerializer2, \
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
-    RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer
+    RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
+    SetThePriceSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -2413,9 +2414,10 @@ class SummaryOfWeighingOutput(APIView):
                 users[f"{item['date__day']}-{classes}"] += item['name']
 
         user_result = {}
+        price_obj = SetThePrice.objects.first()
         for equip_no in equip_list:
             # 细料/硫磺单价'
-            price = 1 if equip_no in ['F01', 'F02', 'F03'] else 2  #todo
+            price = price_obj.xl if equip_no in ['F01', 'F02', 'F03'] else price_obj.lh
             dic = {'equip_no': equip_no}
             data = Plan.objects.using(equip_no).filter(actno__gt=1, merge_flag=1,
                                                        date_time__get=this_month_start,
@@ -2675,3 +2677,19 @@ class ProductInfoDingJiViewSet(ModelViewSet):
         instance.delete_user = self.request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class SetThePriceViewSet(ModelViewSet):
+    queryset = SetThePrice.objects.all()
+    serializer_class = SetThePriceSerializer
+    permission_classes = (IsAuthenticated,)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class PerformanceSummaryView(APIView):
+
+    # 其他补贴或惩罚
+    def post(self, request):
+        # SubsidyInfo.objects.create()
+        pass

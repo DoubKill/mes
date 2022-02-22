@@ -430,3 +430,29 @@ class ProductInfoDingJi(AbstractEntity):
     class Meta:
         db_table = 'product_info_dingji'
         verbose_name_plural = verbose_name = '丁基胶规格设定'
+
+
+class SetThePrice(models.Model):
+    xl = models.FloatField(help_text='细料单价')
+    lh = models.FloatField(help_text='硫磺单价')
+
+    class Meta:
+        db_table = 'set_the_price'
+        verbose_name_plural = verbose_name = '设定细料硫磺单价'
+
+
+class SubsidyInfo(models.Model):
+    Type = (
+        (1, '其他奖惩'),
+        (2, '生产补贴')
+    )
+    date = models.DateField(help_text='日期')
+    type = models.PositiveIntegerField(help_text='补贴类别', choices=Type, default=1)
+    name = models.CharField(max_length=64)
+    group = models.CharField(max_length=12, help_text='班组')
+    price = models.IntegerField(help_text='补贴/奖励金额')
+    desc = models.TextField(help_text='补贴说明', null=True, blank=True)
+
+    class Meta:
+        db_table = 'subsidy_info'
+        verbose_name_plural = verbose_name = '员工绩效汇总'

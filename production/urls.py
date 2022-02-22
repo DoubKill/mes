@@ -52,6 +52,8 @@ router.register(r'trains-feedbacks-apiview', TrainsFeedbacksAPIView, basename="t
 router.register(r'performance-job-ladder', PerformanceJobLadderViewSet)
 # 丁基胶 规格设定
 router.register('product-info-dj', ProductInfoDingJiViewSet)
+# 细料/硫磺单价
+router.register('set_the_price', SetThePriceViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -107,7 +109,7 @@ urlpatterns = [
     path('summary_of_mill_output/', SummaryOfMillOutput.as_view()),
     # path('monthly-output-statistics-and-performance/', MonthlyOutputStatisticsAndPerformance.as_view()),
     # 称量设备产量汇总表
-    path('summary_of_weighing_output', SummaryOfWeighingOutput.as_view()),
+    path('summary_of_weighing_output/', SummaryOfWeighingOutput.as_view()),
 
     # 员工出勤记录表
     path('employee_attendance_records/', EmployeeAttendanceRecordsView.as_view()),
@@ -115,6 +117,8 @@ urlpatterns = [
 
     # 绩效 单价表
     path('performance-unit-price/', PerformanceUnitPriceView.as_view()),
+    # 员工绩效汇总
+    path('performance-summary/', PerformanceSummaryView.as_view()),
 
 
     # 月产量完成报表
