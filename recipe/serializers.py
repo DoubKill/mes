@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import datetime
 
+from django.db.models import Q
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -261,7 +262,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 if batching_details_info:
                     batching_details_info.delete()
                 if weight_cnt_types_info:
-                    WeighBatchingDetail.objects.filter(weight_cnt_type__in=weight_cnt_types_info).delete()
+                    WeighBatchingDetail.objects.filter(weigh_cnt_type__in=weight_cnt_types_info).delete()
                     weight_cnt_types_info.delete()
                 ProductBatchingEquip.objects.filter(product_batching=new_recipe).delete()
                 new_recipe.delete()
@@ -439,8 +440,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
         if del_batching_equip:
             ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=del_batching_equip).update(is_used=False)
         # 删除物料
-        material_ids = list(ProductBatchingDetail.objects.filter(id__in=batching_detail_ids).values_list('material__id', flat=True)) + list(WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).values_list('material__id', flat=True))
-        ProductBatchingEquip.objects.filter(product_batching=instance, id__in=material_ids).update(is_used=False)
+        del_b_detail = list(ProductBatchingDetail.objects.filter(id__in=batching_detail_ids))
+        del_c_detail = list(WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).values_list('id', flat=True))
+        ProductBatchingEquip.objects.filter(Q(batching_detail_equip__in=del_b_detail) | Q(cnt_type_detail_equip__in=del_c_detail), product_batching=instance).delete()
         instance = super().update(instance, validated_data)
         if batching_details is not None:
             for detail in batching_details:
