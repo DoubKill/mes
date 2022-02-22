@@ -129,7 +129,7 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.product_batching,
-                                                            material=instance.material, type=instance.type)
+                                                            batching_detail_equip=instance, type=instance.type)
         if instance.product_batching.used_type not in [6, 7]:
             batching_info = batching_info.filter(is_used=True)
         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
@@ -347,7 +347,7 @@ class WeighCntTypeDetailRetrieveSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         res = super().to_representation(instance)
         batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.weigh_cnt_type.product_batching,
-                                                            material=instance.material, is_used=True, type=4)
+                                                            cnt_type_detail_equip=instance, is_used=True, type=4)
         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
         res.update({'master': update_data})
         return res

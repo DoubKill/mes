@@ -24,7 +24,7 @@ class BaseUploader(object):
             "Content-Type": "text/xml; charset=utf-8"
         }
         pay_load = pay_load.encode('utf-8')
-        resp = requests.post(self.endpoint, data=pay_load, headers=headers, timeout=10)
+        resp = requests.post(self.endpoint, data=pay_load, headers=headers, timeout=5)
         if resp.status_code != 200:
             print(resp.text)
             raise Exception(resp.text)
