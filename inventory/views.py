@@ -2661,6 +2661,7 @@ class WmsInventoryStockView(APIView):
         quality_status = self.request.query_params.get('quality_status')
         entrance_name = self.request.query_params.get('entrance_name')
         position = self.request.query_params.get('position')
+        is_entering = self.request.query_params.get('is_entering')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
@@ -2682,7 +2683,8 @@ class WmsInventoryStockView(APIView):
                  a.SpaceId,
                  a.Sn,
                  a.WeightUnit,
-                 a.CreaterTime
+                 a.CreaterTime,
+                 a.LadenToolNumber
                 FROM
                  dbo.t_inventory_stock AS a
                  INNER JOIN t_inventory_space b ON b.Id = a.StorageSpaceEntityId
@@ -2707,6 +2709,10 @@ class WmsInventoryStockView(APIView):
             temp = list(filter(lambda x: x[4][6] in ('1', '2'), temp))
         elif position == '外':
             temp = list(filter(lambda x: x[4][6] in ('3', '4'), temp))
+        if is_entering == 'Y':
+            temp = list(filter(lambda x: x[8].startswith('5'), temp))
+        elif is_entering == 'N':
+            temp = list(filter(lambda x: not x[8].startswith('5'), temp))
         count = len(temp)
         temp = temp[st:et]
         result = []
@@ -2720,7 +2726,8 @@ class WmsInventoryStockView(APIView):
                  'Sn': item[5],
                  'unit': item[6],
                  'inventory_time': item[7],
-                 'position': '内' if item[4][6] in ('1', '2') else '外'
+                 'position': '内' if item[4][6] in ('1', '2') else '外',
+                 'RFID': item[8]
                  })
         sc.close()
         return Response({'results': result, "count": count})
