@@ -2457,7 +2457,7 @@ class XlRecipeNoticeView(APIView):
             if not send_materials:
                 continue
             not_keyword_material = mes_xl_details.filter(~Q(feeding_mode__startswith=keywords), equip_no=single_equip_no)
-            send_recipe_name = f"{product_no.split('-NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-ONLY)")
+            send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-ONLY)")
             processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中', '等待'], recipe=send_recipe_name)
             if processing_xl_plan:
                 raise ValidationError('预下发配方正在该线体进行配料')
