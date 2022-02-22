@@ -438,7 +438,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
         WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).update(delete_flag=True)
         # 禁用删除机台
         if del_batching_equip:
-            ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=del_batching_equip).update(is_used=False)
+            ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=del_batching_equip).delete()
         # 删除物料
         del_b_detail = list(ProductBatchingDetail.objects.filter(id__in=batching_detail_ids))
         del_c_detail = list(WeighBatchingDetail.objects.filter(id__in=weight_detail_ids).values_list('id', flat=True))
