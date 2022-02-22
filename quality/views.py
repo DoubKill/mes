@@ -2436,11 +2436,6 @@ class ProductTestStaticsView(APIView):
                 AND b.PRODUCTION_CLASS LIKE '%{}%'
                 AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
                 AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-<<<<<<< HEAD
-      
-=======
-
->>>>>>> c613c49ac1faffe5e6b01187bb0fe8382487e13b
      ) a 
     WHERE
      a.test_times = (
@@ -2466,11 +2461,6 @@ class ProductTestStaticsView(APIView):
                 AND b.PRODUCTION_CLASS LIKE '%{}%'
                 AND b.PRODUCTION_FACTORY_DATE >= TO_DATE('{}', 'YYYY-MM-DD')
                 AND b.PRODUCTION_FACTORY_DATE <= TO_DATE('{}', 'YYYY-MM-DD')
-<<<<<<< HEAD
-       
-=======
-
->>>>>>> c613c49ac1faffe5e6b01187bb0fe8382487e13b
       ) x 
      WHERE
       x.data_point_name = a.data_point_name 
