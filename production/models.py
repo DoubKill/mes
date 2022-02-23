@@ -385,7 +385,7 @@ class EmployeeAttendanceRecords(models.Model):
     name = models.CharField(help_text='姓名', max_length=64)
     section = models.CharField(help_text='岗位', max_length=64)
     date = models.DateField(help_text='上班时间')
-    classes = models.CharField(help_text='班组', max_length=64)
+    group = models.CharField(help_text='班组', max_length=64)
     equip = models.CharField(help_text='机台', max_length=64)
 
     class Meta:
