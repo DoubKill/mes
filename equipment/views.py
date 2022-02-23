@@ -3656,15 +3656,15 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                 for item in work_content:
                     uid = item.pop('uid', None)
                     kwargs = {
-                        'abnormal_operation_desc': item['abnormal_operation_desc'],
-                        'abnormal_operation_result': item['abnormal_operation_result'],
-                        'equip_jobitem_standard_id': item['equip_jobitem_standard_id'],
-                        'job_item_check_standard': item['job_item_check_standard'],
-                        'job_item_check_type': item['job_item_check_type'],
-                        'job_item_content': item['job_item_content'],
-                        'job_item_sequence': item['job_item_sequence'],
-                        'operation_result': item['operation_result'],
-                        'unit': item['unit'],
+                        'abnormal_operation_desc': item.get('abnormal_operation_desc'),
+                        'abnormal_operation_result': item.get('abnormal_operation_result'),
+                        'equip_jobitem_standard_id': item.get('equip_jobitem_standard_id'),
+                        'job_item_check_standard': item.get('job_item_check_standard'),
+                        'job_item_check_type': item.get('job_item_check_type'),
+                        'job_item_content': item.get('job_item_content'),
+                        'job_item_sequence': item.get('job_item_sequence'),
+                        'operation_result': item.get('operation_result'),
+                        'unit': item.get('unit'),
                     }
                     if item.get('abnormal_operation_url'):
                         kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
