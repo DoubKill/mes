@@ -307,7 +307,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                         # 保存投料方式设定
                         if master:
                             for k, v in master.items():
-                                handle_material_name = cnt_detail.material_name[:-2] if cnt_detail.material_name.endswith('-C') or cnt_detail.material_name.endswith('-X') else cnt_detail
+                                handle_material_name = cnt_detail.material_name[:-2] if cnt_detail.material_name.endswith('-C') or cnt_detail.material_name.endswith('-X') else cnt_detail.material_name
                                 data = {'product_batching': instance, 'equip_no': k, 'type': 4, 'feeding_mode': v,
                                         'material': cnt_detail, 'handle_material_name': handle_material_name,
                                         'cnt_type_detail_equip': cnt_detail_instance}
@@ -515,13 +515,14 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             if master:
                                 for k, v in master.items():
                                     exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=cnt_detail.material)
+                                    handle_material_name = cnt_detail.material.material_name[:-2] if cnt_detail.material.material_name.endswith('-C') or cnt_detail.material.material_name.endswith('-X') else cnt_detail.material.material_name
                                     if exist_equip:
-                                        update_data = {'type': 4, 'feeding_mode': v, 'material': material, 'handle_material_name': material.material_name}
+                                        update_data = {'type': 4, 'feeding_mode': v, 'material': material, 'handle_material_name': handle_material_name}
                                         exist_equip.filter(cnt_type_detail_equip_id=weight_detail_id).update(**update_data)
                                     else:  # 新增机台
                                         create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
                                                        'cnt_type_detail_equip': cnt_detail, 'type': 4, 'feeding_mode': v,
-                                                       'handle_material_name': material.material_name}
+                                                       'handle_material_name': handle_material_name}
                                         ProductBatchingEquip.objects.create(**create_data)
                         else:
                             # 否则新建
@@ -530,8 +531,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             # 保存投料方式设定
                             if master:
                                 for k, v in master.items():
+                                    handle_material_name = material.material_name[:-2] if material.material_name.endswith('-C') or material.material_name.endswith('-X') else material.material_name
                                     data = {'product_batching': instance, 'equip_no': k, 'material': material,
-                                            'handle_material_name': material.material_name,
+                                            'handle_material_name': handle_material_name,
                                             'cnt_type_detail_equip': cnt_detail_instance, 'type': 4, 'feeding_mode': v}
                                     ProductBatchingEquip.objects.create(**data)
         for cnt_type_instance in instance.weight_cnt_types.filter(delete_flag=False):
