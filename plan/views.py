@@ -751,9 +751,9 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             area_list.append({'factory_date': factory_date,
                               'sn': sn,
                               'product_no': item[0],
-                              'plan_weight': item[1],
-                              'workshop_weight': item[2],
-                              'current_stock': item[3],
+                              'plan_weight': item[1] if item[1] else 0,
+                              'workshop_weight': item[2] if item[2] else 0,
+                              'current_stock': item[3] if item[3] else 0,
                               'desc': item[4],
                               # 'target_stock': float(item[1]) * 1.5,
                               # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
