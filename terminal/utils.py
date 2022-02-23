@@ -129,7 +129,7 @@ class TankStatusSync(object):
                       </tem:open_door>
                    </soapenv:Body>
                 </soapenv:Envelope>""".format(signal_a, signal_b)
-        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers)
+        door_info = requests.post(self.url, data=send_data.encode('utf-8'), headers=headers, timeout=5)
         res = door_info.content.decode('utf-8')
         rep_json = re.findall(r'<open_doorResult>(.*)</open_doorResult>', res)[0]
         data = json.loads(rep_json)
