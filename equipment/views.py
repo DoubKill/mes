@@ -47,7 +47,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule
-from system.models import Section
+from system.models import Section, User
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -3066,6 +3066,12 @@ class EquipApplyOrderViewSet(ModelViewSet):
         "验收记录": "result_accept_result",
     }
 
+    def get_user(self, section):  # 获取当前部门负责人下的所有人
+        self.users += [section.in_charge_user.username]
+        self.users += User.objects.filter(section=section).values_list('username', flat=True)
+        for s in Section.objects.filter(parent_section=section):
+            self.get_user(self, s)
+
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
         status = self.request.query_params.get('status')
@@ -3076,10 +3082,14 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
-                    if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                    section = Section.objects.filter(in_charge_user=self.request.user).first()
+                    if section:
+                    # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                        users = []
+                        self.get_user(self, section)
                         query_set = self.queryset.filter(
-                            Q(Q(status='已接单') |
-                              Q(status='已开始', repair_end_datetime__isnull=True)))
+                            Q(Q(status='已接单', receiving_user__in=users) |
+                              Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users)))
                     else:
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
@@ -3121,9 +3131,13 @@ class EquipApplyOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
-                processing = self.queryset.filter(Q(Q(status='已接单') |
-                                                    Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            section = Section.objects.filter(in_charge_user=self.request.user).first()
+            if section:
+                users = []
+                self.get_user(self, section)
+            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                processing = self.queryset.filter(Q(Q(status='已接单', receiving_user__in=users) |
+                                                    Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users))).count()
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
@@ -3410,6 +3424,12 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         "录入时间": "created_date"
     }
 
+    def get_user(self, section):  # 获取当前部门负责人下的所有人
+        self.users += [section.in_charge_user.username]
+        self.users += User.objects.filter(section=section).values_list('username', flat=True)
+        for s in Section.objects.filter(parent_section=section):
+            self.get_user(self, s)
+
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
         status = self.request.query_params.get('status')
@@ -3419,10 +3439,14 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
-                    if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
+                    section = Section.objects.filter(in_charge_user=self.request.user).first()
+                    if section:
+                        users = []
+                        self.get_user(self, section)
+                    # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
                         query_set = self.queryset.filter(
-                            Q(Q(status='已接单') |
-                              Q(status='已开始', repair_end_datetime__isnull=True)))
+                            Q(Q(status='已接单', receiving_user__in=users) |
+                              Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users)))
                     else:
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
@@ -3458,9 +3482,13 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # todo 写死，设备科
-                processing = self.queryset.filter(Q(Q(status='已接单') |
-                                                    Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            section = Section.objects.filter(in_charge_user=self.request.user).first()
+            if section:
+                users = []
+                self.get_user(self, section)
+            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # todo 写死，设备科
+                processing = self.queryset.filter(Q(Q(status='已接单', receiving_user__in=users) |
+                                                    Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users))).count()
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
