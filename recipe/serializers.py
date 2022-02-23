@@ -479,8 +479,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                     if master:
                         for k, v in master.items():
                             create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
-                                           'batching_detail_equip': batching_detail_instance,
-                                           'type': detail['type'], 'feeding_mode': v}
+                                           'batching_detail_equip': batching_detail_instance, 'type': detail['type'],
+                                           'feeding_mode': v, 'handle_material_name': material.material_name}
                             ProductBatchingEquip.objects.create(**create_data)
         if weight_cnt_types is not None:
             for weight_cnt_type in weight_cnt_types:
