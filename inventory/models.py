@@ -1150,7 +1150,7 @@ class WmsNucleinManagement(AbstractEntity):
     material_no = models.CharField(max_length=128, help_text="wms物料编码")
     material_name = models.CharField(max_length=128, help_text="wms物料名称")
     zc_material_code = models.CharField(max_length=128, help_text='中策物料编码', blank=True, null=True)
-    batch_no = models.CharField(max_length=128, help_text='批次号')
+    batch_no = models.CharField(max_length=128, help_text='批次号', db_index=True)
     locked_status = models.CharField(max_length=8, help_text='状态（已锁定/已解锁）', default='已锁定')
 
     class Meta:
