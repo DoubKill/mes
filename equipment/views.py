@@ -3628,6 +3628,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     'job_item_sequence': item.get('job_item_sequence'),
                     'operation_result': item.get('operation_result'),
                     'unit': item.get('unit'),
+                    'abnormal_operation_url': None
                 }
                 if item.get('abnormal_operation_url'):
                     kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
@@ -3743,6 +3744,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                         'job_item_sequence': item.get('job_item_sequence'),
                         'operation_result': item.get('operation_result'),
                         'unit': item.get('unit'),
+                        'abnormal_operation_url': None
                     }
                     if item.get('abnormal_operation_url'):
                         kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
