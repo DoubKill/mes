@@ -883,7 +883,13 @@ permission_data = [
     {'id': 912, 'code': 'add_wms_hs_management', 'name': '新增', 'parent_id': 910},
     {'id': 913, 'code': 'operate_wms_hs_management', 'name': '解锁/锁定', 'parent_id': 910},
 
-    # 下一个 914开始
+    {'id': 914, 'code': 'material_test_plan', 'name': '原材料检测计划', 'parent_id': None},
+    {'id': 915, 'code': 'view_material_test_plan', 'name': '查看', 'parent_id': 914},
+    {'id': 916, 'code': 'begin_material_test_plan', 'name': '开始检测', 'parent_id': 914},
+    {'id': 917, 'code': 'end_material_test_plan', 'name': '结束检测', 'parent_id': 914},
+    {'id': 918, 'code': 'add_material_test_plan', 'name': '添加', 'parent_id': 914},
+
+    # 下一个 919开始
 ]
 
 
