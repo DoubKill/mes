@@ -389,6 +389,7 @@ class ProductBatchingEquip(models.Model):
     type = models.IntegerField(help_text='类别: 1: 胶料, 2: 炭黑, 3: 油料, 4: 小料')
     feeding_mode = models.CharField(max_length=4, help_text='投料方式: P密炼口投料, C炭黑罐自动, O油料罐自动', null=True, blank=True)
     is_used = models.BooleanField(default=True)
+    send_recipe_flag = models.BooleanField(default=False, help_text='发送配方结果标志: 0 未发送或者发送失败; 1 发送成功')
 
     class Meta:
         db_table = 'product_batching_equip'

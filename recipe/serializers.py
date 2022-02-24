@@ -182,7 +182,8 @@ class ProductBatchingListSerializer(BaseModelSerializer):
         res['new_recipe_id'] = new_recipe_id
         # 返回配方可用机台
         enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True).values_list('equip_no', flat=True).distinct())
-        res['enable_equip'] = enable_equip
+        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+        res.update({'enable_equip': enable_equip, 'send_success_equip': send_success_equip})
         return res
 
     class Meta:
@@ -482,6 +483,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                                            'batching_detail_equip': batching_detail_instance, 'type': detail['type'],
                                            'feeding_mode': v, 'handle_material_name': material.material_name}
                             ProductBatchingEquip.objects.create(**create_data)
+                if master:
+                    # 去除配方下发状态颜色
+                    ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=master.keys()).update(send_recipe_flag=False)
         if weight_cnt_types is not None:
             for weight_cnt_type in weight_cnt_types:
                 weight_details = weight_cnt_type.pop('weight_details', None)
@@ -536,6 +540,9 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                                             'handle_material_name': handle_material_name,
                                             'cnt_type_detail_equip': cnt_detail_instance, 'type': 4, 'feeding_mode': v}
                                     ProductBatchingEquip.objects.create(**data)
+                        if master:
+                            # 去除配方下发状态颜色
+                            ProductBatchingEquip.objects.filter(product_batching=instance, equip_no__in=master.keys()).update(send_recipe_flag=False)
         for cnt_type_instance in instance.weight_cnt_types.filter(delete_flag=False):
             if not cnt_type_instance.weight_details.filter(delete_flag=False).exists():
                 cnt_type_instance.delete_flag = True
@@ -557,6 +564,9 @@ class ProductBatchingPartialUpdateSerializer(BaseModelSerializer):
     def update(self, instance, validated_data):
         pass_flag = validated_data['pass_flag']
         if pass_flag:
+            if instance.used_type != 7:
+                # 去除配方下发状态颜色
+                ProductBatchingEquip.objects.filter(product_batching=instance).update(send_recipe_flag=False)
             if instance.used_type == 1:  # 提交
                 instance.submit_user = self.context['request'].user
                 instance.submit_time = datetime.now()

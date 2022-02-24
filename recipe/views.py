@@ -1,4 +1,6 @@
 # Create your views here.
+import datetime
+
 from django.db.models import Prefetch
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -16,6 +18,8 @@ from basics.views import CommonDeleteMixin
 from mes import settings
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
+from plan.models import ProductClassesPlan
+from production.models import PlanStatus
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
     MaterialAttributeFilter, ERPMaterialFilter, ZCMaterialFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
@@ -282,6 +286,7 @@ class RecipeNoticeAPiView(APIView):
     def post(self, request):
         product_batching_id = self.request.query_params.get('product_batching_id')
         product_no = self.request.query_params.get('product_no')
+        real_product_no = product_no.split('_NEW')[0]
         notice_flag = self.request.query_params.get('notice_flag')
         try:
             product_batching_id = int(product_batching_id)
@@ -296,34 +301,54 @@ class RecipeNoticeAPiView(APIView):
         if not product_batching.dev_type:
             raise ValidationError('请选择机型')
         if not notice_flag:
-            # 查询群控是否存在同名接口
-            real_product_no = product_no if 'NEW' not in product_no else product_no.split('_NEW')[0]
+            # 查询群控是否存在同名配方
             sfj_same_recipe = ProductBatching.objects.using('SFJ').exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=real_product_no)
             if sfj_same_recipe:
                 return Response({'notice_flag': True})
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True)
+        # 发送配方的返回信息
+        receive_msg = ""
+        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
                             .values_list('equip_no', flat=True).distinct())
-        interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': enable_equip})
+        # 过滤掉有等待或者运行中的群控配方
+        n_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
+        send_equip = []
+        for single_equip_no in enable_equip:
+            pcp_obj = ProductClassesPlan.objects.using('SFJ').filter(delete_flag=False, created_date__date__gte=n_date,
+                                                                     product_batching__stage_product_batch_no=real_product_no,
+                                                                     equip__equip_no=single_equip_no).last()
+            if pcp_obj:
+                plan_status = PlanStatus.objects.using('SFJ').filter(plan_classes_uid=pcp_obj.plan_classes_uid).last()
+                if plan_status.status in ['运行中', '等待']:
+                    receive_msg += f"{single_equip_no}: 配方正在密炼, 无法下发 "
+                else:
+                    send_equip.append(single_equip_no)
+            else:
+                send_equip.append(single_equip_no)
+        if not send_equip:
+            raise ValidationError(f"该配方在所选{'、'.join(enable_equip)}机台密炼, 无法下发")
+        interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': send_equip})
         try:
             interface.request()
         except Exception as e:
-            raise ValidationError(e)
-        for p in ProductBatching.objects.filter(batching_type=1,
-                                                stage_product_batch_no=product_batching.stage_product_batch_no,
-                                                dev_type=product_batching.dev_type):
-            p.batching_details.all().delete()
-        # NEW配方下传成功：1、废弃旧配方；2、修改配方名称；
-        if 'NEW' in product_no:
-            origin_recipe = product_no.split('_NEW')[0]
-            # 废弃原配方
-            old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=origin_recipe)
-            old_mes_recipe.update(used_type=6)
-            # 清除机台配方
-            ProductBatchingEquip.objects.filter(product_batching_id__in=old_mes_recipe).update(is_used=False)
-            # 去除配方里的_NEW
-            product_batching.stage_product_batch_no = origin_recipe
-            product_batching.save()
-        return Response(data={'auxiliary_url': settings.AUXILIARY_URL}, status=status.HTTP_200_OK)
+            receive_msg += f"{'、'.join(send_equip)}: {e.args[0]} "
+        else:
+            for p in ProductBatching.objects.filter(batching_type=1,
+                                                    stage_product_batch_no=product_batching.stage_product_batch_no,
+                                                    dev_type=product_batching.dev_type):
+                p.batching_details.all().delete()
+            # NEW配方下传成功：1、废弃旧配方；2、修改配方名称；
+            if 'NEW' in product_no:
+                # 废弃原配方
+                old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no)
+                old_mes_recipe.update(used_type=6)
+                # 清除机台配方
+                ProductBatchingEquip.objects.filter(product_batching_id__in=old_mes_recipe).update(is_used=False)
+                # 去除配方里的_NEW
+                product_batching.stage_product_batch_no = real_product_no
+                product_batching.save()
+            ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, equip_no__in=send_equip).update(send_recipe_flag=True)
+            receive_msg += f"{'、'.join(send_equip)}: 配方下发成功 "
+        return Response(data={'auxiliary_url': settings.AUXILIARY_URL, 'send_recipe_msg': receive_msg}, status=status.HTTP_200_OK)
 
 
 # @method_decorator([api_recorder], name="dispatch")
