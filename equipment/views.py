@@ -3070,7 +3070,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
         self.users += [section.in_charge_user.username]
         self.users += User.objects.filter(section=section).values_list('username', flat=True)
         for s in Section.objects.filter(parent_section=section):
-            self.get_user(self, s)
+            self.get_user(s)
 
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
@@ -3086,7 +3086,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     if section:
                     # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
                         users = []
-                        self.get_user(self, section)
+                        self.get_user(section)
                         query_set = self.queryset.filter(
                             Q(Q(status='已接单', receiving_user__in=users) |
                               Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users)))
@@ -3134,7 +3134,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
                 users = []
-                self.get_user(self, section)
+                self.get_user(section)
             # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
                 processing = self.queryset.filter(Q(Q(status='已接单', receiving_user__in=users) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users))).count()
@@ -3428,7 +3428,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         self.users += [section.in_charge_user.username]
         self.users += User.objects.filter(section=section).values_list('username', flat=True)
         for s in Section.objects.filter(parent_section=section):
-            self.get_user(self, s)
+            self.get_user(s)
 
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
@@ -3442,7 +3442,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     section = Section.objects.filter(in_charge_user=self.request.user).first()
                     if section:
                         users = []
-                        self.get_user(self, section)
+                        self.get_user(section)
                     # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
                         query_set = self.queryset.filter(
                             Q(Q(status='已接单', receiving_user__in=users) |
@@ -3485,7 +3485,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
                 users = []
-                self.get_user(self, section)
+                self.get_user(section)
             # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # todo 写死，设备科
                 processing = self.queryset.filter(Q(Q(status='已接单', receiving_user__in=users) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users))).count()
