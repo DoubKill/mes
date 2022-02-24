@@ -43,7 +43,8 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     MaterialOutHistory, FinalGumOutInventoryLog, Depot, \
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
-    OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement
+    OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
+    WMSExceptHandle
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -2462,6 +2463,7 @@ class WmsStorageSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
+        factory = self.request.query_params.get('factory')  # 厂家
         material_name = self.request.query_params.get('material_name')  # 物料名称
         material_no = self.request.query_params.get('material_no')  # 物料编码
         zc_material_code = self.request.query_params.get('zc_material_code')  # 中策物料编码
@@ -2547,11 +2549,13 @@ class WmsStorageSummaryView(APIView):
         """.format(inventory_where_str, extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
-        l_data = list(WmsNucleinManagement.objects.values_list('batch_no', flat=True))
+        # count = len(temp)
+        # temp = temp[st:et]
+
+        l_data = list(WmsNucleinManagement.objects.filter(locked_status='已锁定').values_list('batch_no', flat=True))
         if self.request.query_params.get('l_flag'):
-            temp = list(filter(lambda x: x[7].strip() not in l_data, temp))
-        count = len(temp)
-        temp = temp[st:et]
+            temp = list(filter(lambda x: x[7] not in l_data, temp))
+
         result = []
         for item in temp:
             result.append(
@@ -2563,10 +2567,38 @@ class WmsStorageSummaryView(APIView):
                  'quantity': item[5],
                  'weight': item[6],
                  'batch_no': item[7],
-                 'quality_status': item[8]
+                 'quality_status': item[8],
+                 'factory': re.findall(r'[(](.*?)[)]', item[0])[-1] if re.findall(r'[(](.*?)[)]', item[0]) else ''
                  })
         sc.close()
-        return Response({'results': result, "count": count})
+        # 返回所有的厂家
+        factory_list = []
+        for item in result:
+            if '(' in item['material_name'] and re.findall(r'[(](.*?)[)]', item['material_name']):
+                    factory_list.append(re.findall(r'[(](.*?)[)]', item['material_name'])[-1])
+        # 根据地区过滤
+        if factory:
+            result = [item for item in result if factory in item['material_name']]
+        count = len(result)
+        # 取原材料第一条入库的时间
+        for i in result[st: et]:
+            if inventory_st:
+                search_kwargs = f"""where a.CreaterTime >= '{inventory_st}'
+                and a.CreaterTime <= '{inventory_et}'
+                and a.MaterialCode = '{i['material_no']}'
+                and a.BatchNo = '{i['batch_no']}'
+                """
+            else:
+                search_kwargs = f"""where a.MaterialCode = '{i['material_no']}'
+                and a.BatchNo = '{i['batch_no']}'
+                """
+            sql = """select min(a.CreaterTime) from t_inventory_stock a {}""".format(search_kwargs)
+            sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+            temp = sc.all()
+            creater_time = temp[0][0]
+            i['creater_time'] = creater_time.split(' ')[0] if creater_time else None
+        sc.close()
+        return Response({'results': result[st:et], "count": count, 'factory_list': list(set(factory_list))})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2831,7 +2863,7 @@ class WMSRelease(APIView):
                 continue
             data['AllCheckDetailList'].append({
                 "TrackingNumber": tracking_num,
-                "CheckResult": 1
+                "CheckResult": 3 if operation_type == '不放行' else 1
             })
             release_log_list.append(WMSReleaseLog(**{'tracking_num': tracking_num,
                                                      'operation_type': operation_type,
@@ -2848,6 +2880,20 @@ class WMSRelease(APIView):
             raise ValidationError('请求失败！{}'.format(r.get('msg')))
         WMSReleaseLog.objects.bulk_create(release_log_list)
         return Response('更新成功！')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSExceptHandleView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    @atomic
+    def post(self, request):
+        data = self.request.data
+        WMSExceptHandle.objects.create(
+            created_user=self.request.user,
+            **data
+        )
+        return Response('保存成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
