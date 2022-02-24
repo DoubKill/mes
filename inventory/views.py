@@ -2463,6 +2463,7 @@ class WmsStorageSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
+        factory = self.request.query_params.get('factory')  # 厂家
         material_name = self.request.query_params.get('material_name')  # 物料名称
         material_no = self.request.query_params.get('material_no')  # 物料编码
         zc_material_code = self.request.query_params.get('zc_material_code')  # 中策物料编码
@@ -2478,6 +2479,11 @@ class WmsStorageSummaryView(APIView):
         extra_where_str = inventory_where_str = ""
         if material_name:
             extra_where_str += "where temp.MaterialName like '%{}%'".format(material_name)
+        if factory:
+            if extra_where_str:
+                extra_where_str += " and temp.MaterialName like '%{}%'".format(factory)
+            else:
+                extra_where_str += "where temp.MaterialName like '%{}%'".format(factory)
         if material_no:
             if extra_where_str:
                 extra_where_str += " and temp.MaterialCode like '%{}%'".format(material_no)
@@ -2565,7 +2571,7 @@ class WmsStorageSummaryView(APIView):
                  'batch_no': item[7],
                  'quality_status': item[8],
                  'factory': re.findall(r'[(](.*?)[)]', item[0])[-1] if re.findall(r'[(](.*?)[)]', item[0]) else '',
-                 'creater_time': item[9].strftime('%Y-%m-%d %H:%M:%S')
+                 'creater_time': item[9].strftime('%Y-%m-%d %H:%M:%S') if isinstance(item[9], datetime.datetime) else item[9]
                  })
         sc.close()
         return Response({'results': result, "count": count})
