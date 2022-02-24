@@ -2794,10 +2794,14 @@ class PerformanceSummaryView(APIView):
 
         """
         user_dic: {
-            '1_a班_投料_Z01_早班': {'name: '张三', 'section': '挤出', 'equip_no': Z01, 'classes': '早班', '1MB_qty': 20, '1MB_unit': 1.10, ...}
-            1_a班_挤出_Z02_早班：{'name: '张三', 'section': '挤出', 'equip_no': Z02, 'classes': '早班', '1MB_qty': 20, '1MB_unit': 1.10, ...}
+            '1_a班_投料_Z01_早班': {'name: '张三', 'section': '挤出', 'equip_no': Z01, 'classes': '早班', '1MB_dj_qty': 20, '1MB_dj_unit': 1.10, ...}
+            1_a班_挤出_Z02_早班：{'name: '张三', 'section': '挤出', 'equip_no': Z02, 'classes': '早班', '1MB_pt_qty': 20, '1MB_pt_unit': 1.10, ...}
             '1_a班_投料_F01_早班': {'name: '张三', 'section': '挤出', 'equip_no': F01, 'classes': '早班', '1MB_qty': 10, 'price': 1.10}
         }
         """
 
-
+        # 计算薪资
+        for item in user_dic:
+            # 判断岗位对应的合并基准（一天内的不同机台）
+            section = item['section']
+            PerformanceJobLadder.objects.values('name', 'coefficient', 'post_standard', 'post_coefficient')
