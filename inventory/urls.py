@@ -148,6 +148,7 @@ urlpatterns = [
     path('wms-inventory/', WMSInventoryView.as_view()),  # 按物料、批次、航道统计原材料库存
     path('wms-instock/', WmsInStockView.as_view()),  # 根据当前货物外伸位地址获取内伸位数据
     path('wms-release/', WMSRelease.as_view()),  # 原材料库质量放行处理
+    path('wms-except_handle/', WMSExceptHandleView.as_view()),  # 原材料库质量异常处理
     path('wms-expire-list/', WMSExpireListView.as_view()),
     path('wms-expire-details/', WMSExpireDetailView.as_view()),
     path('wms-safety-settings/', WmsInventoryMaterialViewSet.as_view()),

@@ -1978,17 +1978,26 @@ class MonthlyOutputStatisticsReport(APIView):
         if state:
             kwargs = {'equip_no': equip, 'product_no__icontains': f"-{state}-{space}"} if equip else \
                 {'product_no__icontains': f"-{state}-{space}"}
-            queryset = self.queryset.filter(**kwargs).values('equip_no', 'product_no')\
+            spare_weight = self.queryset.filter(**kwargs).aggregate(spare_weight=Sum('actual_weight'))['spare_weight']
+            queryset = self.queryset.filter(**kwargs).values('equip_no', 'product_no', 'factory_date')\
                 .annotate(value=Count('id'), weight=Sum('actual_weight'))
+
             dic = {}
             for item in queryset:
-                space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}"
+                space_equip = f"{item['product_no'].split('-')[2]}-{item['equip_no']}-{datetime.datetime.strftime(item['factory_date'], '%Y%m%d')}"
                 if dic.get(space_equip):
                     dic[space_equip]['value'] += item['value']
                     dic[space_equip]['weight'] += round(item['weight'] / 1000, 2)
+                    dic[space_equip]['ratio'] += round(item['weight'] / spare_weight, 2)
                 else:
-                    dic[space_equip] = {'space': item['product_no'].split('-')[2], 'equip_no': item['equip_no'], 'value': item['value'], 'weight': round(item['weight'] / 1000, 2)}
-            result = dic.values()
+                    dic[space_equip] = {'space': item['product_no'].split('-')[2],
+                                        'equip_no': item['equip_no'],
+                                        'time': datetime.datetime.strftime(item['factory_date'], '%m/%d'),
+                                        'value': item['value'],
+                                        'weight': round(item['weight'] / 1000, 2),
+                                        'ratio': f"{round(item['weight'] / spare_weight, 2)}%"
+                                        }
+            result = sorted(dic.values(), key=lambda x: (x['space'], x['equip_no'], x['time']))
             return Response({'result': result})
         else:
             # 取每个机台的历史最大值
