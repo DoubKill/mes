@@ -762,8 +762,8 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
         s = self.serializer_class(data=area_list, many=True)
         s.is_valid(raise_exception=True)
         for item in s.validated_data:
-            item['target_stock'] = item['plan_weight'] * 1.5
-            item['demanded_weight'] = item['plan_weight'] * 1.5 - item['workshop_weight'] - item['current_stock']
+            item['target_stock'] = round(item['plan_weight'] * 1.5, 1)
+            item['demanded_weight'] = round(item['plan_weight'] * 1.5 - item['workshop_weight'] - item['current_stock'], 1)
         s.save()
         return Response('ok')
 
