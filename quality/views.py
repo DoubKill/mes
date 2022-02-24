@@ -2656,8 +2656,8 @@ class ProductTestStaticsView(APIView):
             rate_lb += rate_s_pass_sum
             rate_test_all += v['JC']
             rate_pass_sum += v['HG']
-        all.update(rate_1='%.2f' % (rate_1 / rate_test_all*100), rate_lb='%.2f' % (rate_lb / rate_test_all*100),
-                   rate='%.2f' % (rate_pass_sum / rate_test_all*100))
+        all.update(rate_1='%.2f' % (rate_1 / rate_test_all * 100), rate_lb='%.2f' % (rate_lb / rate_test_all * 100),
+                   rate='%.2f' % (rate_pass_sum / rate_test_all * 100))
         for dic in res_data:
             for key, value in dic.items():
                 dic[key] = None if not dic[key] else dic[key]
@@ -2948,8 +2948,8 @@ class ClassTestStaticsView(APIView):
             rate_lb += rate_s_pass_sum
             rate_test_all += v['JC']
             rate_pass_sum += v['HG']
-        all.update(rate_1='%.2f' % (rate_1 / rate_test_all*100), rate_lb='%.2f' % (rate_lb / rate_test_all*100),
-                   rate='%.2f' % (rate_pass_sum / rate_test_all*100))
+        all.update(rate_1='%.2f' % (rate_1 / rate_test_all * 100), rate_lb='%.2f' % (rate_lb / rate_test_all * 100),
+                   rate='%.2f' % (rate_pass_sum / rate_test_all * 100))
         for dic in res_data:
             for key, value in dic.items():
                 dic[key] = None if not dic[key] else dic[key]
