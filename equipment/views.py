@@ -3072,6 +3072,14 @@ class EquipApplyOrderViewSet(ModelViewSet):
         for s in Section.objects.filter(parent_section=section):
             self.get_user(s)
 
+    def get_assign_user_queryset(self, status):
+        queryset_id = []
+        queryset = EquipApplyOrder.objects.filter(status=status).values('assign_to_user', 'id')
+        for item in queryset:
+            if item['assign_to_user'].split(',')[0] in self.users:
+                queryset_id.append(item['id'])
+        return EquipApplyOrder.objects.filter(id__in=queryset_id) if queryset_id else None
+
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
         status = self.request.query_params.get('status')
@@ -3086,9 +3094,9 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     if section:
                     # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
                         self.get_user(section)
+
                         query_set = self.queryset.filter(
-                            Q(Q(status='已指派', assign_to_user__in=self.users) |
-                                Q(status='已接单', receiving_user__in=self.users) |
+                            Q(Q(status='已接单', receiving_user__in=self.users) |
                               Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users)))
                     else:
                         query_set = self.queryset.filter(  # repair_user
@@ -3101,11 +3109,23 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
-                query_set = self.queryset.filter(Q(status='已生成') |
-                Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))) |
-                Q(Q(status='已指派') & Q(assign_to_user__icontains=user_name)) |
-                Q(Q(status__in=['已接单', '已开始']) & Q(Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name))) |
-                Q(Q(status='已验收', accept_user=user_name)))
+                section = Section.objects.filter(in_charge_user=self.request.user).first()
+                if section:
+                    self.get_user(section)
+                    query_set = self.queryset.filter(Q(status='已生成') |
+                    Q(Q(status='已完成') & Q(receiving_user__in=self.users)) |
+                    # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
+                    Q(Q(status__in=['已接单', '已开始']) & Q(receiving_user__in=self.users)) |
+                    Q(Q(status='已验收', receiving_user__in=self.users)))
+                    queryset_assigned = self.get_assign_user_queryset('已指派')
+                    if queryset_assigned:
+                        query_set = query_set | queryset_assigned
+                else:
+                    query_set = self.queryset.filter(Q(status='已生成') |
+                    Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))) |
+                    Q(Q(status='已指派') & Q(assign_to_user__icontains=user_name)) |
+                    Q(Q(status__in=['已接单', '已开始']) & Q(Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name))) |
+                    Q(Q(status='已验收', accept_user=user_name)))
 
         elif my_order == '2':
             if not status:
@@ -3130,22 +3150,24 @@ class EquipApplyOrderViewSet(ModelViewSet):
         if my_order == '1':
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
-            assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
-                # self.get_user(section)
-            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                self.get_user(section)
+                # assigned = self.queryset.filter(status='已指派', assign_to_user__in=self.users).count()
+                queryset_assigned = self.get_assign_user_queryset('已指派')
+                assigned = queryset_assigned.count() if queryset_assigned else 0
                 processing = self.queryset.filter(Q(
-                                                    Q(status='已指派', assign_to_user__in=self.users) |
                                                     Q(status='已接单', receiving_user__in=self.users) |
-                                                    Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users))).count()
+                                                    Q(status='已开始', receiving_user__in=self.users))).count()
+                finished = self.queryset.filter(Q(status='已完成', receiving_user__in=self.users)).count()
             else:
+                assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
                                                       repair_user__icontains=user_name) |
                                                     Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name))).count()
             # finished = self.queryset.filter(status='已完成', accept_user=user_name).count()
-            finished = self.queryset.filter(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))).count()
+                finished = self.queryset.filter(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3431,6 +3453,14 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         for s in Section.objects.filter(parent_section=section):
             self.get_user(s)
 
+    def get_assign_user_queryset(self, status):
+        queryset_id = []
+        queryset = EquipInspectionOrder.objects.filter(status=status).values('assign_to_user', 'id')
+        for item in queryset:
+            if item['assign_to_user'].split(',')[0] in self.users:
+                queryset_id.append(item['id'])
+        return EquipInspectionOrder.objects.filter(id__in=queryset_id) if queryset_id else None
+
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
         status = self.request.query_params.get('status')
@@ -3443,10 +3473,9 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     section = Section.objects.filter(in_charge_user=self.request.user).first()
                     if section:
                         self.get_user(section)
-                    # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
+                    # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():
                         query_set = self.queryset.filter(
-                            Q(Q(status='已指派', assign_to_user__in=self.users) |
-                                Q(status='已接单', receiving_user__in=self.users) |
+                            Q(Q(status='已接单', receiving_user__in=self.users) |
                               Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users)))
                     else:
                         query_set = self.queryset.filter(  # repair_user
@@ -3457,7 +3486,22 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                         Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                         Q(repair_user__icontains=user_name) | Q(status='已生成'))
             else:
-                query_set = self.queryset.filter(Q(status='已生成') | Q(Q(status=status) & Q(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
+                section = Section.objects.filter(in_charge_user=self.request.user).first()
+                if section:
+                    self.get_user(section)
+                    query_set = self.queryset.filter(Q(status='已生成') |
+                    Q(Q(status='已完成') & Q(receiving_user__in=self.users)) |
+                    # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
+                    Q(Q(status__in=['已接单', '已开始']) & Q(receiving_user__in=self.users)) |
+                    Q(Q(status='已验收', receiving_user__in=self.users)))
+                    queryset_assigned = self.get_assign_user_queryset('已指派')
+                    if queryset_assigned:
+                        print(queryset_assigned)
+                        query_set = query_set | queryset_assigned
+                        print(query_set)
+
+                else:
+                    query_set = self.queryset.filter(Q(status='已生成') | Q(Q(status=status) & Q(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
                                                  Q(repair_user__icontains=user_name))))
         elif my_order == '2':
             if not status:
@@ -3482,19 +3526,24 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         if my_order == '1':
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
-            assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
-            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # todo 写死，设备科
+                self.get_user(section)
+                queryset_assigned = self.get_assign_user_queryset('已指派')
+                assigned = queryset_assigned.count() if queryset_assigned else 0
+
+            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():
                 processing = self.queryset.filter(Q(
-                                                    Q(status='已指派', assign_to_user__in=self.users) |
                                                     Q(status='已接单', receiving_user__in=self.users) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users))).count()
+                finished = self.queryset.filter(Q(status='已完成', receiving_user__in=self.users)).count()
+
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
                                                       repair_user__icontains=user_name))).count()
-            finished = self.queryset.filter(Q(Q(status='已完成') & Q(Q(repair_user__icontains=user_name) | Q(assign_user=user_name)))).count()
+                assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
+                finished = self.queryset.filter(Q(Q(status='已完成') & Q(Q(repair_user__icontains=user_name) | Q(assign_user=user_name)))).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派').count()

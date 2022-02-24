@@ -1118,6 +1118,16 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 判读这个单的接单人是不是本人
+        status = res['status']
+        username = self.context['request'].user.username
+        if status == '待接单':
+            res['show'] = res['assign_to_user'] if username not in res['assign_to_user'] else ''
+        if status == '已接单' or status == '已开始':
+            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+        if status == '已完成':
+            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+
         return res
 
     @atomic
@@ -1269,6 +1279,16 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 判读这个单的接单人是不是本人
+        status = res['status']
+        username = self.context['request'].user.username
+        if status == '待接单':
+            res['show'] = res['assign_to_user'] if username not in res['assign_to_user'] else ''
+        if status == '已接单' or status == '已开始':
+            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+        if status == '已完成':
+            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+
         return res
 
     @atomic
