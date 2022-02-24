@@ -2756,16 +2756,16 @@ class PerformanceSummaryView(APIView):
             price_obj = PerformanceUnitPrice.objects.filter(equip_type=equip_type, state=state).first()
             # 判断是否是丁基胶
             if ProductInfoDingJi.objects.filter(is_use=True, product_no=item['product_no']).exists():
-                unit_price = price_obj.dj  # 单价
+                for key in user_dic.keys():
+                    if key.split('_')[0] == item['factory_date__day'] and key.split('_')[4] == item['classes']:
+                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
+                        user_dic[key][f"{state}_pt_unit"] = price_obj.pt
+
             else:
-                unit_price = price_obj.pt
-            for key in user_dic.keys():
-                if key.split('_')[0] == item[3] and key.split('_')[4] == item[1]:
-                    if user_dic[key].get(f"{state}_qty"):
-                        user_dic[key][f"{state}_qty"] += item[0]
-                    else:
-                        user_dic[key][f"{state}_qty"] = item[0]
-                        user_dic[key][f"{state}_unit"] = unit_price
+                for key in user_dic.keys():
+                    if key.split('_')[0] == item['factory_date__day'] and key.split('_')[4] == item['classes']:
+                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
+                        user_dic[key][f"{state}_dj_unit"] = price_obj.dj
 
          # '1_a班_投料_Z02_早班': {'name: '张三', 'section': '挤出', 'equip_no': Z01, 'classes': '早班', '1MB_qty': 20, '1MB_unit': 1.10, ...}
 
@@ -2787,11 +2787,8 @@ class PerformanceSummaryView(APIView):
                 state = item['repice'].split('-')[1]
                 for key in user_dic.keys():
                     if item['grouptime'] == key.split('_')[4] and day == key.split('_')[0] and equip_no == key.split('_')[3]:
-                        if user_dic[key].get(f"{state}_qty"):
-                            user_dic[key][f"{state}_qty"] += item[0]
-                        else:
-                            user_dic[key][f"{state}_qty"] = item[0]
-                            user_dic[key][price] = price
+                        user_dic[key][f"{state}_qty"] = user_dic[key].get(f"{state}_qty", 0) + item[0]
+                        user_dic[key][price] = price
 
         # '1_a班_投料_F01_早班': {'name: '张三', 'section': '挤出', 'equip_no': F01, 'classes': '早班', '1MB_qty': 10, 'price': 1.10}
 
@@ -2802,9 +2799,5 @@ class PerformanceSummaryView(APIView):
             '1_a班_投料_F01_早班': {'name: '张三', 'section': '挤出', 'equip_no': F01, 'classes': '早班', '1MB_qty': 10, 'price': 1.10}
         }
         """
-
-        # 计算价格
-        # 称量判断有没有price
-        # ======================pass = ========================
 
 
