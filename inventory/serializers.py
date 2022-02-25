@@ -15,15 +15,18 @@ from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
 from basics.models import GlobalCode
+from mes import settings
 from mes.base_serializer import BaseModelSerializer
-from mes.conf import STATION_LOCATION_MAP
+from mes.conf import STATION_LOCATION_MAP, COMMON_READ_ONLY_FIELDS
+from quality.utils import update_wms_quality_result
 from recipe.models import MaterialAttribute
 from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventoryStock, WmsInventoryMaterial, \
     WarehouseInfo, Station, WarehouseMaterialType, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
-    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings
+    SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
+    WmsNucleinManagement
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -769,6 +772,21 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.SerializerMethodField(read_only=True)
+    is_entering = serializers.SerializerMethodField(read_only=True)
+    in_charged_tag = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_entering(self, object):
+        if object.container_no.startswith('5'):
+            return 'Y'
+        else:
+            return 'N'
+
+    def get_in_charged_tag(self, object):
+        ins = WmsNucleinManagement.objects.filter(batch_no=object.batch_no).first()
+        if ins:
+            return ins.locked_status
+        else:
+            return '未管控'
 
     def get_unit_weight(self, object):
         try:
@@ -1341,6 +1359,13 @@ class InOutCommonSerializer(serializers.Serializer):
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)
+    is_entering = serializers.SerializerMethodField()
+
+    def get_is_entering(self, object):
+        if object.pallet_no.startswith('5'):
+            return 'Y'
+        else:
+            return 'N'
 
     def get_order_type(self, obj):
         if obj.inout_type == 1:
@@ -1768,3 +1793,22 @@ class WmsInventoryMaterialSerializer(serializers.ModelSerializer):
     class Meta:
         model = WmsInventoryMaterial
         fields = '__all__'
+
+
+class WmsNucleinManagementSerializer(BaseModelSerializer):
+
+    def update(self, instance, validated_data):
+        instance = super().update(instance, validated_data)
+        if 'locked_status' in validated_data:
+            if validated_data['locked_status'] == '已锁定' and not settings.DEBUG:
+                data_list = [{
+                    "BatchNo": instance.batch_no,
+                    "MaterialCode": instance.material_no,
+                    "CheckResult": 2}]
+                update_wms_quality_result(data_list)
+        return validated_data
+
+    class Meta:
+        model = WmsNucleinManagement
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS

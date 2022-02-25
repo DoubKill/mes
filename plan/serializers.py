@@ -846,7 +846,7 @@ class SchedulingProductSafetyParamsSerializer(BaseModelSerializer):
 
 
 class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSerializer):
-    demanded_weight = serializers.SerializerMethodField(default=0, read_only=True)
+    # demanded_weight = serializers.SerializerMethodField(default=0, read_only=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -854,19 +854,19 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
         data['available_time'] = round(available_time * 24, 1)
         return data
 
-    def get_demanded_weight(self, obj):
-        min_stock_days = SchedulingParamsSetting.objects.first().min_stock_trains
-        if obj.available_time > min_stock_days:
-            return 0
-        return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
+    # def get_demanded_weight(self, obj):
+    #     min_stock_days = SchedulingParamsSetting.objects.first().min_stock_trains
+    #     if obj.available_time > min_stock_days:
+    #         return 0
+    #     return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
 
     def create(self, validated_data):
         validated_data['factory_date'] = datetime.now().date()
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=validated_data['factory_date']).count()
         validated_data['sn'] = c + 1
-        validated_data['current_stock'] = round((calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'FM') +
-                                                 calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'RFM')) / 1000, 2)
+        # validated_data['current_stock'] = round((calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'FM') +
+        #                                          calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'RFM')) / 1000, 2)
         return super(SchedulingProductDemandedDeclareSummarySerializer, self).create(validated_data)
 
     class Meta:

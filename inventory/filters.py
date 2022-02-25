@@ -5,7 +5,7 @@ from production.models import PalletFeedbacks
 from .models import InventoryLog, Station, DeliveryPlanLB, DispatchPlan, DispatchLog, DispatchLocation, \
     MixGumOutInventoryLog, MixGumInInventoryLog, DeliveryPlanFinal, MaterialOutPlan, BarcodeQuality, CarbonOutPlan, \
     MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, DepotSite, SulfurDepotSite, DepotPallt, Sulfur, \
-    OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail
+    OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WmsNucleinManagement
 
 from inventory.models import DeliveryPlan
 
@@ -333,3 +333,15 @@ class OutBoundDeliveryOrderDetailFilter(django_filters.rest_framework.FilterSet)
     class Meta:
         model = OutBoundDeliveryOrderDetail
         fields = ['outbound_delivery_order_id', 'order_no', 'pallet_no', 'lot_no']
+
+
+class WmsNucleinManagementFilter(django_filters.rest_framework.FilterSet):
+    material_no = django_filters.CharFilter(field_name='material_no', help_text='wms物料编码', lookup_expr='icontains')
+    material_name = django_filters.CharFilter(field_name='material_name', help_text='wms物料名称', lookup_expr='icontains')
+    zc_material_no = django_filters.CharFilter(field_name='zc_material_code', help_text='中策物料编码', lookup_expr='icontains')
+    batch_no = django_filters.CharFilter(field_name='batch_no', help_text='批次号', lookup_expr='icontains')
+    locked_status = django_filters.CharFilter(field_name='locked_status', help_text='状态（已锁定/已解锁）')
+
+    class Meta:
+        model = WmsNucleinManagement
+        fields = ('material_no', 'material_name', 'zc_material_no', 'batch_no', 'locked_status')

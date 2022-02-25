@@ -692,7 +692,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=instance).order_by('id') \
-            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+            .values('sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
         work_details_column = check_standard_desc_column = check_standard_type_column = ''
         for detail in details:
             work_details_column += f"{detail['sequence']}、{detail['content']}；"
@@ -706,7 +706,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
     def get_work_details(self, obj):
         # 获取作业详情
         details = EquipJobItemStandardDetail.objects.filter(equip_standard=obj).order_by('id') \
-            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+            .values('id', 'sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
         return details
 
     class Meta:
@@ -718,7 +718,7 @@ class EquipJobItemStandardListSerializer(BaseModelSerializer):
 class EquipJobItemStandardDetailSerializer(BaseModelSerializer):
     class Meta:
         model = EquipJobItemStandardDetail
-        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type')
+        fields = ('sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
@@ -741,7 +741,7 @@ class EquipJobItemStandardCreateSerializer(BaseModelSerializer):
             if check_standard_type == '数值范围':
                 try:
                     m, n = check_standard_desc.split('-')
-                    assert float(m) <= float(n)
+                    assert eval(m) <= eval(n)
                 except:
                     raise serializers.ValidationError('数值范围不正确')
                 else:
@@ -1106,7 +1106,7 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type})
-                work_content.sort(key=lambda x: x['job_item_sequence'])
+                work_content.sort(key=lambda x: int(x['job_item_sequence']))
         res['work_content'] = work_content
         out_order = EquipRepairMaterialReq.objects.filter(work_order_no=res['work_order_no']).first()
         res['warehouse_out_no'] = out_order.warehouse_out_no if out_order else ''
@@ -1243,21 +1243,26 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                         {'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
+                         'unit': i.equip_jobitem_standard.standard_detail.first().unit if i.equip_jobitem_standard_id else None,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type,
                          'abnormal_operation_desc': i.abnormal_operation_desc,
                          'abnormal_operation_result': i.abnormal_operation_result,
                          'abnormal_operation_url': abnormal_operation_url,
+                         'uid': i.id,
+                         'is_save': i.is_save
                          })
             else:
                 data = EquipJobItemStandardDetail.objects.filter(equip_standard=instance.equip_job_item_standard) \
-                    .values('equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type')
+                    .values('id', 'equip_standard', 'sequence', 'content', 'check_standard_desc', 'check_standard_type', 'unit')
                 for i in data:
                     work_content.append(
                         {'job_item_sequence': i.get('sequence'), 'job_item_content': i.get('content'),
                          'job_item_check_standard': i.get('check_standard_desc'),
                          'equip_jobitem_standard_id': i.get('equip_standard'),
-                         'job_item_check_type': i.get('check_standard_type')})
-            work_content.sort(key=lambda x: x['job_item_sequence'])
+                         'job_item_check_type': i.get('check_standard_type'),
+                         'unit': i.get('unit'),
+                         })
+            work_content.sort(key=lambda x: int(x['job_item_sequence']))
         res['work_content'] = work_content
         # 区域位置
         bom_obj = EquipBom.objects.filter(equip_info__equip_no=res.get('equip_no')).first()

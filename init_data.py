@@ -878,7 +878,12 @@ permission_data = [
     {'id': 907, 'code': 'view_aps_stock_summary', 'name': '查看', 'parent_id': 906},
     {'id': 908, 'code': 'export_aps_stock_summary', 'name': '导出', 'parent_id': 906},
 
-    # 下一个 910开始
+    {'id': 910, 'code': 'wms_hs_management', 'name': '原材料库核酸检测管控', 'parent_id': None},
+    {'id': 911, 'code': 'view_wms_hs_management', 'name': '查看', 'parent_id': 910},
+    {'id': 912, 'code': 'add_wms_hs_management', 'name': '新增', 'parent_id': 910},
+    {'id': 913, 'code': 'operate_wms_hs_management', 'name': '解锁/锁定', 'parent_id': 910},
+
+    # 下一个 914开始
 ]
 
 
