@@ -1532,7 +1532,7 @@ class UpdateFlagCountView(APIView):
                 new_total_weight = 0
                 materials = RecipeMaterial.objects.using(equip_no).filter(recipe_name=f_instance.name)
                 for material in materials:
-                    new_weight = round(f_instance.split_count * f_instance.weight / split_count, 3)
+                    new_weight = round(material.weight * f_instance.split_count / split_count, 3)
                     material.weight = new_weight
                     material.error = get_tolerance(batching_equip=equip_no, standard_weight=new_weight, only_num=True)
                     material.time = now_time
@@ -1540,6 +1540,12 @@ class UpdateFlagCountView(APIView):
                     new_total_weight += new_weight
                 new_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=new_total_weight, project_name='all', only_num=True)
                 filter_kwargs.update({'weight': new_total_weight, 'error': new_tolerance, 'time': now_time})
+                f_instance.weight = new_total_weight
+                f_instance.error = new_tolerance
+                f_instance.time = now_time
+                f_instance.split_count = split_count
+                f_instance.save()
+                return Response('操作成功')
             instance.update(**filter_kwargs)
         return Response('操作成功')
 
