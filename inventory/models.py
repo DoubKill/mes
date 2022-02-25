@@ -1134,11 +1134,23 @@ class WMSReleaseLog(AbstractEntity):
         verbose_name_plural = verbose_name = '原材料立库放行记录'
 
 
+class WMSExceptHandle(AbstractEntity):
+    material_code = models.CharField(max_length=128, help_text='物料编码')
+    lot_no = models.CharField(max_length=64, help_text='批次号')
+    result = models.CharField(max_length=10, help_text='放行/不放行', null=True, blank=True)
+    except_reason = models.TextField(help_text='异常处理说明', null=True, blank=True)
+    quality_status = models.CharField(max_length=10, help_text='不合格/待检品/合格')
+
+    class Meta:
+        db_table = 'wms_except_handle'
+        verbose_name_plural = verbose_name = '原材料异常处理记录'
+
+
 class WmsNucleinManagement(AbstractEntity):
     material_no = models.CharField(max_length=128, help_text="wms物料编码")
     material_name = models.CharField(max_length=128, help_text="wms物料名称")
     zc_material_code = models.CharField(max_length=128, help_text='中策物料编码', blank=True, null=True)
-    batch_no = models.CharField(max_length=128, help_text='批次号')
+    batch_no = models.CharField(max_length=128, help_text='批次号', db_index=True)
     locked_status = models.CharField(max_length=8, help_text='状态（已锁定/已解锁）', default='已锁定')
 
     class Meta:

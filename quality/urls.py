@@ -101,6 +101,10 @@ router.register('product-test-resume', ProductTestResumeViewSet)
 
 # 物性/钢拔检测数据查看/修改
 router.register('rubber-max-stretch-test-result', RubberMaxStretchTestResultViewSet)
+# 原材料检测计划
+router.register('material-test-plan', MaterialTestPlanViewSet, basename='material-test-plan')
+# 原材料检测计划详情
+router.register('material-test-plan-detail', MaterialTestPlanDetailViewSet, basename='material-test-plan-detail')
 
 urlpatterns = [
     path('', include(router.urls)),

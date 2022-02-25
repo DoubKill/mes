@@ -47,7 +47,7 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from quality.utils import get_cur_sheet, get_sheet_data
 from terminal.models import ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule
-from system.models import Section
+from system.models import Section, User
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1350,9 +1350,17 @@ class EquipBomViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
 
         def get_location(parent_flag_info):
-            max_location = \
-                self.get_queryset().filter(parent_flag=parent_flag_info.id).aggregate(max_location=Max('location'))[
-                    'max_location']
+            # max无法正确比较1-9 和 1-10
+            child_data = self.get_queryset().filter(parent_flag=parent_flag_info.id).values_list('location', flat=True).distinct()
+            prefix = []
+            for i in child_data:
+                if not prefix:
+                    prefix = i.split('-')
+                    continue
+                n_num = i.split('-')[-1]
+                if int(n_num) > int(prefix[-1]):
+                    prefix = prefix[:-1] + [n_num]
+            max_location = '-'.join(prefix)
             if max_location:
                 if len(max_location) == 1:
                     location = parent_flag_info.location + str(int(max_location.split('-')[-1]) + 1)
@@ -2558,7 +2566,9 @@ class EquipWarehouseOrderDetailViewSet(ModelViewSet):
                 return Response({"success": False, "message": '当前库区中的数量不足', "data": None})
             if not query:
                 return Response({"success": False, "message": '备件以删除不能出库', "data": None})
-            if instance.plan_out_quantity >= out_quantity + instance.out_quantity:
+            if out_quantity > instance.plan_out_quantity - instance.out_quantity:
+                return Response({"success": False, "message": '出库数量不能大于单据出库数量', "data": None})
+            if instance.plan_out_quantity <= out_quantity + instance.out_quantity:
                 instance.out_quantity += out_quantity
                 instance.status = 6  # 出库完成
             else:
@@ -2926,8 +2936,8 @@ class EquipAutoPlanView(APIView):
                             warehouse_area__isnull=True)).first()
                     if not area:
                         return Response({"success": False, "message": '该备件没有可存放的库区', "data": None})
-                    location = EquipWarehouseLocation.objects.filter(equip_warehouse_area=area,
-                                                                     delete_flag=False).values('id', 'location_name')
+                    location = list(EquipWarehouseLocation.objects.filter(equip_warehouse_area=area,
+                                                                     delete_flag=False).values('id', 'location_name'))
                     # 该备件可以存放的库区和库位
                     if default:  # 默认显示的库区
                         area_id = default.equip_warehouse_area.id
@@ -2939,6 +2949,10 @@ class EquipAutoPlanView(APIView):
                         area_name = area.area_name if area else None
                         de_location_name = location[0].get('location_name')
                         de_location_id = location[0].get('id')
+                    # 将默认显示的库位放到第一个
+                    for i in location:
+                        if i['id'] == de_location_id:
+                            location.insert(0, location.pop(location.index(i)))
 
                 else:  # 出库单据
                     quantity = order.plan_out_quantity - order.out_quantity
@@ -2953,6 +2967,10 @@ class EquipAutoPlanView(APIView):
                                  'location_name': item['equip_warehouse_location__location_name']} for item in res]
                     de_location_name = default.equip_warehouse_location.location_name
                     de_location_id = default.equip_warehouse_location.id
+                    # 将默认显示的库位放到第一个
+                    for i in location:
+                        if i['id'] == de_location_id:
+                            location.insert(0, location.pop(location.index(i)))
                 data = {
                     'id': order.id,
                     "equip_warehouse_order": order.equip_warehouse_order.id,
@@ -3055,6 +3073,12 @@ class EquipApplyOrderViewSet(ModelViewSet):
         "验收结果": "result_accept_result",
         "验收记录": "result_accept_result",
     }
+    users = []
+    def get_user(self, section):  # 获取当前部门负责人下的所有人
+        self.users += [section.in_charge_user.username]
+        self.users += User.objects.filter(section=section).values_list('username', flat=True)
+        for s in Section.objects.filter(parent_section=section):
+            self.get_user(s)
 
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
@@ -3066,10 +3090,14 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
-                    if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                    section = Section.objects.filter(in_charge_user=self.request.user).first()
+                    if section:
+                    # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                        self.get_user(section)
                         query_set = self.queryset.filter(
-                            Q(Q(status='已接单') |
-                              Q(status='已开始', repair_end_datetime__isnull=True)))
+                            Q(Q(status='已指派', assign_to_user__in=self.users) |
+                                Q(status='已接单', receiving_user__in=self.users) |
+                              Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users)))
                     else:
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
@@ -3082,7 +3110,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                         Q(repair_user__icontains=user_name) | Q(accept_user=user_name) | Q(status='已生成'))
             else:
                 query_set = self.queryset.filter(Q(status='已生成') |
-                Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(created_user__username=user_name))) |
+                Q(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))) |
                 Q(Q(status='已指派') & Q(assign_to_user__icontains=user_name)) |
                 Q(Q(status__in=['已接单', '已开始']) & Q(Q(entrust_to_user=user_name) | Q(repair_user__icontains=user_name))) |
                 Q(Q(status='已验收', accept_user=user_name)))
@@ -3111,16 +3139,21 @@ class EquipApplyOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
-                processing = self.queryset.filter(Q(Q(status='已接单') |
-                                                    Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            section = Section.objects.filter(in_charge_user=self.request.user).first()
+            if section:
+                # self.get_user(section)
+            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
+                processing = self.queryset.filter(Q(
+                                                    Q(status='已指派', assign_to_user__in=self.users) |
+                                                    Q(status='已接单', receiving_user__in=self.users) |
+                                                    Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users))).count()
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
                                                       repair_user__icontains=user_name) |
                                                     Q(status__in=['已接单', '已开始'], entrust_to_user__icontains=user_name))).count()
             # finished = self.queryset.filter(status='已完成', accept_user=user_name).count()
-            finished = self.queryset.filter(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(created_user__username=user_name))).count()
+            finished = self.queryset.filter(Q(status='已完成') & Q(Q(accept_user=user_name) | Q(repair_user__icontains=user_name) | Q(created_user__username=user_name))).count()
             accepted = self.queryset.filter(status='已验收', accept_user=user_name).count()
         else:
             wait_assign = self.queryset.filter(status='已生成').count()
@@ -3399,6 +3432,12 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         "录入人": "created_username",
         "录入时间": "created_date"
     }
+    users = []
+    def get_user(self, section):  # 获取当前部门负责人下的所有人
+        self.users += [section.in_charge_user.username]
+        self.users += User.objects.filter(section=section).values_list('username', flat=True)
+        for s in Section.objects.filter(parent_section=section):
+            self.get_user(s)
 
     def get_queryset(self):
         my_order = self.request.query_params.get('my_order')
@@ -3409,10 +3448,14 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             if not status:
                 if not searched:
                     # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
-                    if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
+                    section = Section.objects.filter(in_charge_user=self.request.user).first()
+                    if section:
+                        self.get_user(section)
+                    # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  #todo 写死，设备科
                         query_set = self.queryset.filter(
-                            Q(Q(status='已接单') |
-                              Q(status='已开始', repair_end_datetime__isnull=True)))
+                            Q(Q(status='已指派', assign_to_user__in=self.users) |
+                                Q(status='已接单', receiving_user__in=self.users) |
+                              Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users)))
                     else:
                         query_set = self.queryset.filter(  # repair_user
                             Q(Q(status='已接单', repair_user__icontains=user_name) |
@@ -3448,9 +3491,13 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             user_name = self.request.user.username
             wait_assign = self.queryset.filter(status='已生成').count()
             assigned = self.queryset.filter(status='已指派', assign_to_user__icontains=user_name).count()
-            if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # todo 写死，设备科
-                processing = self.queryset.filter(Q(Q(status='已接单') |
-                                                    Q(status='已开始', repair_end_datetime__isnull=True))).count()
+            section = Section.objects.filter(in_charge_user=self.request.user).first()
+            if section:
+            # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # todo 写死，设备科
+                processing = self.queryset.filter(Q(
+                                                    Q(status='已指派', assign_to_user__in=self.users) |
+                                                    Q(status='已接单', receiving_user__in=self.users) |
+                                                    Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=self.users))).count()
             else:
                 processing = self.queryset.filter(Q(Q(status='已接单', repair_user__icontains=user_name) |
                                                     Q(status='已开始', repair_end_datetime__isnull=True,
@@ -3516,6 +3563,40 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             self.queryset.filter(id=data.get('order_id')).update(repair_user=users)
             return Response('修改完成')
         return super().create(request, *args, **kwargs)
+
+    @atomic
+    @action(methods=['post'], detail=False, url_name='temporary_save', url_path='temporary_save')
+    def temporary_save(self, request):
+        data = copy.deepcopy(self.request.data)
+        work_content = data.pop('work_content', [])
+        work_order_no = data.pop('work_order_no')
+
+        # 更新作业内容
+        result_standard = data.get('equip_repair_standard')
+        instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
+        if instance:
+            for item in work_content:
+                uid = item.pop('uid', None)
+                kwargs = {
+                    'abnormal_operation_desc': item.get('abnormal_operation_desc'),
+                    'abnormal_operation_result': item.get('abnormal_operation_result'),
+                    'equip_jobitem_standard_id': item.get('equip_jobitem_standard_id'),
+                    'job_item_check_standard': item.get('job_item_check_standard'),
+                    'job_item_check_type': item.get('job_item_check_type'),
+                    'job_item_content': item.get('job_item_content'),
+                    'job_item_sequence': item.get('job_item_sequence'),
+                    'operation_result': item.get('operation_result'),
+                    'unit': item.get('unit'),
+                }
+                if item.get('abnormal_operation_url'):
+                    kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
+                kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                if uid:  # 更新
+                    EquipResultDetail.objects.filter(id=uid).update(**kwargs)
+                else:  # 新增
+                    EquipResultDetail.objects.create(**kwargs)
+        return Response('操作成功')
+
 
     @atomic
     @action(methods=['post'], detail=False, url_name='multi_update', url_path='multi_update')
@@ -3608,12 +3689,27 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             result_standard = data.get('equip_repair_standard')
             instance = EquipMaintenanceStandard.objects.filter(id=result_standard).first()
             if instance:
-                EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
+                # EquipResultDetail.objects.filter(work_order_no=work_order_no).delete()
                 for item in work_content:
+                    uid = item.pop('uid', None)
+                    kwargs = {
+                        'abnormal_operation_desc': item.get('abnormal_operation_desc'),
+                        'abnormal_operation_result': item.get('abnormal_operation_result'),
+                        'equip_jobitem_standard_id': item.get('equip_jobitem_standard_id'),
+                        'job_item_check_standard': item.get('job_item_check_standard'),
+                        'job_item_check_type': item.get('job_item_check_type'),
+                        'job_item_content': item.get('job_item_content'),
+                        'job_item_sequence': item.get('job_item_sequence'),
+                        'operation_result': item.get('operation_result'),
+                        'unit': item.get('unit'),
+                    }
                     if item.get('abnormal_operation_url'):
-                        item['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
-                    item.update({'work_type': '巡检', 'work_order_no': work_order_no})
-                    EquipResultDetail.objects.create(**item)
+                        kwargs['abnormal_operation_url'] = json.dumps(item['abnormal_operation_url'])
+                    kwargs.update({'work_type': '巡检', 'work_order_no': work_order_no, 'is_save': True})
+                    if uid:  # 更新
+                        EquipResultDetail.objects.filter(id=uid).update(**kwargs)
+                    else:  # 新增
+                        EquipResultDetail.objects.create(**kwargs)
         else:  # 关闭
             accept_num = EquipInspectionOrder.objects.filter(status='已关闭', id__in=pks).count()
             if accept_num != 0:
@@ -3731,16 +3827,13 @@ class EquipCodePrintView(APIView):
                 del data['status']
                 res = requests.post(url=url.get('code1'), json=data, verify=False, timeout=10)
             if status == 2:  # 打印备件条码
-                res = []
-                for spare_code in data.get('spare_list'):
-                    res.append(
-                       {"print_type":1,
-                        "code": spare_code.get('spare_code'),
-                        "name": spare_code.get('spare_name'),
-                        "technical_params": spare_code.get('technical_params'),
-                        "barcode": spare_code.get('spare_code')
-                        })
-                res = requests.post(url=url.get('code2'), json=res, verify=False, timeout=10)
+                data = {"print_type":1,
+                        "code": data.get('spare_code'),
+                        "name": data.get('spare_name'),
+                        "technical_params": data.get('technical_params'),
+                        "barcode": data.get('spare_code')
+                        }
+                res = requests.post(url=url.get('code2'), json=data, verify=False, timeout=10)
             if status == 3:  # 打印bom条码
                 obj = EquipBom.objects.filter(node_id=lot_no).first()
                 if not obj:
@@ -3763,7 +3856,7 @@ class EquipCodePrintView(APIView):
                 data = {
                     "print_type": 1,
                     "area_code": data.get('area_code'),
-                    "area_name": data.get('spare_name'),
+                    "area_name": data.get('area_name'),
                     "part_name": data.get('part_name'),
                     "component_name": data.get('component_name'),
                     "lot_no": data.get('lot_no'),
@@ -4374,9 +4467,9 @@ class GetSpareOrder(APIView):
             order_detail = dic.get('lldmx')  # list
             if EquipWarehouseOrder.objects.filter(barcode=order.get('djbh')):
                 continue
-            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).order_by('id')
+            res = EquipWarehouseOrder.objects.filter(created_date__gt=dt.date.today(), status__in=[1, 2, 3]).last()
             if res:
-                order_id = res['order_id'][:10] + str('%04d' % (int(res['order_id'][11:]) + 1))
+                order_id = res.order_id[:10] + str('%04d' % (int(res.order_id[11:]) + 1))
             else:
                order_id = 'RK' + str(dt.date.today().strftime('%Y%m%d')) + '0001'
             order = EquipWarehouseOrder.objects.create(

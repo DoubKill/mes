@@ -248,9 +248,8 @@ class ProductBatchingSerializer(BaseModelSerializer):
         stage_product_batch_no = validated_data['stage_product_batch_no']
         equip = validated_data['equip']
         batching_type = validated_data['batching_type']
-        instance = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no=stage_product_batch_no,
-                                                                       equip=equip,
-                                                                       batching_type=batching_type)
+        instance = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+            stage_product_batch_no=stage_product_batch_no,  equip=equip, batching_type=batching_type)
         if instance:
             instance.update(**validated_data)
         else:
@@ -402,7 +401,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             raise serializers.ValidationError('排班详情{}不存在'.format(work_schedule_plan1))
         except Equip.DoesNotExist:
             raise serializers.ValidationError('设备{}不存在'.format(equip_no))
-        pb_obj = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no=product_batching_no,
+        pb_obj = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=product_batching_no,
                                                                      batching_type=1,
                                                                      equip=equip).first()
         if not pb_obj:
@@ -847,7 +846,7 @@ class SchedulingProductSafetyParamsSerializer(BaseModelSerializer):
 
 
 class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSerializer):
-    demanded_weight = serializers.SerializerMethodField(default=0, read_only=True)
+    # demanded_weight = serializers.SerializerMethodField(default=0, read_only=True)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -855,19 +854,19 @@ class SchedulingProductDemandedDeclareSummarySerializer(serializers.ModelSeriali
         data['available_time'] = round(available_time * 24, 1)
         return data
 
-    def get_demanded_weight(self, obj):
-        min_stock_days = SchedulingParamsSetting.objects.first().min_stock_trains
-        if obj.available_time > min_stock_days:
-            return 0
-        return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
+    # def get_demanded_weight(self, obj):
+    #     min_stock_days = SchedulingParamsSetting.objects.first().min_stock_trains
+    #     if obj.available_time > min_stock_days:
+    #         return 0
+    #     return round(obj.plan_weight - obj.workshop_weight - obj.current_stock, 1)
 
     def create(self, validated_data):
         validated_data['factory_date'] = datetime.now().date()
         c = SchedulingProductDemandedDeclareSummary.objects.filter(
             factory_date=validated_data['factory_date']).count()
         validated_data['sn'] = c + 1
-        validated_data['current_stock'] = round((calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'FM') +
-                                                 calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'RFM')) / 1000, 2)
+        # validated_data['current_stock'] = round((calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'FM') +
+        #                                          calculate_product_stock(validated_data['factory_date'], validated_data['product_no'], 'RFM')) / 1000, 2)
         return super(SchedulingProductDemandedDeclareSummarySerializer, self).create(validated_data)
 
     class Meta:

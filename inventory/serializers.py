@@ -772,6 +772,21 @@ class BzFinalMixingRubberLBInventorySerializer(serializers.ModelSerializer):
 class WmsInventoryStockSerializer(serializers.ModelSerializer):
     unit_weight = serializers.SerializerMethodField(read_only=True)
     quality_status = serializers.SerializerMethodField(read_only=True)
+    is_entering = serializers.SerializerMethodField(read_only=True)
+    in_charged_tag = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_entering(self, object):
+        if object.container_no.startswith('5'):
+            return 'Y'
+        else:
+            return 'N'
+
+    def get_in_charged_tag(self, object):
+        ins = WmsNucleinManagement.objects.filter(batch_no=object.batch_no).first()
+        if ins:
+            return ins.locked_status
+        else:
+            return '未管控'
 
     def get_unit_weight(self, object):
         try:
@@ -1344,6 +1359,13 @@ class InOutCommonSerializer(serializers.Serializer):
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)
+    is_entering = serializers.SerializerMethodField()
+
+    def get_is_entering(self, object):
+        if object.pallet_no.startswith('5'):
+            return 'Y'
+        else:
+            return 'N'
 
     def get_order_type(self, obj):
         if obj.inout_type == 1:

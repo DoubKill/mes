@@ -346,6 +346,7 @@ class SchedulingProductDemandedDeclareSummary(models.Model):
     desc = models.CharField(max_length=128, help_text='备注（加硫不合格待处理）', blank=True, null=True)
     target_stock = models.FloatField(help_text='目标总库存量（吨）', default=0)
     available_time = models.FloatField(help_text='可用时间', default=0)
+    demanded_weight = models.FloatField(help_text='需生产量（吨）', default=0)
 
     def save(self, *args, **kwargs):
         self.available_time = round((self.workshop_weight + self.current_stock) / self.plan_weight, 2)
@@ -366,6 +367,7 @@ class SchedulingResult(models.Model):
     plan_trains = models.IntegerField(help_text='车数')
     desc = models.CharField(max_length=64, help_text='备注', null=True, blank=True)
     created_time = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    status = models.CharField(max_length=8, help_text='下发状态（未下发/已下发）', default='未下发')
 
     class Meta:
         db_table = 'aps_result'

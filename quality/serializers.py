@@ -28,7 +28,7 @@ from quality.models import TestMethod, MaterialTestOrder, \
     MaterialExamineRatingStandard, ExamineValueUnit, DataPointStandardError, MaterialEquipType, MaterialEquip, \
     IgnoredProductInfo, MaterialReportEquip, MaterialReportValue, ProductReportEquip, \
     ProductReportValue, QualifiedRangeDisplay, ProductTestPlan, ProductTestPlanDetail, RubberMaxStretchTestResult, \
-    LabelPrintLog
+    LabelPrintLog, MaterialTestPlan, MaterialTestPlanDetail
 from recipe.models import MaterialAttribute
 
 
@@ -1943,4 +1943,56 @@ class LabelPrintLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabelPrintLog
+        fields = '__all__'
+
+
+class MaterialTestPlanCreateSerializer(serializers.ModelSerializer):
+
+    material_list = serializers.ListField(write_only=True, default=[])
+
+    class Meta:
+        model = MaterialTestPlan
+        fields = '__all__'
+
+    @atomic
+    def create(self, validated_data):
+        material_list = validated_data.pop('material_list')
+        material_test_plan = super().create(validated_data)
+        for material_dic in material_list:
+            material_name = material_dic.get('material_name')
+            material_sample_name = material_dic.get('material_sample_name', None)
+            material_batch = material_dic.get('material_batch')
+            material_supplier = material_dic.get('material_supplier', None)
+            material_tmh = material_dic.get('material_tmh')
+            material_wlxxid = material_dic.get('material_wlxxid')
+            material = ExamineMaterial.objects.filter(batch=material_batch,
+                                                      wlxxid=material_wlxxid).first()
+            if not material:
+                material = ExamineMaterial.objects.create(batch=material_batch,
+                                                          name=material_name,
+                                                          sample_name=material_sample_name,
+                                                          supplier=material_supplier,
+                                                          tmh=material_tmh,
+                                                          wlxxid=material_wlxxid)
+            MaterialTestPlanDetail.objects.create(material_test_plan=material_test_plan,
+                                                  material=material,recorder=self.context['request'].user,
+                                                  sampling_user=self.context['request'].user)
+        return material_test_plan
+
+
+class MaterialTestPlanDetailSerializer(serializers.ModelSerializer):
+    material_name = serializers.ReadOnlyField(source='material.name')
+    material_tmh = serializers.ReadOnlyField(source='material.tmh')
+    material_batch = serializers.ReadOnlyField(source='material.batch')
+
+    class Meta:
+        model = MaterialTestPlanDetail
+        fields = '__all__'
+
+
+class MaterialTestPlanSerializer(serializers.ModelSerializer):
+    material_list = MaterialTestPlanDetailSerializer(many=True)
+
+    class Meta:
+        model = MaterialTestPlan
         fields = '__all__'
