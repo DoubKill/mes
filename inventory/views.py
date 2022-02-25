@@ -2841,8 +2841,6 @@ class WMSRelease(APIView):
             check_result = 1
             if status == '不合格':
                 check_result = 3
-            elif status == '待检品':
-                check_result = 5
             data['AllCheckDetailList'].append({
                 "TrackingNumber": tracking_num,
                 "CheckResult": check_result
