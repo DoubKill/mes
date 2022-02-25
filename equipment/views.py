@@ -1350,9 +1350,17 @@ class EquipBomViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
 
         def get_location(parent_flag_info):
-            max_location = \
-                self.get_queryset().filter(parent_flag=parent_flag_info.id).aggregate(max_location=Max('location'))[
-                    'max_location']
+            # max无法正确比较1-9 和 1-10
+            child_data = self.get_queryset().filter(parent_flag=parent_flag_info.id).values_list('location', flat=True).distinct()
+            prefix = []
+            for i in child_data:
+                if not prefix:
+                    prefix = i.split('-')
+                    continue
+                n_num = i.split('-')[-1]
+                if int(n_num) > int(prefix[-1]):
+                    prefix = prefix[:-1] + [n_num]
+            max_location = '-'.join(prefix)
             if max_location:
                 if len(max_location) == 1:
                     location = parent_flag_info.location + str(int(max_location.split('-')[-1]) + 1)

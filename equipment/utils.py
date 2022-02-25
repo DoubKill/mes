@@ -69,7 +69,7 @@ class DinDinAPI(object):
         @param phone_num:
         """
         url = 'https://oapi.dingtalk.com/topapi/v2/user/getbymobile'
-        ret = requests.post(url, params={'access_token': self.access_token}, data={"mobile": phone_num})
+        ret = requests.post(url, params={'access_token': self.access_token}, data={"mobile": phone_num}, timeout=5)
         data = json.loads(ret.text)
         return data.get('result').get('userid') if data.get('errcode') == 0 else ''
 
@@ -90,7 +90,7 @@ class DinDinAPI(object):
             "isI18n": False,
             "workDateTo": str(end_time) + ' 00:00:00'
         }
-        ret = requests.post(url, params={'access_token': self.access_token}, json=data)
+        ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
         return data.get('recordresult')
 
@@ -119,7 +119,7 @@ class DinDinAPI(object):
             "userid_list": ",".join(user_ids),
             "to_all_user": False
         }
-        ret = requests.post(url, params={'access_token': self.access_token}, json=data)
+        ret = requests.post(url, params={'access_token': self.access_token}, json=data, timeout=5)
         data = json.loads(ret.text)
         if not data.get('errcode') == 0:
             print('请求错误')

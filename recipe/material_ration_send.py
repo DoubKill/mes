@@ -24,7 +24,7 @@ def send(material_no, material_name, ratio):
         "Ratio ": ratio
     }
     try:
-        ret = requests.post(url, data=body)
+        ret = requests.post(url, data=body, timeout=10)
         data = ret.json()
         if data.get("state"):
             MaterialAttribute.objects.filter(material__material_no=material_no,
