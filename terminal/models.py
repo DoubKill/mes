@@ -147,6 +147,18 @@ class WeightPackageLog(AbstractEntity):
         verbose_name_plural = verbose_name = '称量打包履历'
 
 
+class WeightPackageLogDetails(models.Model):
+    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配id', on_delete=models.CASCADE,
+                                       related_name='weight_package_machine')
+    name = models.CharField(max_length=50, help_text='物料名称')
+    weight = models.DecimalField(max_digits=5, decimal_places=3)
+    error = models.DecimalField(max_digits=4, decimal_places=3)
+
+    class Meta:
+        db_table = 'weight_package_log_details'
+        verbose_name_plural = verbose_name = '机配物料详情'
+
+
 class OtherMaterialLog(models.Model):
     plan_classes_uid = models.CharField(max_length=64, help_text='密炼计划号')
     product_no = models.CharField(max_length=64, help_text='胶料名称-配方号')
@@ -196,6 +208,7 @@ class WeightBatchingLog(AbstractEntity):
     location_no = models.CharField(max_length=64, help_text='产线')
     dev_type = models.CharField(max_length=64, help_text='机型名称')
     failed_reason = models.CharField(max_length=64, help_text='投料失败原因')
+
     # quantity = models.IntegerField(default=1, help_text='包数')
 
     class Meta:
@@ -451,7 +464,8 @@ class Version(models.Model):
 class Bin(models.Model):
     """料仓物料信息表"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
-    bin = models.CharField(db_column='Bin', help_text='料仓位置', max_length=3, blank=True, null=True)  # Field name made lowercase.
+    bin = models.CharField(db_column='Bin', help_text='料仓位置', max_length=3, blank=True,
+                           null=True)  # Field name made lowercase.
     name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
     code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
 
@@ -464,7 +478,7 @@ class MaterialInfo(models.Model):
     """原材料信息表"""
     id = models.BigAutoField(db_column='ID', primary_key=True)  # Field name made lowercase.
     name = models.CharField(max_length=50, help_text='物料名称', blank=True, null=True)
-    code = models.CharField(max_length=50,  help_text='物料代码', blank=True, null=True)
+    code = models.CharField(max_length=50, help_text='物料代码', blank=True, null=True)
     time = models.CharField(max_length=19, help_text='更新时间', blank=True, null=True)
     remark = models.CharField(max_length=10, help_text='备注', blank=True, null=True)
     use_not = models.IntegerField(blank=True, help_text='是否使用，0是1否', null=True)
@@ -476,13 +490,13 @@ class MaterialInfo(models.Model):
 
 class Plan(models.Model):
     """称量计划"""
-    id = models.BigAutoField(db_column='ID', help_text='自增字段',primary_key=True)  # Field name made lowercase.
+    id = models.BigAutoField(db_column='ID', help_text='自增字段', primary_key=True)  # Field name made lowercase.
     planid = models.CharField(max_length=14, help_text='mes传唯一码', blank=True, null=True)
     recipe = models.CharField(max_length=50, help_text='配方名称', blank=True, null=True)
     recipe_id = models.CharField(max_length=10, help_text='配方id', blank=True, null=True)
-    recipe_ver = models.CharField(max_length=10, blank=True, help_text='配方版本',null=True)
-    starttime = models.CharField(max_length=19, help_text='起始时间，写入后会被上位机更新',blank=True, null=True)
-    stoptime = models.CharField(max_length=19, help_text='结束时间，不用写上位机更新',blank=True, null=True)
+    recipe_ver = models.CharField(max_length=10, blank=True, help_text='配方版本', null=True)
+    starttime = models.CharField(max_length=19, help_text='起始时间，写入后会被上位机更新', blank=True, null=True)
+    stoptime = models.CharField(max_length=19, help_text='结束时间，不用写上位机更新', blank=True, null=True)
     grouptime = models.CharField(max_length=4, help_text='班时：早班、中班、晚班', blank=True, null=True)
     oper = models.CharField(max_length=8, help_text='操作员', blank=True, null=True)
     state = models.CharField(max_length=4, help_text='完成、终止、等待、运行中', blank=True, null=True)
@@ -684,7 +698,8 @@ class WeightPackageManualDetails(AbstractEntity):
     batch_type = models.CharField(max_length=64, help_text='配料方式')
     tolerance = models.CharField(max_length=16, help_text='公差')
     standard_weight_old = models.DecimalField(max_digits=6, decimal_places=3, help_text='重量:kg', default=0)
-    manual_details = models.ForeignKey(WeightPackageManual, help_text='单配id', on_delete=models.CASCADE, related_name='package_details')
+    manual_details = models.ForeignKey(WeightPackageManual, help_text='单配id', on_delete=models.CASCADE,
+                                       related_name='package_details')
 
     class Meta:
         db_table = 'weight_package_manual_details'
@@ -696,7 +711,8 @@ class WeightPackageSingle(AbstractEntity):
     bra_code = models.CharField(max_length=64, help_text='卡片条码')
     batching_type = models.CharField(max_length=64, help_text='类别: 配方或通用')
     product_no = models.CharField(max_length=64, help_text='配方名称', null=True, blank=True)
-    dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型', null=True, blank=True)
+    dev_type = models.ForeignKey(EquipCategoryAttribute, on_delete=models.CASCADE, help_text='机型', null=True,
+                                 blank=True)
     split_num = models.IntegerField(help_text='分包数', null=True, blank=True)
     material_name = models.CharField(max_length=64, help_text='物料名称')
     single_weight = models.CharField(max_length=64, help_text='单配重量')
@@ -737,9 +753,12 @@ class WeightPackageWms(AbstractEntity):
 
 class MachineManualRelation(models.Model):
     """合包配料机配与人工配关联关系"""
-    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配id', on_delete=models.CASCADE, null=True, blank=True, related_name='single_weight_package')
-    manual = models.ForeignKey(WeightPackageManual, help_text='人工配料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_manual')
-    manual_wms = models.ForeignKey(WeightPackageWms, help_text='原材料id', on_delete=models.CASCADE, null=True, blank=True, related_name='weight_package_wms')
+    weight_package = models.ForeignKey(WeightPackageLog, help_text='机配id', on_delete=models.CASCADE, null=True,
+                                       blank=True, related_name='single_weight_package')
+    manual = models.ForeignKey(WeightPackageManual, help_text='人工配料id', on_delete=models.CASCADE, null=True, blank=True,
+                               related_name='weight_package_manual')
+    manual_wms = models.ForeignKey(WeightPackageWms, help_text='原材料id', on_delete=models.CASCADE, null=True, blank=True,
+                                   related_name='weight_package_wms')
     count = models.IntegerField(help_text='配置数量', null=True, default=True)
     content = models.TextField(help_text='条码对应的物料', default='')
 

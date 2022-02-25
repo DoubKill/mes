@@ -674,14 +674,16 @@ class EquipMaintenanceAreaSettingSerializer(BaseModelSerializer):
     equip_area_name = serializers.CharField(source='equip_area.area_name', read_only=True, default='')
     workshop = serializers.CharField(source='maintenance_user.workshop', read_only=True, default='')
 
+    def validate(self, attrs):
+        i = EquipMaintenanceAreaSetting.objects.filter(equip=attrs['equip'], maintenance_user=attrs['maintenance_user'], equip_part=attrs['equip_part'])
+        if i:
+            raise serializers.ValidationError('请勿重读添加')
+        return attrs
+
     class Meta:
         model = EquipMaintenanceAreaSetting
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
-        validators = [UniqueTogetherValidator(queryset=EquipMaintenanceAreaSetting.objects.all(),
-                                              fields=('maintenance_user', 'equip', 'equip_part'),
-                                              message='请勿重复添加！'),
-                      ]
 
 
 class EquipJobItemStandardListSerializer(BaseModelSerializer):
