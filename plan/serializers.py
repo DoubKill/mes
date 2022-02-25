@@ -248,9 +248,8 @@ class ProductBatchingSerializer(BaseModelSerializer):
         stage_product_batch_no = validated_data['stage_product_batch_no']
         equip = validated_data['equip']
         batching_type = validated_data['batching_type']
-        instance = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no=stage_product_batch_no,
-                                                                       equip=equip,
-                                                                       batching_type=batching_type)
+        instance = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(
+            stage_product_batch_no=stage_product_batch_no,  equip=equip, batching_type=batching_type)
         if instance:
             instance.update(**validated_data)
         else:
@@ -402,7 +401,7 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             raise serializers.ValidationError('排班详情{}不存在'.format(work_schedule_plan1))
         except Equip.DoesNotExist:
             raise serializers.ValidationError('设备{}不存在'.format(equip_no))
-        pb_obj = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no=product_batching_no,
+        pb_obj = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=product_batching_no,
                                                                      batching_type=1,
                                                                      equip=equip).first()
         if not pb_obj:
