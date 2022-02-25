@@ -3506,9 +3506,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     Q(Q(status='已验收', receiving_user__in=self.users)))
                     queryset_assigned = self.get_assign_user_queryset('已指派')
                     if queryset_assigned:
-                        print(queryset_assigned)
                         query_set = query_set | queryset_assigned
-                        print(query_set)
 
                 else:
                     query_set = self.queryset.filter(Q(status='已生成') | Q(Q(status=status) & Q(Q(assign_to_user__icontains=user_name) | Q(receiving_user=user_name) |
