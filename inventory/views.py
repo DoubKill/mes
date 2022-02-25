@@ -2818,6 +2818,7 @@ class WMSRelease(APIView):
     REQUEST_URL = WMS_URL
 
     def post(self, request):
+        status = self.request.data('status', None)  # 不合格 / 待检品
         operation_type = self.request.data.get('operation_type')  # 1:放行 2:合格
         tracking_nums = self.request.data.get('tracking_nums')
         if not all([operation_type, tracking_nums]):
@@ -2837,9 +2838,12 @@ class WMSRelease(APIView):
         for tracking_num in tracking_nums:
             if not tracking_num:
                 continue
+            check_result = 1
+            if status == '不合格':
+                check_result = 3
             data['AllCheckDetailList'].append({
                 "TrackingNumber": tracking_num,
-                "CheckResult": 3 if operation_type == '不放行' else 1
+                "CheckResult": check_result
             })
             release_log_list.append(WMSReleaseLog(**{'tracking_num': tracking_num,
                                                      'operation_type': operation_type,
