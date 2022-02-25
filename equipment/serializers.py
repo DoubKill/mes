@@ -1123,12 +1123,14 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         # 判读这个单的接单人是不是本人
         status = res['status']
         username = self.context['request'].user.username
-        if status == '待接单':
+        if status == '已指派':
             res['show'] = res['assign_to_user'] if username not in res['assign_to_user'] else ''
         if status == '已接单' or status == '已开始':
             res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
         if status == '已完成':
-            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+            res['show'] = res['repair_user'] if username not in res['repair_user'] else ''
+        if status == '已验收':
+            res['show'] = res['accept_user'] if username not in res['accept_user'] else ''
 
         return res
 
@@ -1284,12 +1286,12 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         # 判读这个单的接单人是不是本人
         status = res['status']
         username = self.context['request'].user.username
-        if status == '待接单':
+        if status == '已指派':
             res['show'] = res['assign_to_user'] if username not in res['assign_to_user'] else ''
         if status == '已接单' or status == '已开始':
             res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
         if status == '已完成':
-            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+            res['show'] = res['repair_user'] if username not in res['repair_user'] else ''
 
         return res
 
