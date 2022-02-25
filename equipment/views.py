@@ -3075,7 +3075,8 @@ class EquipApplyOrderViewSet(ModelViewSet):
     }
     users = []
     def get_user(self, section):  # 获取当前部门负责人下的所有人
-        self.users += [section.in_charge_user.username]
+        if section.in_charge_user:
+            self.users += [section.in_charge_user.username]
         self.users += User.objects.filter(section=section).values_list('username', flat=True)
         for s in Section.objects.filter(parent_section=section):
             self.get_user(s)
@@ -3456,7 +3457,8 @@ class EquipInspectionOrderViewSet(ModelViewSet):
     }
     users = []
     def get_user(self, section):  # 获取当前部门负责人下的所有人
-        self.users += [section.in_charge_user.username]
+        if section.in_charge_user:
+            self.users += [section.in_charge_user.username]
         self.users += User.objects.filter(section=section).values_list('username', flat=True)
         for s in Section.objects.filter(parent_section=section):
             self.get_user(s)
