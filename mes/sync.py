@@ -96,8 +96,9 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
                           actual_weight=F('batching_detail_equip__actual_weight'),
                           standard_error=F('batching_detail_equip__standard_error'))\
                 .values('material_name', 'actual_weight', 'standard_error', 'type', 'sn')
-            # 炭黑油料投料方式为P需要转换类型
-            for i in feed_p_info:
+            # 炭黑油料投料方式为P需要转换类型, 并且重编sn
+            for index, i in enumerate(feed_p_info):
+                i['sn'] = index + 1
                 if i['type'] != 1:
                     i['type'] = 1
             # C
