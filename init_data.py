@@ -81,6 +81,8 @@ permission_data = [
     {'id': 55, 'code': 'refuse_productbatching', 'name': '驳回', 'parent_id': 47},
     {'id': 56, 'code': 'abandon_productbatching', 'name': '弃用', 'parent_id': 47},
     {'id': 57, 'code': 'send_productbatching', 'name': '配方下达', 'parent_id': 47},
+    {'id': 915, 'code': 'stop_productbatching', 'name': '停用', 'parent_id': 47},
+    {'id': 916, 'code': 'sendXl_productbatching', 'name': '发送称量配方', 'parent_id': 47},
 
     {'id': 58, 'code': 'productdayplan', 'name': '排程胶料日计划管理', 'parent_id': None},
     {'id': 59, 'code': 'view_productdayplan', 'name': '查看', 'parent_id': 58},
@@ -470,6 +472,7 @@ permission_data = [
     {'id': 534, 'code': 'xl_weight_card', 'name': '小料包产出-质量追踪卡管理', 'parent_id': None},
     {'id': 535, 'code': 'view_xl_weight_card', 'name': '查看', 'parent_id': 534},
     {'id': 536, 'code': 'print_xl_weight_card', 'name': '打印', 'parent_id': 534},
+    {'id': 914, 'code': 'another_xl_weight_card', 'name': '补打打印', 'parent_id': 534},
 
     {'id': 537, 'code': 'xl_expire_data', 'name': '小料包有效期管理', 'parent_id': None},
     {'id': 538, 'code': 'view_xl_expire_data', 'name': '查看', 'parent_id': 537},
@@ -883,7 +886,7 @@ permission_data = [
     {'id': 912, 'code': 'add_wms_hs_management', 'name': '新增', 'parent_id': 910},
     {'id': 913, 'code': 'operate_wms_hs_management', 'name': '解锁/锁定', 'parent_id': 910},
 
-    # 下一个 914开始
+    # 下一个 917开始
 ]
 
 
