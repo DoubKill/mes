@@ -2818,7 +2818,7 @@ class WMSRelease(APIView):
     REQUEST_URL = WMS_URL
 
     def post(self, request):
-        status = self.request.data('status', None)  # 不合格 / 待检品
+        status = self.request.data.get('status', None)  # 不合格 / 待检品
         operation_type = self.request.data.get('operation_type')  # 1:放行 2:合格
         tracking_nums = self.request.data.get('tracking_nums')
         if not all([operation_type, tracking_nums]):
