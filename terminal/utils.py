@@ -444,6 +444,8 @@ class CLSystem(object):
 
 
 def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', only_num=None):
+    if not standard_weight:
+        standard_weight = 0
     standard_weight = Decimal(standard_weight)
     # 人工单配细料硫磺包
     if batching_equip:

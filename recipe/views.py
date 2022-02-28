@@ -230,6 +230,7 @@ class ProductBatchingViewSet(ModelViewSet):
         # if not used_type:
         #     queryset = queryset.filter(used_type__in=[1, 4])
         exclude_used_type = self.request.query_params.get('exclude_used_type')
+        filter_type = self.request.query_params.get('filter_type')  # 1 表示部分发送(蓝色) 2 表示未设置可用机台
         if exclude_used_type:
             queryset = queryset.exclude(used_type=exclude_used_type)
         if self.request.query_params.get('all'):
@@ -241,6 +242,19 @@ class ProductBatchingViewSet(ModelViewSet):
                                    'dev_type__category_name')
             return Response({'results': data})
         else:
+            if filter_type:
+                queryset = queryset.filter(used_type=4)
+                res_id = []
+                recipe_ids = ProductBatchingEquip.objects.filter(is_used=True).values_list('product_batching_id', flat=True).distinct()
+                if filter_type == '1':
+                    for r_id in recipe_ids:
+                        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id).values_list('equip_no', flat=True).distinct())
+                        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+                        if enable_equip != send_success_equip:
+                            res_id.append(r_id)
+                    queryset = queryset.filter(id__in=res_id)
+                elif filter_type == '2':
+                    queryset = queryset.exclude(id__in=list(recipe_ids))
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
