@@ -2630,7 +2630,7 @@ class WmsStorageView(ListAPIView):
             filter_kwargs['in_storage_time__gte'] = st
         if et:
             filter_kwargs['in_storage_time__lte'] = et
-        queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs)
+        queryset = WmsInventoryStock.objects.using(self.DATABASE_CONF).filter(**filter_kwargs).order_by('in_storage_time')
         if is_entering:
             if is_entering == 'Y':
                 queryset = queryset.filter(container_no__startswith=5)
