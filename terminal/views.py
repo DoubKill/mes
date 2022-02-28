@@ -2449,9 +2449,10 @@ class XlRecipeNoticeView(APIView):
             info = mes_xl_details.values('equip_no').annotate(not_c=Count('id', filter=Q(feeding_mode__startswith='C')))
             equip_list = [i['equip_no'] for i in info if i['not_c'] == 0]
             if len(equip_list) > 1:
-                group_mode_by_id = mes_xl_details.filter(equip_no__in=equip_list).values(
-                    'cnt_type_detail_equip').annotate(num=Count('feeding_mode', distinct=True))
-                res = [j for j in group_mode_by_id if j['num'] != 1]
+                group_mode_by_id = mes_xl_details.filter(equip_no__in=equip_list).values('cnt_type_detail_equip')\
+                    .annotate(s_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='S')),
+                              f_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='F')))
+                res = [j for j in group_mode_by_id if j['s_num'] != 0 and j['f_num'] != 0]
                 if res:
                     raise ValidationError(f"通用配方设置投料方式不一致，无法下发: {','.join(equip_list)}")
         # 查询所有的称量线体罐物料与配方设置物料是否一致

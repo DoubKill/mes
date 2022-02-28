@@ -219,16 +219,13 @@ class ProductBatchingViewSet(ModelViewSet):
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False).order_by('sn')),
         Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
         Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(delete_flag=False)),
-    ).order_by('-created_date')
+    ).order_by('stage_product_batch_no')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-        # used_type = self.request.query_params.get('used_type')
-        # if not used_type:
-        #     queryset = queryset.filter(used_type__in=[1, 4])
         exclude_used_type = self.request.query_params.get('exclude_used_type')
         filter_type = self.request.query_params.get('filter_type')  # 1 表示部分发送(蓝色) 2 表示未设置可用机台
         if exclude_used_type:
@@ -243,10 +240,11 @@ class ProductBatchingViewSet(ModelViewSet):
             return Response({'results': data})
         else:
             if filter_type:
-                queryset = queryset.filter(used_type=4)
                 res_id = []
                 recipe_ids = ProductBatchingEquip.objects.filter(is_used=True).values_list('product_batching_id', flat=True).distinct()
                 if filter_type == '1':
+                    if not recipe_ids:
+                        return Response([])
                     for r_id in recipe_ids:
                         enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id).values_list('equip_no', flat=True).distinct())
                         send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
