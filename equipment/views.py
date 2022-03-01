@@ -3103,8 +3103,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     section = Section.objects.filter(in_charge_user=self.request.user).first()
                     if section:
                     # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():  # 写死，设备科
-                        users = self.get_user(section)
-                        users = ['葛龙']
+                        users = self.get_user(section, users=[])
                         query_set = self.queryset.filter(
                             Q(Q(status='已接单', receiving_user__in=users) |
                               Q(status='已开始', repair_end_datetime__isnull=True, receiving_user__in=users)))
@@ -3162,8 +3161,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             wait_assign = self.queryset.filter(status='已生成').count()
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
-                users = self.get_user(section)
-                users = ['葛龙']
+                users = self.get_user(section, users=[])
                 # assigned = self.queryset.filter(status='已指派', assign_to_user__in=self.users).count()
                 queryset_assigned = self.get_assign_user_queryset('已指派', users)
                 assigned = queryset_assigned.count() if queryset_assigned else 0
