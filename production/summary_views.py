@@ -448,14 +448,14 @@ class IndexOverview(APIView):
             if st:
                 begin_time = str(st.start_time)
             else:
-                begin_time = date_now + '00:00:01'
+                begin_time = date_now + ' 00:00:01'
             if et:
                 end_time = str(et.end_time)
             else:
-                end_time = date_now + '23:59:59'
+                end_time = date_now + ' 23:59:59'
         else:
-            begin_time = date_now + '00:00:01'
-            end_time = date_now + '23:59:59'
+            begin_time = date_now + ' 00:00:01'
+            end_time = date_now + ' 23:59:59'
 
         return date_now, begin_time, end_time
 
