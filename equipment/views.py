@@ -3082,11 +3082,11 @@ class EquipApplyOrderViewSet(ModelViewSet):
             self.get_user(s, users)
         return users
 
-    def get_assign_user_queryset(self, status):
+    def get_assign_user_queryset(self, status, users):
         queryset_id = []
         queryset = EquipApplyOrder.objects.filter(status=status).values('assign_to_user', 'id')
         for item in queryset:
-            if item['assign_to_user'].split(',')[0] in self.users:
+            if item['assign_to_user'].split(',')[0] in users:
                 queryset_id.append(item['id'])
         return EquipApplyOrder.objects.filter(id__in=queryset_id) if queryset_id else None
 
@@ -3126,7 +3126,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
                     # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
                     Q(Q(status__in=['已接单', '已开始']) & Q(receiving_user__in=users)) |
                     Q(Q(status='已验收', receiving_user__in=users)))
-                    queryset_assigned = self.get_assign_user_queryset('已指派')
+                    queryset_assigned = self.get_assign_user_queryset('已指派', users)
                     if queryset_assigned:
                         query_set = query_set | queryset_assigned
                 else:
@@ -3163,7 +3163,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             if section:
                 users = self.get_user(section)
                 # assigned = self.queryset.filter(status='已指派', assign_to_user__in=self.users).count()
-                queryset_assigned = self.get_assign_user_queryset('已指派')
+                queryset_assigned = self.get_assign_user_queryset('已指派', users)
                 assigned = queryset_assigned.count() if queryset_assigned else 0
                 processing = self.queryset.filter(Q(
                                                     Q(status='已接单', receiving_user__in=users) |
@@ -3464,7 +3464,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             self.get_user(s, users)
         return users
 
-    def get_assign_user_queryset(self, status):
+    def get_assign_user_queryset(self, status, users):
         queryset_id = []
         queryset = EquipInspectionOrder.objects.filter(status=status).values('assign_to_user', 'id')
         for item in queryset:
@@ -3505,7 +3505,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
                     Q(Q(status__in=['已接单', '已开始']) & Q(receiving_user__in=users)) |
                     Q(Q(status='已验收', receiving_user__in=users)))
-                    queryset_assigned = self.get_assign_user_queryset('已指派')
+                    queryset_assigned = self.get_assign_user_queryset('已指派', users)
                     if queryset_assigned:
                         query_set = query_set | queryset_assigned
 
@@ -3538,7 +3538,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
                 users = self.get_user(section)
-                queryset_assigned = self.get_assign_user_queryset('已指派')
+                queryset_assigned = self.get_assign_user_queryset('已指派', users)
                 assigned = queryset_assigned.count() if queryset_assigned else 0
 
             # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():
