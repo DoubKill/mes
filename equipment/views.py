@@ -3468,7 +3468,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
         queryset_id = []
         queryset = EquipInspectionOrder.objects.filter(status=status).values('assign_to_user', 'id')
         for item in queryset:
-            if item['assign_to_user'].split(',')[0] in self.users:
+            if item['assign_to_user'].split(',')[0] in users:
                 queryset_id.append(item['id'])
         return EquipInspectionOrder.objects.filter(id__in=queryset_id) if queryset_id else None
 
