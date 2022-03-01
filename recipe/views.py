@@ -309,6 +309,8 @@ class RecipeNoticeAPiView(APIView):
         receive_msg = ""
         enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
                             .values_list('equip_no', flat=True).distinct())
+        if not enable_equip:
+            raise ValidationError('配方已经发送到相应机台或未找到配方投料设置信息')
         # 过滤掉有等待或者运行中的群控配方
         n_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
         send_equip = []

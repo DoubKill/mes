@@ -4,6 +4,7 @@
 import json
 import re
 from datetime import datetime
+from decimal import Decimal
 
 import requests
 from django.db.models import Sum, Q, Count
@@ -443,6 +444,7 @@ class CLSystem(object):
 
 
 def get_tolerance(batching_equip, standard_weight, material_name=None, project_name='单个化工重量', only_num=None):
+    standard_weight = Decimal(standard_weight)
     # 人工单配细料硫磺包
     if batching_equip:
         type_name = '硫磺' if batching_equip.startswith('S') else '细料'
