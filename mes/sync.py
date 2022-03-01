@@ -130,7 +130,7 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
                     continue
                 # 走罐体的化工原料
                 c_xl = batching_info.filter(equip_no=i.equip_no, feeding_mode__startswith='C')\
-                    .annotate(material_name=F('material__material_name'),
+                    .annotate(material_name=F('handle_material_name'),
                               actual_weight=F('cnt_type_detail_equip__standard_weight'),
                               standard_error=F('cnt_type_detail_equip__standard_error'))\
                     .values('material_name', 'actual_weight', 'standard_error')
