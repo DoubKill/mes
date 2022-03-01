@@ -1541,8 +1541,14 @@ class MaterialExamineResultMainCreateSerializer(serializers.ModelSerializer):
             instance.qualified = True
             instance.save()
         material = instance.material
+        result_status = 1
+        first_examine_tesult = MaterialExamineResult.objects.exclude(id=instance.id).filter(material=material).order_by('id').first()
+        if first_examine_tesult:
+            if not first_examine_tesult.qualified:
+                # 第一次检测不合格，后面检测结果不用更新到立库
+                result_status = 3
+        material.status = result_status
         material.qualified = instance.qualified
-        material.status = 1
         material.save()
         return instance
 
