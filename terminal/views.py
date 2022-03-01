@@ -39,7 +39,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
     FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet, \
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
-    WeightPackageManual, WeightPackageSingle, WeightPackageWms
+    WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -2410,12 +2410,21 @@ class MaterialDetailsAux(APIView):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
-        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan.equip.equip_no)
+        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan.equip.equip_no, plan_classes_uid)
+        # 扫过原材料小料码则不能扫入人工单配该物料码(粘合剂KY-7A-C)
+        wms_xl_material = list(OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1, other_type='原材料小料').values_list('material_name', flat=True).distinct())
+        if wms_xl_material:
+            handle_cnt_details = []
+            for i in cnt_type_details:
+                if i.get('material__material_name') not in wms_xl_material:
+                    handle_cnt_details.append(i)
+        else:
+            handle_cnt_details = cnt_type_details
         if from_mes:
-            res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details] + [classes_plan.product_batching.stage_product_batch_no]
+            res = [item.get('material__material_name') for item in material_name_weight + handle_cnt_details] + [classes_plan.product_batching.stage_product_batch_no]
             return Response(res)
         else:
-            return Response({'material_name_weight': material_name_weight, 'cnt_type_details': cnt_type_details})
+            return Response({'material_name_weight': material_name_weight, 'cnt_type_details': handle_cnt_details})
 
 
 @method_decorator([api_recorder], name='dispatch')
@@ -2444,6 +2453,17 @@ class XlRecipeNoticeView(APIView):
         not_tank_materials = mes_xl_details.filter(~Q(feeding_mode__startswith='C'), feeding_mode__startswith=keywords)
         if not not_tank_materials:
             raise ValidationError('配方中的小料内容投料方式与机台不相符')
+        equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
+        if len(equip_no_list) > 1:
+            info = mes_xl_details.values('equip_no').annotate(not_c=Count('id', filter=Q(feeding_mode__startswith='C')))
+            equip_list = [i['equip_no'] for i in info if i['not_c'] == 0]
+            if len(equip_list) > 1:
+                group_mode_by_id = mes_xl_details.filter(equip_no__in=equip_list).values('cnt_type_detail_equip')\
+                    .annotate(s_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='S')),
+                              f_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='F')))
+                res = [j for j in group_mode_by_id if j['s_num'] != 0 and j['f_num'] != 0]
+                if res:
+                    raise ValidationError(f"通用配方设置投料方式不一致，无法下发: {','.join(equip_list)}")
         # 查询所有的称量线体罐物料与配方设置物料是否一致
         mes_xl_materials = not_tank_materials.values_list('handle_material_name', flat=True).distinct()
         xl_equip_materials = list(Bin.objects.using(xl_equip).values_list('name', flat=True))
@@ -2453,19 +2473,23 @@ class XlRecipeNoticeView(APIView):
         # 配方和线体相同物料
         same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
         # 在使用称量配方不能下发
-        equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
-        # 下发配方数据与是否下发标识
+        # 下发配方数据
         now_date = datetime.datetime.now().date()
         before_date = now_date - timedelta(days=1)
         send_data = {'dev_type': product_batching.dev_type.category_no}
         detail_msg = ""
+        already_add_recipe = []
         for single_equip_no in equip_no_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
             if not send_materials:
                 detail_msg += f'{single_equip_no}: 无配料明细可下发 '
                 continue
-            not_keyword_material = mes_xl_details.filter(~Q(feeding_mode__startswith=keywords), equip_no=single_equip_no)
+            not_keyword_material = mes_xl_details.filter(feeding_mode__startswith='C', equip_no=single_equip_no)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-ONLY)")
+            if send_recipe_name in already_add_recipe:
+                continue
+            else:
+                already_add_recipe.append(send_recipe_name)
             processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中', '等待'], recipe=send_recipe_name)
             if processing_xl_plan:
                 detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '

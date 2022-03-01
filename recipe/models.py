@@ -167,7 +167,7 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
-    def get_product_batch(self, equip_no):
+    def get_product_batch(self, equip_no, plan_classes_uid):
         material_name_weight, cnt_type_details = [], []
         # 获取机台配方
         sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=self.stage_product_batch_no,
@@ -179,15 +179,20 @@ class ProductBatching(AbstractEntity):
                                                                             product_batching=sfj_recipe,
                                                                             delete_flag=False, type=1)
             material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight'))
-            # 料包明细
-            details = ProductBatchingEquip.objects.filter(~Q(feeding_mode__startswith='C'),
-                                                          product_batching__stage_product_batch_no=self.stage_product_batch_no,
-                                                          product_batching__dev_type__category_name=self.dev_type.category_no,
-                                                          equip_no=equip_no, is_used=True, type=4,
-                                                          cnt_type_detail_equip__delete_flag=False)
-            cnt_type_details += list(details.annotate(actual_weight=F('cnt_type_detail_equip__standard_weight'),
-                                                      standard_error=F('cnt_type_detail_equip__standard_error'))
-                                     .values('material__material_name', 'actual_weight', 'standard_error'))
+            from terminal.models import OtherMaterialLog
+            common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
+            if not common_scan:  # 扫的通用料包码则过滤掉细料
+                # 料包明细
+                details = ProductBatchingEquip.objects.filter(~Q(feeding_mode__startswith='C'),
+                                                              product_batching__stage_product_batch_no=self.stage_product_batch_no,
+                                                              product_batching__dev_type__category_name=self.dev_type.category_no,
+                                                              equip_no=equip_no, is_used=True, type=4,
+                                                              cnt_type_detail_equip__delete_flag=False)
+                cnt_type_details += list(details.annotate(actual_weight=F('cnt_type_detail_equip__standard_weight'),
+                                                          standard_error=F('cnt_type_detail_equip__standard_error'))
+                                         .values('material__material_name', 'actual_weight', 'standard_error'))
+            else:
+                material_name_weight = [i for i in material_name_weight if i['material__material_name'] not in ['细料', '硫磺']]
         return material_name_weight, cnt_type_details
 
     class Meta:
