@@ -5,8 +5,6 @@ import sys
 
 import django
 
-from mes import settings
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
@@ -17,6 +15,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
 
+from mes import settings
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
 from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
@@ -353,7 +352,7 @@ if __name__ == '__main__':
             if not leader_ding_uid:
                 continue
             if leader_ding_uid in failed:
-                statics = failed['leader_ding_uid']
+                statics = failed[leader_ding_uid]
                 statics[work_type] = statics[work_type] + 1 if work_type in statics else 1
             else:
                 failed[leader_ding_uid] = {work_type: 1}
