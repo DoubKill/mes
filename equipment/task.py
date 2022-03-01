@@ -5,6 +5,8 @@ import sys
 
 import django
 
+from mes import settings
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mes.settings")
@@ -221,8 +223,12 @@ class AutoDispatch(object):
 
     def __init__(self):
         self.ding_api = DinDinAPI()
-        self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=0879c81b51a595920edcde6de87092ee050945625581b2ea7277b17d469c3bdc&timestamp=1645250492135&sign=5LyxDyNHd%2FwbM07WMCH4recxPAwWvkE1Y8EPLNF4lGU%3D'
-        self.group_secret = 'SEC9e441b6498487b844cc2000ee0f94b36fdf5bf9a2b61db556c12dc9353e7e4e0'
+        if settings.DEBUG:
+            self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=0879c81b51a595920edcde6de87092ee050945625581b2ea7277b17d469c3bdc&timestamp=1645250492135&sign=5LyxDyNHd%2FwbM07WMCH4recxPAwWvkE1Y8EPLNF4lGU%3D'
+            self.group_secret = 'SEC9e441b6498487b844cc2000ee0f94b36fdf5bf9a2b61db556c12dc9353e7e4e0'
+        else:
+            self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=327a481ceb5bda5e71a560c7d1e87de8aa3e7edde2038bf4379db8c8389845ab'
+            self.group_secret = 'SECf1842042def9a33612e3b7f064819033d2b5215d18deca79b14b3b1101d26081'
 
     def send_order(self, order):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
