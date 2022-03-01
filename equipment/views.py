@@ -934,7 +934,7 @@ class EquipPartNewViewSet(CommonDeleteMixin, ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class EquipComponentTypeViewSet(CommonDeleteMixin, ModelViewSet):
     """设备部件分类"""
-    queryset = EquipComponentType.objects.all()
+    queryset = EquipComponentType.objects.order_by('component_type_code')
     serializer_class = EquipComponentTypeSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -4477,7 +4477,10 @@ class GetSpare(APIView):
         for item in ret:
             equip_component_type = EquipComponentType.objects.filter(component_type_name=item['wllb']).first()
             if not equip_component_type:
-                raise ValidationError(f'同步失败，{item["wllb"]}分类不存在')
+                code = EquipComponentType.objects.order_by('component_type_code').last().component_type_code
+                component_type_code = code[0:4] + '%03d' % (int(code[-3:]) + 1) if code else '001'
+                equip_component_type = EquipComponentType.objects.create(component_type_code=component_type_code,
+                                                                         component_type_name=item['wllb'], use_flag=True)
             if item['state'] != '启用':
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
