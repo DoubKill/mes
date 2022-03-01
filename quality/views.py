@@ -2402,7 +2402,7 @@ class ProductTestStaticsView(APIView):
         # ---------------- begin ---------------
         dic = {}
         data_point_dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.values(
+        data_point_query = MaterialDataPointIndicator.objects.filter(level=1).values(
             'material_test_method__material__material_no', 'data_point__name',
             'upper_limit', 'lower_limit')
         for i in data_point_query:
@@ -2695,7 +2695,7 @@ class ClassTestStaticsView(APIView):
         # ---------------- begin ---------------
         dic = {}
         data_point_dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.values(
+        data_point_query = MaterialDataPointIndicator.objects.filter(level=1).values(
             'material_test_method__material__material_no', 'data_point__name',
             'upper_limit', 'lower_limit')
         for i in data_point_query:
@@ -2860,7 +2860,7 @@ class ClassTestStaticsView(APIView):
                     'class': production_class,
                     'JC': j['JC'], 'HG': j['HG'], 'MN': 0, 'YD': 0, 'BZ': 0, 'RATE_1': [], 'MH': 0, 'ML': 0, 'TC10': 0,
                     'TC50': 0, 'TC90': 0, 'RATE_S': [], 'sum_s': 0, 'rate': '%.2f' % (j['HG'] / j['JC'] * 100),
-                    'sort_class': 0 if production_class == '早班' else 1
+                    'sort_class': 1 if production_class == '早班' else 2
                 }
             })
         # ---------------- begin ---------------
@@ -2997,7 +2997,7 @@ class UnqialifiedEquipView(APIView):
         # ---------------- begin ---------------
         dic_ = {}
         data_point_dic = {}
-        data_point_query = MaterialDataPointIndicator.objects.values(
+        data_point_query = MaterialDataPointIndicator.objects.filter(level=1).values(
             'material_test_method__material__material_no', 'data_point__name',
             'upper_limit', 'lower_limit')
         for i in data_point_query:
