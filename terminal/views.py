@@ -39,7 +39,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
     FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet, \
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
-    WeightPackageManual, WeightPackageSingle, WeightPackageWms
+    WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -2410,12 +2410,21 @@ class MaterialDetailsAux(APIView):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
-        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan.equip.equip_no)
+        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan.equip.equip_no, plan_classes_uid)
+        # 扫过原材料小料码则不能扫入人工单配该物料码(粘合剂KY-7A-C)
+        wms_xl_material = list(OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1, other_type='原材料小料').values_list('material_name', flat=True).distinct())
+        if wms_xl_material:
+            handle_cnt_details = []
+            for i in cnt_type_details:
+                if i.get('material__material_name') not in wms_xl_material:
+                    handle_cnt_details.append(i)
+        else:
+            handle_cnt_details = cnt_type_details
         if from_mes:
-            res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details] + [classes_plan.product_batching.stage_product_batch_no]
+            res = [item.get('material__material_name') for item in material_name_weight + handle_cnt_details] + [classes_plan.product_batching.stage_product_batch_no]
             return Response(res)
         else:
-            return Response({'material_name_weight': material_name_weight, 'cnt_type_details': cnt_type_details})
+            return Response({'material_name_weight': material_name_weight, 'cnt_type_details': handle_cnt_details})
 
 
 @method_decorator([api_recorder], name='dispatch')
