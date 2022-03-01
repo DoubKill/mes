@@ -3120,7 +3120,7 @@ class EquipApplyOrderViewSet(ModelViewSet):
             else:
                 section = Section.objects.filter(in_charge_user=self.request.user).first()
                 if section:
-                    users = self.get_user(section)
+                    users = self.get_user(section, users=[])
                     query_set = self.queryset.filter(Q(status='已生成') |
                     Q(Q(status='已完成') & Q(receiving_user__in=users)) |
                     # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
@@ -3483,7 +3483,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
                     # 判断当前用户是否是部门负责人，是的话可以看到所有执行中的单据
                     section = Section.objects.filter(in_charge_user=self.request.user).first()
                     if section:
-                        users = self.get_user(section)
+                        users = self.get_user(section, users=[])
                     # if Section.objects.filter(name='设备科', in_charge_user=self.request.user).exists():
                         query_set = self.queryset.filter(
                             Q(Q(status='已接单', receiving_user__in=users) |
@@ -3499,7 +3499,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             else:
                 section = Section.objects.filter(in_charge_user=self.request.user).first()
                 if section:
-                    users = self.get_user(section)
+                    users = self.get_user(section, users=[])
                     query_set = self.queryset.filter(Q(status='已生成') |
                     Q(Q(status='已完成') & Q(receiving_user__in=users)) |
                     # Q(Q(status='已指派') & Q(assign_to_user__in=self.users)) |
@@ -3537,7 +3537,7 @@ class EquipInspectionOrderViewSet(ModelViewSet):
             wait_assign = self.queryset.filter(status='已生成').count()
             section = Section.objects.filter(in_charge_user=self.request.user).first()
             if section:
-                users = self.get_user(section)
+                users = self.get_user(section, users=[])
                 queryset_assigned = self.get_assign_user_queryset('已指派', users)
                 assigned = queryset_assigned.count() if queryset_assigned else 0
 
