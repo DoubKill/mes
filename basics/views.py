@@ -357,3 +357,23 @@ class CurrentClassView(APIView):
         factory_date = work_schedule_plan.plan_schedule.day_time
         return Response(f"{factory_date}/{current_class}")
 
+
+@method_decorator([api_recorder], name="dispatch")
+class CurrentFactoryDate(APIView):
+
+    def get(self, request):
+        # 获取当前时间的工厂日期，开始、结束时间
+        now = datetime.datetime.now()
+        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+            start_time__lte=now,
+            end_time__gte=now,
+            plan_schedule__work_schedule__work_procedure__global_name='密炼'
+        ).first()
+        if current_work_schedule_plan:
+            return Response(
+                {'factory_date': current_work_schedule_plan.plan_schedule.day_time,
+                 'classes': current_work_schedule_plan.classes.global_name
+                 }
+            )
+        else:
+            return Response({})
