@@ -1515,6 +1515,16 @@ class UpdateFlagCountView(APIView):
         equip_no = self.request.data.get('equip_no')
         merge_flag = self.request.data.get('merge_flag')
         split_count = self.request.data.get('split_count')
+        use_not = self.request.data.get('use_not', '')
+        if isinstance(use_not, int):
+            if use_not == 1:  # 停用配方
+                now_date = datetime.datetime.now().date() - timedelta(days=1)
+                pre_fix = now_date.strftime('%Y%m%d')[2:]
+                processing_plan = Plan.objects.using(equip_no).filter(planid__gte=pre_fix)
+                if processing_plan:
+                    raise ValidationError('该配方正在配料, 无法停用')
+            RecipePre.objects.using(equip_no).filter(id=rid).update(use_not=use_not)
+            return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
         filter_kwargs = {}
         if merge_flag is not None:
             filter_kwargs['merge_flag'] = merge_flag

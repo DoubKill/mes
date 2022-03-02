@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
 
+from mes import settings
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
 from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
@@ -221,8 +222,12 @@ class AutoDispatch(object):
 
     def __init__(self):
         self.ding_api = DinDinAPI()
-        self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=0879c81b51a595920edcde6de87092ee050945625581b2ea7277b17d469c3bdc&timestamp=1645250492135&sign=5LyxDyNHd%2FwbM07WMCH4recxPAwWvkE1Y8EPLNF4lGU%3D'
-        self.group_secret = 'SEC9e441b6498487b844cc2000ee0f94b36fdf5bf9a2b61db556c12dc9353e7e4e0'
+        if settings.DEBUG:
+            self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=0879c81b51a595920edcde6de87092ee050945625581b2ea7277b17d469c3bdc&timestamp=1645250492135&sign=5LyxDyNHd%2FwbM07WMCH4recxPAwWvkE1Y8EPLNF4lGU%3D'
+            self.group_secret = 'SEC9e441b6498487b844cc2000ee0f94b36fdf5bf9a2b61db556c12dc9353e7e4e0'
+        else:
+            self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=327a481ceb5bda5e71a560c7d1e87de8aa3e7edde2038bf4379db8c8389845ab'
+            self.group_secret = 'SECf1842042def9a33612e3b7f064819033d2b5215d18deca79b14b3b1101d26081'
 
     def send_order(self, order):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
@@ -297,7 +302,7 @@ class AutoDispatch(object):
                     repair_instance.last_updated_date = now_date
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
-            content.update({'title': f"系统自动派发设备工单成功，请尽快处理！"})
+            content.update({'title': f"系统自动派发{order.work_type}工单成功，请尽快处理！"})
             self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
             # 派单成功发送消息到设备群聊
             msg = f"系统自动派发设备工单成功，请尽快处理！\n工单编号:{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}"
@@ -347,12 +352,12 @@ if __name__ == '__main__':
             if not leader_ding_uid:
                 continue
             if leader_ding_uid in failed:
-                statics = failed['leader_ding_uid']
+                statics = failed[leader_ding_uid]
                 statics[work_type] = statics[work_type] + 1 if work_type in statics else 1
             else:
                 failed[leader_ding_uid] = {work_type: 1}
     if failed:
-        for leader_ding_uid, total_error_msg in failed:
+        for leader_ding_uid, total_error_msg in failed.items():
             send_msg_content = ''
             for work_type, num in total_error_msg.items():
                 send_msg_content += f'{work_type}: {num}'
