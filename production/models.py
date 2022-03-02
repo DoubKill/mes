@@ -414,8 +414,8 @@ class PerformanceJobLadder(models.Model):
 class PerformanceUnitPrice(models.Model):
     state = models.CharField(help_text='段次', max_length=64)
     equip_type = models.CharField(help_text='机型', max_length=64)
-    pt = models.FloatField(help_text='普通胶')
-    dj = models.FloatField(help_text='丁基胶')
+    pt = models.FloatField(help_text='普通胶', null=True, blank=True)
+    dj = models.FloatField(help_text='丁基胶', null=True, blank=True)
 
     class Meta:
         db_table = 'performance_unit_price'
