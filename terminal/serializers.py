@@ -929,12 +929,14 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         str_batch_time = ''.join(batch_time[:10].split('-'))
         # 生成条码: 机台（3位）+年月日（8位）+班次（1位）+自增数（4位） 班次：1早班  2中班  3晚班
         # 履历表中无数据则初始为1, 否则获取最大数+1
-        prefix = f"{equip_no}{str_batch_time}"
-        max_code = WeightPackageLog.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        incr_num = 1 if not max_code else int(max_code[-4:]) + 1
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         train_batch_classes = map_list.get(batch_classes)
-        bra_code = prefix + train_batch_classes + '%04d' % incr_num
+        if not train_batch_classes:
+            raise serializers.ValidationError(f'{batch_classes}不在[早班、中班、晚班]内')
+        prefix = f"{equip_no}{str_batch_time}{train_batch_classes}"
+        max_code = WeightPackageLog.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
+        incr_num = 1 if not max_code else int(max_code[-4:]) + 1
+        bra_code = prefix + '%04d' % incr_num
         attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'material_no': product_no,
                       'material_name': product_no, 'noprint_count': package_fufil - package_count, 'expire_days': days,
                       'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1,
