@@ -357,7 +357,7 @@ if __name__ == '__main__':
             else:
                 failed[leader_ding_uid] = {work_type: 1}
     if failed:
-        for leader_ding_uid, total_error_msg in failed:
+        for leader_ding_uid, total_error_msg in failed.items():
             send_msg_content = ''
             for work_type, num in total_error_msg.items():
                 send_msg_content += f'{work_type}: {num}'
