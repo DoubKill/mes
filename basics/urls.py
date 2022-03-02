@@ -2,7 +2,8 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from basics.views import GlobalCodeTypeViewSet, GlobalCodeViewSet, WorkScheduleViewSet, EquipCategoryViewSet, \
-    EquipViewSet, PlanScheduleViewSet, ClassesDetailViewSet, PlanScheduleManyCreate, LocationViewSet, CurrentClassView
+    EquipViewSet, PlanScheduleViewSet, ClassesDetailViewSet, PlanScheduleManyCreate, LocationViewSet, CurrentClassView, \
+    CurrentFactoryDate
 
 # app_name = 'basics'
 router = DefaultRouter()
@@ -33,5 +34,6 @@ router.register('location', LocationViewSet)
 urlpatterns = [
     path(r'plan-schedules/', PlanScheduleManyCreate.as_view()),
     path('current_class/', CurrentClassView.as_view()),
+    path('current-factory-date/', CurrentFactoryDate.as_view()),  # 根据当前时间获取工厂日期和班次
     path('', include(router.urls)),
 ]
