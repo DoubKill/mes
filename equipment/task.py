@@ -302,7 +302,7 @@ class AutoDispatch(object):
                     repair_instance.last_updated_date = now_date
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
-            content.update({'title': f"系统自动派发设备工单成功，请尽快处理！"})
+            content.update({'title': f"系统自动派发{order.work_type}工单成功，请尽快处理！"})
             self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
             # 派单成功发送消息到设备群聊
             msg = f"系统自动派发设备工单成功，请尽快处理！\n工单编号:{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}"
