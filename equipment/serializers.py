@@ -1120,6 +1120,18 @@ class EquipApplyOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 判读这个单的接单人是不是本人
+        status = res['status']
+        username = self.context['request'].user.username
+        if status == '已指派':
+            res['show'] = res['assign_to_user'] if username not in res['assign_to_user'] else ''
+        if status == '已接单' or status == '已开始':
+            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+        if status == '已完成':
+            res['show'] = res['repair_user'] if username not in res['repair_user'] else ''
+        if status == '已验收':
+            res['show'] = res['accept_user'] if username not in res['accept_user'] else ''
+
         return res
 
     @atomic
@@ -1243,7 +1255,7 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
                         {'job_item_sequence': i.job_item_sequence, 'job_item_content': i.job_item_content,
                          'job_item_check_standard': i.job_item_check_standard,
                          'equip_jobitem_standard_id': i.equip_jobitem_standard_id,
-                         'unit': i.equip_jobitem_standard.standard_detail.first().unit if i.equip_jobitem_standard_id else None,
+                         'unit': i.unit,  # equip_jobitem_standard.standard_detail.first().unit if i.equip_jobitem_standard_id else None,
                          'operation_result': i.operation_result, 'job_item_check_type': i.job_item_check_type,
                          'abnormal_operation_desc': i.abnormal_operation_desc,
                          'abnormal_operation_result': i.abnormal_operation_result,
@@ -1271,6 +1283,16 @@ class EquipInspectionOrderSerializer(BaseModelSerializer):
         prod = GlobalCode.objects.filter(delete_flag=False, global_type__use_flag=1,
                                          global_type__type_name='设备部门组织名称').first()
         res['product_name'] = prod.global_name if prod else ''
+        # 判读这个单的接单人是不是本人
+        status = res['status']
+        username = self.context['request'].user.username
+        if status == '已指派':
+            res['show'] = res['assign_to_user'] if username not in res['assign_to_user'] else ''
+        if status == '已接单' or status == '已开始':
+            res['show'] = res['receiving_user'] if username not in res['receiving_user'] else ''
+        if status == '已完成':
+            res['show'] = res['repair_user'] if username not in res['repair_user'] else ''
+
         return res
 
     @atomic
