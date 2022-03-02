@@ -7,27 +7,28 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
-from django.db.models import Q, Sum, Max, F, Min
+from django.db.models import Q, Sum, Max, Min, Count
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
 
-from basics.models import PlanSchedule, GlobalCode, WorkSchedulePlan
-from inventory.models import MaterialOutHistory, MixGumOutInventoryLog, DepotPallt
+from basics.models import WorkSchedulePlan
+from inventory.models import MixGumOutInventoryLog, DepotPallt
 from mes import settings
 from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PalletFeedbacks
-from recipe.models import ERPMESMaterialRelation, WeighCntType, ProductBatching, ProductBatchingDetail
+from recipe.models import ERPMESMaterialRelation, ProductBatchingDetail, \
+    ProductBatchingEquip
 from terminal.models import EquipOperationLog, WeightBatchingLog, FeedingLog, WeightTankStatus, \
     WeightPackageLog, FeedingMaterialLog, LoadMaterialLog, MaterialInfo, Bin, Plan, RecipePre, ReportBasic, \
     ReportWeight, LoadTankMaterialLog, PackageExpire, RecipeMaterial, CarbonTankFeedWeightSet, \
     FeedingOperationLog, CarbonTankFeedingPrompt, PowderTankSetting, OilTankSetting, ReplaceMaterial, ReturnRubber, \
     ToleranceRule, WeightPackageManual, WeightPackageManualDetails, WeightPackageSingle, OtherMaterialLog, \
-    WeightPackageWms, MachineManualRelation
-from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance, get_sfj_carbon_materials
+    WeightPackageWms, MachineManualRelation, WeightPackageLogDetails
+from terminal.utils import TankStatusSync, CLSystem, material_out_barcode, get_tolerance
 
 logger = logging.getLogger('send_log')
 
@@ -81,17 +82,20 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
         is_used = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code)
         if is_used:
             raise serializers.ValidationError('同一计划中不可多次扫同一条码')
+        common_xl = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, scan_material_type__in=['机配', '人工配', '细料', '硫磺'])
+        if common_xl and bra_code.startswith('TYLB'):
+            raise serializers.ValidationError('本计划不可扫通用料包')
+        common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
+        if common_scan and (bra_code.startswith('S') or bra_code.startswith('F') or bra_code.startswith('MM')):
+            raise serializers.ValidationError('本计划只能扫通用料包')
         # 获取计划
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             raise serializers.ValidationError('该计划不存在')
         # 获取配方信息
-        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch
+        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(equip_no=classes_plan.equip.equip_no, plan_classes_uid=plan_classes_uid)
         if not material_name_weight:
             raise serializers.ValidationError(f'获取配方详情失败:{classes_plan.product_batching.stage_product_batch_no}')
-        if cnt_type_details:
-            # 去除炭黑罐投入的化工原料
-            cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
         detail_infos = {i['material__material_name']: i['actual_weight'] for i in material_name_weight}
         for i in material_name_weight:
             if i['material__material_name'] in ['硫磺', '细料']:
@@ -99,7 +103,14 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             else:
                 detail_infos[i['material__material_name']] = i['actual_weight']
         materials = detail_infos.keys()
-        if bra_code.startswith('AAJ1Z'):  # 胶皮
+        if bra_code.startswith('TYLB'):  # 2号细料与3号硫磺设备对接前扫通用条码
+            common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
+            if common_scan:
+                raise serializers.ValidationError('已经扫过通用料包条码')
+            OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'product_no': classes_plan.product_batching.stage_product_batch_no,
+                                               'material_name': '通用料包', 'bra_code': bra_code, 'status': 1, 'other_type': '通用料包'})
+            raise serializers.ValidationError('通用料包扫码成功')
+        elif bra_code.startswith('AAJ1Z'):  # 胶皮
             pallet_feedback = PalletFeedbacks.objects.filter(lot_no=bra_code).first()
             if pallet_feedback:
                 scan_material_type = '胶皮'
@@ -145,6 +156,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             manual = WeightPackageManual.objects.filter(bra_code=bra_code).first()
             if manual and manual.real_count != 0:
                 material_no = material_name = manual.manual_weight_names
+                # 扫过原材料小料码则不能扫入人工单配该物料码(粘合剂KY-7A-C)
+                wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                  other_type='原材料小料', material_name__in=material_name.keys())
+                if wms_xl_material:
+                    raise serializers.ValidationError('已经扫入原材料小料，不可再扫该物料人工单配')
                 material_name.update({'single_weight': Decimal(manual.split_num)})
                 scan_material_type = '人工配'
                 total_weight = manual.split_num * manual.real_count
@@ -154,6 +170,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
             single = WeightPackageSingle.objects.filter(bra_code=bra_code).first()
             if single:
                 scan_material = single.material_name
+                # 扫过原材料小料码则不能扫入人工单配该物料码(粘合剂KY-7A-C)
+                wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                  other_type='原材料小料', material_name=scan_material)
+                if wms_xl_material:
+                    raise serializers.ValidationError('已经扫入原材料小料，不可再扫该物料人工单配')
                 # mes:single  CTP-C:CTP N550-C:N550
                 if single.material_name.startswith('CTP') or single.material_name.startswith('N'):
                     # 查询配方中对应名称
@@ -177,6 +198,26 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                 material_name_set = set(ERPMESMaterialRelation.objects.filter(zc_material__wlxxid=res['WLXXID'], use_flag=True).values_list('material__material_name', flat=True))
                 if not material_name_set:
                     raise serializers.ValidationError('该物料未与MES原材料建立绑定关系！')
+                cnt_names = [i.get('material__material_name') for i in cnt_type_details]
+                same_cnt = list(material_name_set & set(cnt_names))
+                if same_cnt:
+                    material_name = same_cnt[0]
+                    # 已经通过单配扫入并且没有使用完则不能扫原材料小料条码
+                    load_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid,
+                                                                       material_name=material_name,
+                                                                       useup_time__year='1970')
+                    if load_material:
+                        raise serializers.ValidationError(f'该物料已经扫过人工单配{material_name}')
+                    # 去除原材料小料(群控扣重时需要去除原材料小料物料[mes返回标准内])
+                    wms_xl_material = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1,
+                                                                      other_type='原材料小料', bra_code=bra_code)
+                    if wms_xl_material:
+                        raise serializers.ValidationError('原材料小料条码已经扫过')
+                    OtherMaterialLog.objects.create(**{'plan_classes_uid': plan_classes_uid, 'other_type': '原材料小料',
+                                                       'product_no': classes_plan.product_batching.stage_product_batch_no,
+                                                       'material_name': material_name, 'bra_code': bra_code,
+                                                       'status': 1})
+                    raise serializers.ValidationError('原材料小料扫码成功')
                 comm_material = list(material_name_set & materials)
                 if comm_material:
                     material_name = comm_material[0]
@@ -261,8 +302,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             other_type, status, scan_material_msg = f'{scan_material_type}{recipe_material_name}', True, f'物料:{scan_material} 扫码成功'
                 else:
                     scan_material_msg = '配方中无掺料, 所投物料不在配方中'
-                record_data.update({'other_type': other_type, 'status': status})
-                OtherMaterialLog.objects.create(**record_data)
+                if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=other_type):
+                    record_data.update({'other_type': other_type, 'status': status})
+                    OtherMaterialLog.objects.create(**record_data)
             # 胶块/细料
             else:
                 # 添加到工艺放行表中的数据
@@ -275,9 +317,11 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                     if not res[0]:
                         scan_material_msg = '胶块不在配方中, 请工艺确认'
-                        ReplaceMaterial.objects.create(**replace_material_data)
-                        record_data.update({'other_type': scan_material_type})
-                        OtherMaterialLog.objects.create(**record_data)
+                        if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
+                            ReplaceMaterial.objects.create(**replace_material_data)
+                        if not OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, status=status, other_type=scan_material_type):
+                            record_data.update({'other_type': scan_material_type})
+                            OtherMaterialLog.objects.create(**record_data)
                         flag, send_flag = False, False
                     # 通配条码(MC开头)需要判别有效期
                     if flag and bra_code.startswith('MC'):
@@ -286,8 +330,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '通用配方包已过期, 请工艺确认'
-                                replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
-                                ReplaceMaterial.objects.create(**replace_material_data)
+                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='超过有效期'):
+                                    replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
+                                    ReplaceMaterial.objects.create(**replace_material_data)
                                 record_data.update({'other_type': scan_material_type})
                                 OtherMaterialLog.objects.create(**record_data)
                                 flag, send_flag = False, False
@@ -305,7 +350,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                     if scan_material_type == '机配':  # 扫描机配料包三种场景(细料/硫磺、机配+人工配)
                         merge_flag = weight_package.merge_flag
                         product_no_dev = re.split(r'\(|\（|\[', material_name)[0]
-                        if '专用' in weight_package.product_no and weight_package.product_no.split('-')[-2] != classes_plan.equip.equip_no:
+                        if 'ONLY' in weight_package.product_no and weight_package.product_no.split('-')[-2] != classes_plan.equip.equip_no:
                             raise serializers.ValidationError(f"物料为{weight_package.product_no}, 无法在当前机台使用投料")
                         if (already_y and not merge_flag) or (already_n and merge_flag):
                             raise serializers.ValidationError('扫码合包配置冲突')
@@ -317,15 +362,17 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '配方名不一致, 请工艺确认'
-                                ReplaceMaterial.objects.create(**replace_material_data)
+                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='物料名不一致'):
+                                    ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag and weight_package.expire_days != 0 and now_date - weight_package.batch_time > timedelta(days=weight_package.expire_days):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包已过期, 请工艺确认'
-                                expire_datetime = weight_package.batch_time + timedelta(days=weight_package.expire_days)
-                                replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
-                                ReplaceMaterial.objects.create(**replace_material_data)
+                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='超过有效期'):
+                                    expire_datetime = weight_package.batch_time + timedelta(days=weight_package.expire_days)
+                                    replace_material_data.update({'reason_type': '超过有效期', 'expire_datetime': expire_datetime})
+                                    ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag and merge_flag and abs(weight_package.total_weight[0] - xl_total_weight) > total_standard_error:  # 合包但重量不一致
                             scan_material_type = '硫磺' if '硫磺' in materials else '细料'
@@ -333,11 +380,12 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='重量不匹配', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包重量与配方不一致, 请工艺确认'
-                                replace_material_data.update({'reason_type': '重量不匹配', 'material_type': scan_material_type})
-                                ReplaceMaterial.objects.create(**replace_material_data)
+                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='重量不匹配'):
+                                    replace_material_data.update({'reason_type': '重量不匹配', 'material_type': scan_material_type})
+                                    ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag and not merge_flag:
-                            machine_details = RecipeMaterial.objects.using(weight_package.equip_no).filter(recipe_name=weight_package.product_no)
+                            machine_details = WeightPackageLogDetails.objects.filter(weight_package=weight_package)
                             # 转换配方内物料名与称量配方物料比较
                             cnt_type_data = {}
                             for i in cnt_type_details:
@@ -360,9 +408,10 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                     res = self.material_pass(plan_classes_uid, i['material__material_name'], reason_type='重量不匹配', material_type=scan_material_type)
                                     if not res[0]:
                                         scan_material_msg = '料包重量与配方不一致, 请工艺确认'
-                                        replace_material_data.update({'reason_type': '重量不匹配'})
-                                        replace_material_data['real_material'] = i['material__material_name']
-                                        ReplaceMaterial.objects.create(**replace_material_data)
+                                        if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='重量不匹配'):
+                                            replace_material_data.update({'reason_type': '重量不匹配'})
+                                            replace_material_data['real_material'] = i['material__material_name']
+                                            ReplaceMaterial.objects.create(**replace_material_data)
                                         flag, send_flag = False, False
                                 scan_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=i['material__material_name'], useup_time__year='1970').last()
                                 if scan_material:
@@ -382,7 +431,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             attrs['tank_data'].update({'material_name': material_name, 'material_no': material_no, 'scan_material': material_name,
                                                        'scan_material_type': scan_material_type if not merge_flag else ('硫磺' if '硫磺' in materials else '细料')})
                     else:  # 两种场景(全人工配、机配+人工配)
-                        if '专用' in manual.product_no and manual.product_no.split('-')[-2] != classes_plan.equip.equip_no:
+                        if 'ONLY' in manual.product_no and manual.product_no.split('-')[-2] != classes_plan.equip.equip_no:
                             raise serializers.ValidationError(f"物料为{manual.product_no.split('-')[-2]}, 无法在当前机台使用投料")
                         if already_y:
                             raise serializers.ValidationError('扫码合包配置冲突')
@@ -396,14 +445,16 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             res = self.material_pass(plan_classes_uid, scan_material, material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '配方名不一致, 请工艺确认'
-                                ReplaceMaterial.objects.create(**replace_material_data)
+                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code):
+                                    ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag and expire_days != 0 and now_date - manual.created_date > timedelta(days=expire_days):
                             res = self.material_pass(plan_classes_uid, scan_material, reason_type='超过有效期', material_type=scan_material_type)
                             if not res[0]:
                                 scan_material_msg = '料包已过期, 请工艺确认'
-                                replace_material_data.update({'reason_type': '超过有效期'})
-                                ReplaceMaterial.objects.create(**replace_material_data)
+                                if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='超过有效期'):
+                                    replace_material_data.update({'reason_type': '超过有效期'})
+                                    ReplaceMaterial.objects.create(**replace_material_data)
                                 flag, send_flag = False, False
                         if flag:  # 机配+人工配但重量不一致,需要比较物料
                             if set(manual.detail_material_names) - set([i['material__material_name'] for i in cnt_type_details]):
@@ -417,8 +468,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                     res = self.material_pass(plan_classes_uid, i['material__material_name'], reason_type='重量不匹配', material_type=scan_material_type)
                                     if not res[0]:
                                         scan_material_msg = '料包重量与配方不一致, 请工艺确认'
-                                        replace_material_data.update({'real_material': i['material__material_name'], 'reason_type': '重量不匹配'})
-                                        ReplaceMaterial.objects.create(**replace_material_data)
+                                        if not ReplaceMaterial.objects.filter(plan_classes_uid=plan_classes_uid, bra_code=bra_code, reason_type='重量不匹配'):
+                                            replace_material_data.update({'real_material': i['material__material_name'], 'reason_type': '重量不匹配'})
+                                            ReplaceMaterial.objects.create(**replace_material_data)
                                         flag, send_flag = False, False
                                         break
                                 scan_material = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=i['material__material_name'], useup_time__year='1970').last()
@@ -860,8 +912,8 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
             if record.print_begin_trains == print_begin_trains and record.package_count == package_count:
                 raise serializers.ValidationError('打印起始车次与配置数量无变化，请使用重新打印')
         # 数量判断
-        if print_begin_trains == 0 or print_begin_trains > package_fufil - 1:
-            raise serializers.ValidationError('起始车次不在{}-{}的可选范围'.format(1, package_fufil - 1))
+        if print_begin_trains == 0 or print_begin_trains > package_fufil:
+            raise serializers.ValidationError('起始车次不在{}-{}的可选范围'.format(1, package_fufil))
         if package_count > package_fufil - print_begin_trains + 1 or package_count <= 0:
             raise serializers.ValidationError('配置数量不在{}-{}的可选范围'.format(1, package_fufil - print_begin_trains + 1))
         # 配料时间
@@ -877,12 +929,14 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         str_batch_time = ''.join(batch_time[:10].split('-'))
         # 生成条码: 机台（3位）+年月日（8位）+班次（1位）+自增数（4位） 班次：1早班  2中班  3晚班
         # 履历表中无数据则初始为1, 否则获取最大数+1
-        prefix = f"{equip_no}{str_batch_time}"
-        max_code = WeightPackageLog.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
-        incr_num = 1 if not max_code else int(max_code[-4:]) + 1
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         train_batch_classes = map_list.get(batch_classes)
-        bra_code = prefix + train_batch_classes + '%04d' % incr_num
+        if not train_batch_classes:
+            raise serializers.ValidationError(f'{batch_classes}不在[早班、中班、晚班]内')
+        prefix = f"{equip_no}{str_batch_time}{train_batch_classes}"
+        max_code = WeightPackageLog.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
+        incr_num = 1 if not max_code else int(max_code[-4:]) + 1
+        bra_code = prefix + '%04d' % incr_num
         attrs.update({'bra_code': bra_code, 'begin_trains': print_begin_trains, 'material_no': product_no,
                       'material_name': product_no, 'noprint_count': package_fufil - package_count, 'expire_days': days,
                       'end_trains': print_begin_trains + package_count - 1, 'print_flag': 1,
@@ -895,6 +949,16 @@ class WeightPackageLogCreateSerializer(serializers.ModelSerializer):
         machine_package_count = validated_data['package_count']
         split_count = validated_data['split_count']
         instance = WeightPackageLog.objects.create(**validated_data)
+        # 增加机配详情
+        details = RecipeMaterial.objects.using(instance.equip_no).filter(recipe_name=instance.product_no)
+        if not details:
+            raise serializers.ValidationError(f"{instance.equip_no}上没有找到该配方明细物料")
+        detail_list = []
+        for s in details:
+            create_data = {'weight_package_id': instance.id, 'name': s.name, 'weight': s.weight, 'error': s.error}
+            d_instance = WeightPackageLogDetails(**create_data)
+            detail_list.append(d_instance)
+        WeightPackageLogDetails.objects.bulk_create(detail_list)
         if manual_infos:
             handle_info = manual_infos.pop(-1)
             total_package_count_data, ids_data = handle_info.get('total_package_count_data'), handle_info.get('ids_data')
@@ -1023,8 +1087,6 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
             # 总公差
             machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
-            if '%' in machine_manual_tolerance:
-                machine_manual_tolerance = f"{machine_manual_tolerance[0]}{round(Decimal(machine_manual_tolerance[1:-1]) / 100 * instance.machine_manual_weight, 3)}kg"
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
                     'machine_manual_weight': instance.machine_manual_weight, 'machine_manual_tolerance': machine_manual_tolerance,
                     'manual_weight': total_manual_weight, 'machine_weight': instance.plan_weight,
@@ -1215,7 +1277,10 @@ class WeightPackagePlanSerializer(BaseModelSerializer):
         group = obj.grouptime if obj.grouptime != '中班' else ('早班' if '08:00:00' < obj.addtime[-8:] < '20:00:00' else '夜班')
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=obj.date_time, classes__global_name=group,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        return record.group.global_name
+        if record:
+            return record.group.global_name
+        else:
+            return ''
 
     class Meta:
         model = Plan
@@ -1359,6 +1424,31 @@ class PlanSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         equip_no = validated_data.pop('equip_no')
+        # 称量重量与mes不同无法下发计划
+        recipe_obj = RecipePre.objects.using(equip_no).filter(name=validated_data['recipe']).first()
+        product_no_dev, dev_type = re.split(r'\(|\（|\[', recipe_obj.name)[0], recipe_obj.ver
+        if 'ONLY' in validated_data['recipe']:
+            ml_equip_no = recipe_obj.name.split('-')[-2]
+        else:
+            equip_recipes = ProductBatchingEquip.objects.filter(is_used=True, type=4,
+                                                                product_batching__stage_product_batch_no=product_no_dev,
+                                                                product_batching__dev_type__category_name=dev_type) \
+                .values('equip_no').annotate(num=Count('id', filter=~Q(feeding_mode__startswith=equip_no[0])))
+            if not equip_recipes:
+                raise ValueError(f"未找到mes配方{product_no_dev}[{dev_type}]配料信息")
+            handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
+            if not handle_equip_recipe:
+                raise ValueError(f"未找到配方{product_no_dev}通用配料信息")
+            ml_equip_no = handle_equip_recipe[0]
+        recipe_materials = list(RecipeMaterial.objects.filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
+        mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
+                                                         feeding_mode__startswith=equip_no[0],
+                                                         handle_material_name__in=recipe_materials,
+                                                         product_batching__stage_product_batch_no=product_no_dev,
+                                                         product_batching__dev_type__category_name=dev_type)
+        mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
+        if recipe_obj.weight != mes_machine_weight:
+            raise serializers.ValidationError(f'称量配方重量{recipe_obj.weight}与mes配方不一致{round(mes_machine_weight, 3)}')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
                                                               grouptime=validated_data['grouptime']
                                                               ).order_by('order_by').last()

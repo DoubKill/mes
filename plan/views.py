@@ -730,6 +730,43 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             next_instance.save()
         return Response('成功')
 
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlx(self, request):
+        excel_file = request.FILES.get('file', None)
+        factory_date = self.request.data.get('factory_date', datetime.datetime.now().date())
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != 5:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet, start_row=1)
+        area_list = []
+        c = SchedulingProductDemandedDeclareSummary.objects.filter(
+            factory_date=factory_date).count()
+        sn = c + 1
+        for item in data:
+            if not item[0]:
+                continue
+            area_list.append({'factory_date': factory_date,
+                              'sn': sn,
+                              'product_no': item[0],
+                              'plan_weight': item[1] if item[1] else 0,
+                              'workshop_weight': item[2] if item[2] else 0,
+                              'current_stock': item[3] if item[3] else 0,
+                              'desc': item[4],
+                              # 'target_stock': float(item[1]) * 1.5,
+                              # 'demanded_weight': float(item[1]) * 1.5 - float(item[2]) - float(item[3])
+                              })
+            sn += 1
+        s = self.serializer_class(data=area_list, many=True)
+        s.is_valid(raise_exception=True)
+        for item in s.validated_data:
+            item['target_stock'] = round(item['plan_weight'] * 1.5, 1)
+            item['demanded_weight'] = round(item['plan_weight'] * 1.5 - item['workshop_weight'] - item['current_stock'], 1)
+        s.save()
+        return Response('ok')
+
 
 class SchedulingResultViewSet(ModelViewSet):
     queryset = SchedulingResult.objects.order_by('id')
@@ -825,7 +862,7 @@ class SchedulingResultViewSet(ModelViewSet):
                         plan_trains = int(plan_trains)
                     except ValueError:
                         raise ValidationError('机台：{}， 胶料规格:{}，车次信息错误，请修改后重试！'.format(equip_no, value[0]))
-                    pb = ProductBatching.objects.exclude(used_type=6).filter(stage_product_batch_no__icontains='-{}'.format(product_no)).first()
+                    pb = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no__icontains='-{}'.format(product_no)).first()
                     if pb:
                         product_no = pb.stage_product_batch_no
                     train_time_consume = calculate_equip_recipe_avg_mixin_time(equip_no, product_no)
@@ -883,14 +920,12 @@ class SchedulingProceduresView(APIView):
         links = [APSLink(equip_no, schedule_no) for equip_no in range(len(equip_nos))]
         link_dict = {equip_no: links[idx] for idx, equip_no in enumerate(equip_nos)}
 
-        for instance in SchedulingProductDemandedDeclareSummary.objects.filter(factory_date=factory_date).order_by('sn'):
-            need_weight = round(instance.plan_weight - instance.workshop_weight - instance.current_stock, 1)
-            if need_weight <= 0:
-                continue
+        for dec in SchedulingProductDemandedDeclareSummary.objects.filter(
+                factory_date=factory_date, demanded_weight__gt=0).order_by('sn'):
             try:
                 data = calculate_product_plan_trains(factory_date,
-                                                     instance.product_no,
-                                                     need_weight)
+                                                     dec.product_no,
+                                                     dec.demanded_weight)
             except Exception as e:
                 raise ValidationError(e)
             for item in data:

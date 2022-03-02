@@ -1,4 +1,6 @@
 # Create your views here.
+import datetime
+
 from django.db.models import Prefetch
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
@@ -16,6 +18,8 @@ from basics.views import CommonDeleteMixin
 from mes import settings
 from mes.derorators import api_recorder
 from mes.sync import ProductBatchingSyncInterface
+from plan.models import ProductClassesPlan
+from production.models import PlanStatus
 from recipe.filters import MaterialFilter, ProductInfoFilter, ProductBatchingFilter, \
     MaterialAttributeFilter, ERPMaterialFilter, ZCMaterialFilter
 from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
@@ -25,7 +29,8 @@ from recipe.serializers import MaterialSerializer, ProductInfoSerializer, \
     ProductBatchingDetailMaterialSerializer, WeighCntTypeSerializer, ERPMaterialCreateSerializer, ERPMaterialSerializer, \
     ERPMaterialUpdateSerializer, ZCMaterialSerializer, ProductBatchingDetailRetrieveSerializer
 from recipe.models import Material, ProductInfo, ProductBatching, MaterialAttribute, \
-    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation
+    ProductBatchingDetail, MaterialSupplier, WeighCntType, WeighBatchingDetail, ZCMaterial, ERPMESMaterialRelation, \
+    ProductBatchingEquip
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -128,10 +133,8 @@ class ValidateProductVersionsView(APIView):
         stage_product_batch_no = self.request.query_params.get('stage_product_batch_no')
         if stage_product_batch_no:
             if ProductBatching.objects.exclude(
-                    used_type=6).filter(stage_product_batch_no=stage_product_batch_no,
-                                        factory__isnull=True,
-                                        batching_type=2,
-                                        dev_type_id=dev_type).exists():
+                    used_type__in=[6, 7]).filter(stage_product_batch_no=stage_product_batch_no, factory__isnull=True,
+                                                 batching_type=2, dev_type_id=dev_type).exists():
                 raise ValidationError('该配方已存在')
             return Response('OK')
         if not all([versions, site, product_info, stage]):
@@ -143,13 +146,13 @@ class ValidateProductVersionsView(APIView):
             dev_type = int(dev_type)
         except Exception:
             raise ValidationError('参数错误')
-        product_batching = ProductBatching.objects.exclude(used_type=6).filter(site_id=site,
-                                                                               stage_id=stage,
-                                                                               product_info_id=product_info,
-                                                                               versions=versions,
-                                                                               batching_type=2,
-                                                                               dev_type_id=dev_type,
-                                                                               ).first()
+        product_batching = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(site_id=site,
+                                                                                        stage_id=stage,
+                                                                                        product_info_id=product_info,
+                                                                                        versions=versions,
+                                                                                        batching_type=2,
+                                                                                        dev_type_id=dev_type,
+                                                                                        ).first()
         if product_batching:
             raise ValidationError('该配方已存在')
             # if product_batching.versions >= versions:
@@ -216,7 +219,7 @@ class ProductBatchingViewSet(ModelViewSet):
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False).order_by('sn')),
         Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
         Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(delete_flag=False)),
-    ).order_by('-created_date')
+    ).order_by('stage_product_batch_no')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter
@@ -224,6 +227,7 @@ class ProductBatchingViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         exclude_used_type = self.request.query_params.get('exclude_used_type')
+        filter_type = self.request.query_params.get('filter_type')  # 1 表示部分发送(蓝色) 2 表示未设置可用机台
         if exclude_used_type:
             queryset = queryset.exclude(used_type=exclude_used_type)
         if self.request.query_params.get('all'):
@@ -235,6 +239,20 @@ class ProductBatchingViewSet(ModelViewSet):
                                    'dev_type__category_name')
             return Response({'results': data})
         else:
+            if filter_type:
+                res_id = []
+                recipe_ids = ProductBatchingEquip.objects.filter(is_used=True).values_list('product_batching_id', flat=True).distinct()
+                if filter_type == '1':
+                    if not recipe_ids:
+                        return Response([])
+                    for r_id in recipe_ids:
+                        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id).values_list('equip_no', flat=True).distinct())
+                        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=r_id, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+                        if enable_equip != send_success_equip:
+                            res_id.append(r_id)
+                    queryset = queryset.filter(id__in=res_id)
+                elif filter_type == '2':
+                    queryset = queryset.exclude(id__in=list(recipe_ids))
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
@@ -276,8 +294,12 @@ class RecipeNoticeAPiView(APIView):
     permission_classes = ()
     authentication_classes = ()
 
+    @atomic()
     def post(self, request):
         product_batching_id = self.request.query_params.get('product_batching_id')
+        product_no = self.request.query_params.get('product_no')
+        real_product_no = product_no.split('_NEW')[0]
+        notice_flag = self.request.query_params.get('notice_flag')
         try:
             product_batching_id = int(product_batching_id)
         except Exception:
@@ -290,16 +312,57 @@ class RecipeNoticeAPiView(APIView):
             raise ValidationError('只有应用状态的配方才可下发至上辅机')
         if not product_batching.dev_type:
             raise ValidationError('请选择机型')
-        interface = ProductBatchingSyncInterface(instance=product_batching)
+        if not notice_flag:
+            # 查询群控是否存在同名配方
+            sfj_same_recipe = ProductBatching.objects.using('SFJ').exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=real_product_no)
+            if sfj_same_recipe:
+                return Response({'notice_flag': True})
+        # 发送配方的返回信息
+        receive_msg = ""
+        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, is_used=True, send_recipe_flag=False)
+                            .values_list('equip_no', flat=True).distinct())
+        if not enable_equip:
+            raise ValidationError('配方已经发送到相应机台或未找到配方投料设置信息')
+        # 过滤掉有等待或者运行中的群控配方
+        n_date = datetime.datetime.now().date() - datetime.timedelta(days=1)
+        send_equip = []
+        for single_equip_no in enable_equip:
+            pcp_obj = ProductClassesPlan.objects.using('SFJ').filter(delete_flag=False, created_date__date__gte=n_date,
+                                                                     product_batching__stage_product_batch_no=real_product_no,
+                                                                     equip__equip_no=single_equip_no).last()
+            if pcp_obj:
+                plan_status = PlanStatus.objects.using('SFJ').filter(plan_classes_uid=pcp_obj.plan_classes_uid).last()
+                if plan_status.status in ['运行中', '等待']:
+                    receive_msg += f"{single_equip_no}: 配方正在密炼, 无法下发 "
+                else:
+                    send_equip.append(single_equip_no)
+            else:
+                send_equip.append(single_equip_no)
+        if not send_equip:
+            raise ValidationError(f"该配方在所选{'、'.join(enable_equip)}机台密炼, 无法下发")
+        interface = ProductBatchingSyncInterface(instance=product_batching, context={'enable_equip': send_equip})
         try:
             interface.request()
         except Exception as e:
-            raise ValidationError(e)
-        for p in ProductBatching.objects.filter(batching_type=1,
-                                                stage_product_batch_no=product_batching.stage_product_batch_no,
-                                                dev_type=product_batching.dev_type):
-            p.batching_details.all().delete()
-        return Response(data={'auxiliary_url': settings.AUXILIARY_URL}, status=status.HTTP_200_OK)
+            receive_msg += f"{'、'.join(send_equip)}: {e.args[0]} "
+        else:
+            for p in ProductBatching.objects.filter(batching_type=1,
+                                                    stage_product_batch_no=product_batching.stage_product_batch_no,
+                                                    dev_type=product_batching.dev_type):
+                p.batching_details.all().delete()
+            # NEW配方下传成功：1、废弃旧配方；2、修改配方名称；
+            if 'NEW' in product_no:
+                # 废弃原配方
+                old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no)
+                old_mes_recipe.update(used_type=6)
+                # 清除机台配方
+                ProductBatchingEquip.objects.filter(product_batching_id__in=old_mes_recipe).update(is_used=False)
+                # 去除配方里的_NEW
+                product_batching.stage_product_batch_no = real_product_no
+                product_batching.save()
+            ProductBatchingEquip.objects.filter(product_batching_id=product_batching_id, equip_no__in=send_equip).update(send_recipe_flag=True)
+            receive_msg += f"{'、'.join(send_equip)}: 配方下发成功 "
+        return Response(data={'auxiliary_url': settings.AUXILIARY_URL, 'send_recipe_msg': receive_msg}, status=status.HTTP_200_OK)
 
 
 # @method_decorator([api_recorder], name="dispatch")
@@ -438,9 +501,9 @@ class ProductDevBatchingReceive(APIView):
         # }
         data = self.request.data
         product_batching = ProductBatching.objects.exclude(
-            used_type=6).filter(stage_product_batch_no=data['stage_product_batch_no'],
-                                batching_type=2,
-                                dev_type__category_no=data['dev_type__category_no']).first()
+            used_type__in=[6, 7]).filter(stage_product_batch_no=data['stage_product_batch_no'],
+                                         batching_type=2,
+                                         dev_type__category_no=data['dev_type__category_no']).first()
         try:
             dev_type = EquipCategoryAttribute.objects.get(category_no=data['dev_type__category_no'])
             if data['factory__global_no']:
@@ -514,7 +577,7 @@ class DevTypeProductBatching(APIView):
         if not all([dev_type, product_no]):
             raise ValidationError('参数不足')
         instance = ProductBatching.objects.exclude(
-            used_type=6).filter(
+            used_type__in=[6, 7]).filter(
             dev_type__category_no=dev_type,
             stage_product_batch_no=product_no,
             batching_type=2

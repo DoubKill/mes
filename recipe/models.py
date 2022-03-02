@@ -167,21 +167,32 @@ class ProductBatching(AbstractEntity):
             material_names.add(weight_cnt_type.name)
         return material_names
 
-    @property
-    def get_product_batch(self):
+    def get_product_batch(self, equip_no, plan_classes_uid):
         material_name_weight, cnt_type_details = [], []
-        # 获取机型配方
-        product_batch = ProductBatching.objects.filter(stage_product_batch_no=self.stage_product_batch_no, used_type=4,
-                                                       dev_type__category_no=self.dev_type.category_no, delete_flag=False,
-                                                       batching_type=2).first()
-        if product_batch:
-            # 胶皮、胶块
-            material_name_weight = list(product_batch.batching_details.filter(delete_flag=False, type=1).values('material__material_name', 'actual_weight'))
-            # 小料明细
-            instance = product_batch.weight_cnt_types.filter(delete_flag=False).first()
-            if instance:
-                material_name_weight.append({'material__material_name': '硫磺' if instance.weigh_type == 1 else '细料', 'actual_weight': instance.total_weight})
-                cnt_type_details += list(instance.weight_details.filter(delete_flag=False).annotate(actual_weight=F('standard_weight')).values('material__material_name', 'actual_weight', 'standard_error'))
+        # 获取机台配方
+        sfj_recipe = ProductBatching.objects.using('SFJ').filter(stage_product_batch_no=self.stage_product_batch_no,
+                                                                 used_type=4, delete_flag=False, equip__equip_no=equip_no,
+                                                                 dev_type__category_no=self.dev_type.category_no).first()
+        if sfj_recipe:
+            sfj_details = ProductBatchingDetail.objects.using('SFJ').filter(~Q(material__material_name__icontains='待处理料'),
+                                                                            ~Q(material__material_name__icontains='掺料'),
+                                                                            product_batching=sfj_recipe,
+                                                                            delete_flag=False, type=1)
+            material_name_weight = list(sfj_details.values('material__material_name', 'actual_weight'))
+            from terminal.models import OtherMaterialLog
+            common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
+            if not common_scan:  # 扫的通用料包码则过滤掉细料
+                # 料包明细
+                details = ProductBatchingEquip.objects.filter(~Q(feeding_mode__startswith='C'),
+                                                              product_batching__stage_product_batch_no=self.stage_product_batch_no,
+                                                              product_batching__dev_type__category_name=self.dev_type.category_no,
+                                                              equip_no=equip_no, is_used=True, type=4,
+                                                              cnt_type_detail_equip__delete_flag=False)
+                cnt_type_details += list(details.annotate(actual_weight=F('cnt_type_detail_equip__standard_weight'),
+                                                          standard_error=F('cnt_type_detail_equip__standard_error'))
+                                         .values('material__material_name', 'actual_weight', 'standard_error'))
+            else:
+                material_name_weight = [i for i in material_name_weight if i['material__material_name'] not in ['细料', '硫磺']]
         return material_name_weight, cnt_type_details
 
     class Meta:
@@ -318,6 +329,15 @@ class WeighCntType(models.Model):
             delete_flag=False).aggregate(total_weight=Sum('standard_weight'))['total_weight']
         return total_weight if total_weight else 0
 
+    def cnt_total_weight(self, equip_no):
+        """获取料包重量(除去走罐体称量部分)"""
+        out_materials = ProductBatchingEquip.objects.filter(cnt_type_detail_equip__weigh_cnt_type=self, type=4,
+                                                            is_used=True, equip_no=equip_no, feeding_mode__startswith='C') \
+            .values_list('material__material_name', flat=True)
+        total_weight = self.weight_details.filter(~Q(material__material_name__in=out_materials), delete_flag=False) \
+            .aggregate(total_weight=Sum('standard_weight'))['total_weight']
+        return total_weight if total_weight else 0
+
     class Meta:
         db_table = 'weigh_cnt_type'
         verbose_name_plural = verbose_name = '小料称重分包分类'
@@ -362,3 +382,20 @@ class ERPMESMaterialRelation(models.Model):
     class Meta:
         db_table = 'erp_mes_material_relation'
         verbose_name_plural = verbose_name = 'ERP与MES信息绑定关系'
+
+
+class ProductBatchingEquip(models.Model):
+    product_batching = models.ForeignKey(ProductBatching, on_delete=models.CASCADE, help_text='配方id', related_name='product_batching_equip')
+    equip_no = models.CharField(max_length=8, help_text='机台名称')
+    material = models.ForeignKey(Material, on_delete=models.CASCADE, help_text='物料id')
+    handle_material_name = models.CharField(max_length=255, help_text='去除-C, -X后缀的物料名称')
+    batching_detail_equip = models.ForeignKey(ProductBatchingDetail, on_delete=models.CASCADE, help_text='胶块信息表id', null=True, blank=True)
+    cnt_type_detail_equip = models.ForeignKey(WeighBatchingDetail, on_delete=models.CASCADE, help_text='小料详情id', null=True, blank=True)
+    type = models.IntegerField(help_text='类别: 1: 胶料, 2: 炭黑, 3: 油料, 4: 小料')
+    feeding_mode = models.CharField(max_length=4, help_text='投料方式: P密炼口投料, C炭黑罐自动, O油料罐自动', null=True, blank=True)
+    is_used = models.BooleanField(default=True)
+    send_recipe_flag = models.BooleanField(default=False, help_text='发送配方结果标志: 0 未发送或者发送失败; 1 发送成功')
+
+    class Meta:
+        db_table = 'product_batching_equip'
+        verbose_name_plural = verbose_name = '机台配方详情'

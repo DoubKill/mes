@@ -8,15 +8,19 @@
 """
     基础数据同步至上辅机
 """
+import json
 import logging
 from datetime import datetime
+from doctest import master
 
 import requests
 from django.conf import settings
+from django.db.models import F
 from rest_framework import serializers
 
+from mes.common_code import DecimalEncoder
 from plan.models import ProductClassesPlan, ProductDayPlan
-from recipe.models import ProductBatching, ProductBatchingDetail
+from recipe.models import ProductBatching, ProductBatchingDetail, ProductBatchingEquip
 
 logger = logging.getLogger('sync_log')
 
@@ -38,7 +42,9 @@ class BaseInterface(object):
                 "Content-Type": "application/json; charset=UTF-8",
                 # "Authorization": kwargs['context']
             }
-            res = requests.post(self.endpoint + self.Backend.path, headers=headers, json=kwargs)
+            # Decimal转换为float
+            data = json.dumps(kwargs, cls=DecimalEncoder)
+            res = requests.post(self.endpoint + self.Backend.path, headers=headers, data=data, timeout=10)
         except Exception as err:
             logger.error(err)
             raise Exception('上辅机服务错误')
@@ -47,12 +53,23 @@ class BaseInterface(object):
             raise Exception(res.text)
 
 
-class ProductBatchingDetailSerializer(serializers.ModelSerializer):
-    material = serializers.CharField(source='material.material_no')
-
-    class Meta:
-        model = ProductBatchingDetail
-        fields = ('sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type')
+# class ProductBatchingDetailSerializer(serializers.ModelSerializer):
+#     material = serializers.CharField(source='material.material_no')
+#     master = serializers.DictField(default={})
+#
+#     def to_representation(self, instance):
+#         res = super().to_representation(instance)
+#         batching_info = ProductBatchingEquip.objects.filter(product_batching=instance.product_batching, is_used=True,
+#                                                             material=instance.material, type=instance.type)
+#         if not batching_info:
+#             raise ValueError('未设置机台投料方式')
+#         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
+#         res.update({'master': update_data})
+#         return res
+#
+#     class Meta:
+#         model = ProductBatchingDetail
+#         fields = ('sn', 'material', 'actual_weight', 'standard_error', 'auto_flag', 'type', 'master')
 
 
 class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
@@ -65,16 +82,69 @@ class ProductBatchingSyncInterface(serializers.ModelSerializer, BaseInterface):
     stage = serializers.CharField(source='stage.global_no', default=None)
     equip = serializers.CharField(source='equip.equip_no', default=None)
     used_time = serializers.SerializerMethodField()
-    batching_details = ProductBatchingDetailSerializer(many=True)
+    batching_details = serializers.SerializerMethodField()
     weight_details = serializers.SerializerMethodField()
 
+    def get_batching_details(self, obj):
+        enable_equip = self.context.get('enable_equip')
+        handle_batching_details = {}
+        batching_equip_infos = ProductBatchingEquip.objects.filter(product_batching=obj, is_used=True)
+        for equip_no in enable_equip:
+            # P
+            feed_p_info = batching_equip_infos.filter(equip_no=equip_no, feeding_mode__startswith='P')\
+                .annotate(material_name=F('material__material_name'), sn=F('batching_detail_equip__sn'),
+                          actual_weight=F('batching_detail_equip__actual_weight'),
+                          standard_error=F('batching_detail_equip__standard_error'))\
+                .values('material_name', 'actual_weight', 'standard_error', 'type', 'sn')
+            # 炭黑油料投料方式为P需要转换类型, 并且重编sn
+            for index, i in enumerate(feed_p_info):
+                i['sn'] = index + 1
+                if i['type'] != 1:
+                    i['type'] = 1
+            # C
+            feed_c_info = batching_equip_infos.filter(equip_no=equip_no, feeding_mode__startswith='C', type=2) \
+                .annotate(material_name=F('material__material_name'), sn=F('batching_detail_equip__sn'),
+                          actual_weight=F('batching_detail_equip__actual_weight'),
+                          standard_error=F('batching_detail_equip__standard_error')) \
+                .values('material_name', 'actual_weight', 'standard_error', 'type', 'sn', 'feeding_mode')
+            # O
+            feed_o_info = batching_equip_infos.filter(equip_no=equip_no, feeding_mode__startswith='O', type=3) \
+                .annotate(material_name=F('material__material_name'), sn=F('batching_detail_equip__sn'),
+                          actual_weight=F('batching_detail_equip__actual_weight'),
+                          standard_error=F('batching_detail_equip__standard_error')) \
+                .values('material_name', 'actual_weight', 'standard_error', 'type', 'sn', 'feeding_mode')
+            handle_batching_details[equip_no] = {'P': list(feed_p_info), 'C': list(feed_c_info), 'O': list(feed_o_info)}
+        return handle_batching_details
+
     def get_weight_details(self, obj):
-        weight_details = []
+        enable_equip = self.context.get('enable_equip')
+        weight_details = {}
         for weight_cnt_type in obj.weight_cnt_types.filter(delete_flag=False):
-            weight_details.append({'material': weight_cnt_type.name,
-                                   'actual_weight': float(weight_cnt_type.total_weight),
-                                   'standard_error': float(weight_cnt_type.total_standard_error)
-                                   })
+            # 获取投料方式
+            batching_info = ProductBatchingEquip.objects.filter(product_batching=obj,
+                                                                cnt_type_detail_equip__weigh_cnt_type=weight_cnt_type,
+                                                                is_used=True, type=4, equip_no__in=enable_equip)
+            equip_no_list = []
+            for i in batching_info:
+                if i.equip_no in equip_no_list:
+                    continue
+                # 走罐体的化工原料
+                c_xl = batching_info.filter(equip_no=i.equip_no, feeding_mode__startswith='C')\
+                    .annotate(material_name=F('handle_material_name'),
+                              actual_weight=F('cnt_type_detail_equip__standard_weight'),
+                              standard_error=F('cnt_type_detail_equip__standard_error'))\
+                    .values('material_name', 'actual_weight', 'standard_error')
+                if i.equip_no not in weight_details:
+                    weight_details[i.equip_no] = [{'material_name': weight_cnt_type.name,
+                                                   'actual_weight': float(weight_cnt_type.cnt_total_weight(i.equip_no)),
+                                                   'standard_error': float(weight_cnt_type.total_standard_error),
+                                                   'feeding_mode': i.feeding_mode, 'c_xl_tank': list(c_xl)}]
+                else:
+                    weight_details[i.equip_no].append({'material_name': weight_cnt_type.name,
+                                                       'actual_weight': float(weight_cnt_type.cnt_total_weight(i.equip_no)),
+                                                       'standard_error': float(weight_cnt_type.total_standard_error),
+                                                       'feeding_mode': i.feeding_mode, 'c_xl_tank': list(c_xl)})
+                equip_no_list.append(i.equip_no)
         return weight_details
 
     @staticmethod

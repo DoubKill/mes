@@ -15,6 +15,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from io import BytesIO
 
+from mes import settings
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
 from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
@@ -120,7 +121,7 @@ def property_import(file):
     return True
 
 
-def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
+def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None, custom=False):
     """
     url:钉钉群机器人的Webhook
     secret:钉钉群机器人安全设置-加签
@@ -144,16 +145,19 @@ def send_ding_msg(url, secret, msg, isAtAll, atMobiles=None):
         if not isinstance(atMobiles, list):
             return {'errcode': 404, 'errmsg': 'atMobiles不是列表'}
     # 这里使用  文本类型
-    data = {
-        "msgtype": "text",
-        "text": {
-            "content": msg
-        },
-        "at": {  # @
-            "atMobiles": atMobiles,  # 专门@某一个人 同时下面的isAtAll要为False
-            "isAtAll": isAtAll  # 为真是@所有人
+    if custom:
+        data = msg
+    else:
+        data = {
+            "msgtype": "text",
+            "text": {
+                "content": msg
+            },
+            "at": {  # @
+                "atMobiles": atMobiles,  # 专门@某一个人 同时下面的isAtAll要为False
+                "isAtAll": isAtAll  # 为真是@所有人
+            }
         }
-    }
 
     try:
         r = requests.post(url, data=json.dumps(data), headers=headers, timeout=3)
@@ -218,6 +222,12 @@ class AutoDispatch(object):
 
     def __init__(self):
         self.ding_api = DinDinAPI()
+        if settings.DEBUG:
+            self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=0879c81b51a595920edcde6de87092ee050945625581b2ea7277b17d469c3bdc&timestamp=1645250492135&sign=5LyxDyNHd%2FwbM07WMCH4recxPAwWvkE1Y8EPLNF4lGU%3D'
+            self.group_secret = 'SEC9e441b6498487b844cc2000ee0f94b36fdf5bf9a2b61db556c12dc9353e7e4e0'
+        else:
+            self.group_url = 'https://oapi.dingtalk.com/robot/send?access_token=327a481ceb5bda5e71a560c7d1e87de8aa3e7edde2038bf4379db8c8389845ab'
+            self.group_secret = 'SECf1842042def9a33612e3b7f064819033d2b5215d18deca79b14b3b1101d26081'
 
     def send_order(self, order):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
@@ -233,6 +243,15 @@ class AutoDispatch(object):
             fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
+            # 查询巡检单是否有部分已经分派了
+            part_order = EquipInspectionOrder.objects.filter(plan_id=order.plan_id, assign_to_user__isnull=False).first()
+            if part_order:
+                order.assign_user = '系统自动'
+                order.assign_datetime = now_date
+                order.assign_to_user = part_order.assign_to_user
+                order.status = '已指派'
+                order.last_updated_date = now_date
+                order.save()
             inspection = True
             # 查询工单对应的包干人员[上班并且有空]
             choice_all_user = get_maintenance_status(self.ding_api, order.equip_no, order.equip_repair_standard.type)
@@ -254,9 +273,10 @@ class AutoDispatch(object):
         if not working_persons:
             # 发送消息给上级
             content.update({'title': f"系统派单: 无空闲可指派人员！"})
-            self.ding_api.send_message([leader_ding_uid], content)
+            # self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员')
-            return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
+            # return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
+            return [order.work_type, leader_ding_uid]
         processing_person = []
         for per in working_persons:
             if order.work_type != '巡检':
@@ -282,17 +302,23 @@ class AutoDispatch(object):
                     repair_instance.last_updated_date = now_date
                     repair_instance.save()
             # 派单成功发送钉钉消息给当班人员
-            content.update({'title': f"系统自动派发设备工单成功，请尽快处理！"})
+            content.update({'title': f"系统自动派发{order.work_type}工单成功，请尽快处理！"})
             self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
+            # 派单成功发送消息到设备群聊
+            msg = f"系统自动派发设备工单成功，请尽快处理！\n工单编号:{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}"
+            url = self.get_group_url()
+            send_ding_msg(url=url, secret=self.group_secret, msg=msg, isAtAll=False)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
+            continue
 
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
             content.update({'title': f"所有人员均有工单在处理, 系统自动派单失败！"})
-            self.ding_api.send_message([leader_ding_uid], content)
+            # self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: 系统自动派单失败, 可选人员:{working_persons}, 正在维修人员:{processing_person}')
-            return f'系统派单[{order.work_type}]: 系统自动派单失败'
-        return '系统派单[{order.work_type}]: 完成一次定时派单处理'
+            # return f'系统派单[{order.work_type}]: 系统自动派单失败'
+            return [order.work_type, leader_ding_uid]
+        return f'系统派单[{order.work_type}]: 完成一次定时派单处理'
 
     def get_group_info(self):
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -300,6 +326,15 @@ class AutoDispatch(object):
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=now_date[:10], classes__global_name=group,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
         return record.group.global_name
+
+    def get_group_url(self):
+        timestamp = str(round(time.time() * 1000))
+        secret_enc = self.group_secret.encode('utf-8')
+        string_to_sign = '{}\n{}'.format(timestamp, self.group_secret)
+        string_to_sign_enc = string_to_sign.encode('utf-8')
+        hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+        sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+        return f"{self.group_url}&timestamp={timestamp}&sign={sign}"
 
 
 if __name__ == '__main__':
@@ -309,5 +344,24 @@ if __name__ == '__main__':
     orders = repair_orders + inspect_order
     if not orders:
         logger.info("系统派单: 没有新生成的工单可派")
+    failed = {}  # {ding_uid: {维修: 4, 巡检: 7}}
     for order in orders:
         res = auto_dispatch.send_order(order)
+        if isinstance(res, list):
+            work_type, leader_ding_uid = res
+            if not leader_ding_uid:
+                continue
+            if leader_ding_uid in failed:
+                statics = failed[leader_ding_uid]
+                statics[work_type] = statics[work_type] + 1 if work_type in statics else 1
+            else:
+                failed[leader_ding_uid] = {work_type: 1}
+    if failed:
+        for leader_ding_uid, total_error_msg in failed.items():
+            send_msg_content = ''
+            for work_type, num in total_error_msg.items():
+                send_msg_content += f'{work_type}: {num}'
+            now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            content = {"title": f"单据派单失败, 请及时查看: {send_msg_content}"}
+            auto_dispatch.ding_api.send_message([leader_ding_uid], content)
+

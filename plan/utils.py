@@ -39,7 +39,7 @@ def calculate_equip_left_time():
         else:
             left_time = 0
         ret[equip.equip_no] = left_time
-    print(ret)
+    # print(ret)
 
 
 def calculate_product_available_time():
@@ -70,7 +70,7 @@ def calculate_product_available_time():
         )
     # 按可用天数排序
     ret.sort(key=lambda x: x['available_time'])
-    print(ret)
+    # print(ret)
 
 
 def calculate_product_stock(factory_date, product_no, stage):
@@ -120,7 +120,8 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
         raise ValueError('未找到胶料代码{}定机表数据！'.format(product_no))
     product_batching = ProductBatching.objects.using('SFJ').filter(
         stage_product_batch_no__icontains='-FM-{}'.format(product_no),
-        equip__equip_no=ms.final_main_machine
+        equip__equip_no=ms.final_main_machine,
+        used_type=4
     ).values('id', 'batching_weight', 'equip__equip_no', 'stage_product_batch_no', 'equip__category__category_name')
 
     while product_batching:
@@ -130,12 +131,12 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
             product_batching=product_batching['id'],
             delete_flag=False,
             material__material_type__global_name__in=stages).first()
-        plan_trains = round((need_weight - stock_weight) / batching_weight, 1)
-        i = str(plan_trains).split('.')[-1]
-        if int(i) < 5:
-            plan_trains = int(plan_trains - 1)
-        else:
-            plan_trains = int(plan_trains)
+        plan_trains = int((need_weight - stock_weight) / batching_weight)
+        # i = str(plan_trains).split('.')[-1]
+        # if int(i) < 5 and '-FM' not in product_batching['stage_product_batch_no']:
+        #     plan_trains = int(plan_trains - 1)
+        # else:
+        #     plan_trains = int(plan_trains)
         avg_mixin_time = calculate_equip_recipe_avg_mixin_time(product_batching['equip__equip_no'],
                                                                product_batching['stage_product_batch_no'])
         if c_pb:
@@ -163,7 +164,8 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
             need_weight = float(plan_trains * devoted_weight)
             product_batching = ProductBatching.objects.using('SFJ').filter(
                 stage_product_batch_no__icontains='-{}-{}'.format(stage, product_no),
-                equip__equip_no=mixin_main_equip
+                equip__equip_no=mixin_main_equip,
+                used_type=4
             ).values('id', 'batching_weight', 'equip__equip_no', 'stage_product_batch_no', 'equip__category__category_name')
         else:
             ret.append({'product_no': product_batching['stage_product_batch_no'],
@@ -175,7 +177,8 @@ def calculate_product_plan_trains(factory_date, product_no, need_weight):
                         'dev_type': product_batching['equip__category__category_name']
                         })
             product_batching = None
-    return ret[::-1]
+    ret = filter(lambda x: x['plan_trains'] >= 0, ret)
+    return list(ret)[::-1]
 
 
 def extend_last_aps_result(factory_date, schedule_no):
@@ -293,7 +296,7 @@ class APSLink(object):
         c_node = self.head
         ret = []
         while c_node:
-            print(c_node.value, c_node.time_enough)
+            # print(c_node.value, c_node.time_enough)
             ret.append(c_node.value)
             c_node = c_node.next
         return ret

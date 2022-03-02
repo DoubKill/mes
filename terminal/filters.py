@@ -124,4 +124,4 @@ class ReturnRubberFilter(django_filters.rest_framework.FilterSet):
 
     class Meta:
         model = ReturnRubber
-        fields = ('product_no', 'bra_code', 'print_type')
+        fields = ('product_no', 'bra_code', 'print_type', 'status')

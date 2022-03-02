@@ -4,7 +4,7 @@ import time
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Max, Sum, Q
+from django.db.models import Max, Sum, Q, Prefetch, Count
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from django.shortcuts import get_object_or_404
@@ -29,7 +29,7 @@ from mes.settings import DATABASES
 from plan.models import ProductClassesPlan, BatchingClassesPlan, BatchingClassesEquipPlan
 from production.models import PlanStatus, MaterialTankStatus, TrainsFeedbacks
 from recipe.models import ProductBatchingDetail, ProductBatching, ERPMESMaterialRelation, Material, WeighCntType, \
-    WeighBatchingDetail
+    WeighBatchingDetail, ProductBatchingEquip
 from terminal.filters import FeedingLogFilter, WeightTankStatusFilter, WeightBatchingLogListFilter, \
     BatchingClassesEquipPlanFilter, CarbonTankSetFilter, \
     FeedingOperationLogFilter, ReplaceMaterialFilter, ReturnRubberFilter, WeightPackageManualFilter, \
@@ -39,7 +39,7 @@ from terminal.models import TerminalLocation, EquipOperationLog, WeightBatchingL
     RecipeMaterial, ReportBasic, ReportWeight, Plan, LoadTankMaterialLog, PackageExpire, MaterialChangeLog, \
     FeedingOperationLog, CarbonTankFeedingPrompt, OilTankSetting, PowderTankSetting, CarbonTankFeedWeightSet, \
     ReplaceMaterial, ReturnRubber, ToleranceDistinguish, ToleranceProject, ToleranceHandle, ToleranceRule, \
-    WeightPackageManual, WeightPackageSingle, WeightPackageWms
+    WeightPackageManual, WeightPackageSingle, WeightPackageWms, OtherMaterialLog
 from terminal.serializers import LoadMaterialLogCreateSerializer, \
     EquipOperationLogSerializer, BatchingClassesEquipPlanSerializer, WeightBatchingLogSerializer, \
     WeightBatchingLogCreateSerializer, FeedingLogSerializer, WeightTankStatusSerializer, \
@@ -54,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_sfj_carbon_materials
+    get_manual_materials
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -431,18 +431,18 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         return response(success=True, data=serializer.data)
 
     def list(self, request, *args, **kwargs):
-        equip_no = self.request.query_params.get('equip_no') if self.request.query_params.get('equip_no') else 'F01'
-        batch_time = self.request.query_params.get('batch_time') if self.request.query_params.get('batch_time') else \
-            datetime.datetime.now().strftime('%Y-%m-%d')
+        equip_no = self.request.query_params.get('equip_no', 'F01')
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
         now_date = datetime.datetime.now().replace(microsecond=0)
+        exp_time = 7 if equip_no.startswith('F') else 5
+        s_time, e_time = now_date.date() - timedelta(days=exp_time), now_date.date()
         db_config = [k for k, v in DATABASES.items() if 'YK_XL' in v['NAME']]
         if equip_no not in db_config:
             return Response([])
         # mes网页请求
-        plan_filter_kwargs = {'date_time': batch_time, 'actno__gte': 1}
-        weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date': batch_time}
+        plan_filter_kwargs = {'date_time__gte': s_time, 'date_time__lte': e_time, 'actno__gte': 1}
+        weight_filter_kwargs = {'equip_no': equip_no, 'batch_time__date__gte': s_time, 'batch_time__date__lte': e_time}
         if product_no:
             weight_filter_kwargs.update({'product_no': product_no})
             plan_filter_kwargs.update({'recipe': product_no})
@@ -459,48 +459,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 if page:
                     serializer = WeightPackagePlanSerializer(page, many=True)
                     for i in serializer.data:
-                        recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
-                        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
-                        plan_weight = recipe_pre.first().weight if recipe_pre else 0
-                        split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        # 配料时间
-                        trains_time = ReportBasic.objects.using(equip_no).filter(planid=i['plan_weight_uid'], actno=1).first()
-                        actual_batch_time = trains_time.starttime if trains_time else i['starttime']
-                        # 计算有效期
-                        single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
-                        if not single_expire_record:
-                            expire_days = 0
-                        else:
-                            single_date = single_expire_record.first()
-                            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
-                                'F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
-                        total_weight = plan_weight * split_count
-                        product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
-                        if i['merge_flag']:
-                            # 配方中料包重量
-                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
-                                                                  stage_product_batch_no=product_no_dev,
-                                                                  dev_type__category_name=dev_type).first()
-                            if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
-                                xl_instance = prod.weight_cnt_types.filter(delete_flag=False).first()
-                                if '专用' in i['product_no']:
-                                    xl_materials = list(xl_instance.weight_details.filter(delete_flag=0).values('material__material_name', 'standard_weight'))
-                                    handle_xl_materials = get_sfj_carbon_materials(xl_materials, product_no_dev, i['product_no'].split('-')[-2])
-                                    total_weight = sum([i['standard_weight'] for i in handle_xl_materials])
-                                else:
-                                    total_weight = xl_instance.total_weight
-                        # 公差查询
-                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
-                        if '%' in machine_tolerance:
-                            machine_tolerance = f"{machine_tolerance[0]}{round(Decimal(machine_tolerance[1:-1]) / 100 * total_weight, 3)}kg"
-                        i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
-                                  'batch_time': actual_batch_time, 'product_no': i['product_no'],
-                                  'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
-                                  'batch_user': self.request.user.username, 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
-                                  'expire_datetime': expire_datetime, 'split_count': split_count,
-                                  'machine_manual_weight': total_weight, 'machine_manual_tolerance': machine_tolerance,
-                                  'expire_days': expire_days})
+                        self.handle_machine_print(equip_no, i, product_no, now_date)
                     return self.get_paginated_response(serializer.data)
                 return Response([])
         # 履历表不为空
@@ -520,50 +479,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         # 计划表中未打印数据
                         serializer = WeightPackagePlanSerializer(k).data
-                        recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
-                        plan_weight = recipe_pre.first().weight if recipe_pre else 0
-                        split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        trains_time = ReportBasic.objects.using(equip_no).filter(planid=serializer['plan_weight_uid'], actno=1).first()
-                        actual_batch_time = trains_time.starttime if trains_time else serializer['starttime']
-                        # 计算有效期
-                        single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
-                        if not single_expire_record:
-                            expire_days = 0
-                        else:
-                            single_date = single_expire_record.first()
-                            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
-                                'F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time,
-                                                                     '%Y-%m-%d %H:%M:%S') + timedelta(
-                            days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
-                        total_weight = plan_weight * split_count
-                        product_no_dev = re.split(r'\(|\（|\[', serializer['product_no'])[0]
-                        if serializer['merge_flag']:
-                            # 配方中料包重量
-                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
-                                                                  stage_product_batch_no=product_no_dev,
-                                                                  dev_type__category_name=dev_type).first()
-                            if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
-                                xl_instance = prod.weight_cnt_types.filter(delete_flag=False).first()
-                                if '专用' in serializer['product_no']:
-                                    xl_materials = list(xl_instance.weight_details.filter(delete_flag=0).values('material__material_name', 'standard_weight'))
-                                    handle_xl_materials = get_sfj_carbon_materials(xl_materials, product_no_dev, serializer['product_no'].split('-')[-2])
-                                    total_weight = sum([i['standard_weight'] for i in handle_xl_materials])
-                                else:
-                                    total_weight = xl_instance.total_weight
-                        # 公差查询
-                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
-                        if '%' in machine_tolerance:
-                            machine_tolerance = f"{machine_tolerance[0]}{round(Decimal(machine_tolerance[1:-1]) / 100 * total_weight, 3)}kg"
-                        serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
-                                           'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
-                                           'batching_type': '机配', 'machine_weight': plan_weight,
-                                           'manual_weight': 0, 'batch_user': self.request.user.username,
-                                           'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
-                                           'expire_datetime': expire_datetime, 'expire_days': expire_days,
-                                           'machine_manual_weight': total_weight, 'split_count': split_count,
-                                           'machine_manual_tolerance': machine_tolerance})
+                        self.handle_machine_print(equip_no, serializer, product_no, now_date)
                         data.append(serializer)
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
@@ -593,50 +509,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     except:
                         # 计划表中未打印数据
                         serializer = WeightPackagePlanSerializer(k).data
-                        recipe_pre = RecipePre.objects.using(equip_no).filter(name=serializer['product_no'])
-                        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
-                        plan_weight = recipe_pre.first().weight if recipe_pre else 0
-                        split_count = 1 if not recipe_pre else recipe_pre.first().split_count
-                        trains_time = ReportBasic.objects.using(equip_no).filter(planid=serializer['plan_weight_uid'], actno=1).first()
-                        actual_batch_time = trains_time.starttime if trains_time else serializer['starttime']
-                        # 计算有效期
-                        single_expire_record = PackageExpire.objects.filter(product_no=serializer['product_no'])
-                        if not single_expire_record:
-                            expire_days = 0
-                        else:
-                            single_date = single_expire_record.first()
-                            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
-                                'F') else single_date.package_sulfur_usefullife
-                        expire_datetime = datetime.datetime.strptime(actual_batch_time,
-                                                                     '%Y-%m-%d %H:%M:%S') + timedelta(
-                            days=expire_days) if expire_days != 0 else '9999-09-09 00:00:00'
-                        total_weight = plan_weight * split_count
-                        product_no_dev = re.split(r'\(|\（|\[', serializer['product_no'])[0]
-                        if serializer['merge_flag']:
-                            # 配方中料包重量
-                            prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
-                                                                  stage_product_batch_no=product_no_dev,
-                                                                  dev_type__category_name=dev_type).first()
-                            if prod and prod.weight_cnt_types.filter(delete_flag=False).first():
-                                xl_instance = prod.weight_cnt_types.filter(delete_flag=False).first()
-                                if '专用' in serializer['product_no']:
-                                    xl_materials = list(xl_instance.weight_details.filter(delete_flag=0).values('material__material_name', 'standard_weight'))
-                                    handle_xl_materials = get_sfj_carbon_materials(xl_materials, product_no_dev, serializer['product_no'].split('-')[-2])
-                                    total_weight = sum([i['standard_weight'] for i in handle_xl_materials])
-                                else:
-                                    total_weight = xl_instance.total_weight
-                        # 公差查询
-                        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
-                        if '%' in machine_tolerance:
-                            machine_tolerance = f"{machine_tolerance[0]}{round(Decimal(machine_tolerance[1:-1]) / 100 * total_weight, 3)}kg"
-                        serializer.update({'equip_no': equip_no, 'dev_type': dev_type, 'plan_weight': plan_weight,
-                                           'batch_time': actual_batch_time, 'product_no': serializer['product_no'],
-                                           'batching_type': '机配', 'expire_days': expire_days,
-                                           'machine_weight': plan_weight, 'manual_weight': 0,
-                                           'batch_user': self.request.user.username, 'split_count': split_count,
-                                           'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
-                                           'expire_datetime': expire_datetime, 'machine_manual_weight': total_weight,
-                                           'machine_manual_tolerance': machine_tolerance})
+                        self.handle_machine_print(equip_no, serializer, product_no, now_date)
                         data.append(serializer)
                     else:
                         # 已经打印数据数据更新(打印时完成了50包, 最终计划完成100包)
@@ -717,7 +590,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             if res:
                 # 查询配方中人工配物料
                 try:
-                    if '专用' in product_no:
+                    if 'ONLY' in product_no:
                         recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
                     else:
                         recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
@@ -792,7 +665,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
 
     def scan_check(self, product_no, batching_equip, dev_type, machine_package_count, manual, already_scan_info, check_type='manual'):
         try:
-            if '专用' in product_no:
+            if 'ONLY' in product_no:
                 recipe_manual = get_manual_materials(product_no, dev_type, batching_equip, equip_no=product_no.split('-')[-2])
             else:
                 recipe_manual = get_manual_materials(product_no, dev_type, batching_equip)
@@ -821,6 +694,69 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         if already_count >= machine_package_count:
             raise ValidationError('该人工条码内的物料配置数量已经足够')
         return check_type, manual.id
+
+    def handle_machine_print(self, equip_no, i, product_no, now_date):
+        recipe_pre = RecipePre.objects.using(equip_no).filter(name=i['product_no'])
+        dev_type = recipe_pre.first().ver.upper().strip() if recipe_pre else ''
+        plan_weight = recipe_pre.first().weight if recipe_pre else 0
+        split_count = 1 if not recipe_pre else recipe_pre.first().split_count
+        # 配料时间
+        trains_time = ReportBasic.objects.using(equip_no).filter(planid=i['plan_weight_uid'], actno=1).first()
+        actual_batch_time = trains_time.starttime if trains_time else i['starttime']
+        # 计算有效期
+        single_expire_record = PackageExpire.objects.filter(product_no=i['product_no'])
+        if not single_expire_record:
+            expire_days = 0
+        else:
+            single_date = single_expire_record.first()
+            expire_days = single_date.package_fine_usefullife if equip_no.startswith(
+                'F') else single_date.package_sulfur_usefullife
+        expire_datetime = (datetime.datetime.strptime(actual_batch_time, '%Y-%m-%d %H:%M:%S') + timedelta(
+            days=expire_days)).strftime('%Y-%m-%d %H:%M:%S') if expire_days != 0 else '9999-09-09 00:00:00'
+        total_weight = plan_weight * split_count
+        product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
+        if i['merge_flag']:
+            # 配方中料包重量
+            type_name, prefix = ['细料', 'F'] if equip_no.startswith('F') else ['硫磺', 'S']
+            if 'ONLY' in i['product_no']:
+                ml_equip_no = i['product_no'].split('-')[-2]
+            else:
+                ml_equip_no = ''
+                equip_recipes = ProductBatchingEquip.objects.filter(
+                    is_used=True, type=4, product_batching__stage_product_batch_no=product_no_dev,
+                    product_batching__dev_type__category_name=dev_type).values('equip_no').annotate(
+                    num=Count('id', filter=~Q(feeding_mode__startswith=prefix)))
+                if equip_recipes:
+                    handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
+                    if handle_equip_recipe:
+                        ml_equip_no = handle_equip_recipe[0]
+            sfj_recipe = ProductBatching.objects.using('SFJ').filter(delete_flag=False, used_type=4,
+                                                                     stage_product_batch_no=product_no_dev,
+                                                                     dev_type__category_name=dev_type,
+                                                                     equip__equip_no=ml_equip_no).last()
+            # 获取上辅机配料重量(无法获取则从mes配方中获取)
+            if sfj_recipe:
+                xl_info = ProductBatchingDetail.objects.using('SFJ').filter(product_batching=sfj_recipe, delete_flag=False,
+                                                                            material__material_name=type_name).last()
+                if xl_info:
+                    total_weight = xl_info.actual_weight
+            else:
+                prod = ProductBatching.objects.filter(delete_flag=False, used_type=4, batching_type=2,
+                                                      stage_product_batch_no=product_no_dev,
+                                                      dev_type__category_name=dev_type).first()
+                if prod:
+                    xl_instance = prod.weight_cnt_types.filter(delete_flag=False, name=type_name).first()
+                    if xl_instance:
+                        total_weight = xl_instance.cnt_total_weight(ml_equip_no)
+        # 公差查询
+        machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
+        i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type,
+                  'batch_time': actual_batch_time, 'product_no': i['product_no'],
+                  'batching_type': '机配', 'machine_weight': plan_weight, 'manual_weight': 0,
+                  'batch_user': self.request.user.username, 'print_datetime': now_date.strftime('%Y-%m-%d %H:%M:%S'),
+                  'expire_datetime': expire_datetime, 'split_count': split_count,
+                  'machine_manual_weight': total_weight, 'machine_manual_tolerance': machine_tolerance,
+                  'expire_days': expire_days})
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -905,18 +841,8 @@ class GetMaterialTolerance(APIView):
         material_name = data.get('material_name')
         standard_weight = data.get('standard_weight')
         project_name = data.get('project_name', '单个化工重量')
-        type_name = '硫磺' if batching_equip.startswith('S') else '细料'
-        # 人工单配细料硫磺包
-        if batching_equip:
-            if '单个' not in project_name:
-                project_name = f"整包{type_name}重量"
-            rule = ToleranceRule.objects.filter(distinguish__keyword_name=f"{type_name}称量",
-                                                project__keyword_name=project_name, use_flag=True,
-                                                small_num__lt=standard_weight, big_num__gte=standard_weight).first()
-        # 人工单配配方或通用(所有量程)
-        else:
-            rule = ToleranceRule.objects.filter(distinguish__re_str__icontains=material_name, use_flag=True).first()
-        tolerance = f"{rule.handle.keyword_name}{rule.standard_error}{rule.unit}" if rule else ""
+        only_num = data.get('only_num')
+        tolerance = get_tolerance(batching_equip, standard_weight, material_name, project_name, only_num)
         return Response(tolerance)
 
 
@@ -930,7 +856,7 @@ class GetManualInfo(APIView):
         product_no, dev_type, batching_equip = data.get('product_no'), data.get('dev_type'), data.get('batching_equip')
         if batching_equip:
             try:
-                if "专用" in product_no:
+                if "ONLY" in product_no:
                     equip_no = product_no.split('-')[-2]
                     results = get_manual_materials(product_no, dev_type, batching_equip, equip_no)
                 else:
@@ -1345,9 +1271,9 @@ class RecipePreVIew(ListAPIView):
         product_name = ret.group(1)
         dev_type = ret.group(2)
         product_batching = ProductBatching.objects.exclude(
-            used_type=6).filter(stage_product_batch_no=product_name,
-                                dev_type__category_no=dev_type,
-                                batching_type=2).first()
+            used_type__in=[6, 7]).filter(stage_product_batch_no=product_name,
+                                         dev_type__category_no=dev_type,
+                                         batching_type=2).first()
         if not product_batching:
             raise ValidationError('该配方MES不存在或已废弃！')
 
@@ -1459,7 +1385,8 @@ class XLPlanVIewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        date_time = self.request.query_params.get('date_time', datetime.datetime.now().strftime('%Y-%m-%d'))
+        now_date = datetime.datetime.now().date()
+        date_time = self.request.query_params.get('date_time')
         grouptime = self.request.query_params.get('grouptime')
         recipe = self.request.query_params.get('recipe')
         state = self.request.query_params.get('state')
@@ -1489,6 +1416,9 @@ class XLPlanVIewSet(ModelViewSet):
                 raise
             return self.get_paginated_response(serializer.data)
         else:
+            e_days = 7 if equip_no.startswith('F') else 5
+            s_time, e_time = now_date - timedelta(days=e_days), now_date
+            filter_kwargs.update({'date_time__gte': s_time, 'date_time__lte': e_time})
             new_queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).values('recipe').distinct()
             serializer = self.get_serializer(new_queryset, many=True)
             return Response(serializer.data)
@@ -1585,6 +1515,16 @@ class UpdateFlagCountView(APIView):
         equip_no = self.request.data.get('equip_no')
         merge_flag = self.request.data.get('merge_flag')
         split_count = self.request.data.get('split_count')
+        use_not = self.request.data.get('use_not', '')
+        if isinstance(use_not, int):
+            if use_not == 1:  # 停用配方
+                now_date = datetime.datetime.now().date() - timedelta(days=1)
+                pre_fix = now_date.strftime('%Y%m%d')[2:]
+                processing_plan = Plan.objects.using(equip_no).filter(planid__gte=pre_fix)
+                if processing_plan:
+                    raise ValidationError('该配方正在配料, 无法停用')
+            RecipePre.objects.using(equip_no).filter(id=rid).update(use_not=use_not)
+            return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
         filter_kwargs = {}
         if merge_flag is not None:
             filter_kwargs['merge_flag'] = merge_flag
@@ -1594,7 +1534,29 @@ class UpdateFlagCountView(APIView):
         instance = db_name.objects.using(equip_no).filter(id=rid)
         if not instance:
             raise ValidationError('未找到编号对应的数据')
-        instance.update(**filter_kwargs)
+        with atomic(using=equip_no):
+            # 配方更新
+            f_instance = instance.first()
+            if oper_type != '计划' and f_instance.split_count != split_count:
+                now_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
+                new_total_weight = 0
+                materials = RecipeMaterial.objects.using(equip_no).filter(recipe_name=f_instance.name)
+                for material in materials:
+                    new_weight = round(material.weight * f_instance.split_count / split_count, 3)
+                    material.weight = new_weight
+                    material.error = get_tolerance(batching_equip=equip_no, standard_weight=new_weight, only_num=True)
+                    material.time = now_time
+                    material.save()
+                    new_total_weight += new_weight
+                new_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=new_total_weight, project_name='all', only_num=True)
+                filter_kwargs.update({'weight': new_total_weight, 'error': new_tolerance, 'time': now_time})
+                f_instance.weight = new_total_weight
+                f_instance.error = new_tolerance
+                f_instance.time = now_time
+                f_instance.split_count = split_count
+                f_instance.save()
+                return Response('操作成功')
+            instance.update(**filter_kwargs)
         return Response('操作成功')
 
 
@@ -1690,25 +1652,29 @@ class XLPromptViewSet(ListModelMixin, GenericViewSet):
 
     def list(self, request, *args, **kwargs):
         equip_no = self.request.query_params.get('equip_no')
-        date_now = datetime.datetime.now().date()
-        date_before = date_now - timedelta(days=1)
-        date_now_planid = ''.join(str(date_now).split('-'))[2:]
-        date_before_planid = ''.join(str(date_before).split('-'))[2:]
-        # 从称量系统同步料罐状态到mes表中
-        tank_status_sync = TankStatusSync(equip_no=equip_no)
-        try:
-            tank_status_sync.sync()
-        except:
-            return response(success=False, message='mes同步称量系统料罐状态失败')
-        try:
-            # 当天称量计划的所有配方名称
-            all_recipe = Plan.objects.using(equip_no).filter(
-                Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
-                state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
-        except:
-            return response(success=False, message='称量机台{}错误'.format(equip_no))
-        if not all_recipe:
-            return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
+        planid = self.request.query_params.get('planid')
+        if planid:
+            all_recipe = Plan.objects.using(equip_no).filter(planid=planid).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+        else:
+            date_now = datetime.datetime.now().date()
+            date_before = date_now - timedelta(days=1)
+            date_now_planid = ''.join(str(date_now).split('-'))[2:]
+            date_before_planid = ''.join(str(date_before).split('-'))[2:]
+            # 从称量系统同步料罐状态到mes表中
+            tank_status_sync = TankStatusSync(equip_no=equip_no)
+            try:
+                tank_status_sync.sync()
+            except:
+                return response(success=False, message='mes同步称量系统料罐状态失败')
+            try:
+                # 当天称量计划的所有配方名称
+                all_recipe = Plan.objects.using(equip_no).filter(
+                    Q(planid__startswith=date_now_planid) | Q(planid__startswith=date_before_planid),
+                    state__in=['运行中', '等待']).values('recipe').annotate(setno_trains=Sum('setno'), actno_trains=Sum('actno'))
+            except:
+                return response(success=False, message='称量机台{}错误'.format(equip_no))
+            if not all_recipe:
+                return response(success=False, message='机台{}无进行中或已完成的配料计划'.format(equip_no))
         data = {}
         for single_recipe in all_recipe:
             need_trains = single_recipe.get('setno_trains') - (single_recipe.get('actno_trains') if single_recipe.get('actno_trains') else 0)
@@ -2356,14 +2322,20 @@ class ReturnRubberViewSet(ModelViewSet):
     queryset = ReturnRubber.objects.all().order_by('-id')
     serializer_class = ReturnRubberSerializer
     pagination_class = None
-    permission_classes = (IsAuthenticated,)
+    permission_classes = ()
     filter_backends = (DjangoFilterBackend,)
     filter_class = ReturnRubberFilter
 
-    @action(methods=['post'], detail=False, url_path='print_return_rubber', url_name='print_return_rubber')
+    def get_permissions(self):
+        if self.request.query_params.get('client'):
+            return ()
+        else:
+            return (IsAuthenticated(),)
+
+    @action(methods=['put'], detail=False, url_path='print_return_rubber', url_name='print_return_rubber')
     def print_return_rubber(self, request):
         rid = self.request.data.get('id')
-        status = self.request.data.get('status')
+        status = self.request.data.get('print_flag')
         self.get_queryset().filter(id=rid).update(status=status)
         return response(success=True, message='回正打印状态成功')
 
@@ -2448,12 +2420,138 @@ class MaterialDetailsAux(APIView):
         classes_plan = ProductClassesPlan.objects.filter(plan_classes_uid=plan_classes_uid).first()
         if not classes_plan:
             return Response(f'未找到计划{plan_classes_uid}对应的配方详情')
-        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch
-        if cnt_type_details:
-            # 去除炭黑罐投入的化工原料
-            cnt_type_details = get_sfj_carbon_materials(cnt_type_details, classes_plan.product_batching.stage_product_batch_no, classes_plan.equip.equip_no)
+        material_name_weight, cnt_type_details = classes_plan.product_batching.get_product_batch(classes_plan.equip.equip_no, plan_classes_uid)
+        # 扫过原材料小料码则不能扫入人工单配该物料码(粘合剂KY-7A-C)
+        wms_xl_material = list(OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, status=1, other_type='原材料小料').values_list('material_name', flat=True).distinct())
+        if wms_xl_material:
+            handle_cnt_details = []
+            for i in cnt_type_details:
+                if i.get('material__material_name') not in wms_xl_material:
+                    handle_cnt_details.append(i)
+        else:
+            handle_cnt_details = cnt_type_details
         if from_mes:
-            res = [item.get('material__material_name') for item in material_name_weight + cnt_type_details] + [classes_plan.product_batching.stage_product_batch_no]
+            res = [item.get('material__material_name') for item in material_name_weight + handle_cnt_details] + [classes_plan.product_batching.stage_product_batch_no]
             return Response(res)
         else:
-            return Response({'material_name_weight': material_name_weight, 'cnt_type_details': cnt_type_details})
+            return Response({'material_name_weight': material_name_weight, 'cnt_type_details': handle_cnt_details})
+
+
+@method_decorator([api_recorder], name='dispatch')
+class XlRecipeNoticeView(APIView):
+    """下传mes称量配方到称量系统"""
+
+    def post(self, request):
+        product_batching_id = self.request.query_params.get('product_batching_id')
+        product_no = self.request.query_params.get('product_no')
+        xl_equip = self.request.query_params.get('xl_equip')
+        notice_flag = self.request.query_params.get('notice_flag')
+        try:
+            product_batching_id = int(product_batching_id)
+            keywords = xl_equip[0]
+        except Exception:
+            raise ValidationError('参数错误')
+        product_batching = ProductBatching.objects.filter(id=product_batching_id).prefetch_related(
+            Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False))).first()
+        if not product_batching:
+            raise ValidationError('该配方不存在')
+        if not product_batching.used_type == 4:
+            raise ValidationError('只有应用状态的配方才可下发至称量系统')
+        mes_xl_details = ProductBatchingEquip.objects.filter(product_batching=product_batching, is_used=True, type=4)
+        if not mes_xl_details:
+            raise ValidationError('配方中无称量系统小料内容, 无法下发')
+        not_tank_materials = mes_xl_details.filter(~Q(feeding_mode__startswith='C'), feeding_mode__startswith=keywords)
+        if not not_tank_materials:
+            raise ValidationError('配方中的小料内容投料方式与机台不相符')
+        equip_no_list = mes_xl_details.values_list('equip_no', flat=True).distinct()
+        if len(equip_no_list) > 1:
+            info = mes_xl_details.values('equip_no').annotate(not_c=Count('id', filter=Q(feeding_mode__startswith='C')))
+            equip_list = [i['equip_no'] for i in info if i['not_c'] == 0]
+            if len(equip_list) > 1:
+                group_mode_by_id = mes_xl_details.filter(equip_no__in=equip_list).values('cnt_type_detail_equip')\
+                    .annotate(s_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='S')),
+                              f_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='F')))
+                res = [j for j in group_mode_by_id if j['s_num'] != 0 and j['f_num'] != 0]
+                if res:
+                    raise ValidationError(f"通用配方设置投料方式不一致，无法下发: {','.join(equip_list)}")
+        # 查询所有的称量线体罐物料与配方设置物料是否一致
+        mes_xl_materials = not_tank_materials.values_list('handle_material_name', flat=True).distinct()
+        xl_equip_materials = list(Bin.objects.using(xl_equip).values_list('name', flat=True))
+        out_mes_materials = list(set(mes_xl_materials) - set(xl_equip_materials))
+        if not notice_flag and out_mes_materials:
+            return Response({'notice_flag': True, 'msg': ','.join(out_mes_materials)})
+        # 配方和线体相同物料
+        same_material_list = list(set(mes_xl_materials) & set(xl_equip_materials))
+        # 在使用称量配方不能下发
+        # 下发配方数据
+        now_date = datetime.datetime.now().date()
+        before_date = now_date - timedelta(days=1)
+        send_data = {'dev_type': product_batching.dev_type.category_no}
+        detail_msg = ""
+        already_add_recipe = []
+        for single_equip_no in equip_no_list:
+            send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
+            if not send_materials:
+                detail_msg += f'{single_equip_no}: 无配料明细可下发 '
+                continue
+            not_keyword_material = mes_xl_details.filter(feeding_mode__startswith='C', equip_no=single_equip_no)
+            send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-ONLY)")
+            if send_recipe_name in already_add_recipe:
+                continue
+            else:
+                already_add_recipe.append(send_recipe_name)
+            processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中', '等待'], recipe=send_recipe_name)
+            if processing_xl_plan:
+                detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '
+                continue
+            send_data[send_recipe_name] = send_materials
+            detail_msg += f'{single_equip_no}: 配方下发成功 '
+        # 下传配方
+        try:
+            with atomic(using=xl_equip):
+                self.issue_xl_system(xl_equip, send_data)
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        return Response(f'{xl_equip}:\n {detail_msg}')
+
+    def issue_xl_system(self, xl_equip, data):
+        """
+        新增称量系统配方
+        """
+        dev_type = data.pop('dev_type')
+        # 数据整理[物料名去除后缀, 配料重量提取默认分包数]
+        for recipe_name, recipe_materials in data.items():
+            total_weight = recipe_materials.aggregate(total_weight=Sum('cnt_type_detail_equip__standard_weight'))['total_weight']
+            if not total_weight:
+                raise ValidationError(f'下发物料重量无法解析{total_weight}')
+            # 删除之前配方
+            RecipePre.objects.using(xl_equip).filter(name=recipe_name).delete()
+            RecipeMaterial.objects.using(xl_equip).filter(recipe_name=recipe_name).delete()
+            split_count = 1 if total_weight <= 30 else 2
+            weight = round(total_weight / split_count, 3)
+            n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
+            # 添加配方数据
+            tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=weight, project_name='all', only_num=True)
+            m_id = RecipePre.objects.using(xl_equip).aggregate(m_id=Max('id'))['m_id']
+            if not m_id:
+                raise ValidationError(f'无法解析{xl_equip}配方表主键')
+            RecipePre.objects.using(xl_equip).create(**{'id': m_id + 1, 'name': recipe_name, 'ver': dev_type,
+                                                        'weight': weight, 'error': tolerance, 'use_not': 0,
+                                                        'merge_flag': False, 'split_count': split_count, 'time': n_time})
+            # 添加配方明细数据
+            recipe_material_list = []
+            n_id = RecipeMaterial.objects.using(xl_equip).aggregate(n_id=Max('id'))['n_id']
+            if not n_id:
+                raise ValidationError(f'无法解析{xl_equip}配方明细表主键')
+            add_ids = [n_id]
+            for single in recipe_materials:
+                xl_name = single.handle_material_name
+                single_weight = round(single.cnt_type_detail_equip.standard_weight / split_count, 3)
+                # 单物料公差
+                single_tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=single_weight, only_num=True)
+                create_data = {'id': max(add_ids) + 1, 'recipe_name': recipe_name, 'name': xl_name,
+                               'weight': single_weight, 'error': single_tolerance, 'time': n_time}
+                single_data = RecipeMaterial(**create_data)
+                add_ids.append(max(add_ids) + 1)
+                recipe_material_list.append(single_data)
+            RecipeMaterial.objects.using(xl_equip).bulk_create(recipe_material_list)
