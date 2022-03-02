@@ -1435,10 +1435,10 @@ class PlanSerializer(serializers.ModelSerializer):
                                                                 product_batching__dev_type__category_name=dev_type) \
                 .values('equip_no').annotate(num=Count('id', filter=~Q(feeding_mode__startswith=equip_no[0])))
             if not equip_recipes:
-                raise ValueError(f"未找到mes配方{product_no_dev}[{dev_type}]配料信息")
+                raise serializers.ValidationError(f"未找到mes配方{product_no_dev}[{dev_type}]配料信息")
             handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
             if not handle_equip_recipe:
-                raise ValueError(f"未找到配方{product_no_dev}通用配料信息")
+                raise serializers.ValidationError(f"未找到配方{product_no_dev}通用配料信息")
             ml_equip_no = handle_equip_recipe[0]
         recipe_materials = list(RecipeMaterial.objects.filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
         mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
