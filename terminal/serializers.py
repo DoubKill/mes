@@ -390,7 +390,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             cnt_type_data = {}
                             for i in cnt_type_details:
                                 if i['material__material_name'].endswith('-C') or i['material__material_name'].endswith('-X'):
-                                    cnt_type_data[re.split(r'-C|-X', i['material__material_name'])[0]] = i['material__material_name']
+                                    cnt_type_data[i['material__material_name'][:-2]] = i['material__material_name']
                                 else:
                                     cnt_type_data[i['material__material_name']] = i['material__material_name']
                             if set(machine_details.values_list('name', flat=True)) - set(cnt_type_data.keys()):
@@ -400,7 +400,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             # 扫到物料对应条码列表、扫到物料对应物料的分包数、料框表里的条码对应种类数
                             scan_bra_code, scan_split_num, load_tank_materials = [], [], 0
                             for i in cnt_type_details:
-                                name = re.split(r'-C|-X', i['material__material_name'])[0]
+                                name = i['material__material_name'][:-2] if i['material__material_name'].endswith('-C') or i['material__material_name'].endswith('-X') else i['material__material_name']
                                 instance = machine_details.filter(name=name).first()
                                 if not instance:
                                     continue
@@ -1433,14 +1433,14 @@ class PlanSerializer(serializers.ModelSerializer):
             equip_recipes = ProductBatchingEquip.objects.filter(is_used=True, type=4,
                                                                 product_batching__stage_product_batch_no=product_no_dev,
                                                                 product_batching__dev_type__category_name=dev_type) \
-                .values('equip_no').annotate(num=Count('id', filter=~Q(feeding_mode__startswith=equip_no[0])))
+                .values('equip_no').annotate(num=Count('id', filter=Q(feeding_mode__startswith='C')))
             if not equip_recipes:
-                raise ValueError(f"未找到mes配方{product_no_dev}[{dev_type}]配料信息")
+                raise serializers.ValidationError(f"未找到mes配方{product_no_dev}[{dev_type}]配料信息[投料方式]")
             handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
             if not handle_equip_recipe:
-                raise ValueError(f"未找到配方{product_no_dev}通用配料信息")
+                raise serializers.ValidationError(f"未找到配方{product_no_dev}通用配料信息")
             ml_equip_no = handle_equip_recipe[0]
-        recipe_materials = list(RecipeMaterial.objects.filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
+        recipe_materials = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
         mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
                                                          feeding_mode__startswith=equip_no[0],
                                                          handle_material_name__in=recipe_materials,
@@ -1448,7 +1448,7 @@ class PlanSerializer(serializers.ModelSerializer):
                                                          product_batching__dev_type__category_name=dev_type)
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
         if recipe_obj.weight != mes_machine_weight:
-            raise serializers.ValidationError(f'称量配方重量{recipe_obj.weight}与mes配方不一致{round(mes_machine_weight, 3)}')
+            raise serializers.ValidationError(f'称量配方重量: {recipe_obj.weight}与mes配方不一致: {round(mes_machine_weight, 3)}')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
                                                               grouptime=validated_data['grouptime']
                                                               ).order_by('order_by').last()

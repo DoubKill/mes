@@ -1457,6 +1457,22 @@ class XLPlanVIewSet(ModelViewSet):
 
         return obj
 
+    @action(methods=['post'], detail=False, url_path='up_down_move', url_name='up_down_move')
+    def up_down_move(self, request):
+        equip_no = self.request.data.get('equip_no')
+        c_id = self.request.data.get('c_id')
+        n_id = self.request.data.get('n_id')
+        check_plan = Plan.objects.using(equip_no).filter(~Q(state='等待'), id__in=[c_id, n_id])
+        if check_plan:
+            raise ValidationError('只有等待中的计划可以上下移动')
+        with atomic(using=equip_no):
+            c_instance = Plan.objects.using(equip_no).get(id=c_id)
+            n_instance = Plan.objects.using(equip_no).get(id=n_id)
+            c_instance.order_by, n_instance.order_by = n_instance.order_by, c_instance.order_by
+            c_instance.save()
+            n_instance.save()
+        return Response('移动成功')
+
 
 @method_decorator([api_recorder], name="dispatch")
 class ReportBasicView(ListAPIView):
