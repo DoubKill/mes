@@ -232,6 +232,7 @@ class AutoDispatch(object):
     def send_order(self, order):
         # 提醒消息里的链接类型 False 非巡检  True 巡检
         inspection = False
+        section_name = ''
         now_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         if order.work_type != '巡检':
             # 班组
@@ -239,7 +240,8 @@ class AutoDispatch(object):
             # 设备部门下改班组人员
             instance = GlobalCode.objects.filter(global_type__type_name='设备部门组织名称', use_flag=1,
                                                  global_type__use_flag=1).first()
-            choice_all_user = get_staff_status(DinDinAPI(), instance.global_name, group=group) if instance else []
+            section_name = instance.global_name if instance else section_name
+            choice_all_user = get_staff_status(DinDinAPI(), section_name, group=group) if section_name else []
             fault_name = order.result_fault_cause if order.result_fault_cause else (
                 order.equip_repair_standard.standard_name if order.equip_repair_standard else order.equip_maintenance_standard.standard_name)
         else:
@@ -260,7 +262,12 @@ class AutoDispatch(object):
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单')
             return f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单'
         working_persons = [i for i in choice_all_user if i['optional']]
-        leader_ding_uid = self.ding_api.get_user_id(choice_all_user[0].get('leader_phone_number'))
+        if order.work_type != '巡检':
+            data = [i for i in choice_all_user if i.get('section_name') == section_name]
+            leader_phone_number = '' if not data else data[0].get('leader_phone_number')
+        else:
+            leader_phone_number = choice_all_user[0].get('leader_phone_number')
+        leader_ding_uid = self.ding_api.get_user_id(leader_phone_number)
         # 消息模板
         content = {
             "title": "",
@@ -273,9 +280,7 @@ class AutoDispatch(object):
         if not working_persons:
             # 发送消息给上级
             content.update({'title': f"系统派单: 无空闲可指派人员！"})
-            # self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员')
-            # return f'系统派单[{order.work_type}]: {order.work_order_no}-无空闲可指派人员'
             return [order.work_type, leader_ding_uid]
         processing_person = []
         for per in working_persons:
@@ -314,9 +319,7 @@ class AutoDispatch(object):
         if len(processing_person) == len(working_persons):
             # 所有人都在忙, 派单失败, 钉钉消息推送给上级
             content.update({'title': f"所有人员均有工单在处理, 系统自动派单失败！"})
-            # self.ding_api.send_message([leader_ding_uid], content)
             logger.info(f'系统派单[{order.work_type}]: 系统自动派单失败, 可选人员:{working_persons}, 正在维修人员:{processing_person}')
-            # return f'系统派单[{order.work_type}]: 系统自动派单失败'
             return [order.work_type, leader_ding_uid]
         return f'系统派单[{order.work_type}]: 完成一次定时派单处理'
 
