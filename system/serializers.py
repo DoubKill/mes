@@ -301,10 +301,18 @@ class MaterialReceiveSerializer(serializers.ModelSerializer):
 
 
 class UserImportSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(max_length=150)
+    num = serializers.CharField(max_length=20)
     section = serializers.CharField(max_length=512, allow_null=True, allow_blank=True)
     group_extensions = serializers.CharField(max_length=512, allow_null=True, allow_blank=True)
 
     def validate(self, attrs):
+        username = attrs['username']
+        num = attrs['num']
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError('已存在一位使用该名字的用户：{}'.format(username))
+        if User.objects.filter(num=num).exists():
+            raise serializers.ValidationError('已存在一位使用该工号的用户：{}'.format(num))
         section_name = attrs.pop('section', None)
         permissions = attrs.pop('group_extensions', None)
         if section_name:

@@ -95,7 +95,8 @@ class UserViewSet(ModelViewSet):
             }
             user_list.append(user_data)
         s = UserImportSerializer(data=user_list, many=True, context={'request': self.request})
-        s.is_valid(raise_exception=True)
+        if not s.is_valid():
+            raise ValidationError(list(s.errors[0].values())[0][0])
         s.save()
         return Response('ok')
 
