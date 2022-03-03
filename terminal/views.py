@@ -2507,9 +2507,6 @@ class XlRecipeNoticeView(APIView):
         already_add_recipe = []
         for single_equip_no in equip_no_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
-            if not send_materials:
-                detail_msg += f'{single_equip_no}: 无配料明细可下发 '
-                continue
             not_keyword_material = mes_xl_details.filter(feeding_mode__startswith='C', equip_no=single_equip_no)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-ONLY)")
             if send_recipe_name in already_add_recipe:
@@ -2539,7 +2536,7 @@ class XlRecipeNoticeView(APIView):
         for recipe_name, recipe_materials in data.items():
             total_weight = recipe_materials.aggregate(total_weight=Sum('cnt_type_detail_equip__standard_weight'))['total_weight']
             if not total_weight:
-                raise ValidationError(f'下发物料重量无法解析{total_weight}')
+                total_weight = 0
             # 删除之前配方
             RecipePre.objects.using(xl_equip).filter(name=recipe_name).delete()
             RecipeMaterial.objects.using(xl_equip).filter(recipe_name=recipe_name).delete()
