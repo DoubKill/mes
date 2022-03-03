@@ -390,7 +390,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             cnt_type_data = {}
                             for i in cnt_type_details:
                                 if i['material__material_name'].endswith('-C') or i['material__material_name'].endswith('-X'):
-                                    cnt_type_data[re.split(r'-C|-X', i['material__material_name'])[0]] = i['material__material_name']
+                                    cnt_type_data[i['material__material_name'][:-2]] = i['material__material_name']
                                 else:
                                     cnt_type_data[i['material__material_name']] = i['material__material_name']
                             if set(machine_details.values_list('name', flat=True)) - set(cnt_type_data.keys()):
@@ -400,7 +400,7 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                             # 扫到物料对应条码列表、扫到物料对应物料的分包数、料框表里的条码对应种类数
                             scan_bra_code, scan_split_num, load_tank_materials = [], [], 0
                             for i in cnt_type_details:
-                                name = re.split(r'-C|-X', i['material__material_name'])[0]
+                                name = i['material__material_name'][:-2] if i['material__material_name'].endswith('-C') or i['material__material_name'].endswith('-X') else i['material__material_name']
                                 instance = machine_details.filter(name=name).first()
                                 if not instance:
                                     continue
