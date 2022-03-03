@@ -394,5 +394,13 @@ class DelUser(APIView):
     permission_classes = (IsAuthenticated,)
 
     def delete(self, request, pk):
-        User.objects.filter(pk=pk).update(delete_flag=True, is_active=0)
+        try:
+            instance = User.objects.get(pk=pk)
+        except Exception:
+            raise ValidationError('object does not exits!')
+        u_name = instance.username + '(DELETED{})'.format(str(instance.id))
+        instance.delete_flag = True
+        instance.is_active = 0
+        instance.username = u_name
+        instance.save()
         return Response('ok')
