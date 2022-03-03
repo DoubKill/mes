@@ -331,6 +331,13 @@ class UserImportSerializer(serializers.ModelSerializer):
                 attrs['group_extensions'] = ps
         return attrs
 
+    def create(self, validated_data):
+        password = validated_data.get('password')
+        user = super().create(validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
     class Meta:
         model = User
         fields = ('username', 'password', 'num', 'phone_number', 'id_card_num', 'section', 'group_extensions')
