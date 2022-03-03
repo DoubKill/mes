@@ -1374,6 +1374,7 @@ class XLPlanVIewSet(ModelViewSet):
     """
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
+    pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
 
@@ -1408,13 +1409,12 @@ class XLPlanVIewSet(ModelViewSet):
         queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
-                page = self.paginate_queryset(queryset)
-                serializer = self.get_serializer(page, many=True)
+                serializer = self.get_serializer(queryset, many=True)
             except ConnectionDoesNotExist:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             except Exception:
                 raise
-            return self.get_paginated_response(serializer.data)
+            return Response(serializer.data)
         else:
             e_days = 7 if equip_no.startswith('F') else 5
             s_time, e_time = now_date - timedelta(days=e_days), now_date
@@ -1464,7 +1464,7 @@ class XLPlanVIewSet(ModelViewSet):
         n_id = self.request.data.get('n_id')
         check_plan = Plan.objects.using(equip_no).filter(~Q(state='等待'), id__in=[c_id, n_id])
         if check_plan:
-            raise ValidationError('只有等待中的计划可以上下移动')
+            raise ValidationError('选中计划与被替换计划不全是等待状态')
         with atomic(using=equip_no):
             c_instance = Plan.objects.using(equip_no).get(id=c_id)
             n_instance = Plan.objects.using(equip_no).get(id=n_id)
