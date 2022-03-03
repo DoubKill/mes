@@ -2545,26 +2545,18 @@ class XlRecipeNoticeView(APIView):
             n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
             # 添加配方数据
             tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=weight, project_name='all', only_num=True)
-            m_id = RecipePre.objects.using(xl_equip).aggregate(m_id=Max('id'))['m_id']
-            if not m_id:
-                raise ValidationError(f'无法解析{xl_equip}配方表主键')
-            RecipePre.objects.using(xl_equip).create(**{'id': m_id + 1, 'name': recipe_name, 'ver': dev_type,
-                                                        'weight': weight, 'error': tolerance, 'use_not': 0,
-                                                        'merge_flag': False, 'split_count': split_count, 'time': n_time})
+            RecipePre.objects.using(xl_equip).create(**{'name': recipe_name, 'ver': dev_type, 'weight': weight,
+                                                        'error': tolerance, 'use_not': 0, 'merge_flag': False,
+                                                        'split_count': split_count, 'time': n_time})
             # 添加配方明细数据
             recipe_material_list = []
-            n_id = RecipeMaterial.objects.using(xl_equip).aggregate(n_id=Max('id'))['n_id']
-            if not n_id:
-                raise ValidationError(f'无法解析{xl_equip}配方明细表主键')
-            add_ids = [n_id]
             for single in recipe_materials:
                 xl_name = single.handle_material_name
                 single_weight = round(single.cnt_type_detail_equip.standard_weight / split_count, 3)
                 # 单物料公差
                 single_tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=single_weight, only_num=True)
-                create_data = {'id': max(add_ids) + 1, 'recipe_name': recipe_name, 'name': xl_name,
-                               'weight': single_weight, 'error': single_tolerance, 'time': n_time}
+                create_data = {'recipe_name': recipe_name, 'name': xl_name, 'weight': single_weight,
+                               'error': single_tolerance, 'time': n_time}
                 single_data = RecipeMaterial(**create_data)
-                add_ids.append(max(add_ids) + 1)
                 recipe_material_list.append(single_data)
             RecipeMaterial.objects.using(xl_equip).bulk_create(recipe_material_list)
