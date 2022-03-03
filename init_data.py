@@ -31,6 +31,8 @@ permission_data = [
     {'id': 14, 'code': 'change_user', 'name': '修改', 'parent_id': 11},
     {'id': 15, 'code': 'delete_user', 'name': '启用/停用', 'parent_id': 11},
     {'id': 808, 'code': 'del_user', 'name': '删除', 'parent_id': 11},
+    {'id': 922, 'code': 'import_user', 'name': '导入', 'parent_id': 11},
+    {'id': 923, 'code': 'cid_user', 'name': '修改身份证', 'parent_id': 11},
 
     {'id': 16, 'code': 'group_user', 'name': '角色别用户管理', 'parent_id': None},
     {'id': 17, 'code': 'view_group_user', 'name': '查看', 'parent_id': 16},
@@ -892,7 +894,7 @@ permission_data = [
     {'id': 920, 'code': 'end_material_test_plan', 'name': '结束检测', 'parent_id': 917},
     {'id': 921, 'code': 'add_material_test_plan', 'name': '添加', 'parent_id': 917},
 
-    # 下一个 922开始
+    # 下一个 924开始
 
 ]
 

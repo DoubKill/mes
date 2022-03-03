@@ -20,11 +20,13 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus
+from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import Material
 from system.filters import UserFilter, GroupExtensionFilter, SectionFilter
 from system.models import GroupExtension, User, Section, Permissions
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
-    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, MaterialReceiveSerializer
+    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, \
+    MaterialReceiveSerializer, UserImportSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -65,16 +67,37 @@ class UserViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action in ['list', 'create', 'retrieve']:
             return UserSerializer
-        if self.action == 'create':
-            return UserSerializer
-        if self.action == 'update':
+        else:
             return UserUpdateSerializer
-        if self.action == 'retrieve':
-            return UserSerializer
-        if self.action == 'partial_update':
-            return UserUpdateSerializer
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated, ], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != 7:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet, start_row=1)
+        user_list = []
+        for item in data:
+            user_data = {
+                "username": item[0],
+                "password": item[1],
+                "num": item[2],
+                "phone_number": item[3],
+                "id_card_num": item[4],
+                "section": item[5],
+                "group_extensions": item[6]
+            }
+            user_list.append(user_data)
+        s = UserImportSerializer(data=user_list, many=True, context={'request': self.request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
