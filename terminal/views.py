@@ -54,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_current_factory_date
+    get_manual_materials, get_current_factory_date, CLSystem
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1507,12 +1507,21 @@ class XLPlanVIewSet(ModelViewSet):
                     p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
                                    'order_by': 1, 'date_time': date_time, 'setno': p_data['setno'] - p_data['actno'],
                                    'actno': None, 'addtime': now_time})
-                    Plan.objects.using(equip_no).create(**p_data)
+                    new_plan = Plan.objects.using(equip_no).create(**p_data)
                     order_by_list.append(1)
                     plan.stoptime = now_time
                     plan.state = '完成'
                     plan.save()
                     processing_plan.append(plan)
+                    try:
+                        client = CLSystem(equip_no)
+                        # 终止运行中计划(下位机)
+                        client.stop(plan.planid)
+                        # 下达新计划
+                        client.issue_plan(first_plan_id, new_plan.recipe, new_plan.setno)
+                    except Exception as e:
+                        raise ValidationError(e.args[0])
+
                     continue
                 replace_order_by = max(order_by_list) + 1
                 plan.grouptime = next_classes
