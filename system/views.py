@@ -97,6 +97,13 @@ class UserViewSet(ModelViewSet):
         s = UserImportSerializer(data=user_list, many=True, context={'request': self.request})
         if not s.is_valid():
             raise ValidationError(list(s.errors[0].values())[0][0])
+        validated_data = s.validated_data
+        username_list = [item['username'] for item in validated_data]
+        num_list = [item['num'] for item in validated_data]
+        if len(username_list) != len(set(username_list)):
+            raise ValidationError('导入数据中存在相同的用户名，请修改后重试！')
+        if len(num_list) != len(set(num_list)):
+            raise ValidationError('导入数据中存在相同的员工工号，请修改后重试！')
         s.save()
         return Response('ok')
 
