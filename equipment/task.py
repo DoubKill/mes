@@ -311,18 +311,9 @@ class AutoDispatch(object):
             content.update({'title': f"系统自动派发{order.work_type}工单成功，请尽快处理！"})
             self.ding_api.send_message([per.get('ding_uid')], content, order_id=order.id, inspection=inspection)
             # 派单成功发送消息到设备群聊
-            message_url = f"eapp://pages/repairOrder/repairOrder?id={order.id}" + ("&isInspection=true" if inspection else "") + "&isView=1"
-            msg_to_group = {
-                "msgtype": "link",
-                "link": {
-                    "text": f"工单编号:{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}",
-                    "title": "系统自动派发设备工单成功，请尽快处理！",
-                    "picUrl": "",
-                    "messageUrl": message_url
-                }
-            }
+            msg = f"系统自动派发设备工单成功，请尽快处理！\n工单编号:\n{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}"
             url = self.get_group_url()
-            send_ding_msg(url=url, secret=self.group_secret, msg=msg_to_group, isAtAll=False, custom=True)
+            send_ding_msg(url=url, secret=self.group_secret, msg=msg, isAtAll=False)
             logger.info(f"系统派单[{order.work_type}]-系统自动派单成功: {order.work_order_no}, 被指派人:{per['username']}")
             continue
 
