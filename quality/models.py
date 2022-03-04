@@ -775,7 +775,7 @@ class MaterialTestPlan(models.Model):
         (4, '结束检测')
     )
     material_report_equip = models.ForeignKey(MaterialReportEquip, help_text='检测机台', on_delete=models.CASCADE)
-    plan_uid = models.CharField(max_length=64, help_text='计划编号', default=f"JH{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}")
+    plan_uid = models.CharField(max_length=64, help_text='计划编号', null=True, blank=True)
     test_time = models.DateField(help_text='检测日期')
     test_classes = models.CharField(max_length=64, help_text='生产班次')
     test_group = models.CharField(max_length=64, help_text='生产班组')
