@@ -1497,7 +1497,7 @@ class XLPlanVIewSet(ModelViewSet):
             processing_plan = []
             plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
             for index, plan in enumerate(other_plan):
-                if plan.state == '运行中' and plan.actno >= 1:
+                if plan.state == '运行中' and plan.actno:
                     if processing_plan:
                         raise ValidationError(f'当前班次[{now_classes}]运行中的计划超过1条, 无法结转')
                     first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]

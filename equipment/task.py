@@ -16,6 +16,7 @@ from django.http import HttpResponse
 from io import BytesIO
 
 from mes import settings
+from system.models import Section
 from basics.models import WorkSchedulePlan, GlobalCode
 from equipment.models import PropertyTypeNode, Property, EquipApplyOrder, EquipApplyRepair, EquipInspectionOrder
 from equipment.utils import DinDinAPI, get_staff_status, get_maintenance_status
@@ -263,8 +264,8 @@ class AutoDispatch(object):
             return f'系统派单[{order.work_type}]: {order.work_order_no}-无人员可派单'
         working_persons = [i for i in choice_all_user if i['optional']]
         if order.work_type != '巡检':
-            data = [i for i in choice_all_user if i.get('section_name') == section_name]
-            leader_phone_number = '' if not data else data[0].get('leader_phone_number')
+            section = Section.objects.filter(name=section_name).first()
+            leader_phone_number = '' if not section else section.in_charge_user.phone_number
         else:
             leader_phone_number = choice_all_user[0].get('leader_phone_number')
         leader_ding_uid = self.ding_api.get_user_id(leader_phone_number)
