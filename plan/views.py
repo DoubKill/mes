@@ -761,9 +761,10 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             sn += 1
         s = self.serializer_class(data=area_list, many=True)
         s.is_valid(raise_exception=True)
+        min_stock_day = SchedulingParamsSetting.objects.first().min_stock_trains
         for item in s.validated_data:
-            item['target_stock'] = round(item['plan_weight'] * 2, 1)
-            demanded_weight = round(item['plan_weight'] * 2 - item['workshop_weight'] - item['current_stock'], 1)
+            item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
+            demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
             item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
         s.save()
         return Response('ok')
