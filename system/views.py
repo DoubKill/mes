@@ -20,11 +20,13 @@ from mes.derorators import api_recorder
 from mes.paginations import SinglePageNumberPagination
 from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus
+from quality.utils import get_cur_sheet, get_sheet_data
 from recipe.models import Material
 from system.filters import UserFilter, GroupExtensionFilter, SectionFilter
 from system.models import GroupExtension, User, Section, Permissions
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
-    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, MaterialReceiveSerializer
+    UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, \
+    MaterialReceiveSerializer, UserImportSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -65,16 +67,45 @@ class UserViewSet(ModelViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action in ['list', 'create', 'retrieve']:
             return UserSerializer
-        if self.action == 'create':
-            return UserSerializer
-        if self.action == 'update':
+        else:
             return UserUpdateSerializer
-        if self.action == 'retrieve':
-            return UserSerializer
-        if self.action == 'partial_update':
-            return UserUpdateSerializer
+
+    @action(methods=['post'], detail=False, permission_classes=[IsAuthenticated, ], url_path='import_xlsx',
+            url_name='import_xlsx')
+    def import_xlx(self, request):
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        if cur_sheet.ncols != 7:
+            raise ValidationError('导入文件数据错误！')
+        data = get_sheet_data(cur_sheet, start_row=1)
+        user_list = []
+        for item in data:
+            user_data = {
+                "username": item[0],
+                "password": item[1],
+                "num": item[2],
+                "phone_number": item[3],
+                "id_card_num": item[4],
+                "section": item[5],
+                "group_extensions": item[6]
+            }
+            user_list.append(user_data)
+        s = UserImportSerializer(data=user_list, many=True, context={'request': self.request})
+        if not s.is_valid():
+            raise ValidationError(list(s.errors[0].values())[0][0])
+        validated_data = s.validated_data
+        username_list = [item['username'] for item in validated_data]
+        num_list = [item['num'] for item in validated_data]
+        if len(username_list) != len(set(username_list)):
+            raise ValidationError('导入数据中存在相同的用户名，请修改后重试！')
+        if len(num_list) != len(set(num_list)):
+            raise ValidationError('导入数据中存在相同的员工工号，请修改后重试！')
+        s.save()
+        return Response('ok')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -394,5 +425,13 @@ class DelUser(APIView):
     permission_classes = (IsAuthenticated,)
 
     def delete(self, request, pk):
-        User.objects.filter(pk=pk).update(delete_flag=True, is_active=0)
+        try:
+            instance = User.objects.get(pk=pk)
+        except Exception:
+            raise ValidationError('object does not exits!')
+        u_name = instance.username + '(DELETED{})'.format(str(instance.id))
+        instance.delete_flag = True
+        instance.is_active = 0
+        instance.username = u_name
+        instance.save()
         return Response('ok')
