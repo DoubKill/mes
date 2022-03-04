@@ -315,7 +315,7 @@ class AutoDispatch(object):
             msg_to_group = {
                 "msgtype": "link",
                 "link": {
-                    "text": f"系统自动派发设备工单成功，请尽快处理！\n工单编号:{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}",
+                    "text": f"工单编号:{order.work_order_no}\n机台:{order.equip_no}\n故障原因:{fault_name}\n重要程度:{order.importance_level}\n指派人:系统自动\n被指派人:{per['username']}\n指派时间:{now_date}",
                     "title": "系统自动派发设备工单成功，请尽快处理！",
                     "picUrl": "",
                     "messageUrl": message_url
