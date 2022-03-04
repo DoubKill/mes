@@ -1967,6 +1967,7 @@ class MaterialTestPlanCreateSerializer(serializers.ModelSerializer):
 
     @atomic
     def create(self, validated_data):
+        validated_data['plan_uid'] = f"JH{datetime.now().strftime('%Y%m%d%H%M%S')}"
         material_list = validated_data.pop('material_list')
         material_test_plan = super().create(validated_data)
         for material_dic in material_list:
