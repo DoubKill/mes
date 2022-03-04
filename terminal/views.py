@@ -1494,6 +1494,8 @@ class XLPlanVIewSet(ModelViewSet):
             order_rule = ["date_time", "-grouptime", "order_by"] if now_classes > next_classes else ["date_time", "grouptime", "order_by"]
             other_plan = Plan.objects.using(equip_no).filter(date_time__in=[y_date_time, date_time], grouptime__in=[now_classes, next_classes],
                                                              state__in=['运行中', '等待']).order_by(*order_rule)
+            if not other_plan:
+                raise ValidationError('未找到可切换的计划')
             processing_plan = []
             plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
             for index, plan in enumerate(other_plan):
