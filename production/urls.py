@@ -53,7 +53,10 @@ router.register(r'performance-job-ladder', PerformanceJobLadderViewSet)
 # 丁基胶 规格设定
 router.register('product-info-dj', ProductInfoDingJiViewSet)
 # 细料/硫磺单价
-router.register('set_the_price', SetThePriceViewSet)
+router.register('set-the-price', SetThePriceViewSet)
+# 员工其他奖惩/补贴
+router.register('performance-subsidy', PerformanceSubsidyViewSet, basename='performance-subsidy')
+
 
 urlpatterns = [
     path('', include(router.urls)),

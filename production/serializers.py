@@ -9,7 +9,7 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
-    ProductInfoDingJi, SetThePrice
+    ProductInfoDingJi, SetThePrice, SubsidyInfo
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -403,4 +403,15 @@ class SetThePriceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SetThePrice
+        fields = '__all__'
+
+    def create(self, validated_data):
+        instance = SetThePrice.objects.first()
+        return super().update(instance, validated_data)
+
+
+class SubsidyInfoSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SubsidyInfo
         fields = '__all__'

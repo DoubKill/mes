@@ -6,7 +6,7 @@ import re
 import math
 import time
 from io import BytesIO
-from itertools import groupby
+from itertools import groupby, count
 
 import requests
 import xlwt
@@ -43,11 +43,11 @@ from plan.models import ProductClassesPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
-    ProductInfoDingJiFilter
+    ProductInfoDingJiFilter, SubsidyInfoFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
-    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice
+    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -55,7 +55,7 @@ from production.serializers import QualityControlSerializer, OperationLogSeriali
     CurveInformationSerializer, MixerInformationSerializer2, WeighInformationSerializer2, AlarmLogSerializer, \
     ProcessFeedbackSerializer, TrainsFixSerializer, PalletFeedbacksBatchModifySerializer, ProductPlanRealViewSerializer, \
     RubberCannotPutinReasonSerializer, PerformanceJobLadderSerializer, ProductInfoDingJiSerializer, \
-    SetThePriceSerializer
+    SetThePriceSerializer, SubsidyInfoSerializer
 from rest_framework.generics import ListAPIView, GenericAPIView, ListCreateAPIView, CreateAPIView, UpdateAPIView, \
     get_object_or_404
 from datetime import timedelta
@@ -2388,67 +2388,86 @@ class SummaryOfWeighingOutput(APIView):
 
     def get(self, request):
         factory_date = self.request.query_params.get('factory_date')
-        year, month = factory_date.split('-')
-        this_month_start = datetime.datetime(year, month, 1)
-        if month == 12:
-            this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
-
+        year = int(factory_date.split('-')[0])
+        month = int(factory_date.split('-')[1])
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
-
         result = []
+        result1 = {}
         group_dic = {}
         users = {}  # {'1-早班'： '张三'}
+        user_result = {}
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
                                                 start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day')
         for item in group:
             group_dic[f'{item[2]}-{item[0]}'] = item[1]
         # 查询称量分类下当前月上班的所有员工
-        user_list = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month, equip__in=equip_list).values('name', 'date__day', 'group', 'section')
+        user_list = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month, equip__in=equip_list).values('name', 'date__day', 'group', 'section', 'equip')
         # 岗位系数
         section_dic = {}
-        section_info = PerformanceJobLadder.objects.filter(delete_flag=False).values('name', 'coefficient', 'post_standard', 'post_coefficient')
+        section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('name', 'coefficient', 'post_standard', 'post_coefficient')
         for item in section_info:
             section_dic[item['name']] = [item['coefficient'], item['post_standard'], item['post_coefficient']]
 
         for item in user_list:
-            classes = group.get(f"{item['date__day']}-{item['group']}")
-            if users.get(f"{item['date__day']}-{classes}"):
-                users[f"{item['date__day']}-{classes}"] = [item['name'],]
+            classes = group_dic.get(f"{item['date__day']}-{item['group']}")
+            key = f"{item['date__day']}-{classes}-{item['equip']}"
+            if users.get(key):
+                users[key][item['name']] = item['section']
             else:
-                users[f"{item['date__day']}-{classes}"] += item['name']
+                users[key] = {item['name']: item['section']}
 
-        user_result = {}
+        # 机台产量统计
         price_obj = SetThePrice.objects.first()
         for equip_no in equip_list:
-            # 细料/硫磺单价'
-            price = price_obj.xl if equip_no in ['F01', 'F02', 'F03'] else price_obj.lh
-            dic = {'equip_no': equip_no}
-            data = Plan.objects.using(equip_no).filter(actno__gt=1, merge_flag=1,
-                                                       date_time__get=this_month_start,
-                                                       date_time__lte=this_month_end).values('date_time', 'grouptime').annotate(
-                'date_time', 'grouptime', count=Avg('actno'))
+            dic = {'equip_no': equip_no, 'hj': 0}
+            data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
+                                                       date_time__istartswith=factory_date
+                                                       ).values('date_time', 'grouptime').annotate(count=Count('actno'))
             for item in data:
                 date = item['date_time']
-                day = date.split('-')[2]    # 2  早班
+                day = int(date.split('-')[2])    # 2  早班
                 classes = item['grouptime']  # 早班/ 中班 / 夜班
-                dic[f'{date}{group}'] = item['count']
-                names = users.get(f'{day}-{classes}')
-                for name in names:
-                    if user_result.get(name):
-                        user_result[name][f"{day}{classes}"] = item['count'] * section_dic[name][1] * price
-                    else:
-                        user_result[name] = {f"{day}{classes}": item['count']}
-
+                dic[f'{day}{classes}'] = item['count']
+                dic['hj'] += item['count']
+                names = users.get(f'{day}-{classes}-{equip_no}')
+                if names:
+                    for name, section in names.items():
+                        key = f"{name}_{day}_{classes}_{section}"
+                        if user_result.get(key):
+                            user_result[key][equip_no] = item['count']
+                        else:
+                            user_result[key] = {equip_no: item['count']}
             result.append(dic)
-        result.append(user_result.values())
-        return Response({'result': result})
+        # 细料/硫磺单价'
+        unit_price = price_obj.xl if equip_no in ['F01', 'F02', 'F03'] else price_obj.lh
+        for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
+            name, day, classes, section = key.split('_')
+            coefficient = section_dic[section][0] / 100
+            post_coefficient = section_dic[section][2] / 100
+            if section_dic[section][1] == 1:  # 最大值
+                equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
+                price = round(count_ * coefficient * post_coefficient * unit_price, 2)
+                xl = price if equip in ['F01', 'F02', 'F03'] else 0
+                lh = price if equip in ['S01', 'S02'] else 0
+            else:  # 平均值
+                equip = list(value.keys())[0]
+                count_ = count(list(value.values())) / len(value)
+                xl = price if equip in ['F01', 'F02', 'F03'] else 0
+                lh = price if equip in ['S01', 'S02'] else 0
+                price = round(count_ * coefficient * post_coefficient * unit_price, 2)
+
+            if result1.get(name):
+                result1[name][f"{day}{classes}"] = price
+                result1[name]['xl'] += xl
+                result1[name]['lh'] += lh
+            else:
+                result1[name] = {'name': name, f"{day}{classes}": price, 'xl': xl, 'lh': lh}
+        return Response({'results': result, 'users': result1.values()})
 
 
 @method_decorator([api_recorder], name="dispatch")
 class EmployeeAttendanceRecordsView(APIView):
-    permission_classes = (IsAuthenticated,)
+    # permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -2710,27 +2729,17 @@ class SetThePriceViewSet(ModelViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceSummaryView(APIView):
 
-    # 其他补贴或惩罚
-    def post(self, request):
-        # SubsidyInfo.objects.create()
-        pass
-
     def get(self, request):
-        date = self.request.get('date')
-        name = self.request.query_params.get('name', '')
-        day_d = self.request.query_params.get('day_d', '')
-        group_d = self.request.query_params.get('group_d', '')
+        date = self.request.query_params.get('date')
+        name_d = self.request.query_params.get('name_d')
+        day_d = self.request.query_params.get('day_d')
+        group_d = self.request.query_params.get('group_d')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
-        this_month_start = datetime.datetime(year, month, 1)
-        if month == 12:
-            this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
-        else:
-            this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
         state_list = GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True)
         # 员工考勤记录 (考勤记录)
         user_query = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month)
-        queryset = user_query.values_list('name', 'section', 'date__day', 'group', 'equip', flat=True)
+        queryset = user_query.values_list('name', 'section', 'date__day', 'group', 'equip')
         user_dic = {}
         for item in queryset:
             key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}"
@@ -2738,10 +2747,10 @@ class PerformanceSummaryView(APIView):
 
         # user_dic 中添加classes属性
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
-                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day', flat=True)
-        for key in user_dic.keys():
+                                                start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day')
+        for key in list(user_dic.keys()):
             for item in group:
-                if item[2] == key.split('_')[0] and item[0] == key.split('_')[1]:
+                if str(item[2]) == key.split('_')[0] and item[0] == key.split('_')[1]:
                     user_dic[f"{key}_{item[1]}"] = user_dic[key]
                     user_dic[f"{key}_{item[1]}"]['classes'] = item[1]
                     user_dic.pop(key, None)
@@ -2759,20 +2768,15 @@ class PerformanceSummaryView(APIView):
             # 判断是否是丁基胶
             if ProductInfoDingJi.objects.filter(is_use=True, product_no=item['product_no']).exists():
                 for key in user_dic.keys():
-                    if key.split('_')[0] == item['factory_date__day'] and key.split('_')[4] == item['classes']:
+                    if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
                         user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
                         user_dic[key][f"{state}_pt_unit"] = price_obj.pt
             else:
                 for key in user_dic.keys():
-                    if key.split('_')[0] == item['factory_date__day'] and key.split('_')[4] == item['classes']:
+                    if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
                         user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
                         user_dic[key][f"{state}_dj_unit"] = price_obj.dj
-            """
-            user_dic: {
-            1_a班_投料_Z02_早班': {'name: '张三', 'section': '挤出', 'day': 1, 'equip_no': Z01, 'classes': '早班', '1MB_qty': 20, '1MB_unit': 1.10, ...}
-            }
-            """
-
+        # ========= begin
         # 称量设备的产量
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
         # 细料/硫磺单价
@@ -2780,16 +2784,19 @@ class PerformanceSummaryView(APIView):
         for equip_no in equip_list:
             price = price_obj.xl if equip_no in ['F01', 'F02', 'F03'] else price_obj.lh
             data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
-                                                       date_time__get=this_month_start,
-                                                       date_time__lte=this_month_end).values('date_time', 'grouptime').annotate(
-                'date_time', 'grouptime', 'repice', count=Count('actno'))
+                                                       date_time__istartswith=date
+                                                       ).values('date_time', 'grouptime').annotate(
+               count=Count('actno')).values('date_time', 'grouptime', 'recipe')
+
             for item in data:
-                day = int(item['date_time'].split('-')[-1])
-                state = item['repice'].split('-')[1]
-                for key in user_dic.keys():
-                    if item['grouptime'] == key.split('_')[4] and day == key.split('_')[0] and equip_no == key.split('_')[3]:
-                        user_dic[key][f"{state}_qty"] = user_dic[key].get(f"{state}_qty", 0) + item[0]
-                        user_dic[key][f"{state}_unit"] = price
+                if len(item['recipe'].split('-')) > 3:
+                    day = int(item['date_time'].split('-')[-1])
+                    state = item['recipe'].split('-')[1]
+                    for key in user_dic.keys():
+                        if item['grouptime'] == key.split('_')[4] and day == key.split('_')[0] and equip_no == key.split('_')[3]:
+                            user_dic[key][f"{state}_qty"] = user_dic[key].get(f"{state}_qty", 0) + item[0]
+                            user_dic[key][f"{state}_unit"] = price
+        # =============== end
         results = {}
         results1 = {}
         results2 = {}
@@ -2822,7 +2829,7 @@ class PerformanceSummaryView(APIView):
                 results1[key] = [v]
 
         if day_d and group_d:  # 计算详情
-            start_with = f"{name}_{day_d}_{group_d}"
+            start_with = f"{name_d}_{day_d}_{group_d}"
             results1 = {k: v for k, v in results1.items() if k.startswith(start_with)}
 
         for k, v in results1.items():
@@ -2868,12 +2875,12 @@ class PerformanceSummaryView(APIView):
                         results1[k][key] * results1[k][key_unit] * coefficient * post_coefficient, 2)
 
                     # 添加到results2
-                    if results2.get(f"{name}_{day}_{group}"):
-                        results2[f"{name}_{day}_{group}"][key_state] += results1[k][key_state]
-                        results2[f"{name}_{day}_{group}"]['price'] += results1[k]['price']
+                    k1 = f"{name}_{day}_{group}"
+                    if results2.get(k1):
+                        results2[k1][key_state] = results2[k1].get(key_state, 0) + results1[k][key_state]
+                        results2[k1]['price'] += results1[k]['price']
                     else:
-                        results2[f"{name}_{day}_{group}"] = {key_state: results1[k][key_state],
-                                                             'price': results1[k]['price']}
+                        results2[k1] = {key_state: results1[k][key_state], 'price': results1[k]['price']}
 
                     # 计算机台的产量
                     if results3.get(name):
@@ -2881,25 +2888,19 @@ class PerformanceSummaryView(APIView):
                     else:
                         results3[name] = {equip_no: results1[k][key]}
 
-            """
-            results1
-            处理 results1/ 计算价格的逻辑 * 岗位系数 * 合并系数 * 段次对应的价格，得到的这三条的价格总和
-        {
-            '张三_1_a班_主投': {'name': '张三', 'day': '1', 'section': '主投', 'equip_no': 'Z01', 'group': 'a班', '1MB_dj_qty': 21, '1MB_dj_unit': 1.1, 'price': 24.1, '1MB': 24.1}, 
-            '张三_1_a班_挤出': {'name': '张三', 'day': '1', 'section': '挤出', 'equip_no': 'Z02', 'group': 'a班', '1MB_dj_qty': 20, '1MB_dj_unit': 1.1, 'price': 20.36, '1MB': 20.36}, 
-            '张三_1_a班_投料': {'name': '张三', 'day': '1', 'section': '投料', 'equip_no': 'F01', 'group': 'a班', '1MB_qty': 10, '1MB_unit': 1.1, 'price': 14.31, '1MB': 14.31}}
-            """
         # 详情页面
         if day_d and group_d:
             detail = {}
-            hj = {'name': '产量工资小计'}
+            hj = {'name': '产量工资合计'}
+
             all_price = results2.get(f"{name}_{day_d}_{group_d}")
-            for k, v in all_price:
-                hj[k] = v
+            for k, v in all_price.items():
+                hj[k] = round(v, 2)
             for dic in results1.values():
-                equip = dic['equip_no']
+                equip = dic['equip']
                 section = dic['section']
                 for k, v in dic.items():
+                    # ====== begin
                     if equip in equip_list:  # 称量
                         key = f"{equip}-车数"
                         if k.split('_')[-1] == 'qty':
@@ -2916,7 +2917,7 @@ class PerformanceSummaryView(APIView):
                                     f"{equip}-岗位": {'name': f"{equip}-岗位", state: section}}
                                 )
                     else:  # 密炼
-                        key = f"{equip}普通-车数"
+                    # ======= end
                         if k.split('_')[-1] == 'qty':
                             state = k.split('_')[0]  # 1MB
                             type = '普通' if k.split('_')[1] == 'pt' else '丁基'
@@ -2933,6 +2934,7 @@ class PerformanceSummaryView(APIView):
                                     f"{equip}{type}-岗位": {'name': f"{equip}{type}-岗位", state: section}}
                                 )
             # 计算超产奖励
+            res = {'超产奖励': 0}
             ccjl = results3.get(name)  # {'Z01': 21, 'Z02': 20, 'F01': 10}
             equip_count = len(ccjl)
             for equip, count in ccjl.items():
@@ -2946,19 +2948,33 @@ class PerformanceSummaryView(APIView):
                         price = (count - s) * 5
                     else:
                         price = 0
-                detail['超产奖励'] = detail.get('超产奖励', 0) + price
-            detail['超产奖励'] = round(detail.get('超产奖励', 0) / equip_count, 2)
+                res['超产奖励'] += price
+            res['超产奖励'] = round(res.get('超产奖励', 0) / equip_count, 2)
 
-            return Response({'results': detail.values(), 'hj': hj, 'all_price': all_price['price'], '超产奖励': 1})
+            return Response({'results': detail.values(), 'hj': hj, 'all_price': round(all_price['price'], 2), '超产奖励': res['超产奖励']})
 
         for key in list(results2.keys()):
             name = key.split('_')[0]
             day = key.split('_')[1]
             group = key.split('_')[2]
+            price = round(results2[key]['price'], 2)
+
             if results.get(name):
-                results[name][f"{day}_{group}"] = results2[key]['price']
+                results[name][f"{day}_{group}"] = price
+                results[name]['hj'] += price
             else:
-                results[name] = {'name': name, f"{day}_{group}": results2[key]['price']}
+                results[name] = {'name': name, f"{day}_{group}": price, 'hj': price}
+            results[name]['hj'] = round(results[name]['hj'], 2)
+        # 统计其他补贴
+        query = SubsidyInfo.objects.filter(date__year=year, date__month=month).values('name', 'type').annotate(
+            sum=Sum('price'))
+        for item in query:
+            if item['type'] == 1:
+                results[item['name']]['其他奖惩'] = item['sum']
+            else:
+                results[item['name']]['生产补贴'] = item['sum']
+            results[item['name']]['all'] = results[item['name']].get('all', 0) + round(item['sum'], 2)
+
         # 计算超产奖励
         for k, v in results3.items():
             equip_count = len(v)
@@ -2975,5 +2991,15 @@ class PerformanceSummaryView(APIView):
                         price = 0
                 results[k]['超产奖励'] = results[k].get('超产奖励', 0) + price
             results[k]['超产奖励'] = round(results[k]['超产奖励'] / equip_count, 2)  # 按照平均值计算
+            results[k]['all'] = results[k].get('all', 0) + results[k]['超产奖励']
+            results[k]['all'] = round(results[k].get('all', 0) + results[k]['hj'], 2)
 
         return Response({'results': results.values()})
+
+
+class PerformanceSubsidyViewSet(ModelViewSet):
+    queryset = SubsidyInfo.objects.all()
+    serializer_class = SubsidyInfoSerializer
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = SubsidyInfoFilter

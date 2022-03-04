@@ -95,3 +95,12 @@ class ProductInfoDingJiFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = ProductInfoDingJi
         fields = ('product_no', 'product_name')
+
+
+class SubsidyInfoFilter(django_filters.rest_framework.FilterSet):
+    year = django_filters.CharFilter(field_name='date__year', help_text='year')
+    month = django_filters.CharFilter(field_name='date__month', help_text='month')
+
+    class Meta:
+        model = SubsidyInfo
+        fields = ('date', 'type', 'name', 'group', 'year', 'month')
