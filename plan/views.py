@@ -691,7 +691,7 @@ class SchedulingProductSafetyParamsViewSet(CommonDeleteMixin, ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class ProductDeclareSummaryViewSet(ModelViewSet):
-    queryset = SchedulingProductDemandedDeclareSummary.objects.order_by('sn')
+    queryset = SchedulingProductDemandedDeclareSummary.objects.order_by('available_time')
     serializer_class = SchedulingProductDemandedDeclareSummarySerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
@@ -746,7 +746,7 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             factory_date=factory_date).count()
         sn = c + 1
         for item in data:
-            if not item[0]:
+            if not item[0] or not item[1]:
                 continue
             area_list.append({'factory_date': factory_date,
                               'sn': sn,
@@ -761,9 +761,11 @@ class ProductDeclareSummaryViewSet(ModelViewSet):
             sn += 1
         s = self.serializer_class(data=area_list, many=True)
         s.is_valid(raise_exception=True)
+        min_stock_day = SchedulingParamsSetting.objects.first().min_stock_trains
         for item in s.validated_data:
-            item['target_stock'] = round(item['plan_weight'] * 1.5, 1)
-            item['demanded_weight'] = round(item['plan_weight'] * 1.5 - item['workshop_weight'] - item['current_stock'], 1)
+            item['target_stock'] = round(item['plan_weight'] * min_stock_day, 1)
+            demanded_weight = round(item['plan_weight'] * min_stock_day - item['workshop_weight'] - item['current_stock'], 1)
+            item['demanded_weight'] = demanded_weight if demanded_weight >= 0 else 0
         s.save()
         return Response('ok')
 
@@ -921,7 +923,7 @@ class SchedulingProceduresView(APIView):
         link_dict = {equip_no: links[idx] for idx, equip_no in enumerate(equip_nos)}
 
         for dec in SchedulingProductDemandedDeclareSummary.objects.filter(
-                factory_date=factory_date, demanded_weight__gt=0).order_by('sn'):
+                factory_date=factory_date, demanded_weight__gt=0).order_by('available_time'):
             try:
                 data = calculate_product_plan_trains(factory_date,
                                                      dec.product_no,

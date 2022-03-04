@@ -298,3 +298,46 @@ class MaterialReceiveSerializer(serializers.ModelSerializer):
         model = Material
         fields = ('material_no', 'material_name', 'for_short', 'material_type', 'package_unit', 'use_flag')
         read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class UserImportSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(max_length=150)
+    num = serializers.CharField(max_length=20)
+    section = serializers.CharField(max_length=512, allow_null=True, allow_blank=True)
+    group_extensions = serializers.CharField(max_length=512, allow_null=True, allow_blank=True)
+
+    def validate(self, attrs):
+        username = attrs['username']
+        num = attrs['num']
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError('已存在一位使用该名字的用户：{}'.format(username))
+        if User.objects.filter(num=num).exists():
+            raise serializers.ValidationError('已存在一位使用该工号的用户：{}'.format(num))
+        section_name = attrs.pop('section', None)
+        permissions = attrs.pop('group_extensions', None)
+        if section_name:
+            section = Section.objects.filter(name=section_name).first()
+            if not section:
+                raise serializers.ValidationError('未找到该部门：{}'.format(section_name))
+            attrs['section'] = section
+        if permissions:
+            permissions = permissions.split('/')
+            ps = []
+            for permission in permissions:
+                p = GroupExtension.objects.filter(name=permission).first()
+                if not p:
+                    raise serializers.ValidationError('未找到该角色：{}'.format(permission))
+                ps.append(p.id)
+                attrs['group_extensions'] = ps
+        return attrs
+
+    def create(self, validated_data):
+        password = validated_data.get('password')
+        user = super().create(validated_data)
+        user.set_password(password)
+        user.save()
+        return user
+
+    class Meta:
+        model = User
+        fields = ('username', 'password', 'num', 'phone_number', 'id_card_num', 'section', 'group_extensions')
