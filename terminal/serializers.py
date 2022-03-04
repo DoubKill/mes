@@ -1441,6 +1441,8 @@ class PlanSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"未找到配方{product_no_dev}通用配料信息")
             ml_equip_no = handle_equip_recipe[0]
         recipe_materials = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
+        if not recipe_materials:
+            raise serializers.ValidationError(f'{equip_no}未找到配方{recipe_obj.name}明细物料信息, 无法新增计划')
         mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
                                                          feeding_mode__startswith=equip_no[0],
                                                          handle_material_name__in=recipe_materials,

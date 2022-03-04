@@ -54,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials
+    get_manual_materials, get_current_factory_date
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1459,6 +1459,7 @@ class XLPlanVIewSet(ModelViewSet):
 
     @action(methods=['post'], detail=False, url_path='up_down_move', url_name='up_down_move')
     def up_down_move(self, request):
+        """称量计划上下移动"""
         equip_no = self.request.data.get('equip_no')
         c_id = self.request.data.get('c_id')
         n_id = self.request.data.get('n_id')
@@ -1472,6 +1473,53 @@ class XLPlanVIewSet(ModelViewSet):
             c_instance.save()
             n_instance.save()
         return Response('移动成功')
+
+    @action(methods=['post'], detail=False, url_path='rotate_classes', url_name='rotate_classes')
+    def rotate_classes(self, request):
+        """称量计划结转班次"""
+        equip_no = self.request.data.get('equip_no')
+        next_classes = self.request.data.get('next_classes')
+        factory_date = get_current_factory_date()
+        if not factory_date:
+            raise ValidationError('获取工厂日期和班次失败, 无法结转计划')
+        now_date, now_classes = factory_date.get('factory_date'), factory_date.get('classes')
+        date_time = now_date.strftime('%Y-%m-%d')
+        now_time = date_time + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 同班次不可结转
+        if now_classes == next_classes:
+            raise ValidationError('同班次无法结转计划')
+        with atomic(using=equip_no):
+            y_date_time = (now_date - timedelta(days=1)).strftime('%Y-%m-%d')
+            order_by_list = [0]
+            order_rule = ["date_time", "-grouptime", "order_by"] if now_classes > next_classes else ["date_time", "grouptime", "order_by"]
+            other_plan = Plan.objects.using(equip_no).filter(date_time__in=[y_date_time, date_time], grouptime__in=[now_classes, next_classes],
+                                                             state__in=['运行中', '等待']).order_by(*order_rule)
+            processing_plan = []
+            plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
+            for index, plan in enumerate(other_plan):
+                if plan.state == '运行中' and plan.actno >= 1:
+                    if processing_plan:
+                        raise ValidationError(f'当前班次[{now_classes}]运行中的计划超过1条, 无法结转')
+                    first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
+                    p_data = plan_datas[index]
+                    p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
+                                   'order_by': 1, 'date_time': date_time, 'setno': p_data['setno'] - p_data['actno'],
+                                   'actno': None, 'addtime': now_time})
+                    Plan.objects.using(equip_no).create(**p_data)
+                    order_by_list.append(1)
+                    plan.stoptime = now_time
+                    plan.state = '完成'
+                    plan.save()
+                    processing_plan.append(plan)
+                    continue
+                replace_order_by = max(order_by_list) + 1
+                plan.grouptime = next_classes
+                plan.order_by = replace_order_by
+                plan.oper = self.request.user.username
+                plan.date_time = now_time
+                plan.save()
+                order_by_list.append(replace_order_by)
+        return Response('切换班次计划成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
