@@ -1441,12 +1441,16 @@ class PlanSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(f"未找到配方{product_no_dev}通用配料信息")
             ml_equip_no = handle_equip_recipe[0]
         recipe_materials = list(RecipeMaterial.objects.using(equip_no).filter(recipe_name=recipe_obj.name).values_list('name', flat=True))
+        if not recipe_materials:
+            raise serializers.ValidationError(f'{equip_no}未找到配方{recipe_obj.name}明细物料信息, 无法新增计划')
         mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=ml_equip_no, type=4,
                                                          feeding_mode__startswith=equip_no[0],
                                                          handle_material_name__in=recipe_materials,
                                                          product_batching__stage_product_batch_no=product_no_dev,
                                                          product_batching__dev_type__category_name=dev_type)
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
+        if not mes_machine_weight:
+            raise serializers.ValidationError('获取mes设置重量失败, 无法比较重量')
         if recipe_obj.weight != mes_machine_weight:
             raise serializers.ValidationError(f'称量配方重量: {recipe_obj.weight}与mes配方不一致: {round(mes_machine_weight, 3)}')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],

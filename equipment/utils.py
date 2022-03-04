@@ -135,11 +135,11 @@ def get_staff_status(ding_api, section_name, group=''):
                   group=F('section_users__repair_group'),
                   uid=F('section_users__id'), leader=F('in_charge_user__username'),
                   leader_phone_number=F('in_charge_user__phone_number')) \
-        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group')
+        .values('username', 'phone_number', 'uid', 'leader', 'leader_phone_number', 'group', 'name')
     for staff in staffs:
         staff_dict = {'id': staff.get('uid'), 'phone_number': staff.get('phone_number'), 'optional': False,
                       'username': staff.get('username'), 'group': staff.get('group'), 'leader': staff.get('leader'),
-                      'leader_phone_number': staff.get('leader_phone_number')}
+                      'leader_phone_number': staff.get('leader_phone_number'), 'section_name': staff.get('name')}
         # 根据手机号获取用户钉钉uid
         ding_uid = ding_api.get_user_id(staff.get('phone_number'))
         if ding_uid:

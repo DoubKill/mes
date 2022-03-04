@@ -460,9 +460,14 @@ class MaterialTestMethodSerializer(BaseModelSerializer):
         return obj.data_point.values('id', 'name')
 
     def update(self, instance, validated_data):
+        ins_dts = set(instance.data_point.values_list('id', flat=True))
         data_point = validated_data.get('data_point', None)
         if data_point:
+            u_dts = set([d.id for d in data_point])
             instance.data_point.clear()
+            uncommon_dts1 = u_dts & ins_dts
+            uncommon_dts = ins_dts - uncommon_dts1
+            MaterialDataPointIndicator.objects.filter(material_test_method=instance, data_point_id__in=uncommon_dts).delete()
         return super().update(instance, validated_data)
 
     class Meta:
@@ -1962,6 +1967,7 @@ class MaterialTestPlanCreateSerializer(serializers.ModelSerializer):
 
     @atomic
     def create(self, validated_data):
+        validated_data['plan_uid'] = f"JH{datetime.now().strftime('%Y%m%d%H%M%S')}"
         material_list = validated_data.pop('material_list')
         material_test_plan = super().create(validated_data)
         for material_dic in material_list:
