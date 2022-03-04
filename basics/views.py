@@ -24,6 +24,7 @@ from rest_framework.decorators import action
 from rest_framework import status
 
 from spareparts.models import SpareLocationBinding
+from terminal.utils import get_current_factory_date
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -362,18 +363,5 @@ class CurrentClassView(APIView):
 class CurrentFactoryDate(APIView):
 
     def get(self, request):
-        # 获取当前时间的工厂日期，开始、结束时间
-        now = datetime.datetime.now()
-        current_work_schedule_plan = WorkSchedulePlan.objects.filter(
-            start_time__lte=now,
-            end_time__gte=now,
-            plan_schedule__work_schedule__work_procedure__global_name='密炼'
-        ).first()
-        if current_work_schedule_plan:
-            return Response(
-                {'factory_date': current_work_schedule_plan.plan_schedule.day_time,
-                 'classes': current_work_schedule_plan.classes.global_name
-                 }
-            )
-        else:
-            return Response({})
+        res = get_current_factory_date()
+        return Response(res)

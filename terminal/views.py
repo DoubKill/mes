@@ -54,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials
+    get_manual_materials, get_current_factory_date
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -1374,6 +1374,7 @@ class XLPlanVIewSet(ModelViewSet):
     """
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
+    pagination_class = None
     permission_classes = (IsAuthenticated,)
     filter_backends = [DjangoFilterBackend]
 
@@ -1408,13 +1409,12 @@ class XLPlanVIewSet(ModelViewSet):
         queryset = Plan.objects.using(equip_no).filter(**filter_kwargs).order_by('order_by')
         if not state:
             try:
-                page = self.paginate_queryset(queryset)
-                serializer = self.get_serializer(page, many=True)
+                serializer = self.get_serializer(queryset, many=True)
             except ConnectionDoesNotExist:
                 raise ValidationError('称量机台{}服务错误！'.format(equip_no))
             except Exception:
                 raise
-            return self.get_paginated_response(serializer.data)
+            return Response(serializer.data)
         else:
             e_days = 7 if equip_no.startswith('F') else 5
             s_time, e_time = now_date - timedelta(days=e_days), now_date
@@ -1459,12 +1459,13 @@ class XLPlanVIewSet(ModelViewSet):
 
     @action(methods=['post'], detail=False, url_path='up_down_move', url_name='up_down_move')
     def up_down_move(self, request):
+        """称量计划上下移动"""
         equip_no = self.request.data.get('equip_no')
         c_id = self.request.data.get('c_id')
         n_id = self.request.data.get('n_id')
         check_plan = Plan.objects.using(equip_no).filter(~Q(state='等待'), id__in=[c_id, n_id])
         if check_plan:
-            raise ValidationError('只有等待中的计划可以上下移动')
+            raise ValidationError('选中计划与被替换计划不全是等待状态')
         with atomic(using=equip_no):
             c_instance = Plan.objects.using(equip_no).get(id=c_id)
             n_instance = Plan.objects.using(equip_no).get(id=n_id)
@@ -1472,6 +1473,53 @@ class XLPlanVIewSet(ModelViewSet):
             c_instance.save()
             n_instance.save()
         return Response('移动成功')
+
+    @action(methods=['post'], detail=False, url_path='rotate_classes', url_name='rotate_classes')
+    def rotate_classes(self, request):
+        """称量计划结转班次"""
+        equip_no = self.request.data.get('equip_no')
+        next_classes = self.request.data.get('next_classes')
+        factory_date = get_current_factory_date()
+        if not factory_date:
+            raise ValidationError('获取工厂日期和班次失败, 无法结转计划')
+        now_date, now_classes = factory_date.get('factory_date'), factory_date.get('classes')
+        date_time = now_date.strftime('%Y-%m-%d')
+        now_time = date_time + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # 同班次不可结转
+        if now_classes == next_classes:
+            raise ValidationError('同班次无法结转计划')
+        with atomic(using=equip_no):
+            y_date_time = (now_date - timedelta(days=1)).strftime('%Y-%m-%d')
+            order_by_list = [0]
+            order_rule = ["date_time", "-grouptime", "order_by"] if now_classes > next_classes else ["date_time", "grouptime", "order_by"]
+            other_plan = Plan.objects.using(equip_no).filter(date_time__in=[y_date_time, date_time], grouptime__in=[now_classes, next_classes],
+                                                             state__in=['运行中', '等待']).order_by(*order_rule)
+            processing_plan = []
+            plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
+            for index, plan in enumerate(other_plan):
+                if plan.state == '运行中' and plan.actno:
+                    if processing_plan:
+                        raise ValidationError(f'当前班次[{now_classes}]运行中的计划超过1条, 无法结转')
+                    first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
+                    p_data = plan_datas[index]
+                    p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
+                                   'order_by': 1, 'date_time': date_time, 'setno': p_data['setno'] - p_data['actno'],
+                                   'actno': None, 'addtime': now_time})
+                    Plan.objects.using(equip_no).create(**p_data)
+                    order_by_list.append(1)
+                    plan.stoptime = now_time
+                    plan.state = '完成'
+                    plan.save()
+                    processing_plan.append(plan)
+                    continue
+                replace_order_by = max(order_by_list) + 1
+                plan.grouptime = next_classes
+                plan.order_by = replace_order_by
+                plan.oper = self.request.user.username
+                plan.date_time = now_time
+                plan.save()
+                order_by_list.append(replace_order_by)
+        return Response('切换班次计划成功')
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2507,9 +2555,6 @@ class XlRecipeNoticeView(APIView):
         already_add_recipe = []
         for single_equip_no in equip_no_list:
             send_materials = mes_xl_details.filter(equip_no=single_equip_no, feeding_mode__startswith=keywords, handle_material_name__in=same_material_list)
-            if not send_materials:
-                detail_msg += f'{single_equip_no}: 无配料明细可下发 '
-                continue
             not_keyword_material = mes_xl_details.filter(feeding_mode__startswith='C', equip_no=single_equip_no)
             send_recipe_name = f"{product_no.split('_NEW')[0]}({product_batching.dev_type.category_no}" + (")" if not not_keyword_material else f"-{single_equip_no}-ONLY)")
             if send_recipe_name in already_add_recipe:
@@ -2539,7 +2584,7 @@ class XlRecipeNoticeView(APIView):
         for recipe_name, recipe_materials in data.items():
             total_weight = recipe_materials.aggregate(total_weight=Sum('cnt_type_detail_equip__standard_weight'))['total_weight']
             if not total_weight:
-                raise ValidationError(f'下发物料重量无法解析{total_weight}')
+                total_weight = 0
             # 删除之前配方
             RecipePre.objects.using(xl_equip).filter(name=recipe_name).delete()
             RecipeMaterial.objects.using(xl_equip).filter(recipe_name=recipe_name).delete()
@@ -2548,26 +2593,18 @@ class XlRecipeNoticeView(APIView):
             n_time = datetime.datetime.now().replace(microsecond=0).strftime('%Y-%m-%d %H:%M:%S')
             # 添加配方数据
             tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=weight, project_name='all', only_num=True)
-            m_id = RecipePre.objects.using(xl_equip).aggregate(m_id=Max('id'))['m_id']
-            if not m_id:
-                raise ValidationError(f'无法解析{xl_equip}配方表主键')
-            RecipePre.objects.using(xl_equip).create(**{'id': m_id + 1, 'name': recipe_name, 'ver': dev_type,
-                                                        'weight': weight, 'error': tolerance, 'use_not': 0,
-                                                        'merge_flag': False, 'split_count': split_count, 'time': n_time})
+            RecipePre.objects.using(xl_equip).create(**{'name': recipe_name, 'ver': dev_type, 'weight': weight,
+                                                        'error': tolerance, 'use_not': 0, 'merge_flag': False,
+                                                        'split_count': split_count, 'time': n_time})
             # 添加配方明细数据
             recipe_material_list = []
-            n_id = RecipeMaterial.objects.using(xl_equip).aggregate(n_id=Max('id'))['n_id']
-            if not n_id:
-                raise ValidationError(f'无法解析{xl_equip}配方明细表主键')
-            add_ids = [n_id]
             for single in recipe_materials:
                 xl_name = single.handle_material_name
                 single_weight = round(single.cnt_type_detail_equip.standard_weight / split_count, 3)
                 # 单物料公差
                 single_tolerance = get_tolerance(batching_equip=xl_equip, standard_weight=single_weight, only_num=True)
-                create_data = {'id': max(add_ids) + 1, 'recipe_name': recipe_name, 'name': xl_name,
-                               'weight': single_weight, 'error': single_tolerance, 'time': n_time}
+                create_data = {'recipe_name': recipe_name, 'name': xl_name, 'weight': single_weight,
+                               'error': single_tolerance, 'time': n_time}
                 single_data = RecipeMaterial(**create_data)
-                add_ids.append(max(add_ids) + 1)
                 recipe_material_list.append(single_data)
             RecipeMaterial.objects.using(xl_equip).bulk_create(recipe_material_list)
