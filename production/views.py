@@ -2284,7 +2284,7 @@ class SummaryOfWeighingOutput(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class EmployeeAttendanceRecordsView(APIView):
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -2554,6 +2554,7 @@ class PerformanceSummaryView(APIView):
         name_d = self.request.query_params.get('name_d')
         day_d = self.request.query_params.get('day_d')
         group_d = self.request.query_params.get('group_d')
+        ccjl = self.request.query_params.get('ccjl')
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
         state_list = GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True)
@@ -2621,6 +2622,7 @@ class PerformanceSummaryView(APIView):
         results1 = {}
         results2 = {}
         results3 = {}
+        results4 = {}
         # 是否独立上岗
         independent = {}
         independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values_list('name', 'status')
@@ -2710,10 +2712,12 @@ class PerformanceSummaryView(APIView):
                         results2[k1] = {key_state: results1[k][key_state], 'price': results1[k]['price']}
 
                     # 计算机台的产量
-                    if results3.get(name):
-                        results3[name][equip_no] = results3[name].get(equip_no, 0) + results1[k][key]
+                    equip_no = results1[k]['equip']
+                    day = results1[k]['day']
+                    if results3.get(f'{name}_{day}'):
+                        results3[f'{name}_{day}'][equip_no] = results3[f'{name}_{day}'].get(equip_no, 0) + results1[k][key]
                     else:
-                        results3[name] = {equip_no: results1[k][key]}
+                        results3[f'{name}_{day}'] = {equip_no: results1[k][key]}
 
         # 详情页面
         if day_d and group_d:
@@ -2763,19 +2767,21 @@ class PerformanceSummaryView(APIView):
                                 )
             # 计算超产奖励
             res = {'超产奖励': 0}
-            ccjl = results3.get(name)  # {'Z01': 21, 'Z02': 20, 'F01': 10}
+            ccjl = results3.get(f'{name}_{day_d}')  # {'Z01': 21, 'Z02': 20, 'F01': 10}
             equip_count = len(ccjl)
             for equip, count in ccjl.items():
+                price = 0
                 if max_value.get(equip) and settings_value.__dict__.get(
                         equip):  # 超产奖励 = (机台最大值-机台目标值)*5 + (实际产量-机台最大值)*15
                     m = max_value.get(equip)
                     s = settings_value.__dict__.get(equip)
-                    if count > m:
-                        price = (m - s) * 5 + (count - m) * 15
-                    elif count < max_value and count > s:
-                        price = (count - s) * 5
-                    else:
+                    if count < s:
                         price = 0
+                    elif count > m:
+                        price = (m - s) * 5 + (count - m) * 15
+                    elif count < m and count > s:
+                        price = (count - s) * 5
+
                 res['超产奖励'] += price
             res['超产奖励'] = round(res.get('超产奖励', 0) / equip_count, 2)
 
@@ -2805,29 +2811,43 @@ class PerformanceSummaryView(APIView):
 
         # 计算超产奖励
         for k, v in results3.items():
+            name = k.split('_')[0]
+            day = k.split('_')[1]
             equip_count = len(v)
             for equip, count in v.items():  # {'Z01': 21, 'Z02': 20, 'F01': 10}
-                if max_value.get(equip) and settings_value.__dict__.get(
+                price = 0
+                if max_value.get(equip) and settings_value.__dict__.get(  #todo 奖励系数添加到公共代码
                         equip):  # 超产奖励 = (机台最大值-机台目标值)*5 + (实际产量-机台最大值)*15
                     m = max_value.get(equip)
                     s = settings_value.__dict__.get(equip)
-                    if count > m:
-                        price = (m - s) * 5 + (count - m) * 15
-                    elif count < max_value and count > s:
-                        price = (count - s) * 5
-                    else:
+                    if count < s:
                         price = 0
-                results[k]['超产奖励'] = results[k].get('超产奖励', 0) + price
-            results[k]['超产奖励'] = round(results[k]['超产奖励'] / equip_count, 2)  # 按照平均值计算
-            results[k]['all'] = results[k].get('all', 0) + results[k]['超产奖励']
+                    elif count > m:
+                        price = (m - s) * 5 + (count - m) * 15
+                    elif count < m and count > s:
+                        price = (count - s) * 5
+                results[name]['超产奖励'] = results[name].get('超产奖励', 0) + price
+                date = f"{year}-{month}-{day}"
+                if results4.get(name):
+                    results4[name][date] = results4[name].get(date, 0) + price
+                else:
+                    results4[name] = {date: price}
+            results4[name][date] = round(results4[name][date] / equip_count, 2)
+            results[name]['超产奖励'] = round(results[name]['超产奖励'] / equip_count, 2)  # 按照平均值计算
+            results[name]['all'] = results[name].get('all', 0) + results[name]['超产奖励']
             # 添加定岗系数, 定岗薪资 * 1， 非定岗薪资 * 0.8  #todo 添加到公共代码
             a = 1
-            if independent.get(k, 1) == False:
+            if independent.get(name, 1) == False:
                 a = 0.8
-            results[k]['是否定岗'] = independent.get(k, None)
-            results[k]['hj'] = round(results[k]['hj'] * a, 2)
-            results[k]['all'] = round(results[k].get('all', 0) + results[k]['hj'], 2)
-
+            results[name]['是否定岗'] = independent.get(name, None)
+            results[name]['hj'] = round(results[name]['hj'] * a, 2)
+            results[name]['all'] = round(results[name].get('all', 0) + results[name]['hj'], 2)
+        if ccjl:  # 超产奖励详情
+            if results4.get(name_d):
+                data = results4.get(name_d)
+                res = [{'date': k, 'price': v} for k, v in data.items() if data[k]]
+                return Response({'results': sorted(res, key=lambda x: x['date'])})
+            return Response({'results': None})
         if name_d:  # 名字过滤
             return Response({'results': [results.get(key) for key in results.keys() if key.startswith(name_d)]})
         return Response({'results': results.values()})
@@ -2890,7 +2910,9 @@ class IndependentPostTemplateView(APIView):
             else:
                 raise ValidationError('导入的格式有误')
 
-            if not IndependentPostTemplate.objects.filter(date_time=date, name=name).exists():
+            if IndependentPostTemplate.objects.filter(date_time=date, name=name).exists():
+                IndependentPostTemplate.objects.filter(date_time=date, name=name).update(status=status)
+            else:
                 lst.append(IndependentPostTemplate(name=name, status=status, date_time=date))
         IndependentPostTemplate.objects.bulk_create(lst)
         return Response(f'导入成功')
