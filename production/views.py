@@ -2337,6 +2337,8 @@ class EmployeeAttendanceRecordsView(APIView):
         group_list = []
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
+        if cur_sheet.cell(0, 0).value != '机台/时间':
+            raise ValidationError('导入文件有误')
         try:
             equip_list = []
             for i in range(2, rows):
