@@ -110,7 +110,6 @@ urlpatterns = [
 
     # 密炼机台产量汇总表
     path('summary-of-mill-output/', SummaryOfMillOutput.as_view()),
-    # path('monthly-output-statistics-and-performance/', MonthlyOutputStatisticsAndPerformance.as_view()),
     # 称量设备产量汇总表
     path('summary-of-weighing-output/', SummaryOfWeighingOutput.as_view()),
 
@@ -122,6 +121,9 @@ urlpatterns = [
     path('performance-unit-price/', PerformanceUnitPriceView.as_view()),
     # 员工绩效汇总
     path('performance-summary/', PerformanceSummaryView.as_view()),
+
+    # 是否独立上岗模版
+    path('independent-post-template/', IndependentPostTemplateView.as_view()),
 
 
     # 月产量完成报表

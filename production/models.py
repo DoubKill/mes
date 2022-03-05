@@ -399,7 +399,7 @@ class PerformanceJobLadder(models.Model):
         (2, '平均值')
     )
     code = models.CharField(help_text='岗位编号', max_length=64, unique=True)
-    name = models.CharField(help_text='岗位名称', max_length=64, unique=True)
+    name = models.CharField(help_text='岗位名称', max_length=64)
     type = models.CharField(help_text='岗位类别', max_length=64, null=True, blank=True)
     coefficient = models.IntegerField(help_text='绩效系数')
     post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
@@ -448,7 +448,7 @@ class SubsidyInfo(models.Model):
     )
     date = models.DateField(help_text='日期')
     type = models.PositiveIntegerField(help_text='补贴类别', choices=Type, default=1)
-    name = models.CharField(max_length=64)
+    name = models.CharField(max_length=64, help_text='姓名')
     group = models.CharField(max_length=12, help_text='班组')
     price = models.IntegerField(help_text='补贴/奖励金额')
     desc = models.TextField(help_text='补贴说明', null=True, blank=True)
@@ -456,3 +456,13 @@ class SubsidyInfo(models.Model):
     class Meta:
         db_table = 'subsidy_info'
         verbose_name_plural = verbose_name = '员工绩效汇总'
+
+
+class IndependentPostTemplate(models.Model):
+    name = models.CharField(max_length=64, help_text='姓名')
+    status = models.BooleanField(help_text='是否独立上岗', default=1)
+    date_time = models.CharField(max_length=12, help_text='日期：2022-3')
+
+    class Meta:
+        db_table = 'independent_post_template'
+        verbose_name_plural = verbose_name = '是否独立上岗'

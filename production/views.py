@@ -43,11 +43,11 @@ from plan.models import ProductClassesPlan
 from basics.models import Equip
 from production.filters import TrainsFeedbacksFilter, PalletFeedbacksFilter, QualityControlFilter, EquipStatusFilter, \
     PlanStatusFilter, ExpendMaterialFilter, CollectTrainsFeedbacksFilter, UnReachedCapacityCause, \
-    ProductInfoDingJiFilter, SubsidyInfoFilter
+    ProductInfoDingJiFilter, SubsidyInfoFilter, PerformanceJobLadderFilter
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, OperationLog, \
     QualityControl, ProcessFeedback, AlarmLog, MaterialTankStatus, ProductionDailyRecords, ProductionPersonnelRecords, \
     RubberCannotPutinReason, MachineTargetYieldSettings, EmployeeAttendanceRecords, PerformanceJobLadder, \
-    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo
+    PerformanceUnitPrice, ProductInfoDingJi, SetThePrice, SubsidyInfo, IndependentPostTemplate
 from production.serializers import QualityControlSerializer, OperationLogSerializer, ExpendMaterialSerializer, \
     PlanStatusSerializer, EquipStatusSerializer, PalletFeedbacksSerializer, TrainsFeedbacksSerializer, \
     ProductionRecordSerializer, TrainsFeedbacksBatchSerializer, CollectTrainsFeedbacksSerializer, \
@@ -2073,189 +2073,6 @@ class MonthlyOutputStatisticsReport(APIView):
             return Response({'result': result, 'wl': wl, 'jl': jl})
 
 
-# @method_decorator([api_recorder], name="dispatch")
-# class MonthlyOutputStatisticsAndPerformance(APIView):
-#     permission_classes = (IsAuthenticated,)
-#
-#     def my_order(self, result, order):
-#         lst = []
-#         for dic in result:
-#             if dic['state'] in order:
-#                 lst.append(dic)
-#         res = sorted(lst, key=lambda x: order.index(x['state']))
-#         return res
-#
-#     def get_max_value(self, equip, last_date, group_list):
-#         from django.db import connection
-#         cursor = connection.cursor()
-#         if equip:
-#             filter_kwargs = f""" WHERE equip_no = '{equip}' AND to_char( FACTORY_DATE, 'YYYY-MM-DD' ) <= '{last_date}' GROUP BY CLASSES, FACTORY_DATE ) """
-#         else:
-#             filter_kwargs = f""" WHERE to_char( FACTORY_DATE, 'YYYY-MM-DD' ) <= '{last_date}' GROUP BY CLASSES, FACTORY_DATE ) """
-#         cursor.execute(
-#             # f"""
-#             # SELECT
-#             #     max( count ) count,
-#             #     classes,
-#             #     RIGHT ( days, 2 ) days
-#             # FROM
-#             #     (
-#             #     SELECT count( id ) count, classes, DATE_FORMAT( factory_date, '%Y%m%d' ) days FROM trains_feedbacks
-#             #     where equip_no='{equip}' and factory_date <= '{last_date}' GROUP BY classes, factory_date
-#             #      ) AS a
-#             # GROUP BY
-#             #     RIGHT ( a.days, 2 ),
-#             #     classes
-#             # """
-#             f"""
-#             SELECT MAX( COUNT ) COUNT, classes, days
-#             FROM
-#                 (SELECT
-#                     MAX( COUNT ) COUNT, CLASSES, TO_CHAR( FACTORY_DATE, 'dd' ) days
-#                 FROM
-#                     ( SELECT COUNT( id ) COUNT, CLASSES, FACTORY_DATE FROM TRAINS_FEEDBACKS
-#                    {filter_kwargs}
-#                 GROUP BY CLASSES, TO_CHAR( FACTORY_DATE, 'dd' )
-#                 )
-#             GROUP BY classes, days ORDER BY days
-#             """
-#         )
-#
-#         row = cursor.fetchall()
-#         dic = {'state': '机台最高值', 'count': 0}
-#         for i in row:
-#             try:
-#                 s = group_list[int(i[2]) - 1]
-#             except:
-#                 raise ValidationError('请先去添加排班计划')
-#             classes = s[0] if i[1] == '早班' else s[1]
-#             key = f'{int(i[2])}{classes}'
-#
-#             if dic.get(key):
-#                 dic[key] += i[0]
-#             else:
-#                 dic[key] = i[0]
-#             dic['count'] += i[0]
-#         return dic
-#
-#     def get_settings_value(self, equip, settings_queryset, group_list):
-#         dic = {'state': '机台目标值', 'count': 0}
-#         group_index = [index + 1 for index in range(len(group_list))]
-#         settings_index = [i['input_datetime__day'] for i in settings_queryset]
-#         no_settings = list(set(group_index).difference(set(settings_index)))
-#
-#         for i in settings_queryset:
-#             s = group_list[int(i['input_datetime__day']) - 1]
-#             for classes in s:
-#                 key = f"{int(i['input_datetime__day'])}{classes}"
-#                 if dic.get(key):
-#                     dic[key] += i[equip]
-#                 else:
-#                     dic[key] = i[equip]
-#                 dic['count'] += i[equip]
-#         # 当天没有设定值则取本月的最后一条
-#         for i in no_settings:
-#             value = settings_queryset[-1][equip]
-#             group = group_list[i - 1]
-#             for classes in group:
-#                 key = f"{i}{classes}"
-#                 dic[key] = value
-#                 dic['count'] += value
-#         return dic
-#
-#     def get(self, request):
-#         params = self.request.query_params
-#         unit = params.get('unit', '车')
-#         date = params.get('date')
-#         equip = params.get('equip')
-#         year = int(date.split('-')[0]) if date else datetime.date.today().year
-#         month = int(date.split('-')[1]) if date else datetime.date.today().month
-#         equip_kwargs = {'equip_no': equip} if equip else {}
-#         this_month_start = datetime.datetime(year, month, 1)
-#         if month == 12:
-#             this_month_end = datetime.datetime(year + 1, 1, 1) - timedelta(days=1)
-#         else:
-#             this_month_end = datetime.datetime(year, month + 1, 1) - timedelta(days=1)
-#         last_date = datetime.datetime.strftime(datetime.datetime(year, month, 1) - datetime.timedelta(days=1), '%Y-%m-%d')
-#         kwargs = {'count': Count('id')} if unit == '车' else {'count': Sum('actual_weight')}
-#         # 获取班组
-#         group = WorkSchedulePlan.objects.filter(start_time__date__gte=this_month_start,
-#                                                 start_time__date__lte=this_month_end).values('group__global_name', 'start_time__date').order_by('start_time')
-#         group_list = []
-#         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
-#             group_list.append([item['group__global_name'] for item in group])
-#
-#         queryset = TrainsFeedbacks.objects.filter(factory_date__gte=this_month_start, factory_date__lte=this_month_end, **equip_kwargs).values(
-#             'classes', 'factory_date', 'product_no').annotate(**kwargs)
-#         jl = {'jl': {'state': '加硫小计', 'count': 0}}
-#         wl = {'wl': {'state': '无硫小计', 'count': 0}}
-#         hj = {'hj': {'state': '无硫/加硫合计', 'count': 0}}
-#         # 获取机台目标值
-#         if equip == '190E':
-#             equip = 'E190'
-#         if equip:
-#             settings_queryset = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
-#                                                       input_datetime__month=month).values(f'{equip}','input_datetime__day').order_by('id')
-#             if settings_queryset.exists():
-#                 settings_value = self.get_settings_value(equip, list(settings_queryset), group_list)
-#             else:
-#                 settings_value = {'state': '机台目标值', 'count': 0}
-#             # 获取历史每日生产最大值
-#             max_value = self.get_max_value(equip, last_date, group_list)
-#         else:
-#             settings_value = {'state': '机台目标值', 'count': 0}
-#             max_value = {'state': '机台最高值', 'count': 0}
-#
-#         for item in queryset:
-#             state = item['product_no'].split('-')[1]
-#             day = item['factory_date'].day
-#             count = item['count'] if unit == '车' else item['count'] / 1000
-#             classes = group_list[day - 1][0] if item['classes'] == '早班' else group_list[day - 1][1]
-#             if hj['hj'].get(f'{day}{classes}'):
-#                 hj['hj'][f'{day}{classes}'] += count
-#             else:
-#                 hj['hj'][f'{day}{classes}'] = count
-#             hj['hj']['count'] += count
-#             if state in ['RE', 'FM', 'RFM']:
-#                 if jl.get(state):
-#                     if jl[state].get(f'{day}{classes}'):
-#                         jl[state][f'{day}{classes}'] += count
-#                     else:
-#                         jl[state][f'{day}{classes}'] = count
-#                     jl[state]['count'] += count
-#                 else:
-#                     jl[state] = {'state': state, f'{day}{classes}': count, 'count': count}
-#                 if jl['jl'].get(f'{day}{classes}'):
-#                     jl['jl'][f'{day}{classes}'] += count
-#                 else:
-#                     jl['jl'][f'{day}{classes}'] = count
-#                 jl['jl']['count'] += count
-#             else:
-#                 if wl.get(state):
-#                     if wl[state].get(f'{day}{classes}'):
-#                         wl[state][f'{day}{classes}'] += count
-#                     else:
-#                         wl[state][f'{day}{classes}'] = count
-#                     wl[state]['count'] += count
-#                 else:
-#                     wl[state] = {'state': state, f'{day}{classes}': count, 'count': count}
-#                 if wl['wl'].get(f'{day}{classes}'):
-#                     wl['wl'][f'{day}{classes}'] += count
-#                 else:
-#                     wl['wl'][f'{day}{classes}'] = count
-#                 wl['wl']['count'] += count
-#
-#         jl_order = ['RE', 'FM', 'RFM', '加硫小计']
-#         wl_order = ['1MB', '2MB', '3MB', 'HMB', 'CMB', 'RMB', '无硫小计']
-#         wl = self.my_order(list(wl.values()), wl_order)
-#         jl = self.my_order(list(jl.values()), jl_order)
-#         hj = list(hj.values())
-#         hj.append(settings_value)
-#         hj.append(max_value)
-#
-#         return Response({'wl': wl, 'jl': jl, 'hj': hj, 'group_list': group_list})
-
-
 @method_decorator([api_recorder], name="dispatch")
 class DailyProductionCompletionReport(APIView):
     permission_classes = (IsAuthenticated,)
@@ -2520,51 +2337,51 @@ class EmployeeAttendanceRecordsView(APIView):
         group_list = []
         for key, group in groupby(list(group), key=lambda x: x['start_time__date']):
             group_list.append([item['group__global_name'] for item in group])
-
-        equip_list = []
-        for i in range(2, rows):
-            equip_list.append(cur_sheet.cell(i, 0).value[0:3])
-        for i in equip_list:
-            index = equip_list.index(i)
-            if not equip_list[index]:
-                equip_list[index] = equip_list[index - 1]
-
-        section_list = []
-        for i in range(2, rows):
-            section_list.append(cur_sheet.cell(i, 1).value)
-        start_row = 2
-        rows_num = cur_sheet.nrows  # sheet行数
-        if rows_num <= start_row:
-            return []
-        ret = [None] * (rows_num - start_row)
-        for i in range(start_row, rows_num):
-            ret[i - start_row] = cur_sheet.row_values(i)[2:]
-        data = ret
-        records_lst = []
-        # 判断出勤记录是否存在，存在就更新
-        records = list(EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month).values(
-            'name', 'section', 'date', 'group', 'equip'))
-        for names in data:
-            index = data.index(names)
-            for i, name in enumerate(names):
-                if name:
-                    day = (i // 2) + 1
-                    date_ = f'{date}-{day}'
-                    name = name
-                    section = section_list[index]
-                    group = group_list[day - 1][i % 2]
-                    equip = equip_list[index]
-                    dic = {'name': name, 'section': section, 'date': date_, 'group': group, 'equip': equip}
-                    dic2 = dic.copy()
-                    dic2.pop('name')
-                    if dic in records:
-                        continue
-                    if EmployeeAttendanceRecords.objects.filter(**dic2).exists():
-                        EmployeeAttendanceRecords.objects.filter(**dic2).update(name=name)
-                        continue
-                    records_obj = EmployeeAttendanceRecords(**dic)
-                    records_lst.append(records_obj)
-        EmployeeAttendanceRecords.objects.bulk_create(records_lst)
+        try:
+            equip_list = []
+            for i in range(2, rows):
+                equip_list.append(cur_sheet.cell(i, 0).value[0:3])
+            for i in equip_list:
+                index = equip_list.index(i)
+                if not equip_list[index]:
+                    equip_list[index] = equip_list[index - 1]
+            section_list = []
+            for i in range(2, rows):
+                section_list.append(cur_sheet.cell(i, 1).value)
+            start_row = 2
+            rows_num = cur_sheet.nrows  # sheet行数
+            if rows_num <= start_row:
+                return []
+            ret = [None] * (rows_num - start_row)
+            for i in range(start_row, rows_num):
+                ret[i - start_row] = cur_sheet.row_values(i)[2:]
+            data = ret
+            records_lst = []
+            # 判断出勤记录是否存在，存在就更新
+            records = list(EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month).values(
+                'name', 'section', 'date', 'group', 'equip'))
+            for names in data:
+                index = data.index(names)
+                for i, name in enumerate(names):
+                    if name:
+                        day = (i // 2) + 1
+                        date_ = f'{date}-{day}'
+                        name = name
+                        section = section_list[index]
+                        group = group_list[day - 1][i % 2]
+                        equip = equip_list[index]
+                        dic = {'name': name, 'section': section, 'date': date_, 'group': group, 'equip': equip}
+                        dic2 = dic.copy()
+                        dic2.pop('name')
+                        if dic in records:
+                            continue
+                        if EmployeeAttendanceRecords.objects.filter(**dic2).exists():
+                            EmployeeAttendanceRecords.objects.filter(**dic2).update(name=name)
+                            continue
+                        records_obj = EmployeeAttendanceRecords(**dic)
+                        records_lst.append(records_obj)
+            EmployeeAttendanceRecords.objects.bulk_create(records_lst)
+        except: raise ValidationError('导入文件格式有误')
         return Response(f'导入成功')
 
 
@@ -2656,7 +2473,8 @@ class PerformanceJobLadderViewSet(ModelViewSet):
     queryset = PerformanceJobLadder.objects.filter(delete_flag=False)
     serializer_class = PerformanceJobLadderSerializer
     permission_classes = (IsAuthenticated,)
-    filter_fields = ('name',)
+    filter_backends = (DjangoFilterBackend,)
+    filter_class = PerformanceJobLadderFilter
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -2765,6 +2583,8 @@ class PerformanceSummaryView(APIView):
             equip_type = Equip.objects.filter(equip_no=equip_no).values('category__category_no')[0]['category__category_no']
             state = item['product_no'].split('-')[1]
             price_obj = PerformanceUnitPrice.objects.filter(equip_type=equip_type, state=state).first()
+            if not price_obj:
+                PerformanceUnitPrice.objects.create(state=state, equip_type=equip_type, dj=1.2, pt=1.1)
             # 判断是否是丁基胶
             if ProductInfoDingJi.objects.filter(is_use=True, product_no=item['product_no']).exists():
                 for key in user_dic.keys():
@@ -2776,7 +2596,6 @@ class PerformanceSummaryView(APIView):
                     if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
                         user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
                         user_dic[key][f"{state}_dj_unit"] = price_obj.dj
-        # ========= begin
         # 称量设备的产量
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
         # 细料/硫磺单价
@@ -2796,11 +2615,15 @@ class PerformanceSummaryView(APIView):
                         if item['grouptime'] == key.split('_')[4] and day == key.split('_')[0] and equip_no == key.split('_')[3]:
                             user_dic[key][f"{state}_qty"] = user_dic[key].get(f"{state}_qty", 0) + item[0]
                             user_dic[key][f"{state}_unit"] = price
-        # =============== end
         results = {}
         results1 = {}
         results2 = {}
         results3 = {}
+        # 是否独立上岗
+        independent = {}
+        independent_lst = IndependentPostTemplate.objects.filter(date_time=date).values_list('name', 'status')
+        for item in independent_lst:
+            independent[item[0]] = item[1]
 
         # 取机台历史最大值
         max_value = {}
@@ -2810,8 +2633,10 @@ class PerformanceSummaryView(APIView):
             if not max_value.get(f"{item['equip_no']}"):
                 max_value[f"{item['equip_no']}"] = item['qty']
         # 取每个机台设定的目标值
-        settings_value = MachineTargetYieldSettings.objects.order_by('id').last()
-
+        settings_value = MachineTargetYieldSettings.objects.filter(input_datetime__year=year,
+                                                                   input_datetime__month=month).last()
+        if not settings_value:
+            settings_value = MachineTargetYieldSettings.objects.last()
         # 计算薪资
         section_info = {}
         for item in PerformanceJobLadder.objects.values('name', 'coefficient', 'post_standard', 'post_coefficient', 'type'):
@@ -2892,15 +2717,17 @@ class PerformanceSummaryView(APIView):
         if day_d and group_d:
             detail = {}
             hj = {'name': '产量工资合计'}
-
+            # 添加定岗系数, 定岗薪资 * 1， 非定岗薪资 * 0.8  #todo 添加到公共代码
+            a = 1
+            if independent.get(name_d, 1) == False:  # 非定岗
+                a = 0.8
             all_price = results2.get(f"{name}_{day_d}_{group_d}")
             for k, v in all_price.items():
-                hj[k] = round(v, 2)
+                hj[k] = round(v * a, 2)
             for dic in results1.values():
                 equip = dic['equip']
                 section = dic['section']
                 for k, v in dic.items():
-                    # ====== begin
                     if equip in equip_list:  # 称量
                         key = f"{equip}-车数"
                         if k.split('_')[-1] == 'qty':
@@ -2917,7 +2744,6 @@ class PerformanceSummaryView(APIView):
                                     f"{equip}-岗位": {'name': f"{equip}-岗位", state: section}}
                                 )
                     else:  # 密炼
-                    # ======= end
                         if k.split('_')[-1] == 'qty':
                             state = k.split('_')[0]  # 1MB
                             type = '普通' if k.split('_')[1] == 'pt' else '丁基'
@@ -2951,7 +2777,7 @@ class PerformanceSummaryView(APIView):
                 res['超产奖励'] += price
             res['超产奖励'] = round(res.get('超产奖励', 0) / equip_count, 2)
 
-            return Response({'results': detail.values(), 'hj': hj, 'all_price': round(all_price['price'], 2), '超产奖励': res['超产奖励']})
+            return Response({'results': detail.values(), 'hj': hj, 'all_price': round(all_price['price'] * a, 2), '超产奖励': res['超产奖励']})
 
         for key in list(results2.keys()):
             name = key.split('_')[0]
@@ -2992,14 +2818,77 @@ class PerformanceSummaryView(APIView):
                 results[k]['超产奖励'] = results[k].get('超产奖励', 0) + price
             results[k]['超产奖励'] = round(results[k]['超产奖励'] / equip_count, 2)  # 按照平均值计算
             results[k]['all'] = results[k].get('all', 0) + results[k]['超产奖励']
+            # 添加定岗系数, 定岗薪资 * 1， 非定岗薪资 * 0.8  #todo 添加到公共代码
+            a = 1
+            if independent.get(k, 1) == False:
+                a = 0.8
+            results[k]['是否定岗'] = independent.get(k, None)
+            results[k]['hj'] = round(results[k]['hj'] * a, 2)
             results[k]['all'] = round(results[k].get('all', 0) + results[k]['hj'], 2)
 
+        if name_d:  # 名字过滤
+            return Response({'results': [results.get(key) for key in results.keys() if key.startswith(name_d)]})
         return Response({'results': results.values()})
 
 
+@method_decorator([api_recorder], name="dispatch")
 class PerformanceSubsidyViewSet(ModelViewSet):
-    queryset = SubsidyInfo.objects.all()
+    queryset = SubsidyInfo.objects.order_by('id')
     serializer_class = SubsidyInfoSerializer
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = SubsidyInfoFilter
+    pagination_class = None
+
+    @atomic
+    def create(self, request, *args, **kwargs):
+        for data in request.data:
+            if data.get('id'):
+                SubsidyInfo.objects.filter(id=data.get('id')).update(**data)
+            else:
+                serializer = SubsidyInfoSerializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+        return Response(status=status.HTTP_200_OK)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class IndependentPostTemplateView(APIView):
+
+    def get(self, request):
+        date = self.request.query_params.get('date')
+        export = self.request.query_params.get('export')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
+        # 导出是否独立上岗模版
+
+        if export:
+            names = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month).values_list('name', flat=True).distinct()
+            if names:
+                data = [{'name': name, 'state': '是'} for name in list(names)]
+                return gen_template_response({'姓名': 'name', '是否独立上岗': 'state'}, data, '是否独立上岗模版')
+            raise ValidationError('当月没有考勤记录')
+
+    @atomic
+    def post(self, request):
+        date = self.request.data.get('date')
+        excel_file = request.FILES.get('file', None)
+        if not excel_file:
+            raise ValidationError('文件不可为空！')
+        cur_sheet = get_cur_sheet(excel_file)
+        rows = cur_sheet.nrows
+        lst = []
+        for i in range(1, rows):
+            name = cur_sheet.cell(i, 0).value
+            value = cur_sheet.cell(i, 1).value
+            if value == '是':
+                status = 1
+            elif value == '否':
+                status = 0
+            else:
+                raise ValidationError('导入的格式有误')
+
+            if not IndependentPostTemplate.objects.filter(date_time=date, name=name).exists():
+                lst.append(IndependentPostTemplate(name=name, status=status, date_time=date))
+        IndependentPostTemplate.objects.bulk_create(lst)
+        return Response(f'导入成功')
