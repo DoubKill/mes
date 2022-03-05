@@ -28,6 +28,7 @@ class User(AbstractUser):
     workshop = models.CharField(max_length=32, help_text='车间', verbose_name='车间', blank=True, null=True)
     technology = models.CharField(max_length=32, help_text='技术资格', verbose_name='技术资格', blank=True, null=True)
     repair_group = models.CharField(max_length=32, help_text='维修班组', verbose_name='维修班组', blank=True, null=True)
+    id_card_num = models.CharField(max_length=18, help_text='身份证号码', blank=True, null=True)
 
     def __str__(self):
         return "{}".format(self.username)

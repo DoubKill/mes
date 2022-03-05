@@ -133,6 +133,18 @@ def batching_post_save(sender, instance=None, created=False, update_fields=None,
             if not len(actual_trains_set) == len(common_trains_set):
                 return
 
+            # 判定所有数据点都是否已检测完成
+            data_points = set(MaterialDataPointIndicator.objects.filter(
+                material_test_method__material__material_no=material_test_order.product_no,
+                material_test_method__is_judged=True,
+                delete_flag=False).values_list('data_point__name', flat=True))
+            tested_data_points = set(MaterialTestResult.objects.filter(
+                material_test_order_id__in=test_orders.values_list('id', flat=True)
+            ).values_list('data_point_name', flat=True))
+            common_data_points = data_points & tested_data_points
+            if not len(data_points) == len(common_data_points):
+                return
+
             # 判断该托盘所有test_order检测结果
 
             # 1、不合格车数以及pass章车数相等且大于0，则判定为PASS章

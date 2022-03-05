@@ -1,7 +1,7 @@
 # Create your views here.
 import datetime
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.db.transaction import atomic
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
@@ -66,6 +66,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
             return (IsAuthenticated(),)
 
     def list(self, request, *args, **kwargs):
+        mc_code = self.request.query_params.get('mc_code')  # 人工配通用条码去除-C、-X尾缀
         queryset = self.filter_queryset(self.get_queryset())
         if self.request.query_params.get('all'):
             if self.request.query_params.get('exclude_stage'):
@@ -74,6 +75,8 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
                 queryset = queryset.exclude(material_type__global_name__in=stage_names)
             else:
                 queryset = queryset.filter(use_flag=1)
+                if mc_code:
+                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')))
             data = queryset.values('id', 'material_no', 'material_name',
                                    'material_type__global_name', 'material_type', 'for_short',
                                    'package_unit', 'package_unit__global_name', 'use_flag')
@@ -219,7 +222,7 @@ class ProductBatchingViewSet(ModelViewSet):
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False).order_by('sn')),
         Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
         Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(delete_flag=False)),
-    ).order_by('stage_product_batch_no')
+    ).order_by('stage_product_batch_no', 'dev_type')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductBatchingFilter

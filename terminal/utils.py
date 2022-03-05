@@ -11,6 +11,7 @@ from django.db.models import Sum, Q, Count
 from django.db.transaction import atomic
 from suds.client import Client
 
+from basics.models import WorkSchedulePlan
 from inventory.conf import cb_ip, cb_port
 from inventory.utils import wms_out
 from mes.settings import DATABASES
@@ -501,25 +502,13 @@ def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     return manual_material
 
 
-def get_sfj_carbon_materials(cnt_type_details, stage_product_batch_no, equip_no):
-    """去除炭黑罐投入的化工原料"""
-    handle_cnt_type_details = []
-    sfj_recipe_carbon = ProductBatchingDetail.objects.using('SFJ').filter(~Q(material__material_name__startswith='炭黑'),
-                                                                          ~Q(material__material_name__startswith='白炭黑'),
-                                                                          ~Q(material__material_name__startswith='N'),
-                                                                          ~Q(material__material_name__startswith='卸'),
-                                                                          delete_flag=False, type=2,
-                                                                          product_batching__used_type=4,
-                                                                          product_batching__stage_product_batch_no=stage_product_batch_no,
-                                                                          product_batching__equip__equip_no=equip_no).values_list('material__material_name', flat='True')
-    if sfj_recipe_carbon:
-        for recipe_material in cnt_type_details:
-            for singe_material in sfj_recipe_carbon:
-                material_prefix = re.split(r'[(,（]', singe_material)[0]  # 群控炭黑罐里化工料名: ZNF活性剂(8号罐)， mes: ZNF活性剂-C
-                if recipe_material.get('material__material_name').startswith(material_prefix):
-                    break
-            else:
-                handle_cnt_type_details.append(recipe_material)
-    else:
-        handle_cnt_type_details = cnt_type_details
-    return handle_cnt_type_details
+def get_current_factory_date():
+    # 获取当前时间的工厂日期，开始、结束时间
+    now = datetime.now()
+    current_work_schedule_plan = WorkSchedulePlan.objects.filter(
+        start_time__lte=now,
+        end_time__gte=now,
+        plan_schedule__work_schedule__work_procedure__global_name='密炼'
+    ).first()
+    res = {'factory_date': current_work_schedule_plan.plan_schedule.day_time, 'classes': current_work_schedule_plan.classes.global_name} if current_work_schedule_plan else {}
+    return res
