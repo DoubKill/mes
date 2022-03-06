@@ -717,7 +717,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
         if i['merge_flag']:
             # 配方中料包重量
-            type_name, prefix = ['细料', 'F'] if equip_no.startswith('F') else ['硫磺', 'S']
+            type_name = '细料' if equip_no.startswith('F') else '硫磺'
             if 'ONLY' in i['product_no']:
                 ml_equip_no = i['product_no'].split('-')[-2]
             else:
@@ -725,7 +725,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 equip_recipes = ProductBatchingEquip.objects.filter(
                     is_used=True, type=4, product_batching__stage_product_batch_no=product_no_dev,
                     product_batching__dev_type__category_name=dev_type).values('equip_no').annotate(
-                    num=Count('id', filter=~Q(feeding_mode__startswith=prefix)))
+                    num=Count('id', filter=Q(feeding_mode__startswith='C')))
                 if equip_recipes:
                     handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
                     if handle_equip_recipe:
@@ -778,18 +778,6 @@ class WeightPackageManualViewSet(ModelViewSet):
             return ()
         else:
             return (IsAuthenticated(),)
-
-    def list(self, request, *args, **kwargs):
-        client = self.request.query_params.get('client')
-        queryset = self.filter_queryset(self.get_queryset())
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
 
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
