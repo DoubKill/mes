@@ -779,6 +779,18 @@ class WeightPackageManualViewSet(ModelViewSet):
         else:
             return (IsAuthenticated(),)
 
+    def list(self, request, *args, **kwargs):
+        client = self.request.query_params.get('client')
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
     @action(methods=['put'], detail=False, url_path='update_print_flag', url_name='update_print_flag')
     def update_print_flag(self, request):
         data = self.request.data

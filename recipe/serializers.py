@@ -181,8 +181,8 @@ class ProductBatchingListSerializer(BaseModelSerializer):
             new_recipe_id = new_recipe.id if new_recipe else 0
         res['new_recipe_id'] = new_recipe_id
         # 返回配方可用机台
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True).values_list('equip_no', flat=True).distinct())
-        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
+        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance).values_list('equip_no', flat=True).distinct())
+        send_success_equip = list(ProductBatchingEquip.objects.filter(product_batching=instance, send_recipe_flag=True).values_list('equip_no', flat=True).distinct())
         res.update({'enable_equip': enable_equip, 'send_success_equip': send_success_equip})
         return res
 
@@ -407,11 +407,6 @@ class ProductBatchingRetrieveSerializer(ProductBatchingListSerializer):
         },
     ]
     """)
-    enable_equip = serializers.SerializerMethodField()
-
-    def get_enable_equip(self, obj):
-        enable_equip = list(ProductBatchingEquip.objects.filter(product_batching=obj).values_list('equip_no', flat=True).distinct())
-        return enable_equip
 
     class Meta:
         model = ProductBatching
