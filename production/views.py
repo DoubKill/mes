@@ -2194,8 +2194,11 @@ class SummaryOfMillOutput(APIView):
                     results[f"{equip}_pt"]['count'] += actual_trains
                 results[f"{equip}_xj"][f"{state}-{classes}"] += actual_trains
                 results[f"{equip}_xj"]['count'] += actual_trains
-                count[f"{state}-{classes}"] = actual_trains
+                count[f"{state}-{classes}"] += actual_trains
                 count['count'] += actual_trains
+        for dic in results.values():
+            for key, value in dic.items():
+                dic[key] = None if not dic[key] else dic[key]
         return Response({'results': results.values(), 'count': count, 'state_list': state_list})
 
 
@@ -2558,6 +2561,14 @@ class PerformanceSummaryView(APIView):
         year = int(date.split('-')[0])
         month = int(date.split('-')[1])
         state_list = GlobalCode.objects.filter(global_type__type_name='胶料段次').values_list('global_name', flat=True)
+        # 员工独立上岗系数
+        coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数').values('global_no', 'global_name')
+        coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
+        # 超产奖励系数
+        coefficient1 = GlobalCode.objects.filter(global_type__type_name='超产奖励计算系数').values('global_no', 'global_name')
+        coefficient1_dic = {dic['global_no']: dic['global_name'] for dic in coefficient1}
+        if not coefficient or not coefficient1:
+            raise ValidationError('请先去添加独立上岗或超产奖励系数')
         # 员工考勤记录 (考勤记录)
         user_query = EmployeeAttendanceRecords.objects.filter(date__year=year, date__month=month)
         queryset = user_query.values_list('name', 'section', 'date__day', 'group', 'equip')
@@ -2689,27 +2700,25 @@ class PerformanceSummaryView(APIView):
             else:
                 results1[k] = results1[k][0]
                 results1[k]['price'] = 0
-
             # 计算价格
             for key in list(results1[k].keys()):
                 key_qty = key.split('_')[-1]
                 if key_qty == 'qty':
-                    key_state = key.split('_')[0]
-                    if not results1[k].get(key_state):  # 不同段次的价格
-                        results1[k][key_state] = 1  # 默认给价格为1
+                    key_state = key.split('_')[0]  # 1MB
+                    if not results1[k].get(key_state):  # 计算state价格
+                        results1[k][key_state] = 0
                     key_unit = '_'.join(key.split('_')[0:-1]) + '_unit'
-                    results1[k][key_state] += round(
-                        results1[k][key] * results1[k][key_unit] * coefficient * post_coefficient, 2)
-                    results1[k]['price'] += round(
-                        results1[k][key] * results1[k][key_unit] * coefficient * post_coefficient, 2)
+                    price = round(results1[k][key] * results1[k][key_unit] * coefficient * post_coefficient, 2)
+                    results1[k][key_state] += price
+                    results1[k]['price'] += price
 
                     # 添加到results2
                     k1 = f"{name}_{day}_{group}"
                     if results2.get(k1):
                         results2[k1][key_state] = results2[k1].get(key_state, 0) + results1[k][key_state]
-                        results2[k1]['price'] += results1[k]['price']
+                        results2[k1]['price'] += price
                     else:
-                        results2[k1] = {key_state: results1[k][key_state], 'price': results1[k]['price']}
+                        results2[k1] = {key_state: results1[k][key_state], 'price': price}
 
                     # 计算机台的产量
                     equip_no = results1[k]['equip']
@@ -2723,10 +2732,10 @@ class PerformanceSummaryView(APIView):
         if day_d and group_d:
             detail = {}
             hj = {'name': '产量工资合计'}
-            # 添加定岗系数, 定岗薪资 * 1， 非定岗薪资 * 0.8  #todo 添加到公共代码
-            a = 1
+            # 添加定岗系数
+            a = float(coefficient_dic.get('是'))
             if independent.get(name_d, 1) == False:  # 非定岗
-                a = 0.8
+                a = float(coefficient_dic.get('否'))
             all_price = results2.get(f"{name}_{day_d}_{group_d}")
             for k, v in all_price.items():
                 hj[k] = round(v * a, 2)
@@ -2778,9 +2787,9 @@ class PerformanceSummaryView(APIView):
                     if count < s:
                         price = 0
                     elif count > m:
-                        price = (m - s) * 5 + (count - m) * 15
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过历史最大产量部分'))
                     elif count < m and count > s:
-                        price = (count - s) * 5
+                        price = (count - s) * float(coefficient1_dic.get('超过目标产量部分'))
 
                 res['超产奖励'] += price
             res['超产奖励'] = round(res.get('超产奖励', 0) / equip_count, 2)
@@ -2791,8 +2800,11 @@ class PerformanceSummaryView(APIView):
             name = key.split('_')[0]
             day = key.split('_')[1]
             group = key.split('_')[2]
-            price = round(results2[key]['price'], 2)
-
+            # 添加定岗系数
+            a = float(coefficient_dic.get('是'))
+            if independent.get(name, 1) == False:
+                a = float(coefficient_dic.get('否'))
+            price = round(results2[key]['price'] * a, 2)
             if results.get(name):
                 results[name][f"{day}_{group}"] = price
                 results[name]['hj'] += price
@@ -2816,16 +2828,15 @@ class PerformanceSummaryView(APIView):
             equip_count = len(v)
             for equip, count in v.items():  # {'Z01': 21, 'Z02': 20, 'F01': 10}
                 price = 0
-                if max_value.get(equip) and settings_value.__dict__.get(  #todo 奖励系数添加到公共代码
-                        equip):  # 超产奖励 = (机台最大值-机台目标值)*5 + (实际产量-机台最大值)*15
+                if max_value.get(equip) and settings_value.__dict__.get(equip):  # 超产奖励 = (机台最大值-机台目标值)*5 + (实际产量-机台最大值)*15
                     m = max_value.get(equip)
                     s = settings_value.__dict__.get(equip)
                     if count < s:
                         price = 0
                     elif count > m:
-                        price = (m - s) * 5 + (count - m) * 15
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过历史最大产量部分'))
                     elif count < m and count > s:
-                        price = (count - s) * 5
+                        price = (count - s) * float(coefficient1_dic.get('超过目标产量部分'))
                 results[name]['超产奖励'] = results[name].get('超产奖励', 0) + price
                 date = f"{year}-{month}-{day}"
                 if results4.get(name):
@@ -2835,12 +2846,9 @@ class PerformanceSummaryView(APIView):
             results4[name][date] = round(results4[name][date] / equip_count, 2)
             results[name]['超产奖励'] = round(results[name]['超产奖励'] / equip_count, 2)  # 按照平均值计算
             results[name]['all'] = results[name].get('all', 0) + results[name]['超产奖励']
-            # 添加定岗系数, 定岗薪资 * 1， 非定岗薪资 * 0.8  #todo 添加到公共代码
-            a = 1
-            if independent.get(name, 1) == False:
-                a = 0.8
+
+        for name, dic in results.items():
             results[name]['是否定岗'] = independent.get(name, None)
-            results[name]['hj'] = round(results[name]['hj'] * a, 2)
             results[name]['all'] = round(results[name].get('all', 0) + results[name]['hj'], 2)
         if ccjl:  # 超产奖励详情
             if results4.get(name_d):
