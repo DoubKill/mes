@@ -76,7 +76,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
             else:
                 queryset = queryset.filter(use_flag=1)
                 if mc_code:
-                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')))
+                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')), use_flag=True)
             data = queryset.values('id', 'material_no', 'material_name',
                                    'material_type__global_name', 'material_type', 'for_short',
                                    'package_unit', 'package_unit__global_name', 'use_flag')
@@ -356,7 +356,7 @@ class RecipeNoticeAPiView(APIView):
             # NEW配方下传成功：1、废弃旧配方；2、修改配方名称；
             if 'NEW' in product_no:
                 # 废弃原配方
-                old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no)
+                old_mes_recipe = ProductBatching.objects.filter(stage_product_batch_no=real_product_no, batching_type=2)
                 old_mes_recipe.update(used_type=6)
                 # 清除机台配方
                 ProductBatchingEquip.objects.filter(product_batching_id__in=old_mes_recipe).update(is_used=False)
