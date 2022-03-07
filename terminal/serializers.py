@@ -1137,9 +1137,13 @@ class WeightPackageManualSerializer(BaseModelSerializer):
             expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
             expire_datetime = expire_datetime if expire_day == 0 else str(instance.created_date + timedelta(days=expire_day))
         manual_details = []
+        client = self.context['request'].query_params.get('client')
         for i in instance.package_details.all():
+            material_name = i.material_name
+            if client:
+                material_name = i.material_name[:-2] if i.material_name.endswith('-C') or i.material_name.endswith('-X') else i.material_name
             item = {'batch_time': i.created_date.strftime('%Y-%m-%d'), 'batch_user': i.created_user.username,
-                    'material_name': i.material_name, 'standard_weight': i.standard_weight, 'batch_type': i.batch_type,
+                    'material_name': material_name, 'standard_weight': i.standard_weight, 'batch_type': i.batch_type,
                     'tolerance': i.tolerance}
             manual_details.append(item)
         res.update({'manual_details': manual_details, 'expire_datetime': expire_datetime, 'package_count': instance.real_count})

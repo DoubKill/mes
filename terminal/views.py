@@ -54,7 +54,7 @@ from terminal.serializers import LoadMaterialLogCreateSerializer, \
     ReplaceMaterialSerializer, ReturnRubberSerializer, ToleranceRuleSerializer, WeightPackageManualSerializer, \
     WeightPackageSingleSerializer, WeightPackageLogCUpdateSerializer
 from terminal.utils import TankStatusSync, CarbonDeliverySystem, out_task_carbon, get_tolerance, material_out_barcode, \
-    get_manual_materials, get_current_factory_date
+    get_manual_materials, get_current_factory_date, CLSystem
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -717,7 +717,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
         if i['merge_flag']:
             # 配方中料包重量
-            type_name, prefix = ['细料', 'F'] if equip_no.startswith('F') else ['硫磺', 'S']
+            type_name = '细料' if equip_no.startswith('F') else '硫磺'
             if 'ONLY' in i['product_no']:
                 ml_equip_no = i['product_no'].split('-')[-2]
             else:
@@ -725,7 +725,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 equip_recipes = ProductBatchingEquip.objects.filter(
                     is_used=True, type=4, product_batching__stage_product_batch_no=product_no_dev,
                     product_batching__dev_type__category_name=dev_type).values('equip_no').annotate(
-                    num=Count('id', filter=~Q(feeding_mode__startswith=prefix)))
+                    num=Count('id', filter=Q(feeding_mode__startswith='C')))
                 if equip_recipes:
                     handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
                     if handle_equip_recipe:
@@ -1494,6 +1494,8 @@ class XLPlanVIewSet(ModelViewSet):
             order_rule = ["date_time", "-grouptime", "order_by"] if now_classes > next_classes else ["date_time", "grouptime", "order_by"]
             other_plan = Plan.objects.using(equip_no).filter(date_time__in=[y_date_time, date_time], grouptime__in=[now_classes, next_classes],
                                                              state__in=['运行中', '等待']).order_by(*order_rule)
+            if not other_plan:
+                raise ValidationError('未找到可切换的计划')
             processing_plan = []
             plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
             for index, plan in enumerate(other_plan):
@@ -1505,12 +1507,21 @@ class XLPlanVIewSet(ModelViewSet):
                     p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
                                    'order_by': 1, 'date_time': date_time, 'setno': p_data['setno'] - p_data['actno'],
                                    'actno': None, 'addtime': now_time})
-                    Plan.objects.using(equip_no).create(**p_data)
+                    new_plan = Plan.objects.using(equip_no).create(**p_data)
                     order_by_list.append(1)
                     plan.stoptime = now_time
                     plan.state = '完成'
                     plan.save()
                     processing_plan.append(plan)
+                    try:
+                        client = CLSystem(equip_no)
+                        # 终止运行中计划(下位机)
+                        client.stop(plan.planid)
+                        # 下达新计划
+                        client.issue_plan(first_plan_id, new_plan.recipe, new_plan.setno)
+                    except Exception as e:
+                        raise ValidationError(e.args[0])
+
                     continue
                 replace_order_by = max(order_by_list) + 1
                 plan.grouptime = next_classes
