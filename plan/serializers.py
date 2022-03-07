@@ -401,9 +401,8 @@ class ProductClassesPlansySerializer(BaseModelSerializer):
             raise serializers.ValidationError('排班详情{}不存在'.format(work_schedule_plan1))
         except Equip.DoesNotExist:
             raise serializers.ValidationError('设备{}不存在'.format(equip_no))
-        pb_obj = ProductBatching.objects.exclude(used_type__in=[6, 7]).filter(stage_product_batch_no=product_batching_no,
-                                                                     batching_type=1,
-                                                                     equip=equip).first()
+        pb_obj = ProductBatching.objects.filter(
+            stage_product_batch_no=product_batching_no, batching_type=1, equip=equip).first()
         if not pb_obj:
             raise serializers.ValidationError('日班次计划|胶料配料标准{}不存在'.format(product_batching_no))
         attrs['product_batching'] = pb_obj
