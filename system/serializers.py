@@ -300,7 +300,7 @@ class MaterialReceiveSerializer(serializers.ModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
-class UserImportSerializer(serializers.ModelSerializer):
+class UserImportSerializer(BaseModelSerializer):
     username = serializers.CharField(max_length=150)
     num = serializers.CharField(max_length=20)
     section = serializers.CharField(max_length=512, allow_null=True, allow_blank=True)

@@ -87,16 +87,18 @@ class UserViewSet(ModelViewSet):
             user_data = {
                 "username": item[0],
                 "password": item[1],
-                "num": item[2],
-                "phone_number": item[3],
-                "id_card_num": item[4],
+                "num": str(item[2]).split('.')[0] if item[2] else item[2],
+                "phone_number": str(item[3]).split('.')[0] if item[3] else item[3],
+                "id_card_num": str(item[4]).split('.')[0] if item[4] else item[4],
                 "section": item[5],
                 "group_extensions": item[6]
             }
             user_list.append(user_data)
         s = UserImportSerializer(data=user_list, many=True, context={'request': self.request})
         if not s.is_valid():
-            raise ValidationError(list(s.errors[0].values())[0][0])
+            for i in s.errors:
+                if i:
+                    raise ValidationError(list(i.values())[0])
         validated_data = s.validated_data
         username_list = [item['username'] for item in validated_data]
         num_list = [item['num'] for item in validated_data]
