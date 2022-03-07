@@ -1137,11 +1137,12 @@ class WeightPackageManualSerializer(BaseModelSerializer):
             expire_day = expire_record.package_fine_usefullife if 'F' in instance.batching_equip else expire_record.package_sulfur_usefullife
             expire_datetime = expire_datetime if expire_day == 0 else str(instance.created_date + timedelta(days=expire_day))
         manual_details = []
-        # client = self.context['request'].query_params.get('client')
+        r_client = self.context.get('request')
+        client = r_client.query_params.get('client') if r_client else None
         for i in instance.package_details.all():
             material_name = i.material_name
-            # if client:
-            #     material_name = i.material_name[:-2] if i.material_name.endswith('-C') or i.material_name.endswith('-X') else i.material_name
+            if client:
+                material_name = i.material_name[:-2] if i.material_name.endswith('-C') or i.material_name.endswith('-X') else i.material_name
             item = {'batch_time': i.created_date.strftime('%Y-%m-%d'), 'batch_user': i.created_user.username,
                     'material_name': material_name, 'standard_weight': i.standard_weight, 'batch_type': i.batch_type,
                     'tolerance': i.tolerance}
@@ -1161,7 +1162,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
         record = WorkSchedulePlan.objects.filter(plan_schedule__day_time=str(now_date.date()),
                                                  classes__global_name=batch_class,
                                                  plan_schedule__work_schedule__work_procedure__global_name='密炼').first()
-        batch_group = record.group.global_name
+        batch_group = record.group.global_name if record else ''
         # 条码
         prefix = f"MM{batching_equip}{now_date.date().strftime('%Y%m%d')}{map_list.get(batch_class)}"
         max_code = WeightPackageManual.objects.filter(bra_code__startswith=prefix).aggregate(max_code=Max('bra_code'))['max_code']
