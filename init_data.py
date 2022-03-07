@@ -896,6 +896,8 @@ permission_data = [
 
     {'id': 924, 'code': 'product_info_dj', 'name': '丁基胶规格设定', 'parent_id': None},
     {'id': 925, 'code': 'add_product_info_dj', 'name': '添加', 'parent_id': 924},
+    {'id': 949, 'code': 'change_product_info_dj', 'name': '编辑', 'parent_id': 924},
+    {'id': 950, 'code': 'delete_product_info_dj', 'name': '删除', 'parent_id': 924},
 
     {'id': 926, 'code': 'performance_summary', 'name': '员工绩效汇总表', 'parent_id': None},
     {'id': 927, 'code': 'view_performance_summary', 'name': '查看', 'parent_id': 926},
@@ -926,7 +928,7 @@ permission_data = [
     {'id': 947, 'code': 'export_summary_of_weighing_output', 'name': '导出', 'parent_id': 945},
     {'id': 948, 'code': 'save_summary_of_weighing_output', 'name': '保存', 'parent_id': 945},
 
-    # 下一个 949开始
+    # 下一个 951开始
 ]
 
 
