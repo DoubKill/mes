@@ -1592,13 +1592,22 @@ class UpdateFlagCountView(APIView):
         split_count = self.request.data.get('split_count')
         use_not = self.request.data.get('use_not', '')
         if isinstance(use_not, int):
+            recipe_instance = RecipePre.objects.using(equip_no).filter(id=rid)
+            recipe_name = recipe_instance.first().name
             if use_not == 1:  # 停用配方
                 now_date = datetime.datetime.now().date() - timedelta(days=1)
                 pre_fix = now_date.strftime('%Y%m%d')[2:]
-                processing_plan = Plan.objects.using(equip_no).filter(planid__gte=pre_fix)
-                if processing_plan:
+                processing_plan = Plan.objects.using(equip_no).filter(state='运行中', actno__gte=1, planid__gte=pre_fix).first()
+                if not processing_plan:
+                    plan_recipes = list(Plan.objects.using(equip_no).filter(planid__gte=pre_fix, state=['运行中', '等待']).values_list('recipe', flat=True).distinct())
+                else:
+                    plan_recipes = list(Plan.objects.using(equip_no).filter(id__gte=processing_plan.id, state__in=['运行中', '等待']).values_list('recipe', flat=True).distinct())
+                if recipe_name in plan_recipes:
                     raise ValidationError('该配方正在配料, 无法停用')
-            RecipePre.objects.using(equip_no).filter(id=rid).update(use_not=use_not)
+            else:  # 有同名配方不可启用
+                if RecipePre.objects.using(equip_no).filter(name=recipe_name, use_not=use_not):
+                    raise ValidationError('存在同名已经启用的配方')
+            recipe_instance.update(use_not=use_not)
             return Response(f"{'停用' if use_not == 1 else '启用'}配方成功")
         filter_kwargs = {}
         if merge_flag is not None:
