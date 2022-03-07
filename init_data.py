@@ -894,8 +894,39 @@ permission_data = [
     {'id': 920, 'code': 'end_material_test_plan', 'name': '结束检测', 'parent_id': 917},
     {'id': 921, 'code': 'add_material_test_plan', 'name': '添加', 'parent_id': 917},
 
-    # 下一个 924开始
+    {'id': 924, 'code': 'product_info_dj', 'name': '丁基胶规格设定', 'parent_id': None},
+    {'id': 925, 'code': 'add_product_info_dj', 'name': '添加', 'parent_id': 924},
 
+    {'id': 926, 'code': 'performance_summary', 'name': '员工绩效汇总表', 'parent_id': None},
+    {'id': 927, 'code': 'view_performance_summary', 'name': '查看', 'parent_id': 926},
+    {'id': 928, 'code': 'import_performance_summary', 'name': '导入', 'parent_id': 926},
+    {'id': 929, 'code': 'export_performance_summary', 'name': '导出', 'parent_id': 926},
+
+    {'id': 930, 'code': 'performance_job_ladder', 'name': '岗位阶梯表', 'parent_id': None},
+    {'id': 931, 'code': 'view_performance_job_ladder', 'name': '查看', 'parent_id': 930},
+    {'id': 932, 'code': 'add_performance_job_ladder', 'name': '新建', 'parent_id': 930},
+    {'id': 933, 'code': 'export_performance_job_ladder', 'name': '导出', 'parent_id': 930},
+
+    {'id': 934, 'code': 'performance_unit_price', 'name': '绩效计算单价表', 'parent_id': None},
+    {'id': 935, 'code': 'view_performance_unit_price', 'name': '查看', 'parent_id': 934},
+    {'id': 936, 'code': 'save_performance_unit_price', 'name': '保存', 'parent_id': 934},
+    {'id': 937, 'code': 'export_performance_unit_price', 'name': '导出', 'parent_id': 934},
+
+    {'id': 938, 'code': 'employee_attendance_records', 'name': '员工出勤记录表', 'parent_id': None},
+    {'id': 939, 'code': 'view_employee_attendance_records', 'name': '查看', 'parent_id': 938},
+    {'id': 940, 'code': 'import_employee_attendance_records', 'name': '导入', 'parent_id': 938},
+    {'id': 941, 'code': 'export_employee_attendance_records', 'name': '导出', 'parent_id': 938},
+
+    {'id': 942, 'code': 'summary_of_mill_output', 'name': '密炼机台产量汇总表', 'parent_id': None},
+    {'id': 943, 'code': 'view_summary_of_mill_output', 'name': '查看', 'parent_id': 942},
+    {'id': 944, 'code': 'export_summary_of_mill_output', 'name': '导出', 'parent_id': 942},
+
+    {'id': 945, 'code': 'summary_of_weighing_output', 'name': '称量机台产量汇总表', 'parent_id': None},
+    {'id': 946, 'code': 'view_summary_of_weighing_output', 'name': '查看', 'parent_id': 945},
+    {'id': 947, 'code': 'export_summary_of_weighing_output', 'name': '导出', 'parent_id': 945},
+    {'id': 948, 'code': 'save_summary_of_weighing_output', 'name': '保存', 'parent_id': 945},
+
+    # 下一个 949开始
 ]
 
 
