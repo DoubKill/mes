@@ -406,7 +406,10 @@ class SetThePriceSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         instance = SetThePrice.objects.first()
-        super().update(instance, validated_data)
+        if instance:
+            super().update(instance, validated_data)
+        else:
+            instance = super().create(validated_data)
         return instance
 
 
