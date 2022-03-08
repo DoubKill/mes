@@ -11,7 +11,7 @@ import requests
 import xlwt
 from itertools import chain
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, Prefetch
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -44,7 +44,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle
+    WMSExceptHandle, MaterialOutHistoryOther
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -56,7 +56,8 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer
+    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
+    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -5097,3 +5098,76 @@ class THInventoryMaterialViewSet(WmsInventoryMaterialViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class THStockSummaryView(WMSStockSummaryView):
     DATABASE_CONF = TH_CONF
+
+
+class WMSOutTaskView(ListAPIView):
+    serializer_class = MaterialOutHistoryOtherSerializer
+    permission_classes = (IsAuthenticated,)
+    DB = 'wms'
+
+    def get_queryset(self):
+        query_set = MaterialOutHistoryOther.objects.using(self.DB).order_by('-id')
+        order_no = self.request.query_params.get('order_no')
+        task_status = self.request.query_params.get('task_status')
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        filter_kwargs = {}
+        if order_no:
+            filter_kwargs['order_no__icontains'] = order_no
+        if task_status:
+            filter_kwargs['task_status'] = task_status
+        if material_no:
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no__icontains=material_no).values_list('task_id', flat=True)
+            filter_kwargs['id__in'] = task_ids
+        if material_name:
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name__icontains=material_name).values_list('task_id', flat=True)
+            filter_kwargs['id__in'] = task_ids
+        return query_set.filter(**filter_kwargs)
+
+
+class THOutTaskView(WMSOutTaskView):
+    DB = 'cb'
+
+
+class WMSOutTaskDetailView(ListAPIView):
+    serializer_class = MaterialOutHistorySerializer
+    permission_classes = (IsAuthenticated,)
+    DB = 'wms'
+
+    def get_queryset(self):
+        task = self.request.query_params.get('task')
+        task_order_no = self.request.query_params.get('task_order_no')
+        task_status = self.request.query_params.get('task_status')
+        lot_no = self.request.query_params.get('lot_no')
+        material_no = self.request.query_params.get('material_no')
+        tunnel = self.request.query_params.get('tunnel')
+        location = self.request.query_params.get('material_no')
+        pallet_no = self.request.query_params.get('material_no')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        filter_kwargs = {}
+        if task:
+            filter_kwargs['task_id'] = task
+        if task_order_no:
+            filter_kwargs['task__order_no'] = task_order_no
+        if task_status:
+            filter_kwargs['task_status'] = task_status
+        if lot_no:
+            filter_kwargs['lot_no__icontains'] = lot_no
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if tunnel:
+            filter_kwargs['location__icontains'] = tunnel
+        if location:
+            filter_kwargs['location__icontains'] = location
+        if pallet_no:
+            filter_kwargs['pallet_no__icontains'] = pallet_no
+        if st:
+            filter_kwargs['task__start_time__gte='] = st
+        if et:
+            filter_kwargs['task__start_time__lte='] = et
+        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).order_by('-id')
+
+
+class THOutTaskDetailView(WMSOutTaskDetailView):
+    DB = 'cb'
