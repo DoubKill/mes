@@ -627,7 +627,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     obj = record
                     ids = [i['manual_id'] for i in already_scan_info if i['manual_type'] == 'manual_single' and {comm_material[0]} == set(i['names'])]
                     if record.id in ids:
-                        raise ValueError('该条码已经扫过')
+                        raise ValidationError('该条码已经扫过')
                     if record.now_package == 0:
                         raise ValidationError('该人工配料条码配置数量已经用完')
                     if record.package_count != machine_package_count:
@@ -674,21 +674,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         recipe_manual_names = {i['material__material_name']: i['standard_weight'] for i in recipe_manual}
         scan_info = list(manual.package_details.all().values_list('material_name', flat=True))
         if set(scan_info) - set(recipe_manual_names.keys()):
-            raise ValueError('手工条码内部分物料不在配方中')
+            raise ValidationError('手工条码内部分物料不在配方中')
         # 重量比较
         for item in manual.package_details.all():
             name, weight = item.material_name, item.standard_weight_old
             if recipe_manual_names.get(name) != weight:
-                raise ValueError(f'手工条码中物料重量与配方不符:{name}')
+                raise ValidationError(f'手工条码中物料重量与配方不符:{name}')
         # 查找已经扫码物料中配料内容一致的总配置数量
         already_count = 0
         for i in already_scan_info:
             if i['manual_type'] == check_type:
                 if set(scan_info) & set(i['names']) and set(scan_info) != set(i['names']):
-                    raise ValueError('物料种类与之前扫入重叠但不一致')
+                    raise ValidationError('物料种类与之前扫入重叠但不一致')
                 if set(scan_info) == set(i['names']):
                     if i['manual_id'] == manual.id:
-                        raise ValueError('该条码已经扫过')
+                        raise ValidationError('该条码已经扫过')
                     already_count += i['package_count']
         # 已经扫码的物料配置数量大于机配，不可扫码
         if already_count >= machine_package_count:
@@ -1488,16 +1488,23 @@ class XLPlanVIewSet(ModelViewSet):
         # 同班次不可结转
         if now_classes == next_classes:
             raise ValidationError('同班次无法结转计划')
+        if now_classes == '中班' and next_classes != '夜班':
+            raise ValidationError(f'当前{now_classes}只能切换到夜班')
+        if now_classes == '夜班' and next_classes != '早班':
+            raise ValidationError(f'当前{now_classes}只能切换到早班')
         with atomic(using=equip_no):
-            y_date_time = (now_date - timedelta(days=1)).strftime('%Y-%m-%d')
+            y_date_time = (now_date + timedelta(days=1)).strftime('%Y-%m-%d')
+            date_time_filter = [date_time] if now_classes in ['早班', '中班'] else [date_time, y_date_time]
             order_by_list = [0]
             order_rule = ["date_time", "-grouptime", "order_by"] if now_classes > next_classes else ["date_time", "grouptime", "order_by"]
-            other_plan = Plan.objects.using(equip_no).filter(date_time__in=[y_date_time, date_time], grouptime__in=[now_classes, next_classes],
+            other_plan = Plan.objects.using(equip_no).filter(date_time__in=date_time_filter, grouptime__in=[now_classes, next_classes],
                                                              state__in=['运行中', '等待']).order_by(*order_rule)
             if not other_plan:
                 raise ValidationError('未找到可切换的计划')
             processing_plan = []
             plan_datas = other_plan.values('recipe', 'recipe_id', 'recipe_ver', 'state', 'setno', 'actno', 'date_time', 'merge_flag')
+            client = CLSystem(equip_no)
+            handle_plan_data = {}
             for index, plan in enumerate(other_plan):
                 if plan.state == '运行中' and plan.actno:
                     if processing_plan:
@@ -1505,31 +1512,39 @@ class XLPlanVIewSet(ModelViewSet):
                     first_plan_id = datetime.datetime.now().strftime('%Y%m%d%H%M%S')[2:]
                     p_data = plan_datas[index]
                     p_data.update({'planid': first_plan_id, 'grouptime': next_classes, 'oper': self.request.user.username,
-                                   'order_by': 1, 'date_time': date_time, 'setno': p_data['setno'] - p_data['actno'],
-                                   'actno': None, 'addtime': now_time})
+                                   'order_by': 1, 'date_time': date_time if now_classes != '夜班' else y_date_time,
+                                   'setno': p_data['setno'] - p_data['actno'], 'actno': None, 'addtime': now_time})
                     new_plan = Plan.objects.using(equip_no).create(**p_data)
                     order_by_list.append(1)
                     plan.stoptime = now_time
                     plan.state = '完成'
                     plan.save()
                     processing_plan.append(plan)
-                    try:
-                        client = CLSystem(equip_no)
-                        # 终止运行中计划(下位机)
-                        client.stop(plan.planid)
-                        # 下达新计划
-                        client.issue_plan(first_plan_id, new_plan.recipe, new_plan.setno)
-                    except Exception as e:
-                        raise ValidationError(e.args[0])
-
+                    handle_plan_data['stop'] = plan
+                    handle_plan_data['issue'] = new_plan
                     continue
                 replace_order_by = max(order_by_list) + 1
                 plan.grouptime = next_classes
                 plan.order_by = replace_order_by
                 plan.oper = self.request.user.username
-                plan.date_time = now_time
+                plan.date_time = date_time if now_classes != '夜班' else y_date_time
                 plan.save()
                 order_by_list.append(replace_order_by)
+                if plan.state == '运行中':
+                    handle_plan_data['issue'] = handle_plan_data['issue'] + [plan] if 'issue' in handle_plan_data else [plan]
+            try:
+                stop_plan = handle_plan_data.get('stop')
+                issue_plan = handle_plan_data.get('issue')
+                if stop_plan:
+                    # 终止运行中计划(下位机)
+                    client.stop(stop_plan.planid)
+                if issue_plan:
+                    for single_plan in issue_plan:
+                        # 下达新计划
+                        client.issue_plan(single_plan.planid, single_plan.recipe, single_plan.setno)
+            except Exception as e:
+                raise ValidationError(e.args[0])
+
         return Response('切换班次计划成功')
 
 
