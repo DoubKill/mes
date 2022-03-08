@@ -2672,6 +2672,7 @@ class WmsInventoryStockView(APIView):
         entrance_name = self.request.query_params.get('entrance_name')
         position = self.request.query_params.get('position')
         is_entering = self.request.query_params.get('is_entering')
+        batch_no = self.request.query_params.get('batch_no')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
@@ -2685,6 +2686,8 @@ class WmsInventoryStockView(APIView):
             extra_where_str += " and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
             extra_where_str += " and a.StockDetailState={}".format(quality_status)
+        if batch_no:
+            extra_where_str += " and a.BatchNo like '%{}%'".format(batch_no)
         sql = """SELECT
                  a.StockDetailState,
                  c.MaterialCode,
