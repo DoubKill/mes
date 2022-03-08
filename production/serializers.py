@@ -406,7 +406,8 @@ class SetThePriceSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         instance = SetThePrice.objects.first()
-        return super().update(instance, validated_data)
+        super().update(instance, validated_data)
+        return instance
 
 
 class SubsidyInfoSerializer(serializers.ModelSerializer):
