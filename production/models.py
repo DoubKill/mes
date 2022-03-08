@@ -382,15 +382,47 @@ class MachineTargetYieldSettings(models.Model):
 
 
 class EmployeeAttendanceRecords(models.Model):
-    name = models.CharField(help_text='姓名', max_length=64)
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL)
     section = models.CharField(help_text='岗位', max_length=64)
-    date = models.DateField(help_text='上班时间')
-    group = models.CharField(help_text='班组', max_length=64)
-    equip = models.CharField(help_text='机台', max_length=64)
+    factory_date = models.DateField(help_text='工厂时间')
+    begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
+    work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True)
+    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True)
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12)
+    equip = models.CharField(help_text='机台', max_length=12)
+    status = models.CharField(max_length=12, help_text='换岗/加班/补卡')
+    is_use = models.CharField(max_length=12, help_text='确认/添加/废弃')
 
     class Meta:
         db_table = 'employee_attendance_records'
         verbose_name_plural = verbose_name = '员工出勤记录表'
+
+
+class FillCardApply(models.Model):
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL)
+    employee_attendance_records = models.ForeignKey(EmployeeAttendanceRecords, on_delete=models.CASCADE)
+    bk_date = models.DateTimeField(help_text='补卡时间', null=True, blank=True)
+    desc = models.TextField(help_text='补卡理由')
+    handling_suggestion = models.TextField(help_text='处理意见')
+
+    class Meta:
+        db_table = 'fill_card_apply'
+        verbose_name_plural = verbose_name = '补卡申请'
+
+
+class ApplyForExtraWork(models.Model):
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL)
+    employee_attendance_records = models.ForeignKey(EmployeeAttendanceRecords, on_delete=models.CASCADE)
+    begin_date = models.DateTimeField(help_text='加班开始时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='加班结束', null=True, blank=True)
+    desc = models.TextField(help_text='加班理由')
+    handling_suggestion = models.TextField(help_text='处理意见')
+
+    class Meta:
+        db_table = '加班申请'
+        verbose_name_plural = verbose_name = '加班申请'
 
 
 class PerformanceJobLadder(models.Model):
