@@ -2238,6 +2238,8 @@ class SummaryOfWeighingOutput(APIView):
 
         # 机台产量统计
         price_obj = SetThePrice.objects.first()
+        if not price_obj:
+            raise ValidationError('请先去添加细料/硫磺单价')
         for equip_no in equip_list:
             dic = {'equip_no': equip_no, 'hj': 0}
             data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
@@ -2614,6 +2616,8 @@ class PerformanceSummaryView(APIView):
         equip_list = Equip.objects.filter(category__equip_type__global_name='称量设备').values_list('equip_no', flat=True)
         # 细料/硫磺单价
         price_obj = SetThePrice.objects.first()
+        if not price_obj:
+            raise ValidationError('请先去添加细料/硫磺单价')
         for equip_no in equip_list:
             price = price_obj.xl if equip_no in ['F01', 'F02', 'F03'] else price_obj.lh
             data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
