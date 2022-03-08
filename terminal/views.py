@@ -621,7 +621,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                                                                 'single_weight': single_weight, 'split_num': machine_split_count,
                                                                 'package_count': machine_package_count,
                                                                 'batch_time': res.get('SM_CREATE'), 'standard_weight_old': standard_weight,
-                                                                'real_count': machine_package_count, 'now_package': res.get('ZL') // standard_weight})
+                                                                'real_count': machine_package_count, 'now_package': 100000})
                     obj = record  # 原材料条码实例
                 else:
                     obj = record
@@ -2596,7 +2596,7 @@ class XlRecipeNoticeView(APIView):
                 continue
             else:
                 already_add_recipe.append(send_recipe_name)
-            processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中', '等待'], recipe=send_recipe_name)
+            processing_xl_plan = Plan.objects.using(xl_equip).filter(Q(planid__startswith=now_date.strftime('%Y%m%d')[2:]) | Q(planid__startswith=before_date.strftime('%Y%m%d')[2:]), state__in=['运行中'], recipe=send_recipe_name)
             if processing_xl_plan:
                 detail_msg += f'{single_equip_no}: 预下发配方正在该线体进行配料 '
                 continue
