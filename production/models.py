@@ -382,11 +382,18 @@ class MachineTargetYieldSettings(models.Model):
 
 
 class EmployeeAttendanceRecords(models.Model):
-    name = models.CharField(help_text='姓名', max_length=64)
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
     section = models.CharField(help_text='岗位', max_length=64)
-    date = models.DateField(help_text='上班时间')
-    group = models.CharField(help_text='班组', max_length=64)
-    equip = models.CharField(help_text='机台', max_length=64)
+    factory_date = models.DateField(help_text='工厂时间')
+    begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
+    work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
+    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True)
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
+    equip = models.CharField(help_text='机台', max_length=12)
+    status = models.CharField(max_length=12, help_text='换岗/加班/补卡', null=True, blank=True)
+    is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
 
     class Meta:
         db_table = 'employee_attendance_records'
