@@ -175,16 +175,9 @@ class LoadMaterialLogCreateSerializer(BaseModelSerializer):
                                                                   other_type='原材料小料', material_name=scan_material)
                 if wms_xl_material:
                     raise serializers.ValidationError('已经扫入原材料小料，不可再扫该物料人工单配')
-                # mes:single  CTP-C:CTP N550-C:N550
-                if single.material_name.startswith('CTP') or single.material_name.startswith('N'):
-                    # 查询配方中对应名称
-                    mes_recipe = [i for i in materials if i.startswith(single.material_name)]
-                    if mes_recipe:
-                        material_name = mes_recipe[0]
-                    else:
-                        raise serializers.ValidationError(f'配方明细中未找到{single.material_name}')
-                else:
-                    material_name = single.material_name
+                # 查询配方中对应名称[扫码:环保型塑解剂, 群控: 环保型塑解剂-C]
+                mes_recipe = {i[:-2]: i for i in materials if i.endwith('-C') or i.endwith('-X')}
+                material_name = mes_recipe[single.material_name] if single.material_name in mes_recipe else single.material_name
                 material_no = material_name
                 total_weight = single.package_count * single.split_num if single.batching_type == '配方' else single.package_count
                 unit = '包'
