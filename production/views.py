@@ -2251,7 +2251,7 @@ class SummaryOfWeighingOutput(APIView):
             dic = {'equip_no': equip_no, 'hj': 0}
             data = Plan.objects.using(equip_no).filter(actno__gt=1, state='完成',
                                                        date_time__istartswith=factory_date
-                                                       ).values('date_time', 'grouptime').annotate(count=Count('actno'))
+                                                       ).values('date_time', 'grouptime').annotate(count=Sum('actno'))
             for item in data:
                 date = item['date_time']
                 day = int(date.split('-')[2])    # 2  早班
