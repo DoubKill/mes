@@ -2095,8 +2095,8 @@ class DailyProductionCompletionReport(APIView):
             'name_4': {'name': '实际完成数-1(吨)', 'weight': 0},
             'name_5': {'name': '实际完成数-2(吨)', 'weight': 0},
             'name_6': {'name': '实际生产工作日数', 'weight': 0},
-            'name_7': {'name': '日均完成率', 'weight': 0},
-            'name_8': {'name': '日均完成率2', 'weight': 0},
+            'name_7': {'name': '日均完成率', 'weight': None},
+            'name_8': {'name': '日均完成率2', 'weight': None},
         }
         # 终炼实际完成（吨）  FM , RFM , RE
         queryset = TrainsFeedbacks.objects.filter(Q(factory_date__year=year, factory_date__month=month) &
