@@ -913,10 +913,18 @@ class BarcodeQuality(models.Model):
 
     # location = models.CharField(max_length=64, help_text="货位地址")
 
-
     class Meta:
         db_table = "barcode_quality"
         verbose_name_plural = verbose_name = '物料条码质量维护'
+
+
+class MaterialEntrance(models.Model):
+    code = models.CharField(max_length=64, db_column='EntranceCode')
+    name = models.CharField(max_length=64, db_column='Name')
+
+    class Meta:
+        db_table = "t_inventory_entrance"
+        managed = False
 
 
 # by afeng
@@ -1199,4 +1207,15 @@ class ProductStockDailySummary(models.Model):
 
     class Meta:
         db_table = 'product_stock_daily_summary'
+        verbose_name_plural = verbose_name = '胶片库存每日统计'
+
+
+class MaterialOutboundOrder(models.Model):
+    order_type = models.IntegerField(help_text='出库类型 1：原材料 2：炭黑库', db_index=True)
+    order_no = models.CharField(max_length=128, help_text='订单编号', db_index=True)
+    created_date = models.DateTimeField(verbose_name='创建时间', auto_now_add=True)
+    created_username = models.CharField(max_length=128, help_text='创建人')
+
+    class Meta:
+        db_table = 'material_outbound_order'
         verbose_name_plural = verbose_name = '胶片库存每日统计'

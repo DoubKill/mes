@@ -44,7 +44,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle, MaterialOutHistoryOther
+    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -3147,13 +3147,14 @@ class WMSTunnelView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
-        sql = 'select TunnelName from t_inventory_tunnel;'
+        sql = 'select TunnelName, TunnelCode from t_inventory_tunnel;'
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
         for item in temp:
             result.append(
-                {'name': item[0]})
+                {'name': item[0],
+                 'code': item[1]})
         sc.close()
         return Response(result)
 
@@ -5100,6 +5101,7 @@ class THStockSummaryView(WMSStockSummaryView):
     DATABASE_CONF = TH_CONF
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WMSOutTaskView(ListAPIView):
     serializer_class = MaterialOutHistoryOtherSerializer
     permission_classes = (IsAuthenticated,)
@@ -5125,10 +5127,12 @@ class WMSOutTaskView(ListAPIView):
         return query_set.filter(**filter_kwargs)
 
 
+@method_decorator([api_recorder], name="dispatch")
 class THOutTaskView(WMSOutTaskView):
     DB = 'cb'
 
 
+@method_decorator([api_recorder], name="dispatch")
 class WMSOutTaskDetailView(ListAPIView):
     serializer_class = MaterialOutHistorySerializer
     permission_classes = (IsAuthenticated,)
@@ -5157,17 +5161,116 @@ class WMSOutTaskDetailView(ListAPIView):
         if material_no:
             filter_kwargs['material_no__icontains'] = material_no
         if tunnel:
-            filter_kwargs['location__icontains'] = tunnel
+            filter_kwargs['location__icontains'] = '-{}'.format(tunnel)
         if location:
             filter_kwargs['location__icontains'] = location
         if pallet_no:
             filter_kwargs['pallet_no__icontains'] = pallet_no
         if st:
-            filter_kwargs['task__start_time__gte='] = st
+            filter_kwargs['task__start_time__gte'] = st
         if et:
-            filter_kwargs['task__start_time__lte='] = et
+            filter_kwargs['task__start_time__lte'] = et
         return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).order_by('-id')
 
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        entrance_data = dict(MaterialEntrance.objects.using(self.DB).values_list('code', 'name'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'entrance_data': entrance_data
+        }
 
+
+@method_decorator([api_recorder], name="dispatch")
 class THOutTaskDetailView(WMSOutTaskDetailView):
     DB = 'cb'
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WmsOutboundOrderView(APIView):
+    URL = WMS_URL
+    ORDER_TYPE = 1
+
+    def post(self, request):
+        outbound_type = self.request.data.get('outbound_type')  # 1 指定库位出库 2：指定重量出库
+        entrance_code = self.request.data.get('entrance_code')  # 出库口
+        outbound_data = self.request.data.get('outbound_data')
+        if outbound_type not in (1, 2):
+            raise ValidationError('bad request！')
+        if not entrance_code:
+            raise ValidationError('请选择出库口！')
+        if not isinstance(outbound_data, list):
+            raise ValidationError('data error!')
+        task_num = 'MES{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S%f'))
+        details = []
+        if outbound_type == 1:
+            url = '{}/MESApi/AllocateSpaceDelivery'.format(self.URL)
+            for idx, item in enumerate(outbound_data):
+                details.append(
+                    {
+                        "TaskDetailNumber": task_num + str(idx+1),
+                        "MaterialCode": item.get('MaterialCode'),
+                        "MaterialName": item.get('MaterialName'),
+                        "SpaceCode": item.get('SpaceId'),
+                        "Quantity": item.get('Quantity')
+                    }
+                )
+            data = {
+                "TaskNumber": task_num,
+                "EntranceCode": entrance_code,
+                "AllocationInventoryDetails": details
+            }
+        else:
+            url = '{}/MESApi/AllocateWeightDelivery'.format(self.URL)
+            for idx, item in enumerate(outbound_data):
+                details.append({
+                        "MaterialCode": item.get('MaterialCode'),
+                        "StockDetailState": item.get('StockDetailState'),
+                        "MaterialName": item.get('MaterialName'),
+                        "WeightOfActual": item.get('WeightOfActual')
+                    }
+                )
+            data = {
+                "TaskNumber": task_num,
+                "EntranceCode": entrance_code,
+                "AllocationInventoryDetails": details
+            }
+        headers = {"UserId": 75, "tenantNumber": 1}
+        try:
+            r = requests.post(url, json=data, headers=headers, timeout=5)
+        except Exception as e:
+            raise ValidationError('请求出库失败，请联系管理员！')
+        MaterialOutboundOrder.objects.create(order_no=task_num,
+                                             created_username=self.request.user.username,
+                                             order_type=self.ORDER_TYPE)
+        return Response('成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THOutboundOrderView(WmsOutboundOrderView):
+    URL = TH_URL
+    ORDER_TYPE = 2
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WwsCancelTaskView(APIView):
+    URL = WMS_URL
+
+    def post(self, request):
+        task_num = self.request.data.get('task_num')
+        data = [{"TaskNumber": task_num}]
+        url = self.URL + '/MESApi/CancelTask'
+        try:
+            r = requests.post(url, json=data, timeout=5)
+        except Exception as e:
+            raise ValidationError('请求出库失败，请联系管理员！')
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THCancelTaskView(WwsCancelTaskView):
+    URL = TH_URL

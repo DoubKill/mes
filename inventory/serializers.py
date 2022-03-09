@@ -1825,6 +1825,10 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
     created_time = serializers.CharField(source='task.start_time')
     initiator = serializers.CharField(source='task.initiator')
     task_order_no = serializers.CharField(source='task.order_no')
+    entrance_name = serializers.SerializerMethodField()
+
+    def get_entrance_name(self, obj):
+        return self.context['entrance_data'].get(obj.entrance)
 
     class Meta:
         model = MaterialOutHistory
