@@ -630,7 +630,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                         raise ValidationError('该条码已经扫过')
                     if record.now_package == 0:
                         raise ValidationError('该人工配料条码配置数量已经用完')
-                    if record.package_count != machine_package_count:
+                    if record.package_count != machine_package_count or record.single_weight != single_weight :
                         new_record = WeightPackageWms.objects.create(**{'bra_code': scan_bra_code, 'material_name': comm_material[0],
                                                                         'single_weight': single_weight, 'split_num': machine_split_count,
                                                                         'package_count': machine_package_count,
