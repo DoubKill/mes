@@ -64,7 +64,7 @@ from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes import settings
 from mes.common_code import SqlClient, OSum
-from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL
+from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
@@ -5331,3 +5331,169 @@ class WwsCancelTaskView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class THCancelTaskView(WwsCancelTaskView):
     URL = TH_URL
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFStockView(APIView):
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "where ProductName like N'%{}%'".format(material_name)
+        if material_no:
+            if extra_where_str:
+                extra_where_str += " and ProductNo like '%{}%'".format(material_no)
+            else:
+                extra_where_str += "where ProductNo like '%{}%'".format(material_no)
+        if st:
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime >= '{}'".format(st)
+            else:
+                extra_where_str += "where TaskStartTime >= '{}'".format(st)
+        if et:
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime <= '{}'".format(st)
+            else:
+                extra_where_str += "where TaskStartTime <= '{}'".format(st)
+        sql = """select
+                   ProductNo,
+                   ProductName,
+                   TaskState,
+                   OastNo,
+                   count(*)
+            from dsp_OastTask
+            {}
+            group by ProductNo, ProductName, TaskState, OastNo;""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = {}
+        for item in temp:
+            material_no = item[0]
+            qty = item[4]
+            task_state = item[2]
+            if material_no not in result:
+                underway_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
+                if task_state == 1:  # 入库中
+                    if not item[3]:  # 没有烤箱编号
+                        underway_qty += qty
+                    else:  # 有烤箱编号
+                        indoor_qty += qty
+                elif task_state == 2:  # 烘烤运行中
+                    baking_qty += qty
+                    indoor_qty += qty
+                elif task_state == 3:  # 出库中
+                    finished_qty += qty
+                    indoor_qty += qty
+                elif task_state == 4:  # 等待烘烤
+                    indoor_qty += qty
+                elif task_state == 5:  # 等待出库
+                    finished_qty += qty
+                    indoor_qty += qty
+                elif task_state == 6:  # 已出库
+                    outbound_qty += qty
+                result[item[0]] = {'material_no': item[0],
+                                   'material_name': item[1],
+                                   'underway_qty': underway_qty,
+                                   'baking_qty': baking_qty,
+                                   'finished_qty': finished_qty,
+                                   'indoor_qty': indoor_qty,
+                                   'outbound_qty': outbound_qty}
+            else:
+                if task_state == 1:  # 入库中
+                    if not item[3]:  # 没有烤箱编号
+                        result[item[0]]['underway_qty'] += qty
+                    else:  # 有烤箱编号
+                        result[item[0]]['indoor_qty'] += qty
+                elif task_state == 2:  # 烘烤运行中
+                    result[item[0]]['baking_qty'] += qty
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 3:  # 出库中
+                    result[item[0]]['finished_qty'] += qty
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 4:  # 等待烘烤
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 5:  # 等待出库
+                    result[item[0]]['finished_qty'] += qty
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 6:  # 已出库
+                    result[item[0]]['outbound_qty'] += qty
+        sc.close()
+
+        # 补充立体库库内库存数量
+        material_nos = list(result.keys())
+        stock_data = dict(WmsInventoryStock.objects.using('wms').filter(
+            material_no__in=material_nos,
+            container_no__startswith='5'
+        ).values('material_no').annotate(c=Count('material_no')).values_list('material_no', 'c'))
+        for key, value in result.items():
+            value['stock_qty'] = stock_data.get(key)
+
+        return Response(result.values())
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFStockDetailView(APIView):
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        st = self.request.query_params.get('st')  # 开始时间
+        et = self.request.query_params.get('et')  # 结束时间
+        material_no = self.request.query_params.get('material_no')  # 物料编码
+        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库
+        if not all([material_no, data_type]):
+            raise ValidationError('参数缺失！')
+        extra_where_str = "where ProductNo = '{}'".format(material_no)
+        if data_type == '3':  # 输送途中
+            extra_where_str += "and TaskState=1 and OastNo is null"
+        if data_type == '4':  # 正在烘
+            extra_where_str += "and TaskState=2"
+        if data_type == '5':  # 已经烘完
+            extra_where_str += "and TaskState in (3, 5)"
+        if data_type == '6':  # 烘房小计
+            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and OastNo is not null and datalength(OastNo)<>0)"
+        if data_type == '7':  # 已出库
+            extra_where_str += "and TaskState=6"
+        if st:
+            extra_where_str += " and TaskStartTime >= '{}'".format(st)
+        if et:
+            extra_where_str += " and TaskStartTime <= '{}'".format(et)
+        sql = """select
+                OastNo,
+                TaskState,
+                ProductName,
+                ProductNo,
+                'pc',
+                RFID,
+                'rksj',
+                'cksj',
+                OastStartTime,
+                OastEntTime,
+                'qrsj'
+            from dsp_OastTask {}""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {
+                    'oven_no': item[0],
+                    'status': item[1],
+                    'material_name': item[2],
+                    'material_no': item[3],
+                    'batch_no': item[4],
+                    'pallet_no': item[5],
+                    'inbound_time': item[6],
+                    'outbound_time': item[7],
+                    'baking_start_time': item[8],
+                    'baking_end_time': item[9],
+                    'confirm_time': item[10]
+                }
+            )
+        sc.close()
+
+        return Response(result)

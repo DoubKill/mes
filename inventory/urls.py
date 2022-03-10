@@ -182,6 +182,9 @@ urlpatterns = [
     # 胶料库内库存统计
     path('In-library_inventory/', LIBRARYINVENTORYView.as_view()),
 
+    path('hf-stock/', HFStockView.as_view()),  # 烘房胶料信息统计列表
+    path('hf-stock-detail/', HFStockDetailView.as_view()),  # 烘房胶料信息详细列表
+
     # 混炼胶库存管理
     path('bz-mixin-inventory/', BzMixingRubberInventory.as_view()),  # 北自混炼胶库存列表
     path('bz-mixin-inventory-summary/', BzMixingRubberInventorySummary.as_view()),  # 根据出库口获取混炼胶库存统计列表
