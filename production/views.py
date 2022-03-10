@@ -2854,14 +2854,15 @@ class PerformanceSubsidyViewSet(ModelViewSet):
     @atomic
     def create(self, request, *args, **kwargs):
         for data in request.data:
+            price = data.get('price', 0)
+            desc = data.get('desc', None)
             if data.get('id'):
-                price = data.get('price', 0)
-                desc = data.get('desc', None)
                 SubsidyInfo.objects.filter(id=data.get('id')).update(price=price, desc=desc)
             else:
-                serializer = SubsidyInfoSerializer(data=data)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
+                if data.get('price'):
+                    serializer = SubsidyInfoSerializer(data=data)
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
         return Response(status=status.HTTP_200_OK)
 
 
