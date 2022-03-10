@@ -2859,10 +2859,9 @@ class PerformanceSubsidyViewSet(ModelViewSet):
             if data.get('id'):
                 SubsidyInfo.objects.filter(id=data.get('id')).update(price=price, desc=desc)
             else:
-                if data.get('price'):
-                    serializer = SubsidyInfoSerializer(data=data)
-                    serializer.is_valid(raise_exception=True)
-                    serializer.save()
+                serializer = SubsidyInfoSerializer(data=data)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
         return Response(status=status.HTTP_200_OK)
 
 
