@@ -7,6 +7,7 @@ import math
 import time
 from io import BytesIO
 from itertools import groupby, count
+from itertools import count as c
 
 import requests
 import xlwt
@@ -2280,11 +2281,11 @@ class SummaryOfWeighingOutput(APIView):
                 lh = price if equip in ['S01', 'S02'] else 0
             else:  # 平均值
                 equip = list(value.keys())[0]
-                count_ = count(list(value.values())) / len(value)
-                xl = price if equip in ['F01', 'F02', 'F03'] else 0
-                lh = price if equip in ['S01', 'S02'] else 0
+                count_ = sum(value.values()) / len(value)
                 unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
                 price = round(count_ * coefficient * post_coefficient * unit_price, 2)
+                xl = price if equip in ['F01', 'F02', 'F03'] else 0
+                lh = price if equip in ['S01', 'S02'] else 0
 
             if result1.get(name):
                 result1[name][f"{day}{classes}"] = price

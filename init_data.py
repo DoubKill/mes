@@ -896,6 +896,7 @@ permission_data = [
 
     {'id': 924, 'code': 'product_info_dj', 'name': '丁基胶规格设定', 'parent_id': None},
     {'id': 925, 'code': 'add_product_info_dj', 'name': '添加', 'parent_id': 924},
+    {'id': 953, 'code': 'view_product_info_dj', 'name': '查看', 'parent_id': 924},
     {'id': 926, 'code': 'change_product_info_dj', 'name': '编辑', 'parent_id': 924},
     {'id': 927, 'code': 'delete_product_info_dj', 'name': '删除', 'parent_id': 924},
 
