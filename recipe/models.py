@@ -183,7 +183,9 @@ class ProductBatching(AbstractEntity):
             common_scan = OtherMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, other_type='通用料包', status=1)
             if not common_scan:  # 扫的通用料包码则过滤掉细料
                 # 料包明细
-                details = ProductBatchingEquip.objects.filter(~Q(feeding_mode__startswith='C'),
+                details = ProductBatchingEquip.objects.filter(Q(~Q(feeding_mode__startswith='C'),
+                                                                ~Q(feeding_mode__startswith='P'),
+                                                                ~Q(feeding_mode__startswith='R')),
                                                               product_batching__stage_product_batch_no=self.stage_product_batch_no,
                                                               product_batching__dev_type__category_name=self.dev_type.category_no,
                                                               equip_no=equip_no, is_used=True, type=4,
@@ -331,8 +333,11 @@ class WeighCntType(models.Model):
 
     def cnt_total_weight(self, equip_no):
         """获取料包重量(除去走罐体称量部分)"""
-        total_weight = ProductBatchingEquip.objects.filter(~Q(feeding_mode__startswith='C'), type=4, equip_no=equip_no,
-                                                           cnt_type_detail_equip__weigh_cnt_type=self, is_used=True) \
+        total_weight = ProductBatchingEquip.objects.filter(Q(~Q(feeding_mode__startswith='C'),
+                                                             ~Q(feeding_mode__startswith='P'),
+                                                             ~Q(feeding_mode__startswith='R')),
+                                                           type=4, equip_no=equip_no, is_used=True,
+                                                           cnt_type_detail_equip__weigh_cnt_type=self) \
             .aggregate(total_weight=Sum('cnt_type_detail_equip__standard_weight'))['total_weight']
         return total_weight if total_weight else 0
 
@@ -393,6 +398,7 @@ class ProductBatchingEquip(models.Model):
     feeding_mode = models.CharField(max_length=4, help_text='投料方式: P密炼口投料, C炭黑罐自动, O油料罐自动', null=True, blank=True)
     is_used = models.BooleanField(default=True)
     send_recipe_flag = models.BooleanField(default=False, help_text='发送配方结果标志: 0 未发送或者发送失败; 1 发送成功')
+    is_manual = models.BooleanField(default=False, help_text='是否人工单配')
 
     class Meta:
         db_table = 'product_batching_equip'

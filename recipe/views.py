@@ -76,7 +76,7 @@ class MaterialViewSet(CommonDeleteMixin, ModelViewSet):
             else:
                 queryset = queryset.filter(use_flag=1)
                 if mc_code:
-                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')), use_flag=True)
+                    queryset = queryset.filter(~Q(Q(material_name__endswith='-C') | Q(material_name__endswith='-X')))
             data = queryset.values('id', 'material_no', 'material_name',
                                    'material_type__global_name', 'material_type', 'for_short',
                                    'package_unit', 'package_unit__global_name', 'use_flag')

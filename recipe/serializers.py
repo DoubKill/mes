@@ -125,6 +125,7 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
     material_name = serializers.CharField(source='material.material_name', read_only=True)
     material_no = serializers.CharField(source='material.material_no', read_only=True)
     master = serializers.DictField(default={})
+    is_manual = serializers.BooleanField(default=False)
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -133,7 +134,7 @@ class ProductBatchingDetailSerializer(BaseModelSerializer):
         if instance.product_batching.used_type not in [6, 7]:
             batching_info = batching_info.filter(is_used=True)
         update_data = {i.equip_no: i.feeding_mode for i in batching_info}
-        res.update({'master': update_data})
+        res.update({'master': update_data, 'is_manual': batching_info.first().is_manual if batching_info.first() else False})
         return res
 
     class Meta:
@@ -275,6 +276,7 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 material = detail.get('material')
                 detail.pop('id', None)
                 master = detail.pop('master', None)
+                is_manual = detail.pop('is_manual', False)
                 if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
                 elif material.material_type.global_name == '油料':
@@ -284,9 +286,9 @@ class ProductBatchingCreateSerializer(BaseModelSerializer):
                 # 保存投料方式设定
                 if master:
                     for k, v in master.items():
-                        data = {'product_batching': instance, 'equip_no': k, 'material': material,
-                                'feeding_mode': v, 'handle_material_name': material.material_name,
-                                'type': detail['type'], 'batching_detail_equip': detail_instance}
+                        data = {'product_batching': instance, 'equip_no': k, 'material': material, 'feeding_mode': v,
+                                'handle_material_name': material.material_name, 'type': detail['type'],
+                                'batching_detail_equip': detail_instance, 'is_manual': is_manual}
                         ProductBatchingEquip.objects.create(**data)
         if weight_cnt_types:
             # 新建小料包
@@ -444,6 +446,7 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             for detail in batching_details:
                 batching_detail_id = detail.pop('id', None)
                 master = detail.pop('master', None)
+                is_manual = detail.pop('is_manual', False)
                 material = detail.get('material')
                 if material.material_type.global_name == '炭黑':
                     detail['type'] = 2
@@ -460,12 +463,13 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                             exist_equip = ProductBatchingEquip.objects.filter(product_batching=instance, is_used=True, equip_no=k, material=batching_detail_instance.material)
                             if exist_equip:
                                 update_data = {'type': detail['type'], 'feeding_mode': v, 'material': material,
-                                               'handle_material_name': material.material_name}
+                                               'handle_material_name': material.material_name, 'is_manual': is_manual}
                                 exist_equip.filter(batching_detail_equip_id=batching_detail_id).update(**update_data)
                             else:  # 新增机台
                                 create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
                                                'batching_detail_equip': batching_detail_instance, 'type': detail['type'],
-                                               'feeding_mode': v, 'handle_material_name': material.material_name}
+                                               'feeding_mode': v, 'handle_material_name': material.material_name,
+                                               'is_manual': is_manual}
                                 ProductBatchingEquip.objects.create(**create_data)
                 else:
                     # 更新
@@ -476,7 +480,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
                         for k, v in master.items():
                             create_data = {'product_batching': instance, 'equip_no': k, 'material': material,
                                            'batching_detail_equip': batching_detail_instance, 'type': detail['type'],
-                                           'feeding_mode': v, 'handle_material_name': material.material_name}
+                                           'feeding_mode': v, 'handle_material_name': material.material_name,
+                                           'is_manual': is_manual}
                             ProductBatchingEquip.objects.create(**create_data)
                 if master:
                     # 去除配方下发状态颜色

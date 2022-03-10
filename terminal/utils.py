@@ -476,16 +476,11 @@ def get_tolerance(batching_equip, standard_weight, material_name=None, project_n
 def get_manual_materials(product_no, dev_type, batching_equip, equip_no=None):
     product_no_dev = re.split(r'\(|\（|\[', product_no)[0]
     if not equip_no:
-        equip_recipes = ProductBatchingEquip.objects.filter(is_used=True, type=4,
-                                                            product_batching__stage_product_batch_no=product_no_dev,
-                                                            product_batching__dev_type__category_name=dev_type)\
-            .values('equip_no').annotate(num=Count('id', filter=Q(feeding_mode__startswith='C')))
-        if not equip_recipes:
-            raise ValueError(f"未找到配方{product_no}配料信息")
-        handle_equip_recipe = [i['equip_no'] for i in equip_recipes if i['num'] == 0]
-        if not handle_equip_recipe:
-            raise ValueError(f"未找到配方{product_no}通用配料信息")
-        equip_no = handle_equip_recipe[0]
+        flag, result = get_common_equip(product_no_dev, dev_type)
+        if flag:
+            equip_no = result[0]
+        else:
+            raise ValueError(result)
     mes_recipe = ProductBatchingEquip.objects.filter(is_used=True, equip_no=equip_no, type=4,
                                                      feeding_mode__startswith=batching_equip[0],
                                                      product_batching__stage_product_batch_no=product_no_dev,
@@ -512,3 +507,67 @@ def get_current_factory_date():
     ).first()
     res = {'factory_date': current_work_schedule_plan.plan_schedule.day_time, 'classes': current_work_schedule_plan.classes.global_name} if current_work_schedule_plan else {}
     return res
+
+
+def get_common_equip(product_no_dev, dev_type):
+    """获取mes配方中通用料包机台"""
+    equip_recipes = ProductBatchingEquip.objects.filter(
+        is_used=True, type=4, product_batching__stage_product_batch_no=product_no_dev,
+        product_batching__dev_type__category_name=dev_type).values('equip_no').annotate(
+        num=Count('id', filter=Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P'))))
+    # 1、数量都不相等 则全为专用；2、存在数量相等，比较相等数量机台
+    data = {}
+    common_list = []
+    for i in equip_recipes:
+        if i['num'] == 0:  # 没有P、C机台加入待校验
+            common_list.append(i['equip_no'])
+            continue
+        data[i['num']] = [i['equip_no']] if i['num'] not in data else data[i['num']] + [i['equip_no']]
+    if len(common_list) == 1:
+        return True, common_list
+    elif len(common_list) > 1:
+        flag, check_res = compare_common_equip(product_no_dev, dev_type, common_list)
+        if flag:
+            return True, check_res
+    # 按数量排序[出现两组P/C数量一致时，先满足物料一致的为通用] ex: {1: ['Z11', 'Z12'], 2: ['Z13', 'Z14']}
+    sorted_data = sorted(data.items(), key=lambda x: x)
+    # 处理数据
+    # 机台数全是1：无通用；其他: 比较机台数大于1的机台;
+    if set([len(i) for i in data.values()]) == {1}:
+        return False, '无通用配方信息'
+    for i in sorted_data:
+        if len(i[1]) == 1:
+            continue
+        c_p = ProductBatchingEquip.objects.filter(Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
+                                                  product_batching__dev_type__category_name=dev_type, is_used=True,
+                                                  product_batching__stage_product_batch_no=product_no_dev, type=4,
+                                                  equip_no__in=i[1]).values('equip_no').annotate(total_num=Sum('material'))
+        if len(set(c_p.values_list('total_num'))) == len(i[1]):
+            continue
+        f_data = {}
+        for j in c_p:
+            total_num = j['total_num']
+            f_data[total_num] = [j['equip_no']] if total_num not in f_data else f_data[total_num] + [j['equip_no']]
+        res_data = [k for k, v in f_data.items() if len(v) > 1]
+        flag, check_res = compare_common_equip(product_no_dev, dev_type, f_data[min(res_data)])
+        res = True if flag else False
+        return res, check_res
+    return False, '未找到通用配方信息'
+
+
+def compare_common_equip(product_no_dev, dev_type, equip_list):
+    """去除P/C以后其他投料方式是否一致"""
+    info = ProductBatchingEquip.objects.filter(~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
+                                               product_batching__stage_product_batch_no=product_no_dev, type=4,
+                                               product_batching__dev_type__category_name=dev_type, is_used=True,
+                                               equip_no__in=equip_list).values('cnt_type_detail_equip')\
+        .annotate(s_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='S')),
+                  f_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='F')),
+                  r_num=Count('feeding_mode', distinct=True, filter=Q(feeding_mode__startswith='R')))\
+        .values_list('s_num', 'f_num', 'r_num')
+    res = [j for j in info if j.count(0) != 2]
+    if res:
+        return False, f"通用配方设置投料方式不一致，无法下发: {','.join(equip_list)}"
+    else:
+        return True, equip_list
+
