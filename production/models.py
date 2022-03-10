@@ -453,11 +453,11 @@ class SubsidyInfo(models.Model):
         (1, '其他奖惩'),
         (2, '生产补贴')
     )
-    date = models.DateField(help_text='日期')
+    date = models.DateField(help_text='日期', null=True, blank=True)
     type = models.PositiveIntegerField(help_text='补贴类别', choices=Type, default=1)
     name = models.CharField(max_length=64, help_text='姓名')
     group = models.CharField(max_length=12, help_text='班组')
-    price = models.IntegerField(help_text='补贴/奖励金额')
+    price = models.FloatField(help_text='补贴/奖励金额', default=0)
     desc = models.TextField(help_text='补贴说明', null=True, blank=True)
 
     class Meta:
