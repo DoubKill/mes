@@ -30,6 +30,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode, WorkSchedulePlan
+from equipment.utils import gen_template_response
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, PutPlanManagementFinalFilter, \
     MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, \
@@ -5137,6 +5138,23 @@ class WMSOutTaskDetailView(ListAPIView):
     serializer_class = MaterialOutHistorySerializer
     permission_classes = (IsAuthenticated,)
     DB = 'wms'
+    FILE_NAME = '出库任务'
+    EXPORT_FIELDS_DICT = {'出库单据号': 'task_order_no',
+                          '下架任务号': 'order_no',
+                          '巷道编号': 'tunnel',
+                          '追踪码': 'lot_no',
+                          '识别卡ID': 'pallet_no',
+                          '库位码': 'location',
+                          '物料名称': 'material_name',
+                          '物料编码': 'material_no',
+                          '批次号': 'batch_no',
+                          '创建时间': 'created_time',
+                          '状态': 'status',
+                          '创建人': 'initiator',
+                          '数量': 'qty',
+                          '重量': 'weight',
+                          '出库站台': 'entrance_name',
+                          }
 
     def get_queryset(self):
         task = self.request.query_params.get('task')
@@ -5145,8 +5163,9 @@ class WMSOutTaskDetailView(ListAPIView):
         lot_no = self.request.query_params.get('lot_no')
         material_no = self.request.query_params.get('material_no')
         tunnel = self.request.query_params.get('tunnel')
-        location = self.request.query_params.get('material_no')
-        pallet_no = self.request.query_params.get('material_no')
+        location = self.request.query_params.get('location')
+        pallet_no = self.request.query_params.get('pallet_no')
+        entrance_name = self.request.query_params.get('entrance_name')
         st = self.request.query_params.get('st')
         et = self.request.query_params.get('et')
         filter_kwargs = {}
@@ -5170,7 +5189,10 @@ class WMSOutTaskDetailView(ListAPIView):
             filter_kwargs['task__start_time__gte'] = st
         if et:
             filter_kwargs['task__start_time__lte'] = et
-        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).order_by('-id')
+        if entrance_name:
+            entrance_data = dict(MaterialEntrance.objects.using(self.DB).values_list('name', 'code'))
+            filter_kwargs['entrance'] = entrance_data.get(entrance_name)
+        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).select_related('task').order_by('-task')
 
     def get_serializer_context(self):
         """
@@ -5183,6 +5205,26 @@ class WMSOutTaskDetailView(ListAPIView):
             'view': self,
             'entrance_data': entrance_data
         }
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if export:
+            et = self.request.query_params.get('et')
+            st = self.request.query_params.get('st')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')
+            if diff.days > 31:
+                raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -5215,8 +5257,8 @@ class WmsOutboundOrderView(APIView):
                         "TaskDetailNumber": task_num + str(idx+1),
                         "MaterialCode": item.get('MaterialCode'),
                         "MaterialName": item.get('MaterialName'),
-                        "SpaceCode": item.get('SpaceId'),
-                        "Quantity": item.get('Quantity')
+                        "SpaceCode": item.get('SpaceCode'),
+                        "Quantity": 1
                     }
                 )
             data = {
@@ -5239,11 +5281,18 @@ class WmsOutboundOrderView(APIView):
                 "EntranceCode": entrance_code,
                 "AllocationInventoryDetails": details
             }
-        headers = {"UserId": 75, "tenantNumber": 1}
+        # headers = {"UserId": 75, "tenantNumber": 1}
         try:
-            r = requests.post(url, json=data, headers=headers, timeout=5)
+            res = requests.post(url, json=data, timeout=5)
         except Exception as e:
             raise ValidationError('请求出库失败，请联系管理员！')
+        try:
+            resp = json.loads(res.content)
+        except Exception:
+            resp = {}
+        resp_status = resp.get('state')
+        if resp_status != 1:
+            raise ValidationError('取消失败：{}'.format(resp.get('msg')))
         MaterialOutboundOrder.objects.create(order_no=task_num,
                                              created_username=self.request.user.username,
                                              order_type=self.ORDER_TYPE)
@@ -5265,9 +5314,17 @@ class WwsCancelTaskView(APIView):
         data = [{"TaskNumber": task_num}]
         url = self.URL + '/MESApi/CancelTask'
         try:
-            r = requests.post(url, json=data, timeout=5)
+            res = requests.post(url, json=data, timeout=5)
         except Exception as e:
-            raise ValidationError('请求出库失败，请联系管理员！')
+            raise ValidationError('请求取消出库失败，请联系管理员！')
+        try:
+            resp = json.loads(res.content)
+        except Exception:
+            resp = {}
+        # {'state': 1, 'datas': '调用MES-取消出库任务接口成功', 'msg': '调用MES-取消出库任务接口成功'}
+        resp_status = resp.get('state')
+        if resp_status != 1:
+            raise ValidationError('取消失败：{}'.format(resp.get('msg')))
         return Response('ok')
 
 

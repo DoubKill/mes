@@ -1826,9 +1826,24 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
     initiator = serializers.CharField(source='task.initiator')
     task_order_no = serializers.CharField(source='task.order_no')
     entrance_name = serializers.SerializerMethodField()
+    tunnel = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     def get_entrance_name(self, obj):
         return self.context['entrance_data'].get(obj.entrance)
+
+    def get_tunnel(self, obj):
+        return obj.location.split('-')[1]
+
+    def get_status(self, obj):
+        status_dict = {1: '待处理',
+                       2: '处理中',
+                       3: '完成',
+                       4: '已解绑',
+                       5: '取消',
+                       6: '异常',
+                       12: '强制完成'}
+        return status_dict.get(obj.task_status)
 
     class Meta:
         model = MaterialOutHistory
