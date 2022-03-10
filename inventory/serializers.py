@@ -26,7 +26,7 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
-    WmsNucleinManagement, MaterialOutHistoryOther, MaterialOutHistory
+    WmsNucleinManagement, MaterialOutHistoryOther, MaterialOutHistory, MaterialOutboundOrder
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1815,6 +1815,15 @@ class WmsNucleinManagementSerializer(BaseModelSerializer):
 
 
 class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
+    initiator = serializers.SerializerMethodField()
+
+    def get_initiator(self, obj):
+        if obj.initiator.startswith('MES'):
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no).first()
+            if order:
+                return order.created_username
+            return obj.initiator
+        return obj.initiator
 
     class Meta:
         model = MaterialOutHistoryOther
