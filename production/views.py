@@ -2854,7 +2854,7 @@ class PerformanceSubsidyViewSet(ModelViewSet):
     @atomic
     def create(self, request, *args, **kwargs):
         for data in request.data:
-            price = data.get('price', 0)
+            price = data.get('price') if data.get('price') else 0
             desc = data.get('desc', None)
             if data.get('id'):
                 SubsidyInfo.objects.filter(id=data.get('id')).update(price=price, desc=desc)
