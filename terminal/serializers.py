@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import requests
-from django.db.models import Q, Sum, Max, Min, Count
+from django.db.models import Q, Sum, Max, Min, Count, F
 from django.db.transaction import atomic
 from django.db.utils import ConnectionDoesNotExist
 from rest_framework import serializers
@@ -1074,8 +1074,30 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                                    'class_group': f'{first_record.batch_group}/{first_record.batch_class}' if first_record else '',
                                    'manual_weight': total_manual_weight, 'manual_tolerance': tolerance,
                                    'detail_manual': detail_manual, 'detail_machine': total_manual_weight - detail_manual})
-            # 总公差
-            machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
+        else:  # 不合包显示人工配料信息
+            ml_equip_no, msg = '', ''
+            product_no_dev = re.split(r'\(|\（|\[', res['product_no'])[0]
+            if 'ONLY' in res['product_no']:
+                ml_equip_no = res['product_no'].split('-')[-2]
+            else:
+                flag, result = get_common_equip(product_no_dev, res['dev_type'])
+                if flag:
+                    ml_equip_no = result[0]
+                else:
+                    msg = result
+            if ml_equip_no:
+                machine_materials = list(instance.weight_package_machine.all().values_list('name', flat=True))
+                batch_info = ProductBatchingEquip.objects.filter(
+                    ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
+                    ~Q(handle_material_name__in=machine_materials), is_used=True, type=4, equip_no=ml_equip_no,
+                    product_batching__stage_product_batch_no=product_no_dev, product_batching__dev_type__category_name=res['dev_type'])\
+                    .annotate(weight=F('cnt_type_detail_equip__standard_weight'), error=F('cnt_type_detail_equip__standard_error'))\
+                    .values('handle_material_name', 'weight', 'error')
+                res.update({'display_manual_info': list(batch_info)})
+            else:
+                res.update({'display_manual_info': msg})
+        # 总公差
+        machine_manual_tolerance = get_tolerance(batching_equip=res['equip_no'], standard_weight=instance.machine_manual_weight, project_name='all')
         res.update({'batching_type': batching_type, 'manual_headers': manual_headers, 'manual_body': manual_body,
                     'machine_manual_weight': instance.machine_manual_weight, 'machine_manual_tolerance': machine_manual_tolerance,
                     'manual_weight': total_manual_weight, 'machine_weight': instance.plan_weight,

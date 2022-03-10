@@ -714,6 +714,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
             days=expire_days)).strftime('%Y-%m-%d %H:%M:%S') if expire_days != 0 else '9999-09-09 00:00:00'
         total_weight = plan_weight * split_count
         product_no_dev = re.split(r'\(|\（|\[', i['product_no'])[0]
+        display_manual_info, msg = '', ''
         if i['merge_flag']:
             # 配方中料包重量
             type_name = '细料' if equip_no.startswith('F') else '硫磺'
@@ -724,7 +725,8 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 if flag:
                     ml_equip_no = result[0]
                 else:
-                    raise ValidationError(result)
+                    ml_equip_no = ''  # 为获取到通用配方配料信息, 无法获取对应机台料包重量[取配方料包重量]
+                    msg = result
             sfj_recipe = ProductBatching.objects.using('SFJ').filter(delete_flag=False, used_type=4,
                                                                      stage_product_batch_no=product_no_dev,
                                                                      dev_type__category_name=dev_type,
@@ -743,6 +745,21 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                     xl_instance = prod.weight_cnt_types.filter(delete_flag=False, name=type_name).first()
                     if xl_instance:
                         total_weight = xl_instance.cnt_total_weight(ml_equip_no)
+        # 获取人工配信息
+            # 人工物料信息
+            if not ml_equip_no:
+                i.update({'display_manual_info': msg})
+            else:
+                machine_materials = RecipeMaterial.objects.using(equip_no).filter(recipe_name=i['product_no']).values_list('name', flat=True)
+                batch_info = ProductBatchingEquip.objects.filter(
+                    ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
+                    ~Q(handle_material_name__in=machine_materials), is_used=True, type=4, equip_no=ml_equip_no,
+                    product_batching__stage_product_batch_no=product_no_dev,
+                    product_batching__dev_type__category_name=dev_type) \
+                    .annotate(weight=F('cnt_type_detail_equip__standard_weight'),
+                              error=F('cnt_type_detail_equip__standard_error')) \
+                    .values('handle_material_name', 'weight', 'error')
+                i.update({'display_manual_info': list(batch_info)})
         # 公差查询
         machine_tolerance = get_tolerance(batching_equip=equip_no, standard_weight=total_weight, project_name='all')
         i.update({'plan_weight': plan_weight, 'equip_no': equip_no, 'dev_type': dev_type, 'machine_weight': plan_weight,
