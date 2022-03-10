@@ -382,7 +382,7 @@ class MachineTargetYieldSettings(models.Model):
 
 
 class EmployeeAttendanceRecords(models.Model):
-    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL)
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
     section = models.CharField(help_text='岗位', max_length=64)
     factory_date = models.DateField(help_text='工厂时间')
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
@@ -401,7 +401,7 @@ class EmployeeAttendanceRecords(models.Model):
 
 
 class FillCardApply(models.Model):
-    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL)
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
     employee_attendance_records = models.ForeignKey(EmployeeAttendanceRecords, on_delete=models.CASCADE)
     bk_date = models.DateTimeField(help_text='补卡时间', null=True, blank=True)
     desc = models.TextField(help_text='补卡理由')
@@ -413,7 +413,7 @@ class FillCardApply(models.Model):
 
 
 class ApplyForExtraWork(models.Model):
-    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL)
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
     employee_attendance_records = models.ForeignKey(EmployeeAttendanceRecords, on_delete=models.CASCADE)
     begin_date = models.DateTimeField(help_text='加班开始时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='加班结束', null=True, blank=True)
