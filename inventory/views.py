@@ -5215,7 +5215,7 @@ class WMSOutTaskDetailView(ListAPIView):
             st = self.request.query_params.get('st')
             if not all([st, et]):
                 raise ValidationError('请选择导出的时间范围！')
-            diff = datetime.datetime.strptime(et, '%Y-%m-%d') - datetime.datetime.strptime(st, '%Y-%m-%d')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
             if diff.days > 31:
                 raise ValidationError('导出数据的日期跨度不得超过一个月！')
             data = self.get_serializer(queryset, many=True).data
