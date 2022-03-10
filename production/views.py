@@ -2855,7 +2855,9 @@ class PerformanceSubsidyViewSet(ModelViewSet):
     def create(self, request, *args, **kwargs):
         for data in request.data:
             if data.get('id'):
-                SubsidyInfo.objects.filter(id=data.get('id')).update(**data)
+                price = data.get('price', 0)
+                desc = data.get('desc', None)
+                SubsidyInfo.objects.filter(id=data.get('id')).update(price=price, desc=desc)
             else:
                 serializer = SubsidyInfoSerializer(data=data)
                 serializer.is_valid(raise_exception=True)
