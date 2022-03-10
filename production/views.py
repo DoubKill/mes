@@ -2267,14 +2267,14 @@ class SummaryOfWeighingOutput(APIView):
                         else:
                             user_result[key] = {equip_no: item['count']}
             result.append(dic)
-        # 细料/硫磺单价'
-        unit_price = price_obj.xl if equip_no in ['F01', 'F02', 'F03'] else price_obj.lh
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
             coefficient = section_dic[section][0] / 100
             post_coefficient = section_dic[section][2] / 100
             if section_dic[section][1] == 1:  # 最大值
                 equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
+                # 细料/硫磺单价'
+                unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
                 price = round(count_ * coefficient * post_coefficient * unit_price, 2)
                 xl = price if equip in ['F01', 'F02', 'F03'] else 0
                 lh = price if equip in ['S01', 'S02'] else 0
@@ -2283,6 +2283,7 @@ class SummaryOfWeighingOutput(APIView):
                 count_ = count(list(value.values())) / len(value)
                 xl = price if equip in ['F01', 'F02', 'F03'] else 0
                 lh = price if equip in ['S01', 'S02'] else 0
+                unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
                 price = round(count_ * coefficient * post_coefficient * unit_price, 2)
 
             if result1.get(name):
