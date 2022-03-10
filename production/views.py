@@ -2621,13 +2621,13 @@ class PerformanceSummaryView(APIView):
             if ProductInfoDingJi.objects.filter(is_use=True, product_no=item['product_no']).exists():
                 for key in user_dic.keys():
                     if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
-                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
-                        user_dic[key][f"{state}_pt_unit"] = price_obj.pt
+                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
+                        user_dic[key][f"{state}_dj_unit"] = price_obj.pt
             else:
                 for key in user_dic.keys():
                     if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
-                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
-                        user_dic[key][f"{state}_dj_unit"] = price_obj.dj
+                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
+                        user_dic[key][f"{state}_pt_unit"] = price_obj.dj
         results = {}
         results1 = {}
         results2 = {}
