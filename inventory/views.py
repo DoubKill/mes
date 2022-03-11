@@ -2844,7 +2844,7 @@ class WMSRelease(APIView):
                 continue
             check_result = 1
             if operation_type == '不放行':
-                check_result = 3
+                check_result = 2
             data['AllCheckDetailList'].append({
                 "TrackingNumber": tracking_num,
                 "CheckResult": check_result

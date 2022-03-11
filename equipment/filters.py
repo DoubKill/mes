@@ -179,10 +179,11 @@ class EquipSpareErpFilter(django_filters.rest_framework.FilterSet):
     spare_name = django_filters.CharFilter(field_name='spare_name', help_text='备件名称', lookup_expr='icontains')
     supplier_name = django_filters.CharFilter(field_name='supplier_name', help_text='供应商名称', lookup_expr='icontains')
     specification = django_filters.CharFilter(field_name='specification', help_text='规格型号', lookup_expr='icontains')
+    unique_id = django_filters.CharFilter(field_name='unique_id', help_text='唯一ID', lookup_expr='icontains')
 
     class Meta:
         model = EquipSpareErp
-        fields = ('equip_component_type', 'spare_code', 'spare_name', 'supplier_name', 'specification', 'use_flag')
+        fields = ('equip_component_type', 'spare_code', 'spare_name', 'supplier_name', 'specification', 'use_flag', 'unique_id')
 
 
 class EquipBomFilter(django_filters.rest_framework.FilterSet):

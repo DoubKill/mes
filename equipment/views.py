@@ -2443,6 +2443,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         spare_name = self.request.query_params.get('spare_name', '')
         spare_code = self.request.query_params.get('spare_code', '')
         work_order_no = self.request.query_params.get('work_order_no')
+        unique_id = self.request.query_params.get('unique_id', '')
         if work_order_no:
             data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
                                                                         'created_date', 'plan_name')
@@ -2450,11 +2451,10 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
             return Response(data)
         if status == '入库':
             data = EquipSpareErp.objects.filter(use_flag=True, spare_name__icontains=spare_name,
-                                                spare_code__icontains=spare_code).values('id', 'spare_code',
-                                                                                         'spare_name',
-                                                                                         'equip_component_type__component_type_name',
-                                                                                         'specification',
-                                                                                         'technical_params', 'unit')
+                                                spare_code__icontains=spare_code, unique_id__icontains=unique_id
+                                                ).values('id', 'spare_code', 'unique_id', 'spare_name',
+                                                         'equip_component_type__component_type_name',
+                                                         'specification', 'technical_params', 'unit')
             for i in data:
                 i['spare__code'] = i['spare_code']
                 i['component_type_name'] = i['equip_component_type__component_type_name']
@@ -4537,7 +4537,8 @@ class GetSpareOrder(APIView):
             for spare in order_detail:
                 equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
                 if not equip_spare:
-                    raise ValidationError('调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件')
+                    equip_spare = EquipSpareErp.objects.create(unique_id=spare.get('wlxxid'))
+                    # raise ValidationError('调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件')
                 kwargs = {'equip_warehouse_order': order,
                           'equip_spare': equip_spare,
                           'plan_in_quantity': spare.get('cksl')}
