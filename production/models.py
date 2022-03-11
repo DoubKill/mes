@@ -379,3 +379,97 @@ class MachineTargetYieldSettings(models.Model):
 
     class Meta:
         db_table = 'machine_target_yield_settings'
+
+
+class EmployeeAttendanceRecords(models.Model):
+    user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
+    section = models.CharField(help_text='岗位', max_length=64)
+    factory_date = models.DateField(help_text='工厂时间')
+    begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
+    end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
+    work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
+    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True)
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
+    equip = models.CharField(help_text='机台', max_length=12)
+    status = models.CharField(max_length=12, help_text='换岗/加班/补卡', null=True, blank=True)
+    is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
+
+    class Meta:
+        db_table = 'employee_attendance_records'
+        verbose_name_plural = verbose_name = '员工出勤记录表'
+
+
+class PerformanceJobLadder(models.Model):
+    Status = (
+        (1, '最大值'),
+        (2, '平均值')
+    )
+    code = models.CharField(help_text='岗位编号', max_length=64, unique=True)
+    name = models.CharField(help_text='岗位名称', max_length=64)
+    type = models.CharField(help_text='岗位类别', max_length=64, null=True, blank=True)
+    coefficient = models.IntegerField(help_text='绩效系数')
+    post_standard = models.PositiveIntegerField(choices=Status, default=1, help_text='多岗位合并基准', null=True, blank=True)
+    post_coefficient = models.IntegerField(help_text='多岗位合并系数', null=True, blank=True)
+    delete_flag = models.BooleanField(help_text='是否删除', verbose_name='是否删除', default=False)
+
+    class Meta:
+        db_table = 'performance_job_ladder'
+        verbose_name_plural = verbose_name = '岗位阶梯表'
+
+
+class PerformanceUnitPrice(models.Model):
+    state = models.CharField(help_text='段次', max_length=64)
+    equip_type = models.CharField(help_text='机型', max_length=64)
+    pt = models.FloatField(help_text='普通胶', null=True, blank=True)
+    dj = models.FloatField(help_text='丁基胶', null=True, blank=True)
+
+    class Meta:
+        db_table = 'performance_unit_price'
+        verbose_name_plural = verbose_name = '绩效单价表'
+
+
+class ProductInfoDingJi(AbstractEntity):
+    product_no = models.CharField(help_text='胶料编码', max_length=64)
+    product_name = models.CharField(help_text='胶料名称', max_length=64)
+    is_use = models.BooleanField(help_text='是否作为丁基胶判断标准', default=0)
+
+    class Meta:
+        db_table = 'product_info_dingji'
+        verbose_name_plural = verbose_name = '丁基胶规格设定'
+
+
+class SetThePrice(models.Model):
+    xl = models.FloatField(help_text='细料单价')
+    lh = models.FloatField(help_text='硫磺单价')
+
+    class Meta:
+        db_table = 'set_the_price'
+        verbose_name_plural = verbose_name = '设定细料硫磺单价'
+
+
+class SubsidyInfo(models.Model):
+    Type = (
+        (1, '其他奖惩'),
+        (2, '生产补贴')
+    )
+    date = models.DateField(help_text='日期', null=True, blank=True)
+    type = models.PositiveIntegerField(help_text='补贴类别', choices=Type, default=1)
+    name = models.CharField(max_length=64, help_text='姓名')
+    group = models.CharField(max_length=12, help_text='班组')
+    price = models.FloatField(help_text='补贴/奖励金额', default=0)
+    desc = models.TextField(help_text='补贴说明', null=True, blank=True)
+
+    class Meta:
+        db_table = 'subsidy_info'
+        verbose_name_plural = verbose_name = '员工绩效汇总'
+
+
+class IndependentPostTemplate(models.Model):
+    name = models.CharField(max_length=64, help_text='姓名')
+    status = models.BooleanField(help_text='是否独立上岗', default=1)
+    date_time = models.CharField(max_length=12, help_text='日期：2022-3')
+
+    class Meta:
+        db_table = 'independent_post_template'
+        verbose_name_plural = verbose_name = '是否独立上岗'
