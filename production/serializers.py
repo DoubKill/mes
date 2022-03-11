@@ -8,7 +8,8 @@ from mes.base_serializer import BaseModelSerializer
 from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
-    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason
+    OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
+    ProductInfoDingJi, SetThePrice, SubsidyInfo
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -366,4 +367,54 @@ class RubberCannotPutinReasonSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RubberCannotPutinReason
+        fields = '__all__'
+
+
+class PerformanceJobLadderSerializer(serializers.ModelSerializer):
+    code = serializers.CharField(default='GW0001')
+    post_standard_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PerformanceJobLadder
+        fields = '__all__'
+
+    def create(self, validated_data):
+        if PerformanceJobLadder.objects.exists():
+            code = int(PerformanceJobLadder.objects.last().code[2:]) + 1
+            code = 'GW%.4d' % code
+            validated_data['code'] = code
+        instance = super().create(validated_data)
+        return instance
+
+    def get_post_standard_name(self, obj):
+        return obj.get_post_standard_display()
+
+
+class ProductInfoDingJiSerializer(BaseModelSerializer):
+    username = serializers.ReadOnlyField(source='created_user__username')
+
+    class Meta:
+        model = ProductInfoDingJi
+        fields = '__all__'
+
+
+class SetThePriceSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SetThePrice
+        fields = '__all__'
+
+    def create(self, validated_data):
+        instance = SetThePrice.objects.first()
+        if instance:
+            super().update(instance, validated_data)
+        else:
+            instance = super().create(validated_data)
+        return instance
+
+
+class SubsidyInfoSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = SubsidyInfo
         fields = '__all__'

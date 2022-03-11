@@ -529,22 +529,12 @@ class EquipSpareErpListSerializer(BaseModelSerializer):
 
 
 class EquipSpareErpCreateSerializer(BaseModelSerializer):
-    spare_code = serializers.CharField(max_length=64,
-                                       validators=[
-                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
-                                                           message='该备件代码已存在'),
-                                       ])
-    spare_name = serializers.CharField(max_length=64,
-                                       validators=[
-                                           UniqueValidator(queryset=EquipSpareErp.objects.all(),
-                                                           message='该备件名称已存在'),
-                                       ])
 
     class Meta:
         model = EquipSpareErp
         fields = ('equip_component_type', 'spare_code', 'spare_name', 'specification', 'technical_params', 'unit',
                   'key_parts_flag', 'supplier_name', 'lower_stock', 'upper_stock', 'cost', 'texture_material',
-                  'period_validity', 'use_flag')
+                  'period_validity', 'use_flag', 'unique_id')
 
 
 class EquipSpareErpImportCreateSerializer(BaseModelSerializer):
@@ -1405,6 +1395,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
 
     spare_code = serializers.ReadOnlyField(source='equip_spare.spare_code', help_text='备件编码')
     spare_name = serializers.ReadOnlyField(source='equip_spare.spare_name', help_text='备件名称')
+    unique_id = serializers.ReadOnlyField(source='equip_spare.unique_id', help_text='备件唯一ID')
     component_type_name = serializers.ReadOnlyField(source='equip_spare.equip_component_type.component_type_name',
                                                     help_text='备件分类名称')
     specification = serializers.ReadOnlyField(source='equip_spare.specification', help_text='规格型号')
@@ -1416,7 +1407,7 @@ class EquipWarehouseOrderDetailSerializer(BaseModelSerializer):
     class Meta:
         model = EquipWarehouseOrderDetail
         fields = ("id", "created_username", "spare_code", "spare_name", "component_type_name", "specification",
-            "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity",
+            "technical_params", "unit", "created_date", "in_quantity", "out_quantity", "plan_in_quantity", "unique_id",
             "plan_out_quantity", "status", "status_name", "equip_warehouse_order", "equip_spare", "all_qty", "key_parts_flag")
 
     def get_all_qty(self, instance):

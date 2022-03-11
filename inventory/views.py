@@ -11,7 +11,7 @@ import requests
 import xlwt
 from itertools import chain
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, Prefetch
 from django.db.transaction import atomic
 from django.forms import model_to_dict
 from django.http import HttpResponse
@@ -30,6 +30,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from basics.models import GlobalCode, WorkSchedulePlan
+from equipment.utils import gen_template_response
 from inventory.filters import StationFilter, PutPlanManagementLBFilter, PutPlanManagementFilter, \
     DispatchPlanFilter, DispatchLogFilter, DispatchLocationFilter, PutPlanManagementFinalFilter, \
     MaterialPlanManagementFilter, BarcodeQualityFilter, CarbonPlanManagementFilter, \
@@ -44,7 +45,7 @@ from inventory.models import InventoryLog, WarehouseInfo, Station, WarehouseMate
     DepotSite, DepotPallt, Sulfur, SulfurDepot, SulfurDepotSite, MaterialInHistory, MaterialInventoryLog, \
     CarbonOutPlan, FinalRubberyOutBoundOrder, MixinRubberyOutBoundOrder, FinalGumInInventoryLog, OutBoundDeliveryOrder, \
     OutBoundDeliveryOrderDetail, WMSReleaseLog, WmsInventoryMaterial, WMSMaterialSafetySettings, WmsNucleinManagement, \
-    WMSExceptHandle
+    WMSExceptHandle, MaterialOutHistoryOther, MaterialOutboundOrder, MaterialEntrance
 from inventory.models import DeliveryPlan, MaterialInventory
 from inventory.serializers import PutPlanManagementSerializer, \
     OverdueMaterialManagementSerializer, WarehouseInfoSerializer, StationSerializer, WarehouseMaterialTypeSerializer, \
@@ -56,13 +57,14 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer
+    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
+    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
 from mes import settings
 from mes.common_code import SqlClient, OSum
-from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL
+from mes.conf import WMS_CONF, TH_CONF, WMS_URL, TH_URL, HF_CONF
 from mes.derorators import api_recorder
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import permissions
@@ -2672,6 +2674,7 @@ class WmsInventoryStockView(APIView):
         entrance_name = self.request.query_params.get('entrance_name')
         position = self.request.query_params.get('position')
         is_entering = self.request.query_params.get('is_entering')
+        batch_no = self.request.query_params.get('batch_no')
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 15)
         st = (int(page) - 1) * int(page_size)
@@ -2685,6 +2688,8 @@ class WmsInventoryStockView(APIView):
             extra_where_str += " and c.MaterialCode like '%{}%'".format(material_no)
         if quality_status:
             extra_where_str += " and a.StockDetailState={}".format(quality_status)
+        if batch_no:
+            extra_where_str += " and a.BatchNo like '%{}%'".format(batch_no)
         sql = """SELECT
                  a.StockDetailState,
                  c.MaterialCode,
@@ -2818,8 +2823,7 @@ class WMSRelease(APIView):
     REQUEST_URL = WMS_URL
 
     def post(self, request):
-        status = self.request.data.get('status', None)  # 不合格 / 待检品
-        operation_type = self.request.data.get('operation_type')  # 1:放行 2:合格
+        operation_type = self.request.data.get('operation_type')  # 1:放行 2: 不放行
         tracking_nums = self.request.data.get('tracking_nums')
         if not all([operation_type, tracking_nums]):
             raise ValidationError('参数不足！')
@@ -2839,8 +2843,8 @@ class WMSRelease(APIView):
             if not tracking_num:
                 continue
             check_result = 1
-            if status == '不合格':
-                check_result = 3
+            if operation_type == '不放行':
+                check_result = 2
             data['AllCheckDetailList'].append({
                 "TrackingNumber": tracking_num,
                 "CheckResult": check_result
@@ -3143,13 +3147,14 @@ class WMSTunnelView(APIView):
     DATABASE_CONF = WMS_CONF
 
     def get(self, request):
-        sql = 'select TunnelName from t_inventory_tunnel;'
+        sql = 'select TunnelName, TunnelCode from t_inventory_tunnel;'
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
         for item in temp:
             result.append(
-                {'name': item[0]})
+                {'name': item[0],
+                 'code': item[1]})
         sc.close()
         return Response(result)
 
@@ -5094,3 +5099,400 @@ class THInventoryMaterialViewSet(WmsInventoryMaterialViewSet):
 @method_decorator([api_recorder], name="dispatch")
 class THStockSummaryView(WMSStockSummaryView):
     DATABASE_CONF = TH_CONF
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSOutTaskView(ListAPIView):
+    serializer_class = MaterialOutHistoryOtherSerializer
+    permission_classes = (IsAuthenticated,)
+    DB = 'wms'
+
+    def get_queryset(self):
+        query_set = MaterialOutHistoryOther.objects.using(self.DB).order_by('-id')
+        order_no = self.request.query_params.get('order_no')
+        task_status = self.request.query_params.get('task_status')
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        filter_kwargs = {}
+        if order_no:
+            filter_kwargs['order_no__icontains'] = order_no
+        if task_status:
+            filter_kwargs['task_status'] = task_status
+        if material_no:
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_no__icontains=material_no).values_list('task_id', flat=True)
+            filter_kwargs['id__in'] = task_ids
+        if material_name:
+            task_ids = MaterialOutHistory.objects.using(self.DB).filter(material_name__icontains=material_name).values_list('task_id', flat=True)
+            filter_kwargs['id__in'] = task_ids
+        return query_set.filter(**filter_kwargs)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THOutTaskView(WMSOutTaskView):
+    DB = 'cb'
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WMSOutTaskDetailView(ListAPIView):
+    serializer_class = MaterialOutHistorySerializer
+    permission_classes = (IsAuthenticated,)
+    DB = 'wms'
+    FILE_NAME = '出库任务'
+    EXPORT_FIELDS_DICT = {'出库单据号': 'task_order_no',
+                          '下架任务号': 'order_no',
+                          '巷道编号': 'tunnel',
+                          '追踪码': 'lot_no',
+                          '识别卡ID': 'pallet_no',
+                          '库位码': 'location',
+                          '物料名称': 'material_name',
+                          '物料编码': 'material_no',
+                          '批次号': 'batch_no',
+                          '创建时间': 'created_time',
+                          '状态': 'status',
+                          '创建人': 'initiator',
+                          '数量': 'qty',
+                          '重量': 'weight',
+                          '出库站台': 'entrance_name',
+                          }
+
+    def get_queryset(self):
+        task = self.request.query_params.get('task')
+        task_order_no = self.request.query_params.get('task_order_no')
+        task_status = self.request.query_params.get('task_status')
+        lot_no = self.request.query_params.get('lot_no')
+        material_no = self.request.query_params.get('material_no')
+        tunnel = self.request.query_params.get('tunnel')
+        location = self.request.query_params.get('location')
+        pallet_no = self.request.query_params.get('pallet_no')
+        entrance_name = self.request.query_params.get('entrance_name')
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        filter_kwargs = {}
+        if task:
+            filter_kwargs['task_id'] = task
+        if task_order_no:
+            filter_kwargs['task__order_no'] = task_order_no
+        if task_status:
+            filter_kwargs['task_status'] = task_status
+        if lot_no:
+            filter_kwargs['lot_no__icontains'] = lot_no
+        if material_no:
+            filter_kwargs['material_no__icontains'] = material_no
+        if tunnel:
+            filter_kwargs['location__icontains'] = '-{}'.format(tunnel)
+        if location:
+            filter_kwargs['location__icontains'] = location
+        if pallet_no:
+            filter_kwargs['pallet_no__icontains'] = pallet_no
+        if st:
+            filter_kwargs['task__start_time__gte'] = st
+        if et:
+            filter_kwargs['task__start_time__lte'] = et
+        if entrance_name:
+            entrance_data = dict(MaterialEntrance.objects.using(self.DB).values_list('name', 'code'))
+            filter_kwargs['entrance'] = entrance_data.get(entrance_name)
+        return MaterialOutHistory.objects.using(self.DB).filter(**filter_kwargs).select_related('task').order_by('-task')
+
+    def get_serializer_context(self):
+        """
+        Extra context provided to the serializer class.
+        """
+        entrance_data = dict(MaterialEntrance.objects.using(self.DB).values_list('code', 'name'))
+        return {
+            'request': self.request,
+            'format': self.format_kwarg,
+            'view': self,
+            'entrance_data': entrance_data
+        }
+
+    def list(self, request, *args, **kwargs):
+        export = self.request.query_params.get('export')
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if export:
+            et = self.request.query_params.get('et')
+            st = self.request.query_params.get('st')
+            if not all([st, et]):
+                raise ValidationError('请选择导出的时间范围！')
+            diff = datetime.datetime.strptime(et, '%Y-%m-%d %H:%M:%S') - datetime.datetime.strptime(st, '%Y-%m-%d %H:%M:%S')
+            if diff.days > 31:
+                raise ValidationError('导出数据的日期跨度不得超过一个月！')
+            data = self.get_serializer(queryset, many=True).data
+            return gen_template_response(self.EXPORT_FIELDS_DICT, data, self.FILE_NAME)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THOutTaskDetailView(WMSOutTaskDetailView):
+    DB = 'cb'
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WmsOutboundOrderView(APIView):
+    URL = WMS_URL
+    ORDER_TYPE = 1
+
+    def post(self, request):
+        outbound_type = self.request.data.get('outbound_type')  # 1 指定库位出库 2：指定重量出库
+        entrance_code = self.request.data.get('entrance_code')  # 出库口
+        outbound_data = self.request.data.get('outbound_data')
+        if outbound_type not in (1, 2):
+            raise ValidationError('bad request！')
+        if not entrance_code:
+            raise ValidationError('请选择出库口！')
+        if not isinstance(outbound_data, list):
+            raise ValidationError('data error!')
+        task_num = 'MES{}'.format(datetime.datetime.now().strftime('%Y%m%d%H%M%S%f'))
+        details = []
+        if outbound_type == 1:
+            url = '{}/MESApi/AllocateSpaceDelivery'.format(self.URL)
+            for idx, item in enumerate(outbound_data):
+                details.append(
+                    {
+                        "TaskDetailNumber": task_num + str(idx+1),
+                        "MaterialCode": item.get('MaterialCode'),
+                        "MaterialName": item.get('MaterialName'),
+                        "SpaceCode": item.get('SpaceCode'),
+                        "Quantity": 1
+                    }
+                )
+            data = {
+                "TaskNumber": task_num,
+                "EntranceCode": entrance_code,
+                "AllocationInventoryDetails": details
+            }
+        else:
+            url = '{}/MESApi/AllocateWeightDelivery'.format(self.URL)
+            for idx, item in enumerate(outbound_data):
+                details.append({
+                        "MaterialCode": item.get('MaterialCode'),
+                        "StockDetailState": item.get('StockDetailState'),
+                        "MaterialName": item.get('MaterialName'),
+                        "WeightOfActual": item.get('WeightOfActual')
+                    }
+                )
+            data = {
+                "TaskNumber": task_num,
+                "EntranceCode": entrance_code,
+                "AllocationInventoryDetails": details
+            }
+        # headers = {"UserId": 75, "tenantNumber": 1}
+        try:
+            res = requests.post(url, json=data, timeout=5)
+        except Exception as e:
+            raise ValidationError('请求出库失败，请联系管理员！')
+        try:
+            resp = json.loads(res.content)
+        except Exception:
+            resp = {}
+        resp_status = resp.get('state')
+        if resp_status != 1:
+            raise ValidationError('取消失败：{}'.format(resp.get('msg')))
+        MaterialOutboundOrder.objects.create(order_no=task_num,
+                                             created_username=self.request.user.username,
+                                             order_type=self.ORDER_TYPE)
+        return Response('成功')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THOutboundOrderView(WmsOutboundOrderView):
+    URL = TH_URL
+    ORDER_TYPE = 2
+
+
+@method_decorator([api_recorder], name="dispatch")
+class WwsCancelTaskView(APIView):
+    URL = WMS_URL
+
+    def post(self, request):
+        task_num = self.request.data.get('task_num')
+        data = [{"TaskNumber": task_num}]
+        url = self.URL + '/MESApi/CancelTask'
+        try:
+            res = requests.post(url, json=data, timeout=5)
+        except Exception as e:
+            raise ValidationError('请求取消出库失败，请联系管理员！')
+        try:
+            resp = json.loads(res.content)
+        except Exception:
+            resp = {}
+        # {'state': 1, 'datas': '调用MES-取消出库任务接口成功', 'msg': '调用MES-取消出库任务接口成功'}
+        resp_status = resp.get('state')
+        if resp_status != 1:
+            raise ValidationError('取消失败：{}'.format(resp.get('msg')))
+        return Response('ok')
+
+
+@method_decorator([api_recorder], name="dispatch")
+class THCancelTaskView(WwsCancelTaskView):
+    URL = TH_URL
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFStockView(APIView):
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        st = self.request.query_params.get('st')
+        et = self.request.query_params.get('et')
+        material_no = self.request.query_params.get('material_no')
+        material_name = self.request.query_params.get('material_name')
+        extra_where_str = ""
+        if material_name:
+            extra_where_str += "where ProductName like N'%{}%'".format(material_name)
+        if material_no:
+            if extra_where_str:
+                extra_where_str += " and ProductNo like '%{}%'".format(material_no)
+            else:
+                extra_where_str += "where ProductNo like '%{}%'".format(material_no)
+        if st:
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime >= '{}'".format(st)
+            else:
+                extra_where_str += "where TaskStartTime >= '{}'".format(st)
+        if et:
+            if extra_where_str:
+                extra_where_str += " and TaskStartTime <= '{}'".format(st)
+            else:
+                extra_where_str += "where TaskStartTime <= '{}'".format(st)
+        sql = """select
+                   ProductNo,
+                   ProductName,
+                   TaskState,
+                   OastNo,
+                   count(*)
+            from dsp_OastTask
+            {}
+            group by ProductNo, ProductName, TaskState, OastNo;""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = {}
+        for item in temp:
+            material_no = item[0]
+            qty = item[4]
+            task_state = item[2]
+            if material_no not in result:
+                underway_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
+                if task_state == 1:  # 入库中
+                    if not item[3]:  # 没有烤箱编号
+                        underway_qty += qty
+                    else:  # 有烤箱编号
+                        indoor_qty += qty
+                elif task_state == 2:  # 烘烤运行中
+                    baking_qty += qty
+                    indoor_qty += qty
+                elif task_state == 3:  # 出库中
+                    finished_qty += qty
+                    indoor_qty += qty
+                elif task_state == 4:  # 等待烘烤
+                    indoor_qty += qty
+                elif task_state == 5:  # 等待出库
+                    finished_qty += qty
+                    indoor_qty += qty
+                elif task_state == 6:  # 已出库
+                    outbound_qty += qty
+                result[item[0]] = {'material_no': item[0],
+                                   'material_name': item[1],
+                                   'underway_qty': underway_qty,
+                                   'baking_qty': baking_qty,
+                                   'finished_qty': finished_qty,
+                                   'indoor_qty': indoor_qty,
+                                   'outbound_qty': outbound_qty}
+            else:
+                if task_state == 1:  # 入库中
+                    if not item[3]:  # 没有烤箱编号
+                        result[item[0]]['underway_qty'] += qty
+                    else:  # 有烤箱编号
+                        result[item[0]]['indoor_qty'] += qty
+                elif task_state == 2:  # 烘烤运行中
+                    result[item[0]]['baking_qty'] += qty
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 3:  # 出库中
+                    result[item[0]]['finished_qty'] += qty
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 4:  # 等待烘烤
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 5:  # 等待出库
+                    result[item[0]]['finished_qty'] += qty
+                    result[item[0]]['indoor_qty'] += qty
+                elif task_state == 6:  # 已出库
+                    result[item[0]]['outbound_qty'] += qty
+        sc.close()
+
+        # 补充立体库库内库存数量
+        material_nos = list(result.keys())
+        stock_data = dict(WmsInventoryStock.objects.using('wms').filter(
+            material_no__in=material_nos,
+            container_no__startswith='5'
+        ).values('material_no').annotate(c=Count('material_no')).values_list('material_no', 'c'))
+        for key, value in result.items():
+            value['stock_qty'] = stock_data.get(key)
+
+        return Response(result.values())
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFStockDetailView(APIView):
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        st = self.request.query_params.get('st')  # 开始时间
+        et = self.request.query_params.get('et')  # 结束时间
+        material_no = self.request.query_params.get('material_no')  # 物料编码
+        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库
+        if not all([material_no, data_type]):
+            raise ValidationError('参数缺失！')
+        extra_where_str = "where ProductNo = '{}'".format(material_no)
+        if data_type == '3':  # 输送途中
+            extra_where_str += "and TaskState=1 and OastNo is null"
+        if data_type == '4':  # 正在烘
+            extra_where_str += "and TaskState=2"
+        if data_type == '5':  # 已经烘完
+            extra_where_str += "and TaskState in (3, 5)"
+        if data_type == '6':  # 烘房小计
+            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and OastNo is not null and datalength(OastNo)<>0)"
+        if data_type == '7':  # 已出库
+            extra_where_str += "and TaskState=6"
+        if st:
+            extra_where_str += " and TaskStartTime >= '{}'".format(st)
+        if et:
+            extra_where_str += " and TaskStartTime <= '{}'".format(et)
+        sql = """select
+                OastNo,
+                TaskState,
+                ProductName,
+                ProductNo,
+                'pc',
+                RFID,
+                'rksj',
+                'cksj',
+                OastStartTime,
+                OastEntTime,
+                'qrsj'
+            from dsp_OastTask {}""".format(extra_where_str)
+        sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+        temp = sc.all()
+        result = []
+        for item in temp:
+            result.append(
+                {
+                    'oven_no': item[0],
+                    'status': item[1],
+                    'material_name': item[2],
+                    'material_no': item[3],
+                    'batch_no': item[4],
+                    'pallet_no': item[5],
+                    'inbound_time': item[6],
+                    'outbound_time': item[7],
+                    'baking_start_time': item[8],
+                    'baking_end_time': item[9],
+                    'confirm_time': item[10]
+                }
+            )
+        sc.close()
+
+        return Response(result)
