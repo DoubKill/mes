@@ -2543,6 +2543,7 @@ class PerformanceUnitPriceView(APIView):
 class ProductInfoDingJiViewSet(ModelViewSet):
     queryset = ProductInfoDingJi.objects.filter(delete_flag=False)
     serializer_class = ProductInfoDingJiSerializer
+    permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
     filter_class = ProductInfoDingJiFilter
 
@@ -2564,6 +2565,7 @@ class SetThePriceViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class PerformanceSummaryView(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         date = self.request.query_params.get('date')
@@ -2867,6 +2869,7 @@ class PerformanceSubsidyViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class IndependentPostTemplateView(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         date = self.request.query_params.get('date')
