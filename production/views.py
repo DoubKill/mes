@@ -2232,9 +2232,9 @@ class SummaryOfWeighingOutput(APIView):
         user_list = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, equip__in=equip_list).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
         # 岗位系数
         section_dic = {}
-        section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('name', 'coefficient', 'post_standard', 'post_coefficient')
+        section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
         for item in section_info:
-            section_dic[item['name']] = [item['coefficient'], item['post_standard'], item['post_coefficient']]
+            section_dic[f"{item['name']}_{item['type']}"] = [item['coefficient'], item['post_standard'], item['post_coefficient']]
 
         for item in user_list:
             classes = group_dic.get(f"{item['factory_date__day']}-{item['group']}")
@@ -2270,19 +2270,23 @@ class SummaryOfWeighingOutput(APIView):
             result.append(dic)
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
-            coefficient = section_dic[section][0] / 100
-            post_coefficient = section_dic[section][2] / 100
             if section_dic[section][1] == 1:  # 最大值
                 equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
                 # 细料/硫磺单价'
+                type = '细料称量' if equip in ['F01', 'F02', 'F03'] else '硫磺称量'
                 unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
+                coefficient = section_dic[f"{section}_{type}"][0] / 100
+                post_coefficient = section_dic[f"{section}_{type}"][2] / 100
                 price = round(count_ * coefficient * post_coefficient * unit_price, 2)
                 xl = price if equip in ['F01', 'F02', 'F03'] else 0
                 lh = price if equip in ['S01', 'S02'] else 0
             else:  # 平均值
                 equip = list(value.keys())[0]
                 count_ = sum(value.values()) / len(value)
+                type = '细料称量' if equip in ['F01', 'F02', 'F03'] else '硫磺称量'
                 unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
+                coefficient = section_dic[f"{section}_{type}"][0] / 100
+                post_coefficient = section_dic[f"{section}_{type}"][2] / 100
                 price = round(count_ * coefficient * post_coefficient * unit_price, 2)
                 xl = price if equip in ['F01', 'F02', 'F03'] else 0
                 lh = price if equip in ['S01', 'S02'] else 0
