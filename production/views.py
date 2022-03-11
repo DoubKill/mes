@@ -2270,10 +2270,11 @@ class SummaryOfWeighingOutput(APIView):
             result.append(dic)
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
-            if section_dic[section][1] == 1:  # 最大值
+            equip = list(value.keys())[0]
+            type = '细料称量' if equip in ['F01', 'F02', 'F03'] else '硫磺称量'
+            if section_dic[f"{section}_{type}"][1] == 1:  # 最大值
                 equip, count_ = sorted(value.items(), key=lambda kv: (kv[1], kv[0]))[-1]
                 # 细料/硫磺单价'
-                type = '细料称量' if equip in ['F01', 'F02', 'F03'] else '硫磺称量'
                 unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
                 coefficient = section_dic[f"{section}_{type}"][0] / 100
                 post_coefficient = section_dic[f"{section}_{type}"][2] / 100
@@ -2283,7 +2284,6 @@ class SummaryOfWeighingOutput(APIView):
             else:  # 平均值
                 equip = list(value.keys())[0]
                 count_ = sum(value.values()) / len(value)
-                type = '细料称量' if equip in ['F01', 'F02', 'F03'] else '硫磺称量'
                 unit_price = price_obj.xl if equip in ['F01', 'F02', 'F03'] else price_obj.lh
                 coefficient = section_dic[f"{section}_{type}"][0] / 100
                 post_coefficient = section_dic[f"{section}_{type}"][2] / 100
