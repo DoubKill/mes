@@ -7,7 +7,8 @@ import pymssql
 import requests
 import xlwt
 from DBUtils.PooledDB import PooledDB
-from django.db.models import Min, Max, Sum
+from django.contrib.auth.backends import ModelBackend
+from django.db.models import Min, Max, Sum, Q
 from django.http import HttpResponse
 from rest_framework import status, mixins
 from rest_framework.generics import CreateAPIView
@@ -353,3 +354,19 @@ def get_template_response(titles: list, filename="", description=""):
     output.seek(0)
     response.write(output.getvalue())
     return response
+
+
+class UsernameMobileAuthBackend(ModelBackend):
+    """用户名或工号登录"""
+
+    def authenticate(self, request, username=None, password=None, **kwargs):
+        """判断用户名、工号和密码是否正确"""
+        query_set = User.objects.filter(Q(username=username) | Q(num=username))
+        try:
+            if query_set.exists():
+                user = query_set.get()
+                if user.check_password(password):
+                    return user
+        except:
+            return None
+        return None
