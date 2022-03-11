@@ -931,7 +931,11 @@ permission_data = [
     {'id': 951, 'code': 'export_summary_of_weighing_output', 'name': '导出', 'parent_id': 949},
     {'id': 952, 'code': 'save_summary_of_weighing_output', 'name': '保存', 'parent_id': 949},
 
-    # 下一个 953开始
+    {'id': 953, 'code': 'material_hf_summary', 'name': '烘房胶料信息统计查询', 'parent_id': None},
+    {'id': 954, 'code': 'view_material_hf_summary', 'name': '查看', 'parent_id': 953},
+    {'id': 955, 'code': 'export_material_hf_summary', 'name': '导出', 'parent_id': 953},
+
+    # 下一个 956开始
 ]
 
 
