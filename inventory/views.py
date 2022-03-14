@@ -5496,4 +5496,3 @@ class HFStockDetailView(APIView):
         sc.close()
 
         return Response(result)
-
