@@ -5291,7 +5291,7 @@ class WmsOutboundOrderView(APIView):
             resp = {}
         resp_status = resp.get('state')
         if resp_status != 1:
-            raise ValidationError('取消失败：{}'.format(resp.get('msg')))
+            raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         MaterialOutboundOrder.objects.create(order_no=task_num,
                                              created_username=self.request.user.username,
                                              order_type=self.ORDER_TYPE)
@@ -5310,6 +5310,8 @@ class WwsCancelTaskView(APIView):
 
     def post(self, request):
         task_num = self.request.data.get('task_num')
+        if not task_num:
+            raise ValidationError('请输入出库单号！')
         data = [{"TaskNumber": task_num}]
         url = self.URL + '/MESApi/CancelTask'
         try:
