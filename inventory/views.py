@@ -58,7 +58,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
-    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
+    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
