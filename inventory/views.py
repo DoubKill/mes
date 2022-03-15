@@ -2885,11 +2885,11 @@ class WMSExceptHandleView(APIView):
 
     def post(self, request):
         data = self.request.data
-        serializer = WMSExceptHandleSerializer(data=data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-        WMSExceptHandle.objects.create(
-            **serializer.validated_data
-        )
+        lot_no = data.pop('lot_no', None)
+        lst = []
+        for item in lot_no:
+            lst.append(WMSExceptHandle(**data, lot_no=item))
+        WMSExceptHandle.objects.bulk_create(lst)
         return Response('保存成功')
 
 
