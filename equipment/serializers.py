@@ -525,6 +525,7 @@ class EquipSpareErpListSerializer(BaseModelSerializer):
     def get_equip_component_type_name(self, obj):
         if obj.equip_component_type:
             return obj.equip_component_type.component_type_name
+        return None
 
     class Meta:
         model = EquipSpareErp
