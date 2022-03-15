@@ -2888,7 +2888,7 @@ class WMSExceptHandleView(APIView):
         lot_no = data.pop('lot_no', None)
         lst = []
         for item in lot_no:
-            lst.append(WMSExceptHandle(**data, lot_no=item))
+            lst.append(WMSExceptHandle(**data, lot_no=item, created_user=self.request.user))
         WMSExceptHandle.objects.bulk_create(lst)
         return Response('保存成功')
 
