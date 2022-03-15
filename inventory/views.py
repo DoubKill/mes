@@ -2883,12 +2883,12 @@ class WMSExceptHandleView(APIView):
             data = []
         return Response({'results': data})
 
-    @atomic
     def post(self, request):
         data = self.request.data
+        serializer = WMSExceptHandleSerializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
         WMSExceptHandle.objects.create(
-            created_user=self.request.user,
-            **data
+            **serializer.validated_data
         )
         return Response('保存成功')
 
