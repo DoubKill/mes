@@ -56,7 +56,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer
+    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, WMSExceptHandleSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -2864,6 +2864,15 @@ class WMSRelease(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class WMSExceptHandleView(APIView):
     permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        material_code = self.request.query_params.get('material_code', None)
+        lot_no = self.request.query_params.get('lot_no', None)
+        if not material_code or not lot_no:
+            raise ValidationError('查询参数缺失')
+        queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no)
+        serializer = WMSExceptHandleSerializer(instance=queryset)
+        return Response({'results': serializer.data})
 
     @atomic
     def post(self, request):

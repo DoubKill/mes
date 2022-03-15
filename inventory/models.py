@@ -1140,6 +1140,7 @@ class WMSExceptHandle(AbstractEntity):
     result = models.CharField(max_length=10, help_text='放行/不放行', null=True, blank=True)
     except_reason = models.TextField(help_text='异常处理说明', null=True, blank=True)
     quality_status = models.CharField(max_length=10, help_text='不合格/待检品/合格')
+    status = models.CharField(max_length=12, help_text='异常处理/设定合格')
 
     class Meta:
         db_table = 'wms_except_handle'
