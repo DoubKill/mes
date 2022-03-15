@@ -552,6 +552,10 @@ class PalletFeedbacksBatch(APIView):
 
     @atomic
     def post(self, request):
+        for item in request.data:
+            p = item['pallet_no']
+            b = re.sub(u'\u0000', "", p)
+            item['pallet_no'] = b
         serializer = PalletFeedbacksSerializer(data=request.data, many=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
