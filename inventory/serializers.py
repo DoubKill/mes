@@ -1354,12 +1354,20 @@ class InOutCommonSerializer(serializers.Serializer):
     inout_type = serializers.IntegerField(read_only=True)
     material_no = serializers.CharField(max_length=64, read_only=True)
     material_name = serializers.CharField(max_length=64, read_only=True)
-    initiator = serializers.CharField(source='task.initiator', read_only=True)
+    initiator = serializers.SerializerMethodField()
     start_time = serializers.DateTimeField(source='task.start_time', read_only=True)
     fin_time = serializers.DateTimeField(source='task.fin_time', read_only=True)
     order_type = serializers.SerializerMethodField()
     batch_no = serializers.CharField(max_length=64, read_only=True)
     is_entering = serializers.SerializerMethodField()
+
+    def get_initiator(self, obj):
+        if obj.task.initiator == 'MES':
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
+            if order:
+                return order.created_username
+            return obj.task.initiator
+        return obj.task.initiator
 
     def get_is_entering(self, object):
         if object.pallet_no.startswith('5'):
@@ -1826,7 +1834,7 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
     initiator = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
-        if obj.initiator.startswith('MES'):
+        if obj.initiator == 'MES':
             order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no).first()
             if order:
                 return order.created_username
@@ -1840,11 +1848,19 @@ class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
 
 class MaterialOutHistorySerializer(serializers.ModelSerializer):
     created_time = serializers.CharField(source='task.start_time')
-    initiator = serializers.CharField(source='task.initiator')
+    initiator = serializers.SerializerMethodField()
     task_order_no = serializers.CharField(source='task.order_no')
     entrance_name = serializers.SerializerMethodField()
     tunnel = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+
+    def get_initiator(self, obj):
+        if obj.task.initiator == 'MES':
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
+            if order:
+                return order.created_username
+            return obj.task.initiator
+        return obj.task.initiator
 
     def get_entrance_name(self, obj):
         return self.context['entrance_data'].get(obj.entrance)
