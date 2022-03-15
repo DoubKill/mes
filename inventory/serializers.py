@@ -1819,6 +1819,7 @@ class WMSExceptHandleSerializer(BaseModelSerializer):
     class Meta:
         model = WMSExceptHandle
         fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
 class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
