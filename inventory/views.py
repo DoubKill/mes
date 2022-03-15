@@ -57,14 +57,8 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurResumeModelSerializer, DepotSulfurInfoModelSerializer, PalletDataModelSerializer, DepotResumeModelSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
-    WmsNucleinManagementSerializer, OutBoundTasksSerializer, WMSExceptHandleSerializer, WmsInventoryMaterialSerializer, \
-    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
-<<<<<<< HEAD
-    OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, WMSExceptHandleSerializer
-=======
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
     MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
->>>>>>> aaddc221c2223b3bc609abdebc0bfc240907cedd
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer

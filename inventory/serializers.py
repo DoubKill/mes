@@ -27,11 +27,6 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
     WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory
-<<<<<<< HEAD
-    WmsNucleinManagement, WMSExceptHandle
-=======
-    WmsNucleinManagement, MaterialOutHistoryOther, MaterialOutHistory, MaterialOutboundOrder
->>>>>>> aaddc221c2223b3bc609abdebc0bfc240907cedd
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
