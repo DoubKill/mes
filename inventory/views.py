@@ -2875,7 +2875,7 @@ class WMSExceptHandleView(APIView):
         lot_no = self.request.query_params.get('lot_no', None)
         if not material_code or not lot_no:
             raise ValidationError('查询参数缺失')
-        queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no)
+        queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no).order_by('id')
         if queryset.exists():
             serializer = WMSExceptHandleSerializer(instance=queryset, many=True)
             data = serializer.data
