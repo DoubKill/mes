@@ -86,3 +86,29 @@ class CollectTrainsFeedbacksFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = TrainsFeedbacks
         fields = ("st", "classes", "equip_no", "product_no")
+
+
+class ProductInfoDingJiFilter(django_filters.rest_framework.FilterSet):
+    product_no = django_filters.CharFilter(field_name='product_no', help_text='胶料编码', lookup_expr='icontains')
+    product_name = django_filters.CharFilter(field_name='product_name', help_text='胶料名称', lookup_expr='icontains')
+
+    class Meta:
+        model = ProductInfoDingJi
+        fields = ('product_no', 'product_name')
+
+
+class SubsidyInfoFilter(django_filters.rest_framework.FilterSet):
+    year = django_filters.CharFilter(field_name='date__year', help_text='year')
+    month = django_filters.CharFilter(field_name='date__month', help_text='month')
+
+    class Meta:
+        model = SubsidyInfo
+        fields = ('date', 'type', 'name', 'group', 'year', 'month')
+
+
+class PerformanceJobLadderFilter(django_filters.rest_framework.FilterSet):
+    name = django_filters.CharFilter(field_name='name', lookup_expr='icontains')
+
+    class Meta:
+        model = PerformanceJobLadder
+        fields = ('name', )

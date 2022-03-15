@@ -153,6 +153,10 @@ urlpatterns = [
     path('wms-expire-details/', WMSExpireDetailView.as_view()),
     path('wms-safety-settings/', WmsInventoryMaterialViewSet.as_view()),
     path('wms-stock-summsry/', WMSStockSummaryView.as_view()),  # 库存统计
+    path('wms-out-tasks/', WMSOutTaskView.as_view()),  # 原材料出库单据列表
+    path('wms-out-task-details/', WMSOutTaskDetailView.as_view()),  # 原材料出库单据明细列表
+    path('wms-outbound-order/', WmsOutboundOrderView.as_view()),
+    path('wms-cancel-task/', WwsCancelTaskView.as_view()),
 
     # 炭黑出库
     path('th-storage-summary/', THStorageSummaryView.as_view()),  # 炭黑所有库存统计
@@ -169,10 +173,17 @@ urlpatterns = [
     path('th-expire-details/', THExpireDetailView.as_view()),
     path('th-safety-settings/', THInventoryMaterialViewSet.as_view()),
     path('th-stock-summsry/', THStockSummaryView.as_view()),  # 库存统计
+    path('th-out-tasks/', THOutTaskView.as_view()),  # 炭黑库出库单据列表
+    path('th-out-task-details/', THOutTaskDetailView.as_view()),  # 炭黑库出库单据明细列表
+    path('th-outbound-order/', THOutboundOrderView.as_view()),
+    path('th-cancel-task/', THCancelTaskView.as_view()),
 
     path('outbound-history/', OutBoundHistory.as_view()),
     # 胶料库内库存统计
     path('In-library_inventory/', LIBRARYINVENTORYView.as_view()),
+
+    path('hf-stock/', HFStockView.as_view()),  # 烘房胶料信息统计列表
+    path('hf-stock-detail/', HFStockDetailView.as_view()),  # 烘房胶料信息详细列表
 
     # 混炼胶库存管理
     path('bz-mixin-inventory/', BzMixingRubberInventory.as_view()),  # 北自混炼胶库存列表

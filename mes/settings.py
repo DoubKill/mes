@@ -528,6 +528,9 @@ CELERY_RESULT_BACKEND = 'django-db'  # BACKEND配置，这里使用orm
 
 CELERY_RESULT_SERIALIZER = 'json'  # 结果序列化方案
 
+AUTHENTICATION_BACKENDS = ['mes.common_code.UsernameMobileAuthBackend']
+
+
 if DEBUG:
     try:
         from .local_settings import *

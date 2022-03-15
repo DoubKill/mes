@@ -26,7 +26,12 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
+    WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory
+<<<<<<< HEAD
     WmsNucleinManagement, WMSExceptHandle
+=======
+    WmsNucleinManagement, MaterialOutHistoryOther, MaterialOutHistory, MaterialOutboundOrder
+>>>>>>> aaddc221c2223b3bc609abdebc0bfc240907cedd
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1818,4 +1823,49 @@ class WMSExceptHandleSerializer(BaseModelSerializer):
 
     class Meta:
         model = WMSExceptHandle
+        fields = '__all__'
+
+
+class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
+    initiator = serializers.SerializerMethodField()
+
+    def get_initiator(self, obj):
+        if obj.initiator.startswith('MES'):
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no).first()
+            if order:
+                return order.created_username
+            return obj.initiator
+        return obj.initiator
+
+    class Meta:
+        model = MaterialOutHistoryOther
+        fields = '__all__'
+
+
+class MaterialOutHistorySerializer(serializers.ModelSerializer):
+    created_time = serializers.CharField(source='task.start_time')
+    initiator = serializers.CharField(source='task.initiator')
+    task_order_no = serializers.CharField(source='task.order_no')
+    entrance_name = serializers.SerializerMethodField()
+    tunnel = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    def get_entrance_name(self, obj):
+        return self.context['entrance_data'].get(obj.entrance)
+
+    def get_tunnel(self, obj):
+        return obj.location.split('-')[1]
+
+    def get_status(self, obj):
+        status_dict = {1: '待处理',
+                       2: '处理中',
+                       3: '完成',
+                       4: '已解绑',
+                       5: '取消',
+                       6: '异常',
+                       12: '强制完成'}
+        return status_dict.get(obj.task_status)
+
+    class Meta:
+        model = MaterialOutHistory
         fields = '__all__'
