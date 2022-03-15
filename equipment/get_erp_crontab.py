@@ -108,8 +108,9 @@ class GetSpareOrder(APIView):
             for spare in order_detail:
                 equip_spare = EquipSpareErp.objects.filter(unique_id=spare.get('wlxxid')).first()
                 if not equip_spare:
-                    logger.info(msg=f"调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件, time: {datetime.datetime.now()}")
-                    continue
+                    equip_spare = EquipSpareErp.objects.create(unique_id=spare.get('wlxxid'))
+                    # logger.info(msg=f"调用库存领料单接口失败，单据中备件不存在，请先去同步erp备件, time: {datetime.datetime.now()}")
+                    # continue
                 kwargs = {'equip_warehouse_order': order,
                           'equip_spare': equip_spare,
                           'plan_in_quantity': spare.get('cksl')}
