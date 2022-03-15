@@ -5358,9 +5358,9 @@ class HFStockView(APIView):
                 extra_where_str += "where TaskStartTime >= '{}'".format(st)
         if et:
             if extra_where_str:
-                extra_where_str += " and TaskStartTime <= '{}'".format(st)
+                extra_where_str += " and TaskStartTime <= '{}'".format(et)
             else:
-                extra_where_str += "where TaskStartTime <= '{}'".format(st)
+                extra_where_str += "where TaskStartTime <= '{}'".format(et)
         sql = """select
                    ProductNo,
                    ProductName,
@@ -5450,13 +5450,13 @@ class HFStockDetailView(APIView):
             raise ValidationError('参数缺失！')
         extra_where_str = "where ProductNo = '{}'".format(material_no)
         if data_type == '3':  # 输送途中
-            extra_where_str += "and TaskState=1 and OastNo is null"
+            extra_where_str += "and TaskState=1 and (OastNo is null or OastNo=0)"
         if data_type == '4':  # 正在烘
             extra_where_str += "and TaskState=2"
         if data_type == '5':  # 已经烘完
             extra_where_str += "and TaskState in (3, 5)"
         if data_type == '6':  # 烘房小计
-            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and OastNo is not null and datalength(OastNo)<>0)"
+            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and (OastNo is not null and OastNo!=0))"
         if data_type == '7':  # 已出库
             extra_where_str += "and TaskState=6"
         if st:
