@@ -56,7 +56,10 @@ router.register('product-info-dj', ProductInfoDingJiViewSet)
 router.register('set-the-price', SetThePriceViewSet)
 # 员工其他奖惩/补贴
 router.register('performance-subsidy', PerformanceSubsidyViewSet, basename='performance-subsidy')
-
+# 绩效管理 考勤组
+router.register('attendance-group-setup', AttendanceGroupSetupViewSet)
+# 用户考勤打卡
+router.register('attendance-clock', AttendanceClockViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -125,7 +128,14 @@ urlpatterns = [
     # 是否独立上岗模版
     path('independent-post-template/', IndependentPostTemplateView.as_view()),
 
-
     # 月产量完成报表
     path('daily-production-completion-report/', DailyProductionCompletionReport.as_view()),
+
+    # =============钉钉考勤======
+    # 补卡申请
+    path('reissue-card/', ReissueCardView.as_view()),
+    # 加班申请
+    path('over-time/', OverTimeView.as_view()),
+    # 考勤记录查询
+    path('attendance-record-search/', AttendanceRecordSearch.as_view())
 ]

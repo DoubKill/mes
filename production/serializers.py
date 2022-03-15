@@ -9,7 +9,9 @@ from mes.conf import COMMON_READ_ONLY_FIELDS
 from plan.models import ProductClassesPlan
 from production.models import TrainsFeedbacks, PalletFeedbacks, EquipStatus, PlanStatus, ExpendMaterial, QualityControl, \
     OperationLog, UnReachedCapacityCause, ProcessFeedback, AlarmLog, RubberCannotPutinReason, PerformanceJobLadder, \
-    ProductInfoDingJi, SetThePrice, SubsidyInfo
+    ProductInfoDingJi, SetThePrice, SubsidyInfo, AttendanceGroupSetup, EmployeeAttendanceRecords, FillCardApply, \
+    ApplyForExtraWork
+from system.models import User
 
 
 class EquipStatusSerializer(BaseModelSerializer):
@@ -417,4 +419,32 @@ class SubsidyInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SubsidyInfo
+        fields = '__all__'
+
+
+class AttendanceGroupSetupSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = AttendanceGroupSetup
+        fields = '__all__'
+
+
+class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = EmployeeAttendanceRecords
+        fields = '__all__'
+
+
+class FillCardApplySerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = FillCardApply
+        fields = '__all__'
+
+
+class ApplyForExtraWorkSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ApplyForExtraWork
         fields = '__all__'

@@ -112,3 +112,13 @@ class PerformanceJobLadderFilter(django_filters.rest_framework.FilterSet):
     class Meta:
         model = PerformanceJobLadder
         fields = ('name', )
+
+
+class AttendanceGroupSetupFilter(django_filters.rest_framework.FilterSet):
+    attendance_group = django_filters.CharFilter(field_name='attendance_group', lookup_expr='icontains')
+    principal = django_filters.CharFilter(field_name='principal', lookup_expr='icontains')
+    attendance_users = django_filters.CharFilter(field_name='attendance_users', lookup_expr='icontains')
+
+    class Meta:
+        model = AttendanceGroupSetup
+        fields = ('attendance_group', 'principal', 'attendance_users')

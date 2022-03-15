@@ -390,10 +390,10 @@ class EmployeeAttendanceRecords(models.Model):
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True)
     actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
-    group = models.CharField(help_text='班组', max_length=12)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
     equip = models.CharField(help_text='机台', max_length=12)
-    status = models.CharField(max_length=12, help_text='换岗/加班/补卡')
-    is_use = models.CharField(max_length=12, help_text='确认/添加/废弃')
+    status = models.CharField(max_length=12, help_text='上岗/换岗/加班', null=True, blank=True)
+    is_use = models.CharField(max_length=12, help_text='确认/添加/废弃', null=True, blank=True)
 
     class Meta:
         db_table = 'employee_attendance_records'
@@ -401,11 +401,19 @@ class EmployeeAttendanceRecords(models.Model):
 
 
 class FillCardApply(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
     user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
-    employee_attendance_records = models.ForeignKey(EmployeeAttendanceRecords, on_delete=models.CASCADE)
+    equip = models.CharField(max_length=64, help_text='机台')
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
+    section = models.CharField(help_text='岗位', max_length=64)
+    employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
     bk_date = models.DateTimeField(help_text='补卡时间', null=True, blank=True)
     desc = models.TextField(help_text='补卡理由')
-    handling_suggestion = models.TextField(help_text='处理意见')
+    handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
+    handling_result = models.NullBooleanField(help_text='处理结果', default=None)
+    apply_date = models.DateTimeField(auto_now_add=True, help_text='补卡时间')
+    status = models.CharField(max_length=12, help_text='上岗/换岗/下岗', null=True, blank=True)
 
     class Meta:
         db_table = 'fill_card_apply'
@@ -413,15 +421,21 @@ class FillCardApply(models.Model):
 
 
 class ApplyForExtraWork(models.Model):
+    factory_date = models.DateField(help_text='工厂时间')
     user = models.ForeignKey(User, help_text='员工', on_delete=models.SET_NULL, null=True)
-    employee_attendance_records = models.ForeignKey(EmployeeAttendanceRecords, on_delete=models.CASCADE)
+    equip = models.CharField(max_length=64, help_text='机台')
+    classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
+    group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
+    section = models.CharField(help_text='岗位', max_length=64)
+    employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='加班开始时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='加班结束', null=True, blank=True)
     desc = models.TextField(help_text='加班理由')
     handling_suggestion = models.TextField(help_text='处理意见')
+    handling_result = models.NullBooleanField(help_text='处理结果', default=None)
 
     class Meta:
-        db_table = '加班申请'
+        db_table = 'apply_for_extra_work'
         verbose_name_plural = verbose_name = '加班申请'
 
 
@@ -498,3 +512,25 @@ class IndependentPostTemplate(models.Model):
     class Meta:
         db_table = 'independent_post_template'
         verbose_name_plural = verbose_name = '是否独立上岗'
+
+
+class AttendanceGroupSetup(models.Model):
+    ATTENDANCE_TYPE = (
+        (1, '不固定时间上下班'),
+        (2, '按排班时间下班'),
+        (3, '固定时间上下班')
+    )
+    attendance_group = models.CharField(max_length=64, help_text='考勤组名称')
+    attendance_users = models.CharField(max_length=64, help_text='参加考勤人员')
+    attendance_type = models.PositiveIntegerField(choices=ATTENDANCE_TYPE, help_text='考勤类型', default=1)
+    attendance_st = models.TimeField(help_text='考勤开始时间')
+    attendance_et = models.TimeField(help_text='考勤结束时间')
+    principal = models.CharField(max_length=12, help_text='考勤负责人')
+    range_time = models.IntegerField(help_text='上班多久后可打下班卡', null=True, blank=True)
+    lead_time = models.IntegerField(help_text='提前几分钟可打工卡', null=True, blank=True)
+    type = models.CharField(help_text='类别', max_length=64, null=True, blank=True)
+
+    class Meta:
+        db_table = 'attendance_group_setup'
+        verbose_name_plural = verbose_name = '绩效管理考勤组'
+
