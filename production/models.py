@@ -407,12 +407,12 @@ class FillCardApply(models.Model):
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
     section = models.CharField(help_text='岗位', max_length=64)
-    employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
+    # employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
     bk_date = models.DateTimeField(help_text='补卡时间', null=True, blank=True)
-    desc = models.TextField(help_text='补卡理由')
+    desc = models.TextField(help_text='补卡理由', null=True, blank=True)
     handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
-    apply_date = models.DateTimeField(auto_now_add=True, help_text='补卡时间')
+    apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
     status = models.CharField(max_length=12, help_text='上岗/换岗/下岗', null=True, blank=True)
 
     class Meta:
@@ -430,8 +430,9 @@ class ApplyForExtraWork(models.Model):
     employee_attendance_records_ids = models.CharField(max_length=32, help_text='考勤记录', null=True, blank=True)
     begin_date = models.DateTimeField(help_text='加班开始时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='加班结束', null=True, blank=True)
-    desc = models.TextField(help_text='加班理由')
-    handling_suggestion = models.TextField(help_text='处理意见')
+    desc = models.TextField(help_text='加班理由', null=True, blank=True)
+    handling_suggestion = models.TextField(help_text='处理意见', null=True, blank=True)
+    apply_date = models.DateTimeField(auto_now_add=True, help_text='申请时间')
     handling_result = models.NullBooleanField(help_text='处理结果', default=None)
 
     class Meta:

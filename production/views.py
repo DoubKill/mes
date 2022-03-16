@@ -3420,11 +3420,17 @@ class AttendanceRecordSearch(APIView):
                                                             user=self.request.user,
                                                             end_date__isnull=False).order_by('id')
         if day:  # 当前的上下班时间
+            group_setup = AttendanceGroupSetup.objects.filter(principal=username).first()
             if queryset.filter(factory_date=f"{date}-{day}").exists():
                 begin_date = min(queryset.filter(factory_date=f"{date}-{day}").values_list('begin_date', flat=True))
                 end_date = max(queryset.filter(factory_date=f"{date}-{day}").values_list('end_date', flat=True))
                 return Response({'begin_date': datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S'),
-                                 'end_date': datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')})
+                                 'end_date': datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S'),
+                                 'work_time': round((end_date - begin_date).seconds / 3600, 2),
+                                 'attendance_type': group_setup.get_attendance_type_display,
+                                 'attendance_st': group_setup.attendance_st,
+                                 'attendance_et': group_setup.attendance_et
+                                 })
             return Response({})
         # 汇总数据
         results = {
@@ -3455,3 +3461,10 @@ class AttendanceRecordSearch(APIView):
             if days != 0:
                 results['avg_times'] = results['work_times'] / days
         return Response({'results': results})
+
+
+class AttendanceTimeStatisticsViewSet(ModelViewSet):
+    queryset = EmployeeAttendanceRecords.objects.filter(
+        Q(end_date__isnull=False) | Q(is_use='添加'))
+    serializer_class = EmployeeAttendanceRecordsSerializer
+
