@@ -2881,7 +2881,7 @@ class WMSExceptHandleView(APIView):
                 queryset.append(WMSExceptHandle.objects.filter(batch_no=batch_no, num=num).first())
         else:
             queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no).order_by('id')
-        if queryset.exists():
+        if queryset:
             serializer = WMSExceptHandleSerializer(instance=queryset, many=True)
             data = serializer.data
         else:
