@@ -1151,7 +1151,9 @@ class WMSReleaseLog(AbstractEntity):
 
 class WMSExceptHandle(AbstractEntity):
     material_code = models.CharField(max_length=128, help_text='物料编码')
-    lot_no = models.CharField(max_length=64, help_text='批次号')
+    lot_no = models.CharField(max_length=64, help_text='质检条码', null=True, blank=True)
+    batch_no = models.CharField(max_length=64, help_text='批次号', null=True, blank=True)
+    num = models.IntegerField(help_text='处理次数', default=1)
     result = models.CharField(max_length=10, help_text='放行/不放行', null=True, blank=True)
     except_reason = models.TextField(help_text='异常处理说明', null=True, blank=True)
     quality_status = models.CharField(max_length=10, help_text='不合格/待检品/合格')

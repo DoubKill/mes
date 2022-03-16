@@ -2873,9 +2873,14 @@ class WMSExceptHandleView(APIView):
     def get(self, request):
         material_code = self.request.query_params.get('material_code', None)
         lot_no = self.request.query_params.get('lot_no', None)
-        if not material_code or not lot_no:
-            raise ValidationError('查询参数缺失')
-        queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no).order_by('id')
+        batch_no = self.request.query_params.get('batch_no', None)
+        if batch_no:
+            queryset = []
+            nums = WMSExceptHandle.objects.filter(batch_no=batch_no).values_list('num', flat=True)
+            for num in set(nums):
+                queryset.append(WMSExceptHandle.objects.filter(batch_no=batch_no, num=num).first())
+        else:
+            queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no).order_by('id')
         if queryset.exists():
             serializer = WMSExceptHandleSerializer(instance=queryset, many=True)
             data = serializer.data
@@ -2885,10 +2890,15 @@ class WMSExceptHandleView(APIView):
 
     def post(self, request):
         data = self.request.data
+        batch_no = data.get('batch_no')
         lot_no = data.pop('lot_no', None)
         lst = []
+        obj = WMSExceptHandle.objects.filter(batch_no=batch_no).first()
+        num = 1
+        if obj:
+            num = obj.num + 1
         for item in lot_no:
-            lst.append(WMSExceptHandle(**data, lot_no=item, created_user=self.request.user))
+            lst.append(WMSExceptHandle(**data, lot_no=item, created_user=self.request.user, num=num))
         WMSExceptHandle.objects.bulk_create(lst)
         return Response('保存成功')
 
