@@ -221,7 +221,8 @@ class ProductBatchingViewSet(ModelViewSet):
     ).prefetch_related(
         Prefetch('batching_details', queryset=ProductBatchingDetail.objects.filter(delete_flag=False).order_by('sn')),
         Prefetch('weight_cnt_types', queryset=WeighCntType.objects.filter(delete_flag=False)),
-        Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(delete_flag=False)),
+        Prefetch('weight_cnt_types__weight_details', queryset=WeighBatchingDetail.objects.filter(
+            delete_flag=False).order_by('id')),
     ).order_by('stage_product_batch_no', 'dev_type')
     permission_classes = (IsAuthenticated,)
     filter_backends = (DjangoFilterBackend,)
