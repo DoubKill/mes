@@ -896,6 +896,7 @@ permission_data = [
 
     {'id': 924, 'code': 'product_info_dj', 'name': '丁基胶规格设定', 'parent_id': None},
     {'id': 925, 'code': 'add_product_info_dj', 'name': '添加', 'parent_id': 924},
+    {'id': 953, 'code': 'view_product_info_dj', 'name': '查看', 'parent_id': 924},
     {'id': 926, 'code': 'change_product_info_dj', 'name': '编辑', 'parent_id': 924},
     {'id': 927, 'code': 'delete_product_info_dj', 'name': '删除', 'parent_id': 924},
 
@@ -930,7 +931,11 @@ permission_data = [
     {'id': 951, 'code': 'export_summary_of_weighing_output', 'name': '导出', 'parent_id': 949},
     {'id': 952, 'code': 'save_summary_of_weighing_output', 'name': '保存', 'parent_id': 949},
 
-    # 下一个 953开始
+    {'id': 953, 'code': 'material_hf_summary', 'name': '烘房胶料信息统计查询', 'parent_id': None},
+    {'id': 954, 'code': 'view_material_hf_summary', 'name': '查看', 'parent_id': 953},
+    {'id': 955, 'code': 'export_material_hf_summary', 'name': '导出', 'parent_id': 953},
+
+    # 下一个 956开始
 ]
 
 

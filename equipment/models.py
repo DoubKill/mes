@@ -303,10 +303,10 @@ class EquipSpareErp(AbstractEntity):
     """
         erp备件物料
     """
-    spare_code = models.CharField(max_length=64, help_text='erp备件编码')
-    spare_name = models.CharField(max_length=150, help_text='erp备件名称')
+    spare_code = models.CharField(max_length=64, help_text='erp备件编码', null=True, blank=True)
+    spare_name = models.CharField(max_length=150, help_text='erp备件名称', null=True, blank=True)
     equip_component_type = models.ForeignKey(EquipComponentType, on_delete=models.CASCADE,
-                                             help_text='部件分类')
+                                             help_text='部件分类', null=True, blank=True)
     supplier_name = models.CharField(max_length=64, help_text='供应商名称', blank=True, null=True)
     specification = models.CharField(max_length=64, help_text='技术型号', blank=True, null=True)
     technical_params = models.CharField(max_length=64, help_text='用途', blank=True, null=True)
