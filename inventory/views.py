@@ -2893,7 +2893,7 @@ class WMSExceptHandleView(APIView):
         batch_no = data.get('batch_no')
         lot_no = data.pop('lot_no', None)
         lst = []
-        obj = WMSExceptHandle.objects.filter(batch_no=batch_no).first()
+        obj = WMSExceptHandle.objects.filter(batch_no=batch_no).last()
         num = 1
         if obj:
             num = obj.num + 1
