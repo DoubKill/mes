@@ -2230,13 +2230,20 @@ class SummaryOfWeighingOutput(APIView):
         result1 = {}
         group_dic = {}
         users = {}  # {'1-早班'： '张三'}
+        work_times = {}
         user_result = {}
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
                                                 start_time__month=month).values_list('group__global_name', 'classes__global_name', 'start_time__day')
         for item in group:
             group_dic[f'{item[2]}-{item[0]}'] = item[1]
         # 查询称量分类下当前月上班的所有员工
-        user_list = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, equip__in=equip_list).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
+        user_list = EmployeeAttendanceRecords.objects.filter(Q(factory_date__year=year,
+                                                             factory_date__month=month,
+                                                             equip__in=equip_list) &
+                                                             Q(Q(end_date__isnull=False) | ~Q(is_use='废弃'))
+                                                             ).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
+
+        # user_list = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, equip__in=equip_list).values('user__username', 'factory_date__day', 'group', 'section', 'equip')
         # 岗位系数
         section_dic = {}
         section_info = PerformanceJobLadder.objects.filter(delete_flag=False, type__in=['细料称量', '硫磺称量']).values('type', 'name', 'coefficient', 'post_standard', 'post_coefficient')
@@ -2247,8 +2254,10 @@ class SummaryOfWeighingOutput(APIView):
             classes = group_dic.get(f"{item['factory_date__day']}-{item['group']}")
             key = f"{item['factory_date__day']}-{classes}-{item['equip']}"
             if users.get(key):
+                work_times[key][item['user__username']] = item['actual_time']
                 users[key][item['user__username']] = item['section']
             else:
+                work_times[key] = {item['user__username']: item['actual_time']}
                 users[key] = {item['user__username']: item['section']}
 
         # 机台产量统计
@@ -2270,10 +2279,13 @@ class SummaryOfWeighingOutput(APIView):
                 if names:
                     for name, section in names.items():
                         key = f"{name}_{day}_{classes}_{section}"
+                        work_time = work_times.get(f'{day}-{classes}-{equip_no}').get(name)
                         if user_result.get(key):
-                            user_result[key][equip_no] = item['count']
+                            # user_result[key][equip_no] = item['count']
+                            user_result[key][equip_no] = int(item['count'] / 12 * work_time)
                         else:
-                            user_result[key] = {equip_no: item['count']}
+                            # user_result[key] = {equip_no: item['count']}
+                            user_result[key] = {equip_no: int(item['count'] / 12 * work_time)}
             result.append(dic)
         for key, value in user_result.items():  # value {'F03': 109, 'F02': 100,},
             name, day, classes, section = key.split('_')
@@ -2597,12 +2609,17 @@ class PerformanceSummaryView(APIView):
             raise ValidationError('请先去添加独立上岗或超产奖励系数')
         # 员工考勤记录 (考勤记录)
         section_list = PerformanceJobLadder.objects.filter(delete_flag=False, type='密炼').values_list('name', flat=True)
-        user_query = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, section__in=section_list)
-        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip')
+        user_query = EmployeeAttendanceRecords.objects.filter(Q(factory_date__year=year,
+                                                             factory_date__month=month,
+                                                             section__in=section_list) &
+                                                             Q(Q(end_date__isnull=False) | ~Q(is_use='废弃'))
+                                                             )
+        # user_query = EmployeeAttendanceRecords.objects.filter(factory_date__year=year, factory_date__month=month, section__in=section_list)
+        queryset = user_query.values_list('user__username', 'section', 'factory_date__day', 'group', 'equip', 'actual_time')  # 导入的没有班次
         user_dic = {}
         for item in queryset:
-            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}"
-            user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': item[4]}
+            key = f"{item[2]}_{item[3]}_{item[1]}_{item[4]}"  # 1_A班_挤出_Z01
+            user_dic[key] = {'name': item[0], 'section': item[1], 'day': item[2], 'group': item[3], 'equip': item[4], 'actual_time': item[5]}
 
         # user_dic 中添加classes属性
         group = WorkSchedulePlan.objects.filter(start_time__year=year,
@@ -2634,12 +2651,16 @@ class PerformanceSummaryView(APIView):
             if ProductInfoDingJi.objects.filter(is_use=True, product_no=item['product_no']).exists():
                 for key in user_dic.keys():
                     if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
-                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
+                        work_time = user_dic[key]['actual_time']
+                        # user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + item['qty']
+                        user_dic[key][f"{state}_dj_qty"] = user_dic[key].get(f"{state}_dj_qty", 0) + int(item['qty'] / 12 * work_time)
                         user_dic[key][f"{state}_dj_unit"] = price_obj.pt
             else:
                 for key in user_dic.keys():
+                    work_time = user_dic[key]['actual_time']
                     if key.split('_')[0] == str(item['factory_date__day']) and key.split('_')[4] == item['classes']:
-                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
+                        # user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + item['qty']
+                        user_dic[key][f"{state}_pt_qty"] = user_dic[key].get(f"{state}_pt_qty", 0) + int(item['qty'] / 12 * work_time)
                         user_dic[key][f"{state}_pt_unit"] = price_obj.dj
         results = {}
         results1 = {}
