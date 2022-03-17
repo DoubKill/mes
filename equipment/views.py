@@ -2469,12 +2469,12 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
                 queryset = self.filter_queryset(self.get_queryset().filter(status__in=[4, 5, 6]))
             else:
                 queryset = self.filter_queryset(self.get_queryset())
-            page = self.paginate_queryset(queryset)
+            page = self.paginate_queryset(queryset.distinct())
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
 
-            serializer = self.get_serializer(queryset, many=True)
+            serializer = self.get_serializer(queryset.distinct(), many=True)
             return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
