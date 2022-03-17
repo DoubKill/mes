@@ -4600,3 +4600,4 @@ class EquipOrderEntrustView(APIView):
             ding_api.send_message(user_ids, content, order_id)
 
         return Response('委托操作成功')
+
