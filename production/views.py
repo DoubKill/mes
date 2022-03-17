@@ -3153,15 +3153,20 @@ class AttendanceClockViewSet(ModelViewSet):
         user = self.request.user
         username = user.username
         status = data.get('status')
-        factory_date = data.get('factory_date')
+        # factory_date = data.get('factory_date')
         bk_date = data.get('bk_date')
         now_time = datetime.datetime.now()
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user)
         principal = attendance_group_obj.principal  # 考勤负责人
         # 下岗时间
         if attendance_group_obj.attendance_et.hour > 12:  # 白班
-            attendance_et = datetime.datetime.strptime(f"{factory_date} {str(attendance_group_obj.attendance_et)}")
-        else:
+            attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
+        else:  # 夜班
+            hours = datetime.datetime.strptime(now_time, '%H:%M:%S')
+            if attendance_group_obj.attendance_et < hours < attendance_group_obj.attendance_st:
+                factory_date = now_time - datetime.timedelta(days=1)
+            else:
+                factory_date = date_now
             factory_date1 = str(datetime.datetime.strptime(factory_date, '%Y-%m-%d') + datetime.timedelta(days=1))
             attendance_et = datetime.datetime.strptime(f"{factory_date1} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
         if now_time > attendance_et:
@@ -3178,7 +3183,7 @@ class AttendanceClockViewSet(ModelViewSet):
         elif status == '下岗':
             obj = EmployeeAttendanceRecords.objects.filter(
                 user=user,
-                factory_date=data.get('factory_date'),
+                factory_date=factory_date,
                 end_date__isnull=True,
                 section=data.get('section'),
                 classes=data.get('classes'),
@@ -3193,6 +3198,7 @@ class AttendanceClockViewSet(ModelViewSet):
             user=self.request.user,
             equip=','.join(equip_list),
             apply_date=now_time,
+            factory_date=factory_date,
             **data
         )
         # 钉钉提醒
@@ -3215,7 +3221,7 @@ class AttendanceClockViewSet(ModelViewSet):
         self.send_message(principal_obj, content)
         return Response('消息发送给审批人')
 
-    @action(methods=['post'], detail=False, permission_classes=[], url_path='reissue_card', url_name='reissue_card')
+    @action(methods=['post'], detail=False, permission_classes=[], url_path='overtime', url_name='overtime')
     def overtime(self, request):
         # 加班也存在换岗的情况
         user = self.request.user
@@ -3227,6 +3233,7 @@ class AttendanceClockViewSet(ModelViewSet):
         apply = ApplyForExtraWork.objects.create(
             user=self.request.user,
             equip=equip,
+            factory_date=date_now,
             **data
         )
         # 钉钉提醒
