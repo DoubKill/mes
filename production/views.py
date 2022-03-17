@@ -3043,8 +3043,8 @@ class AttendanceClockViewSet(ModelViewSet):
                     if time_now < date_now + datetime.timedelta(days=1, hours=2):  # 直到明天凌晨两点，显示当前的打卡记录
                         results['state'] = 3  # 进行中的
                         results['ids'] = ids
-                        results['begin_date'] = last_obj.begin_date
-                        results['end_date'] = last_obj.end_date
+                        results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
+                        results['end_date'] = datetime.datetime.strftime(last_obj.end_date, '%H:%M:%S') if last_obj.end_date else None
                         results['section_list'].remove(last_obj.section)
                         results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
                         group, classes = last_obj.group, last_obj.classes
@@ -3056,8 +3056,8 @@ class AttendanceClockViewSet(ModelViewSet):
                     if time_now < date_now + datetime.timedelta(days=1, hours=14):
                         results['state'] = 3
                         results['ids'] = ids
-                        results['begin_date'] = last_obj.begin_date
-                        results['end_date'] = last_obj.end_date
+                        results['begin_date'] = datetime.datetime.strftime(last_obj.begin_date, '%H:%M:%S') if last_obj.begin_date else None
+                        results['end_date'] = datetime.datetime.strftime(last_obj.end_date, '%H:%M:%S') if last_obj.end_date else None
                         results['section_list'].remove(last_obj.section)
                         results['section_list'].insert(0, last_obj.section)  # 放到第一位显示
                         group, classes = last_obj.group, last_obj.classes
@@ -3097,6 +3097,17 @@ class AttendanceClockViewSet(ModelViewSet):
             lead_time = datetime.timedelta(minutes=attendance_group_obj.lead_time)
             if time_now < attendance_st - lead_time:
                 raise ValidationError('未到可打卡时间')
+            # 本次上岗打卡操作自动补上上次离岗打卡
+            last_date = datetime.datetime.strptime(date_now, '%Y-%m-%d') - datetime.timedelta(days=1)
+            if attendance_group_obj.attendance_et.hour > 12:  # 白班
+                end_date = f"{str(last_date)} {str(attendance_group_obj.attendance_et)}"
+            else:
+                end_date = f"{str(date_now)} {str(attendance_group_obj.attendance_et)}"
+            EmployeeAttendanceRecords.objects.filter(
+                user=user,
+                end_date__isnull=True,
+                factory_date=last_date
+            ).update(end_date=end_date)
             for equip in equip_list:
                 obj = EmployeeAttendanceRecords.objects.create(
                     user=user,
