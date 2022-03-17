@@ -2603,7 +2603,7 @@ class PerformanceSummaryView(APIView):
         coefficient = GlobalCode.objects.filter(global_type__type_name='是否独立上岗系数').values('global_no', 'global_name')
         coefficient_dic = {dic['global_no']: dic['global_name'] for dic in coefficient}
         # 超产奖励系数
-        coefficient1 = GlobalCode.objects.filter(global_type__type_name='超产奖励计算系数').values('global_no', 'global_name')
+        coefficient1 = GlobalCode.objects.filter(global_type__type_name='超产单价').values('global_no', 'global_name')
         coefficient1_dic = {dic['global_no']: dic['global_name'] for dic in coefficient1}
         if not coefficient or not coefficient1:
             raise ValidationError('请先去添加独立上岗或超产奖励系数')
@@ -2804,7 +2804,7 @@ class PerformanceSummaryView(APIView):
                     if count < s:
                         price = 0
                     elif count > m:
-                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过历史最大产量部分'))
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过最高值部分'))
                     elif count < m and count > s:
                         price = (count - s) * float(coefficient1_dic.get('超过目标产量部分'))
                 res['超产奖励'] += price
@@ -2850,7 +2850,7 @@ class PerformanceSummaryView(APIView):
                     if count < s:
                         price = 0
                     elif count > m:
-                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过历史最大产量部分'))
+                        price = (m - s) * float(coefficient1_dic.get('超过目标产量部分')) + (count - m) * float(coefficient1_dic.get('超过最高值部分'))
                     elif count < m and count > s:
                         price = (count - s) * float(coefficient1_dic.get('超过目标产量部分'))
                 results[name]['超产奖励'] = results[name].get('超产奖励', 0) + price
