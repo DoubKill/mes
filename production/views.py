@@ -3099,6 +3099,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 raise ValidationError('未到可打卡时间')
             # 本次上岗打卡操作自动补上上次离岗打卡
             last_date = datetime.datetime.strptime(date_now, '%Y-%m-%d') - datetime.timedelta(days=1)
+            last_date = datetime.datetime.strftime(last_date, '%Y-%m-%d')
             if attendance_group_obj.attendance_et.hour > 12:  # 白班
                 end_date = f"{str(last_date)} {str(attendance_group_obj.attendance_et)}"
             else:
@@ -3159,8 +3160,10 @@ class AttendanceClockViewSet(ModelViewSet):
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user)
         principal = attendance_group_obj.principal  # 考勤负责人
         # 下岗时间
+        equip_list = data.pop('equip_list')
         if attendance_group_obj.attendance_et.hour > 12:  # 白班
             attendance_et = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S')
+            factory_date = date_now
         else:  # 夜班
             hours = datetime.datetime.strptime(now_time, '%H:%M:%S')
             if attendance_group_obj.attendance_et < hours < attendance_group_obj.attendance_st:
@@ -3444,18 +3447,24 @@ class AttendanceRecordSearch(APIView):
                                                             user=self.request.user,
                                                             end_date__isnull=False).order_by('id')
         if day:  # 当前的上下班时间
-            group_setup = AttendanceGroupSetup.objects.filter(principal=username).first()
+            group_setup = AttendanceGroupSetup.objects.filter(attendance_users__icontains=username).first()
             if queryset.filter(factory_date=f"{date}-{day}").exists():
                 begin_date = min(queryset.filter(factory_date=f"{date}-{day}").values_list('begin_date', flat=True))
                 end_date = max(queryset.filter(factory_date=f"{date}-{day}").values_list('end_date', flat=True))
-                return Response({'begin_date': datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S'),
-                                 'end_date': datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S'),
+                return Response({
                                  'work_time': round((end_date - begin_date).seconds / 3600, 2),
-                                 'attendance_type': group_setup.get_attendance_type_display,
+                                 'attendance_type': group_setup.get_attendance_type_display(),
                                  'attendance_st': group_setup.attendance_st,
-                                 'attendance_et': group_setup.attendance_et
+                                 'attendance_et': group_setup.attendance_et,
+                                 'time': [
+                                     {'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"},
+                                     {'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"}]
                                  })
-            return Response({})
+            return Response({
+                'attendance_type': group_setup.get_attendance_type_display() if group_setup else None,
+                'attendance_st': group_setup.attendance_st,
+                'attendance_et': group_setup.attendance_et
+            })
         # 汇总数据
         results = {
             'days': [],
@@ -3464,15 +3473,18 @@ class AttendanceRecordSearch(APIView):
             'zt': 0,  # 早退
         }
         for item in queryset.filter(factory_date__year=year, factory_date__month=month):
-            if item.factory_date__day not in results.get('days'):
+            day = int(str(item.factory_date).split('-')[-1])
+            if day not in results.get('days'):
+                results['days'].append(day)
                 attendance_group_obj = AttendanceGroupSetup.objects.filter(attendance_users__icontains=username).first()
                 begin_date = min(queryset.filter(factory_date=item.factory_date).values_list('begin_date', flat=True))
                 end_date = max(queryset.filter(factory_date=item.factory_date).values_list('end_date', flat=True))
                 work_time = round((end_date - begin_date).seconds / 3600, 2)
                 results['work_times'] += work_time
-                if begin_date > attendance_group_obj.attendance_st:
+
+                if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
                     results['cd'] += 1
-                if end_date < attendance_group_obj.attendance_et:
+                if end_date < datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S'):
                     results['zt'] += 1
         if detail:
             equip_list = queryset.values('equip', 'section').annotate(work_times=Sum('work_time')).values(
@@ -3483,7 +3495,7 @@ class AttendanceRecordSearch(APIView):
         else:
             days = queryset.values('factory_date').annotate(Count('id')).count()
             if days != 0:
-                results['avg_times'] = results['work_times'] / days
+                results['avg_times'] = round(results['work_times'] / days, 2)
         return Response({'results': results})
 
 
