@@ -1144,6 +1144,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
     EXPORT_FIELDS_DICT = {
         "备件代码": "spare_code",
         "备件名称": "spare_name",
+        "备件唯一id": "unique_id",
         "备件分类": "equip_component_type_name",
         "规格型号": "specification",
         "技术参数": "technical_params",
@@ -1198,25 +1199,26 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的备件名称不能重复')
-            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2]).first()
+            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[3]).first()
             if not equip_component_type:
-                raise ValidationError('备件分类{}不存在'.format(item[2]))
+                raise ValidationError('备件分类{}不存在'.format(item[3]))
             obj = EquipSpareErp.objects.filter(Q(spare_code=item[0]) | Q(spare_name=item[1])).first()
             if not obj:
                 parts_list.append({"spare_code": item[0],
                                    "spare_name": item[1],
+                                   "unique_id": item[2] if item[2] else None,
                                    "equip_component_type": equip_component_type.id,
-                                   "specification": item[3] if item[3] else None,
-                                   "technical_params": item[4] if item[4] else None,
-                                   "unit": item[5] if item[5] else None,
-                                   "key_parts_flag": 1 if item[6] == '是' else 0,
-                                   "lower_stock": item[7] if item[7] else None,
-                                   "upper_stock": item[8] if item[8] else None,
-                                   "cost": item[9] if item[9] else None,
-                                   "texture_material": item[10] if item[10] else None,
-                                   "period_validity": item[11] if item[11] else None,
-                                   "supplier_name": item[12] if item[12] else None,
-                                   "use_flag": 1 if item[13] == 'Y' else 0,
+                                   "specification": item[4] if item[4] else None,
+                                   "technical_params": item[5] if item[5] else None,
+                                   "unit": item[6] if item[6] else None,
+                                   "key_parts_flag": 1 if item[7] == '是' else 0,
+                                   "lower_stock": item[8] if item[8] else None,
+                                   "upper_stock": item[9] if item[9] else None,
+                                   "cost": item[10] if item[10] else None,
+                                   "texture_material": item[11] if item[11] else None,
+                                   "period_validity": item[12] if item[12] else None,
+                                   "supplier_name": item[13] if item[13] else None,
+                                   "use_flag": 1 if item[14] == 'Y' else 0,
                                    "info_source": "ERP"})
         s = EquipSpareErpImportCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
