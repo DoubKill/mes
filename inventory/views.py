@@ -5313,11 +5313,11 @@ class WmsOutboundOrderView(APIView):
         except Exception:
             resp = {}
         resp_status = resp.get('state')
-        if resp_status != 1:
-            raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         MaterialOutboundOrder.objects.create(order_no=task_num,
                                              created_username=self.request.user.username,
                                              order_type=self.ORDER_TYPE)
+        if resp_status != 1:
+            raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         return Response('成功')
 
 
