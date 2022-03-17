@@ -54,15 +54,24 @@ class GetSpare(APIView):
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
                 continue
-            EquipSpareErp.objects.create(
-                spare_code=item['wlbh'],
-                spare_name=item['wlmc'],
-                equip_component_type=equip_component_type,
-                specification=item['gg'],
-                unit=item['bzdwmc'],
-                unique_id=item['wlxxid'],
-                sync_date=datetime.datetime.now()
-            )
+            EquipSpareErp.objects.update_or_create(
+                defaults={"spare_code": item['wlbh'],
+                          "spare_name": item['wlmc'],
+                          "equip_component_type": equip_component_type,
+                          "specification": item['gg'],
+                          "unit": item['bzdwmc'],
+                          "unique_id": item['wlxxid'],
+                          "sync_date": datetime.datetime.now()
+                          }, **{"unique_id": item['wlxxid']})
+            # EquipSpareErp.objects.create(
+            #     spare_code=item['wlbh'],
+            #     spare_name=item['wlmc'],
+            #     equip_component_type=equip_component_type,
+            #     specification=item['gg'],
+            #     unit=item['bzdwmc'],
+            #     unique_id=item['wlxxid'],
+            #     sync_date=datetime.datetime.now()
+            # )
         return '同步完成'
 
 

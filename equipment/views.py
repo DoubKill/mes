@@ -2442,18 +2442,24 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         order = self.request.query_params.get('order', None)
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
-        spare_name = self.request.query_params.get('spare_name', '')
-        spare_code = self.request.query_params.get('spare_code', '')
+        spare_name = self.request.query_params.get('spare_name')
+        spare_code = self.request.query_params.get('spare_code')
         work_order_no = self.request.query_params.get('work_order_no')
-        unique_id = self.request.query_params.get('unique_id', '')
+        unique_id = self.request.query_params.get('unique_id')
+        filter_kwargs = {}
+        if spare_name:
+            filter_kwargs['spare_name'] = spare_name
+        if spare_code:
+            filter_kwargs['spare_code'] = spare_code
+        if unique_id:
+            filter_kwargs['unique_id'] = unique_id
         if work_order_no:
             data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
                                                                         'created_date', 'plan_name')
             [i.update(created_date=i['created_date'].strftime('%Y-%m-%d %H:%M:%S')) for i in data]
             return Response(data)
         if status == '入库':
-            data = EquipSpareErp.objects.filter(use_flag=True, spare_name__icontains=spare_name,
-                                                spare_code__icontains=spare_code, unique_id__icontains=unique_id
+            data = EquipSpareErp.objects.filter(use_flag=True, **filter_kwargs
                                                 ).values('id', 'spare_code', 'unique_id', 'spare_name',
                                                          'equip_component_type__component_type_name',
                                                          'specification', 'technical_params', 'unit')
@@ -4488,14 +4494,22 @@ class GetSpare(APIView):
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
                 continue
-            EquipSpareErp.objects.create(
-                spare_code=item['wlbh'],
-                spare_name=item['wlmc'],
-                equip_component_type=equip_component_type,
-                specification=item['gg'],
-                unit=item['bzdwmc'],
-                unique_id=item['wlxxid'],
-                sync_date=dt.datetime.now()
+            EquipSpareErp.objects.update_or_create(
+                defaults={"spare_code": item['wlbh'],
+                          "spare_name": item['wlmc'],
+                          "equip_component_type": equip_component_type,
+                          "specification": item['gg'],
+                          "unit": item['bzdwmc'],
+                          "unique_id": item['wlxxid'],
+                          "sync_date": dt.datetime.now()
+                          }, **{"unique_id": item['wlxxid']}
+                # spare_code=item['wlbh'],
+                # spare_name=item['wlmc'],
+                # equip_component_type=equip_component_type,
+                # specification=item['gg'],
+                # unit=item['bzdwmc'],
+                # unique_id=item['wlxxid'],
+                # sync_date=dt.datetime.now()
             )
         return Response('同步完成')
 
