@@ -2590,7 +2590,8 @@ class WmsStorageView(ListAPIView):
                           "批次号": "batch_no", "是否进烘房": "is_entering", "供应商": "supplier_name",
                           "托盘号": "container_no", "库位地址": "location", "单位": "unit",
                           "单位重量": "unit_weight", "总重量": "total_weight",
-                          "核酸管控": "in_charged_tag", "品质状态": "quality_status"}
+                          "核酸管控": "in_charged_tag", "品质状态": "quality_status",
+                          '件数': 'sl', '唛头重量': 'zl'}
 
     def list(self, request, *args, **kwargs):
         filter_kwargs = {}
@@ -4931,9 +4932,11 @@ class WMSStockSummaryView(APIView):
         style.alignment.wrap = 1
 
         columns = ['No', '物料名称', '物料编码', '中策物料编码', '数单位量', 'PDM', '物料组',
-                   '有效库存数量', '有效库存重量（kg）', '合格品数量', '合格品重量（kg）',
-                   '待检品数量', '待检品重量（kg）', '不合格品数量', '不合格品重量（kg）', '总数量', '总重量（kg）', ]
-
+                   '有效库存数量', '有效库存重量（kg）',
+                   '合格品数量', '合格品重量（kg）',
+                   '待检品数量', '待检品重量（kg）',
+                   '不合格品数量', '不合格品重量（kg）',
+                   '总数量', '总重量（kg）', '总件数', '总唛头重量（kg）', ]
         for col_num in range(len(columns)):
             sheet.write(1, col_num, columns[col_num])
             # 写入数据
@@ -4956,6 +4959,8 @@ class WMSStockSummaryView(APIView):
             sheet.write(data_row, 14, i['weight_3'])
             sheet.write(data_row, 15, i['total_quantity'])
             sheet.write(data_row, 16, i['total_weight'])
+            sheet.write(data_row, 17, i['total_sl'])
+            sheet.write(data_row, 18, i['total_zl'])
             data_row = data_row + 1
         # 写出到IO
         output = BytesIO()
@@ -4999,14 +5004,18 @@ class WMSStockSummaryView(APIView):
             m.MaterialGroupName,
             temp.quantity,
             temp.WeightOfActual,
-            temp.StockDetailState
+            temp.StockDetailState,
+            temp.sl,
+            temp.zl
         from (
             select
                 a.MaterialCode,
                 a.MaterialName,
                 a.StockDetailState,
                 SUM(a.WeightOfActual) AS WeightOfActual,
-                SUM(a.Quantity ) AS quantity
+                SUM(a.Quantity ) AS quantity,
+                SUM(a.SL ) AS sl,
+                SUM(a.ZL ) AS zl
             from t_inventory_stock AS a
             group by
                  a.MaterialCode,
@@ -5027,29 +5036,17 @@ class WMSStockSummaryView(APIView):
             if quality_status == 2:
                 quality_status = 5
             if item[1] not in data_dict:
-                data = {'name': item[0],
-                        'code': item[1],
-                        'zc_material_code': item[2],
-                        'unit': item[3],
-                        'pdm': item[4],
-                        'group_name': item[5],
-                        'total_quantity': item[6],
-                        'total_weight': item[7],
-                        'quantity_1': 0,
-                        'weight_1': 0,
-                        'quantity_3': 0,
-                        'weight_3': 0,
-                        'quantity_4': 0,
-                        'weight_4': 0,
-                        'quantity_5': 0,
-                        'weight_5': 0
-                        }
-                data['quantity_{}'.format(quality_status)] = item[6]
-                data['weight_{}'.format(quality_status)] = item[7]
+                data = {'name': item[0], 'code': item[1], 'zc_material_code': item[2], 'unit': item[3], 'pdm': item[4],
+                        'group_name': item[5], 'total_quantity': item[6], 'total_weight': item[7], 'total_sl': item[9],
+                        'total_zl': item[10], 'quantity_1': 0, 'weight_1': 0, 'quantity_3': 0, 'weight_3': 0,
+                        'quantity_4': 0, 'weight_4': 0, 'quantity_5': 0, 'weight_5': 0,
+                        'quantity_{}'.format(quality_status): item[6], 'weight_{}'.format(quality_status): item[7]}
                 data_dict[item[1]] = data
             else:
                 data_dict[item[1]]['total_quantity'] += item[6]
                 data_dict[item[1]]['total_weight'] += item[7]
+                data_dict[item[1]]['total_sl'] += item[9]
+                data_dict[item[1]]['total_zl'] += item[10]
                 data_dict[item[1]]['quantity_{}'.format(quality_status)] = item[6]
                 data_dict[item[1]]['weight_{}'.format(quality_status)] = item[7]
         result = []
@@ -5068,6 +5065,8 @@ class WMSStockSummaryView(APIView):
             result = list(filter(lambda x: x['flag'] == 'L', result))
         total_quantity = sum([item['total_quantity'] for item in result])
         total_weight = sum([item['total_weight'] for item in result])
+        total_sl = sum([item['total_sl'] for item in result])
+        total_zl = sum([item['total_zl'] for item in result])
         total_quantity1 = sum([item['quantity_1'] for item in result])
         total_weight1 = sum([item['weight_1'] for item in result])
         total_quantity3 = sum([item['quantity_3'] for item in result])
@@ -5084,7 +5083,7 @@ class WMSStockSummaryView(APIView):
             return self.export_xls(data)
         return Response(
             {'results': ret, "count": count,
-             'total_quantity': total_quantity, 'total_weight': total_weight,
+             'total_quantity': total_quantity, 'total_weight': total_weight, 'total_sl': total_sl, 'total_zl': total_zl,
              'total_quantity1': total_quantity1, 'total_weight1': total_weight1,
              'total_quantity3': total_quantity3, 'total_weight3': total_weight3,
              'total_quantity5': total_quantity5, 'total_weight5': total_weight5
