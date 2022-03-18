@@ -26,7 +26,7 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
-    WmsNucleinManagement, MaterialOutHistoryOther, MaterialOutHistory, MaterialOutboundOrder
+    WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1818,6 +1818,14 @@ class WmsNucleinManagementSerializer(BaseModelSerializer):
 
     class Meta:
         model = WmsNucleinManagement
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
+class WMSExceptHandleSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = WMSExceptHandle
         fields = '__all__'
         read_only_fields = COMMON_READ_ONLY_FIELDS
 

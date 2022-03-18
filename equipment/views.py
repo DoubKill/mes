@@ -1144,6 +1144,7 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
     EXPORT_FIELDS_DICT = {
         "备件代码": "spare_code",
         "备件名称": "spare_name",
+        "备件唯一id": "unique_id",
         "备件分类": "equip_component_type_name",
         "规格型号": "specification",
         "技术参数": "technical_params",
@@ -1198,25 +1199,26 @@ class EquipSpareErpViewSet(CommonDeleteMixin, ModelViewSet):
             lst = [i[1] for i in data]
             if lst.count(item[1]) > 1:
                 raise ValidationError('导入的备件名称不能重复')
-            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[2]).first()
+            equip_component_type = EquipComponentType.objects.filter(component_type_name=item[3]).first()
             if not equip_component_type:
-                raise ValidationError('备件分类{}不存在'.format(item[2]))
+                raise ValidationError('备件分类{}不存在'.format(item[3]))
             obj = EquipSpareErp.objects.filter(Q(spare_code=item[0]) | Q(spare_name=item[1])).first()
             if not obj:
                 parts_list.append({"spare_code": item[0],
                                    "spare_name": item[1],
+                                   "unique_id": item[2] if item[2] else None,
                                    "equip_component_type": equip_component_type.id,
-                                   "specification": item[3] if item[3] else None,
-                                   "technical_params": item[4] if item[4] else None,
-                                   "unit": item[5] if item[5] else None,
-                                   "key_parts_flag": 1 if item[6] == '是' else 0,
-                                   "lower_stock": item[7] if item[7] else None,
-                                   "upper_stock": item[8] if item[8] else None,
-                                   "cost": item[9] if item[9] else None,
-                                   "texture_material": item[10] if item[10] else None,
-                                   "period_validity": item[11] if item[11] else None,
-                                   "supplier_name": item[12] if item[12] else None,
-                                   "use_flag": 1 if item[13] == 'Y' else 0,
+                                   "specification": item[4] if item[4] else None,
+                                   "technical_params": item[5] if item[5] else None,
+                                   "unit": item[6] if item[6] else None,
+                                   "key_parts_flag": 1 if item[7] == '是' else 0,
+                                   "lower_stock": item[8] if item[8] else None,
+                                   "upper_stock": item[9] if item[9] else None,
+                                   "cost": item[10] if item[10] else None,
+                                   "texture_material": item[11] if item[11] else None,
+                                   "period_validity": item[12] if item[12] else None,
+                                   "supplier_name": item[13] if item[13] else None,
+                                   "use_flag": 1 if item[14] == 'Y' else 0,
                                    "info_source": "ERP"})
         s = EquipSpareErpImportCreateSerializer(data=parts_list, many=True, context={'request': request})
         if s.is_valid(raise_exception=False):
@@ -2440,18 +2442,24 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
         order = self.request.query_params.get('order', None)
         page = self.request.query_params.get('page', 1)
         page_size = self.request.query_params.get('page_size', 10)
-        spare_name = self.request.query_params.get('spare_name', '')
-        spare_code = self.request.query_params.get('spare_code', '')
+        spare_name = self.request.query_params.get('spare_name')
+        spare_code = self.request.query_params.get('spare_code')
         work_order_no = self.request.query_params.get('work_order_no')
-        unique_id = self.request.query_params.get('unique_id', '')
+        unique_id = self.request.query_params.get('unique_id')
+        filter_kwargs = {}
+        if spare_name:
+            filter_kwargs['spare_name'] = spare_name
+        if spare_code:
+            filter_kwargs['spare_code'] = spare_code
+        if unique_id:
+            filter_kwargs['unique_id'] = unique_id
         if work_order_no:
             data = EquipApplyOrder.objects.exclude(status='已关闭').values('work_order_no',
                                                                         'created_date', 'plan_name')
             [i.update(created_date=i['created_date'].strftime('%Y-%m-%d %H:%M:%S')) for i in data]
             return Response(data)
         if status == '入库':
-            data = EquipSpareErp.objects.filter(use_flag=True, spare_name__icontains=spare_name,
-                                                spare_code__icontains=spare_code, unique_id__icontains=unique_id
+            data = EquipSpareErp.objects.filter(use_flag=True, **filter_kwargs
                                                 ).values('id', 'spare_code', 'unique_id', 'spare_name',
                                                          'equip_component_type__component_type_name',
                                                          'specification', 'technical_params', 'unit')
@@ -2469,6 +2477,7 @@ class EquipWarehouseOrderViewSet(ModelViewSet):
                 queryset = self.filter_queryset(self.get_queryset().filter(status__in=[4, 5, 6]))
             else:
                 queryset = self.filter_queryset(self.get_queryset())
+            queryset = list(set(queryset))
             page = self.paginate_queryset(queryset)
             if page is not None:
                 serializer = self.get_serializer(page, many=True)
@@ -4485,14 +4494,22 @@ class GetSpare(APIView):
                 continue
             if EquipSpareErp.objects.filter(spare_code=item['wlbh']).exists():
                 continue
-            EquipSpareErp.objects.create(
-                spare_code=item['wlbh'],
-                spare_name=item['wlmc'],
-                equip_component_type=equip_component_type,
-                specification=item['gg'],
-                unit=item['bzdwmc'],
-                unique_id=item['wlxxid'],
-                sync_date=dt.datetime.now()
+            EquipSpareErp.objects.update_or_create(
+                defaults={"spare_code": item['wlbh'],
+                          "spare_name": item['wlmc'],
+                          "equip_component_type": equip_component_type,
+                          "specification": item['gg'],
+                          "unit": item['bzdwmc'],
+                          "unique_id": item['wlxxid'],
+                          "sync_date": dt.datetime.now()
+                          }, **{"unique_id": item['wlxxid']}
+                # spare_code=item['wlbh'],
+                # spare_name=item['wlmc'],
+                # equip_component_type=equip_component_type,
+                # specification=item['gg'],
+                # unit=item['bzdwmc'],
+                # unique_id=item['wlxxid'],
+                # sync_date=dt.datetime.now()
             )
         return Response('同步完成')
 
