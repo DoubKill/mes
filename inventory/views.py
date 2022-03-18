@@ -5451,15 +5451,15 @@ class HFStockDetailView(APIView):
             raise ValidationError('参数缺失！')
         extra_where_str = "where ProductNo = '{}'".format(material_no)
         if data_type == '3':  # 输送途中
-            extra_where_str += "and TaskState=1 and (OastNo is null or OastNo=0)"
+            extra_where_str += " and TaskState=1 and (OastNo is null or OastNo=0)"
         if data_type == '4':  # 正在烘
-            extra_where_str += "and TaskState=2"
+            extra_where_str += " and TaskState=2"
         if data_type == '5':  # 已经烘完
-            extra_where_str += "and TaskState in (3, 5)"
+            extra_where_str += " and TaskState in (3, 5)"
         if data_type == '6':  # 烘房小计
-            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and (OastNo is not null and OastNo!=0))"
+            extra_where_str += " and ((TaskState in (2, 3, 4, 5)) or (TaskState=1 and (OastNo is not null and OastNo!=0)))"
         if data_type == '7':  # 已出库
-            extra_where_str += "and TaskState=6"
+            extra_where_str += " and TaskState=6"
         if st:
             extra_where_str += " and TaskStartTime >= '{}'".format(st)
         if et:
@@ -5469,13 +5469,9 @@ class HFStockDetailView(APIView):
                 TaskState,
                 ProductName,
                 ProductNo,
-                'pc',
                 RFID,
-                'rksj',
-                'cksj',
                 OastStartTime,
-                OastEntTime,
-                'qrsj'
+                OastEntTime
             from dsp_OastTask {}""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
@@ -5487,13 +5483,9 @@ class HFStockDetailView(APIView):
                     'status': item[1],
                     'material_name': item[2],
                     'material_no': item[3],
-                    'batch_no': item[4],
-                    'pallet_no': item[5],
-                    'inbound_time': item[6],
-                    'outbound_time': item[7],
-                    'baking_start_time': item[8],
-                    'baking_end_time': item[9],
-                    'confirm_time': item[10]
+                    'pallet_no': item[4],
+                    'baking_start_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S')
                 }
             )
         sc.close()
