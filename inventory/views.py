@@ -2,6 +2,7 @@ import datetime
 import decimal
 import json
 import logging
+import math
 import random
 import re
 import time
@@ -86,7 +87,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
-from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB
+from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB, HFSystem
 
 logger = logging.getLogger('send_log')
 
@@ -5498,3 +5499,84 @@ class HFStockDetailView(APIView):
         sc.close()
 
         return Response(result)
+
+
+@method_decorator([api_recorder], name="dispatch")
+class HFRealStatusView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        data_type = self.request.query_params.get('type')
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
+        response_data = {}
+        try:
+            if data_type == '0':  # 烘箱状态
+                hf = HFSystem()
+                hf_info = hf.get_hf_info()
+                # 非运行中不展示开始时间和时长
+                for i in hf_info:
+                    if i['OastState'] != 2:
+                        i.update({'OastStartTime': '', 'OastServiceTime': ''})
+                response_data['results'] = hf_info
+            elif data_type == '1':  # 任务列表
+                sql = f"""select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
+                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask where 
+                                 TaskState != 6 order by -F_Id """
+                sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+                res = sc.all()
+                all_pages = math.ceil(len(res) / page_size)
+                data = res[(page - 1) * page_size: page * page_size] if all_pages > page else res[
+                                                                                              (page - 1) * page_size:]
+                hf_info = []
+                for i in data:
+                    run_time = None
+                    if i[7]:
+                        now_date = datetime.datetime.now()
+                        end_time = now_date if not i[8] else i[8]
+                        diff_time = end_time - i[7]
+                        h_time, m_time = divmod(int(diff_time.total_seconds()) // 60, 60)
+                        run_time = f'{h_time}小时{m_time}分钟'
+                    hf_info.append({'F_Id': i[0],
+                                    'TaskState': i[1],
+                                    'ProductName': i[2],
+                                    'RFID': i[3],
+                                    'OastNo': i[11],
+                                    'TaskStartTime': '' if not i[4] else i[4].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'OastInTime': '' if not i[5] else i[5].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'OastOutTime': '' if not i[6] else i[6].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'RoadWay': i[10],
+                                    'TaskEntTime': '' if not i[9] else i[9].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'Runtime': run_time})
+                response_data.update({'all_pages': all_pages, 'total_data': len(res), 'results': hf_info})
+            else:  # 待入箱列表
+                sql = f"""select F_Id, ProductName, RFID, TaskStartTime, RoadWay from dsp_OastTask where OastNo = 0
+                          order by -F_id"""
+                sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+                res = sc.all()
+                all_pages = math.ceil(len(res) / page_size)
+                data = res[(page - 1) * page_size: page * page_size] if all_pages > page else res[
+                                                                                              (page - 1) * page_size:]
+                hf_info = []
+                for i in data:
+                    hf_info.append(
+                        {'F_Id': i[0],
+                         'ProductName': i[1],
+                         'RFID': i[2],
+                         'TaskStartTime': '' if not i[3] else i[3].strftime("%Y-%m-%d %H:%M:%S"),
+                         'RoadWay': i[4]})
+                response_data.update({'all_pages': all_pages, 'total_data': len(res), 'results': hf_info})
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        return Response(response_data)
+
+    def post(self, request):
+        """烘箱手动出库 OastNo: '1' """
+        try:
+            hf = HFSystem()
+            res = hf.manual_out_hf(self.request.data)
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        else:
+            return Response(res)
