@@ -508,8 +508,7 @@ class ERPSpareComponentRelationListSerializer(serializers.ModelSerializer):
 
 
 class EquipSpareErpListSerializer(BaseModelSerializer):
-    equip_component_type_name = serializers.CharField(source='equip_component_type.component_type_name',
-                                                      help_text='备件分类', max_length=64)
+    equip_component_type_name = serializers.SerializerMethodField()
     key_parts_flag_name = serializers.SerializerMethodField()
     use_flag_name = serializers.SerializerMethodField()
     cost = serializers.SerializerMethodField()
@@ -522,6 +521,11 @@ class EquipSpareErpListSerializer(BaseModelSerializer):
 
     def get_use_flag_name(self, obj):
         return 'Y' if obj.use_flag else 'N'
+
+    def get_equip_component_type_name(self, obj):
+        if obj.equip_component_type:
+            return obj.equip_component_type.component_type_name
+        return None
 
     class Meta:
         model = EquipSpareErp
