@@ -5389,17 +5389,16 @@ class HFStockView(APIView):
                    ProductNo,
                    ProductName,
                    TaskState,
-                   OastNo,
                    count(*)
             from dsp_OastTask
             {}
-            group by ProductNo, ProductName, TaskState, OastNo;""".format(extra_where_str)
+            group by ProductNo, ProductName, TaskState;""".format(extra_where_str)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = {}
         for item in temp:
             material_no = item[0]
-            qty = item[4]
+            qty = item[3]
             task_state = item[2]
             if material_no not in result:
                 underway_qty = waiting_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
@@ -5408,8 +5407,8 @@ class HFStockView(APIView):
                 elif task_state == 2:  # 烘烤运行中
                     baking_qty += qty
                     indoor_qty += qty
-                # elif task_state == 3:  # 出库中
-                #     finished_qty += qty
+                elif task_state == 3:  # 出库中
+                    outbound_qty += qty
                 #     indoor_qty += qty
                 elif task_state == 4:  # 等待烘烤
                     waiting_qty += qty
@@ -5433,8 +5432,8 @@ class HFStockView(APIView):
                 elif task_state == 2:  # 烘烤运行中
                     result[item[0]]['baking_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
-                # elif task_state == 3:  # 出库中
-                #     result[item[0]]['finished_qty'] += qty
+                elif task_state == 3:  # 出库中
+                    result[item[0]]['outbound_qty'] += qty
                 #     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 4:  # 等待烘烤
                     result[item[0]]['waiting_qty'] += qty
@@ -5483,7 +5482,7 @@ class HFStockDetailView(APIView):
         if data_type == '6':  # 烘房小计
             extra_where_str += " and TaskState in (2, 4, 5)"
         if data_type == '7':  # 已出库
-            extra_where_str += " and TaskState=6"
+            extra_where_str += " and TaskState in (3, 6)"
         if st:
             extra_where_str += " and TaskStartTime >= '{}'".format(st)
         if et:
