@@ -59,7 +59,7 @@ from inventory.serializers import PutPlanManagementSerializer, \
     SulfurDepotModelSerializer, SulfurDepotSiteModelSerializer, SulfurDataModelSerializer, DepotSulfurModelSerializer, \
     DepotPalltInfoModelSerializer, OutBoundDeliveryOrderSerializer, OutBoundDeliveryOrderDetailSerializer, \
     OutBoundTasksSerializer, WmsInventoryMaterialSerializer, WmsNucleinManagementSerializer, \
-    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer
+    MaterialOutHistoryOtherSerializer, MaterialOutHistorySerializer, WMSExceptHandleSerializer
 from inventory.models import WmsInventoryStock
 from inventory.serializers import BzFinalMixingRubberInventorySerializer, \
     WmsInventoryStockSerializer, InventoryLogSerializer
@@ -2871,13 +2871,36 @@ class WMSRelease(APIView):
 class WMSExceptHandleView(APIView):
     permission_classes = (IsAuthenticated,)
 
-    @atomic
+    def get(self, request):
+        material_code = self.request.query_params.get('material_code', None)
+        lot_no = self.request.query_params.get('lot_no', None)
+        batch_no = self.request.query_params.get('batch_no', None)
+        if batch_no:
+            queryset = []
+            nums = WMSExceptHandle.objects.filter(batch_no=batch_no).values_list('num', flat=True)
+            for num in set(nums):
+                queryset.append(WMSExceptHandle.objects.filter(batch_no=batch_no, num=num).first())
+        else:
+            queryset = WMSExceptHandle.objects.filter(material_code=material_code,lot_no=lot_no).order_by('id')
+        if queryset:
+            serializer = WMSExceptHandleSerializer(instance=queryset, many=True)
+            data = serializer.data
+        else:
+            data = []
+        return Response({'results': data})
+
     def post(self, request):
         data = self.request.data
-        WMSExceptHandle.objects.create(
-            created_user=self.request.user,
-            **data
-        )
+        batch_no = data.get('batch_no')
+        lot_no = data.pop('lot_no', None)
+        lst = []
+        obj = WMSExceptHandle.objects.filter(batch_no=batch_no).last()
+        num = 1
+        if obj:
+            num = obj.num + 1
+        for item in lot_no:
+            lst.append(WMSExceptHandle(**data, lot_no=item, created_user=self.request.user, num=num))
+        WMSExceptHandle.objects.bulk_create(lst)
         return Response('保存成功')
 
 
