@@ -5402,19 +5402,17 @@ class HFStockView(APIView):
             qty = item[4]
             task_state = item[2]
             if material_no not in result:
-                underway_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
+                underway_qty = waiting_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
                 if task_state == 1:  # 入库中
-                    if not item[3]:  # 没有烤箱编号
-                        underway_qty += qty
-                    else:  # 有烤箱编号
-                        indoor_qty += qty
+                    underway_qty += qty
                 elif task_state == 2:  # 烘烤运行中
                     baking_qty += qty
                     indoor_qty += qty
-                elif task_state == 3:  # 出库中
-                    finished_qty += qty
-                    indoor_qty += qty
+                # elif task_state == 3:  # 出库中
+                #     finished_qty += qty
+                #     indoor_qty += qty
                 elif task_state == 4:  # 等待烘烤
+                    waiting_qty += qty
                     indoor_qty += qty
                 elif task_state == 5:  # 等待出库
                     finished_qty += qty
@@ -5424,23 +5422,22 @@ class HFStockView(APIView):
                 result[item[0]] = {'material_no': item[0],
                                    'material_name': item[1],
                                    'underway_qty': underway_qty,
+                                   'waiting_qty': waiting_qty,
                                    'baking_qty': baking_qty,
                                    'finished_qty': finished_qty,
                                    'indoor_qty': indoor_qty,
                                    'outbound_qty': outbound_qty}
             else:
                 if task_state == 1:  # 入库中
-                    if not item[3]:  # 没有烤箱编号
-                        result[item[0]]['underway_qty'] += qty
-                    else:  # 有烤箱编号
-                        result[item[0]]['indoor_qty'] += qty
+                    result[item[0]]['underway_qty'] += qty
                 elif task_state == 2:  # 烘烤运行中
                     result[item[0]]['baking_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
-                elif task_state == 3:  # 出库中
-                    result[item[0]]['finished_qty'] += qty
-                    result[item[0]]['indoor_qty'] += qty
+                # elif task_state == 3:  # 出库中
+                #     result[item[0]]['finished_qty'] += qty
+                #     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 4:  # 等待烘烤
+                    result[item[0]]['waiting_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 5:  # 等待出库
                     result[item[0]]['finished_qty'] += qty
@@ -5469,18 +5466,22 @@ class HFStockDetailView(APIView):
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         material_no = self.request.query_params.get('material_no')  # 物料编码
-        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库
+        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库 8:等待烘烤
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
         if not all([material_no, data_type]):
             raise ValidationError('参数缺失！')
         extra_where_str = "where ProductNo = '{}'".format(material_no)
         if data_type == '3':  # 输送途中
-            extra_where_str += " and TaskState=1 and (OastNo is null or OastNo=0)"
+            extra_where_str += " and TaskState=1"
+        if data_type == '8':  # 等待烘烤
+            extra_where_str += " and TaskState=4"
         if data_type == '4':  # 正在烘
             extra_where_str += " and TaskState=2"
         if data_type == '5':  # 已经烘完
-            extra_where_str += " and TaskState in (3, 5)"
+            extra_where_str += " and TaskState=5"
         if data_type == '6':  # 烘房小计
-            extra_where_str += " and ((TaskState in (2, 3, 4, 5)) or (TaskState=1 and (OastNo is not null and OastNo!=0)))"
+            extra_where_str += " and TaskState in (2, 4, 5)"
         if data_type == '7':  # 已出库
             extra_where_str += " and TaskState=6"
         if st:
@@ -5495,10 +5496,16 @@ class HFStockDetailView(APIView):
                 RFID,
                 OastStartTime,
                 OastEntTime
-            from dsp_OastTask {}""".format(extra_where_str)
+            from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
+            """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
+
+        count_sql = 'select count(*) from dsp_OastTask {}'.format(extra_where_str)
+        sc = SqlClient(sql=count_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        count = temp2[0][0]
         for item in temp:
             result.append(
                 {
@@ -5512,8 +5519,7 @@ class HFStockDetailView(APIView):
                 }
             )
         sc.close()
-
-        return Response(result)
+        return Response({'result': result, 'count': count})
 
 
 @method_decorator([api_recorder], name="dispatch")
