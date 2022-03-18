@@ -2,6 +2,7 @@ import datetime
 import decimal
 import json
 import logging
+import math
 import random
 import re
 import time
@@ -86,7 +87,7 @@ from .conf import wms_ip, wms_port, cb_ip, cb_port
 from .models import MaterialInventory as XBMaterialInventory
 from .models import BzFinalMixingRubberInventory
 from .serializers import XBKMaterialInventorySerializer
-from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB
+from .utils import export_xls, OUTWORKUploader, OUTWORKUploaderLB, HFSystem
 
 logger = logging.getLogger('send_log')
 
@@ -5401,19 +5402,17 @@ class HFStockView(APIView):
             qty = item[4]
             task_state = item[2]
             if material_no not in result:
-                underway_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
+                underway_qty = waiting_qty = baking_qty = finished_qty = indoor_qty = outbound_qty = 0
                 if task_state == 1:  # 入库中
-                    if not item[3]:  # 没有烤箱编号
-                        underway_qty += qty
-                    else:  # 有烤箱编号
-                        indoor_qty += qty
+                    underway_qty += qty
                 elif task_state == 2:  # 烘烤运行中
                     baking_qty += qty
                     indoor_qty += qty
-                elif task_state == 3:  # 出库中
-                    finished_qty += qty
-                    indoor_qty += qty
+                # elif task_state == 3:  # 出库中
+                #     finished_qty += qty
+                #     indoor_qty += qty
                 elif task_state == 4:  # 等待烘烤
+                    waiting_qty += qty
                     indoor_qty += qty
                 elif task_state == 5:  # 等待出库
                     finished_qty += qty
@@ -5423,23 +5422,22 @@ class HFStockView(APIView):
                 result[item[0]] = {'material_no': item[0],
                                    'material_name': item[1],
                                    'underway_qty': underway_qty,
+                                   'waiting_qty': waiting_qty,
                                    'baking_qty': baking_qty,
                                    'finished_qty': finished_qty,
                                    'indoor_qty': indoor_qty,
                                    'outbound_qty': outbound_qty}
             else:
                 if task_state == 1:  # 入库中
-                    if not item[3]:  # 没有烤箱编号
-                        result[item[0]]['underway_qty'] += qty
-                    else:  # 有烤箱编号
-                        result[item[0]]['indoor_qty'] += qty
+                    result[item[0]]['underway_qty'] += qty
                 elif task_state == 2:  # 烘烤运行中
                     result[item[0]]['baking_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
-                elif task_state == 3:  # 出库中
-                    result[item[0]]['finished_qty'] += qty
-                    result[item[0]]['indoor_qty'] += qty
+                # elif task_state == 3:  # 出库中
+                #     result[item[0]]['finished_qty'] += qty
+                #     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 4:  # 等待烘烤
+                    result[item[0]]['waiting_qty'] += qty
                     result[item[0]]['indoor_qty'] += qty
                 elif task_state == 5:  # 等待出库
                     result[item[0]]['finished_qty'] += qty
@@ -5468,20 +5466,24 @@ class HFStockDetailView(APIView):
         st = self.request.query_params.get('st')  # 开始时间
         et = self.request.query_params.get('et')  # 结束时间
         material_no = self.request.query_params.get('material_no')  # 物料编码
-        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库
+        data_type = self.request.query_params.get('data_type')  # 3：输送途中 4：正在烘  5：已经烘完 6：烘房小计 7：已出库 8:等待烘烤
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
         if not all([material_no, data_type]):
             raise ValidationError('参数缺失！')
         extra_where_str = "where ProductNo = '{}'".format(material_no)
         if data_type == '3':  # 输送途中
-            extra_where_str += "and TaskState=1 and (OastNo is null or OastNo=0)"
+            extra_where_str += " and TaskState=1"
+        if data_type == '8':  # 等待烘烤
+            extra_where_str += " and TaskState=4"
         if data_type == '4':  # 正在烘
-            extra_where_str += "and TaskState=2"
+            extra_where_str += " and TaskState=2"
         if data_type == '5':  # 已经烘完
-            extra_where_str += "and TaskState in (3, 5)"
+            extra_where_str += " and TaskState=5"
         if data_type == '6':  # 烘房小计
-            extra_where_str += "and (TaskState in (2, 3, 4, 5)) or (TaskState=1 and (OastNo is not null and OastNo!=0))"
+            extra_where_str += " and TaskState in (2, 4, 5)"
         if data_type == '7':  # 已出库
-            extra_where_str += "and TaskState=6"
+            extra_where_str += " and TaskState=6"
         if st:
             extra_where_str += " and TaskStartTime >= '{}'".format(st)
         if et:
@@ -5491,17 +5493,19 @@ class HFStockDetailView(APIView):
                 TaskState,
                 ProductName,
                 ProductNo,
-                'pc',
                 RFID,
-                'rksj',
-                'cksj',
                 OastStartTime,
-                OastEntTime,
-                'qrsj'
-            from dsp_OastTask {}""".format(extra_where_str)
+                OastEntTime
+            from dsp_OastTask {} order by OastNo OFFSET {} ROWS FETCH FIRST {} ROWS ONLY
+            """.format(extra_where_str, (page-1)*page_size, page_size)
         sc = SqlClient(sql=sql, **self.DATABASE_CONF)
         temp = sc.all()
         result = []
+
+        count_sql = 'select count(*) from dsp_OastTask {}'.format(extra_where_str)
+        sc = SqlClient(sql=count_sql, **self.DATABASE_CONF)
+        temp2 = sc.all()
+        count = temp2[0][0]
         for item in temp:
             result.append(
                 {
@@ -5509,15 +5513,91 @@ class HFStockDetailView(APIView):
                     'status': item[1],
                     'material_name': item[2],
                     'material_no': item[3],
-                    'batch_no': item[4],
-                    'pallet_no': item[5],
-                    'inbound_time': item[6],
-                    'outbound_time': item[7],
-                    'baking_start_time': item[8],
-                    'baking_end_time': item[9],
-                    'confirm_time': item[10]
+                    'pallet_no': item[4],
+                    'baking_start_time': '' if not item[5] else item[5].strftime('%Y-%m-%d %H:%M:%S'),
+                    'baking_end_time': '' if not item[6] else item[6].strftime('%Y-%m-%d %H:%M:%S')
                 }
             )
         sc.close()
+        return Response({'result': result, 'count': count})
 
-        return Response(result)
+
+@method_decorator([api_recorder], name="dispatch")
+class HFRealStatusView(APIView):
+    permission_classes = (IsAuthenticated,)
+    DATABASE_CONF = HF_CONF
+
+    def get(self, request):
+        data_type = self.request.query_params.get('type')
+        page = int(self.request.query_params.get('page', 1))
+        page_size = int(self.request.query_params.get('page_size', 10))
+        response_data = {}
+        try:
+            if data_type == '0':  # 烘箱状态
+                hf = HFSystem()
+                hf_info = hf.get_hf_info()
+                # 非运行中不展示开始时间和时长
+                for i in hf_info:
+                    if i['OastState'] != 2:
+                        i.update({'OastStartTime': '', 'OastServiceTime': ''})
+                response_data['results'] = hf_info
+            elif data_type == '1':  # 任务列表
+                sql = f"""select F_Id, TaskState, ProductName, RFID, TaskStartTime, OastInTime, OastOutTime, 
+                                 OastStartTime, OastEntTime, TaskEntTime, RoadWay, OastNo from dsp_OastTask where 
+                                 TaskState != 6 order by -F_Id """
+                sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+                res = sc.all()
+                all_pages = math.ceil(len(res) / page_size)
+                data = res[(page - 1) * page_size: page * page_size] if all_pages > page else res[
+                                                                                              (page - 1) * page_size:]
+                hf_info = []
+                for i in data:
+                    run_time = None
+                    if i[7]:
+                        now_date = datetime.datetime.now()
+                        end_time = now_date if not i[8] else i[8]
+                        diff_time = end_time - i[7]
+                        h_time, m_time = divmod(int(diff_time.total_seconds()) // 60, 60)
+                        run_time = f'{h_time}小时{m_time}分钟'
+                    hf_info.append({'F_Id': i[0],
+                                    'TaskState': i[1],
+                                    'ProductName': i[2],
+                                    'RFID': i[3],
+                                    'OastNo': i[11],
+                                    'TaskStartTime': '' if not i[4] else i[4].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'OastInTime': '' if not i[5] else i[5].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'OastOutTime': '' if not i[6] else i[6].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'RoadWay': i[10],
+                                    'TaskEntTime': '' if not i[9] else i[9].strftime("%Y-%m-%d %H:%M:%S"),
+                                    'Runtime': run_time})
+                response_data.update({'all_pages': all_pages, 'total_data': len(res), 'results': hf_info})
+            else:  # 待入箱列表
+                sql = f"""select F_Id, ProductName, RFID, TaskStartTime, RoadWay from dsp_OastTask where OastNo = 0
+                          order by -F_id"""
+                sc = SqlClient(sql=sql, **self.DATABASE_CONF)
+                res = sc.all()
+                all_pages = math.ceil(len(res) / page_size)
+                data = res[(page - 1) * page_size: page * page_size] if all_pages > page else res[
+                                                                                              (page - 1) * page_size:]
+                hf_info = []
+                for i in data:
+                    hf_info.append(
+                        {'F_Id': i[0],
+                         'ProductName': i[1],
+                         'RFID': i[2],
+                         'TaskStartTime': '' if not i[3] else i[3].strftime("%Y-%m-%d %H:%M:%S"),
+                         'RoadWay': i[4]})
+                response_data.update({'all_pages': all_pages, 'total_data': len(res), 'results': hf_info})
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        return Response(response_data)
+
+    def post(self, request):
+        """烘箱手动出库 OastNo: '1' """
+        try:
+            hf = HFSystem()
+            res = hf.manual_out_hf(self.request.data)
+        except Exception as e:
+            raise ValidationError(e.args[0])
+        else:
+            return Response(res)
