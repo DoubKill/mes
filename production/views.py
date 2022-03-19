@@ -3335,9 +3335,10 @@ class ReissueCardView(APIView):
         if data.get('handling_result'):  # 审批通过
             status = obj.status
             equips = serializer_data.get('equip')
+            equip_list = equips.split(',')
             if status == '上岗':
                 lst = []
-                for equip in equips:
+                for equip in equip_list:
                     lst.append(
                         EmployeeAttendanceRecords(
                             user=user,
@@ -3357,7 +3358,7 @@ class ReissueCardView(APIView):
                     status__in=['上岗', '换岗']
                 ).update(end_date=serializer_data.get('bk_date'))
                 lst = []
-                for equip in equips:
+                for equip in equip_list:
                     lst.append(
                         EmployeeAttendanceRecords(
                             user=user,
@@ -3453,7 +3454,7 @@ class OverTimeView(APIView):
             end_date = obj.end_date
             work_time = round((end_date - begin_date).seconds / 3600, 2)
             equips = serializer_data.get('equip')
-            for equip in equips:
+            for equip in equips.split(','):
                 EmployeeAttendanceRecords.objects.create(
                     user=obj.user,
                     section=obj.section,
