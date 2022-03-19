@@ -437,14 +437,30 @@ class EmployeeAttendanceRecordsSerializer(serializers.ModelSerializer):
 
 
 class FillCardApplySerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    id_card_num = serializers.SerializerMethodField()
 
     class Meta:
         model = FillCardApply
         fields = '__all__'
 
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_id_card_num(self, obj):
+        return obj.user.id_card_num
+
 
 class ApplyForExtraWorkSerializer(serializers.ModelSerializer):
+    username = serializers.SerializerMethodField()
+    id_card_num = serializers.SerializerMethodField()
 
     class Meta:
         model = ApplyForExtraWork
         fields = '__all__'
+
+    def get_username(self, obj):
+        return obj.user.username
+
+    def get_id_card_num(self, obj):
+        return obj.user.id_card_num

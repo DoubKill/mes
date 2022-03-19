@@ -2955,12 +2955,9 @@ class AttendanceGroupSetupViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name="dispatch")
 class AttendanceClockViewSet(ModelViewSet):
-    # AttendanceGroupSetup 考勤组管理
-    # EmployeeAttendanceRecords  考勤记录
     queryset = EmployeeAttendanceRecords.objects.all()
     serializer_class = EmployeeAttendanceRecordsSerializer
-    # filter_backends = (DjangoFilterBackend,)
-    # filter_class = EmployeeAttendanceRecordsFilter
+    permission_classes = (IsAuthenticated,)
 
     def send_message(self, user, content):
         phone = user.phone_number
@@ -2971,7 +2968,7 @@ class AttendanceClockViewSet(ModelViewSet):
     def get_user_group(self, user_obj):
         username =user_obj.username
         # 获取登陆用户所在考勤组
-        attendance_group_obj = AttendanceGroupSetup.objects.filter(attendance_users__icontains=username).first()
+        attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
         if not attendance_group_obj:
             raise ValidationError('当前用户未添加至考勤组')
         group_type = attendance_group_obj.type   # 密炼/细料称量/硫磺称量
@@ -3020,10 +3017,6 @@ class AttendanceClockViewSet(ModelViewSet):
             'equip_list': equip_list,
             'section_list': section_list,
             'principal': attendance_group_obj.principal,  # 前端根据这个判断是否显示审批
-            # 'attendance_st': attendance_group_obj.attendance_st,
-            # 'attendance_et': attendance_group_obj.attendance_et,
-            # 'range_time': attendance_group_obj.range_time,
-            # 'lead_time': attendance_group_obj.lead_time
         }
         if apply:  # 补卡/加班
             return Response({'results': results})
@@ -3121,9 +3114,11 @@ class AttendanceClockViewSet(ModelViewSet):
         elif status == '下岗':  # 可重复打卡
             attendance_st = datetime.datetime.strptime(f"{date_now} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S')
             range_time = datetime.timedelta(minutes=attendance_group_obj.range_time)
-            if time_now < attendance_st + range_time:
-                raise ValidationError('未到可打卡时间')
+            # if time_now < attendance_st + range_time:
+            #     raise ValidationError('未到可打卡时间')
             begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
+            if time_now < begin_date + range_time:
+                raise ValidationError(f'上班{attendance_group_obj.range_time}分钟内不能打下班卡')
             end_date = time_now
             work_time = round((end_date - begin_date).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
@@ -3131,8 +3126,9 @@ class AttendanceClockViewSet(ModelViewSet):
             )
             results['ids'] = ids
         elif status == '换岗':
-            # begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
-            end_date = begin_date = time_now
+            begin_date = EmployeeAttendanceRecords.objects.filter(id__in=ids).first().begin_date
+            end_date = time_now
+
             work_time = round((end_date - begin_date).seconds / 3600, 2)
             EmployeeAttendanceRecords.objects.filter(id__in=ids).update(
                 end_date=end_date, work_time=work_time, actual_time=work_time
@@ -3141,7 +3137,7 @@ class AttendanceClockViewSet(ModelViewSet):
                 obj = EmployeeAttendanceRecords.objects.create(
                     user=user,
                     equip=equip,
-                    begin_date=begin_date,
+                    begin_date=time_now,
                     factory_date=date_now,
                     **data
                 )
@@ -3211,16 +3207,16 @@ class AttendanceClockViewSet(ModelViewSet):
         serializer_data = FillCardApplySerializer(apply).data
         content = {
             "title": f"{username}的补卡申请",
-            "form": [{"key": "姓名:", "value": username},
-                     {"key": "身份证号:", "value": user.id_card_num},
-                     {"key": "班组:", "value": apply.group},
-                     {"key": "班次:", "value": apply.classes},
-                     {"key": "岗位:", "value": apply.section},
-                     {"key": "机台:", "value": apply.equip},
-                     {"key": "补卡时间:", "value": serializer_data.get('bk_date')},
-                     {"key": "补卡理由:", "value": apply.desc},
-                     {"key": "处理意见:", "value": apply.handling_suggestion},
-                     {"key": "处理结果:", "value": apply.handling_result}]},
+            "form": [
+                {"key": "姓名:", "value": username},
+                {"key": "班组:", "value": apply.group},
+                {"key": "班次:", "value": apply.classes},
+                {"key": "岗位:", "value": apply.section},
+                {"key": "机台:", "value": apply.equip},
+                {"key": "补卡时间:", "value": serializer_data.get('bk_date')},
+                {"key": "补卡理由:", "value": apply.desc},
+            ],
+        }
         self.send_message(principal_obj, content)
         return Response('消息发送给审批人')
 
@@ -3230,7 +3226,7 @@ class AttendanceClockViewSet(ModelViewSet):
         user = self.request.user
         data = self.request.data
         equip_list = data.pop('equip_list', None)
-        equip = ','.join(equip_list),
+        equip = ','.join(equip_list)
         attendance_group_obj, section_list, equip_list, date_now, group_list = self.get_user_group(user)
         principal = attendance_group_obj.principal  # 考勤负责人
         apply = ApplyForExtraWork.objects.create(
@@ -3246,24 +3242,26 @@ class AttendanceClockViewSet(ModelViewSet):
         serializer_data = ApplyForExtraWorkSerializer(apply).data
         content = {
             "title": f"{user.username}的补卡申请",
-            "form": [{"key": "姓名:", "value": user.username},
-                     {"key": "身份证号:", "value": user.id_card_num},
-                     {"key": "班组:", "value": apply.group},
-                     {"key": "班次:", "value": apply.classes},
-                     {"key": "岗位:", "value": apply.section},
-                     {"key": "机台:", "value": apply.equip},
-                     {"key": "加班开始时间:", "value": serializer_data.get('begin_date')},
-                     {"key": "加班结束时间:", "value": serializer_data.get('end_date')},
-                     {"key": "加班理由:", "value": apply.desc},
-                     {"key": "处理意见:", "value": apply.handling_suggestion},
-                     {"key": "处理结果:", "value": apply.handling_result}]},
+            "form": [
+                {"key": "姓名:", "value": user.username},
+                {"key": "班组:", "value": apply.group},
+                {"key": "班次:", "value": apply.classes},
+                {"key": "岗位:", "value": apply.section},
+                {"key": "机台:", "value": apply.equip},
+                {"key": "加班开始时间:", "value": serializer_data.get('begin_date')},
+                {"key": "加班结束时间:", "value": serializer_data.get('end_date')},
+                {"key": "加班理由:", "value": apply.desc},
+            ],
+        }
         self.send_message(principal_obj, content)
         return Response('消息发送给审批人')
 
 
 @method_decorator([api_recorder], name="dispatch")
 class ReissueCardView(APIView):
+    permission_classes = (IsAuthenticated,)
     queryset = FillCardApply.objects.order_by('-id')
+    queryset2 = ApplyForExtraWork.objects.order_by('-id')
 
     def send_message(self, user, content):
         phone = user.phone_number
@@ -3272,18 +3270,43 @@ class ReissueCardView(APIView):
         ding_api.send_message([ding_uid], content)
 
     def get(self, request):
+        # 分页
+        page = self.request.query_params.get("page", 1)
+        page_size = self.request.query_params.get("page_size", 10)
+        state = self.request.query_params.get('state', 1)
+        name = self.request.query_params.get('name', None)
+        try:
+            st = (int(page) - 1) * int(page_size)
+            et = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
             data = self.queryset.filter(user=self.request.user).order_by('-id')
-            serializer = FillCardApplySerializer(data, many=True)
-            return Response({'results': serializer.data})
+            # data2 = self.queryset2.filter(user=self.request.user).order_by('-id')
+            data2 = None
         else:  # 审批补卡申请
             user = self.request.user
             group_setup = AttendanceGroupSetup.objects.filter(principal=user.username).first()
             attendance_users = group_setup.attendance_users
+            principal = group_setup.principal
             attendance_users_list = attendance_users.split(',')
+            attendance_users_list.append(principal)
+            # 列表中找出和name想象的
+            if name:
+                attendance_users_list = [user for user in attendance_users_list if name in user]
             data = self.queryset.filter(user__username__in=attendance_users_list)
-            serializer = FillCardApplySerializer(data, many=True)
-            return Response({'results': serializer.data})
+            data2 = self.queryset2.filter(user__username__in=attendance_users_list)
+        serializer = FillCardApplySerializer(data, many=True)
+        serializer2 = ApplyForExtraWorkSerializer(data2, many=True)
+        res = serializer.data + serializer2.data
+        if int(state) == 1:  # 未审批
+            res = [item for item in res if item.get('handling_result') == None]
+        elif int(state) == 2:
+            res = [item for item in res if item.get('handling_result') != None]
+        count = len(res)
+        results = sorted(list(res), key=lambda x: x['apply_date'])
+        return Response({'results': results[st:et], 'count': count})
 
     @atomic
     def post(self, request):  # 处理补卡申请
@@ -3296,16 +3319,18 @@ class ReissueCardView(APIView):
         user = obj.user
         content = {
             "title": "补卡申请",
-            "form": [{"key": "姓名:", "value": user.username},
-                     {"key": "身份证号:", "value": user.id_card_num},
-                     {"key": "班组:", "value": serializer_data.get('group')},
-                     {"key": "班次:", "value": serializer_data.get('classes')},
-                     {"key": "岗位:", "value": serializer_data.get('section')},
-                     {"key": "机台:", "value": serializer_data.get('equip')},
-                     {"key": "补卡时间:", "value": serializer_data.get('bk_date')},
-                     {"key": "补卡理由:", "value": serializer_data.get('desc')},
-                     {"key": "处理意见:", "value": serializer_data.get('handling_suggestion')},
-                     {"key": "处理结果:", "value": serializer_data.get('handling_result')}]},
+            "form": [
+                {"key": "姓名:", "value": user.username},
+                {"key": "班组:", "value": serializer_data.get('group')},
+                {"key": "班次:", "value": serializer_data.get('classes')},
+                {"key": "岗位:", "value": serializer_data.get('section')},
+                {"key": "机台:", "value": serializer_data.get('equip')},
+                {"key": "补卡时间:", "value": serializer_data.get('bk_date')},
+                {"key": "补卡理由:", "value": serializer_data.get('desc')},
+                {"key": "处理意见:", "value": serializer_data.get('handling_suggestion')},
+                {"key": "处理结果:", "value": serializer_data.get('handling_result')}
+            ],
+        }
         self.send_message(user, content)
         if data.get('handling_result'):  # 审批通过
             status = obj.status
@@ -3366,6 +3391,7 @@ class ReissueCardView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class OverTimeView(APIView):
+    permission_classes = (IsAuthenticated,)
     queryset = ApplyForExtraWork.objects.order_by('-id')
 
     def send_message(self, user, content):
@@ -3375,18 +3401,27 @@ class OverTimeView(APIView):
         ding_api.send_message([ding_uid], content)
 
     def get(self, request):
+        # 分页
+        page = self.request.query_params.get("page", 1)
+        page_size = self.request.query_params.get("page_size", 10)
+        try:
+            st = (int(page) - 1) * int(page_size)
+            et = int(page) * int(page_size)
+        except:
+            raise ValidationError("page/page_size异常，请修正后重试")
+
         if self.request.query_params.get('apply'):  # 查看自己的加班申请
             data = self.queryset.filter(user=self.request.user).order_by('-id')
-            serializer = ApplyForExtraWorkSerializer(data, many=True)
-            return Response({'results': serializer.data})
-        else:  # 审批补卡申请
+        else:  # 审批加班申请
             user = self.request.user
             group_setup = AttendanceGroupSetup.objects.filter(principal=user.username).first()
             attendance_users = group_setup.attendance_users
             attendance_users_list = attendance_users.split(',')
             data = self.queryset.filter(user__username__in=attendance_users_list)
-            serializer = ApplyForExtraWorkSerializer(data, many=True)
-            return Response({'results': serializer.data})
+        serializer = ApplyForExtraWorkSerializer(data, many=True)
+        count = len(serializer.data)
+        result = serializer.data[st:et]
+        return Response({'results': result, 'count': count})
 
     @atomic
     def post(self, request):  # 处理加班申请
@@ -3398,18 +3433,20 @@ class OverTimeView(APIView):
         serializer_data = ApplyForExtraWorkSerializer(obj).data
         user = obj.user
         content = {
-            "title": "补卡申请",
-            "form": [{"key": "姓名:", "value": user.username},
-                     {"key": "身份证号:", "value": user.id_card_num},
-                     {"key": "班组:", "value": serializer_data.get('group')},
-                     {"key": "班次:", "value": serializer_data.get('classes')},
-                     {"key": "岗位:", "value": serializer_data.get('section')},
-                     {"key": "机台:", "value": serializer_data.get('equip')},
-                     {"key": "加班开始时间:", "value": serializer_data.get('begin_date')},
-                     {"key": "加班结束时间:", "value": serializer_data.get('end_date')},
-                     {"key": "加班理由:", "value": serializer_data.get('desc')},
-                     {"key": "处理意见:", "value": serializer_data.get('handling_suggestion')},
-                     {"key": "处理结果:", "value": serializer_data.get('handling_result')}]},
+            "title": "加班申请",
+            "form": [
+                {"key": "姓名:", "value": user.username},
+                {"key": "班组:", "value": serializer_data.get('group')},
+                {"key": "班次:", "value": serializer_data.get('classes')},
+                {"key": "岗位:", "value": serializer_data.get('section')},
+                {"key": "机台:", "value": serializer_data.get('equip')},
+                {"key": "加班开始时间:", "value": serializer_data.get('begin_date')},
+                {"key": "加班结束时间:", "value": serializer_data.get('end_date')},
+                {"key": "加班理由:", "value": serializer_data.get('desc')},
+                {"key": "处理意见:", "value": serializer_data.get('handling_suggestion')},
+                {"key": "处理结果:", "value": serializer_data.get('handling_result')}
+            ],
+        }
         self.send_message(user, content)
         if data.get('handling_result'):  # 申请通过
             begin_date = obj.begin_date
@@ -3436,35 +3473,40 @@ class OverTimeView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class AttendanceRecordSearch(APIView):
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request):
         username = self.request.user.username
         detail = self.request.query_params.get("detail")
         date = self.request.query_params.get('date')
         day = self.request.query_params.get('day')
-        year, month = date.split('-')
+        year = int(date.split('-')[0])
+        month = int(date.split('-')[1])
         queryset = EmployeeAttendanceRecords.objects.filter(~Q(is_use='废弃'),
-                                                            user=self.request.user,
-                                                            end_date__isnull=False).order_by('id')
+                                                            user=self.request.user).order_by('id')
         if day:  # 当前的上下班时间
-            group_setup = AttendanceGroupSetup.objects.filter(attendance_users__icontains=username).first()
-            if queryset.filter(factory_date=f"{date}-{day}").exists():
-                begin_date = min(queryset.filter(factory_date=f"{date}-{day}").values_list('begin_date', flat=True))
-                end_date = max(queryset.filter(factory_date=f"{date}-{day}").values_list('end_date', flat=True))
-                return Response({
-                                 'work_time': round((end_date - begin_date).seconds / 3600, 2),
-                                 'attendance_type': group_setup.get_attendance_type_display(),
-                                 'attendance_st': group_setup.attendance_st,
-                                 'attendance_et': group_setup.attendance_et,
-                                 'time': [
-                                     {'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"},
-                                     {'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"}]
-                                 })
-            return Response({
+            group_setup = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
+            record =queryset.filter(factory_date=f"{date}-{day}")
+            results = {
                 'attendance_type': group_setup.get_attendance_type_display() if group_setup else None,
                 'attendance_st': group_setup.attendance_st,
                 'attendance_et': group_setup.attendance_et
-            })
+            }
+            if record:
+                begin_date = record.first().begin_date
+                end_date = record.last().end_date
+                work_time = [{'title': f"上班: {datetime.datetime.strftime(begin_date, '%Y-%m-%d %H:%M:%S')}"}]
+                if record.filter(status='换岗'):
+                    times = record.filter(status='换岗').values_list('begin_date', flat=True)
+                    if times:
+                        for t in list(set(times)):
+                            work_time.append({'title': f"换岗: {datetime.datetime.strftime(t, '%Y-%m-%d %H:%M:%S')}"})
+                if end_date:
+                    work_time.append({'title': f"下班: {datetime.datetime.strftime(end_date, '%Y-%m-%d %H:%M:%S')}"})
+                results['work_time'] = round((end_date - begin_date).seconds / 3600, 2) if end_date else  0
+                results['time'] = work_time
+                return Response(results)
+            return Response(results)
         # 汇总数据
         results = {
             'days': [],
@@ -3474,23 +3516,29 @@ class AttendanceRecordSearch(APIView):
         }
         for item in queryset.filter(factory_date__year=year, factory_date__month=month):
             day = int(str(item.factory_date).split('-')[-1])
+            record = queryset.filter(factory_date=item.factory_date)
             if day not in results.get('days'):
                 results['days'].append(day)
-                attendance_group_obj = AttendanceGroupSetup.objects.filter(attendance_users__icontains=username).first()
-                begin_date = min(queryset.filter(factory_date=item.factory_date).values_list('begin_date', flat=True))
-                end_date = max(queryset.filter(factory_date=item.factory_date).values_list('end_date', flat=True))
-                work_time = round((end_date - begin_date).seconds / 3600, 2)
+                attendance_group_obj = AttendanceGroupSetup.objects.filter(Q(attendance_users__icontains=username) | Q(principal=username)).first()
+                begin_date = record.first().begin_date
+                end_date = record.last().end_date
+                if not end_date:
+                    work_time = 0
+                else:
+                    work_time = round((end_date - begin_date).seconds / 3600, 2)
                 results['work_times'] += work_time
 
                 if begin_date > datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_st)}", '%Y-%m-%d %H:%M:%S'):
                     results['cd'] += 1
-                if end_date < datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S'):
+                if end_date and end_date < datetime.datetime.strptime(f"{str(item.factory_date)} {str(attendance_group_obj.attendance_et)}", '%Y-%m-%d %H:%M:%S'):
                     results['zt'] += 1
         if detail:
-            equip_list = queryset.values('equip', 'section').annotate(work_times=Sum('work_time')).values(
+            equip_list = queryset.filter(factory_date__year=year, factory_date__month=month
+                                         ).values('equip', 'section').annotate(work_times=Sum('work_time')).values(
                 'equip', 'section', 'work_times')
             results['equip_list'] = equip_list
-            work_detail = queryset.values('factory_date', 'classes', 'group', 'equip', 'section', 'work_time')
+            work_detail = queryset.filter(factory_date__year=year, factory_date__month=month
+                                          ).values('factory_date', 'classes', 'group', 'equip', 'section', 'work_time')
             results['work_detail'] = work_detail
         else:
             days = queryset.values('factory_date').annotate(Count('id')).count()
@@ -3503,4 +3551,5 @@ class AttendanceTimeStatisticsViewSet(ModelViewSet):
     queryset = EmployeeAttendanceRecords.objects.filter(
         Q(end_date__isnull=False) | Q(is_use='添加'))
     serializer_class = EmployeeAttendanceRecordsSerializer
+    permission_classes = (IsAuthenticated,)
 

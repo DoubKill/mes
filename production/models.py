@@ -388,7 +388,7 @@ class EmployeeAttendanceRecords(models.Model):
     begin_date = models.DateTimeField(help_text='上岗时间', null=True, blank=True)
     end_date = models.DateTimeField(help_text='下岗时间', null=True, blank=True)
     work_time = models.FloatField(help_text='计算工作时间', null=True, blank=True, default=12)
-    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True)
+    actual_time = models.FloatField(help_text='承认工作时间', null=True, blank=True, default=12)
     classes = models.CharField(help_text='班次', max_length=12, null=True, blank=True)
     group = models.CharField(help_text='班组', max_length=12, null=True, blank=True)
     equip = models.CharField(help_text='机台', max_length=12)
