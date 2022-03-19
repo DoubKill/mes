@@ -2464,6 +2464,7 @@ class WmsStorageSummaryView(APIView):
         参数：?material_name=物料名称&material_no=物料编码&zc_material_code=中策物料编码&batch_no=批次号&pdm_no=PDM号&st=入库开始时间&et=入库结束时间&quality_status=# 品质状态 1：合格 3：不合格
     """
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         factory = self.request.query_params.get('factory')  # 厂家
@@ -2667,6 +2668,7 @@ class WmsStorageView(ListAPIView):
 class WmsInventoryStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -2753,6 +2755,7 @@ class WmsInventoryStockView(APIView):
 class WmsInStockView(APIView):
     """根据当前货物外伸位地址获取内伸位数据, 参数：entrance_name=出库口名称&space_id=货位地址"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         out_space_id = self.request.query_params.get('space_id')
@@ -3064,6 +3067,7 @@ order by left_days;""".format(expire_days, material_code, quality_status)
 class WmsInventoryWeightStockView(APIView):
     """WMS库存货位信息，参数：material_name=原材料名称&material_no=原材料编号&quality_status=品质状态1合格3不合格&entrance_name=出库口名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         material_name = self.request.query_params.get('material_name')
@@ -3133,6 +3137,7 @@ class WmsInventoryWeightStockView(APIView):
 class InventoryEntranceView(APIView):
     """获取所有出库口名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         sql = 'select name, EntranceCode from t_inventory_entrance where Type=2;'
@@ -3152,6 +3157,7 @@ class InventoryEntranceView(APIView):
 class WMSMaterialGroupNameView(APIView):
     """获取所有原材料库物料组名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         sql = 'select Name from t_inventory_material_group;'
@@ -3169,6 +3175,7 @@ class WMSMaterialGroupNameView(APIView):
 class WMSTunnelView(APIView):
     """获取所有原材料库巷道名称"""
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         sql = 'select TunnelName, TunnelCode from t_inventory_tunnel;'
@@ -3188,6 +3195,7 @@ class WMSInventoryView(APIView):
     """原材料库存信息，material_name=原材料名称&material_no=原材料编号&material_group_name=物料组名称&tunnel_name=巷道名称&page=页数&page_size=每页数量"""
     DATABASE_CONF = WMS_CONF
     FILE_NAME = '原材料库存统计'
+    permission_classes = (IsAuthenticated, )
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -4527,6 +4535,7 @@ class InOutBoundSummaryView(APIView):
 
 @method_decorator([api_recorder], name="dispatch")
 class LIBRARYINVENTORYView(ListAPIView):
+    permission_classes = (IsAuthenticated, )
 
     def get_result(self, model, db, store_name, warehouse_name, location_status, **kwargs):
         # 各胶料封闭货位数据
@@ -4898,6 +4907,7 @@ class WmsInventoryMaterialViewSet(GenericAPIView):
     DB = 'wms'
     queryset = WmsInventoryMaterial.objects.all()
     serializer_class = WmsInventoryMaterialSerializer
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request, *args, **kwargs):
         queryset = WmsInventoryMaterial.objects.using(self.DB).all()
@@ -4940,6 +4950,7 @@ class WmsInventoryMaterialViewSet(GenericAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class WMSStockSummaryView(APIView):
     DATABASE_CONF = WMS_CONF
+    permission_classes = (IsAuthenticated, )
 
     def export_xls(self, result):
         response = HttpResponse(content_type='application/vnd.ms-excel')
@@ -5257,6 +5268,7 @@ class THOutTaskDetailView(WMSOutTaskDetailView):
 
 @method_decorator([api_recorder], name="dispatch")
 class WmsOutboundOrderView(APIView):
+    permission_classes = (IsAuthenticated, )
     URL = WMS_URL
     ORDER_TYPE = 1
 
@@ -5305,8 +5317,11 @@ class WmsOutboundOrderView(APIView):
                 "AllocationInventoryDetails": details
             }
         # headers = {"UserId": 75, "tenantNumber": 1}
+        MaterialOutboundOrder.objects.create(order_no=task_num,
+                                             created_username=self.request.user.username,
+                                             order_type=self.ORDER_TYPE)
         try:
-            res = requests.post(url, json=data, timeout=5)
+            res = requests.post(url, json=data, timeout=10)
         except Exception as e:
             raise ValidationError('请求出库失败，请联系管理员！')
         try:
@@ -5314,9 +5329,6 @@ class WmsOutboundOrderView(APIView):
         except Exception:
             resp = {}
         resp_status = resp.get('state')
-        MaterialOutboundOrder.objects.create(order_no=task_num,
-                                             created_username=self.request.user.username,
-                                             order_type=self.ORDER_TYPE)
         if resp_status != 1:
             raise ValidationError('出库失败：{}'.format(resp.get('msg')))
         return Response('成功')
@@ -5331,6 +5343,7 @@ class THOutboundOrderView(WmsOutboundOrderView):
 @method_decorator([api_recorder], name="dispatch")
 class WwsCancelTaskView(APIView):
     URL = WMS_URL
+    permission_classes = (IsAuthenticated, )
 
     def post(self, request):
         task_num = self.request.data.get('task_num')
@@ -5361,6 +5374,7 @@ class THCancelTaskView(WwsCancelTaskView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockView(APIView):
     DATABASE_CONF = HF_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         st = self.request.query_params.get('st')
@@ -5460,6 +5474,7 @@ class HFStockView(APIView):
 @method_decorator([api_recorder], name="dispatch")
 class HFStockDetailView(APIView):
     DATABASE_CONF = HF_CONF
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         st = self.request.query_params.get('st')  # 开始时间
