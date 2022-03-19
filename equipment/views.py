@@ -2432,7 +2432,7 @@ class EquipWarehouseLocationViewSet(ModelViewSet):
 
 @method_decorator([api_recorder], name='dispatch')
 class EquipWarehouseOrderViewSet(ModelViewSet):
-    queryset = EquipWarehouseOrder.objects.filter(delete_flag=False).order_by('-created_date')
+    queryset = EquipWarehouseOrder.objects.filter(delete_flag=False).order_by('-order_id')
     serializer_class = EquipWarehouseOrderSerializer
     permission_classes = (IsAuthenticated,)
     filter_class = EquipWarehouseOrderFilter
