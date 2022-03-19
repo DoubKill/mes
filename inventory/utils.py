@@ -11,6 +11,7 @@ import requests
 import xlwt
 import xmltodict
 from django.http import HttpResponse
+from rest_framework.exceptions import ValidationError
 from suds.client import Client
 
 
@@ -25,7 +26,10 @@ class BaseUploader(object):
             "Content-Type": "text/xml; charset=utf-8"
         }
         pay_load = pay_load.encode('utf-8')
-        resp = requests.post(self.endpoint, data=pay_load, headers=headers, timeout=5)
+        try:
+            resp = requests.post(self.endpoint, data=pay_load, headers=headers, timeout=5)
+        except Exception:
+            raise ValidationError('请求失败，请联系管理员！')
         if resp.status_code != 200:
             print(resp.text)
             raise Exception(resp.text)
