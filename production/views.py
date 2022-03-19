@@ -3280,14 +3280,15 @@ class ReissueCardView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-
+        group_setup = AttendanceGroupSetup.objects.filter(principal=self.request.user.username).first()
         if self.request.query_params.get('apply'):  # 查看自己的补卡申请
-            data = self.queryset.filter(user=self.request.user).order_by('-id')
+            user_list = [self.request.user.username]
+            if group_setup:
+                user_list += group_setup.attendance_users.split(',')
+            data = self.queryset.filter(user__username__in=user_list).order_by('-id')
             # data2 = self.queryset2.filter(user=self.request.user).order_by('-id')
             data2 = None
         else:  # 审批补卡申请
-            user = self.request.user
-            group_setup = AttendanceGroupSetup.objects.filter(principal=user.username).first()
             attendance_users = group_setup.attendance_users
             principal = group_setup.principal
             attendance_users_list = attendance_users.split(',')
@@ -3410,12 +3411,13 @@ class OverTimeView(APIView):
             et = int(page) * int(page_size)
         except:
             raise ValidationError("page/page_size异常，请修正后重试")
-
+        group_setup = AttendanceGroupSetup.objects.filter(principal=self.request.user.username).first()
         if self.request.query_params.get('apply'):  # 查看自己的加班申请
-            data = self.queryset.filter(user=self.request.user).order_by('-id')
+            user_list = [self.request.user.username]
+            if group_setup:
+                user_list += group_setup.attendance_users.split(',')
+            data = self.queryset.filter(user__username__in=user_list).order_by('-id')
         else:  # 审批加班申请
-            user = self.request.user
-            group_setup = AttendanceGroupSetup.objects.filter(principal=user.username).first()
             attendance_users = group_setup.attendance_users
             attendance_users_list = attendance_users.split(',')
             data = self.queryset.filter(user__username__in=attendance_users_list)
