@@ -11,6 +11,7 @@ import requests
 import xlwt
 import xmltodict
 from django.http import HttpResponse
+from suds.client import Client
 
 
 class BaseUploader(object):
@@ -180,3 +181,26 @@ def export_xls(field_dict, result, filename):
     output.seek(0)
     response.write(output.getvalue())
     return response
+
+
+class HFSystem(object):
+
+    def __init__(self):
+        self.url = 'http://10.4.24.25:3000/StockService?wsdl'
+        self.hf_system = Client(self.url)
+
+    def get_hf_info(self):
+        """获取烘箱信息"""
+        res = self.hf_system.service.GetOASTDetails()
+        res_json = json.loads(res)
+        if res_json.get('Result') == '0':
+            raise ValueError(res_json.get('Message'))
+        return res_json.get('OastDetails')
+
+    def manual_out_hf(self, oast_no):
+        """向wcs下发烘箱出库指令 oast_no={'OastNo': '1'}"""
+        res = self.hf_system.service.ManualOASTOutTask(json.dumps(oast_no))
+        res_json = json.loads(res)
+        if res_json.get('Result') == '0':
+            raise ValueError(res_json.get('Message'))
+        return f"{oast_no.get('OastNo')}号烘箱出库成功"

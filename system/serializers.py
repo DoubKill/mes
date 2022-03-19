@@ -11,6 +11,9 @@ from django.contrib.auth.models import Permission
 from django.db.transaction import atomic
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from rest_framework_jwt.serializers import JSONWebTokenSerializer
+from django.contrib.auth import authenticate
+from rest_framework_jwt.settings import api_settings
 
 from basics.models import Equip, WorkSchedulePlan, GlobalCode
 from mes.base_serializer import BaseModelSerializer
@@ -19,6 +22,12 @@ from plan.models import ProductClassesPlan, MaterialDemanded, ProductDayPlan
 from production.models import PlanStatus
 from recipe.models import ProductBatching, Material, ProductBatchingDetail
 from system.models import GroupExtension, User, Section
+
+
+jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER
+jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER
+jwt_decode_handler = api_settings.JWT_DECODE_HANDLER
+jwt_get_username_from_payload = api_settings.JWT_PAYLOAD_GET_USERNAME_HANDLER
 
 
 class PermissionSerializer(BaseModelSerializer):
@@ -341,3 +350,30 @@ class UserImportSerializer(BaseModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'password', 'num', 'phone_number', 'id_card_num', 'section', 'group_extensions')
+
+
+class UserLoginSerializer(JSONWebTokenSerializer):
+
+    def validate(self, attrs):
+        credentials = {
+            self.username_field: attrs.get(self.username_field),
+            'password': attrs.get('password')
+        }
+
+        if all(credentials.values()):
+            user = authenticate(**credentials)
+
+            if user:
+                if not user.is_active:
+                    raise serializers.ValidationError('该账号已被停用！')
+
+                payload = jwt_payload_handler(user)
+
+                return {
+                    'token': jwt_encode_handler(payload),
+                    'user': user
+                }
+            else:
+                raise serializers.ValidationError('用户名或密码错误！')
+        else:
+            raise serializers.ValidationError('请输入用户名和密码')

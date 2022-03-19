@@ -26,7 +26,7 @@ from system.filters import UserFilter, GroupExtensionFilter, SectionFilter
 from system.models import GroupExtension, User, Section, Permissions
 from system.serializers import GroupExtensionSerializer, GroupExtensionUpdateSerializer, UserSerializer, \
     UserUpdateSerializer, SectionSerializer, GroupUserUpdateSerializer, PlanReceiveSerializer, \
-    MaterialReceiveSerializer, UserImportSerializer
+    MaterialReceiveSerializer, UserImportSerializer, UserLoginSerializer
 
 
 @method_decorator([api_recorder], name="dispatch")
@@ -295,6 +295,7 @@ class LoginView(ObtainJSONWebToken):
     post
         登录并返回用户所有权限
     """
+    serializer_class = UserLoginSerializer
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
