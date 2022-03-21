@@ -222,31 +222,41 @@ class BatchProductBatchingVIew(APIView):
                     used_up = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid,
                                                                  material_name=material_name).last()
                     if used_up:
-                        single_material.update({'bra_code': used_up.bra_code, 'init_weight': used_up.init_weight,
-                                                'used_weight': used_up.actual_weight, 'single_need': used_up.single_need,
-                                                'scan_material': used_up.scan_material, 'unit': used_up.unit,
-                                                'adjust_left_weight': used_up.adjust_left_weight, 'id': used_up.id,
-                                                'scan_material_type': used_up.scan_material_type,
-                                                'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)
-                                                })
+                        single_material.update({
+                            'detail': [
+                                {'bra_code': used_up.bra_code, 'init_weight': used_up.init_weight,
+                                 'used_weight': used_up.actual_weight, 'single_need': used_up.single_need,
+                                 'scan_material': used_up.scan_material, 'unit': used_up.unit,
+                                 'adjust_left_weight': used_up.adjust_left_weight, 'id': used_up.id,
+                                 'scan_material_type': used_up.scan_material_type,
+                                 'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)
+                                 }
+                            ]
+                        })
                     else:
-                        single_material.update(
-                            {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0,
-                             'scan_material': ''})
+                        single_material.update({
+                            'detail': [
+                                {'bra_code': '', 'init_weight': 0, 'used_weight': 0, 'adjust_left_weight': 0, 'scan_material': ''}
+                            ]
+                        })
                     res.append(single_material)
                     continue
             # 全部完成进料
-            single_material.update({'bra_code': load_data['bra_code'], 'init_weight': load_data['init_weight'],
-                                    'used_weight': load_data['actual_weight'], 'single_need': load_data['single_need'],
-                                    'scan_material': load_data['scan_material'], 'unit': load_data['unit'],
-                                    'scan_material_type': load_data['scan_material_type'],
-                                    'adjust_left_weight': load_data['adjust_left_weight'], 'id': load_data['id']
-                                    })
+            single_material.update({
+                'detail': [
+                    {'bra_code': load_data['bra_code'], 'init_weight': load_data['init_weight'],
+                     'used_weight': load_data['actual_weight'], 'single_need': load_data['single_need'],
+                     'scan_material': load_data['scan_material'], 'unit': load_data['unit'],
+                     'scan_material_type': load_data['scan_material_type'], 'msg': '',
+                     'adjust_left_weight': load_data['adjust_left_weight'], 'id': load_data['id']
+                     }
+                ]
+            })
             # 判断物料是否够一车
             left = LoadTankMaterialLog.objects.filter(plan_classes_uid=plan_classes_uid, material_name=material_name) \
                 .aggregate(left_weight=Sum('real_weight'))['left_weight']
             if left < load_data['single_need']:
-                single_material.update({'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
+                single_material['detail'][0].update({'msg': '物料：{}不足, 请扫码添加物料'.format(material_name)})
             res.append(single_material)
         return Response(res)
 
@@ -850,7 +860,7 @@ class WeightPackageManualViewSet(ModelViewSet):
     def list(self, request, *args, **kwargs):
         history = self.request.query_params.get('history')
         product_no = self.request.query_params.get('product_no')
-        flag = self.request.query_params.get('flag')  # 1 失效 2 过期
+        print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         if history:
             res = {}
             last_instance = self.get_queryset().filter(product_no=product_no).last()
@@ -859,10 +869,10 @@ class WeightPackageManualViewSet(ModelViewSet):
                             'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
             return Response(res)
         queryset = self.filter_queryset(self.get_queryset())
-        if flag == '1':
+        if print_flag == '2':
             bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MM').values_list('bra_code', flat=True).distinct())
             queryset = queryset.filter(bra_code__in=bra_codes)
-        elif flag == '2':
+        elif print_flag == '3':
             now_time = datetime.datetime.now()
             queryset = queryset.filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
                                          Q(product_no__icontains='RE'), created_date__lt=now_time - timedelta(days=5)) |
@@ -909,7 +919,7 @@ class WeightPackageSingleViewSet(ModelViewSet):
         history = self.request.query_params.get('history')
         product_batching_id = self.request.query_params.get('product_batching')
         product_no = self.request.query_params.get('product_no')
-        flag = self.request.query_params.get('flag')  # 1 失效 2 过期
+        print_flag = self.request.query_params.get('print_flag')  # 2 失效 3 过期
         material_name = self.request.query_params.get('material_name')
         if history:
             res = {}
@@ -931,10 +941,10 @@ class WeightPackageSingleViewSet(ModelViewSet):
             return Response(history_weight)
         else:
             queryset = self.filter_queryset(self.get_queryset())
-            if flag == '1':
+            if print_flag == '2':
                 bra_codes = list(LoadTankMaterialLog.objects.filter(bra_code__startswith='MC').values_list('bra_code', flat=True).distinct())
                 queryset = queryset.filter(bra_code__in=bra_codes)
-            elif flag == '2':
+            elif print_flag == '3':
                 now_time = datetime.datetime.now()
                 queryset = queryset.filter(Q(Q(product_no__icontains='FM') | Q(product_no__icontains='RFM') |
                                              Q(product_no__icontains='RE'),
@@ -1215,6 +1225,17 @@ class BatchChargeLogListViewSet(ListAPIView):
         if created_username:
             queryset = queryset.filter(created_username__icontains=created_username)
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @method_decorator([api_recorder], name="dispatch")
