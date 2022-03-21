@@ -4728,10 +4728,10 @@ class LIBRARYINVENTORYView(ListAPIView):
             return self.export_xls(result)
 
         if warehouse_name == '终炼胶库':
-            total_goods_num = 1428
+            total_goods_num = 1952
             used_goods_num = BzFinalMixingRubberInventoryLB.objects.using('lb').filter(store_name='炼胶库').count()
         elif warehouse_name == '混炼胶库':
-            total_goods_num = 1952
+            total_goods_num = 1428
             used_goods_num = BzFinalMixingRubberInventory.objects.using('bz').all().count()
         else:
             total_goods_num = 1428 + 1952
