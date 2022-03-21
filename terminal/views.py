@@ -1811,6 +1811,8 @@ class UpdateFlagCountView(APIView):
                 materials = RecipeMaterial.objects.using(equip_no).filter(recipe_name=f_instance.name)
                 for material in materials:
                     new_weight = round(material.weight * f_instance.split_count / split_count, 3)
+                    if new_weight >= 100:  # 数据库最大只能5位，其中3位为小数
+                        raise ValidationError('物料重量过大,无法修改')
                     material.weight = new_weight
                     material.error = get_tolerance(batching_equip=equip_no, standard_weight=new_weight, only_num=True)
                     material.time = now_time
