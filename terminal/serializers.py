@@ -1065,9 +1065,9 @@ class WeightPackageLogSerializer(BaseModelSerializer):
                     product_batching__stage_product_batch_no=product_no_dev, product_batching__dev_type__category_name=res['dev_type'])
                 for j in batch_info:
                     batch_info_res.append({
-                        'material_type': j.material.material_type, 'handle_material_name': j.handle_material_name,
-                        'weight': j.cnt_type_detail_equip.actual_weight if j.cnt_type_detail_equip else j.batching_detail_equip.standard_weight,
-                        'error': j.cnt_type_detail_equip.standard_error if j.cnt_type_detail_equip else j.batching_detail_equip.standard_error,
+                        'material_type': j.material.material_type.global_name, 'handle_material_name': j.handle_material_name,
+                        'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
+                        'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                     })
                 res.update({'display_manual_info': list(batch_info_res)})
             else:
@@ -1447,7 +1447,7 @@ class PlanSerializer(serializers.ModelSerializer):
         mes_machine_weight = mes_recipe.aggregate(weight=Sum('cnt_type_detail_equip__standard_weight'))['weight']
         if not mes_machine_weight:
             raise serializers.ValidationError('获取mes设置重量失败, 无法比较重量')
-        if recipe_obj.weight != mes_machine_weight:
+        if recipe_obj.weight * recipe_obj.split_count != mes_machine_weight:
             raise serializers.ValidationError(f'称量配方重量: {recipe_obj.weight}与mes配方不一致: {round(mes_machine_weight, 3)}')
         last_group_plan = Plan.objects.using(equip_no).filter(date_time=validated_data['date_time'],
                                                               grouptime=validated_data['grouptime']

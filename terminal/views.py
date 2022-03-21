@@ -492,7 +492,6 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         equip_no = self.request.query_params.get('equip_no', 'F01')
         product_no = self.request.query_params.get('product_no')
         status = self.request.query_params.get('status', 'all')
-        expire_flag = self.request.query_params.get('expire_flag')
         now_date = datetime.datetime.now().replace(microsecond=0)
         exp_time = 7 if equip_no.startswith('F') else 5
         s_time, e_time = now_date.date() - timedelta(days=exp_time), now_date.date()
@@ -584,7 +583,7 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
         else:
             weight_filter_kwargs.update({'status': status})
             already_print = self.get_queryset().filter(**weight_filter_kwargs)
-            if expire_flag:
+            if status.endswith('E'):
                 bra_codes = list(LoadTankMaterialLog.objects.filter(scan_material_type__in=['人工配', '机配', '细料', '硫磺']).values_list('bra_code', flat=True).distinct())
                 already_print = self.get_queryset().filter(**weight_filter_kwargs).filter(bra_code__in=bra_codes)
             for k in already_print:
@@ -816,15 +815,12 @@ class WeightPackageLogViewSet(TerminalCreateAPIView,
                 ~Q(Q(feeding_mode__startswith='C') | Q(feeding_mode__startswith='P')),
                 ~Q(handle_material_name__in=machine_materials), is_used=True, type=4, equip_no=ml_equip_no,
                 product_batching__stage_product_batch_no=product_no_dev,
-                product_batching__dev_type__category_name=dev_type) \
-                .annotate(weight=F('cnt_type_detail_equip__standard_weight'),
-                          error=F('cnt_type_detail_equip__standard_error')) \
-                .values('handle_material_name', 'weight', 'error')
+                product_batching__dev_type__category_name=dev_type)
             for j in batch_info:
                 batch_info_res.append({
-                    'material_type': j.material.material_type, 'handle_material_name': j.handle_material_name,
-                    'weight': j.cnt_type_detail_equip.actual_weight if j.cnt_type_detail_equip else j.batching_detail_equip.standard_weight,
-                    'error': j.cnt_type_detail_equip.standard_error if j.cnt_type_detail_equip else j.batching_detail_equip.standard_error,
+                    'material_type': j.material.material_type.global_name, 'handle_material_name': j.handle_material_name,
+                    'weight': j.batching_detail_equip.actual_weight if j.batching_detail_equip else j.cnt_type_detail_equip.standard_weight,
+                    'error': j.batching_detail_equip.standard_error if j.batching_detail_equip else j.cnt_type_detail_equip.standard_error,
                 })
             i.update({'display_manual_info': list(batch_info_res)})
         # 公差查询
