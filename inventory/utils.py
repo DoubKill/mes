@@ -11,6 +11,8 @@ import requests
 import xlwt
 import xmltodict
 from django.http import HttpResponse
+from rest_framework.exceptions import ValidationError
+from suds.client import Client
 
 
 class BaseUploader(object):
@@ -24,7 +26,10 @@ class BaseUploader(object):
             "Content-Type": "text/xml; charset=utf-8"
         }
         pay_load = pay_load.encode('utf-8')
-        resp = requests.post(self.endpoint, data=pay_load, headers=headers, timeout=5)
+        try:
+            resp = requests.post(self.endpoint, data=pay_load, headers=headers, timeout=5)
+        except Exception:
+            raise ValidationError('请求失败，请联系管理员！')
         if resp.status_code != 200:
             print(resp.text)
             raise Exception(resp.text)
@@ -180,3 +185,26 @@ def export_xls(field_dict, result, filename):
     output.seek(0)
     response.write(output.getvalue())
     return response
+
+
+class HFSystem(object):
+
+    def __init__(self):
+        self.url = 'http://10.4.24.25:3000/StockService?wsdl'
+        self.hf_system = Client(self.url)
+
+    def get_hf_info(self):
+        """获取烘箱信息"""
+        res = self.hf_system.service.GetOASTDetails()
+        res_json = json.loads(res)
+        if res_json.get('Result') == '0':
+            raise ValueError(res_json.get('Message'))
+        return res_json.get('OastDetails')
+
+    def manual_out_hf(self, oast_no):
+        """向wcs下发烘箱出库指令 oast_no={'OastNo': '1'}"""
+        res = self.hf_system.service.ManualOASTOutTask(json.dumps(oast_no))
+        res_json = json.loads(res)
+        if res_json.get('Result') == '0':
+            raise ValueError(res_json.get('Message'))
+        return f"{oast_no.get('OastNo')}号烘箱出库成功"

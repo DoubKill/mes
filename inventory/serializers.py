@@ -26,7 +26,7 @@ from .models import MaterialInventory, BzFinalMixingRubberInventory, WmsInventor
     DeliveryPlanFinal, MixGumOutInventoryLog, MixGumInInventoryLog, MaterialOutPlan, BzFinalMixingRubberInventoryLB, \
     BarcodeQuality, CarbonOutPlan, MixinRubberyOutBoundOrder, FinalRubberyOutBoundOrder, Depot, DepotSite, DepotPallt, \
     SulfurDepotSite, Sulfur, SulfurDepot, OutBoundDeliveryOrder, OutBoundDeliveryOrderDetail, WMSMaterialSafetySettings, \
-    WmsNucleinManagement, MaterialOutHistoryOther, MaterialOutHistory, MaterialOutboundOrder
+    WmsNucleinManagement, WMSExceptHandle, MaterialOutboundOrder, MaterialOutHistoryOther, MaterialOutHistory
 
 from inventory.models import DeliveryPlan, DeliveryPlanStatus, InventoryLog, MaterialInventory
 from inventory.utils import OUTWORKUploader, OUTWORKUploaderLB, wms_out
@@ -1822,12 +1822,23 @@ class WmsNucleinManagementSerializer(BaseModelSerializer):
         read_only_fields = COMMON_READ_ONLY_FIELDS
 
 
+class WMSExceptHandleSerializer(BaseModelSerializer):
+
+    class Meta:
+        model = WMSExceptHandle
+        fields = '__all__'
+        read_only_fields = COMMON_READ_ONLY_FIELDS
+
+
 class MaterialOutHistoryOtherSerializer(serializers.ModelSerializer):
     initiator = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
+        db = self.context['db']
+        order_type = 1 if db == 'wms' else 2
         if obj.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no).first()
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.order_no,
+                                                         order_type=order_type).first()
             if order:
                 return order.created_username
             return obj.initiator
@@ -1847,8 +1858,11 @@ class MaterialOutHistorySerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
 
     def get_initiator(self, obj):
+        db = self.context['db']
+        order_type = 1 if db == 'wms' else 2
         if obj.task.initiator == 'MES':
-            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no).first()
+            order = MaterialOutboundOrder.objects.filter(order_no=obj.task.order_no,
+                                                         order_type=order_type).first()
             if order:
                 return order.created_username
             return obj.task.initiator
