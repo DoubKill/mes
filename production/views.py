@@ -2478,18 +2478,18 @@ class EmployeeAttendanceRecordsExport(ViewSet):
             sheet.write_merge(1, 1, 2 * (i + 1), 2 * (i + 1), group_list[i][0], style)
             sheet.write_merge(1, 1, 2 * (i + 1) + 1, 2 * (i + 1) + 1, group_list[i][1], style)
         index = 2
-        for i in equip_list:
-            sheet.write_merge(index, index, 0, 0, i['equip_no'], style)
-            for section in section_list:
-                if i['equip_no'].startswith('Z') and section['type'] == '密炼':
-                    sheet.write_merge(index, index, 1, 1, section['name'], style)
-                    index += 1
-                if i['equip_no'].startswith('S') and section['type'] == '硫磺称量':
-                    sheet.write_merge(index, index, 1, 1, section['name'], style)
-                    index += 1
-                if i['equip_no'].startswith('F') and section['type'] == '细料称量':
-                    sheet.write_merge(index, index, 1, 1, section['name'], style)
-                    index += 1
+        # for i in equip_list:
+        #     sheet.write_merge(index, index, 0, 0, i['equip_no'], style)
+        #     for section in section_list:
+        #         if i['equip_no'].startswith('Z') and section['type'] == '密炼':
+        #             sheet.write_merge(index, index, 1, 1, section['name'], style)
+        #             index += 1
+        #         if i['equip_no'].startswith('S') and section['type'] == '硫磺称量':
+        #             sheet.write_merge(index, index, 1, 1, section['name'], style)
+        #             index += 1
+        #         if i['equip_no'].startswith('F') and section['type'] == '细料称量':
+        #             sheet.write_merge(index, index, 1, 1, section['name'], style)
+        #             index += 1
 
                 # 从几个开始 （）
             # index = (list(equip_list).index(i) + 1) * 4      :  4,  8, 12
