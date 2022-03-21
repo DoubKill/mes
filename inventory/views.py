@@ -452,6 +452,7 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
         batch_no = self.request.query_params.get("batch_no")
         l_batch_no = self.request.query_params.get("l_batch_no")
         is_entering = self.request.query_params.get("is_entering")
+        tunnel = self.request.query_params.get("tunnel")
         if location:
             filter_dict.update(location__icontains=location)
         if material_no:
@@ -469,6 +470,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(start_time__gte=start_time)
             if end_time:
                 filter_dict.update(start_time__lte=end_time)
+            if tunnel:
+                filter_dict.update(location__startswith='{}-'.format(tunnel))
             if order_type == "出库":
                 if self.request.query_params.get("type") == "正常出库":
                     actual_type = "生产出库"
@@ -491,6 +494,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(start_time__gte=start_time)
             if end_time:
                 filter_dict.update(start_time__lte=end_time)
+            if tunnel:
+                filter_dict.update(location__startswith='{}-'.format(tunnel))
             if order_type == "出库":
                 if self.request.query_params.get("type") == "正常出库":
                     actual_type = "生产出库"
@@ -549,6 +554,8 @@ class InventoryLogViewSet(viewsets.ReadOnlyModelViewSet):
                 filter_dict.update(batch_no=batch_no)
             if l_batch_no:
                 filter_dict.update(batch_no__icontains=l_batch_no)
+            if tunnel:
+                filter_dict['location__startswith'] = 'ZCM-{}'.format(tunnel)
             if is_entering:
                 if is_entering == 'Y':
                     queryset = queryset.filter(pallet_no__startswith=5)
@@ -3971,6 +3978,7 @@ class BzMixingRubberInventory(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class BzMixingRubberInventorySummary(APIView):
     """根据出库口获取混炼胶库存统计列表。参数：quality_status=品质状态&station=出库口名称&location_status=货位状态&lot_existed="""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         params = request.query_params
@@ -4175,6 +4183,7 @@ class BzFinalRubberInventory(ListAPIView):
 @method_decorator([api_recorder], name="dispatch")
 class BzFinalRubberInventorySummary(APIView):
     """终炼胶库存、帘布库库存统计列表。参数：quality_status=品质状态&location_status=货位状态&store_name=炼胶库/帘布库&lot_existed=有无收皮条码"""
+    permission_classes = (IsAuthenticated, )
 
     def get(self, request):
         params = request.query_params
@@ -4255,6 +4264,7 @@ class OutBoundTasksListView(ListAPIView):
         根据出库口过滤混炼、终炼出库任务列表，参数：warehouse_name=混炼胶库/终炼胶库&station_id=出库口id
     """
     serializer_class = OutBoundTasksSerializer
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         warehouse_name = self.request.query_params.get('warehouse_name')  # 库存名称
@@ -4752,6 +4762,7 @@ class OutBoundDeliveryOrderViewSet(ModelViewSet):
     serializer_class = OutBoundDeliveryOrderSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderFilter
+    permission_classes = (IsAuthenticated, )
 
     @action(methods=['get'], detail=False, permission_classes=[], url_path='export',
             url_name='export')
@@ -4803,6 +4814,7 @@ class OutBoundDeliveryOrderDetailViewSet(ModelViewSet):
     serializer_class = OutBoundDeliveryOrderDetailSerializer
     filter_backends = (DjangoFilterBackend,)
     filter_class = OutBoundDeliveryOrderDetailFilter
+    permission_classes = (IsAuthenticated, )
 
     def get_queryset(self):
         queryset = self.queryset

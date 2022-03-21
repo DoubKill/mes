@@ -808,10 +808,19 @@ class InventoryLogSerializer(serializers.ModelSerializer):
     product_info = serializers.SerializerMethodField(read_only=True)
     inout_num_type = serializers.SerializerMethodField(read_only=True)
     fin_time = serializers.SerializerMethodField(read_only=True)
+    initiator = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = InventoryLog
         fields = "__all__"
+
+    def get_initiator(self, obj):
+        if hasattr(obj, 'initiator'):
+            task = OutBoundDeliveryOrderDetail.objects.filter(order_no=obj.order_no).first()
+            if task:
+                return task.created_user.username
+            return obj.initiator
+        return None
 
     def get_inout_num_type(self, obj):
         if obj.inout_num_type == "快检出库":
@@ -1736,6 +1745,7 @@ class OutBoundDeliveryOrderDetailSerializer(BaseModelSerializer):
                                           datetime.datetime.now().date().strftime('%Y%m%d'),
                                           ordering)
             validated_data['order_no'] = order_no
+            validated_data['created_user'] = self.context['request'].user
             try:
                 instance = OutBoundDeliveryOrderDetail.objects.create(**validated_data)
                 break
