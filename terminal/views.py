@@ -855,7 +855,7 @@ class WeightPackageManualViewSet(ModelViewSet):
             res = {}
             last_instance = self.get_queryset().filter(product_no=product_no).last()
             if last_instance:
-                res.update({'equip_no': last_instance.equip_no, 'split_count': last_instance.split_count,
+                res.update({'batching_equip': last_instance.batching_equip, 'split_num': last_instance.split_num,
                             'package_count': last_instance.package_count, 'print_count': last_instance.print_count})
             return Response(res)
         queryset = self.filter_queryset(self.get_queryset())
@@ -913,11 +913,10 @@ class WeightPackageSingleViewSet(ModelViewSet):
         material_name = self.request.query_params.get('material_name')
         if history:
             res = {}
-            last_instance = self.get_queryset().filter(product_no=product_no).last()
+            last_instance = self.get_queryset().filter(product_no=product_no, batching_type='配方').last()
             if not last_instance:
                 return Response(res)
-            recipe_manual = ProductBatchingEquip.objects.filter(Q(Q(Q(feeding_mode__startswith='R') | Q(is_manual=True)) |
-                                                                  Q(~Q(type=1), feeding_mode__startswith='P')),
+            recipe_manual = ProductBatchingEquip.objects.filter(Q(feeding_mode__startswith='R') | Q(is_manual=True) | Q(~Q(type=1), feeding_mode__startswith='P'),
                                                                 product_batching_id=product_batching_id,
                                                                 material__material_name=last_instance.material_name)
             if not recipe_manual:
@@ -1189,12 +1188,13 @@ class BatchChargeLogListViewSet(ListAPIView):
         plan_classes_uid = self.request.query_params.get('plan_classes_uid')
         production_factory_date = self.request.query_params.get('production_factory_date')
         equip_no = self.request.query_params.get('equip_no')
+        trains = self.request.query_params.get('trains')
         production_classes = self.request.query_params.get('production_classes')
         material_no = self.request.query_params.get('material_no')
         bra_code = self.request.query_params.get('bra_code')
         created_username = self.request.query_params.get('created_username')
         if plan_classes_uid:
-            queryset = queryset.filter(feed_log__plan_classes_uid=plan_classes_uid)
+            queryset = queryset.filter(feed_log__plan_classes_uid__icontains=plan_classes_uid)
         if production_factory_date:
             queryset = queryset.filter(feed_log__production_factory_date=production_factory_date)
         if equip_no:
@@ -1210,6 +1210,8 @@ class BatchChargeLogListViewSet(ListAPIView):
                 queryset = queryset.exclude(feed_log__product_no__icontains="FM").all()
         if bra_code:
             queryset = queryset.filter(bra_code__icontains=bra_code)
+        if trains:
+            queryset = queryset.filter(feed_log__trains__icontains=trains)
         if created_username:
             queryset = queryset.filter(created_username__icontains=created_username)
         return queryset
@@ -2804,14 +2806,11 @@ class ApplyHaltEquipView(APIView):
     permission_classes = (IsAuthenticated, )
 
     def get(self, request):
-        res = {}
+        res = []
         halt_types = EquipMachineHaltType.objects.filter(use_flag=True)
         for i in halt_types:
             halt_reasons = list(i.equipmachinehaltreason_set.filter(use_flag=True).values('machine_halt_reason_name'))
-            if i.machine_halt_type_name in res:
-                res[i.machine_halt_type_name] += halt_reasons
-            else:
-                res[i.machine_halt_type_name] = halt_reasons
+            res.append({'halt_type': i.machine_halt_type_name, 'halt_reasons': halt_reasons})
         return Response(res)
 
     @atomic

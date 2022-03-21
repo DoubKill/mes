@@ -578,6 +578,8 @@ class ProductBatchingUpdateSerializer(ProductBatchingRetrieveSerializer):
             else:
                 ready_data.update({'product_batching': instance})
                 ProductBatchingMixed.objects.create(**ready_data)
+        else:  # 清除对搭设置
+            ProductBatchingMixed.objects.filter(product_batching=instance).delete()
         for cnt_type_instance in instance.weight_cnt_types.filter(delete_flag=False):
             if not cnt_type_instance.weight_details.filter(delete_flag=False).exists():
                 cnt_type_instance.delete_flag = True

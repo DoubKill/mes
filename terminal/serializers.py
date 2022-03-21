@@ -1190,7 +1190,7 @@ class WeightPackageManualSerializer(BaseModelSerializer):
 
 class WeightPackageSingleSerializer(BaseModelSerializer):
     dev_type_name = serializers.ReadOnlyField(source='dev_type.category_name', help_text='机型名称')
-    feeding_mode = serializers.CharField(help_text='物料的投料方式:R 不需要打条码', write_only=True)
+    feeding_mode = serializers.CharField(help_text='物料的投料方式:R 不需要打条码', write_only=True, default='P')
 
     def to_representation(self, instance):
         res = super().to_representation(instance)
@@ -1200,7 +1200,7 @@ class WeightPackageSingleSerializer(BaseModelSerializer):
 
     @atomic
     def create(self, validated_data):
-        feeding_mode = validated_data.pop('feeding_mode', 'P')
+        feeding_mode = validated_data.pop('feeding_mode')
         map_list = {"早班": '1', "中班": '2', "夜班": '3'}
         now_date = datetime.now().replace(microsecond=0)
         material_name, single_weight, split_num = validated_data.get('material_name'), validated_data.get('single_weight'), validated_data.get('split_num')
@@ -1361,6 +1361,7 @@ class LoadMaterialLogListSerializer(serializers.ModelSerializer):
     production_factory_date = serializers.ReadOnlyField(source='feed_log.production_factory_date')
     production_classes = serializers.ReadOnlyField(source='feed_log.production_classes')
     equip_no = serializers.ReadOnlyField(source='feed_log.equip_no')
+    plan_classes_uid = serializers.ReadOnlyField(source='feed_log.plan_classes_uid')
 
     def get_mixing_finished(self, obj):
         product_no = obj.feed_log.product_no
